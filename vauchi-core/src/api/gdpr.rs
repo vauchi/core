@@ -313,8 +313,17 @@ pub fn export_encrypted(
     storage: &Storage,
     password: &str,
 ) -> Result<Vec<u8>, crate::storage::StorageError> {
-    let export = export_all_data(storage)?;
-    let json = serde_json::to_string(&export)
+    encrypt_export(&export_all_data(storage)?, password)
+}
+
+/// Encrypts an already assembled export under `password`, in the format
+/// [`import_encrypted`] reads. `Vauchi::export_personal_data_encrypted`
+/// passes the auth-mode-aware export through here (private#616).
+pub fn encrypt_export(
+    export: &GdprExport,
+    password: &str,
+) -> Result<Vec<u8>, crate::storage::StorageError> {
+    let json = serde_json::to_string(export)
         .map_err(|e| crate::storage::StorageError::Serialization(e.to_string()))?;
 
     let salt: [u8; GDPR_SALT_LEN] = crate::crypto::random_bytes();

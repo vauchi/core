@@ -124,8 +124,8 @@ pub use consent::{ConsentManager, ConsentRecord, ConsentStatus, ConsentType};
 
 // GDPR
 pub use gdpr::{
-    GDPR_EXPORT_VERSION, GDPR_SALT_LEN, GdprExport, export_all_data, export_encrypted,
-    import_encrypted,
+    GDPR_EXPORT_VERSION, GDPR_SALT_LEN, GdprExport, encrypt_export, export_all_data,
+    export_encrypted, import_encrypted,
 };
 
 // Paper heirloom (private#363)

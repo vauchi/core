@@ -6,7 +6,7 @@
 
 use super::super::error::VauchiResult;
 use super::{AuthMode, Vauchi};
-use crate::api::gdpr::{GdprExport, export_all_data, export_for_contacts};
+use crate::api::gdpr::{GdprExport, encrypt_export, export_all_data, export_for_contacts};
 
 impl Vauchi {
     /// Exports the user's personal data. Like every other read it follows
@@ -18,5 +18,12 @@ impl Vauchi {
             return Ok(export_for_contacts(&self.storage, &decoys, false)?);
         }
         Ok(export_all_data(&self.storage)?)
+    }
+
+    /// [`Vauchi::export_personal_data`], encrypted under `password`. The free
+    /// `export_encrypted(storage, ...)` reads the real store whatever the
+    /// auth mode; this follows it (private#616).
+    pub fn export_personal_data_encrypted(&self, password: &str) -> VauchiResult<Vec<u8>> {
+        Ok(encrypt_export(&self.export_personal_data()?, password)?)
     }
 }

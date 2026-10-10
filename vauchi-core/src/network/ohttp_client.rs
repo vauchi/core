@@ -18,7 +18,7 @@ use super::error::NetworkError;
 /// fresh encrypted request and a [`ResponseDecryptor`] that must be used to
 /// decrypt the corresponding response.
 pub struct OhttpClient {
-    /// Encoded key config bytes (fetched from `GET /v2/ohttp-key`).
+    /// Encoded key config bytes (from the gateway's signed key record).
     encoded_config: Vec<u8>,
 }
 
@@ -33,8 +33,8 @@ pub struct ResponseDecryptor {
 impl OhttpClient {
     /// Create a client from the encoded key config bytes.
     ///
-    /// The bytes are typically fetched from `GET /v2/ohttp-key` (content-type
-    /// `application/ohttp-keys`).
+    /// The bytes are the `key_config` of a signed record from
+    /// `GET /v2/ohttp-key-signed`, once its anchor has accepted it.
     pub fn new(encoded_config: Vec<u8>) -> Result<Self, NetworkError> {
         // Validate the config is parseable at construction time so we fail
         // early rather than on every request.

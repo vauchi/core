@@ -240,10 +240,6 @@ fn test_ohttp_config_defaults() {
     use vauchi_core::api::OhttpConfig;
 
     let cfg = OhttpConfig::default();
-    assert_eq!(
-        cfg.key_ttl_secs, 43200,
-        "default key_ttl_secs must be 43200 (12 h)"
-    );
     assert!(
         !cfg.allow_direct,
         "allow_direct must be false in production defaults"

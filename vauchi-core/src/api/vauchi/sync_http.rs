@@ -93,20 +93,16 @@ impl Vauchi {
         // send-phase swallow).
         let first = self.sync_inner();
         if should_refetch_key_and_retry(&first) {
-            // Key is stale — evict cache, re-resolve (fetch), retry
-            // once. best-effort: if clear fails the next sync cycle hits the
-            // same stale-key error and retries this same path.
+            // The held key was just refused: only a new signed record helps.
             let relay_url = self.http_relay_url();
-            #[allow(clippy::let_underscore_must_use)]
-            let _ = self.storage.ohttp_cache().clear_ohttp_key(&relay_url);
-            let key_bytes = match self.config.relay.ohttp_trust_anchor() {
-                // The held key was just refused: only a new signed record helps.
-                Some(anchor) => {
-                    self.resolve_signed_ohttp_key(&relay_url, &anchor, true)?
-                        .key_config
-                }
-                None => self.resolve_ohttp_key(&relay_url)?,
-            };
+            let anchor = self
+                .config
+                .relay
+                .ohttp_trust_anchor()
+                .ok_or_else(no_ohttp_anchor_error)?;
+            let key_bytes = self
+                .resolve_signed_ohttp_key(&relay_url, &anchor, true)?
+                .key_config;
             let client = OhttpClient::new(key_bytes).map_err(VauchiError::Network)?;
             self.ohttp_key = Some(client);
 
@@ -744,43 +740,18 @@ impl Vauchi {
         self.last_sync_unix_seconds = Some(self.clock.unix_seconds());
     }
 
-    /// Resolve the OHTTP key: the relay's signed key when it has an anchor
-    /// (#288); otherwise the storage cache within its TTL, else a fetch
-    /// through the outer relay (or directly when `allow_direct`). No key is
-    /// compiled in (plan 6.7).
+    /// Resolve the OHTTP key: only ever the relay's signed key, so a relay
+    /// without an anchor gets none (#288 plan 7.5 retired the unsigned
+    /// `/v2/ohttp-key`). No key is compiled in (plan 6.7).
     fn resolve_ohttp_key(&self, relay_url: &str) -> VauchiResult<Vec<u8>> {
-        if let Some(anchor) = self.config.relay.ohttp_trust_anchor() {
-            return Ok(self
-                .resolve_signed_ohttp_key(relay_url, &anchor, false)?
-                .key_config);
-        }
-        // 1. Try loading from cache — use if still within TTL
-        if let Some((cached_bytes, fetched_at)) =
-            self.storage.ohttp_cache().load_ohttp_key(relay_url)?
-            && self.is_ohttp_key_fresh(fetched_at)
-        {
-            if OhttpClient::new(cached_bytes.clone()).is_ok() {
-                return Ok(cached_bytes);
-            }
-            self.storage.ohttp_cache().clear_ohttp_key(relay_url)?;
-        }
-
-        // 2. Fetch the live key when permitted: allow_direct (dev), or the
-        //    OHTTP endpoint is a distinct IP-stripping relay (so the fetch
-        //    doesn't leak IP to the data relay; problem
-        //    2026-05-25-relay-ohttp-forward-hop-502).
-        let via_ohttp_relay = self.distinct_ohttp_route().is_some();
-        if (self.config.ohttp.allow_direct || via_ohttp_relay)
-            && let Ok(fetched) = self.fetch_and_cache_ohttp_key(relay_url)
-        {
-            return Ok(fetched);
-        }
-
-        Err(VauchiError::Network(
-            crate::network::NetworkError::ConnectionFailed(
-                "no OHTTP key available: cache expired, fetch failed/disabled".into(),
-            ),
-        ))
+        let anchor = self
+            .config
+            .relay
+            .ohttp_trust_anchor()
+            .ok_or_else(no_ohttp_anchor_error)?;
+        Ok(self
+            .resolve_signed_ohttp_key(relay_url, &anchor, false)?
+            .key_config)
     }
 
     /// The key of a relay with an OHTTP anchor (#288): only ever from a
@@ -907,24 +878,6 @@ impl Vauchi {
             .ok()
             .flatten()
             .filter(|held| gateway_still_holds(held.window, current))
-    }
-
-    /// Check whether a cached OHTTP key is still within its TTL.
-    fn is_ohttp_key_fresh(&self, fetched_at_epoch_secs: u64) -> bool {
-        let now = self.clock.unix_seconds();
-        let age = now.saturating_sub(fetched_at_epoch_secs);
-        age < self.config.ohttp.key_ttl_secs
-    }
-
-    /// Fetch a fresh OHTTP key from the relay and cache it in storage.
-    fn fetch_and_cache_ohttp_key(&self, relay_url: &str) -> VauchiResult<Vec<u8>> {
-        let transport = self.create_bootstrap_transport_direct();
-        let key_bytes = transport.fetch_ohttp_key().map_err(VauchiError::Network)?;
-        OhttpClient::new(key_bytes.clone()).map_err(VauchiError::Network)?;
-        self.storage
-            .ohttp_cache()
-            .save_ohttp_key(relay_url, &key_bytes)?;
-        Ok(key_bytes)
     }
 
     /// Resolve the effective certificate pin set for the relay.
@@ -1077,9 +1030,9 @@ impl Vauchi {
     /// parameter is retained for patch-compatible Rust consumers and checked
     /// against the configured application origin. Construction performs
     /// no network I/O: it uses the relay's held signed key when it has an
-    /// anchor, otherwise the in-memory key or a fresh validated storage-cache
-    /// entry. Without one, action
-    /// methods return their existing fail-closed error before sending a request.
+    /// anchor, otherwise only an in-memory key set for testing. Without one,
+    /// action methods return their existing fail-closed error before sending
+    /// a request.
     pub fn build_relay_transport(
         &self,
         application_relay_url: &str,
@@ -1127,25 +1080,13 @@ impl Vauchi {
         transport
     }
 
-    /// Resolve an OHTTP client without performing network I/O.
+    /// The in-memory OHTTP client, copied without network I/O.
     fn offline_ohttp_client(&self) -> Option<OhttpClient> {
-        if let Some(ref client) = self.ohttp_key
-            && let Ok(copy) = OhttpClient::new(client.encoded_config().to_vec())
-        {
-            return Some(copy);
-        }
-
-        let endpoint = self.http_relay_url();
-        self.storage
-            .ohttp_cache()
-            .load_ohttp_key(&endpoint)
-            .ok()
-            .flatten()
-            .filter(|(_, fetched_at)| self.is_ohttp_key_fresh(*fetched_at))
-            .and_then(|(bytes, _)| OhttpClient::new(bytes).ok())
+        let client = self.ohttp_key.as_ref()?;
+        OhttpClient::new(client.encoded_config().to_vec()).ok()
     }
 
-    /// OHTTP-relay base URL for `/v2/ohttp` + the `/v2/ohttp-key` bootstrap,
+    /// OHTTP-relay base URL for `/v2/ohttp` + the `/v2/ohttp-key-signed` bootstrap,
     /// derived by [`crate::api::config::ohttp_endpoint`] (problem
     /// 2026-05-25-relay-ohttp-forward-hop-502).
     pub(crate) fn http_relay_url(&self) -> String {
@@ -1253,6 +1194,12 @@ fn gateway_still_holds(window: u64, current: u64) -> bool {
 fn ohttp_route_error() -> VauchiError {
     VauchiError::Network(crate::network::NetworkError::ConnectionFailed(
         "OHTTP outer relay must use a distinct valid origin".into(),
+    ))
+}
+
+fn no_ohttp_anchor_error() -> VauchiError {
+    VauchiError::Network(crate::network::NetworkError::ConnectionFailed(
+        "relay has no OHTTP anchor; unsigned gateway keys are not accepted".into(),
     ))
 }
 

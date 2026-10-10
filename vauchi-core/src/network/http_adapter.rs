@@ -16,7 +16,7 @@
 //!   /v2/health` probe here. Removed per
 //!   `2026-05-04-cli-adapter-health-check-breaks-outer-hop` Option A
 //!   because the probe (a) broke routing through `vauchi-ohttp-relay`
-//!   (the outer privacy hop only proxies `/v2/ohttp` + `/v2/ohttp-key`)
+//!   (the outer privacy hop only proxies `/v2/ohttp` + `/v2/ohttp-key-signed`)
 //!   and (b) acted as a pre-sync timing beacon — the relay (or
 //!   outer-hop) operator could correlate `health` request bursts with
 //!   the OHTTP envelopes that followed. The first real `send`/`receive`

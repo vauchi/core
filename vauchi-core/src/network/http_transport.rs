@@ -34,10 +34,6 @@ use vauchi_protocol::ohttp_key::{
 /// Default retry delay when the server doesn't specify Retry-After.
 const DEFAULT_RATE_LIMIT_RETRY_SECS: u64 = 10;
 
-/// OHTTP key configurations are small. Bound bootstrap responses so an
-/// untrusted outer relay cannot exhaust client memory before key validation.
-const MAX_OHTTP_KEY_RESPONSE_BYTES: usize = 64 * 1024;
-
 /// Verify and parse a signed pin-config response.
 ///
 /// **Wire format**: `[64-byte Ed25519 signature][N * 32-byte SPKI fingerprints]`
@@ -229,9 +225,9 @@ impl HttpTransport {
     /// When set, all data requests are encrypted via OHTTP. Call with a fresh
     /// client when the gateway key rotates (HTTP 400 on stale key).
     ///
-    /// The key is installed unverified. For a relay with an OHTTP anchor use
-    /// [`Self::set_signed_ohttp`], which also keeps every refetch signed
-    /// (#288).
+    /// The key is installed unverified, and a transport given only this key
+    /// does not refetch after a rejection. A relay's real key goes through
+    /// [`Self::set_signed_ohttp`], which keeps every refetch signed (#288).
     pub fn set_ohttp(&mut self, client: OhttpClient) {
         *self.ohttp_slot() = Some(client);
     }
@@ -325,19 +321,6 @@ impl HttpTransport {
         let resp = agent.get(CDN_URL).call().ok()?;
         let body: String = resp.into_body().read_to_string().ok()?;
         VersionPolicy::from_cdn_json(&body).ok()
-    }
-
-    /// Fetch the relay's OHTTP gateway public key.
-    ///
-    /// Always uses direct HTTP (not OHTTP) — this is the
-    /// bootstrap step before OHTTP can be activated.
-    /// Returns the raw encoded key config bytes (RFC 9458).
-    pub fn fetch_ohttp_key(&self) -> Result<Vec<u8>, NetworkError> {
-        self.fetch_key_body(
-            "/v2/ohttp-key",
-            "application/ohttp-keys",
-            MAX_OHTTP_KEY_RESPONSE_BYTES,
-        )
     }
 
     /// Fetch the gateway's signed key record (#288). Like the key, it is a
@@ -840,7 +823,9 @@ impl HttpTransport {
         };
 
         match first {
-            Err(e) if Self::is_rejected_ohttp_key(&e) => {
+            // Only an anchored transport refetches: the unsigned key an
+            // outer relay could substitute is retired (#288 plan 7.5).
+            Err(e) if Self::is_rejected_ohttp_key(&e) && self.signed_slot().is_some() => {
                 // The read guard above is dropped before this point on
                 // purpose: `RwLock` is not reentrant, so refreshing while
                 // holding it would deadlock.
@@ -853,30 +838,22 @@ impl HttpTransport {
         }
     }
 
-    /// Fetch a fresh gateway key and install it. An anchored transport
-    /// takes it only from a signed record its anchor accepts; on refusal it
-    /// keeps the key it holds (#288: this path used to install whatever
-    /// `/v2/ohttp-key` returned).
+    /// Fetch the next signed record and install its key once the anchor
+    /// accepts it; on refusal the transport keeps the key it holds (#288).
     fn refresh_ohttp_key(&self) -> Result<(), NetworkError> {
-        let anchored = self
+        let (anchor, held, clock) = self
             .signed_slot()
             .as_ref()
-            .map(|signed| (signed.anchor, signed.held.clone(), signed.clock.clone()));
-        if let Some((anchor, held, clock)) = anchored {
-            let record = self.fetch_signed_ohttp_key()?;
-            let accepted =
-                accept_signed_key(&record, &anchor, clock.unix_seconds(), Some(&held))
-                    .map_err(|rejection| NetworkError::InvalidMessage(rejection.to_string()))?;
-            let client = OhttpClient::new(accepted.key_config.clone())?;
-            *self.ohttp_slot() = Some(client);
-            if let Some(signed) = self.signed_slot().as_mut() {
-                signed.held = accepted;
-            }
-            return Ok(());
-        }
-        let key = self.fetch_ohttp_key()?;
-        let client = OhttpClient::new(key)?;
+            .map(|signed| (signed.anchor, signed.held.clone(), signed.clock.clone()))
+            .ok_or(NetworkError::NotConnected)?;
+        let record = self.fetch_signed_ohttp_key()?;
+        let accepted = accept_signed_key(&record, &anchor, clock.unix_seconds(), Some(&held))
+            .map_err(|rejection| NetworkError::InvalidMessage(rejection.to_string()))?;
+        let client = OhttpClient::new(accepted.key_config.clone())?;
         *self.ohttp_slot() = Some(client);
+        if let Some(signed) = self.signed_slot().as_mut() {
+            signed.held = accepted;
+        }
         Ok(())
     }
 

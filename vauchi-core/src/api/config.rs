@@ -232,7 +232,7 @@ pub struct RelayConfig {
     /// Pinned certificates for the **OHTTP relay** host (`ohttp.vauchi.app`
     /// in production) — a distinct entity from the data relay with its own
     /// TLS key (ADR-037). Applied to the outer TLS of the OHTTP transport
-    /// (`POST /v2/ohttp` and the `GET /v2/ohttp-key` bootstrap) whenever the
+    /// (`POST /v2/ohttp` and the `GET /v2/ohttp-key-signed` bootstrap) whenever the
     /// OHTTP endpoint resolves to a different host than `server_url`.
     ///
     /// Empty = no OHTTP-host pinning: self-hosters who don't run a separate
@@ -262,7 +262,7 @@ pub struct RelayConfig {
     pub pin_config_verify_key: Option<[u8; 32]>,
 
     /// Explicit OHTTP-relay base URL — where OHTTP traffic (`POST /v2/ohttp`
-    /// and the `GET /v2/ohttp-key` bootstrap) is sent: the IP-stripping hop
+    /// and the `GET /v2/ohttp-key-signed` bootstrap) is sent: the IP-stripping hop
     /// per ADR-037.
     ///
     /// When `None` (default), the endpoint is derived: the production relay
@@ -390,7 +390,7 @@ pub(crate) const PROD_OHTTP_BACKUP_COMMITMENT: Option<[u8; 32]> = Some([
 pub(crate) const PROD_OHTTP_RELAY_URL: &str = "https://ohttp.vauchi.app";
 
 /// Resolve the OHTTP endpoint — the base URL for `POST /v2/ohttp` and the
-/// `GET /v2/ohttp-key` bootstrap.
+/// `GET /v2/ohttp-key-signed` bootstrap.
 ///
 /// Precedence: an explicit `ohttp_relay_url` wins; otherwise the production
 /// relay routes through [`PROD_OHTTP_RELAY_URL`] (the IP-stripping hop), and
@@ -476,7 +476,7 @@ impl RelayConfig {
     }
 
     /// The OHTTP endpoint this configuration sends to — the base URL for
-    /// `POST /v2/ohttp` and the `GET /v2/ohttp-key` bootstrap, resolved the
+    /// `POST /v2/ohttp` and the `GET /v2/ohttp-key-signed` bootstrap, resolved the
     /// same way sync resolves it (see [`ohttp_endpoint`]).
     pub fn ohttp_endpoint(&self) -> String {
         ohttp_endpoint(&self.server_url, self.ohttp_relay_url.as_deref())
@@ -606,22 +606,11 @@ impl SyncConfig {
 }
 
 /// OHTTP privacy configuration.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct OhttpConfig {
-    /// Client-side key TTL in seconds (default 43200 = 12h).
-    pub key_ttl_secs: u64,
     /// Allow direct (non-OHTTP) data requests.
     /// Only for dev/testing — production must be false.
     pub allow_direct: bool,
-}
-
-impl Default for OhttpConfig {
-    fn default() -> Self {
-        Self {
-            key_ttl_secs: 43200,
-            allow_direct: false,
-        }
-    }
 }
 
 /// Configuration for social key recovery.

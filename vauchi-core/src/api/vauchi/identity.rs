@@ -11,7 +11,7 @@ use crate::identity::Identity;
 use crate::types::BackupReminderState;
 use crate::types::SettingsFlags;
 
-use crate::storage::{SecureStorage, StorageError};
+use crate::storage::SecureStorage;
 
 use super::super::contact_manager::ContactManager;
 use super::super::error::{VauchiError, VauchiResult};
@@ -71,7 +71,7 @@ impl Vauchi {
 
             // Store SMK in SecureStorage BEFORE rekey (safety: see DP-1 rationale)
             ss.save_key(SMK_KEY_NAME, smk.as_bytes())
-                .map_err(smk_store_failure)?;
+                .map_err(storage_keys::keychain_error)?;
 
             // Derive SEK and rekey storage
             let sek = smk.derive_sek();
@@ -150,7 +150,7 @@ impl Vauchi {
 
         // Store SMK in SecureStorage BEFORE rekey
         ss.save_key(SMK_KEY_NAME, smk.as_bytes())
-            .map_err(smk_store_failure)?;
+            .map_err(storage_keys::keychain_error)?;
 
         // Derive SEK and rekey storage
         let sek = smk.derive_sek();
@@ -924,16 +924,4 @@ fn ed25519_pk_to_x25519(ed25519_pk: &[u8; 32]) -> VauchiResult<x25519_dalek::Pub
         .map_err(|e| VauchiError::Crypto(format!("invalid Ed25519 public key: {e}")))?;
     let montgomery = verifying_key.to_montgomery();
     Ok(x25519_dalek::PublicKey::from(montgomery.to_bytes()))
-}
-
-/// A keychain that is locked, lost its key or did not answer keeps that
-/// kind, so opening storage starts on Core's lock screen and finishes the
-/// move to the SMK after the unlock (vauchi/private#580).
-fn smk_store_failure(error: StorageError) -> VauchiError {
-    match error {
-        StorageError::SecureStorageLocked
-        | StorageError::SecureStorageKeyInvalidated
-        | StorageError::SecureStorageUnavailable => VauchiError::Storage(error),
-        other => VauchiError::Configuration(format!("Failed to store SMK: {}", other)),
-    }
 }

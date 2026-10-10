@@ -25,7 +25,7 @@ use crate::api::shred::BOOTSTRAP_KEY_NAME;
 /// Keeps every keychain failure typed, so Core can choose the unlock,
 /// recovery or try-again screen (ADR-045). The platform's message is
 /// dropped: it is for logs, and may name paths.
-fn keychain_error(error: StorageError) -> VauchiError {
+pub(super) fn keychain_error(error: StorageError) -> VauchiError {
     VauchiError::Storage(match error {
         StorageError::SecureStorageLocked | StorageError::SecureStorageKeyInvalidated => error,
         _ => StorageError::SecureStorageUnavailable,

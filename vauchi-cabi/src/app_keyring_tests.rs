@@ -6,6 +6,8 @@
 //! whose data no key opens, starts on Core's storage-lock screens instead of
 //! a null handle (vauchi/private#581). The keyring is platform secure
 //! storage, so an in-memory double is the right one; the crypto is real.
+//!
+//! Traces to: features/storage_key_upgrade.feature
 
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
@@ -25,6 +27,8 @@ use crate::app_presentation::{vauchi_app_dispatch, vauchi_app_initial_commands};
 struct SwitchableKeyring {
     keys: Mutex<HashMap<String, Vec<u8>>>,
     reachable: AtomicBool,
+    /// Reads answer and writes do not, as a keyring that is still unlocking.
+    writable: AtomicBool,
 }
 
 impl SwitchableKeyring {
@@ -32,6 +36,7 @@ impl SwitchableKeyring {
         Arc::new(Self {
             keys: Mutex::new(HashMap::new()),
             reachable: AtomicBool::new(true),
+            writable: AtomicBool::new(true),
         })
     }
 
@@ -49,6 +54,11 @@ impl SwitchableKeyring {
 impl SecureStorage for SwitchableKeyring {
     fn save_key(&self, name: &str, key: &[u8]) -> Result<(), StorageError> {
         self.check()?;
+        if !self.writable.load(Ordering::SeqCst) {
+            return Err(StorageError::Encryption(
+                "Keyring error: item is locked".into(),
+            ));
+        }
         self.keys.lock().unwrap().insert(name.into(), key.to_vec());
         Ok(())
     }
@@ -231,5 +241,45 @@ fn starting_over_on_the_desktop_opens_a_fresh_install() {
     assert!(!surface(&fresh).starts_with("storage_lock"), "got {fresh}");
     // SAFETY: `app` is live.
     assert_eq!(unsafe { crate::vauchi_app_has_identity(app) }, 0);
+    destroy(app);
+}
+
+// @internal
+#[test]
+fn a_fresh_install_whose_keyring_refuses_writes_offers_try_again() {
+    let dir = tempfile::tempdir().unwrap();
+    let keyring = SwitchableKeyring::new();
+    keyring.writable.store(false, Ordering::SeqCst);
+
+    let app = open(&dir, keyring.clone());
+
+    assert_eq!(surface(&initial(app)), "storage_lock.unavailable");
+    assert!(keyring.keys.lock().unwrap().is_empty());
+    destroy(app);
+}
+
+// @internal
+#[test]
+fn try_again_opens_the_fresh_install_once_the_keyring_takes_writes() {
+    let dir = tempfile::tempdir().unwrap();
+    let keyring = SwitchableKeyring::new();
+    keyring.writable.store(false, Ordering::SeqCst);
+    let app = open(&dir, keyring.clone());
+    let locked = initial(app);
+
+    keyring.writable.store(true, Ordering::SeqCst);
+    let opened = press_primary(app, &locked);
+
+    assert!(
+        !surface(&opened).starts_with("storage_lock"),
+        "got {opened}"
+    );
+    assert!(
+        keyring
+            .keys
+            .lock()
+            .unwrap()
+            .contains_key("storage_bootstrap")
+    );
     destroy(app);
 }

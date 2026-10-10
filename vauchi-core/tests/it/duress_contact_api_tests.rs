@@ -426,3 +426,66 @@ fn test_export_personal_data_normal_mode_holds_real_contacts() {
         "normal mode keeps the real audit log: {json}"
     );
 }
+
+// =============================================================================
+// The encrypted personal-data export follows the auth mode too (private#616)
+// =============================================================================
+
+// @scenario: duress_mode :: Cannot access real contacts from duress mode
+#[test]
+fn test_export_personal_data_encrypted_duress_holds_decoys_only() {
+    let (wb, bob_id) = setup_duress_with_decoy();
+    wb.storage()
+        .consent()
+        .log_audit_event("real_owner_event", None)
+        .unwrap();
+
+    let encrypted = wb
+        .export_personal_data_encrypted("export-password")
+        .expect("the encrypted export should succeed");
+    let export = vauchi_core::api::import_encrypted(&encrypted, "export-password")
+        .expect("the export decrypts with its password");
+
+    let names: Vec<&str> = export
+        .contacts
+        .iter()
+        .map(|c| c.display_name.as_str())
+        .collect();
+    assert_eq!(names, ["Decoy Dana"], "only the decoy may be exported");
+    assert!(
+        export.audit_log.is_empty(),
+        "the decoy profile exports no audit log"
+    );
+    let json = serde_json::to_string(&export).unwrap();
+    assert!(
+        !json.contains(&bob_id),
+        "encrypted export holds a real contact id: {json}"
+    );
+}
+
+// @scenario: privacy_compliance :: Export all my data
+#[test]
+fn test_export_personal_data_encrypted_normal_mode_holds_real_contacts() {
+    let (alice_wb, _bob_wb, _secret, _bob_id, _alice_id) = setup_alice_bob_exchange();
+    let plain = alice_wb.export_personal_data().unwrap();
+
+    let encrypted = alice_wb
+        .export_personal_data_encrypted("export-password")
+        .expect("the encrypted export should succeed");
+    let export = vauchi_core::api::import_encrypted(&encrypted, "export-password")
+        .expect("the export decrypts with its password");
+
+    assert_eq!(export.contacts.len(), 1, "the real contact is exported");
+    assert_eq!(
+        export.contacts[0].display_name, plain.contacts[0].display_name,
+        "the encrypted export holds the same real contact as the plain one"
+    );
+    assert_eq!(
+        export.contacts[0].public_key_fingerprint,
+        plain.contacts[0].public_key_fingerprint
+    );
+    assert!(
+        vauchi_core::api::import_encrypted(&encrypted, "wrong-password").is_err(),
+        "a wrong password does not decrypt the export"
+    );
+}

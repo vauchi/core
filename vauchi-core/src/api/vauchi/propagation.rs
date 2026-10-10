@@ -27,7 +27,7 @@ pub(crate) struct PreparedDevicePayload {
 impl PreparedDevicePayload {
     /// The recipient device this copy is addressed to for device-scoped
     /// mailbox deposit (F4, ADR-064 Amendment 2026-07-25): `Some` for a
-    /// per-device fan-out copy, `None` for the legacy `[0;32]` /
+    /// per-device fan-out copy, `None` for the shared `[0;32]` /
     /// genesis-sealed copy (identity mailbox).
     pub(crate) fn target_device_id(&self) -> Option<[u8; 32]> {
         (self.peer_device_id != [0u8; 32]).then_some(self.peer_device_id)
@@ -366,7 +366,7 @@ impl Vauchi {
         // Amendment 2026-07-25 — the refuted B-lite hazard; this applies to
         // handshake payloads too, since a crossing handshake means the
         // counterparty may hold nothing of ours yet). Anything short of
-        // Active rides the legacy [0;32] session — or, for handshake
+        // Active rides the shared [0;32] session — or, for handshake
         // payloads with no session at all, the stateless genesis envelope
         // (the (None, None) arm below).
         let handshake_payload = matches!(

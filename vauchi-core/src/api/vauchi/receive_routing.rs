@@ -47,7 +47,7 @@ use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, to
 /// Opens an origin-device hint (if present) to the sender device id, using the
 /// resolved contact's shared key. Returns `None` when there is no hint, the
 /// contact has no shared key, or the hint fails to authenticate — the caller
-/// then falls back to the legacy `[0;32]` sender-device path.
+/// then falls back to the shared `[0;32]` sender-device path.
 fn resolve_origin_device(
     contacts: &[Contact],
     contact_id: &str,

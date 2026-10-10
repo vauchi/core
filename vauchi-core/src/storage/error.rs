@@ -146,7 +146,7 @@ pub struct PendingUpdate {
     pub target_relay_url: Option<String>,
     /// Recipient device id for a per-device fan-out copy (F4, ADR-064
     /// Amendment 2026-07-25). `Some(device_id)` deposits at that device's
-    /// device-scoped contact mailbox; `None` (legacy `[0;32]`, genesis,
+    /// device-scoped contact mailbox; `None` (shared `[0;32]`, genesis,
     /// alerts, reciprocity) deposits at the identity-scoped mailbox.
     pub target_device_id: Option<[u8; 32]>,
 }

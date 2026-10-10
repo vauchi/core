@@ -18,7 +18,7 @@
 //! Security note — the hint is a *selection* hint only. It is never the
 //! authority for the origin device: successful ratchet decryption is. A forged
 //! or swapped hint at worst selects a session that will not decrypt, and the
-//! receiver falls through to the legacy `[0;32]` path. Binding the ciphertext
+//! receiver falls through to the shared `[0;32]` path. Binding the ciphertext
 //! into the AAD is what makes a relay-swapped hint fail to open (rather than
 //! selecting the wrong session and dropping a legitimate blob).
 
@@ -102,7 +102,7 @@ pub fn seal_origin_hint(
 /// Opens a hint, returning the sender device id when it authenticates against
 /// this `shared_key`, `mailbox_token`, and `ciphertext`. Any mismatch (wrong
 /// relationship, swapped blob, tampered bytes, unknown version) returns `None`
-/// so the caller falls back to the legacy `[0;32]` path.
+/// so the caller falls back to the shared `[0;32]` path.
 pub fn open_origin_hint(
     shared_key: &[u8; 32],
     mailbox_token: &str,

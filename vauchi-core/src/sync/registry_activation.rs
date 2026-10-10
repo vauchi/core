@@ -54,7 +54,7 @@ fn validate_broadcast_json(bytes: &[u8]) -> Result<(), DeltaError> {
 /// hazard, refuted 2026-07-24).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActivationState {
-    /// No handshake in flight; sends use the legacy `[0;32]` path.
+    /// No handshake in flight; sends use the shared `[0;32]` path.
     Dormant,
     /// Our registry was pushed; awaiting the peer's confirmation.
     Pushed,

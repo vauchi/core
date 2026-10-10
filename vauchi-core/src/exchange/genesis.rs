@@ -28,7 +28,7 @@
 //!   `shared_key` + the message header on each attempt and never persists a
 //!   transient row; a bounded chain index caps key-derivation work.
 //!
-//! MR B keeps the receiver's post-accept session under the legacy `[0;32]`
+//! MR B keeps the receiver's post-accept session under the shared `[0;32]`
 //! ratchet id (today's production HTTP receive path routes everything there);
 //! canonical per-device sessions and the msg#2 acknowledgement belong to the
 //! later routing program. See

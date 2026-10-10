@@ -212,7 +212,7 @@ fn registration_tokens(
             // a per-device fan-out copy reaches THIS device without a sibling
             // draining it from a shared identity mailbox (ADR-064 Amendment
             // 2026-07-25). Kept alongside the identity token, which still
-            // receives legacy [0;32] and genesis-cold-start sends.
+            // receives shared [0;32] and genesis-cold-start sends.
             if let Some(device_id) = own_device_id {
                 all_tokens.push(token_hex(&compute_device_mailbox_token(
                     shared_key, own_pubkey, device_id, day,

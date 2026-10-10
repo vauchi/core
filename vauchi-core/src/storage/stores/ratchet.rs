@@ -15,8 +15,10 @@ use super::super::{Storage, StorageError};
 use crate::crypto::kdf::HKDF;
 use crate::crypto::ratchet::DoubleRatchetState;
 
-/// Device ID used by peers that predate per-device ratchet sessions.
-pub const LEGACY_PEER_DEVICE_ID: [u8; 32] = [0; 32];
+/// Device ID of the shared per-contact session: genesis cold-start sends,
+/// handshake ACKs, and peers whose sending device is not yet known (before
+/// F4 activation). Not compatibility code; it stays (vauchi/private#575).
+pub const SHARED_PEER_DEVICE_ID: [u8; 32] = [0; 32];
 
 /// Scoped persistence view for the ratchets domain.
 pub struct RatchetStore<'a> {
@@ -58,7 +60,7 @@ impl RatchetStore<'_> {
         state: &DoubleRatchetState,
         is_initiator: bool,
     ) -> Result<(), StorageError> {
-        self.save_ratchet_state_for_device(contact_id, &LEGACY_PEER_DEVICE_ID, state, is_initiator)
+        self.save_ratchet_state_for_device(contact_id, &SHARED_PEER_DEVICE_ID, state, is_initiator)
     }
 
     /// Saves a Double Ratchet state for one device belonging to a contact.
@@ -101,7 +103,7 @@ impl RatchetStore<'_> {
         &self,
         contact_id: &str,
     ) -> Result<Option<(DoubleRatchetState, bool)>, StorageError> {
-        self.load_ratchet_state_for_device(contact_id, &LEGACY_PEER_DEVICE_ID)
+        self.load_ratchet_state_for_device(contact_id, &SHARED_PEER_DEVICE_ID)
     }
 
     /// Loads the Double Ratchet state for one device belonging to a contact.

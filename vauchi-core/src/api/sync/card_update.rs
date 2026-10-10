@@ -238,7 +238,7 @@ pub fn process_single_card_update(
 /// Device-aware receive path used after rotating anonymous-token resolution.
 ///
 /// `peer_device_id` scopes both the ratchet session and the stale-version
-/// floor to one of the sender's devices; the legacy all-zero id addresses
+/// floor to one of the sender's devices; the shared all-zero id addresses
 /// pre-multi-device peers. This public entry point does not assume the route is
 /// authenticated, so any stateless device fallback remains safety-rate-limited.
 pub fn process_single_card_update_for_device(
@@ -356,7 +356,7 @@ fn process_single_card_update_for_device_with_budget(
 
     let plaintext = match ratchet.decrypt(&ratchet_msg) {
         Ok(plaintext) => plaintext,
-        // A failed decrypt on the legacy `[0;32]` session may be a genesis
+        // A failed decrypt on the shared `[0;32]` session may be a genesis
         // message from a sender sibling we hold no session with — try genesis
         // before failing (plan §REVISION F8). We already hold a session here, so
         // a rate-limited attempt on this arm is speculative: fall through to the
@@ -657,7 +657,7 @@ enum GenesisBudget {
     /// Unauthenticated cold-start traffic has no other progress path, so
     /// surface the retriable rate-limit error.
     EnforceAndSurface,
-    /// A legacy session exists and the attempt is speculative, so fall through
+    /// A shared session exists and the attempt is speculative, so fall through
     /// to the ACKable ordinary error when the safety budget is exhausted.
     EnforceAndFallThrough,
     /// A non-zero device route came from the ciphertext-bound, relationship-key

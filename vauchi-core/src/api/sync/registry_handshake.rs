@@ -35,7 +35,7 @@ pub struct RegistryReplyNeeded {
     /// The peer device that sent us the push/ack. The reply routes to this
     /// device's device-scoped mailbox so a shared identity mailbox cannot
     /// let a sibling drain an ack meant for another (ADR-064 Amendment
-    /// 2026-07-25). `[0; 32]` when the origin device is unknown (legacy
+    /// 2026-07-25). `[0; 32]` when the origin device is unknown (shared
     /// identity-scoped fallback).
     pub sender_device_id: [u8; 32],
 }

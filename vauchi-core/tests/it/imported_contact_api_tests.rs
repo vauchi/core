@@ -486,3 +486,20 @@ fn test_reimport_same_vcf_no_duplicates() {
     let contacts = wb.list_contacts().unwrap();
     assert_eq!(contacts.len(), 1, "only one contact should exist");
 }
+
+// A vCard NICKNAME becomes the imported contact's own local nickname
+// (vauchi/private#574).
+// @internal
+#[test]
+fn a_vcard_nickname_becomes_the_contacts_nickname() {
+    let wb = new_vauchi();
+    let vcf = b"BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Test User\r\nNICKNAME:Testy\r\nEND:VCARD\r\n";
+
+    wb.import_contacts_from_vcf(vcf).unwrap();
+    let contact = wb.list_contacts().unwrap().into_iter().next().unwrap();
+
+    assert_eq!(
+        wb.get_contact_nickname(contact.id()).unwrap().as_deref(),
+        Some("Testy")
+    );
+}

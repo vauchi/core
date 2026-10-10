@@ -610,7 +610,7 @@ fn last_surface_id(batch: &Value) -> Option<String> {
         .iter()
         .filter_map(|c| c.get("ReplaceSurface"))
         .filter_map(|replace| replace["surface"]["surface_id"].as_str())
-        .last()
+        .next_back()
         .map(str::to_owned)
 }
 

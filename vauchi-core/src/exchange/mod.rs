@@ -81,12 +81,9 @@ pub mod x3dh;
 #[cfg(not(feature = "testing"))]
 mod x3dh;
 
-// ble has additional #[allow(deprecated)] (ADR-031 transport deprecation)
 #[cfg(feature = "testing")]
-#[allow(deprecated)]
 pub mod ble;
 #[cfg(not(feature = "testing"))]
-#[allow(deprecated)]
 mod ble;
 
 #[cfg(feature = "audio-cpal")]
@@ -126,13 +123,12 @@ pub use accelerometer::{
 #[cfg(feature = "audio-cpal")]
 pub use audio_cpal::CpalAudioBackend;
 pub use audio_modem::AudioConfig;
-#[allow(deprecated)]
 pub use ble::{
     BLE_DEFAULT_USABLE, BLE_MIN_MTU, BLE_PAYLOAD_SIZE, BLEAdvertisement, BLEDevice, BLEError,
-    BLEExchangeSession, BLEExchangeState, BLEProximityVerifier, BLETransport, CHAR_CARD_EXCHANGE,
-    CHAR_CHALLENGE, CHAR_DATA_NOTIFY, CHAR_DATA_WRITE, CHAR_EXCHANGE_PAYLOAD,
-    CHAR_HANDSHAKE_NOTIFY, CHAR_HANDSHAKE_WRITE, ExchangeBle, MockBLETransport, MockBLEVerifier,
-    VAUCHI_BLE_DIAGNOSTIC_SERVICE_UUID, VAUCHI_BLE_SERVICE_UUID,
+    BLEExchangeSession, BLEExchangeState, BLEProximityVerifier, CHAR_CARD_EXCHANGE, CHAR_CHALLENGE,
+    CHAR_DATA_NOTIFY, CHAR_DATA_WRITE, CHAR_EXCHANGE_PAYLOAD, CHAR_HANDSHAKE_NOTIFY,
+    CHAR_HANDSHAKE_WRITE, ExchangeBle, MockBLEVerifier, VAUCHI_BLE_DIAGNOSTIC_SERVICE_UUID,
+    VAUCHI_BLE_SERVICE_UUID,
 };
 pub use ble_chunking::{BLE_CHUNK_OVERHEAD, BleChunker, BleReassembler};
 pub use ble_handshake::{

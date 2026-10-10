@@ -223,6 +223,27 @@ mod both_shells_agree {
         })
     }
 
+    /// Only the step's own field sets the PIN; text reported for any other
+    /// field leaves it as it is.
+    // @scenario: duress_mode.feature :: Enable duress PIN in settings
+    #[test]
+    fn text_from_another_field_leaves_the_pin_alone() {
+        let mut engine = DuressPinEngine::new(DuressConfig::default(), Locale::English);
+        let _ = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "duress_actions".into(),
+            item_id: "set_up".into(),
+        });
+        edit(&mut engine, "pin", "123".into());
+        edit(&mut engine, "alert_message", "999999".into());
+        assert_eq!(filled(&engine, "pin"), 3);
+
+        edit(&mut engine, "pin", "123456".into());
+        let _ = press_continue(&mut engine);
+        edit(&mut engine, "confirm_pin", "12".into());
+        edit(&mut engine, "pin", "999999".into());
+        assert_eq!(filled(&engine, "confirm_pin"), 2);
+    }
+
     proptest! {
         /// Any keystrokes (`None` is a backspace) typed into the PIN by a
         /// shell sending its own text, and into the confirmation by a shell

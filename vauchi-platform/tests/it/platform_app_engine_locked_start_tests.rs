@@ -603,6 +603,59 @@ fn a_prompt_that_opens_storage_unlocks_when_no_duress_pin_is_set_up() {
     );
 }
 
+fn last_surface_id(batch: &Value) -> Option<String> {
+    batch["commands"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|c| c.get("ReplaceSurface"))
+        .filter_map(|replace| replace["surface"]["surface_id"].as_str())
+        .last()
+        .map(str::to_owned)
+}
+
+// @scenario: duress_mode.feature :: Biometric unlock with duress
+#[test]
+fn a_prompt_that_opens_storage_leaves_the_app_on_its_lock_screen_when_a_duress_pin_is_set_up() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = onboarded_with_duress(&dir);
+    keychain.locked.store(true, Ordering::SeqCst);
+    let engine = open(&dir, &keychain);
+    engine.initial_commands_json().unwrap();
+
+    keychain.locked.store(false, Ordering::SeqCst);
+    let opened = prompt_succeeded(&engine);
+
+    assert_eq!(
+        last_surface_id(&opened).as_deref(),
+        Some("lock"),
+        "got {opened}"
+    );
+}
+
+// @scenario: duress_mode.feature :: Biometric unlock without duress
+#[test]
+fn a_prompt_that_opens_storage_passes_the_app_password_lock_when_no_duress_pin_is_set_up() {
+    use vauchi_platform::DomainCommand;
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = onboarded(&dir);
+    open(&dir, &keychain)
+        .dispatch_domain_command(DomainCommand::SetupAppPassword {
+            password: "123456".into(),
+        })
+        .expect("app password");
+    keychain.locked.store(true, Ordering::SeqCst);
+    let engine = open(&dir, &keychain);
+    engine.initial_commands_json().unwrap();
+
+    keychain.locked.store(false, Ordering::SeqCst);
+    let opened = prompt_succeeded(&engine);
+
+    let surface = last_surface_id(&opened);
+    assert!(surface.is_some(), "no surface after the unlock: {opened}");
+    assert_ne!(surface.as_deref(), Some("lock"), "got {opened}");
+}
+
 const IMPORTED_CONTACT: &str =
     "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:before-580\r\nFN:Carol\r\nEND:VCARD\r\n";
 

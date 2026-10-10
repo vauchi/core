@@ -296,6 +296,13 @@ impl RecoveryClaim {
 /// Domain separator for recovery voucher signatures (ADR-007).
 const VOUCHER_DOMAIN: &[u8] = b"vauchi-recovery-voucher-v1";
 
+/// Serialized voucher from a contact: no guardian token. Not a legacy format;
+/// contact vouching uses it today (vauchi/private#574).
+pub const CONTACT_VOUCHER_FORMAT: u8 = 1;
+
+/// Serialized voucher from a designated guardian: carries a guardian token.
+pub const GUARDIAN_VOUCHER_FORMAT: u8 = 2;
+
 /// Voucher created by a contact confirming the recovery claim.
 #[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -306,8 +313,9 @@ pub struct RecoveryVoucher {
     timestamp: u64,
     #[serde_as(as = "[_; 64]")]
     signature: [u8; 64],
-    /// Optional guardian token proving the voucher is from a designated guardian.
-    /// Present in v2 vouchers; absent in v1 (legacy).
+    /// Guardian token proving the voucher is from a designated guardian.
+    /// Present in a guardian voucher; absent in a contact voucher, which is
+    /// how any contact vouches (offline claim, platform and CLI flows).
     guardian_token: Option<guardian::GuardianToken>,
 }
 
@@ -422,10 +430,15 @@ impl RecoveryVoucher {
 
     /// Serializes the voucher to bytes.
     ///
-    /// Version 1: legacy layout (no guardian token).
-    /// Version 2: includes guardian token after the v1 fields.
+    /// A contact voucher ([`CONTACT_VOUCHER_FORMAT`]) carries no guardian
+    /// token; a guardian voucher ([`GUARDIAN_VOUCHER_FORMAT`]) appends one.
+    /// Both are current formats.
     pub fn to_bytes(&self) -> Vec<u8> {
-        let version: u8 = if self.guardian_token.is_some() { 2 } else { 1 };
+        let version: u8 = if self.guardian_token.is_some() {
+            GUARDIAN_VOUCHER_FORMAT
+        } else {
+            CONTACT_VOUCHER_FORMAT
+        };
         // Version + old_pk + new_pk + voucher_pk + timestamp + signature
         let mut bytes = Vec::with_capacity(1 + 32 + 32 + 32 + 8 + 64);
         bytes.push(version);
@@ -444,7 +457,7 @@ impl RecoveryVoucher {
 
     /// Deserializes a voucher from bytes.
     ///
-    /// Supports both v1 (legacy, no guardian token) and v2 (with guardian token).
+    /// Accepts both current formats: contact and guardian vouchers.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, RecoveryError> {
         // Version (1) + old_pk (32) + new_pk (32) + voucher_pk (32) + timestamp (8) + signature (64) = 169
         if bytes.len() < 169 {
@@ -452,7 +465,7 @@ impl RecoveryVoucher {
         }
 
         let version = bytes[0];
-        if version != 1 && version != 2 {
+        if version != CONTACT_VOUCHER_FORMAT && version != GUARDIAN_VOUCHER_FORMAT {
             return Err(RecoveryError::InvalidFormat);
         }
 
@@ -474,7 +487,7 @@ impl RecoveryVoucher {
             .try_into()
             .map_err(|_| RecoveryError::InvalidFormat)?;
 
-        let guardian_token = if version >= 2 && bytes.len() > 169 {
+        let guardian_token = if version == GUARDIAN_VOUCHER_FORMAT && bytes.len() > 169 {
             if bytes.len() < 173 {
                 // Need at least 4 bytes for length prefix
                 return Err(RecoveryError::InvalidFormat);
@@ -532,8 +545,7 @@ pub const RECOVERY_CLAIM_MIN_INPUT_LEN: usize = 20;
 
 /// Complete recovery proof with multiple vouchers.
 ///
-/// The `version` field enables schema evolution: new fields can be added in future
-/// versions while maintaining backward compatibility for loading older proofs.
+/// The `version` field is required and names the proof's schema.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RecoveryProof {
     /// Schema version for forward compatibility (#72).

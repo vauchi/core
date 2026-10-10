@@ -310,9 +310,24 @@ pub(crate) fn open_engine(slot: &mut Option<AppEngine>) -> Result<&mut AppEngine
 }
 
 impl PlatformAppEngine {
+    /// The engine slot. An engine whose storage a shred deleted is
+    /// replaced by one opened on a fresh install first (vauchi/private#599);
+    /// the slot is released while reopening, so the locked-start lock is
+    /// never taken while the engine lock is held.
     pub(crate) fn lock_engine(
         &self,
     ) -> Result<std::sync::MutexGuard<'_, Option<AppEngine>>, MobileError> {
+        let mut slot = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        if !slot.as_mut().is_some_and(AppEngine::take_storage_shredded) {
+            return Ok(slot);
+        }
+        let Some(shredded) = slot.take() else {
+            return Ok(slot);
+        };
+        drop(slot);
+        self.reopen_after_shred(shredded)?;
         self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("Lock failed: {e}"),
         })

@@ -234,6 +234,9 @@ pub struct AppEngine {
     /// observers that are not rendering the current command batch
     /// (P5b, 2026-06-10), whichever envelope carried the event.
     pending_ble_terminal_invalidation: bool,
+    /// Set when a shred deleted the storage this engine holds; the host
+    /// reopens a fresh install (vauchi/private#599).
+    storage_shredded: bool,
     /// Glance (one-sided QR) OOB state. `glance_display_nonce` is the nonce
     /// this device shows in its QR and must require as the responder;
     /// `glance_scanned` is the scanner-side binding built from a scanned QR —
@@ -318,6 +321,21 @@ impl AppEngine {
     /// can be told about is attack surface with no benefit.
     pub fn set_local_network_address(&mut self, address: Option<String>) {
         self.local_network_address = address;
+    }
+
+    pub fn device_capabilities(&self) -> &DeviceCapabilities {
+        &self.device_capabilities
+    }
+
+    /// Records that a shred deleted the storage this engine holds.
+    pub fn mark_storage_shredded(&mut self) {
+        self.storage_shredded = true;
+    }
+
+    /// Whether a shred deleted this engine's storage since the last call;
+    /// the host then reopens a fresh install.
+    pub fn take_storage_shredded(&mut self) -> bool {
+        std::mem::take(&mut self.storage_shredded)
     }
 
     pub fn set_device_capabilities(&mut self, caps: DeviceCapabilities) {
@@ -528,6 +546,7 @@ impl AppEngine {
             last_good_qr_layout: None,
             ble_handshake_session: None,
             pending_ble_terminal_invalidation: false,
+            storage_shredded: false,
             glance_display_nonce: None,
             glance_scanned: None,
             glance_pre_scan_discoveries: Vec::new(),

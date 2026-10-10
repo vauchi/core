@@ -758,8 +758,15 @@ impl PlatformAppEngine {
         &self,
         listener: Box<dyn PlatformEventListener>,
     ) -> Result<(), MobileError> {
-        let listener = Arc::new(listener);
+        self.attach_event_listener(Arc::new(listener))
+    }
 
+    /// Registers `listener` on the open engine and mirrors it into the
+    /// direct-call slot.
+    pub(crate) fn attach_event_listener(
+        &self,
+        listener: Arc<Box<dyn PlatformEventListener>>,
+    ) -> Result<(), MobileError> {
         let mut engine_slot = self.lock_engine()?;
         let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
 

@@ -379,6 +379,7 @@ impl AppEngine {
         match self.vauchi.perform_emergency_wipe(true) {
             Ok(_) => {
                 self.engine_cache.clear();
+                self.mark_storage_shredded();
                 ActionResult::WipeComplete
             }
             Err(_) => ActionResult::ShowToast {

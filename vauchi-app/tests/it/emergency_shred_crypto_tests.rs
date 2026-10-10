@@ -139,3 +139,26 @@ fn a_copy_taken_before_the_wipe_does_not_open_afterwards() {
         reopened.as_ref().map(|_| "opened")
     );
 }
+
+// @internal
+#[test]
+fn the_wipe_tells_the_host_to_reopen_and_a_cancel_does_not() {
+    let install = Install::new();
+    let mut engine = engine_on_shred(&install);
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel_shred".into(),
+    });
+    assert!(
+        !engine.take_storage_shredded(),
+        "a cancelled wipe asked for a reopen"
+    );
+
+    let mut engine = engine_on_shred(&Install::new());
+    let _ = confirm_wipe(&mut engine);
+
+    assert!(engine.take_storage_shredded());
+    assert!(
+        !engine.take_storage_shredded(),
+        "the reopen request is taken once"
+    );
+}

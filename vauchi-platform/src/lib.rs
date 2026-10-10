@@ -37,6 +37,7 @@ mod pae_dispatch;
 mod platform_app_engine;
 mod platform_app_engine_internals;
 mod platform_app_engine_locked;
+mod platform_app_engine_reopen;
 mod platform_app_engine_test_helpers;
 mod policies;
 mod sync_presentation;

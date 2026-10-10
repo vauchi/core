@@ -198,6 +198,7 @@ impl PlatformAppEngine {
                 engine.invalidate_screen(&AppScreen::Settings);
                 engine.invalidate_screen(&AppScreen::Privacy);
                 engine.invalidate_screen(&AppScreen::EmergencyShred);
+                engine.mark_storage_shredded();
                 Ok(DomainCommandResult::ShredCompleted {
                     report: crate::types::MobileShredReport::from(&report),
                 })
@@ -227,6 +228,7 @@ impl PlatformAppEngine {
                 engine.invalidate_screen(&AppScreen::Settings);
                 engine.invalidate_screen(&AppScreen::Privacy);
                 engine.invalidate_screen(&AppScreen::EmergencyShred);
+                engine.mark_storage_shredded();
                 Ok(DomainCommandResult::ShredCompleted {
                     report: crate::types::MobileShredReport::from(&report),
                 })

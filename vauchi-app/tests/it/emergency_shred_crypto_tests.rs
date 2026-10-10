@@ -162,3 +162,29 @@ fn the_wipe_tells_the_host_to_reopen_and_a_cancel_does_not() {
         "the reopen request is taken once"
     );
 }
+
+/// Settings → Advanced → Wipe All Data (vauchi/private#598): the row used to
+/// end in an inline confirm that deleted nothing; it opens the same shred
+/// screen as Privacy, where typing WIPE runs the crypto-shred.
+// @internal
+#[test]
+fn the_advanced_wipe_row_opens_the_shred_screen_and_wipes_for_real() {
+    let install = Install::new();
+    let mut vauchi = install.open(&install.data_dir).unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::SettingsAdvanced);
+
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "danger".into(),
+        item_id: "emergency_wipe".into(),
+    });
+    assert_eq!(engine.current_app_screen(), &AppScreen::EmergencyShred);
+
+    let result = confirm_wipe(&mut engine);
+    assert!(
+        matches!(result, ActionResult::WipeComplete),
+        "got {result:?}"
+    );
+    assert!(!install.has_key("smk"), "the SMK survived the wipe");
+}

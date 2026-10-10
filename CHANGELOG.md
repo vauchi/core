@@ -6,7 +6,7 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.79.0] — 2026-10-10
 
 ### Changed
 

@@ -31,6 +31,18 @@ pub enum KeychainError {
     KeyInvalidated,
 }
 
+/// A keychain callback that failed in a way the platform did not declare is
+/// an ordinary keychain failure (vauchi/private#580); without this UniFFI
+/// panics across the FFI boundary and the process aborts. The platform's
+/// message is dropped: it may name paths.
+impl From<uniffi::UnexpectedUniFFICallbackError> for KeychainError {
+    fn from(_: uniffi::UnexpectedUniFFICallbackError) -> Self {
+        KeychainError::OperationFailed {
+            msg: "unexpected keychain failure".into(),
+        }
+    }
+}
+
 impl From<KeychainError> for vauchi_core::StorageError {
     fn from(error: KeychainError) -> Self {
         match error {

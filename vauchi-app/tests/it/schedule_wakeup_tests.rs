@@ -255,8 +255,9 @@ fn a_live_link_session_schedules_a_far_shorter_wakeup_than_the_idle_heartbeat() 
 }
 
 // `FakeClock` is `#[cfg(any(test, feature = "testing"))]`; the no-feature
-// compile check excludes the clock-driven tests below with it.
-#[cfg(feature = "testing")]
+// compile check excludes the clock-driven tests below with it. A Link
+// session exists only with network-http and storage (`link_exchange.rs`).
+#[cfg(all(feature = "testing", feature = "network-http", feature = "storage"))]
 mod link_heartbeat {
     use super::*;
     use vauchi_app::ui::WorkflowEngine;

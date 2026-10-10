@@ -6,6 +6,17 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+
+- A successful biometric prompt on Core's lock screen is acted on by Core
+  (vauchi/private#591). Without a duress PIN the app opens on its default
+  screen. With one, the lock screen stays, withdraws the biometric action
+  and takes the password, which picks normal or duress mode. Every shell,
+  macOS included, gets duress without a native app-password screen.
+  `SetAuthenticationRequirement` is still sent first in the batch.
+
 ## [0.78.2] — 2026-10-10
 
 ### Fixed

@@ -18,6 +18,7 @@ fn _flame_install() {
 mod common;
 mod content;
 mod e2e;
+mod emergency_wipe_shred_tests;
 mod integration;
 
 mod accelerometer_verifier_tests;

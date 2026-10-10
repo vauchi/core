@@ -225,7 +225,7 @@ pub unsafe extern "C" fn vauchi_app_poll_notifications(app: *mut VauchiApp) -> *
         }
 
         let app = unsafe { &*app };
-        let Ok(mut engine_slot) = app.engine.lock() else {
+        let Ok(mut engine_slot) = app.lock_engine() else {
             return std::ptr::null_mut();
         };
         let Some(engine) = engine_slot.as_mut() else {
@@ -265,7 +265,7 @@ pub unsafe extern "C" fn vauchi_app_on_wakeup(app: *mut VauchiApp) -> *mut c_cha
         }
 
         let app = unsafe { &*app };
-        let Ok(mut engine_slot) = app.engine.lock() else {
+        let Ok(mut engine_slot) = app.lock_engine() else {
             return std::ptr::null_mut();
         };
         let Some(engine) = engine_slot.as_mut() else {
@@ -345,8 +345,7 @@ pub unsafe extern "C" fn vauchi_app_navigate_to(
             };
             let app = &*handle;
             match app
-                .engine
-                .lock()
+                .lock_engine()
                 .ok()
                 .as_mut()
                 .and_then(|slot| slot.as_mut())
@@ -384,8 +383,7 @@ pub unsafe extern "C" fn vauchi_app_navigate_back(handle: *mut VauchiApp) -> *mu
             }
             let app = &*handle;
             match app
-                .engine
-                .lock()
+                .lock_engine()
                 .ok()
                 .as_mut()
                 .and_then(|slot| slot.as_mut())
@@ -418,8 +416,7 @@ pub unsafe extern "C" fn vauchi_app_available_screens(handle: *mut VauchiApp) ->
             }
             let app = &*handle;
             match app
-                .engine
-                .lock()
+                .lock_engine()
                 .ok()
                 .as_mut()
                 .and_then(|slot| slot.as_mut())
@@ -459,8 +456,7 @@ pub unsafe extern "C" fn vauchi_app_default_screen(handle: *mut VauchiApp) -> *m
             }
             let app = &*handle;
             match app
-                .engine
-                .lock()
+                .lock_engine()
                 .ok()
                 .as_mut()
                 .and_then(|slot| slot.as_mut())
@@ -508,7 +504,7 @@ pub unsafe extern "C" fn vauchi_app_current_tab_id(
                 _ => return std::ptr::null_mut(),
             };
             let app = &*handle;
-            let Ok(mut engine_slot) = app.engine.lock() else {
+            let Ok(mut engine_slot) = app.lock_engine() else {
                 return std::ptr::null_mut();
             };
             let Some(engine) = engine_slot.as_mut() else {
@@ -538,8 +534,7 @@ pub unsafe extern "C" fn vauchi_app_has_identity(handle: *mut VauchiApp) -> i32 
                 return -1;
             }
             let app = &*handle;
-            app.engine
-                .lock()
+            app.lock_engine()
                 .ok()
                 .and_then(|slot| {
                     slot.as_ref()
@@ -576,8 +571,7 @@ pub unsafe extern "C" fn vauchi_app_create_identity(
             } else {
                 from_c_str(display_name).unwrap_or_else(|| "Test User".to_string())
             };
-            app.engine
-                .lock()
+            app.lock_engine()
                 .ok()
                 .and_then(|mut slot| {
                     slot.as_mut().map(|engine| {
@@ -616,8 +610,7 @@ pub unsafe extern "C" fn vauchi_app_handle_app_backgrounded(handle: *mut VauchiA
             }
             let app = &*handle;
             match app
-                .engine
-                .lock()
+                .lock_engine()
                 .ok()
                 .as_mut()
                 .and_then(|slot| slot.as_mut())
@@ -689,8 +682,11 @@ pub unsafe extern "C" fn vauchi_app_set_event_callback(
 
 /// Registers `handler` on the open engine (or clears it with `None`).
 pub(crate) fn register_event_callback(app: &VauchiApp, handler: Option<EventCallbackHandler>) {
+    if let Ok(mut current) = app.event_callback.lock() {
+        *current = handler;
+    }
     let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let Ok(mut engine_slot) = app.engine.lock() else {
+        let Ok(mut engine_slot) = app.lock_engine() else {
             return;
         };
         let Some(engine) = engine_slot.as_mut() else {
@@ -721,6 +717,7 @@ pub(crate) fn register_event_callback(app: &VauchiApp, handler: Option<EventCall
 /// The caller of `vauchi_app_set_event_callback` guarantees that both the
 /// callback and `user_data` remain valid and thread-safe for the lifetime
 /// of the registration.
+#[derive(Clone, Copy)]
 pub(crate) struct EventCallbackHandler {
     cb: unsafe extern "C" fn(*const c_char, *mut std::ffi::c_void),
     user_data: *mut std::ffi::c_void,
@@ -839,8 +836,7 @@ pub unsafe extern "C" fn vauchi_app_import_contacts_from_vcf(
         let bytes = unsafe { std::slice::from_raw_parts(data, data_len) };
         let app = unsafe { &*handle };
         match app
-            .engine
-            .lock()
+            .lock_engine()
             .ok()
             .as_mut()
             .and_then(|slot| slot.as_mut())
@@ -887,8 +883,7 @@ pub unsafe extern "C" fn vauchi_app_drain_notifications(handle: *mut VauchiApp) 
             }
             let app = &*handle;
             match app
-                .engine
-                .lock()
+                .lock_engine()
                 .ok()
                 .as_mut()
                 .and_then(|slot| slot.as_mut())

@@ -23,6 +23,7 @@ use vauchi_core::{Command, Event, StorageError, VauchiError};
 use crate::VauchiApp;
 use crate::app::{EventCallbackHandler, open_with_file_key, register_event_callback};
 
+#[derive(Clone)]
 pub(crate) struct KeyringOpen {
     pub(crate) data_path: PathBuf,
     pub(crate) config: VauchiConfig,
@@ -117,7 +118,8 @@ pub(crate) fn open_app(
         config,
         keyring,
     };
-    let app = match params.open() {
+    let reopen = params.clone();
+    let mut app = match params.open() {
         Opened::Engine(vauchi) => VauchiApp::opened(AppEngine::new(*vauchi)),
         Opened::Locked(reason) => VauchiApp::locked(LockedStart {
             presentation: StorageLockPresentation::new(reason, Locale::English),
@@ -125,6 +127,7 @@ pub(crate) fn open_app(
             pending_callback: None,
         }),
     };
+    app.reopen = Some(reopen);
     Box::into_raw(Box::new(app))
 }
 
@@ -134,6 +137,70 @@ impl VauchiApp {
             engine: std::sync::Mutex::new(None),
             locked: std::sync::Mutex::new(Some(start)),
             event_handler_id: std::sync::Mutex::new(None),
+            event_callback: std::sync::Mutex::new(None),
+            reopen: None,
+        }
+    }
+
+    /// The engine slot. An engine whose storage a shred deleted is replaced
+    /// by one opened on a fresh install first (vauchi/private#599); the slot
+    /// is released while reopening, so the locked-start lock is never taken
+    /// while the engine lock is held.
+    pub(crate) fn lock_engine(&self) -> Result<std::sync::MutexGuard<'_, Option<AppEngine>>, ()> {
+        let mut slot = self.engine.lock().map_err(|_| ())?;
+        if !slot.as_mut().is_some_and(AppEngine::take_storage_shredded) {
+            return Ok(slot);
+        }
+        let Some(shredded) = slot.take() else {
+            return Ok(slot);
+        };
+        drop(slot);
+        self.reopen_after_shred(shredded);
+        self.engine.lock().map_err(|_| ())
+    }
+
+    fn reopen_after_shred(&self, previous: AppEngine) {
+        let Some(params) = self.reopen.clone() else {
+            if let Ok(mut slot) = self.engine.lock() {
+                *slot = Some(previous);
+            }
+            return;
+        };
+        let render_context = previous.render_context().clone();
+        let capabilities = previous.device_capabilities().clone();
+        let online = previous.is_network_online();
+        drop(previous);
+        let callback = self.event_callback.lock().ok().and_then(|c| *c);
+        if let Ok(mut handler_id) = self.event_handler_id.lock() {
+            *handler_id = None;
+        }
+        let _ = std::fs::create_dir_all(&params.data_path);
+        match params.open() {
+            Opened::Engine(vauchi) => {
+                let mut engine = AppEngine::new(*vauchi);
+                engine.set_render_context(render_context);
+                engine.set_device_capabilities(capabilities);
+                engine.set_network_online(online);
+                if let Ok(mut slot) = self.engine.lock() {
+                    *slot = Some(engine);
+                }
+                if callback.is_some() {
+                    register_event_callback(self, callback);
+                }
+            }
+            Opened::Locked(reason) => {
+                let start = LockedStart {
+                    presentation: StorageLockPresentation::new(
+                        reason,
+                        render_context.resolved_locale(),
+                    ),
+                    params,
+                    pending_callback: callback.map(Some),
+                };
+                if let Ok(mut locked) = self.locked.lock() {
+                    *locked = Some(start);
+                }
+            }
         }
     }
 

@@ -48,6 +48,11 @@ pub struct VauchiApp {
     pub(crate) locked: Mutex<Option<app_locked::LockedStart>>,
     /// Active event handler ID for cleanup on replacement or destroy.
     pub(crate) event_handler_id: Mutex<Option<vauchi_core::api::HandlerId>>,
+    /// The registered event callback, registered again on a reopened engine.
+    pub(crate) event_callback: Mutex<Option<app::EventCallbackHandler>>,
+    /// How this handle opened storage, to reopen a fresh install after a
+    /// shred (vauchi/private#599); `None` for handles that cannot reopen.
+    pub(crate) reopen: Option<app_locked::KeyringOpen>,
 }
 
 impl VauchiApp {
@@ -56,6 +61,8 @@ impl VauchiApp {
             engine: Mutex::new(Some(engine)),
             locked: Mutex::new(None),
             event_handler_id: Mutex::new(None),
+            event_callback: Mutex::new(None),
+            reopen: None,
         }
     }
 }

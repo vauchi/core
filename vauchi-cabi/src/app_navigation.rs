@@ -80,8 +80,7 @@ pub unsafe extern "C" fn vauchi_app_tab_info(
             let app = &*handle;
             let locale = resolve_locale(locale_code);
             match app
-                .engine
-                .lock()
+                .lock_engine()
                 .ok()
                 .as_mut()
                 .and_then(|slot| slot.as_mut())
@@ -123,8 +122,7 @@ pub unsafe extern "C" fn vauchi_app_sidebar_items(
             let app = &*handle;
             let locale = resolve_locale(locale_code);
             match app
-                .engine
-                .lock()
+                .lock_engine()
                 .ok()
                 .as_mut()
                 .and_then(|slot| slot.as_mut())

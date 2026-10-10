@@ -4,17 +4,19 @@
 
 //! Emergency broadcast, decoy contacts, and configuration accessors.
 
+use std::path::Path;
 use std::sync::Arc;
 
 use crate::contact_card::ContactCard;
 use crate::rng::SecureRngExt;
 
-use crate::storage::Storage;
+use crate::storage::{SecureStorage, Storage, StorageError};
 
 use super::super::config::VauchiConfig;
 use super::super::emergency::{BROADCAST_COOLDOWN_SECS, BroadcastResult};
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventDispatcher, VauchiEvent};
+use super::super::shred::{ShredManager, widget_panic_shred};
 use super::Vauchi;
 use crate::types::{EmergencyBroadcastConfig, MAX_TRUSTED_CONTACTS};
 
@@ -207,14 +209,11 @@ impl Vauchi {
 
     /// Performs an emergency data wipe (panic shred).
     ///
-    /// This is the "nuclear option" — it destroys all local data immediately
-    /// without the normal 7-day grace period. Requires explicit confirmation.
-    ///
-    /// If `confirm` is false, returns an error asking for confirmation.
-    /// This prevents accidental wipes from buggy callers.
-    ///
-    /// The actual implementation delegates to `ShredManager::panic_shred()`
-    /// or, if no ShredManager is available, directly clears all storage tables.
+    /// The crypto-shred (vauchi/private#599): every key that opens the data
+    /// is deleted from secure storage, then the database and the data
+    /// directory, through [`ShredManager::panic_shred`]; a copy of the data
+    /// taken before the wipe then has no key left that opens it. Requires
+    /// explicit confirmation, so a buggy caller cannot wipe by accident.
     pub fn perform_emergency_wipe(&mut self, confirm: bool) -> VauchiResult<()> {
         if !confirm {
             return Err(VauchiError::InvalidState(
@@ -234,6 +233,40 @@ impl Vauchi {
             let _ = self.broadcast_identity_revocations(&deliveries);
         }
 
+        let data_dir = self
+            .storage
+            .db_path()
+            .and_then(Path::parent)
+            .map(Path::to_path_buf);
+        match data_dir {
+            Some(data_dir) => self.shred_data_directory(&data_dir)?,
+            // An in-memory database ends with the process; there is no file
+            // or directory to shred, and its parent is not ours to delete.
+            None => self.clear_in_memory_data()?,
+        }
+        self.identity = None;
+        Ok(())
+    }
+
+    fn shred_data_directory(&self, data_dir: &Path) -> VauchiResult<()> {
+        let keyless = NoSecureStorage;
+        let secure: &dyn SecureStorage = self.secure_storage.as_deref().unwrap_or(&keyless);
+        let report = match self.identity.as_ref() {
+            Some(identity) => {
+                ShredManager::new(&self.storage, secure, identity, data_dir).panic_shred(None, None)
+            }
+            None => widget_panic_shred(data_dir, secure),
+        }
+        .map_err(|e| VauchiError::Configuration(format!("Emergency wipe failed: {e}")))?;
+        if !report.smk_destroyed {
+            return Err(VauchiError::Configuration(
+                "Emergency wipe could not delete the storage keys".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn clear_in_memory_data(&mut self) -> VauchiResult<()> {
         // Clear all contacts
         let contacts = self.storage.contacts().list_contacts()?;
         for contact in &contacts {
@@ -260,14 +293,7 @@ impl Vauchi {
             .consent()
             .save_deletion_state(&crate::storage::DeletionState::Executed { executed_at: now })?;
 
-        // Clear identity — both in-memory and the persisted row.
-        // Without delete_identity() the wipe leaves the identity row in
-        // storage; has_identity() (which falls back to storage) would
-        // still return true and the user's master seed would survive a
-        // restart.
-        self.identity = None;
         self.storage.identity().delete_identity()?;
-
         Ok(())
     }
 
@@ -493,5 +519,21 @@ impl Vauchi {
             dispatched += 1;
         }
         Ok(dispatched)
+    }
+}
+
+/// Secure storage for an install without one: it holds no keys, so deleting
+/// succeeds and nothing is left behind.
+struct NoSecureStorage;
+
+impl SecureStorage for NoSecureStorage {
+    fn save_key(&self, _: &str, _: &[u8]) -> Result<(), StorageError> {
+        Err(StorageError::SecureStorageUnavailable)
+    }
+    fn load_key(&self, _: &str) -> Result<Option<Vec<u8>>, StorageError> {
+        Ok(None)
+    }
+    fn delete_key(&self, _: &str) -> Result<(), StorageError> {
+        Ok(())
     }
 }

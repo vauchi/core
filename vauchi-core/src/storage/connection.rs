@@ -67,6 +67,11 @@ impl Storage {
     }
 
     /// Creates an in-memory storage (for testing).
+    /// The database file, or `None` for an in-memory database.
+    pub fn db_path(&self) -> Option<&Path> {
+        self.db_path.as_deref()
+    }
+
     pub fn in_memory(encryption_key: SymmetricKey) -> Result<Self, StorageError> {
         let conn = Connection::open_in_memory()?;
         Self::configure_pragmas(&conn)?;

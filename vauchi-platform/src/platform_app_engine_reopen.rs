@@ -6,23 +6,11 @@
 //! the shred deleted the database the old engine held, so anything created
 //! through it would be written into a deleted file.
 
-use std::sync::Arc;
-
 use vauchi_app::ui::AppEngine;
 
+use crate::PlatformAppEngine;
 use crate::error::MobileError;
 use crate::platform_app_engine_locked::{LockedStart, OpenParams, Opened};
-use crate::{PlatformAppEngine, PlatformEventListener};
-
-/// The registered listener, shared with the direct-call slot, handed to a
-/// locked start that registers it once storage opens.
-struct SharedListener(Arc<Box<dyn PlatformEventListener>>);
-
-impl PlatformEventListener for SharedListener {
-    fn on_presentation_invalidated(&self) {
-        self.0.on_presentation_invalidated();
-    }
-}
 
 impl PlatformAppEngine {
     /// Replaces the shredded `previous` engine with one opened on a fresh
@@ -85,8 +73,7 @@ impl PlatformAppEngine {
                 start.keep_render_context(render_context);
                 start.pending.capabilities = Some(capabilities);
                 start.pending.network_online = Some(online);
-                start.pending.listener =
-                    listener.map(|l| Box::new(SharedListener(l)) as Box<dyn PlatformEventListener>);
+                start.pending.listener = listener;
                 *self.lock_locked_start()? = Some(start);
             }
         }

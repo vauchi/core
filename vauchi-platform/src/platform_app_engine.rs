@@ -742,7 +742,7 @@ impl PlatformAppEngine {
         listener: Box<dyn PlatformEventListener>,
     ) -> Result<(), MobileError> {
         let Some(listener) = self.keep_while_locked(listener, |start, listener| {
-            start.pending.listener = Some(listener)
+            start.pending.listener = Some(Arc::new(listener))
         })?
         else {
             return Ok(());

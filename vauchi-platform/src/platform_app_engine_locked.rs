@@ -85,7 +85,7 @@ pub(crate) struct PendingSetup {
     pub(crate) network_online: Option<bool>,
     /// The shell reports its window once; the opened engine needs it too.
     pub(crate) environment: Option<Event>,
-    pub(crate) listener: Option<Box<dyn PlatformEventListener>>,
+    pub(crate) listener: Option<Arc<Box<dyn PlatformEventListener>>>,
 }
 
 pub(crate) struct LockedStart {
@@ -244,7 +244,7 @@ impl PlatformAppEngine {
                 *self.lock_engine()? = Some(engine);
                 *locked = None;
                 if let Some(listener) = pending.listener {
-                    self.register_event_listener(listener)?;
+                    self.attach_event_listener(listener)?;
                 }
                 Ok(commands)
             }

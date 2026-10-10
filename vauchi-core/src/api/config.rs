@@ -529,8 +529,15 @@ pub struct SyncConfig {
     /// Automatically sync on contact card changes.
     pub auto_sync: bool,
 
-    /// Sync interval in milliseconds (0 = manual only).
+    /// Mean gap between background syncs in milliseconds (0 = manual only).
+    /// Gaps are exponential around it, clamped to the bounds below.
     pub sync_interval_ms: u64,
+
+    /// Shortest gap between background syncs, in milliseconds.
+    pub sync_interval_min_ms: u64,
+
+    /// Longest gap between background syncs, in milliseconds.
+    pub sync_interval_max_ms: u64,
 
     /// Maximum pending updates before forcing sync.
     pub max_pending_updates: usize,
@@ -549,10 +556,6 @@ pub struct SyncConfig {
     /// Maximum delay before first sync after exchange (milliseconds).
     pub post_exchange_delay_max_ms: u64,
 
-    /// Jitter percentage applied to `sync_interval_ms` (0-50, default 15).
-    /// Actual interval = `sync_interval_ms` +/- jitter%.
-    pub sync_interval_jitter_percent: u32,
-
     /// Enable payload padding to bucket sizes (256, 512, 1024, 4096).
     /// Prevents message size analysis. Aligned with relay bucket sizes.
     pub padding_enabled: bool,
@@ -562,12 +565,13 @@ impl Default for SyncConfig {
     fn default() -> Self {
         SyncConfig {
             auto_sync: true,
-            sync_interval_ms: 60_000, // 1 minute
+            sync_interval_ms: 60_000,      // 1 minute mean
+            sync_interval_min_ms: 10_000,  // 10 seconds
+            sync_interval_max_ms: 300_000, // 5 minutes
             max_pending_updates: 50,
             batch_size: Some(20),
             post_exchange_delay_min_ms: 30_000,  // 30 seconds
             post_exchange_delay_max_ms: 300_000, // 5 minutes
-            sync_interval_jitter_percent: 15,
             padding_enabled: true,
         }
     }
@@ -588,19 +592,24 @@ impl SyncConfig {
         Duration::from_millis(ms)
     }
 
-    /// Returns the sync interval with random jitter applied.
-    ///
-    /// Jitter is capped at 50% to prevent degenerate intervals.
-    pub fn jittered_sync_interval(&self, rng: &dyn crate::rng::SecureRng) -> Duration {
-        let base = self.sync_interval_ms;
-        let pct = self.sync_interval_jitter_percent.min(50) as u64;
-        if pct == 0 {
-            return Duration::from_millis(base);
+    /// The gap before the next background sync: exponential around
+    /// `sync_interval_ms`, clamped to `[sync_interval_min_ms,
+    /// sync_interval_max_ms]`. Memoryless gaps leave no fixed period for a
+    /// relay hop to recognise; the same schedule applies whether or not the
+    /// app is open (owner decision 2026-10-10, private#603).
+    pub fn next_sync_interval(&self, rng: &dyn crate::rng::SecureRng) -> Duration {
+        let mean = self.sync_interval_ms;
+        if mean == 0 {
+            return Duration::ZERO;
         }
-        let delta = base * pct / 100;
-        let min = base.saturating_sub(delta);
-        let max = base + delta;
-        let ms = rng.random_in_range_u64(min, max);
+        let (min, max) = (
+            self.sync_interval_min_ms,
+            self.sync_interval_max_ms.max(self.sync_interval_min_ms),
+        );
+        // u in (0, 1]: 53 random bits, offset by one so ln(u) stays finite.
+        let u = (rng.random_u64() >> 11).saturating_add(1) as f64 / (1u64 << 53) as f64;
+        let sample = -(mean as f64) * u.ln();
+        let ms = sample.clamp(min as f64, max as f64).round() as u64;
         Duration::from_millis(ms)
     }
 }

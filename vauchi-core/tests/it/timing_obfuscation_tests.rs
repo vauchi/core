@@ -151,5 +151,7 @@ fn test_sync_config_timing_defaults() {
     let config = SyncConfig::default();
     assert_eq!(config.post_exchange_delay_min_ms, 30_000);
     assert_eq!(config.post_exchange_delay_max_ms, 300_000);
-    assert_eq!(config.sync_interval_jitter_percent, 15);
+    assert_eq!(config.sync_interval_ms, 60_000);
+    assert_eq!(config.sync_interval_min_ms, 10_000);
+    assert_eq!(config.sync_interval_max_ms, 300_000);
 }

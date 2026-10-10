@@ -717,7 +717,7 @@ impl Vauchi {
     /// render a "Last synced X ago" caption (humble-UI follow-up to ios!472).
     fn update_timing_after_sync(&mut self) {
         let c2_deadline =
-            self.monotonic.now() + self.config.sync.jittered_sync_interval(self.rng.as_ref());
+            self.monotonic.now() + self.config.sync.next_sync_interval(self.rng.as_ref());
 
         let deadline = if let Some(exchange_time) = self.last_exchange_time {
             let max_delay = Duration::from_millis(self.config.sync.post_exchange_delay_max_ms);
@@ -1547,7 +1547,8 @@ mod tests {
         let fake = Arc::new(FakeMonotonicClock::new());
         let mut v = Vauchi::in_memory().unwrap().with_monotonic(fake.clone());
         v.config.sync.sync_interval_ms = 1_000;
-        v.config.sync.sync_interval_jitter_percent = 0;
+        v.config.sync.sync_interval_min_ms = 1_000;
+        v.config.sync.sync_interval_max_ms = 1_000;
         v.config.sync.post_exchange_delay_min_ms = 300_000;
         v.config.sync.post_exchange_delay_max_ms = 300_000;
         let exchanged_at = fake.now();

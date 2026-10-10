@@ -199,6 +199,7 @@ mod dual_vauchi_repro_test;
 mod duplicate_detection_engine_tests;
 mod duress_alert_secondary_device_tests;
 mod duress_contact_api_tests;
+mod duress_contact_reads_by_id_tests;
 mod duress_mode_concealment_tests;
 mod duress_mode_device_tests;
 mod duress_mode_vocabulary_tests;

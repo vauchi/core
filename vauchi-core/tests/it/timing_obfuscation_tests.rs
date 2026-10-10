@@ -59,60 +59,79 @@ fn test_post_exchange_delay_min_greater_than_max() {
     );
 }
 
-// --- C2: Sync Interval Jitter ---
+// --- C2: Sync interval schedule (private#603) ---
+//
+// Owner decision 2026-10-10: gaps between polls are exponential with a
+// 60 s mean, clamped to 10 s-5 min. A fixed period (60 s +/-15%) is a
+// timing signature a hop can recognise; memoryless gaps are not.
+
+fn sample_intervals(config: &SyncConfig, n: usize) -> Vec<f64> {
+    let rng = vauchi_core::rng::OsSecureRng::new();
+    (0..n)
+        .map(|_| config.next_sync_interval(&rng).as_secs_f64())
+        .collect()
+}
 
 // @internal
 #[test]
-fn test_jittered_sync_interval_in_range() {
-    let config = SyncConfig {
-        sync_interval_ms: 60_000,
-        sync_interval_jitter_percent: 15,
-        ..Default::default()
-    };
-    for _ in 0..100 {
-        let interval = config.jittered_sync_interval(&vauchi_core::rng::OsSecureRng::new());
+fn test_sync_intervals_stay_within_bounds() {
+    let config = SyncConfig::default();
+    for gap in sample_intervals(&config, 5_000) {
         assert!(
-            interval >= Duration::from_millis(51_000),
-            "interval {interval:?} below 51s (60s - 15%)"
-        );
-        assert!(
-            interval <= Duration::from_millis(69_000),
-            "interval {interval:?} above 69s (60s + 15%)"
+            (10.0..=300.0).contains(&gap),
+            "gap {gap}s outside 10 s-5 min"
         );
     }
 }
 
 // @internal
 #[test]
-fn test_zero_jitter_returns_exact_interval() {
-    let config = SyncConfig {
-        sync_interval_ms: 60_000,
-        sync_interval_jitter_percent: 0,
-        ..Default::default()
-    };
-    let interval = config.jittered_sync_interval(&vauchi_core::rng::OsSecureRng::new());
-    assert_eq!(interval, Duration::from_secs(60));
+fn test_sync_intervals_are_exponential_around_a_60s_mean() {
+    let gaps = sample_intervals(&SyncConfig::default(), 20_000);
+    let n = gaps.len() as f64;
+    let mean = gaps.iter().sum::<f64>() / n;
+    // Clamping lifts the mean of Exp(60 s) to about 60.4 s.
+    assert!((57.0..=64.0).contains(&mean), "mean {mean}s");
+    // P(X < 60 s) = 1 - 1/e = 0.632 for an exponential; a 60 s +/-15%
+    // uniform schedule gives 0.5, so this separates the two.
+    let below_mean = gaps.iter().filter(|g| **g < 60.0).count() as f64 / n;
+    assert!(
+        (0.60..=0.66).contains(&below_mean),
+        "P(gap < 60 s) = {below_mean}"
+    );
+    // P(X <= 10 s) = 1 - e^(-1/6) = 0.154, all clamped to the floor.
+    let at_floor = gaps.iter().filter(|g| **g <= 10.0).count() as f64 / n;
+    assert!(
+        (0.13..=0.18).contains(&at_floor),
+        "P(gap = 10 s) = {at_floor}"
+    );
 }
 
 // @internal
 #[test]
-fn test_jitter_capped_at_50_percent() {
+fn test_equal_bounds_pin_the_interval() {
     let config = SyncConfig {
         sync_interval_ms: 60_000,
-        sync_interval_jitter_percent: 100, // should be capped to 50
+        sync_interval_min_ms: 1_000,
+        sync_interval_max_ms: 1_000,
         ..Default::default()
     };
-    for _ in 0..100 {
-        let interval = config.jittered_sync_interval(&vauchi_core::rng::OsSecureRng::new());
-        assert!(
-            interval >= Duration::from_millis(30_000),
-            "interval {interval:?} below 30s (60s - 50%)"
-        );
-        assert!(
-            interval <= Duration::from_millis(90_000),
-            "interval {interval:?} above 90s (60s + 50%)"
-        );
+    for gap in sample_intervals(&config, 100) {
+        assert_eq!(gap, 1.0);
     }
+}
+
+// @internal
+#[test]
+fn test_zero_interval_means_manual_sync_only() {
+    let config = SyncConfig {
+        sync_interval_ms: 0,
+        ..Default::default()
+    };
+    assert_eq!(
+        config.next_sync_interval(&vauchi_core::rng::OsSecureRng::new()),
+        Duration::ZERO
+    );
 }
 
 // --- C3: Padding Config ---

@@ -128,47 +128,6 @@ impl DeviceLinkInitiator {
         self.build_response(request, Some(sync_payload_json), proof, now)
     }
 
-    /// Processes a link request and creates a response.
-    ///
-    /// Returns the encrypted response and the updated registry with the new device.
-    #[deprecated(note = "Use prepare_confirmation() + confirm_link() for user verification")]
-    pub fn process_request(
-        &self,
-        encrypted_request: &[u8],
-        proof: &ProximityProof,
-        now: u64,
-    ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
-
-        if request.device_name.is_empty() {
-            return Err(ExchangeError::InvalidQRFormat);
-        }
-
-        self.build_response(&request, None, proof, now)
-    }
-
-    /// Processes a link request and creates a response with sync payload.
-    ///
-    /// This variant includes the full sync payload for the new device.
-    #[deprecated(
-        note = "Use prepare_confirmation() + confirm_link_with_sync() for user verification"
-    )]
-    pub fn process_request_with_sync(
-        &self,
-        encrypted_request: &[u8],
-        sync_payload_json: &str,
-        proof: &ProximityProof,
-        now: u64,
-    ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
-
-        if request.device_name.is_empty() {
-            return Err(ExchangeError::InvalidQRFormat);
-        }
-
-        self.build_response(&request, Some(sync_payload_json), proof, now)
-    }
-
     /// Internal helper to build the response from a validated request.
     ///
     /// Validates the proximity proof cryptographically before releasing the
@@ -336,43 +295,6 @@ impl DeviceLinkInitiatorRestored {
         now: u64,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
         self.build_response(request, Some(sync_payload_json), proof, now)
-    }
-
-    /// Processes a link request and creates a response.
-    #[deprecated(note = "Use prepare_confirmation() + confirm_link() for user verification")]
-    pub fn process_request(
-        &self,
-        encrypted_request: &[u8],
-        proof: &ProximityProof,
-        now: u64,
-    ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
-
-        if request.device_name.is_empty() {
-            return Err(ExchangeError::InvalidQRFormat);
-        }
-
-        self.build_response(&request, None, proof, now)
-    }
-
-    /// Processes a link request with sync payload and creates a response.
-    #[deprecated(
-        note = "Use prepare_confirmation() + confirm_link_with_sync() for user verification"
-    )]
-    pub fn process_request_with_sync(
-        &self,
-        encrypted_request: &[u8],
-        sync_payload_json: &str,
-        proof: &ProximityProof,
-        now: u64,
-    ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
-
-        if request.device_name.is_empty() {
-            return Err(ExchangeError::InvalidQRFormat);
-        }
-
-        self.build_response(&request, Some(sync_payload_json), proof, now)
     }
 
     /// Internal helper to build the response from a validated request.

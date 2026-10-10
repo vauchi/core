@@ -157,7 +157,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_device_link_full_flow() {
         let master_seed_a = [0x42u8; 32];
         let identity_a = Identity::create("Alice", 0);
@@ -174,9 +173,9 @@ mod tests {
 
         let encrypted_request = responder.create_request(0u64).unwrap();
 
-        let (encrypted_response, updated_registry, new_device) = initiator
-            .process_request(&encrypted_request, &proof, 0u64)
-            .unwrap();
+        let (_, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
+        let (encrypted_response, updated_registry, new_device) =
+            initiator.confirm_link(&request, &proof, 0u64).unwrap();
 
         let response = responder.process_response(&encrypted_response).unwrap();
 
@@ -349,13 +348,11 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
-    fn test_device_link_process_request_empty_device_name() {
+    fn test_device_link_prepare_confirmation_empty_device_name() {
         let master_seed = [0x42u8; 32];
         let identity = Identity::create("Alice", 0);
         let registry = create_test_registry(&identity);
         let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry, 0u64);
-        let proof = create_valid_proof(initiator.proximity_challenge());
 
         let request = DeviceLinkRequest {
             device_name: "".to_string(),
@@ -364,7 +361,7 @@ mod tests {
         };
         let encrypted = request.encrypt(initiator.qr().link_key()).unwrap();
 
-        let result = initiator.process_request(&encrypted, &proof, 0u64);
+        let result = initiator.prepare_confirmation(&encrypted);
         assert!(matches!(result, Err(ExchangeError::InvalidQRFormat)));
     }
 
@@ -450,7 +447,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_device_link_with_full_sync_payload() {
         let master_seed = [0x42u8; 32];
         let identity = Identity::create("Alice", 0);
@@ -488,8 +484,9 @@ mod tests {
 
         let encrypted_request = responder.create_request(0u64).unwrap();
 
+        let (_, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
         let (encrypted_response, _updated_registry, _new_device) = initiator
-            .process_request_with_sync(&encrypted_request, &sync_json, &proof, 0u64)
+            .confirm_link_with_sync(&request, &sync_json, &proof, 0u64)
             .unwrap();
 
         let response = responder.process_response(&encrypted_response).unwrap();
@@ -516,7 +513,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_device_link_initiator_restored_flow() {
         let master_seed = [0x42u8; 32];
         let identity = Identity::create("Alice", 0);
@@ -536,8 +532,11 @@ mod tests {
             DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string(), 0u64).unwrap();
         let encrypted_request = responder.create_request(0u64).unwrap();
 
+        let (_, request) = restored_initiator
+            .prepare_confirmation(&encrypted_request)
+            .unwrap();
         let (encrypted_response, updated_registry, new_device) = restored_initiator
-            .process_request(&encrypted_request, &proof, 0u64)
+            .confirm_link(&request, &proof, 0u64)
             .unwrap();
 
         let response = responder.process_response(&encrypted_response).unwrap();
@@ -721,7 +720,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_deprecated_process_request_still_works() {
         let master_seed = [0x42u8; 32];
         let identity = Identity::create("Alice", 0);
@@ -737,9 +735,9 @@ mod tests {
 
         let encrypted_request = responder.create_request(0u64).unwrap();
 
-        let (encrypted_response, updated_registry, new_device) = initiator
-            .process_request(&encrypted_request, &proof, 0u64)
-            .unwrap();
+        let (_, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
+        let (encrypted_response, updated_registry, new_device) =
+            initiator.confirm_link(&request, &proof, 0u64).unwrap();
 
         let response = responder.process_response(&encrypted_response).unwrap();
 

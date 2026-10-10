@@ -245,51 +245,6 @@ fn test_restored_initiator_requires_proximity() {
     );
 }
 
-// @internal
-#[test]
-#[allow(deprecated)]
-fn test_deprecated_process_request_requires_proximity() {
-    let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice", 0);
-    let registry = create_test_registry(&identity);
-
-    // Initiator with wrong proximity proof
-    let initiator = DeviceLinkInitiator::new(
-        master_seed,
-        &identity,
-        registry,
-        vauchi_core::clock::SystemClock::shared().unix_seconds(),
-    );
-
-    let qr_string = initiator.qr().to_data_string();
-    let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder = DeviceLinkResponder::from_qr(
-        scanned_qr,
-        "My Phone".to_string(),
-        vauchi_core::clock::SystemClock::shared().unix_seconds(),
-    )
-    .unwrap();
-    let encrypted_request = responder
-        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
-        .unwrap();
-
-    // Deprecated process_request() should also enforce proximity
-    let wrong_proof = ProximityProof::Ultrasonic {
-        challenge_response: [0xFFu8; 16],
-        verified_at: now_unix_secs(),
-    };
-    let result = initiator.process_request(
-        &encrypted_request,
-        &wrong_proof,
-        vauchi_core::clock::SystemClock::shared().unix_seconds(),
-    );
-    assert!(
-        matches!(result, Err(ExchangeError::ProximityNotVerified)),
-        "Expected ProximityNotVerified on deprecated API, got: {:?}",
-        result.err()
-    );
-}
-
 // ---------------------------------------------------------------------------
 // Evidence-based proximity proof tests (TDD red phase)
 //

@@ -200,6 +200,7 @@ const SYNC_ITEM_VISIBILITY_CHANGED_V1: &str = r#"{
 /// SerializedRatchetState V1.
 /// Persistence format for Double Ratchet state.
 const SERIALIZED_RATCHET_STATE_V1: &str = r#"{
+    "version": 1,
     "root_key": [10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200,210,220,230,240,250,1,2,3,4,5,6,7],
     "our_dh_secret": [7,6,5,4,3,2,1,0,7,6,5,4,3,2,1,0,7,6,5,4,3,2,1,0,7,6,5,4,3,2,1,0],
     "their_dh": [8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8],

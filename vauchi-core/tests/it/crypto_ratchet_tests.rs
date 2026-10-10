@@ -527,15 +527,18 @@ fn the_serialized_state_records_counts_and_generation() {
 
 // @internal
 #[test]
-fn a_saved_state_from_before_versioning_loads_as_version_one() {
+fn a_saved_state_without_a_version_is_refused() {
     let (alice, _) = create_test_pair();
     let mut json = serde_json::to_value(alice.serialize()).unwrap();
     json.as_object_mut().unwrap().remove("version");
 
-    let state: vauchi_core::crypto::ratchet::SerializedRatchetState =
-        serde_json::from_value(json).unwrap();
+    let err = serde_json::from_value::<vauchi_core::crypto::ratchet::SerializedRatchetState>(json)
+        .unwrap_err();
 
-    assert_eq!(state.version, 1);
+    assert!(
+        err.to_string().contains("version"),
+        "unexpected error: {err}"
+    );
 }
 
 // Debug output reaches logs and panics, so it must carry counters only.

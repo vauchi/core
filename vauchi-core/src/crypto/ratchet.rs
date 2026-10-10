@@ -78,7 +78,6 @@ pub const RATCHET_STATE_VERSION: u8 = 1;
 #[derive(Clone, Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
 pub struct SerializedRatchetState {
     /// Schema version for forward compatibility (#236)
-    #[serde(default = "default_ratchet_version")]
     pub version: u8,
     /// Root key for deriving new chain keys
     pub root_key: [u8; 32],
@@ -100,11 +99,6 @@ pub struct SerializedRatchetState {
     pub previous_send_chain_length: u32,
     /// Skipped message keys: (dh_gen, msg_index) -> key_bytes
     pub skipped_keys: Vec<((u32, u32), [u8; 32])>,
-}
-
-/// Default version for deserializing ratchet states that predate the version field.
-fn default_ratchet_version() -> u8 {
-    1
 }
 
 impl std::fmt::Debug for SerializedRatchetState {

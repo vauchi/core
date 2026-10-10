@@ -537,7 +537,6 @@ pub const RECOVERY_CLAIM_MIN_INPUT_LEN: usize = 20;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RecoveryProof {
     /// Schema version for forward compatibility (#72).
-    #[serde(default = "default_proof_version")]
     version: u8,
     old_pk: IdentityKey,
     new_pk: IdentityKey,
@@ -545,11 +544,6 @@ pub struct RecoveryProof {
     vouchers: Vec<RecoveryVoucher>,
     created_at: u64,
     expires_at: u64,
-}
-
-/// Default version for deserializing proofs that predate the version field.
-fn default_proof_version() -> u8 {
-    1
 }
 
 impl RecoveryProof {

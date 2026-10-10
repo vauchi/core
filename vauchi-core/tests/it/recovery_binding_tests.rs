@@ -194,13 +194,16 @@ fn a_revocation_keeps_the_time_it_was_made() {
 
 // @internal
 #[test]
-fn a_proof_saved_before_versioning_loads_as_version_one() {
+fn a_proof_without_a_version_is_refused() {
     let mut json = serde_json::to_value(RecoveryProof::new(&OLD, &NEW, 1, 0)).unwrap();
     json.as_object_mut().unwrap().remove("version");
 
-    let proof: RecoveryProof = serde_json::from_value(json).unwrap();
+    let err = serde_json::from_value::<RecoveryProof>(json).unwrap_err();
 
-    assert_eq!(proof.version(), 1);
+    assert!(
+        err.to_string().contains("version"),
+        "unexpected error: {err}"
+    );
 }
 
 // @internal

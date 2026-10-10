@@ -26,6 +26,7 @@ mod platform_app_engine_keychain_open_tests;
 mod platform_app_engine_link_responder_tests;
 mod platform_app_engine_locked_start_tests;
 mod platform_app_engine_recovery_tests;
+mod platform_app_engine_shred_reopen_tests;
 mod platform_app_engine_shred_tests;
 mod platform_app_engine_tests;
 mod policies_tests;

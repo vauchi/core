@@ -21,6 +21,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - Settings → Advanced → Wipe All Data opens the shred screen, where typing
   WIPE runs the shred; its inline confirm deleted nothing
   (vauchi/private#598).
+- A keychain callback that fails in a way the platform did not declare
+  reaches Core as a keychain failure instead of aborting the process.
 
 ### Added
 

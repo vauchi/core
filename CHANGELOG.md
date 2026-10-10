@@ -6,6 +6,17 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.79.1] — 2026-10-10
+
+### Fixed
+
+- A duress PIN is stored as typed (vauchi/private#618). The setup read
+  every value as digits to append, so a shell sending its whole field on
+  each keystroke (Android) stored `665654` for `654321`. A value is now
+  the whole field: leading `•` stand for the digits Core already holds,
+  digits after them are typed. Non-digits are still dropped and the
+  length capped.
+
 ## [0.79.0] — 2026-10-10
 
 ### Changed

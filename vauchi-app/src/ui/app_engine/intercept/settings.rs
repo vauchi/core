@@ -212,14 +212,14 @@ impl AppEngine {
                     });
                     return Some(ActionResult::NavigateTo(screen));
                 }
-                // Only on the main screen. The `danger` group that carries this
-                // row is built solely by `advanced_screen()`, which owns the
-                // inline-confirm flow, so widening the guard without this
-                // scope would hijack that flow (M6 D6.1). The arm is kept —
-                // rather than deleted as unreachable — because it guards a
-                // destructive action and `app_engine_settings_lock_tests::
-                // settings_emergency_wipe_navigates_to_shred` still pins it.
-                "emergency_wipe" if self.screen == AppScreen::Settings => {
+                // One shred screen, with its typed confirmation, for every
+                // wipe row (vauchi/private#598).
+                "emergency_wipe"
+                    if matches!(
+                        self.screen,
+                        AppScreen::Settings | AppScreen::SettingsAdvanced
+                    ) =>
+                {
                     let screen = self.navigate_to(AppScreen::EmergencyShred);
                     return Some(ActionResult::NavigateTo(screen));
                 }

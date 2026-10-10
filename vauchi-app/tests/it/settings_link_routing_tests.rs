@@ -259,24 +259,13 @@ fn advanced_tapping_failed_deliveries_navigates_to_delivery_status() {
 
 // @internal
 #[test]
-fn advanced_tapping_emergency_wipe_shows_inline_confirm() {
+fn advanced_tapping_emergency_wipe_opens_the_shred_screen() {
     let mut engine = engine_on(AppScreen::SettingsAdvanced);
     let _ = tap_row(&mut engine, "emergency_wipe");
     assert_eq!(
         *engine.current_app_screen(),
-        AppScreen::SettingsAdvanced,
-        "emergency_wipe keeps the inline-confirm flow on the advanced screen"
-    );
-    assert!(
-        engine
-            .current_screen()
-            .components
-            .iter()
-            .any(|component| matches!(
-                component,
-                Component::InlineConfirm { id, .. } if id == "emergency_wipe"
-            )),
-        "emergency_wipe tap must reveal the inline confirmation"
+        AppScreen::EmergencyShred,
+        "the wipe row opens the shred screen and its typed confirmation (#598)"
     );
 }
 

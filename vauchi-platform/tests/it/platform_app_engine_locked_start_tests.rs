@@ -7,6 +7,8 @@
 //! Core's unlock or recovery screen through the normal presentation calls
 //! (vauchi/private#580, ADR-043 Amendment 7 §3). Nothing is deleted until
 //! the person confirms.
+//!
+//! Traces to: features/storage_key_upgrade.feature
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -601,18 +603,38 @@ fn a_prompt_that_opens_storage_unlocks_when_no_duress_pin_is_set_up() {
     );
 }
 
-/// An install from before #580 whose old key reaches Core as the bootstrap
-/// key, as the Android and iOS keychain bridges serve it.
+const IMPORTED_CONTACT: &str =
+    "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:before-580\r\nFN:Carol\r\nEND:VCARD\r\n";
+
+fn contact_count(engine: &PlatformAppEngine) -> u32 {
+    match engine
+        .dispatch_domain_command(vauchi_platform::DomainCommand::ContactCount)
+        .expect("contact count")
+    {
+        vauchi_platform::DomainCommandResult::Count { value } => value,
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+/// An install from before #580, with one contact, whose old key reaches
+/// Core as the bootstrap key, as the Android and iOS keychain bridges serve
+/// it.
 fn installed_before_with_its_key_as_bootstrap(dir: &tempfile::TempDir) -> ControlledKeychain {
     let old_key = vauchi_core::crypto::SymmetricKey::generate();
-    drive_onboarding(
-        &PlatformAppEngine::new(
-            dir.path().to_string_lossy().to_string(),
-            RELAY.into(),
-            old_key.as_bytes().to_vec(),
-        )
-        .unwrap(),
-    );
+    let before = PlatformAppEngine::new(
+        dir.path().to_string_lossy().to_string(),
+        RELAY.into(),
+        old_key.as_bytes().to_vec(),
+    )
+    .unwrap();
+    drive_onboarding(&before);
+    before
+        .dispatch_domain_command(vauchi_platform::DomainCommand::ImportContactsFromVcf {
+            data: IMPORTED_CONTACT.as_bytes().to_vec(),
+        })
+        .expect("import a contact");
+    assert_eq!(contact_count(&before), 1);
+    drop(before);
     let keychain = ControlledKeychain::new(SharedKeychain::new());
     keychain
         .store
@@ -664,6 +686,7 @@ fn the_unlock_finishes_the_upgrade_the_locked_keychain_held_up() {
         "got {opened}"
     );
     assert!(engine.has_identity().unwrap());
+    assert_eq!(contact_count(&engine), 1);
     assert_eq!(keychain.store.names(), ["smk"]);
 }
 
@@ -684,4 +707,25 @@ fn an_upgrade_whose_keychain_fails_the_smk_for_another_reason_offers_try_again()
 
     let batch = parse(engine.initial_commands_json().unwrap());
     assert_eq!(surface(&batch), "storage_lock.unavailable");
+}
+
+// @internal
+#[test]
+fn an_upgrade_whose_keychain_answers_keeps_everything_and_leaves_only_the_smk() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = installed_before_with_its_key_as_bootstrap(&dir);
+
+    let engine = PlatformAppEngine::open_with_keychain(
+        dir.path().to_string_lossy().to_string(),
+        RELAY.into(),
+        None,
+        Box::new(keychain.clone()),
+    )
+    .unwrap();
+
+    let batch = parse(engine.initial_commands_json().unwrap());
+    assert!(!surface(&batch).starts_with("storage_lock"), "got {batch}");
+    assert!(engine.has_identity().unwrap());
+    assert_eq!(contact_count(&engine), 1);
+    assert_eq!(keychain.store.names(), ["smk"]);
 }

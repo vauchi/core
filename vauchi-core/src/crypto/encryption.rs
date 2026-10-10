@@ -193,7 +193,7 @@ pub fn decrypt(key: &SymmetricKey, ciphertext: &[u8]) -> Result<Vec<u8>, Encrypt
 /// Decrypts data with associated data, auto-detecting the algorithm.
 ///
 /// For tag `0x03` (AD-bound), the provided AD is used for authentication.
-/// For tag `0x02`, AD is ignored (backward compatibility with non-AD ciphertext).
+/// For tag `0x02` (ciphertext from [`encrypt`], no AD), the AD is not checked.
 pub fn decrypt_with_ad(
     key: &SymmetricKey,
     ciphertext: &[u8],

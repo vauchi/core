@@ -139,7 +139,7 @@ pub enum ReceiveOutcome {
 /// 1. Revoked sender check
 /// 2. Blocked contact check
 /// 3. Ratchet decryption
-/// 4. Versioned payload handling (CEK-wrapped or legacy)
+/// 4. Versioned payload handling (CEK-wrapped only)
 /// 5. Signature verification (sender + recipient key binding)
 /// 6. Replay detection
 /// 7. Delta application
@@ -539,7 +539,7 @@ fn process_single_card_update_for_device_with_budget(
         );
     }
 
-    // 4. Handle versioned payload (CEK-wrapped or legacy)
+    // 4. Handle versioned payload (CEK-wrapped only)
     let (delta_bytes, new_cek) = decode_versioned_payload(&plaintext)?;
 
     // 5. Parse delta

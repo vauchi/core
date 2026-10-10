@@ -188,14 +188,21 @@ fn test_encrypt_with_ad_cannot_decrypt_without_ad() {
 
 // @internal
 #[test]
-fn test_decrypt_with_ad_backward_compat_tag_0x02() {
+// A ciphertext without associated data (tag 0x02) must not pass where the AD
+// binds it to its context (vauchi/private#574).
+fn decrypt_with_ad_refuses_a_ciphertext_without_ad() {
     let key = SymmetricKey::generate();
-    let plaintext = b"old message";
-    // Encrypt with tag 0x02 (no AD)
-    let ciphertext = encrypt(&key, plaintext).unwrap();
-    // decrypt_with_ad should handle tag 0x02 by ignoring AD
-    let decrypted = decrypt_with_ad(&key, &ciphertext, b"ignored-ad").unwrap();
-    assert_eq!(plaintext.to_vec(), decrypted);
+    let ciphertext = encrypt(&key, b"no ad").unwrap();
+
+    let result = decrypt_with_ad(&key, &ciphertext, b"context");
+
+    assert!(
+        matches!(
+            result,
+            Err(vauchi_core::crypto::encryption::EncryptionError::DecryptionFailed)
+        ),
+        "{result:?}"
+    );
 }
 
 // --- Additional coverage for edge cases and error paths ---

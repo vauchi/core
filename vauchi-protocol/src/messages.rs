@@ -57,8 +57,6 @@ pub enum MessagePayload {
     RecoveryProofQuery(RecoveryProofQuery),
     RecoveryProofResponse(RecoveryProofResponse),
     HandshakeAck(HandshakeAck),
-    PurgeRequest(PurgeRequest),
-    PurgeResponse(PurgeResponse),
     IdentityRevoked(IdentityRevoked),
     ForwardingHints(ForwardingHints),
     DeviceLinkRelay(DeviceLinkRelay),
@@ -166,35 +164,6 @@ pub struct DeviceLinkRelay {
     pub sender_token: String,
     pub encrypted_payload: Vec<u8>,
 }
-
-// =========================================================================
-// Purge messages
-// =========================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PurgeRequest {
-    #[serde(default)]
-    pub include_recovery_proofs: bool,
-    #[serde(default)]
-    pub recovery_key_hash: Option<String>,
-    // v2: Signed purge fields (optional for backward compat)
-    #[serde(default)]
-    pub public_key: Option<String>,
-    #[serde(default)]
-    pub signature: Option<String>,
-    #[serde(default)]
-    pub purge_token: Option<String>,
-    #[serde(default)]
-    pub timestamp: Option<u64>,
-}
-
-/// Server response to a [`PurgeRequest`].
-///
-/// Presence of this response signals success. Counts are intentionally omitted
-/// to avoid leaking storage metadata to clients (T0-10 audit finding).
-/// The relay logs counts server-side for operational visibility.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PurgeResponse {}
 
 // =========================================================================
 // Identity revocation
@@ -319,38 +288,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_purge_request_roundtrip() {
-        let req = PurgeRequest {
-            include_recovery_proofs: true,
-            recovery_key_hash: Some("abc123".to_string()),
-            public_key: Some("pk123".to_string()),
-            signature: Some("sig456".to_string()),
-            purge_token: Some("tok789".to_string()),
-            timestamp: Some(1234567890),
-        };
-        let json = serde_json::to_string(&req).unwrap();
-        let decoded: PurgeRequest = serde_json::from_str(&json).unwrap();
-        assert!(decoded.include_recovery_proofs);
-        assert_eq!(decoded.recovery_key_hash, Some("abc123".to_string()));
-        assert_eq!(decoded.public_key, Some("pk123".to_string()));
-        assert_eq!(decoded.signature, Some("sig456".to_string()));
-        assert_eq!(decoded.purge_token, Some("tok789".to_string()));
-        assert_eq!(decoded.timestamp, Some(1234567890));
-    }
-
-    #[test]
-    fn test_purge_request_defaults() {
-        let json = "{}";
-        let decoded: PurgeRequest = serde_json::from_str(json).unwrap();
-        assert!(!decoded.include_recovery_proofs);
-        assert_eq!(decoded.recovery_key_hash, None);
-        assert_eq!(decoded.public_key, None);
-        assert_eq!(decoded.signature, None);
-        assert_eq!(decoded.purge_token, None);
-        assert_eq!(decoded.timestamp, None);
-    }
-
-    #[test]
     fn test_envelope_roundtrip() {
         let envelope = MessageEnvelope {
             version: PROTOCOL_VERSION,
@@ -468,16 +405,6 @@ mod tests {
         let json = r#"{"version":1,"message_id":"m1","timestamp":0,"payload":{"type":"FutureFeature","data":"x"}}"#;
         let envelope: MessageEnvelope = serde_json::from_str(json).unwrap();
         assert!(matches!(envelope.payload, MessagePayload::Unknown));
-    }
-
-    #[test]
-    fn test_purge_response_roundtrip() {
-        let resp = PurgeResponse {};
-        let json = serde_json::to_string(&resp).unwrap();
-        let decoded: PurgeResponse = serde_json::from_str(&json).unwrap();
-        // Empty struct — presence signals success, no fields to assert
-        assert_eq!(json, "{}");
-        assert!(format!("{:?}", decoded).contains("PurgeResponse"));
     }
 
     #[test]

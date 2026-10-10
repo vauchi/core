@@ -66,7 +66,6 @@ fn provider_contract_all_relay_payload_variants_constructable() {
             message_id: "m1".to_string(),
             status: AckStatus::Stored,
         }),
-        MessagePayload::PurgeResponse(PurgeResponse {}),
         MessagePayload::RecoveryProofResponse(RecoveryProofResponse { proofs: vec![] }),
         MessagePayload::ForwardingHints(ForwardingHints {
             hints: vec![],
@@ -76,8 +75,8 @@ fn provider_contract_all_relay_payload_variants_constructable() {
     ];
     assert_eq!(
         payloads.len(),
-        5,
-        "relay must be able to construct 5 response payload types"
+        4,
+        "relay must be able to construct 4 response payload types"
     );
 }
 

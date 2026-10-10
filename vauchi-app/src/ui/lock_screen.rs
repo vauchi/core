@@ -22,6 +22,7 @@ pub struct LockScreenEngine {
     locale: Locale,
     has_biometrics: bool,
     biometric_type: Option<BiometricType>,
+    biometric_passed: bool,
 }
 
 impl Drop for LockScreenEngine {
@@ -39,6 +40,7 @@ impl LockScreenEngine {
             locale: Locale::English,
             has_biometrics: false,
             biometric_type: None,
+            biometric_passed: false,
         }
     }
 
@@ -108,6 +110,10 @@ impl LockScreenEngine {
         }
     }
 
+    fn offers_biometric_unlock(&self) -> bool {
+        self.has_biometrics && !self.biometric_passed
+    }
+
     fn biometric_label_key(&self) -> &'static str {
         match self.biometric_type {
             Some(BiometricType::FaceId) => "lock_screen.unlock_face_button",
@@ -124,7 +130,7 @@ impl LockScreenEngine {
             enabled: !self.entered_pin.is_empty(),
             a11y: None,
         }];
-        if self.has_biometrics {
+        if self.offers_biometric_unlock() {
             actions.push(ScreenAction {
                 id: "unlock_biometric".into(),
                 label: get_string(self.locale, self.biometric_label_key()),
@@ -168,6 +174,10 @@ impl WorkflowEngine for LockScreenEngine {
                 self.set_device_capabilities(&capabilities);
                 true
             }
+            EngineUpdate::BiometricUnlockPassed => {
+                self.biometric_passed = true;
+                true
+            }
             _ => false,
         }
     }
@@ -204,7 +214,7 @@ impl WorkflowEngine for LockScreenEngine {
             // Only an action the batch offered may reach the shell: a press
             // forged without the capability stays inert.
             UserAction::ActionPressed { action_id }
-                if action_id == "unlock_biometric" && self.has_biometrics =>
+                if action_id == "unlock_biometric" && self.offers_biometric_unlock() =>
             {
                 ActionResult::Commands {
                     commands: vec![Command::RequestBiometricUnlock],

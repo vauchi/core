@@ -158,6 +158,9 @@ pub enum EngineUpdate {
     /// live engine so a screen gated on a capability re-prepares without a
     /// rebuild that would drop its state (the lock screen's attempt count).
     DeviceCapabilities(vauchi_core::exchange::capability::types::DeviceCapabilities),
+    /// The biometric prompt succeeded but a duress PIN is set, so the lock
+    /// screen asks for the password only (ADR-032, #591).
+    BiometricUnlockPassed,
 }
 
 /// Cycle-thread bridge updates for the multi-stage exchange engine.
@@ -407,6 +410,7 @@ impl EngineUpdate {
             },
             Self::ConfirmPendingDelete => "ConfirmPendingDelete",
             Self::DeviceCapabilities(_) => "DeviceCapabilities",
+            Self::BiometricUnlockPassed => "BiometricUnlockPassed",
             Self::MyInfoEntryDetail(u) => match u {
                 MyInfoEntryDetailUpdate::GroupVisibility { .. } => {
                     "MyInfoEntryDetail::GroupVisibility"

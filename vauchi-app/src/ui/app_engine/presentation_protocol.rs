@@ -713,6 +713,31 @@ impl AppEngine {
         Ok(())
     }
 
+    /// With a duress PIN set, biometrics alone cannot tell the real user from
+    /// a coerced one, so the lock screen stays and takes the password
+    /// (ADR-032); otherwise the app opens.
+    fn leave_lock_after_biometric_unlock(
+        &mut self,
+        unlocked: bool,
+    ) -> Result<Vec<Command>, AppPresentationError> {
+        let next_revision = self
+            .surface_revision
+            .checked_add(1)
+            .ok_or(AppPresentationError::RevisionExhausted)?;
+        if unlocked {
+            let screen = self.default_screen();
+            self.navigate_to_internal(screen);
+        } else {
+            self.engine
+                .apply_update(crate::ui::EngineUpdate::BiometricUnlockPassed);
+        }
+        self.surface_revision = next_revision;
+        let screen = self.current_screen();
+        let mut commands = self.surface_commands(&screen)?;
+        commands.extend(self.drain_pending_commands());
+        Ok(commands)
+    }
+
     fn reduce_hardware_event(
         &mut self,
         event: Event,
@@ -731,7 +756,12 @@ impl AppEngine {
                 }
                 _ => vauchi_core::AuthenticationRequirement::AppPassword,
             };
-            return Ok(vec![Command::SetAuthenticationRequirement { requirement }]);
+            let unlocked = requirement == vauchi_core::AuthenticationRequirement::Unlocked;
+            let mut commands = vec![Command::SetAuthenticationRequirement { requirement }];
+            if self.is_locked() {
+                commands.extend(self.leave_lock_after_biometric_unlock(unlocked)?);
+            }
+            return Ok(commands);
         }
         // BLE handshake machine gate, shared by every envelope that can
         // carry a hardware event (typed UniFFI seam and canonical

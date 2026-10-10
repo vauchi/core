@@ -31,16 +31,22 @@ pub struct DuressConfig {
 /// `setup_duress_password` accepted whatever arrived.
 use vauchi_core::emergency::DURESS_PIN_LENGTH as PIN_LENGTH;
 
-/// Folds one input event into a PIN buffer.
+/// What a PIN field holds after an edit; `value` is the whole field.
 ///
-/// A shell may deliver a single keystroke or a whole string — a paste, an
-/// autofill, an accessibility insertion, or a harness typing the field at
-/// once. Treating the multi-character case as "assign it verbatim" is what
-/// let the literal string `undefined` become a duress credential on a real
-/// device, so every shape arrives here and is filtered to ASCII digits and
-/// truncated identically.
-fn accept_pin_input(current: &str, value: &str) -> String {
-    let mut out = String::from(current);
+/// The field shows the digits Core holds as `•` (the `PinInput`
+/// projection), so leading bullets stand for those digits — a shell that
+/// echoes Core's value sends `••5` — and the digits after them are typed. A
+/// shell that keeps its own text (Android) sends only digits, the whole PIN
+/// so far. Appending every value instead stored `665654` for `654321`
+/// (vauchi/private#618). Non-digits are dropped and the length capped, so
+/// a pasted `undefined` still cannot become a credential (#202).
+fn pin_from_field(held: &str, value: &str) -> String {
+    let kept = value
+        .chars()
+        .take_while(|c| *c == '•')
+        .count()
+        .min(held.len());
+    let mut out = String::from(&held[..kept]);
     for b in value.bytes().filter(|b| b.is_ascii_digit()) {
         if out.len() == PIN_LENGTH {
             break;
@@ -532,11 +538,9 @@ impl WorkflowEngine for DuressPinEngine {
                     value,
                 },
             ) if component_id == "pin" => {
-                if value.is_empty() {
-                    self.new_pin.pop();
-                } else {
-                    self.new_pin = accept_pin_input(&self.new_pin, &value);
-                }
+                let pin = pin_from_field(&self.new_pin, &value);
+                self.new_pin.zeroize();
+                self.new_pin = pin;
                 ActionResult::UpdateScreen(self.current_screen())
             }
             (DuressPinStep::EnterPin, UserAction::ActionPressed { action_id })
@@ -580,11 +584,9 @@ impl WorkflowEngine for DuressPinEngine {
                     value,
                 },
             ) if component_id == "confirm_pin" => {
-                if value.is_empty() {
-                    self.confirm_pin.pop();
-                } else {
-                    self.confirm_pin = accept_pin_input(&self.confirm_pin, &value);
-                }
+                let pin = pin_from_field(&self.confirm_pin, &value);
+                self.confirm_pin.zeroize();
+                self.confirm_pin = pin;
                 ActionResult::UpdateScreen(self.current_screen())
             }
             (DuressPinStep::ConfirmPin, UserAction::ActionPressed { action_id })

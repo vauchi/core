@@ -473,17 +473,17 @@ fn duress_back_navigation() {
 
 // @internal
 #[test]
-fn duress_pin_accumulates_single_chars() {
+fn duress_pin_takes_the_whole_field_on_each_keystroke() {
     let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::English);
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "duress_actions".into(),
         item_id: "set_up".into(),
     });
 
-    for ch in ['1', '2', '3', '4', '5', '6'] {
+    for field in ["1", "12", "123", "1234", "12345", "123456"] {
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "pin".into(),
-            value: ch.to_string(),
+            value: field.to_string(),
         });
     }
 
@@ -501,10 +501,10 @@ fn duress_pin_accumulates_single_chars() {
         other => panic!("expected NavigateTo, got {:?}", other),
     }
 
-    for ch in ['1', '2', '3', '4', '5', '6'] {
+    for field in ["1", "12", "123", "1234", "12345", "123456"] {
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "confirm_pin".into(),
-            value: ch.to_string(),
+            value: field.to_string(),
         });
     }
 
@@ -532,16 +532,17 @@ fn duress_pin_backspace_removes_last_char() {
         item_id: "set_up".into(),
     });
 
-    for ch in ['1', '2', '3'] {
+    for field in ["1", "12", "123"] {
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "pin".into(),
-            value: ch.to_string(),
+            value: field.to_string(),
         });
     }
 
+    // Backspace in a field showing Core's "•••".
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "pin".into(),
-        value: String::new(),
+        value: "••".to_string(),
     });
 
     let screen = engine.current_screen();

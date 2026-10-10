@@ -75,11 +75,15 @@ fn start_setup(engine: &mut AppEngine) -> ActionResult {
     })
 }
 
+/// Types `text` key by key, sending the whole field each time as a shell
+/// does (#618).
 fn type_into(engine: &mut AppEngine, component_id: &str, text: &str) {
+    let mut field = String::new();
     for ch in text.chars() {
+        field.push(ch);
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: component_id.into(),
-            value: ch.to_string(),
+            value: field.clone(),
         });
     }
 }

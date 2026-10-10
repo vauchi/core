@@ -6,6 +6,27 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.78.2] — 2026-10-10
+
+### Fixed
+
+- The in-app emergency wipe is the crypto-shred (vauchi/private#599): it
+  deletes the SMK and the bootstrap key from secure storage, then the
+  database and the data directory, so a copy of the data taken before the
+  wipe no longer opens. It used to delete rows and keep every key.
+- After a shred the engine reopens on a fresh install, on mobile and on the
+  desktop C ABI, keeping the render context, capabilities, network state
+  and event listener; it used to keep the deleted database (the desktop
+  could not create a new identity afterwards).
+- Settings → Advanced → Wipe All Data opens the shred screen, where typing
+  WIPE runs the shred; its inline confirm deleted nothing
+  (vauchi/private#598).
+
+### Added
+
+- `Storage::db_path`, `AppEngine::device_capabilities`,
+  `AppEngine::mark_storage_shredded` and `AppEngine::take_storage_shredded`.
+
 ## [0.78.1] — 2026-10-10
 
 ### Fixed

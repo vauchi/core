@@ -552,7 +552,7 @@ mod extended_property_tests {
 
                     let mut verification_card = old_card.clone();
                     if !delta.is_empty() {
-                        delta.apply(&mut verification_card, 0).unwrap();
+                        delta.apply(&mut verification_card).unwrap();
                     }
 
                     prop_assert_eq!(card.display_name(), verification_card.display_name());

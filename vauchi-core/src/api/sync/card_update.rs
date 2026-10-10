@@ -583,7 +583,7 @@ fn process_single_card_update_for_device_with_budget(
     card.deduplicate_fields();
     let received_at = storage.clock().unix_seconds();
     delta
-        .apply(&mut card, received_at)
+        .apply(&mut card)
         .map_err(|_| CardUpdateError::DeltaApplicationFailed)?;
     contact.update_card(
         card,
@@ -950,7 +950,7 @@ fn receive_genesis_card_delta(
     card.deduplicate_fields();
     let received_at = storage.clock().unix_seconds();
     delta
-        .apply(&mut card, received_at)
+        .apply(&mut card)
         .map_err(|_| CardUpdateError::DeltaApplicationFailed)?;
     let mut updated = contact.clone();
     updated.update_card(

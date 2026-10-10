@@ -142,7 +142,7 @@ fn test_card_delta_workflow() {
     );
 
     let mut result_card = old_card.clone();
-    delta.apply(&mut result_card, 0).unwrap();
+    delta.apply(&mut result_card).unwrap();
 
     assert_eq!(result_card.display_name(), updated_card.display_name());
     assert_eq!(result_card.fields().len(), updated_card.fields().len());

@@ -88,22 +88,6 @@ const CARD_DELTA_ADDED_V1: &str = r#"{
     "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
 }"#;
 
-/// CardDelta V1 with Modified field change.
-const CARD_DELTA_MODIFIED_V1: &str = r#"{
-    "version": 2,
-    "timestamp": 1700000100,
-    "changes": [
-        {
-            "Modified": {
-                "field_id": "existingfield",
-                "new_value": "updated@example.com"
-            }
-        }
-    ],
-    "nonce": "CwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCws=",
-    "signature": "EREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREQ=="
-}"#;
-
 /// CardDelta V1 with Removed field change.
 const CARD_DELTA_REMOVED_V1: &str = r#"{
     "version": 3,
@@ -318,31 +302,6 @@ fn test_card_delta_added_compatibility_v1() {
 
 // @internal
 #[test]
-fn test_card_delta_modified_compatibility_v1() {
-    use vauchi_core::sync::CardDelta;
-
-    let delta: CardDelta = serde_json::from_str(CARD_DELTA_MODIFIED_V1)
-        .expect("Failed to deserialize CardDelta Modified V1");
-
-    assert_eq!(delta.nonce, [0x0b; 32]);
-
-    assert_eq!(delta.version, 2);
-    assert_eq!(delta.changes.len(), 1);
-
-    match &delta.changes[0] {
-        vauchi_core::sync::FieldChange::Modified {
-            field_id,
-            new_value,
-        } => {
-            assert_eq!(field_id, "existingfield");
-            assert_eq!(new_value, "updated@example.com");
-        }
-        _ => panic!("Expected Modified variant"),
-    }
-}
-
-// @internal
-#[test]
 fn test_card_delta_removed_compatibility_v1() {
     use vauchi_core::sync::CardDelta;
 
@@ -544,14 +503,14 @@ fn test_field_change_enum_variant_names() {
     // These strings represent the JSON enum tag names
     // If these fail to parse, the enum variant names have changed
     let added = r#"{"Added":{"field":{"id":"x","field_type":"Phone","label":"L","value":"V"}}}"#;
-    let modified = r#"{"Modified":{"field_id":"x","new_value":"v"}}"#;
     let removed = r#"{"Removed":{"field_id":"x"}}"#;
     let name_changed = r#"{"DisplayNameChanged":{"new_name":"N"}}"#;
 
     use vauchi_core::sync::FieldChange;
 
     serde_json::from_str::<FieldChange>(added).expect("Added variant name changed");
-    serde_json::from_str::<FieldChange>(modified).expect("Modified variant name changed");
+    serde_json::from_str::<FieldChange>(r#"{"Modified":{"field_id":"x","new_value":"v"}}"#)
+        .expect_err("the retired Modified variant must not parse (#573)");
     serde_json::from_str::<FieldChange>(removed).expect("Removed variant name changed");
     serde_json::from_str::<FieldChange>(name_changed)
         .expect("DisplayNameChanged variant name changed");

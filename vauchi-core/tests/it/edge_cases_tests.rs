@@ -286,7 +286,7 @@ fn test_delta_apply_preserves_display_name() {
     let mut target = old.clone();
     let delta = CardDelta::compute(&old, &new, 0);
 
-    let _ = delta.apply(&mut target, 0);
+    let _ = delta.apply(&mut target);
     assert_eq!(target.display_name(), "Preserved Name");
 }
 

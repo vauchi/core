@@ -102,22 +102,6 @@ fn test_field_change_added_serialization_snapshot() {
 
 // @internal
 #[test]
-fn test_field_change_modified_serialization_snapshot() {
-    use vauchi_core::sync::FieldChange;
-
-    let change = FieldChange::Modified {
-        field_id: "existing-field".to_string(),
-        new_value: "updated-value".to_string(),
-    };
-
-    let serialized = serde_json::to_string(&change).unwrap();
-
-    let expected = r#"{"Modified":{"field_id":"existing-field","new_value":"updated-value"}}"#;
-    assert_eq!(serialized, expected);
-}
-
-// @internal
-#[test]
 fn test_field_change_removed_serialization_snapshot() {
     use vauchi_core::sync::FieldChange;
 

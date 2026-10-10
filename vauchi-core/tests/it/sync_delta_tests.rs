@@ -55,9 +55,9 @@ fn duplicate_added_then_removed_leaves_no_stale_field() {
     let remove = CardDelta::compute(&with_work, &empty, 0); // Removed(work)
 
     let mut received = ContactCard::new("Alice");
-    add.apply(&mut received, 0).unwrap(); // first repropagate
-    add.apply(&mut received, 0).unwrap(); // second repropagate (same id again)
-    remove.apply(&mut received, 0).unwrap(); // revocation
+    add.apply(&mut received).unwrap(); // first repropagate
+    add.apply(&mut received).unwrap(); // second repropagate (same id again)
+    remove.apply(&mut received).unwrap(); // revocation
 
     let copies = received
         .fields()
@@ -176,8 +176,8 @@ fn delayed_direct_edit_does_not_block_resolved_field_winner() {
     let winner_repropagation = CardDelta::compute(&ContactCard::new("Alice"), &resolved_winner, 21);
 
     let mut recipient = base;
-    delayed_loser.apply(&mut recipient, 100).unwrap();
-    winner_repropagation.apply(&mut recipient, 101).unwrap();
+    delayed_loser.apply(&mut recipient).unwrap();
+    winner_repropagation.apply(&mut recipient).unwrap();
 
     let field = recipient
         .fields()
@@ -225,7 +225,7 @@ fn test_delta_apply_display_name() {
         validation_summary: None,
     };
 
-    delta.apply(&mut card, 0).unwrap();
+    delta.apply(&mut card).unwrap();
 
     assert_eq!(card.display_name(), "Alice Smith");
 }
@@ -246,7 +246,7 @@ fn test_delta_apply_add_field() {
         validation_summary: None,
     };
 
-    delta.apply(&mut card, 0).unwrap();
+    delta.apply(&mut card).unwrap();
 
     assert_eq!(card.fields().len(), 1);
     assert_eq!(card.fields()[0].value(), "alice@example.com");
@@ -272,7 +272,7 @@ fn test_delta_apply_rejects_stale_repropagated_field() {
         validation_summary: None,
     };
 
-    delta.apply(&mut card, 0).unwrap();
+    delta.apply(&mut card).unwrap();
 
     assert_eq!(card.fields()[0].value(), "+12025550502");
     assert_eq!(card.fields()[0].updated_at(), 20);
@@ -296,7 +296,7 @@ fn test_delta_apply_remove_field() {
         validation_summary: None,
     };
 
-    delta.apply(&mut card, 0).unwrap();
+    delta.apply(&mut card).unwrap();
 
     assert!(card.fields().is_empty());
 }
@@ -329,7 +329,7 @@ fn test_delta_roundtrip() {
     let delta = CardDelta::compute(&old, &new, 0);
 
     let mut result = old.clone();
-    delta.apply(&mut result, 0).unwrap();
+    delta.apply(&mut result).unwrap();
 
     assert_eq!(result.display_name(), "Alice Smith");
     assert_eq!(result.fields().len(), 2);

@@ -109,11 +109,6 @@ pub enum FieldChange {
     /// INVARIANT: `field` must be the result of `ContactField::strip_private()`.
     /// Private annotations (e.g., `note`) must never appear in outbound deltas.
     Added { field: ContactField },
-    /// A legacy value-only modification.
-    ///
-    /// New deltas use [`FieldChange::Added`] upserts so the sender's logical
-    /// field clock survives delayed delivery.
-    Modified { field_id: String, new_value: String },
     /// A field was removed.
     Removed { field_id: String },
     /// The display name was changed.
@@ -214,10 +209,7 @@ impl CardDelta {
     /// Applies this delta to a contact card.
     ///
     /// Modifies the card in place to reflect all changes in the delta.
-    /// `now` stamps the `updated_at` of any field whose value changes.
-    /// Production callers source `now` from `Vauchi::clock()` /
-    /// `Storage::clock()`; tests pin a deterministic value.
-    pub fn apply(&self, card: &mut ContactCard, now: u64) -> Result<(), DeltaError> {
+    pub fn apply(&self, card: &mut ContactCard) -> Result<(), DeltaError> {
         for change in &self.changes {
             match change {
                 FieldChange::DisplayNameChanged { new_name } => {
@@ -236,21 +228,6 @@ impl CardDelta {
                     }
                     card.add_field(field.clone())
                         .map_err(|e| DeltaError::ApplyError(e.to_string()))?;
-                }
-                FieldChange::Modified {
-                    field_id,
-                    new_value,
-                } => {
-                    let found = card.fields_mut().iter_mut().find(|f| f.id() == field_id);
-
-                    match found {
-                        Some(field) => {
-                            field.set_value(new_value, now);
-                        }
-                        None => {
-                            return Err(DeltaError::FieldNotFound(field_id.clone()));
-                        }
-                    }
                 }
                 FieldChange::Removed { field_id } => {
                     // Ignore errors for removal — field might already be removed
@@ -274,7 +251,6 @@ impl CardDelta {
             .iter()
             .map(|change| match change {
                 FieldChange::Added { field } => field.label().to_string(),
-                FieldChange::Modified { field_id, .. } => field_id.clone(),
                 FieldChange::Removed { field_id } => format!("{} (removed)", field_id),
                 FieldChange::DisplayNameChanged { new_name } => format!("name: {}", new_name),
             })
@@ -304,7 +280,6 @@ impl CardDelta {
                     FieldChange::DisplayNameChanged { .. } => true,
                     // For field changes, check visibility rules
                     FieldChange::Added { field } => rules.can_see(field.id(), contact_id),
-                    FieldChange::Modified { field_id, .. } => rules.can_see(field_id, contact_id),
                     FieldChange::Removed { field_id } => rules.can_see(field_id, contact_id),
                 }
             })
@@ -336,7 +311,6 @@ impl CardDelta {
             .filter(|change| match change {
                 FieldChange::DisplayNameChanged { .. } => true,
                 FieldChange::Added { field } => can_see(field.id()),
-                FieldChange::Modified { field_id, .. } => can_see(field_id),
                 FieldChange::Removed { field_id } => can_see(field_id),
             })
             .cloned()

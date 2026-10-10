@@ -283,3 +283,41 @@ fn try_again_opens_the_fresh_install_once_the_keyring_takes_writes() {
     );
     destroy(app);
 }
+
+/// The in-app wipe, as `AppEngine` runs it for the wipe screens.
+fn wipe(app: *mut VauchiApp) {
+    // SAFETY: `app` is a live handle owned by the test.
+    let app = unsafe { &*app };
+    let mut slot = app.engine.lock().unwrap();
+    let engine = slot.as_mut().expect("an open engine");
+    engine.vauchi_mut().perform_emergency_wipe(true).unwrap();
+    engine.mark_storage_shredded();
+}
+
+// @internal
+#[test]
+fn after_a_wipe_the_next_identity_survives_a_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let keyring = SwitchableKeyring::new();
+    let app = open(&dir, keyring.clone());
+    // SAFETY: `app` is live; a null display name means the default.
+    assert_eq!(
+        unsafe { crate::vauchi_app_create_identity(app, std::ptr::null()) },
+        0
+    );
+
+    wipe(app);
+    // SAFETY: `app` is live; a null display name means the default.
+    let created = unsafe { crate::vauchi_app_create_identity(app, std::ptr::null()) };
+    destroy(app);
+    let restarted = open(&dir, keyring.clone());
+
+    assert_eq!(created, 0, "no identity could be created after the wipe");
+    // SAFETY: `restarted` is live.
+    assert_eq!(
+        unsafe { crate::vauchi_app_has_identity(restarted) },
+        1,
+        "the identity created after the wipe did not survive a restart"
+    );
+    destroy(restarted);
+}

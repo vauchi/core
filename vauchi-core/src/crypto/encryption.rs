@@ -192,8 +192,8 @@ pub fn decrypt(key: &SymmetricKey, ciphertext: &[u8]) -> Result<Vec<u8>, Encrypt
 
 /// Decrypts data with associated data, auto-detecting the algorithm.
 ///
-/// For tag `0x03` (AD-bound), the provided AD is used for authentication.
-/// For tag `0x02` (ciphertext from [`encrypt`], no AD), the AD is not checked.
+/// Only tag `0x03` (AD-bound) is accepted, so the AD always authenticates;
+/// a ciphertext from [`encrypt`] (tag `0x02`, no AD) is refused.
 pub fn decrypt_with_ad(
     key: &SymmetricKey,
     ciphertext: &[u8],
@@ -205,7 +205,6 @@ pub fn decrypt_with_ad(
 
     match ciphertext[0] {
         ALG_TAG_XCHACHA20_AD => decrypt_xchacha20_ad(key, &ciphertext[1..], ad),
-        ALG_TAG_XCHACHA20 => decrypt_xchacha20(key, &ciphertext[1..]),
         _ => Err(EncryptionError::DecryptionFailed),
     }
 }

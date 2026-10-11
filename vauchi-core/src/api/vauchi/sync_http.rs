@@ -123,7 +123,7 @@ impl Vauchi {
     ///
     /// Extracted so that `sync()` can retry on stale OHTTP key errors.
     #[tracing::instrument(level = "debug", skip_all, name = "vauchi.sync_inner")]
-    fn sync_inner(&mut self) -> VauchiResult<VauchiSyncOutcome> {
+    pub(super) fn sync_inner(&mut self) -> VauchiResult<VauchiSyncOutcome> {
         let identity = self.identity.as_ref().expect("identity checked in sync()");
         // Load contacts once — shared by register_tokens, receive, and send phases.
         let contacts = self.storage.contacts().list_contacts().unwrap_or_default();
@@ -718,7 +718,7 @@ impl Vauchi {
     /// is also computed and the MAX of C1 and C2 is used. Also captures the
     /// wall-clock unix timestamp for `last_sync_time()` so MyInfoEngine can
     /// render a "Last synced X ago" caption (humble-UI follow-up to ios!472).
-    fn update_timing_after_sync(&mut self) {
+    pub(super) fn update_timing_after_sync(&mut self) {
         let c2_deadline =
             self.monotonic.now() + self.config.sync.next_sync_interval(self.rng.as_ref());
 

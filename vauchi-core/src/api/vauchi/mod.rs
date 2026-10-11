@@ -42,6 +42,8 @@ mod security;
 mod setup;
 mod storage_keys;
 #[cfg(feature = "network-http")]
+mod sync_delayed;
+#[cfg(feature = "network-http")]
 mod sync_http;
 mod tags;
 mod visibility;

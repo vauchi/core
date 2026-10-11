@@ -80,11 +80,17 @@ pub(crate) struct PendingFetch {
 pub struct DelayedRequests {
     pub(crate) fetches: Vec<PendingFetch>,
     pub(crate) acks: Vec<PendingOhttp>,
+    pub(crate) answered_fetches: u64,
 }
 
 impl DelayedRequests {
     pub fn shared() -> Arc<Mutex<Self>> {
         Arc::new(Mutex::new(Self::default()))
+    }
+
+    /// Fetch answers collected so far.
+    pub fn answered_fetches(&self) -> u64 {
+        self.answered_fetches
     }
 }
 

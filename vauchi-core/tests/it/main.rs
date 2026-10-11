@@ -392,6 +392,7 @@ mod propagation_sync_item_variant_tests;
 mod property_tests;
 mod protocol_compatibility_tests;
 mod proximity_confidence_tests;
+mod qr_landing_url_tests;
 mod qr_scanner_pipeline_tests;
 mod qr_v3_relay_tests;
 mod ratchet_crash_recovery_tests;

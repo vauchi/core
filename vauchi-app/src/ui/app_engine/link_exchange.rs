@@ -122,7 +122,12 @@ impl AppEngine {
             Some(bytes) => bytes,
             None => return,
         };
-        let (initiation, presence_commands) = link_mode::initiator_generate();
+        let display_name = self
+            .vauchi
+            .identity()
+            .map(|identity| identity.display_name().to_string())
+            .unwrap_or_default();
+        let (initiation, presence_commands) = link_mode::initiator_generate_named(&display_name);
         let share_url = initiation.url.clone();
         let deadline = self.vauchi.clock().unix_seconds() + INITIATOR_POLL_DEADLINE_SECS;
         self.link_initiator = Some(LinkInitiatorSession::new(

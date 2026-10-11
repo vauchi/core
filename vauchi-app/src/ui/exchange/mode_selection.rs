@@ -244,6 +244,7 @@ impl ModeSelectionEngine {
             }
             if let Some(name) = item_id.strip_prefix("mode:")
                 && let Some(mode) = parse_mode(name)
+                && is_offered(mode)
             {
                 return ModeSelectionResult::Selected(mode);
             }

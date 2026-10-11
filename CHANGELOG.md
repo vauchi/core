@@ -6,6 +6,16 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.80.1] — 2026-10-11
+
+### Fixed
+
+- Back never leaves the lock screen (vauchi/private#639). Locking pushed
+  the screen it covered onto the navigation history, so a Back press
+  returned there without the password. The lock screen now offers no
+  Back, a Back request there answers as at any root screen, and every
+  other Back works as before.
+
 ## [0.80.0] — 2026-10-11
 
 ### Removed

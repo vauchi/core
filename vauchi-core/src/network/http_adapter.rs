@@ -80,6 +80,11 @@ pub struct HttpTransportAdapter {
     /// When set, fetches and acknowledgements go through the outer relay's
     /// delayed path (#628) and their answers are collected on a later cycle.
     delayed: Option<Arc<Mutex<DelayedRequests>>>,
+    /// Whether this cycle has collected and posted its delayed requests.
+    /// Only the first poll of a cycle does: the send phase also drains
+    /// `receive()` and drops incoming updates, so a later collect there
+    /// would consume an answer and lose its mail until the next fetch.
+    delayed_polled: bool,
 }
 
 impl HttpTransportAdapter {
@@ -95,6 +100,7 @@ impl HttpTransportAdapter {
             has_fetched: false,
             last_truncated: false,
             delayed: None,
+            delayed_polled: false,
         }
     }
 
@@ -297,7 +303,11 @@ impl super::transport::Transport for HttpTransportAdapter {
         self.has_fetched = true;
         self.last_truncated = false;
         match self.delayed.clone() {
-            Some(delayed) => self.fetch_delayed(&delayed)?,
+            Some(delayed) if !self.delayed_polled => {
+                self.delayed_polled = true;
+                self.fetch_delayed(&delayed)?;
+            }
+            Some(_) => {}
             None => self.fetch_now()?,
         }
         self.next_buffered()
@@ -377,10 +387,12 @@ impl HttpTransportAdapter {
             }
         }
         let mut failure = None;
+        let mut answered = 0;
         let mut pending_fetches = Vec::new();
         for PendingFetch { tokens, pending } in fetches {
             match self.http.collect_delayed_fetch(pending) {
                 Ok(Collected::Ready((blobs, truncated))) => {
+                    answered += 1;
                     self.last_truncated |= truncated;
                     self.pending_blobs.extend(blobs);
                 }
@@ -415,6 +427,7 @@ impl HttpTransportAdapter {
             let mut requests = lock(delayed);
             requests.acks.extend(pending_acks);
             requests.fetches.extend(pending_fetches);
+            requests.answered_fetches += answered;
         }
         match failure {
             Some(e) if self.pending_blobs.is_empty() => Err(e),

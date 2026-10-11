@@ -6,6 +6,19 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.80.2] — 2026-10-11
+
+### Fixed
+
+- A locked session refuses every navigation until it is unlocked
+  (vauchi/private#639). Entering the lock screen locks the session; only
+  the password, or a biometric unlock without a duress PIN, opens it.
+  Until then no navigation or surface switch leaves the lock screen,
+  whatever asks for it. An engine built over a Vauchi already opened with
+  the password starts unlocked.
+- The duress-setup entry flow asks for the app password first when it is
+  not given; a duress PIN could be set without knowing it.
+
 ## [0.80.1] — 2026-10-11
 
 ### Fixed
@@ -15,14 +28,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   returned there without the password. The lock screen now offers no
   Back, a Back request there answers as at any root screen, and every
   other Back works as before.
-- A locked session refuses every navigation until it is unlocked
-  (vauchi/private#639). Entering the lock screen locks the session; only
-  the password, or a biometric unlock without a duress PIN, opens it.
-  Until then no navigation or surface switch leaves the lock screen,
-  whatever asks for it. An engine built over a Vauchi already opened with
-  the password starts unlocked.
-- The duress-setup entry flow asks for the app password first when it is
-  not given; a duress PIN could be set without knowing it.
 
 ## [0.80.0] — 2026-10-11
 

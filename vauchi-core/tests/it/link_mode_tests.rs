@@ -20,12 +20,75 @@ use vauchi_core::exchange::link_mode::*;
 #[test]
 fn generate_produces_valid_url() {
     let (init, _) = initiator_generate();
-    assert!(
-        init.url.starts_with("vauchi://exchange?"),
-        "URL must use vauchi scheme"
-    );
-    assert!(init.url.contains("pk="), "URL must contain pk param");
-    assert!(init.url.contains("n="), "URL must contain nonce param");
+    // An https link a non-user can open (vauchi/private#277); the payload
+    // sits in the fragment, which browsers never send to the server.
+    let (before_fragment, fragment) = init
+        .url
+        .split_once('#')
+        .expect("the payload is in the fragment");
+    assert_eq!(before_fragment, "https://vauchi.app/x");
+    assert!(fragment.contains("pk="), "URL must contain pk param");
+    assert!(fragment.contains("n="), "URL must contain nonce param");
+}
+
+fn b64(bytes: &[u8]) -> String {
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
+}
+
+// Links shared before the https form still complete during the 7-day
+// escrow TTL (vauchi/private#277, plan D2).
+// @internal
+#[test]
+fn legacy_vauchi_scheme_links_still_parse() {
+    let (pk, n) = ([7u8; 32], [9u8; 32]);
+    let legacy = format!("vauchi://exchange?pk={}&n={}", b64(&pk), b64(&n));
+    let parsed = parse_link_url(&legacy).expect("legacy link parses");
+    assert_eq!(parsed.initiator_public_key, pk);
+    assert_eq!(parsed.nonce, n);
+    assert!(parse_exchange_deep_link(&legacy).is_ok());
+}
+
+// @internal
+#[test]
+fn https_link_opens_through_the_deep_link_parser() {
+    let (init, _) = initiator_generate();
+    assert!(parse_exchange_deep_link(&init.url).is_ok());
+}
+
+// The payload must stay out of anything a server sees (plan D1), and only
+// vauchi.app/x is ours.
+// @internal
+#[test]
+fn https_links_outside_the_fragment_or_off_domain_are_rejected() {
+    let params = format!("pk={}&n={}", b64(&[1u8; 32]), b64(&[2u8; 32]));
+    for url in [
+        format!("https://vauchi.app/x?{params}"),
+        format!("https://evil.example/x#{params}"),
+        format!("https://vauchi.app/y#{params}"),
+        format!("http://vauchi.app/x#{params}"),
+        "https://vauchi.app/x#".to_string(),
+        "https://vauchi.app/x".to_string(),
+    ] {
+        assert!(parse_link_url(&url).is_none(), "{url} must not parse");
+        assert!(
+            parse_exchange_deep_link(&url).is_err(),
+            "{url} must not open"
+        );
+    }
+}
+
+proptest::proptest! {
+    // Both forms carry the same key and nonce (CC-04).
+    // @internal
+    #[test]
+    fn both_link_forms_roundtrip(pk in any::<[u8; 32]>(), n in any::<[u8; 32]>()) {
+        let params = format!("pk={}&n={}", b64(&pk), b64(&n));
+        for url in [format!("https://vauchi.app/x#{params}"), format!("vauchi://exchange?{params}")] {
+            let parsed = parse_link_url(&url).expect("well-formed link parses");
+            proptest::prop_assert_eq!(parsed.initiator_public_key, pk);
+            proptest::prop_assert_eq!(parsed.nonce, n);
+        }
+    }
 }
 
 // @internal

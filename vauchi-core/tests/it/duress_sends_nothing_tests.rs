@@ -73,3 +73,18 @@ fn an_emergency_alert_still_decodes() {
 
     assert!(SafetyAlertPayload::decode(&wire).is_ok());
 }
+
+// @scenario: duress_mode :: A duress unlock sends nothing
+#[test]
+fn a_duress_pin_alone_counts_as_duress_set_up() {
+    let mut wb = create_vauchi_with_identity("Alice");
+    wb.setup_app_password("my-pin-1234").unwrap();
+    wb.setup_duress_password("654321").unwrap();
+
+    let status = wb.get_emergency_wipe_status().unwrap();
+
+    assert!(
+        status.duress_configured,
+        "duress protection is the PIN; there are no alert settings to require"
+    );
+}

@@ -193,19 +193,16 @@ fn background_event_is_a_no_op_when_core_does_not_require_locking() {
 
 // @internal
 #[test]
-fn biometric_event_returns_only_a_generic_authentication_command() {
+fn biometric_event_off_the_lock_screen_answers_nothing() {
     let mut app = AppEngine::new(Vauchi::in_memory().expect("in-memory core"));
 
     let commands = app
         .dispatch(Event::BiometricUnlockSucceeded)
         .expect("biometric event");
 
-    assert!(commands.iter().any(|command| matches!(
-        command,
-        Command::SetAuthenticationRequirement {
-            requirement: vauchi_core::AuthenticationRequirement::Unlocked
-        }
-    )));
+    // Core acts on the unlock decision itself; with no lock screen there
+    // is nothing to change and nothing for a shell to apply (#591).
+    assert_eq!(commands, Vec::<Command>::new());
 }
 
 // @scenario: generic_presentation_protocol.feature :: Release contains only the generic action system

@@ -1154,8 +1154,8 @@ fn biometric_unlock_succeeded_hardware_event_returns_authentication_command_when
     // the `Vauchi::biometric_unlock_decision` layer in
     // `core/vauchi-core/src/api/vauchi/security.rs` tests; here we
     // assert only that the hardware event is routed to that decision
-    // path and that its decision returns as a generic authentication
-    // command. Retires the legacy
+    // path. Off the lock screen Core has nothing to change and answers an
+    // empty batch (#591). Retires the legacy
     // `PlatformAppEngine::biometric_unlock_check` typed getter
     // (Track B of `2026-05-11-pure-functional-core-program`).
     use vauchi_platform::MobileEvent;
@@ -1171,8 +1171,9 @@ fn biometric_unlock_succeeded_hardware_event_returns_authentication_command_when
         "legacy result escaped: {v:?}"
     );
     assert_eq!(
-        v["commands"][0]["SetAuthenticationRequirement"]["requirement"], "unlocked",
-        "fresh engine without duress must yield an unlocked command, got {v:?}",
+        v["commands"],
+        serde_json::json!([]),
+        "a fresh engine has no lock screen to leave, got {v:?}",
     );
 }
 

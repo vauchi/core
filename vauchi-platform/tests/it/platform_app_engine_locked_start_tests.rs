@@ -555,38 +555,9 @@ fn onboarded_with_duress(dir: &tempfile::TempDir) -> ControlledKeychain {
     keychain
 }
 
-fn authentication_requirement(batch: &Value) -> Option<String> {
-    batch["commands"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find_map(|c| c.get("SetAuthenticationRequirement"))
-        .and_then(|set| set["requirement"].as_str())
-        .map(str::to_owned)
-}
-
 // @internal
 #[test]
-fn a_prompt_that_opens_storage_asks_for_the_app_password_when_a_duress_pin_is_set_up() {
-    let dir = tempfile::tempdir().unwrap();
-    let keychain = onboarded_with_duress(&dir);
-    keychain.locked.store(true, Ordering::SeqCst);
-    let engine = open(&dir, &keychain);
-    engine.initial_commands_json().unwrap();
-
-    keychain.locked.store(false, Ordering::SeqCst);
-    let opened = prompt_succeeded(&engine);
-
-    assert_eq!(
-        authentication_requirement(&opened).as_deref(),
-        Some("app_password"),
-        "got {opened}"
-    );
-}
-
-// @internal
-#[test]
-fn a_prompt_that_opens_storage_unlocks_when_no_duress_pin_is_set_up() {
+fn a_prompt_that_opens_storage_opens_the_app_when_no_app_password_is_set_up() {
     let dir = tempfile::tempdir().unwrap();
     let keychain = onboarded(&dir);
     keychain.locked.store(true, Ordering::SeqCst);
@@ -596,10 +567,10 @@ fn a_prompt_that_opens_storage_unlocks_when_no_duress_pin_is_set_up() {
     keychain.locked.store(false, Ordering::SeqCst);
     let opened = prompt_succeeded(&engine);
 
-    assert_eq!(
-        authentication_requirement(&opened).as_deref(),
-        Some("unlocked"),
-        "got {opened}"
+    let surface = last_surface_id(&opened).expect("a surface after the unlock");
+    assert!(
+        !surface.starts_with("storage_lock") && surface != "lock",
+        "still locked: {surface} in {opened}"
     );
 }
 

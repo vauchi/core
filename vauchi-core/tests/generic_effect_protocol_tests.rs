@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use vauchi_core::{
-    AlertSpec, AuthenticationRequirement, Command, DocumentSpec, ExportFileSpec, InvocationOutcome,
-    NotificationSpec, NotificationUrgency, ToastSpec,
+    AlertSpec, Command, DocumentSpec, ExportFileSpec, InvocationOutcome, NotificationSpec,
+    NotificationUrgency, ToastSpec,
 };
 
 // @internal
@@ -64,21 +64,6 @@ fn notification_command_contains_only_prepared_os_presentation() {
     let decoded: Command = serde_json::from_slice(&encoded).expect("decode notification");
 
     assert_eq!(decoded, command);
-}
-
-// @internal
-#[test]
-fn authentication_requirement_is_a_generic_core_command() {
-    let command = Command::SetAuthenticationRequirement {
-        requirement: AuthenticationRequirement::AppPassword,
-    };
-
-    let encoded = serde_json::to_value(&command).expect("serialize authentication command");
-
-    assert_eq!(
-        encoded["SetAuthenticationRequirement"]["requirement"],
-        "app_password"
-    );
 }
 
 // @internal

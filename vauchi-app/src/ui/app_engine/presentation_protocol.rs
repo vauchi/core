@@ -747,21 +747,13 @@ impl AppEngine {
                 .vauchi_mut()
                 .biometric_unlock_check()
                 .map_err(|error| AppPresentationError::Authentication(error.to_string()))?;
-            let requirement = match outcome {
-                vauchi_core::BiometricUnlockOutcome::Unlocked => {
-                    vauchi_core::AuthenticationRequirement::Unlocked
-                }
-                vauchi_core::BiometricUnlockOutcome::PromptForDuressPin => {
-                    vauchi_core::AuthenticationRequirement::AppPassword
-                }
-                _ => vauchi_core::AuthenticationRequirement::AppPassword,
-            };
-            let unlocked = requirement == vauchi_core::AuthenticationRequirement::Unlocked;
-            let mut commands = vec![Command::SetAuthenticationRequirement { requirement }];
-            if self.is_locked() {
-                commands.extend(self.leave_lock_after_biometric_unlock(unlocked)?);
+            // Any outcome but a plain unlock keeps the password gate, so an
+            // outcome added later fails closed.
+            let unlocked = matches!(outcome, vauchi_core::BiometricUnlockOutcome::Unlocked);
+            if !self.is_locked() {
+                return Ok(Vec::new());
             }
-            return Ok(commands);
+            return self.leave_lock_after_biometric_unlock(unlocked);
         }
         // BLE handshake machine gate, shared by every envelope that can
         // carry a hardware event (typed UniFFI seam and canonical

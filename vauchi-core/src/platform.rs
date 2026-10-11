@@ -450,10 +450,6 @@ pub enum Command {
     ResetApplication,
     /// Post a fully prepared operating-system notification.
     PostNotification { notification: NotificationSpec },
-    /// Apply Core's post-biometric authentication decision.
-    SetAuthenticationRequirement {
-        requirement: AuthenticationRequirement,
-    },
     /// Run the platform biometric prompt (LAContext, BiometricPrompt) for
     /// the lock screen's biometric unlock action. Success arrives as
     /// [`Event::BiometricUnlockSucceeded`]; a shell without the hardware
@@ -463,18 +459,6 @@ pub enum Command {
     /// holds what it protected in secure storage (vauchi/private#580). The
     /// handle is the shell's own opaque name, echoed back unchanged.
     ForgetStoredSecret { handle: String },
-}
-
-/// Authentication state the native startup shell must present.
-#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum AuthenticationRequirement {
-    /// Biometric authentication completed and normal app state may be shown.
-    Unlocked,
-    /// A configured duress PIN requires the native app-password prompt.
-    AppPassword,
 }
 
 /// Haptic intent for [`Command::Celebrate`]. Closed enum — platforms map
@@ -659,7 +643,6 @@ impl Command {
             Self::PerformNativeBack => "PerformNativeBack",
             Self::ResetApplication => "ResetApplication",
             Self::PostNotification { .. } => "PostNotification",
-            Self::SetAuthenticationRequirement { .. } => "SetAuthenticationRequirement",
             Self::RequestBiometricUnlock => "RequestBiometricUnlock",
             Self::ForgetStoredSecret { .. } => "ForgetStoredSecret",
         }

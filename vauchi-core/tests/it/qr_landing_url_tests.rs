@@ -195,9 +195,18 @@ proptest! {
 
     // @internal
     #[test]
-    fn arbitrary_fragments_never_panic_the_scanner(fragment in ".{0,400}") {
+    fn fragments_outside_base64url_are_rejected(
+        fragment in "[A-Za-z0-9_-]{0,200}[^A-Za-z0-9_\\-\\s][^\\s]{0,200}"
+    ) {
         let url = format!("{QR_URL_PREFIX}{fragment}");
-        let _ = OobBootstrapQr::from_data_string(&url);
-        let _ = ExchangeQR::from_data_string(&url);
+
+        prop_assert!(matches!(
+            OobBootstrapQr::from_data_string(&url),
+            Err(ExchangeError::InvalidQRFormat)
+        ));
+        prop_assert!(matches!(
+            ExchangeQR::from_data_string(&url),
+            Err(ExchangeError::InvalidQRFormat)
+        ));
     }
 }

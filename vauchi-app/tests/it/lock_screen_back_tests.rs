@@ -107,6 +107,19 @@ fn a_direct_navigate_back_while_locked_stays_on_the_lock_screen() {
     assert_eq!(engine.current_screen().screen_id, "lock_screen");
 }
 
+/// `navigate_back` is public; a caller that skips `can_go_back` must not
+/// pop past the lock either.
+// @scenario: security.feature :: App lock with PIN
+#[test]
+fn navigate_back_called_directly_while_locked_stays_on_the_lock_screen() {
+    let mut engine = locked_after_backgrounding(PASSWORD);
+
+    let screen = engine.navigate_back();
+
+    assert_eq!(screen.screen_id, "lock_screen");
+    assert_eq!(engine.current_screen().screen_id, "lock_screen");
+}
+
 // @scenario: security.feature :: App lock with PIN
 #[test]
 fn the_locked_surface_offers_no_back() {

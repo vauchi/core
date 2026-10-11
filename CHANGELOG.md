@@ -15,6 +15,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   0.79.0, so shells have nothing to apply; iOS and Android dropped their
   app-password screens. Off the lock screen a biometric unlock now answers
   an empty batch.
+- The unsigned OHTTP key bootstrap (vauchi/private#288, plan 7.5). Core
+  never requests `GET /v2/ohttp-key`: the key comes only from the signed
+  record under the relay's anchor, and a relay without an anchor fails
+  closed. `HttpTransport::fetch_ohttp_key` and `OhttpConfig::key_ttl_secs`
+  are gone; `probe_ohttp_forward_hop` takes the anchor and the current
+  time and verifies the signed record.
+- `PurgeRequest`, `PurgeResponse` and their `MessagePayload` variants from
+  vauchi-protocol, unused since the HTTP purge (vauchi/private#574).
+- The identity-wide self mailbox token; device sync uses the
+  recipient-specific token only (vauchi/private#574).
+
+### Changed
+
+- Background syncs follow exponential gaps around 60 s, clamped to
+  10 s–5 min, whether or not the app is open (vauchi/private#603).
+  `SyncConfig::next_sync_interval` replaces `jittered_sync_interval`, and
+  `sync_interval_min_ms`/`sync_interval_max_ms` replace
+  `sync_interval_jitter_percent`.
+- A vCard nickname becomes the contact's own nickname; `ContactCard` has
+  no nickname and its `schema_version` is required (vauchi/private#574).
+
+### Fixed
+
+- The encrypted personal-data export follows the auth mode
+  (vauchi/private#616): under the duress PIN it held the real contact
+  book. `Vauchi::export_personal_data_encrypted` replaces
+  `export_encrypted(storage, …)` for callers holding a `Vauchi`.
+- Reads keyed by a real contact's id answer as unknown under the duress
+  PIN (vauchi/private#388): shared names and avatars, nickname, custom
+  avatar, personal notes, display options and delivery records, and the
+  failed-delivery list keeps decoy recipients only.
+- `decrypt_with_ad` accepts only ciphertext bound to associated data
+  (vauchi/private#574).
 
 ## [0.79.2] — 2026-10-11
 

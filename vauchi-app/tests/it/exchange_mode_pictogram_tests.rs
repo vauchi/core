@@ -12,6 +12,7 @@ use vauchi_app::ui::{AppEngine, AppScreen, ScreenModel, UserAction, WorkflowEngi
 use vauchi_core::Event;
 use vauchi_core::api::Vauchi;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
+use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::types::AudioCapability;
 
 const MODES: [&str; 9] = [
@@ -25,6 +26,15 @@ const MODES: [&str; 9] = [
     "link",
     "cable",
 ];
+
+fn unoffered(mode: &str) -> Option<ExchangeMode> {
+    match mode {
+        "bump" => Some(ExchangeMode::Bump),
+        "shake" => Some(ExchangeMode::Shake),
+        "magic" => Some(ExchangeMode::Magic),
+        _ => None,
+    }
+}
 
 fn pictogram(mode: &str) -> String {
     format!("pictogram.exchange.{mode}")
@@ -132,10 +142,15 @@ fn a_permission_row_keeps_its_modes_pictogram() {
 fn every_mode_screen_opens_with_its_pictogram_and_name() {
     for mode in MODES {
         let mut engine = engine_on_picker(full_caps());
-        let _ = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "category:quick".into(),
-            item_id: format!("mode:{mode}"),
-        });
+        // The picker no longer starts the three it does not offer
+        // (vauchi/private#271); their screens still exist until #506.
+        let _ = match unoffered(mode) {
+            Some(unoffered) => engine.select_exchange_mode_for_testing(unoffered),
+            None => engine.handle_action(UserAction::ListItemSelected {
+                component_id: "category:quick".into(),
+                item_id: format!("mode:{mode}"),
+            }),
+        };
         let screen = engine.current_screen();
         let name = get_string(Locale::English, &format!("exchange.mode_name.{mode}"));
         let badge = all_objects(&screen).into_iter().find(|o| {

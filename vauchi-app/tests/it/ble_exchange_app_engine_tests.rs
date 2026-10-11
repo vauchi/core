@@ -32,28 +32,22 @@ fn engine_with_identity() -> AppEngine {
     AppEngine::new(vauchi)
 }
 
-/// Enter the exchange flow and pick `item_id` (e.g. `mode:magic`). With no
-/// groups the picker hands off directly. Returns the engine parked on the
-/// resulting screen.
-fn enter_ble_mode(item_id: &str) -> AppEngine {
+/// Enters the exchange flow and starts `mode`, which the picker no longer
+/// offers, past its guard (vauchi/private#271), so the radio-only BLE path
+/// stays covered until #506 brings those modes back. With no groups the
+/// selection hands off directly; returns the engine on the resulting screen.
+fn enter_unoffered_ble_mode(mode: vauchi_core::exchange::mode::ExchangeMode) -> AppEngine {
     let mut engine = engine_with_identity();
     let entry = engine.navigate_to(AppScreen::Exchange);
-    // Mode-selection root reports the canonical tab-root id `exchange`
-    // (so frontends render the bottom nav bar) — see canonical_screen_id_tests.
     assert_eq!(entry.screen_id, "exchange");
-    // The picker parses only the `mode:` prefix of `item_id`; the
-    // component_id (category) is ignored.
-    let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "category:quick".into(),
-        item_id: item_id.into(),
-    });
+    let _ = engine.select_exchange_mode_for_testing(mode);
     engine
 }
 
 // @internal
 #[test]
 fn selecting_magic_routes_to_ble_exchange_and_renders_discovering() {
-    let engine = enter_ble_mode("mode:magic");
+    let engine = enter_unoffered_ble_mode(vauchi_core::exchange::mode::ExchangeMode::Magic);
     assert!(
         matches!(
             engine.current_app_screen(),
@@ -81,7 +75,7 @@ fn bump_and_shake_also_route_to_ble_exchange() {
             vauchi_core::exchange::mode::ExchangeMode::Shake,
         ),
     ] {
-        let engine = enter_ble_mode(item);
+        let engine = enter_unoffered_ble_mode(mode);
         match engine.current_app_screen() {
             AppScreen::BleExchange { mode: got } => assert_eq!(
                 *got, mode,
@@ -95,7 +89,7 @@ fn bump_and_shake_also_route_to_ble_exchange() {
 // @internal
 #[test]
 fn forwarding_ble_discovery_advances_engine_to_exchanging() {
-    let mut engine = enter_ble_mode("mode:magic");
+    let mut engine = enter_unoffered_ble_mode(vauchi_core::exchange::mode::ExchangeMode::Magic);
     assert_eq!(
         engine.current_screen().screen_id,
         "exchange_ble_discovering"
@@ -128,7 +122,7 @@ fn forwarding_ble_discovery_advances_engine_to_exchanging() {
 // @internal
 #[test]
 fn ble_disconnect_forwarded_through_app_engine_renders_failed() {
-    let mut engine = enter_ble_mode("mode:magic");
+    let mut engine = enter_unoffered_ble_mode(vauchi_core::exchange::mode::ExchangeMode::Magic);
     let _ = engine.handle_hardware_event(Event::BleDisconnected {
         device_id: "peer-1".into(),
         direction: vauchi_core::BleLinkDirection::Outbound,
@@ -148,7 +142,7 @@ fn ble_disconnect_forwarded_through_app_engine_renders_failed() {
 // @internal
 #[test]
 fn losing_glare_link_disconnect_does_not_fail_the_exchange() {
-    let mut engine = enter_ble_mode("mode:magic");
+    let mut engine = enter_unoffered_ble_mode(vauchi_core::exchange::mode::ExchangeMode::Magic);
     engine.start_ble_handshake_as_responder();
     let _ = engine.forward_ble_hardware_event(&Event::BleConnected {
         device_id: "survivor".into(),
@@ -186,7 +180,7 @@ fn ble_permission_denied_mid_wait_renders_failed_screen() {
     // pre-entry guard produces — not a toast over a still-"Searching…" screen
     // (the device-observed forever-scan). Pins the engine-level outcome so a
     // refactor of the BLE fail path to ShowToast would fail here.
-    let mut engine = enter_ble_mode("mode:magic");
+    let mut engine = enter_unoffered_ble_mode(vauchi_core::exchange::mode::ExchangeMode::Magic);
     let _ = engine.handle_hardware_event(Event::PermissionDenied {
         transport: "ble".into(),
     });
@@ -200,7 +194,7 @@ fn ble_permission_denied_mid_wait_renders_failed_screen() {
 // @internal
 #[test]
 fn cancel_on_ble_exchange_lands_on_mode_picker() {
-    let mut engine = enter_ble_mode("mode:magic");
+    let mut engine = enter_unoffered_ble_mode(vauchi_core::exchange::mode::ExchangeMode::Magic);
     assert!(matches!(
         engine.current_app_screen(),
         AppScreen::BleExchange { .. }
@@ -231,7 +225,7 @@ fn cancel_on_ble_exchange_lands_on_mode_picker() {
 /// Enter Magic and fail it with a peer disconnect, parking the engine on
 /// the BLE failed screen.
 fn failed_ble_engine() -> AppEngine {
-    let mut engine = enter_ble_mode("mode:magic");
+    let mut engine = enter_unoffered_ble_mode(vauchi_core::exchange::mode::ExchangeMode::Magic);
     let _ = engine.handle_hardware_event(Event::BleDisconnected {
         device_id: "peer-1".into(),
         direction: vauchi_core::BleLinkDirection::Outbound,
@@ -330,10 +324,8 @@ fn a_peerless_ble_discovery_offers_nothing_found_via_poll_notifications() {
     vauchi.create_identity("Alice").expect("identity");
     let mut engine = AppEngine::new(vauchi);
     let _ = engine.navigate_to(AppScreen::Exchange);
-    let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "category:quick".into(),
-        item_id: "mode:magic".into(),
-    });
+    let _ =
+        engine.select_exchange_mode_for_testing(vauchi_core::exchange::mode::ExchangeMode::Magic);
     assert_eq!(
         engine.current_screen().screen_id,
         "exchange_ble_discovering",

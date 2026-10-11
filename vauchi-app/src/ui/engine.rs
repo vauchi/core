@@ -177,4 +177,11 @@ pub trait WorkflowEngine: Send {
     fn as_any(&self) -> Option<&dyn Any> {
         None
     }
+
+    /// Mutable twin of `as_any`, compiled only for tests: lets a test drive
+    /// an engine past checks the user surface enforces (vauchi/private#271).
+    #[cfg(any(test, feature = "testing"))]
+    fn as_any_mut(&mut self) -> Option<&mut dyn Any> {
+        None
+    }
 }

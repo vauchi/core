@@ -40,6 +40,8 @@ mod backup_reminder_toast_tests;
 mod backup_screen_tests;
 mod batch2_i18n_tests;
 mod batch3_i18n_tests;
+// Uses the testing-feature hooks (vauchi/private#271).
+#[cfg(feature = "testing")]
 mod ble_exchange_app_engine_tests;
 mod ble_handshake_machine_tests;
 mod ble_pair_fault_gate_tests;
@@ -98,6 +100,8 @@ mod exchange_group_filter_preview_tests;
 mod exchange_group_selection_actions_tests;
 mod exchange_last_used_defaults_tests;
 mod exchange_location_capture_tests;
+// Uses the testing-feature hooks (vauchi/private#271).
+#[cfg(feature = "testing")]
 mod exchange_mode_pictogram_tests;
 mod exchange_no_numeric_progress_tests;
 mod exchange_picker_hero_tests;

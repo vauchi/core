@@ -425,6 +425,14 @@ impl ExchangeEngine {
         ActionResult::StartLinkExchange
     }
 
+    /// Starts `mode` as a picker selection would, past the picker's
+    /// offered-modes guard, so the radio-only BLE path of modes the picker no
+    /// longer offers stays tested (vauchi/private#271, #506).
+    #[cfg(any(test, feature = "testing"))]
+    pub fn select_mode_for_testing(&mut self, mode: ExchangeMode) -> ActionResult {
+        self.apply_selected_mode(mode)
+    }
+
     /// What a picker selection does: record the mode, then the field preview
     /// or the mode's sub-flow.
     fn apply_selected_mode(&mut self, mode: ExchangeMode) -> ActionResult {
@@ -1239,6 +1247,11 @@ impl WorkflowEngine for ExchangeEngine {
     }
 
     fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
+
+    #[cfg(any(test, feature = "testing"))]
+    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
         Some(self)
     }
 }
@@ -2137,6 +2150,21 @@ mod tests {
         (engine, result)
     }
 
+    /// Start a mode the picker no longer offers, past its guard
+    /// (vauchi/private#271), the way a selection would.
+    fn start_unoffered_mode(
+        ledger: TransportReadiness,
+        mode: ExchangeMode,
+    ) -> (ExchangeEngine, ActionResult) {
+        let mut engine = ExchangeEngine::new(
+            failfast_config(ledger),
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        assert_eq!(engine.step, ExchangeStep::ModeSelection);
+        let result = engine.select_mode_for_testing(mode);
+        (engine, result)
+    }
+
     /// Assert a routing result is the fail-fast screen naming `needle`.
     fn assert_failed_naming(result: ActionResult, engine: &ExchangeEngine, needle: &str) {
         let screen = match result {
@@ -2166,7 +2194,7 @@ mod tests {
     fn denied_ble_routes_magic_to_failed_not_ble_wait() {
         let mut led = TransportReadiness::new();
         led.note_denied(DeviceRequirement::Ble);
-        let (engine, result) = pick_mode(led, "mode:magic");
+        let (engine, result) = start_unoffered_mode(led, ExchangeMode::Magic);
         assert_eq!(engine.config.mode, Some(ExchangeMode::Magic));
         assert!(
             !matches!(result, ActionResult::StartBleExchange { .. }),
@@ -2208,7 +2236,7 @@ mod tests {
     #[test]
     fn unknown_ledger_lets_magic_enter_ble_wait() {
         // Optimistic-Unknown contract: an empty ledger never blocks entry.
-        let (engine, result) = pick_mode(TransportReadiness::new(), "mode:magic");
+        let (engine, result) = start_unoffered_mode(TransportReadiness::new(), ExchangeMode::Magic);
         assert!(
             matches!(result, ActionResult::StartBleExchange { .. }),
             "unknown permission must still enter the wait, got {result:?}"
@@ -2254,7 +2282,7 @@ mod tests {
         // the BLE wait.
         let mut led = TransportReadiness::new();
         led.note_permission_denied("location");
-        let (engine, result) = pick_mode(led, "mode:magic");
+        let (engine, result) = start_unoffered_mode(led, ExchangeMode::Magic);
         assert!(
             matches!(result, ActionResult::StartBleExchange { .. }),
             "a location denial must not gate a BLE mode, got {result:?}"
@@ -2292,7 +2320,7 @@ mod tests {
         // denied the guard must re-fail, not fall through to the BLE wait.
         let mut led = TransportReadiness::new();
         led.note_denied(DeviceRequirement::Ble);
-        let (mut engine, _first) = pick_mode(led, "mode:magic");
+        let (mut engine, _first) = start_unoffered_mode(led, ExchangeMode::Magic);
         assert_eq!(engine.step, ExchangeStep::Failed);
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "retry".into(),

@@ -14,6 +14,8 @@ mod completion_contact;
 mod completion_forms;
 mod contact_visibility_view;
 mod glance;
+#[cfg(any(test, feature = "testing"))]
+mod test_hooks;
 // INLINE_TEST_REQUIRED: injects a completed DeviceReplacementEngine into the
 // private `engine`/`screen` fields to drive the decommission-at-Complete hook.
 #[cfg(test)]

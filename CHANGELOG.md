@@ -6,6 +6,16 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.79.2] — 2026-10-11
+
+### Fixed
+
+- The app password form stores the password as typed
+  (vauchi/private#621). It echoed one `•` per character and stored the
+  value that came back, so a shell typing onto Core's value saved the
+  bullets as part of the password. The form now echoes what was typed, as
+  the lock screen does; shells mask password inputs (#619).
+
 ## [0.79.1] — 2026-10-10
 
 ### Fixed

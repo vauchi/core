@@ -104,6 +104,17 @@ pub struct LinkInitiation {
 /// The caller must persist `secret_key_bytes` and `nonce` for later
 /// use in [`initiator_complete`].
 pub fn initiator_generate() -> (LinkInitiation, Vec<Command>) {
+    initiator_generate_named("")
+}
+
+/// Longest sender name a link carries, in bytes: keeps the link and its QR
+/// short.
+const LINK_NAME_MAX_BYTES: usize = 64;
+
+/// Like [`initiator_generate`], with the sender's display name in the
+/// fragment (`nm=`, base64url) so the vauchi.app/x landing page can say who
+/// is sharing (vauchi/private#277). An empty name adds nothing.
+pub fn initiator_generate_named(display_name: &str) -> (LinkInitiation, Vec<Command>) {
     // Use StaticSecret (not EphemeralSecret) because we need to persist
     // the secret key bytes for later ECDH. StaticSecret supports to_bytes().
     let secret = StaticSecret::random_from_rng(OsRng);
@@ -112,7 +123,12 @@ pub fn initiator_generate() -> (LinkInitiation, Vec<Command>) {
 
     let pk_b64 = URL_SAFE_NO_PAD.encode(public.as_bytes());
     let nonce_b64 = URL_SAFE_NO_PAD.encode(nonce);
-    let url = format!("{LINK_URL_PREFIX}pk={pk_b64}&n={nonce_b64}");
+    let mut url = format!("{LINK_URL_PREFIX}pk={pk_b64}&n={nonce_b64}");
+    let name = truncate_to_char_boundary(display_name, LINK_NAME_MAX_BYTES);
+    if !name.is_empty() {
+        url.push_str("&nm=");
+        url.push_str(&URL_SAFE_NO_PAD.encode(name));
+    }
 
     let handshake_slot = derive_handshake_slot(&nonce);
     let presence_slot = derive_initiator_presence_slot(&nonce);
@@ -198,6 +214,17 @@ pub struct ParsedLinkUrl {
     pub initiator_public_key: [u8; 32],
     /// Random nonce from the URL.
     pub nonce: [u8; 32],
+}
+
+fn truncate_to_char_boundary(text: &str, max_bytes: usize) -> &str {
+    if text.len() <= max_bytes {
+        return text;
+    }
+    let mut end = max_bytes;
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    &text[..end]
 }
 
 /// Parse a link exchange URL.

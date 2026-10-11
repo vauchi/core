@@ -6,6 +6,16 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Removed
+
+- `Command::SetAuthenticationRequirement` and `AuthenticationRequirement`
+  (vauchi/private#591). Core acts on a biometric unlock itself since
+  0.79.0, so shells have nothing to apply; iOS and Android dropped their
+  app-password screens. Off the lock screen a biometric unlock now answers
+  an empty batch.
+
 ## [0.79.2] — 2026-10-11
 
 ### Fixed

@@ -22,6 +22,7 @@
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 use super::ExchangeError;
+use super::qr_url::{decode_scanned_qr, encode_qr_url};
 use super::x3dh::X3DHKeyPair;
 use crate::crypto::{PublicKey, Signature};
 use crate::identity::Identity;
@@ -210,8 +211,17 @@ impl ExchangeQR {
         public_key.verify(&message, &signature)
     }
 
-    /// Encodes the QR data to a string for embedding in QR code.
+    /// Encodes as the raw base64 payload apps from before #277 display.
     pub fn to_data_string(&self) -> String {
+        BASE64.encode(self.to_bytes())
+    }
+
+    /// Encodes as the `https://vauchi.app/x#q=…` URL the QR displays.
+    pub fn to_qr_url(&self) -> String {
+        encode_qr_url(&self.to_bytes())
+    }
+
+    fn to_bytes(&self) -> Vec<u8> {
         let name_bytes = self.display_name.as_bytes();
         let name_len = name_bytes.len() as u16;
 
@@ -236,15 +246,12 @@ impl ExchangeQR {
             data.extend_from_slice(url_bytes);
         }
         data.extend_from_slice(&self.signature);
-
-        BASE64.encode(&data)
+        data
     }
 
-    /// Parses QR data from a scanned string.
+    /// Parses a scanned QR in either form: the landing URL or the raw payload.
     pub fn from_data_string(data: &str) -> Result<Self, ExchangeError> {
-        let bytes = BASE64
-            .decode(data)
-            .map_err(|_| ExchangeError::InvalidQRFormat)?;
+        let bytes = decode_scanned_qr(data).ok_or(ExchangeError::InvalidQRFormat)?;
 
         // Minimum: MAGIC(4) + version(1) + pubkey(32) + exchange_key(32)
         //   + token(32) + challenge(16) + timestamp(8) + name_len(2) + flags(1) + sig(64) = 192

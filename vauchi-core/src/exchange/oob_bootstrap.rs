@@ -22,6 +22,7 @@ use super::exchange_payload::{
     EXCHANGE_PAYLOAD_SIZE, ParsedPayload, build_exchange_payload, is_payload_expired,
     parse_exchange_payload, verify_payload_signature,
 };
+use super::qr_url::{decode_scanned_qr, encode_qr_url};
 use super::x3dh::X3DHKeyPair;
 use crate::crypto::kdf::HKDF;
 use crate::identity::Identity;
@@ -150,16 +151,19 @@ impl OobBootstrapQr {
         Ok(Self { inner })
     }
 
-    /// Encode as the base64 QR string carried by `Component::QrCode`.
+    /// Encode as the raw base64 payload apps from before #277 display.
     pub fn to_data_string(&self) -> String {
         BASE64.encode(self.to_bytes())
     }
 
-    /// Decode a scanned base64 QR string — parse only (see [`Self::from_bytes`]).
+    /// Encode as the `https://vauchi.app/x#q=…` URL the QR displays.
+    pub fn to_qr_url(&self) -> String {
+        encode_qr_url(&self.to_bytes())
+    }
+
+    /// Decode a scanned QR in either form — parse only (see [`Self::from_bytes`]).
     pub fn from_data_string(data: &str) -> Result<Self, ExchangeError> {
-        let bytes = BASE64
-            .decode(data.trim())
-            .map_err(|_| ExchangeError::InvalidQRFormat)?;
+        let bytes = decode_scanned_qr(data).ok_or(ExchangeError::InvalidQRFormat)?;
         Self::from_bytes(&bytes)
     }
 

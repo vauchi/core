@@ -704,6 +704,37 @@ mod tests {
         );
     }
 
+    // Unlike an unavailable mode (above), an unoffered one is a product
+    // decision: the picker must not start it even if its id arrives
+    // (vauchi/private#271; the render list alone used to be the guard).
+    #[test]
+    fn selecting_an_unoffered_mode_does_not_start_it() {
+        let mut engine = ModeSelectionEngine::new(
+            full_caps(),
+            TransportReadiness::default(),
+            None,
+            Locale::English,
+        );
+        for unoffered in ["mode:bump", "mode:shake", "mode:magic"] {
+            let result = engine.handle_action(&UserAction::ListItemSelected {
+                component_id: "category:standard".into(),
+                item_id: unoffered.into(),
+            });
+            assert!(
+                matches!(result, ModeSelectionResult::Screen(_)),
+                "{unoffered} must not be selectable"
+            );
+        }
+        let result = engine.handle_action(&UserAction::ListItemSelected {
+            component_id: "category:standard".into(),
+            item_id: "mode:glance".into(),
+        });
+        assert!(matches!(
+            result,
+            ModeSelectionResult::Selected(ExchangeMode::Glance)
+        ));
+    }
+
     #[test]
     fn unknown_action_returns_screen() {
         let mut engine = ModeSelectionEngine::new(

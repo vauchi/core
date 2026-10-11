@@ -115,6 +115,37 @@ fn a_locked_session_refuses_a_surface_switch() {
     assert_eq!(engine.current_screen().screen_id, "lock_screen");
 }
 
+/// A shell still holds the surfaces it was shown before the lock (here
+/// Settings and its Advanced child); activating one of them must not leave
+/// the lock screen.
+// @scenario: security.feature :: App lock with PIN
+#[test]
+fn a_locked_session_refuses_switching_to_a_surface_shown_before_the_lock() {
+    for surface in ["settings", "settings_advanced"] {
+        let mut engine = engine_with_password(false);
+        engine.vauchi_mut().authenticate(PASSWORD).unwrap();
+        engine.navigate_to(AppScreen::Settings);
+        engine.navigate_to(AppScreen::SettingsAdvanced);
+        let _ = engine.initial_commands().unwrap();
+        let _ = engine.dispatch(Event::AppBackgrounded).unwrap();
+        assert_eq!(
+            engine.current_screen().screen_id,
+            "lock_screen",
+            "precondition"
+        );
+
+        let _ = engine.dispatch(Event::SurfaceActivated {
+            surface_id: SurfaceId::new(surface).unwrap(),
+        });
+
+        assert_eq!(
+            engine.current_screen().screen_id,
+            "lock_screen",
+            "activating {surface} left the lock screen without the password",
+        );
+    }
+}
+
 // @scenario: security.feature :: App lock with PIN
 #[test]
 fn a_wrong_password_keeps_the_session_locked() {

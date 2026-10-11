@@ -165,7 +165,7 @@ impl AppEngine {
     /// cannot disagree about what "locked" means
     /// (`problems/2026-08-12-android-app-password-bypass`).
     pub(super) fn is_locked(&self) -> bool {
-        self.session_locked || matches!(self.screen, AppScreen::Lock)
+        self.session_locked
     }
 
     /// Whether a move to `screen` must be refused: the session is locked
@@ -297,6 +297,9 @@ impl AppEngine {
     pub(super) fn activate_surface_engine(&mut self, screen: AppScreen) {
         if self.screen == screen || self.refuses_while_locked(&screen) {
             return;
+        }
+        if matches!(screen, AppScreen::Lock) {
+            self.session_locked = true;
         }
         let new_engine = self.engine_cache.remove(&screen).unwrap_or_else(|| {
             Self::create_engine(
@@ -633,10 +636,46 @@ impl AppEngine {
     }
 }
 
-// INLINE_TEST_REQUIRED: asserts on the private tab_metadata table, which has no public accessor
+// INLINE_TEST_REQUIRED: asserts on the private tab_metadata table, which has
+// no public accessor, and drives activate_surface_engine directly: while
+// locked only the lock surface is presented, so no event reaches its guard
+// (vauchi/private#639).
 #[cfg(test)]
 mod tests {
     use super::*;
+    use vauchi_core::api::Vauchi;
+
+    /// Defence in depth for the session lock: should a stale surface ever
+    /// stay active, switching to it must not leave the lock screen.
+    // @internal
+    #[test]
+    fn a_locked_session_refuses_a_surface_engine_switch() {
+        let mut vauchi = Vauchi::in_memory().unwrap();
+        vauchi.create_identity("Alice").unwrap();
+        vauchi.setup_app_password("pass1234").unwrap();
+        let mut engine = AppEngine::new(vauchi);
+        assert!(engine.is_locked(), "precondition: starts locked");
+
+        engine.activate_surface_engine(AppScreen::Settings);
+
+        assert_eq!(engine.screen, AppScreen::Lock);
+        assert!(engine.is_locked());
+    }
+
+    /// Activating the lock surface locks the session, so "locked" never
+    /// depends on how the lock screen was reached.
+    // @internal
+    #[test]
+    fn activating_the_lock_surface_locks_the_session() {
+        let mut vauchi = Vauchi::in_memory().unwrap();
+        vauchi.create_identity("Alice").unwrap();
+        let mut engine = AppEngine::new(vauchi);
+        assert!(!engine.is_locked(), "precondition: no password, unlocked");
+
+        engine.activate_surface_engine(AppScreen::Lock);
+
+        assert!(engine.is_locked());
+    }
 
     /// Every screen `tab_metadata` names a key for, so the test covers the
     /// whole table rather than the handful of screens a tab bar shows.

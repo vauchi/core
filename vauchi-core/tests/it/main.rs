@@ -430,6 +430,7 @@ mod relay_url_validator_tests;
 mod repeat_exchange_rekey_tests;
 mod replay_detection_api_tests;
 mod replay_detection_tests;
+mod responder_deferred_send_tests;
 mod retry_queue_tests;
 mod revocation_protocol_tests;
 mod rng_tests;

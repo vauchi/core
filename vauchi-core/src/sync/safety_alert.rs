@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Safety-alert payload — the signed, replay-protected envelope carried by
-//! emergency-broadcast and duress alerts.
+//! emergency-broadcast alerts. A duress unlock sends none (ADR-032
+//! amendment 2026-10-11).
 //!
 //! Carried inside the Double Ratchet plaintext as [`VersionedPayload`]
 //! version `0x04` (see `delta.rs`), so on the wire it is indistinguishable

@@ -13,7 +13,6 @@ use super::{AuthMode, BiometricUnlockOutcome, Vauchi};
 use crate::emergency::DURESS_PIN_LENGTH;
 use crate::sleeper::Sleeper;
 use crate::storage::ActivityLogRow;
-use crate::types::DuressSettings;
 
 /// Rejects anything that is not exactly [`DURESS_PIN_LENGTH`] ASCII digits.
 ///
@@ -48,12 +47,6 @@ pub fn validate_duress_pin(pin: &str) -> VauchiResult<()> {
 /// item P2-B); core now owns the constant so the two language
 /// implementations cannot drift apart.
 pub const BIOMETRIC_UNLOCK_MIN_DURATION: Duration = Duration::from_millis(300);
-
-/// Maximum number of contacts that can receive duress alerts.
-///
-/// Kept for settings validation even though the current duress flow triggers
-/// a local wipe instead of sending alerts.
-pub const MAX_DURESS_CONTACTS: usize = 5;
 
 impl Vauchi {
     // === Delivery Status Operations ===
@@ -383,51 +376,10 @@ impl Vauchi {
     /// only clears the concealed view (#462).
     pub fn disable_duress(&mut self) -> VauchiResult<()> {
         if self.in_duress_mode() {
-            let mut concealed = self.concealed_duress();
-            concealed.enabled = false;
-            concealed.settings = None;
+            self.concealed_duress().enabled = false;
             return Ok(());
         }
         self.storage.identity().disable_duress()?;
-        Ok(())
-    }
-
-    // === Duress Settings ===
-
-    /// Saves duress alert settings (trusted contacts, message, location).
-    pub fn save_duress_settings(&self, settings: &DuressSettings) -> VauchiResult<()> {
-        if settings.alert_contact_ids.len() > MAX_DURESS_CONTACTS {
-            return Err(VauchiError::InvalidState(format!(
-                "maximum {MAX_DURESS_CONTACTS} duress contacts allowed, got {}",
-                settings.alert_contact_ids.len()
-            )));
-        }
-        if self.in_duress_mode() {
-            self.concealed_duress().settings = Some(settings.clone());
-            return Ok(());
-        }
-        self.storage.duress().save_duress_settings(settings)?;
-        Ok(())
-    }
-
-    /// Loads duress alert settings.
-    ///
-    /// Returns `None` if no settings have been configured. In duress mode
-    /// this is the concealed view (#462).
-    pub fn load_duress_settings(&self) -> VauchiResult<Option<DuressSettings>> {
-        if self.in_duress_mode() {
-            return Ok(self.concealed_duress().settings.clone());
-        }
-        Ok(self.storage.duress().load_duress_settings()?)
-    }
-
-    /// Deletes duress alert settings.
-    pub fn delete_duress_settings(&self) -> VauchiResult<()> {
-        if self.in_duress_mode() {
-            self.concealed_duress().settings = None;
-            return Ok(());
-        }
-        self.storage.duress().delete_duress_settings()?;
         Ok(())
     }
 

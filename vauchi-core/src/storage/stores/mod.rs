@@ -22,7 +22,6 @@ mod decoy;
 mod delivery;
 mod device;
 mod device_delivery;
-mod duress;
 mod emergency;
 mod field_notes;
 mod genesis_limit;
@@ -49,7 +48,6 @@ pub use decoy::DecoyStore;
 pub use delivery::DeliveryStore;
 pub use device::DeviceStore;
 pub use device_delivery::DeviceDeliveryStore;
-pub use duress::DuressStore;
 pub use emergency::EmergencyStore;
 pub use field_notes::FieldNoteStore;
 pub use genesis_limit::{

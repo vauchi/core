@@ -9,21 +9,6 @@
 //! depending on nothing — is what breaks the `storage → api` cycle they
 //! would otherwise create.
 
-/// Duress settings for emergency alert configuration.
-///
-/// Stored in the `duress_settings` table (migration V20).
-/// Determines which contacts receive alerts, what message is included,
-/// and whether device location is included.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct DuressSettings {
-    /// Contact IDs of trusted contacts who receive duress alerts.
-    pub alert_contact_ids: Vec<String>,
-    /// Custom alert message included in the alert payload.
-    pub alert_message: String,
-    /// Whether to include device location in the alert.
-    pub include_location: bool,
-}
-
 /// Emergency broadcast configuration.
 ///
 /// Stored in the `emergency_config` table (migration V22).

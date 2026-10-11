@@ -304,41 +304,6 @@ impl PlatformAppEngine {
                 engine.invalidate_screen(&AppScreen::Privacy);
                 Ok(DomainCommandResult::Unit)
             }
-            DomainCommand::ConfigureDuressAlerts {
-                contact_ids,
-                message,
-            } => {
-                let settings = vauchi_core::DuressSettings {
-                    alert_contact_ids: contact_ids,
-                    alert_message: message,
-                    include_location: false,
-                };
-                engine
-                    .vauchi()
-                    .save_duress_settings(&settings)
-                    .map_err(|e| MobileError::Other {
-                        detail: e.to_string(),
-                    })?;
-                engine.invalidate_screen(&AppScreen::Settings);
-                engine.invalidate_screen(&AppScreen::Privacy);
-                Ok(DomainCommandResult::Unit)
-            }
-            DomainCommand::GetDuressSettings => {
-                let settings =
-                    engine
-                        .vauchi()
-                        .load_duress_settings()
-                        .map_err(|e| MobileError::Other {
-                            detail: e.to_string(),
-                        })?;
-                Ok(DomainCommandResult::DuressSettingsOpt {
-                    settings: settings.map(|s| crate::types::MobileDuressSettings {
-                        alert_contact_ids: s.alert_contact_ids,
-                        alert_message: s.alert_message,
-                        include_location: s.include_location,
-                    }),
-                })
-            }
             DomainCommand::AddDecoyContact { name, card_json } => {
                 let card: vauchi_core::ContactCard =
                     serde_json::from_str(&card_json).map_err(|e| MobileError::Other {

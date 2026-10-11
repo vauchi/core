@@ -957,100 +957,6 @@ fn test_list_contacts_duress_mode_returns_decoy() {
 // =============================================================================
 // =============================================================================
 
-// @scenario: duress_mode :: Duress mode is opt-in and disabled by default
-#[test]
-fn test_load_duress_settings_returns_none_initially() {
-    let wb = create_vauchi_with_identity("Alice");
-
-    let settings = wb.load_duress_settings().expect("load should succeed");
-    assert!(
-        settings.is_none(),
-        "duress settings should be None before any configuration"
-    );
-}
-
-// @internal
-// @scenario: duress_mode :: App update preserves duress configuration
-#[test]
-fn test_save_load_duress_settings_roundtrip() {
-    let wb = create_vauchi_with_identity("Alice");
-
-    let settings = vauchi_core::types::DuressSettings {
-        alert_contact_ids: vec!["contact-1".to_string(), "contact-2".to_string()],
-        alert_message: "I need help".to_string(),
-        include_location: true,
-    };
-
-    wb.save_duress_settings(&settings)
-        .expect("save should succeed");
-
-    let loaded = wb
-        .load_duress_settings()
-        .expect("load should succeed")
-        .expect("should have duress settings");
-
-    assert_eq!(loaded.alert_contact_ids, settings.alert_contact_ids);
-    assert_eq!(loaded.alert_message, settings.alert_message);
-    assert_eq!(loaded.include_location, settings.include_location);
-}
-
-// @scenario: duress_mode :: Disable duress mode from settings
-#[test]
-fn test_delete_duress_settings() {
-    let wb = create_vauchi_with_identity("Alice");
-
-    let settings = vauchi_core::types::DuressSettings {
-        alert_contact_ids: vec!["contact-1".to_string()],
-        alert_message: "Help".to_string(),
-        include_location: false,
-    };
-
-    wb.save_duress_settings(&settings)
-        .expect("save should succeed");
-
-    wb.delete_duress_settings().expect("delete should succeed");
-
-    let loaded = wb.load_duress_settings().expect("load should succeed");
-    assert!(
-        loaded.is_none(),
-        "duress settings should be None after delete"
-    );
-}
-
-// =============================================================================
-// =============================================================================
-
-// @scenario: duress_mode :: A duress unlock sends nothing
-#[test]
-fn test_duress_unlock_without_settings_queues_nothing() {
-    let mut wb = create_vauchi_with_identity("Alice");
-
-    wb.setup_app_password("my-pin-1234")
-        .expect("setup should succeed");
-    wb.setup_duress_password("654321")
-        .expect("setup duress should succeed");
-
-    // Do NOT configure duress settings
-
-    // Authenticate with duress PIN — should NOT fail, just no alerts
-    let mode = wb.authenticate("654321").expect("auth should succeed");
-    assert_eq!(mode, AuthMode::Duress);
-
-    // Verify no pending updates were queued (no settings = no recipients).
-    let pending = wb
-        .storage()
-        .pending()
-        .count_all_pending_updates()
-        .expect("count pending");
-    assert!(
-        pending == 0,
-        "duress authentication without settings should not queue pending updates"
-    );
-}
-
-// =============================================================================
-// =============================================================================
-
 // @scenario: duress_mode :: Duress credential shows decoy contacts
 // @scenario: duress_mode :: A duress unlock sends nothing
 #[test]
@@ -1070,7 +976,7 @@ fn test_full_duress_flow_sends_nothing() {
     wb.add_decoy_contact("decoy-1", "Fake Friend", &decoy_card)
         .expect("add decoy should succeed");
 
-    // 4. Create a trusted contact with a ratchet so the alert can be queued.
+    // 4. A ratcheted contact a duress unlock could have written to.
     let trusted_contact = Contact::from_exchange(
         *wb.identity().unwrap().signing_public_key(),
         ContactCard::new("Trusted Friend"),
@@ -1093,33 +999,19 @@ fn test_full_duress_flow_sends_nothing() {
         .save_ratchet_state(&trusted_id, &ratchet, is_initiator)
         .unwrap();
 
-    // 5. Configure duress alert settings
-    let settings = vauchi_core::types::DuressSettings {
-        alert_contact_ids: vec![trusted_id.clone()],
-        alert_message: "Emergency - duress unlock".to_string(),
-        include_location: true,
-    };
-    wb.save_duress_settings(&settings)
-        .expect("save duress settings should succeed");
-
-    // 6. Verify everything is configured
+    // 5. Verify everything is configured
     assert!(wb.is_password_enabled().expect("check should succeed"));
     assert!(wb.is_duress_enabled().expect("check should succeed"));
-    let loaded_settings = wb
-        .load_duress_settings()
-        .expect("load should succeed")
-        .expect("should have settings");
-    assert_eq!(loaded_settings.alert_contact_ids.len(), 1);
 
-    // 7. Authenticate with duress PIN — triggers full flow
+    // 6. Authenticate with duress PIN — triggers full flow
     let mode = wb.authenticate("654321").expect("auth should succeed");
     assert_eq!(mode, AuthMode::Duress);
 
-    // 8a. Verify duress mode shows decoy contacts
+    // 7a. Verify duress mode shows decoy contacts
     let contacts = wb.list_contacts().expect("list should succeed");
     assert_eq!(contacts.len(), 1, "should show decoy contacts only");
     assert_eq!(contacts[0].display_name(), "Fake Friend");
-    // 8b. A duress unlock sends nothing (ADR-032 amendment 2026-10-11).
+    // 7b. A duress unlock sends nothing (ADR-032 amendment 2026-10-11).
     let pending = wb
         .storage()
         .pending()

@@ -2,7 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Duress PIN engine — configure a duress PIN that triggers silent alerts.
+//! Duress PIN engine — configure the PIN that opens the decoy profile. It
+//! sends nothing (ADR-032 amendment 2026-10-11).
 //! Copy resolves through `i18n::get_string` in the locale threaded at
 //! construction (M3 S3c of `2026-07-03-core-screens-bypass-i18n`); keys
 //! live in the `resistance.duress.*` + shared `action.*` families.
@@ -17,12 +18,6 @@ use zeroize::Zeroize;
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct DuressConfig {
     pub enabled: bool,
-    /// All of the user's contacts — the pool the recipient picker renders.
-    pub available_contacts: Vec<Item>,
-    /// Ids (subset of `available_contacts`) chosen to receive the duress alert.
-    pub selected_contact_ids: Vec<String>,
-    pub alert_message: String,
-    pub include_location: bool,
 }
 
 /// Taken from core so the reducer and the API cannot disagree about how
@@ -65,9 +60,6 @@ pub struct DuressPinEngine {
     pending_disable: bool,
     /// Number of decoy contacts, for the overview's decoy row.
     decoy_count: usize,
-    /// Alerts opened from the overview's alerts row: no PIN is asked, Back
-    /// returns to the overview, and saving leaves the PIN as it is.
-    alerts_only: bool,
     locale: Locale,
 }
 
@@ -86,7 +78,6 @@ enum DuressPinStep {
     Overview,
     EnterPin,
     ConfirmPin,
-    ConfigureAlerts,
 }
 
 impl DuressPinEngine {
@@ -98,7 +89,6 @@ impl DuressPinEngine {
             confirm_pin: String::new(),
             pending_disable: false,
             decoy_count: 0,
-            alerts_only: false,
             locale,
         }
     }
@@ -119,7 +109,6 @@ impl DuressPinEngine {
 
     fn start_pin_entry(&mut self) -> ActionResult {
         self.step = DuressPinStep::EnterPin;
-        self.alerts_only = false;
         self.new_pin.clear();
         self.confirm_pin.clear();
         ActionResult::NavigateTo(self.current_screen())
@@ -138,19 +127,16 @@ impl DuressPinEngine {
         &self.new_pin
     }
 
-    /// Setup is three steps; the overview is not one of them, and editing
-    /// only the alerts is a single screen without a step bar (#459).
+    /// Setup is two steps; the overview is not one of them (#459).
     fn progress(&self) -> Option<Progress> {
         let current_step = match self.step {
             DuressPinStep::Overview => return None,
-            DuressPinStep::ConfigureAlerts if self.alerts_only => return None,
             DuressPinStep::EnterPin => 1,
             DuressPinStep::ConfirmPin => 2,
-            DuressPinStep::ConfigureAlerts => 3,
         };
         Some(Progress {
             current_step,
-            total_steps: 3,
+            total_steps: 2,
             label: None,
         })
     }
@@ -197,16 +183,6 @@ impl DuressPinEngine {
                             "resistance.duress.row_decoys_none",
                             "resistance.duress.row_decoys_one",
                             "resistance.duress.row_decoys_many",
-                        ),
-                    ),
-                    row(
-                        "alerts",
-                        "resistance.duress.row_alerts",
-                        self.count(
-                            self.config.selected_contact_ids.len(),
-                            "resistance.duress.row_alerts_off",
-                            "resistance.duress.row_alerts_one",
-                            "resistance.duress.row_alerts_many",
                         ),
                     ),
                 ],
@@ -357,88 +333,6 @@ impl DuressPinEngine {
             ..Default::default()
         }
     }
-
-    fn alerts_screen(&self) -> ScreenModel {
-        ScreenModel {
-            screen_id: "duress_alerts".into(),
-            title: self.t("resistance.duress.configure_alerts"),
-            subtitle: None,
-            components: vec![
-                Component::ToggleList {
-                    id: "recipients".into(),
-                    label: self.t("resistance.duress.setup.alert_recipients"),
-                    items: self
-                        .config
-                        .available_contacts
-                        .iter()
-                        .map(|c| ToggleItem {
-                            id: c.id.clone(),
-                            label: c.name.clone(),
-                            selected: self.config.selected_contact_ids.contains(&c.id),
-                            subtitle: None,
-                            a11y: Some(A11y::labeled(c.name.clone())),
-                            info_key: None,
-                        })
-                        .collect(),
-                    a11y: None,
-                },
-                Component::TextInput {
-                    id: "alert_message".into(),
-                    label: self.t("resistance.duress.alert_message"),
-                    value: self.config.alert_message.clone(),
-                    placeholder: Some(self.t("resistance.duress.message_placeholder")),
-                    max_length: None,
-                    validation_error: None,
-                    input_type: InputType::Text,
-                    a11y: Some(A11y {
-                        label: Some(self.t("resistance.duress.message_a11y")),
-                        hint: Some(self.t("resistance.duress.message_placeholder")),
-                        role: Some(AccessibilityRole::TextField),
-                    }),
-                    info_key: None,
-                },
-                Component::ToggleList {
-                    id: "alerts".into(),
-                    label: self.t("resistance.duress.options"),
-                    items: vec![ToggleItem {
-                        id: "include_location".into(),
-                        label: self.t("resistance.duress.setup.include_location"),
-                        selected: self.config.include_location,
-                        subtitle: Some(self.t("resistance.duress.include_location_desc")),
-                        a11y: Some(A11y::labeled(
-                            self.t("resistance.duress.setup.include_location"),
-                        )),
-                        info_key: None,
-                    }],
-                    a11y: None,
-                },
-            ],
-            contextual_actions: vec![
-                ScreenAction {
-                    id: "back".into(),
-                    label: self.t("action.back"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("action.back"))),
-                },
-                ScreenAction {
-                    id: "save".into(),
-                    label: self.t("action.save"),
-                    style: ActionStyle::Primary,
-                    // A duress alert with no recipient reaches nobody — require ≥1
-                    // whenever there is anybody to pick (2026-07-03-coercion-
-                    // safety-config-gaps). With an empty pool the gate is
-                    // unsatisfiable, and enforcing it would deny the PIN's local
-                    // decoy protection to everyone who has not exchanged yet.
-                    enabled: self.config.available_contacts.is_empty()
-                        || !self.config.selected_contact_ids.is_empty(),
-                    a11y: Some(A11y::labeled(self.t("action.save"))),
-                },
-            ],
-            progress: self.progress(),
-            ..Default::default()
-        }
-    }
 }
 
 impl WorkflowEngine for DuressPinEngine {
@@ -447,15 +341,7 @@ impl WorkflowEngine for DuressPinEngine {
         Some(crate::ui::EngineOutput::DuressPin(
             crate::ui::DuressPinSetup {
                 enabled: config.enabled,
-                // Empty when only the alerts were edited: the PIN stays.
-                pin: if self.alerts_only {
-                    String::new()
-                } else {
-                    self.pin().to_string()
-                },
-                alert_contact_ids: config.selected_contact_ids.clone(),
-                alert_message: config.alert_message.clone(),
-                include_location: config.include_location,
+                pin: self.pin().to_string(),
             },
         ))
     }
@@ -465,7 +351,6 @@ impl WorkflowEngine for DuressPinEngine {
             DuressPinStep::Overview => self.overview_screen(),
             DuressPinStep::EnterPin => self.enter_pin_screen(),
             DuressPinStep::ConfirmPin => self.confirm_pin_screen(),
-            DuressPinStep::ConfigureAlerts => self.alerts_screen(),
         }
     }
 
@@ -482,17 +367,6 @@ impl WorkflowEngine for DuressPinEngine {
                 || (component_id == ROWS_ID && item_id == "pin") =>
             {
                 self.start_pin_entry()
-            }
-            (
-                DuressPinStep::Overview,
-                UserAction::ListItemSelected {
-                    component_id,
-                    item_id,
-                },
-            ) if component_id == ROWS_ID && item_id == "alerts" => {
-                self.step = DuressPinStep::ConfigureAlerts;
-                self.alerts_only = true;
-                ActionResult::NavigateTo(self.current_screen())
             }
             (
                 DuressPinStep::Overview,
@@ -598,79 +472,14 @@ impl WorkflowEngine for DuressPinEngine {
                         message: self.t("resistance.duress.error_mismatch"),
                     }
                 } else {
-                    self.step = DuressPinStep::ConfigureAlerts;
-                    ActionResult::NavigateTo(self.current_screen())
+                    self.config.enabled = true;
+                    ActionResult::Complete
                 }
             }
             (DuressPinStep::ConfirmPin, UserAction::ActionPressed { action_id })
                 if action_id == "back" =>
             {
                 self.step = DuressPinStep::EnterPin;
-                ActionResult::NavigateTo(self.current_screen())
-            }
-
-            // --- ConfigureAlerts ---
-            (
-                DuressPinStep::ConfigureAlerts,
-                UserAction::TextChanged {
-                    component_id,
-                    value,
-                },
-            ) if component_id == "alert_message" => {
-                self.config.alert_message = value;
-                ActionResult::UpdateScreen(self.current_screen())
-            }
-            (
-                DuressPinStep::ConfigureAlerts,
-                UserAction::ItemToggled {
-                    component_id,
-                    item_id,
-                },
-            ) if component_id == "recipients" => {
-                if let Some(pos) = self
-                    .config
-                    .selected_contact_ids
-                    .iter()
-                    .position(|id| id == &item_id)
-                {
-                    self.config.selected_contact_ids.remove(pos);
-                } else {
-                    self.config.selected_contact_ids.push(item_id);
-                }
-                ActionResult::UpdateScreen(self.current_screen())
-            }
-            (
-                DuressPinStep::ConfigureAlerts,
-                UserAction::ItemToggled {
-                    component_id,
-                    item_id,
-                },
-            ) if component_id == "alerts" && item_id == "include_location" => {
-                self.config.include_location = !self.config.include_location;
-                ActionResult::UpdateScreen(self.current_screen())
-            }
-            // Save is gated on ≥1 recipient; with none, this arm's guard fails
-            // and the fallback re-renders (the disabled Save is a no-op). An
-            // empty contact pool cannot satisfy that gate, so it is exempt —
-            // the guard must mirror the Save affordance's enabled rule exactly,
-            // or the button renders active and does nothing.
-            (DuressPinStep::ConfigureAlerts, UserAction::ActionPressed { action_id })
-                if (action_id == "save" || action_id == "submit_alert_message")
-                    && (self.config.available_contacts.is_empty()
-                        || !self.config.selected_contact_ids.is_empty()) =>
-            {
-                self.config.enabled = true;
-                ActionResult::Complete
-            }
-            (DuressPinStep::ConfigureAlerts, UserAction::ActionPressed { action_id })
-                if action_id == "back" =>
-            {
-                self.step = if self.alerts_only {
-                    self.alerts_only = false;
-                    DuressPinStep::Overview
-                } else {
-                    DuressPinStep::ConfirmPin
-                };
                 ActionResult::NavigateTo(self.current_screen())
             }
 

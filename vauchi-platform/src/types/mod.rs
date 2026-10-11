@@ -33,9 +33,9 @@ pub use notification::{
 pub use security::{
     MobileAuthMode, MobileBiometricUnlockOutcome, MobileBroadcastResult, MobileConsentRecord,
     MobileConsentStatus, MobileConsentType, MobileDecoyContact, MobileDeletionInfo,
-    MobileDeletionState, MobileDuressSettings, MobileEmergencyConfig, MobileGdprExport,
-    MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
-    MobileShredReport, MobileShredStatus, MobileShredToken,
+    MobileDeletionState, MobileEmergencyConfig, MobileGdprExport, MobileRecoveryClaim,
+    MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher, MobileShredReport,
+    MobileShredStatus, MobileShredToken,
 };
 pub use social::{
     MobileLabelContactBadge, MobileLabelContactRow, MobileLabelContactStatus, MobileSocialNetwork,

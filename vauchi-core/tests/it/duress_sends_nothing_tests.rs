@@ -13,7 +13,7 @@ use crate::common::helpers::create_vauchi_with_identity;
 
 // @scenario: duress_mode :: A duress unlock sends nothing
 #[test]
-fn a_duress_unlock_queues_nothing_even_for_former_alert_recipients() {
+fn a_duress_unlock_queues_nothing_for_a_ratcheted_contact() {
     let mut wb = create_vauchi_with_identity("Alice");
     wb.setup_app_password("my-pin-1234").unwrap();
     wb.setup_duress_password("654321").unwrap();
@@ -31,12 +31,6 @@ fn a_duress_unlock_queues_nothing_even_for_former_alert_recipients() {
         &vauchi_core::crypto::SymmetricKey::generate(),
         *dh.public_key(),
     )
-    .unwrap();
-    wb.save_duress_settings(&vauchi_core::types::DuressSettings {
-        alert_contact_ids: vec![friend_id],
-        alert_message: "I'm in danger".to_string(),
-        include_location: false,
-    })
     .unwrap();
 
     let mode = wb.authenticate("654321").unwrap();

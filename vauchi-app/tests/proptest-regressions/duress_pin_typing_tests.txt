@@ -8,3 +8,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 0498929fbb41ea8f7b378667147d1582a2638ed87f638312d8921afe3af06821 # shrinks to keys = [None, Some(0), Some(0), Some(0), Some(0), Some(0), Some(0), Some(0), None]
+cc 47daba1eb96d5e2eb471cda55ffa7dfbef84ddef79a3bfb924a4ad8479311857 # shrinks to keys = [Some(0), Some(0), Some(0), Some(0), Some(0), Some(0)]

@@ -69,13 +69,7 @@ fn setup_counts_two_steps() {
 // @scenario: duress_mode :: A duress unlock sends nothing
 #[test]
 fn an_enabled_duress_pin_lists_no_alerts_row() {
-    let engine = DuressPinEngine::new(
-        DuressConfig {
-            enabled: true,
-            ..DuressConfig::default()
-        },
-        Locale::English,
-    );
+    let engine = DuressPinEngine::new(DuressConfig { enabled: true }, Locale::English);
 
     let rows: Vec<String> = engine
         .current_screen()

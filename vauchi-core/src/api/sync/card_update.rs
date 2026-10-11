@@ -439,8 +439,8 @@ fn process_single_card_update_for_device_with_budget(
         }
     };
 
-    // 3b. Alerts route separately. Emergency/duress alerts reuse the card-update
-    //     envelope for wire indistinguishability (ADR-032) but carry no card
+    // 3b. Alerts route separately. Emergency alerts reuse the card-update
+    //     envelope for wire indistinguishability (ADR-036) but carry no card
     //     delta — a 0x04 payload is verified + surfaced here, before the
     //     card-delta path (2026-07-04-coercion-safety-alerts-never-received).
     if let Ok(VersionedPayload::Alert(alert)) = VersionedPayload::decode(&plaintext) {

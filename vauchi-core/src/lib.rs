@@ -63,7 +63,7 @@ pub mod text;
 pub mod install_id;
 pub use types::{
     AhaMomentTracker, AhaMomentType, AudioCapability, BackupReminderState, BiometricUnlockOutcome,
-    ConsentRecord, ConsentType, DEFAULT_EMERGENCY_MESSAGE, DemoContactState, DuressSettings,
+    ConsentRecord, ConsentType, DEFAULT_EMERGENCY_MESSAGE, DemoContactState,
     EmergencyBroadcastConfig, EmergencyWipeStatus, EventOrigin, ExchangeTransport,
     MAX_TRUSTED_CONTACTS, OnboardingProgress, OnboardingStep, OwnCardRepropagateState,
     ProximityConfidence, ReminderFrequency,
@@ -93,10 +93,9 @@ pub mod storage;
 #[cfg(feature = "storage")]
 pub use storage::{
     ActivityLogStore, ConsentStore, ContactStore, DecoyStore, DeliveryStore, DeviceDeliveryStore,
-    DeviceStore, DuressStore, EmergencyStore, FieldNoteStore, IdentityStore, LabelStore,
-    OhttpCacheStore, PendingStore, PendingUpdate, PinCacheStore, PlaceStore, RatchetStore,
-    RecoveryStore, ReplayStore, RetryStore, Storage, StorageError, SyncStore, TagStore,
-    UpdateStatus, UxStore,
+    DeviceStore, EmergencyStore, FieldNoteStore, IdentityStore, LabelStore, OhttpCacheStore,
+    PendingStore, PendingUpdate, PinCacheStore, PlaceStore, RatchetStore, RecoveryStore,
+    ReplayStore, RetryStore, Storage, StorageError, SyncStore, TagStore, UpdateStatus, UxStore,
 };
 
 pub mod exchange;
@@ -148,9 +147,9 @@ pub mod api;
 #[cfg(feature = "network-rustls")]
 pub use api::{
     AppPasswordConfig, AuthMode, AuthResult, BIOMETRIC_UNLOCK_MIN_DURATION, BroadcastResult,
-    ConsentStatus, DeviceSyncOrchestrator, DuressAlert, DuressAlertType, GroupDraft, HandlerId,
-    RecoveryReadiness, SearchFacets, SetupProgress, SyncError, SyncManager, Vauchi, VauchiBuilder,
-    VauchiConfig, VauchiError, VauchiEvent, VauchiResult, VauchiSyncOutcome, validate_duress_pin,
+    ConsentStatus, DeviceSyncOrchestrator, GroupDraft, HandlerId, RecoveryReadiness, SearchFacets,
+    SetupProgress, SyncError, SyncManager, Vauchi, VauchiBuilder, VauchiConfig, VauchiError,
+    VauchiEvent, VauchiResult, VauchiSyncOutcome, validate_duress_pin,
 };
 #[cfg(all(feature = "network-rustls", feature = "network-http"))]
 pub use api::{PERIODIC_SYNC_INTERVAL_SECONDS, PERIODIC_SYNC_MAX_RETRIES};

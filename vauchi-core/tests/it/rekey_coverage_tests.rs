@@ -164,37 +164,6 @@ fn test_rekey_preserves_password_hash() {
     assert_eq!(plain, b"argon2id-hash-placeholder");
 }
 
-// @scenario: security :: Rekey preserves duress_settings
-#[test]
-fn test_rekey_preserves_duress_settings() {
-    let (_dir, mut storage) = open_storage();
-    let key1 = storage.key().clone();
-
-    let ids_enc = vauchi_core::crypto::encrypt(&key1, b"[\"contact-a\"]").unwrap();
-    let msg_enc = vauchi_core::crypto::encrypt(&key1, b"help me").unwrap();
-    storage.connection().execute(
-        "INSERT INTO duress_settings (id, alert_contact_ids_encrypted, alert_message_encrypted, created_at, updated_at) VALUES (1, ?1, ?2, 1000, 1000)",
-        rusqlite::params![ids_enc, msg_enc],
-    ).unwrap();
-
-    let key2 = SymmetricKey::generate();
-    storage.rekey(key2.clone()).unwrap();
-
-    let (ids_loaded, msg_loaded): (Vec<u8>, Vec<u8>) = storage.connection().query_row(
-        "SELECT alert_contact_ids_encrypted, alert_message_encrypted FROM duress_settings WHERE id = 1",
-        [],
-        |row| Ok((row.get(0)?, row.get(1)?)),
-    ).unwrap();
-    assert_eq!(
-        vauchi_core::crypto::decrypt(&key2, &ids_loaded).unwrap(),
-        b"[\"contact-a\"]"
-    );
-    assert_eq!(
-        vauchi_core::crypto::decrypt(&key2, &msg_loaded).unwrap(),
-        b"help me"
-    );
-}
-
 // @scenario: security :: Rekey preserves decoy_contacts
 #[test]
 fn test_rekey_preserves_decoy_contacts() {

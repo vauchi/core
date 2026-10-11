@@ -35,11 +35,11 @@ use crate::types::{
     MobileContactDisplayOptions, MobileDecoyContact, MobileDeletionInfo, MobileDeliveryRecord,
     MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact, MobileDemoContactState,
     MobileDeviceDeliveryRecord, MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo,
-    MobileDuplicatePair, MobileDuressSettings, MobileEmergencyConfig, MobileFieldNote,
-    MobileFieldType, MobileGdprExport, MobileOnboardingProgress, MobileOnboardingStep,
-    MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
-    MobileRetryEntry, MobileShredReport, MobileShredStatus, MobileShredToken, MobileSocialNetwork,
-    MobileSyncResult, MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileDuplicatePair, MobileEmergencyConfig, MobileFieldNote, MobileFieldType, MobileGdprExport,
+    MobileOnboardingProgress, MobileOnboardingStep, MobileRecoveryClaim, MobileRecoveryProgress,
+    MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileShredReport,
+    MobileShredStatus, MobileShredToken, MobileSocialNetwork, MobileSyncResult,
+    MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -393,13 +393,6 @@ pub enum DomainCommand {
     IsDuressEnabled,
     /// Disable duress mode and clear duress hash/salt.
     DisableDuress,
-    /// Configure the duress alert destination set + message.
-    ConfigureDuressAlerts {
-        contact_ids: Vec<String>,
-        message: String,
-    },
-    /// Read the persisted duress alert settings.
-    GetDuressSettings,
     /// Add a decoy contact (shown in duress mode). `card_json` is a
     /// JSON-serialised `ContactCard`. Returns the generated decoy id.
     AddDecoyContact {
@@ -906,11 +899,6 @@ pub enum DomainCommandResult {
     /// Authentication-mode result (B7 batch 7 — `Authenticate`).
     AuthMode {
         mode: MobileAuthMode,
-    },
-    /// Optional duress-settings payload (B7 batch 7 —
-    /// `GetDuressSettings`).
-    DuressSettingsOpt {
-        settings: Option<MobileDuressSettings>,
     },
     /// List of decoy contacts (B7 batch 7 — `ListDecoyContacts`).
     DecoyContacts {

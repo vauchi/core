@@ -286,9 +286,6 @@ impl Vauchi {
         // wipe was incomplete (was silently dropped before 2026-05-21).
         self.storage.emergency().delete_emergency_config()?;
 
-        // Clear duress settings — same: incomplete wipe must surface.
-        self.storage.duress().delete_duress_settings()?;
-
         // Mark deletion as executed
         let now = self.clock.unix_seconds();
         self.storage
@@ -301,7 +298,7 @@ impl Vauchi {
 
     /// Returns a snapshot of emergency readiness and deletion state.
     ///
-    /// Combines the emergency broadcast config, duress settings, app password
+    /// Combines the emergency broadcast config, the duress PIN, app password
     /// state, current deletion state, and recovery-trusted contact count into a
     /// single struct for the frontend emergency overview screen.
     ///
@@ -315,11 +312,7 @@ impl Vauchi {
                 .emergency()
                 .load_emergency_config()?
                 .is_some_and(|c| !c.trusted_contact_ids.is_empty());
-        let duress_configured = if concealed {
-            self.concealed_duress().enabled
-        } else {
-            self.storage.duress().load_duress_settings()?.is_some()
-        };
+        let duress_configured = self.is_duress_enabled()?;
 
         let deletion_state = self.storage.consent().load_deletion_state()?;
         let deletion_scheduled = matches!(

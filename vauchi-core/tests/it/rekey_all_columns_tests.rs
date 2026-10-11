@@ -21,7 +21,7 @@
 //!   `Vauchi_Label_Name_HMAC_v1` derived from the new SEK.
 //! - `recovery_settings.id`, `recovery_progress.id`, `own_card.id`,
 //!   `device_registry.id`, `device_info.id`, `version_vector.id`,
-//!   `ux_state.id`, `duress_settings.id`, `emergency_config.id`,
+//!   `ux_state.id`, `emergency_config.id`,
 //!   `deletion_state.id` are singleton rows with `id = 1`.
 
 use hmac::{Hmac, Mac};
@@ -201,12 +201,6 @@ fn fixtures() -> Vec<(&'static str, &'static str, &'static [u8])> {
         ("tags", "name_encrypted", b"climbing"),
         ("places", "data_encrypted", b"{\"name\":\"Home\"}"),
         ("audit_log", "details_encrypted", b"audit-details"),
-        (
-            "duress_settings",
-            "alert_contact_ids_encrypted",
-            b"[\"contact-a\"]",
-        ),
-        ("duress_settings", "alert_message_encrypted", b"help me"),
         ("decoy_contacts", "card_encrypted", b"{\"name\":\"Decoy\"}"),
         ("decoy_contacts", "display_name_encrypted", b"Decoy"),
         (
@@ -607,20 +601,6 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     )
     .unwrap();
 
-    // ── duress_settings (singleton) ──────────────────────────
-    conn.execute(
-        "INSERT INTO duress_settings \
-         (id, alert_contact_ids_encrypted, alert_message_encrypted, created_at, updated_at) \
-         VALUES (1, ?1, ?2, ?3, ?4)",
-        params![
-            enc("duress_settings", "alert_contact_ids_encrypted"),
-            enc("duress_settings", "alert_message_encrypted"),
-            now,
-            now,
-        ],
-    )
-    .unwrap();
-
     // ── decoy_contacts ───────────────────────────────────────
     conn.execute(
         "INSERT INTO decoy_contacts \
@@ -784,8 +764,6 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
         ("version_vector", "vector_json_encrypted"),
         ("sync_field_timestamps", "timestamps_json_encrypted"),
         ("deletion_state", "state_json_encrypted"),
-        ("duress_settings", "alert_contact_ids_encrypted"),
-        ("duress_settings", "alert_message_encrypted"),
         ("emergency_config", "trusted_contact_ids_encrypted"),
         ("emergency_config", "message_encrypted"),
         ("recovery_settings", "settings_encrypted"),

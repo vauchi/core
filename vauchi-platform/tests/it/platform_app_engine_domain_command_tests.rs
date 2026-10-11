@@ -1474,47 +1474,6 @@ fn disable_duress_clears_duress_state() {
 
 // @internal
 #[test]
-fn get_duress_settings_returns_none_initially() {
-    let (engine, _dir) = create_engine_with_identity();
-
-    match engine
-        .dispatch_domain_command(DomainCommand::GetDuressSettings)
-        .expect("get")
-    {
-        DomainCommandResult::DuressSettingsOpt { settings } => {
-            assert!(settings.is_none(), "no settings yet");
-        }
-        other => panic!("unexpected result: {other:?}"),
-    }
-}
-
-// @internal
-#[test]
-fn configure_duress_alerts_persists_to_get_settings() {
-    let (engine, _dir) = create_engine_with_identity();
-
-    engine
-        .dispatch_domain_command(DomainCommand::ConfigureDuressAlerts {
-            contact_ids: vec!["c1".into(), "c2".into()],
-            message: "help".into(),
-        })
-        .expect("configure");
-
-    match engine
-        .dispatch_domain_command(DomainCommand::GetDuressSettings)
-        .expect("get")
-    {
-        DomainCommandResult::DuressSettingsOpt { settings } => {
-            let s = settings.expect("must be configured");
-            assert_eq!(s.alert_contact_ids, vec!["c1".to_string(), "c2".into()]);
-            assert_eq!(s.alert_message, "help");
-        }
-        other => panic!("unexpected result: {other:?}"),
-    }
-}
-
-// @internal
-#[test]
 fn list_decoy_contacts_is_empty_initially() {
     let (engine, _dir) = create_engine_with_identity();
 

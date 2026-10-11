@@ -28,12 +28,7 @@ const BACKUP_SCREENS: &[&str] = &[
     "backup_failed",
 ];
 
-const DURESS_SCREENS: &[&str] = &[
-    "duress_overview",
-    "duress_enter_pin",
-    "duress_confirm_pin",
-    "duress_alerts",
-];
+const DURESS_SCREENS: &[&str] = &["duress_overview", "duress_enter_pin", "duress_confirm_pin"];
 
 const SHRED_SCREENS: &[&str] = &["shred_warning", "shred_confirm"];
 
@@ -181,21 +176,7 @@ fn make_backup(mode: Option<BackupMode>) -> BackupRecoveryEngine {
 
 fn make_duress() -> DuressPinEngine {
     DuressPinEngine::new(
-        DuressConfig {
-            enabled: false,
-            available_contacts: vec![Item {
-                id: "c1".into(),
-                name: "Contact".into(),
-                subtitle: None,
-                initials: "C".into(),
-                status: None,
-                actions: vec![],
-                a11y: None,
-            }],
-            selected_contact_ids: vec![],
-            alert_message: String::new(),
-            include_location: false,
-        },
+        DuressConfig { enabled: false },
         vauchi_app::i18n::Locale::English,
     )
 }
@@ -598,20 +579,9 @@ proptest! {
             component_id: "confirm_pin".into(),
             value: pin,
         });
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
-        });
-        prop_assert_eq!(engine.current_screen().screen_id, "duress_alerts");
-
-        // Choose a recipient (required before Save completes).
-        let _ = engine.handle_action(UserAction::ItemToggled {
-            component_id: "recipients".into(),
-            item_id: "c1".into(),
-        });
-
-        // Save → Complete
+        // Confirm → Complete
         let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "save".into(),
+            action_id: "continue".into(),
         });
         prop_assert!(matches!(result, ActionResult::Complete));
     }

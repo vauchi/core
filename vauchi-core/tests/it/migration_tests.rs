@@ -821,8 +821,8 @@ fn test_schema_version_after_all_migrations() {
 
     let version = MigrationRunner::current_version(&conn).unwrap();
     assert_eq!(
-        version, 80,
-        "Schema version should be 80 after all migrations, got {}",
+        version, 81,
+        "Schema version should be 81 after all migrations, got {}",
         version
     );
 }
@@ -1278,4 +1278,20 @@ fn test_migration_v40_adds_reciprocity_columns() {
             "contacts table missing column after v40: {col}",
         );
     }
+}
+
+// @scenario: duress_mode :: A duress unlock sends nothing
+#[test]
+fn test_migration_v81_drops_duress_settings() {
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+
+    run_migrations_up_to(&conn, &key, 80);
+    assert!(get_table_names(&conn).contains(&"duress_settings".to_string()));
+    run_migrations_up_to(&conn, &key, 81);
+
+    assert!(
+        !get_table_names(&conn).contains(&"duress_settings".to_string()),
+        "the duress alert recipients and message are gone after v81"
+    );
 }

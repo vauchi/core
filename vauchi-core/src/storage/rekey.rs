@@ -82,8 +82,6 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("identity", "password_hash_encrypted"),
     ("identity", "duress_hash_encrypted"),
     // V20 duress settings
-    ("duress_settings", "alert_contact_ids_encrypted"),
-    ("duress_settings", "alert_message_encrypted"),
     // V21 decoy contacts
     ("decoy_contacts", "card_encrypted"),
     ("decoy_contacts", "display_name_encrypted"),
@@ -294,9 +292,6 @@ impl Storage {
 
             self.rekey_identity_passwords(old_key, &new_key)?;
             report(&mut completed, "identity_passwords");
-
-            self.rekey_duress_settings(old_key, &new_key)?;
-            report(&mut completed, "duress_settings");
 
             self.rekey_decoy_contacts(old_key, &new_key)?;
             self.rekey_nullable_column(
@@ -1769,53 +1764,6 @@ impl Storage {
                     .map_err(|e| StorageError::Migration(format!("Update duress_hash: {}", e)))?;
             }
         }
-        Ok(())
-    }
-
-    /// Re-encrypt duress_settings: alert_contact_ids_encrypted, alert_message_encrypted
-    fn rekey_duress_settings(
-        &self,
-        old_key: &SymmetricKey,
-        new_key: &SymmetricKey,
-    ) -> Result<(), StorageError> {
-        #[allow(clippy::type_complexity)]
-        let result: Result<(Option<Vec<u8>>, Option<Vec<u8>>), _> = self.conn.query_row(
-            "SELECT alert_contact_ids_encrypted, alert_message_encrypted FROM duress_settings WHERE id = 1",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        );
-
-        if let Ok((ids_enc, msg_enc)) = result {
-            if let Some(enc) = ids_enc
-                && !enc.is_empty()
-            {
-                let plain = decrypt(old_key, &enc)
-                    .map_err(|e| StorageError::Migration(format!("Decrypt duress_ids: {}", e)))?;
-                let new_enc = encrypt(new_key, &plain)
-                    .map_err(|e| StorageError::Migration(format!("Encrypt duress_ids: {}", e)))?;
-                self.conn
-                    .execute(
-                        "UPDATE duress_settings SET alert_contact_ids_encrypted = ?1 WHERE id = 1",
-                        params![new_enc],
-                    )
-                    .map_err(|e| StorageError::Migration(format!("Update duress_ids: {}", e)))?;
-            }
-            if let Some(enc) = msg_enc
-                && !enc.is_empty()
-            {
-                let plain = decrypt(old_key, &enc)
-                    .map_err(|e| StorageError::Migration(format!("Decrypt duress_msg: {}", e)))?;
-                let new_enc = encrypt(new_key, &plain)
-                    .map_err(|e| StorageError::Migration(format!("Encrypt duress_msg: {}", e)))?;
-                self.conn
-                    .execute(
-                        "UPDATE duress_settings SET alert_message_encrypted = ?1 WHERE id = 1",
-                        params![new_enc],
-                    )
-                    .map_err(|e| StorageError::Migration(format!("Update duress_msg: {}", e)))?;
-            }
-        }
-        // Table may not have a row — that's fine, query_row returns Err(QueryReturnedNoRows)
         Ok(())
     }
 

@@ -296,10 +296,11 @@ fn a_filled_password_input_reports_as_filled_to_the_shell() {
          leaves a shell unable to tell 'needs input' from 'already answered', and the CLI's \
          prompt loop re-offers the field forever"
     );
-    assert!(
-        !value.contains("first-pin-1234"),
-        "the masked echo must not carry the secret itself, got {value:?}"
-    );
+    // Owner decision 2026-10-11 (#621): the form echoes what was typed, as
+    // the lock screen does, and every shell masks password inputs (#619).
+    // A masked echo was sent back by shells typing onto it and stored as
+    // part of the password.
+    assert_eq!(value, "first-pin-1234");
 }
 
 fn find_input_value(nodes: &[PresentationNode], wanted: &BindingId) -> Option<String> {

@@ -27,17 +27,11 @@ use crate::ui::*;
 use zeroize::Zeroize;
 
 /// Engine that drives the set/change-app-password form.
-/// Presented stand-in for a secret the engine holds but must not echo.
 ///
-/// A permanently empty `value` makes a filled secret input indistinguishable
-/// from an untouched one, and a shell that picks the first empty input to
-/// prompt for re-offers the same field forever. Mirrors the `PinInput`
-/// projection, which already presents `"•".repeat(filled)`; only the length
-/// is exposed, never the secret.
-fn masked_echo(secret: &str) -> String {
-    "•".repeat(secret.chars().count())
-}
-
+/// Each field echoes what was typed, as the lock screen does, and the shell
+/// masks it (`InputType::Password`). Echoing one `•` per character instead
+/// made a shell that types onto Core's value send the bullets back, and the
+/// form stored them as part of the password (vauchi/private#621).
 pub struct ChangePasswordEngine {
     /// True when a password already exists → change mode; false → setup mode.
     password_enabled: bool,
@@ -126,7 +120,7 @@ impl ChangePasswordEngine {
         Component::TextInput {
             id: "current_password".into(),
             label: self.t("change_password.current_password_label"),
-            value: masked_echo(&self.current),
+            value: self.current.clone(),
             placeholder: Some(self.t("change_password.current_password_placeholder")),
             max_length: Some(128),
             validation_error: None,
@@ -159,7 +153,7 @@ impl ChangePasswordEngine {
         Component::TextInput {
             id: "new_password".into(),
             label,
-            value: masked_echo(&self.new_pw),
+            value: self.new_pw.clone(),
             placeholder: Some(placeholder),
             max_length: Some(128),
             validation_error: self.new_validation_error(),
@@ -192,7 +186,7 @@ impl ChangePasswordEngine {
         Component::TextInput {
             id: "confirm_password".into(),
             label,
-            value: masked_echo(&self.confirm),
+            value: self.confirm.clone(),
             placeholder: Some(placeholder),
             max_length: Some(128),
             validation_error: self.confirm_validation_error(),
@@ -268,11 +262,15 @@ impl WorkflowEngine for ChangePasswordEngine {
                 component_id,
                 value,
             } => {
-                match component_id.as_str() {
-                    "current_password" => self.current = value,
-                    "new_password" => self.new_pw = value,
-                    "confirm_password" => self.confirm = value,
-                    _ => {}
+                let field = match component_id.as_str() {
+                    "current_password" => Some(&mut self.current),
+                    "new_password" => Some(&mut self.new_pw),
+                    "confirm_password" => Some(&mut self.confirm),
+                    _ => None,
+                };
+                if let Some(field) = field {
+                    field.zeroize();
+                    *field = value;
                 }
                 ActionResult::UpdateScreen(self.current_screen())
             }

@@ -124,13 +124,23 @@ struct State {
     gateway: Option<MockGateway>,
 }
 
-/// A real OHTTP gateway (RFC 9458) answering `fetch` with no blobs.
+/// A real OHTTP gateway (RFC 9458) answering `fetch` with the blobs set
+/// through [`MockRelay::set_gateway_blobs`] (none by default) and `ack`
+/// with `acknowledged: true`.
 struct MockGateway {
     server: ohttp::Server,
+    /// The encoded key config the gateway decapsulates with.
+    key_config: Vec<u8>,
     /// The encoded signed record of the gateway's key (#288).
     signed_record: Vec<u8>,
     /// Inner actions decapsulated so far, in arrival order.
     actions: Vec<String>,
+    /// Blobs every `fetch` answers with.
+    blobs: Vec<serde_json::Value>,
+    /// Encapsulated answers to ticketed requests, by ticket (#628). The
+    /// mock forwards at once; `held_polls` collects answer `202` first.
+    async_answers: std::collections::HashMap<String, CannedResponse>,
+    held_polls: u32,
 }
 
 pub struct MockRelay {
@@ -205,13 +215,52 @@ impl MockRelay {
         )
         .expect("KeyConfig::new");
         let encoded_config = config.encode().expect("encode key config");
-        let signed_record = signer.record_for(window, encoded_config).encode();
+        let signed_record = signer.record_for(window, encoded_config.clone()).encode();
         let server = ohttp::Server::new(config).expect("ohttp::Server::new");
         self.state.lock().unwrap().gateway = Some(MockGateway {
             server,
+            key_config: encoded_config,
             signed_record,
             actions: Vec::new(),
+            blobs: Vec::new(),
+            async_answers: std::collections::HashMap::new(),
+            held_polls: 0,
         });
+    }
+
+    /// The encoded key config of the gateway enabled by
+    /// [`Self::enable_ohttp_gateway`].
+    pub fn ohttp_key_config(&self) -> Vec<u8> {
+        self.with_gateway(|gateway| gateway.key_config.clone())
+    }
+
+    /// Blobs the gateway answers every `fetch` with.
+    pub fn set_gateway_blobs(&self, blobs: Vec<vauchi_protocol::v2::FetchedBlob>) {
+        let blobs = blobs
+            .into_iter()
+            .map(|blob| serde_json::to_value(blob).expect("FetchedBlob serializes"))
+            .collect();
+        self.with_gateway(|gateway| gateway.blobs = blobs);
+    }
+
+    /// The next `polls` collects of any ticket answer `202` (still delayed).
+    pub fn hold_async_answers(&self, polls: u32) {
+        self.with_gateway(|gateway| gateway.held_polls = polls);
+    }
+
+    /// Drops every held answer, as an outer-relay restart does.
+    pub fn forget_async_answers(&self) {
+        self.with_gateway(|gateway| gateway.async_answers.clear());
+    }
+
+    fn with_gateway<T>(&self, f: impl FnOnce(&mut MockGateway) -> T) -> T {
+        f(self
+            .state
+            .lock()
+            .unwrap()
+            .gateway
+            .as_mut()
+            .expect("enable_ohttp_gateway first"))
     }
 
     /// Inner actions the gateway has decapsulated, in arrival order.
@@ -356,7 +405,8 @@ fn serve_ohttp(gateway: &mut MockGateway, body: &[u8]) -> CannedResponse {
         .and_then(|request| request.get("action")?.as_str().map(str::to_string))
         .unwrap_or_default();
     let reply = match action.as_str() {
-        "fetch" => serde_json::json!({ "status": "ok", "blobs": [] }),
+        "fetch" => serde_json::json!({ "status": "ok", "blobs": gateway.blobs }),
+        "ack" => serde_json::json!({ "status": "ok", "acknowledged": true }),
         _ => serde_json::json!({ "status": "error", "error": "unsupported by the mock gateway" }),
     };
     gateway.actions.push(action);
@@ -369,6 +419,41 @@ fn serve_ohttp(gateway: &mut MockGateway, body: &[u8]) -> CannedResponse {
             .encapsulate(&padded_reply)
             .expect("encapsulate reply"),
     }
+}
+
+/// `POST /v2/ohttp-async`: answer the ticketed request now and hold the
+/// encapsulated answer; `GET /v2/ohttp-async/{ticket}` hands it over once.
+fn serve_ohttp_async(
+    gateway: &mut MockGateway,
+    method: &str,
+    path: &str,
+    headers: &[(String, String)],
+    body: &[u8],
+) -> CannedResponse {
+    if method == "POST" {
+        let Some(ticket) = headers
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case("vauchi-ticket"))
+            .map(|(_, value)| value.clone())
+        else {
+            return CannedResponse::status(400);
+        };
+        let answer = serve_ohttp(gateway, body);
+        gateway.async_answers.insert(ticket, answer);
+        return CannedResponse::status(202);
+    }
+    let ticket = path.trim_start_matches("/v2/ohttp-async/");
+    if !gateway.async_answers.contains_key(ticket) {
+        return CannedResponse::status(404);
+    }
+    if gateway.held_polls > 0 {
+        gateway.held_polls -= 1;
+        return CannedResponse::status(202).with_header("Retry-After", "60");
+    }
+    gateway
+        .async_answers
+        .remove(ticket)
+        .unwrap_or_else(|| CannedResponse::status(404))
 }
 
 fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<State>>) -> std::io::Result<()> {
@@ -427,6 +512,10 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<State>>) -> std::io
             super::signed_gateway::signed_response(gateway.signed_record.clone())
         } else if let (Some(gateway), "/v2/ohttp") = (s.gateway.as_mut(), path.as_str()) {
             serve_ohttp(gateway, &body)
+        } else if let (Some(gateway), true) =
+            (s.gateway.as_mut(), path.starts_with("/v2/ohttp-async"))
+        {
+            serve_ohttp_async(gateway, &method, &path, &headers, &body)
         } else {
             s.default
                 .clone()
@@ -443,6 +532,7 @@ fn write_response(stream: &mut TcpStream, response: &CannedResponse) -> std::io:
     let status_text = match response.status {
         200 => "OK",
         201 => "Created",
+        202 => "Accepted",
         204 => "No Content",
         400 => "Bad Request",
         401 => "Unauthorized",

@@ -788,6 +788,13 @@ impl WorkflowEngine for AppEngine {
         }
 
         let result = self.engine.handle_action(action);
+        self.finish_engine_result(result)
+    }
+}
+
+impl AppEngine {
+    /// Everything that follows the active engine's answer to an action.
+    fn finish_engine_result(&mut self, result: ActionResult) -> ActionResult {
         self.pin_typed_glance_code();
         let result = self.route_result(result);
         // Slice 32l T3.1b: feed typed DeviceLink* ActionResults into the engine-owned machine.

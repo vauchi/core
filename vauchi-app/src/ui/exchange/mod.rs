@@ -425,6 +425,26 @@ impl ExchangeEngine {
         ActionResult::StartLinkExchange
     }
 
+    /// What a picker selection does: record the mode, then the field preview
+    /// or the mode's sub-flow.
+    fn apply_selected_mode(&mut self, mode: ExchangeMode) -> ActionResult {
+        self.config.mode = Some(mode);
+        self.mode_selection = None;
+        // Record the selection step so a BACK press from
+        // the sub-flow rewinds here (see navigate_back_within).
+        self.step_history.push(ExchangeStep::ModeSelection);
+        // G4 (group-first): group selection already happened
+        // before mode. Show the field preview if the user chose
+        // "continue" at the group step (even with no groups
+        // toggled); "skip" goes straight to the sub-flow.
+        if self.show_preview_after_mode {
+            self.field_preview = Some(self.build_field_preview_config());
+            self.step = ExchangeStep::FieldPreview;
+            return ActionResult::NavigateTo(self.build_screen());
+        }
+        self.enter_mode_sub_flow()
+    }
+
     /// Route to the mode-specific sub-flow once the optional group /
     /// field-preview steps are done. Single source of truth for
     /// `ExchangeMode` → `ExchangeStep`, so the three entry points
@@ -1065,21 +1085,7 @@ impl WorkflowEngine for ExchangeEngine {
             if let Some(ref mut ms) = self.mode_selection {
                 match ms.handle_action(&action) {
                     ModeSelectionResult::Selected(mode) => {
-                        self.config.mode = Some(mode);
-                        self.mode_selection = None;
-                        // Record the selection step so a BACK press from
-                        // the sub-flow rewinds here (see navigate_back_within).
-                        self.step_history.push(ExchangeStep::ModeSelection);
-                        // G4 (group-first): group selection already happened
-                        // before mode. Show the field preview if the user chose
-                        // "continue" at the group step (even with no groups
-                        // toggled); "skip" goes straight to the sub-flow.
-                        if self.show_preview_after_mode {
-                            self.field_preview = Some(self.build_field_preview_config());
-                            self.step = ExchangeStep::FieldPreview;
-                            return ActionResult::NavigateTo(self.build_screen());
-                        }
-                        return self.enter_mode_sub_flow();
+                        return self.apply_selected_mode(mode);
                     }
                     ModeSelectionResult::Screen(screen) => {
                         return ActionResult::UpdateScreen(*screen);

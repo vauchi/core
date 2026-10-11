@@ -35,6 +35,45 @@ fn b64(bytes: &[u8]) -> String {
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
 }
 
+fn name_param(url: &str) -> Option<String> {
+    let fragment = url.split_once('#')?.1;
+    let value = fragment.split('&').find_map(|p| p.strip_prefix("nm="))?;
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(value)
+        .ok()?;
+    String::from_utf8(bytes).ok()
+}
+
+// The landing page names the sender, read from the fragment only
+// (vauchi/private#277, plan D1/D3).
+// @internal
+#[test]
+fn named_link_carries_the_sender_name_and_still_parses() {
+    let (init, _) = initiator_generate_named("Zoë Example");
+    assert_eq!(name_param(&init.url).as_deref(), Some("Zoë Example"));
+    let parsed = parse_link_url(&init.url).expect("named link parses");
+    assert_eq!(parsed.nonce, init.nonce);
+    assert!(parse_exchange_deep_link(&init.url).is_ok());
+}
+
+// @internal
+#[test]
+fn unnamed_link_has_no_name_param() {
+    let (init, _) = initiator_generate_named("");
+    assert!(!init.url.contains("nm="), "{}", init.url);
+}
+
+// A long name is cut to 64 bytes on a character boundary, keeping the link
+// and its QR short.
+// @internal
+#[test]
+fn long_sender_name_is_cut_on_a_character_boundary() {
+    let name = "é".repeat(50); // 100 bytes
+    let (init, _) = initiator_generate_named(&name);
+    let carried = name_param(&init.url).expect("name present and valid UTF-8");
+    assert_eq!(carried, "é".repeat(32));
+}
+
 // Links shared before the https form still complete during the 7-day
 // escrow TTL (vauchi/private#277, plan D2).
 // @internal

@@ -13,6 +13,10 @@
 
 use base64::Engine;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+#[cfg(feature = "testing")]
+use vauchi_core::sleeper::FakeSleeper;
 
 use crate::common::mock_relay::{CannedResponse, MockRelay};
 use crate::common::signed_gateway::{NOW, SignedGateway};
@@ -377,6 +381,15 @@ fn vauchi_through(
     outer: &MockRelay,
     delayed: bool,
 ) -> (vauchi_core::api::Vauchi, tempfile::TempDir) {
+    vauchi_sleeping_on(outer, delayed, Arc::new(FakeSleeper::new()))
+}
+
+#[cfg(feature = "testing")]
+fn vauchi_sleeping_on(
+    outer: &MockRelay,
+    delayed: bool,
+    sleeper: Arc<FakeSleeper>,
+) -> (vauchi_core::api::Vauchi, tempfile::TempDir) {
     use vauchi_core::api::{Vauchi, VauchiConfig};
     let application = MockRelay::start();
     let dir = tempfile::tempdir().expect("temp dir");
@@ -385,7 +398,9 @@ fn vauchi_through(
         .with_relay_url(application.url())
         .with_ohttp_relay_url(outer.url());
     config.relay.ohttp_delayed = delayed;
-    let mut vauchi = Vauchi::new(config).expect("create Vauchi");
+    let mut vauchi = Vauchi::new(config)
+        .expect("create Vauchi")
+        .with_sleeper(sleeper.clone());
     vauchi.create_identity("Delayed").expect("identity");
     vauchi.set_ohttp_key_for_testing(OhttpClient::new(outer.ohttp_key_config()).expect("key"));
     (vauchi, dir)
@@ -444,4 +459,92 @@ fn delayed_forwarding_is_off_by_default() {
         "{:?}",
         requests(&outer)
     );
+}
+
+const POLL: Duration = Duration::from_secs(30);
+const MAX_WAIT: Duration = Duration::from_secs(960);
+
+#[cfg(feature = "testing")]
+fn fetched(outcome: &vauchi_core::api::VauchiSyncOutcome) -> usize {
+    match outcome {
+        vauchi_core::api::VauchiSyncOutcome::Ok { fetched, .. } => *fetched,
+        other => panic!("expected a completed sync, got {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+#[cfg(feature = "testing")]
+fn a_waiting_sync_returns_the_mail_its_delayed_fetch_brought() {
+    let outer = gateway_relay();
+    outer.set_gateway_blobs(vec![blob("b1")]);
+    outer.hold_async_answers(2);
+    let sleeper = Arc::new(FakeSleeper::new());
+    let (mut vauchi, _dir) = vauchi_sleeping_on(&outer, true, sleeper.clone());
+
+    let outcome = vauchi
+        .sync_collecting_delayed(POLL, MAX_WAIT)
+        .expect("sync");
+
+    assert_eq!(fetched(&outcome), 1, "{outcome:?}");
+    assert!(!sleeper.calls().is_empty());
+    assert!(
+        sleeper.calls().iter().all(|d| *d == POLL),
+        "{:?}",
+        sleeper.calls()
+    );
+}
+
+// @internal
+#[test]
+#[cfg(feature = "testing")]
+fn a_waiting_sync_gives_up_after_its_maximum_wait() {
+    let outer = gateway_relay();
+    outer.hold_async_answers(u32::MAX);
+    let sleeper = Arc::new(FakeSleeper::new());
+    let (mut vauchi, _dir) = vauchi_sleeping_on(&outer, true, sleeper.clone());
+
+    let outcome = vauchi
+        .sync_collecting_delayed(POLL, 3 * POLL)
+        .expect("sync");
+
+    assert_eq!(fetched(&outcome), 0);
+    assert_eq!(sleeper.calls(), vec![POLL; 3]);
+}
+
+// @internal
+#[test]
+#[cfg(feature = "testing")]
+fn a_lost_answer_is_waited_for_again() {
+    let outer = gateway_relay();
+    outer.set_gateway_blobs(vec![blob("b1")]);
+    outer.hold_async_answers(1);
+    let sleeper = Arc::new(FakeSleeper::new());
+    let (mut vauchi, _dir) = vauchi_sleeping_on(&outer, true, sleeper.clone());
+    vauchi.sync().expect("a sync that posts the first fetch");
+    outer.forget_async_answers();
+    vauchi.set_next_sync_allowed(std::time::Instant::now());
+
+    let outcome = vauchi
+        .sync_collecting_delayed(POLL, MAX_WAIT)
+        .expect("sync");
+
+    assert_eq!(fetched(&outcome), 1, "{outcome:?}");
+}
+
+// @internal
+#[test]
+#[cfg(feature = "testing")]
+fn without_delayed_mode_a_waiting_sync_never_sleeps() {
+    let outer = gateway_relay();
+    outer.set_gateway_blobs(vec![blob("b1")]);
+    let sleeper = Arc::new(FakeSleeper::new());
+    let (mut vauchi, _dir) = vauchi_sleeping_on(&outer, false, sleeper.clone());
+
+    let outcome = vauchi
+        .sync_collecting_delayed(POLL, MAX_WAIT)
+        .expect("sync");
+
+    assert_eq!(fetched(&outcome), 1, "{outcome:?}");
+    assert!(sleeper.calls().is_empty());
 }

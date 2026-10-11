@@ -97,6 +97,12 @@ pub enum VauchiError {
     #[error("contact is blocked: {0}")]
     ContactBlocked(String),
 
+    /// The send waits for the contact's first message: a freshly exchanged
+    /// responder has no sending chain until the initiator's first message
+    /// arrives, and that arrival owes the contact a repropagation.
+    #[error("send deferred until the contact's first message arrives")]
+    SendDeferred,
+
     /// Contact limit reached.
     #[error("contact limit reached: maximum {0} contacts allowed")]
     ContactLimitReached(usize),

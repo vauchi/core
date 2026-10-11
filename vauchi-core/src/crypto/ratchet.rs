@@ -264,6 +264,12 @@ impl DoubleRatchetState {
         *self.our_dh.public_key()
     }
 
+    /// Whether this session can encrypt. A responder cannot until the
+    /// initiator's first message arrives.
+    pub fn can_send(&self) -> bool {
+        self.send_chain.is_some()
+    }
+
     /// Encrypt a message using the Double Ratchet.
     ///
     /// Advances the sending chain and returns an encrypted message.

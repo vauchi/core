@@ -248,14 +248,39 @@ pub fn process_single_card_update_for_device(
     peer_device_id: &[u8; 32],
     ciphertext: &[u8],
 ) -> Result<ReceiveOutcome, CardUpdateError> {
-    process_single_card_update_for_device_with_budget(
+    let could_send = session_can_send(storage, sender_id, peer_device_id)?;
+    let outcome = process_single_card_update_for_device_with_budget(
         identity,
         storage,
         sender_id,
         peer_device_id,
         ciphertext,
         GenesisBudget::EnforceAndSurface,
-    )
+    )?;
+    // A responder's sends to this contact were deferred until now
+    // (`VauchiError::SendDeferred`); its first sending chain owes them.
+    if could_send == Some(false)
+        && session_can_send(storage, sender_id, peer_device_id)? == Some(true)
+    {
+        storage
+            .ux()
+            .save_own_card_repropagate(&crate::types::OwnCardRepropagateState {
+                needs_repropagate: true,
+                failed_attempts: 0,
+            })?;
+    }
+    Ok(outcome)
+}
+
+fn session_can_send(
+    storage: &Storage,
+    sender_id: &str,
+    peer_device_id: &[u8; 32],
+) -> Result<Option<bool>, CardUpdateError> {
+    Ok(storage
+        .ratchets()
+        .load_ratchet_state_for_device(sender_id, peer_device_id)?
+        .map(|(session, _)| session.can_send()))
 }
 
 /// Device-aware receive after an origin hint authenticated the relationship

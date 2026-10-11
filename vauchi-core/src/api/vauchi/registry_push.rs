@@ -241,9 +241,9 @@ impl Vauchi {
         let prepared = if tracker.state() == ActivationState::Active {
             match self.encrypt_payload_for_contact_devices(identity, &contact, &payload) {
                 Ok(prepared) => prepared,
-                Err(VauchiError::InvalidState(_)) | Err(VauchiError::NotFound(_)) => {
-                    genesis_sealed(self)?
-                }
+                Err(VauchiError::InvalidState(_))
+                | Err(VauchiError::SendDeferred)
+                | Err(VauchiError::NotFound(_)) => genesis_sealed(self)?,
                 Err(error) => return Err(error),
             }
         } else {

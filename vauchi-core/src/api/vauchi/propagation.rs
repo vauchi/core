@@ -77,10 +77,12 @@ impl Vauchi {
             });
             match queue_result {
                 Ok(()) => queued += 1,
-                // Expected skips: blocked, no ratchet, empty delta, not exchanged
+                // Expected skips: blocked, no ratchet, empty delta, not exchanged,
+                // or a responder still waiting for its first message
                 Err(VauchiError::ContactBlocked(_))
                 | Err(VauchiError::NotFound(_))
-                | Err(VauchiError::InvalidState(_)) => continue,
+                | Err(VauchiError::InvalidState(_))
+                | Err(VauchiError::SendDeferred) => continue,
                 Err(error) => return Err(error),
             }
         }
@@ -469,9 +471,7 @@ impl Vauchi {
                     continue;
                 }
                 Err(crate::crypto::ratchet::RatchetError::NoSendingChain) => {
-                    return Err(VauchiError::InvalidState(
-                        "responder awaiting initiator's first message; deferring send".into(),
-                    ));
+                    return Err(VauchiError::SendDeferred);
                 }
                 Err(other) => return Err(VauchiError::Crypto(format!("{other:?}"))),
             };

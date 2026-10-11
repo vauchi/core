@@ -431,7 +431,7 @@ impl Vauchi {
             contact_id: contact_id.to_string(),
             field: field.to_string(),
         });
-        self.repropagate_to_contact(contact_id)
+        self.repropagate_or_defer(contact_id)
     }
 
     /// Sets a field as private for a contact, and re-propagates the card.
@@ -446,7 +446,7 @@ impl Vauchi {
             contact_id: contact_id.to_string(),
             field: field.to_string(),
         });
-        self.repropagate_to_contact(contact_id)
+        self.repropagate_or_defer(contact_id)
     }
 
     /// Sets a field as restricted to specific contacts, and re-propagates the card.
@@ -462,7 +462,7 @@ impl Vauchi {
             contact_id: contact_id.to_string(),
             field: field.to_string(),
         });
-        self.repropagate_to_contact(contact_id)
+        self.repropagate_or_defer(contact_id)
     }
 
     /// Adds a contact to a label and re-propagates the card to that contact.
@@ -477,7 +477,7 @@ impl Vauchi {
         if self.in_duress_mode() {
             return Ok(());
         }
-        self.repropagate_to_contact(contact_id)
+        self.repropagate_or_defer(contact_id)
     }
 
     /// Removes a contact from a label and re-propagates the card to that contact.
@@ -492,7 +492,7 @@ impl Vauchi {
         if self.in_duress_mode() {
             return Ok(());
         }
-        self.repropagate_to_contact(contact_id)
+        self.repropagate_or_defer(contact_id)
     }
 
     /// Deletes a group and re-propagates the card to its (former) members, so a
@@ -513,7 +513,7 @@ impl Vauchi {
         self.storage.labels().delete_group(label_id)?;
         self.record_group_deletion(label_id);
         for contact_id in &members {
-            self.repropagate_to_contact(contact_id)?;
+            self.repropagate_or_defer(contact_id)?;
         }
         Ok(())
     }
@@ -535,7 +535,7 @@ impl Vauchi {
         // Re-propagate to all contacts in this label
         let label = self.storage.labels().load_group(label_id)?;
         for contact_id in label.contacts() {
-            self.repropagate_to_contact(contact_id)?;
+            self.repropagate_or_defer(contact_id)?;
         }
         Ok(())
     }
@@ -550,7 +550,7 @@ impl Vauchi {
         is_visible: bool,
     ) -> VauchiResult<()> {
         self.set_contact_visibility_override(contact_id, field_id, is_visible)?;
-        self.repropagate_to_contact(contact_id)
+        self.repropagate_or_defer(contact_id)
     }
 
     /// Removes a per-contact visibility override and re-propagates to that
@@ -561,7 +561,7 @@ impl Vauchi {
         field_id: &str,
     ) -> VauchiResult<()> {
         self.remove_contact_visibility_override(contact_id, field_id)?;
-        self.repropagate_to_contact(contact_id)
+        self.repropagate_or_defer(contact_id)
     }
 
     /// Records the contact's current effective-visible field set as the
@@ -591,6 +591,17 @@ impl Vauchi {
             .contacts()
             .save_last_sent_visible_fields(contact_id, &visible)?;
         Ok(())
+    }
+
+    /// Re-propagates to one contact, or leaves it to the contact's first
+    /// incoming message when this side is a responder that cannot send yet:
+    /// that arrival owes a repropagation (`process_single_card_update_for_device`),
+    /// so the wait is neither an error nor a spent retry (vauchi/private#294).
+    fn repropagate_or_defer(&self, contact_id: &str) -> VauchiResult<()> {
+        match self.repropagate_to_contact(contact_id) {
+            Err(VauchiError::SendDeferred) => Ok(()),
+            other => other,
+        }
     }
 
     /// Re-propagates the current card state to a single contact.
@@ -750,7 +761,7 @@ impl Vauchi {
 
         let mut all_ok = true;
         for contact in self.storage.contacts().list_contacts()? {
-            if self.repropagate_to_contact(contact.id()).is_err() {
+            if self.repropagate_or_defer(contact.id()).is_err() {
                 all_ok = false;
             }
         }

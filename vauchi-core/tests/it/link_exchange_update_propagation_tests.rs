@@ -112,6 +112,8 @@ fn completing_a_link_exchange_arms_repropagation_so_the_initiator_primes_the_pee
         0,
         "the responder cannot send before the initiator's first message"
     );
+
+    deliver_all(&initiator, &responder, &responder_id, &initiator_id);
     let state = responder
         .storage()
         .ux()
@@ -119,7 +121,7 @@ fn completing_a_link_exchange_arms_repropagation_so_the_initiator_primes_the_pee
         .expect("marker readable");
     assert!(
         state.should_run(),
-        "the deferred responder send must stay armed for the next sync"
+        "the initiator's first message owes the deferred responder a pass"
     );
 }
 

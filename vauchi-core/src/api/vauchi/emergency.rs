@@ -166,7 +166,9 @@ impl Vauchi {
             let prepared =
                 match self.encrypt_payload_for_contact_devices(identity, &contact, &payload) {
                     Ok(prepared) => prepared,
-                    Err(VauchiError::NotFound(_)) | Err(VauchiError::InvalidState(_)) => continue,
+                    Err(VauchiError::NotFound(_))
+                    | Err(VauchiError::InvalidState(_))
+                    | Err(VauchiError::SendDeferred) => continue,
                     Err(error) => return Err(error),
                 };
             self.storage.with_savepoint(|| -> VauchiResult<()> {

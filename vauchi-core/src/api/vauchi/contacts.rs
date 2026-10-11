@@ -432,8 +432,12 @@ impl Vauchi {
         let manager = ContactManager::new(&self.storage, self.events.clone());
         manager.unarchive_contact(id)?;
         match self.repropagate_to_contact(id) {
-            // Expected skips: no ratchet yet, nothing visible to deliver.
-            Ok(()) | Err(VauchiError::NotFound(_)) | Err(VauchiError::InvalidState(_)) => {}
+            // Expected skips: no ratchet yet, nothing visible to deliver, or
+            // a responder whose first incoming message will repropagate.
+            Ok(())
+            | Err(VauchiError::NotFound(_))
+            | Err(VauchiError::InvalidState(_))
+            | Err(VauchiError::SendDeferred) => {}
             Err(e) => return Err(e),
         }
         self.record_sync_item(crate::sync::SyncItem::ContactUnarchived {

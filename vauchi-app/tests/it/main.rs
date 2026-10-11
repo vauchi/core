@@ -131,6 +131,7 @@ mod locale_provenance_tests;
 mod lock_screen_back_tests;
 mod lock_screen_biometric_unlock_tests;
 mod lock_screen_feedback_tests;
+mod lock_session_tests;
 mod multi_stage_back_tests;
 mod multi_stage_deadline_tests;
 mod multi_stage_exchange_i18n_tests;

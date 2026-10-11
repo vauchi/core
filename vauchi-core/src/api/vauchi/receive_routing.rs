@@ -106,7 +106,7 @@ pub struct BlobOutcome {
     /// reciprocity confirmations never populate it.
     pub device_fanout_contact_id: Option<String>,
     /// `Some` when the applied blob was a verified safety alert (not a card
-    /// delta). Drives an `Emergency`/`DuressAlertReceived` event instead of an
+    /// delta). Drives an `EmergencyAlertReceived` event instead of an
     /// `IncomingUpdate` (2026-07-04-coercion-safety-alerts-never-received).
     pub alert: Option<ReceivedAlert>,
     /// `Some` when the applied blob was an F4 registry push (or an ack
@@ -555,7 +555,7 @@ mod tests {
     fn test_incoming_update_events_skips_alert_outcomes() {
         let mut applied_alert = outcome(true, Some("contact-A"));
         applied_alert.alert = Some(ReceivedAlert {
-            kind: AlertKind::Duress,
+            kind: AlertKind::Emergency,
             message: "m".into(),
             timestamp: 1,
             location: None,

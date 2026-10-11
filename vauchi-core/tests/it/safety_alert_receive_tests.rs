@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! End-to-end coercion-safety alert flow: send (disguised card_delta) →
-//! receive → surface as an Emergency/Duress event.
+//! receive → surface as an emergency alert event.
 //!
 //! Regression suite for 2026-07-04-coercion-safety-alerts-never-received: the
 //! send path existed but the receive path parsed every payload as a CardDelta
@@ -103,37 +103,6 @@ fn create_alert_blob(
         .save_ratchet_state(alice_contact_id, &bob_ratchet, is_init)
         .unwrap();
     serde_json::to_vec(&ratchet_msg).unwrap()
-}
-
-// @internal
-#[test]
-fn received_duress_alert_is_verified_and_surfaced() {
-    let (alice_wb, bob_wb, bob_contact_id, alice_contact_id) = setup_two_party();
-    let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
-
-    let blob = create_alert_blob(
-        &bob_wb,
-        &alice_signing_pk,
-        &alice_contact_id,
-        AlertKind::Duress,
-        [9u8; 32],
-    );
-
-    let outcome = process_single_card_update(
-        alice_wb.identity().unwrap(),
-        alice_wb.storage(),
-        &bob_contact_id,
-        &blob,
-    )
-    .expect("a signed alert must be received, not dropped");
-    match outcome {
-        ReceiveOutcome::Alert(a) => {
-            assert_eq!(a.kind, AlertKind::Duress);
-            assert_eq!(a.message, "help me");
-            assert_eq!(a.timestamp, 1_720_000_000);
-        }
-        other => panic!("expected an Alert outcome, got {other:?}"),
-    }
 }
 
 // @internal
@@ -238,7 +207,7 @@ fn received_alert_persists_unsurfaced_fact_atomically() {
         &bob_wb,
         &alice_signing_pk,
         &alice_contact_id,
-        AlertKind::Duress,
+        AlertKind::Emergency,
         [11u8; 32],
     );
     process_single_card_update(
@@ -263,7 +232,7 @@ fn received_alert_persists_unsurfaced_fact_atomically() {
     // depends on this).
     match VersionedPayload::decode(&facts[0].signed_payload).unwrap() {
         VersionedPayload::Alert(stored) => {
-            assert_eq!(stored.kind(), AlertKind::Duress);
+            assert_eq!(stored.kind(), AlertKind::Emergency);
             assert_eq!(stored.message(), "help me");
             assert_eq!(stored.timestamp(), 1_720_000_000);
             assert_eq!(stored.nonce(), &[11u8; 32]);
@@ -283,14 +252,14 @@ fn replayed_alert_does_not_duplicate_fact() {
         &bob_wb,
         &alice_signing_pk,
         &alice_contact_id,
-        AlertKind::Duress,
+        AlertKind::Emergency,
         [12u8; 32],
     );
     let blob2 = create_alert_blob(
         &bob_wb,
         &alice_signing_pk,
         &alice_contact_id,
-        AlertKind::Duress,
+        AlertKind::Emergency,
         [12u8; 32],
     );
 
@@ -319,7 +288,7 @@ fn alert_receive_is_atomic_fact_failure_preserves_the_nonce() {
         &bob_wb,
         &alice_signing_pk,
         &alice_contact_id,
-        AlertKind::Duress,
+        AlertKind::Emergency,
         [13u8; 32],
     );
 
@@ -373,7 +342,7 @@ fn surfacing_dispatches_pending_facts_at_least_once() {
         &bob_wb,
         &alice_signing_pk,
         &alice_contact_id,
-        AlertKind::Duress,
+        AlertKind::Emergency,
         [21u8; 32],
     );
     // The storage-level receive persists the fact but dispatches nothing —
@@ -398,7 +367,7 @@ fn surfacing_dispatches_pending_facts_at_least_once() {
         let events = collected.lock().unwrap();
         assert_eq!(events.len(), 1);
         match &events[0] {
-            VauchiEvent::DuressAlertReceived {
+            VauchiEvent::EmergencyAlertReceived {
                 contact_id,
                 message,
                 timestamp,
@@ -411,7 +380,7 @@ fn surfacing_dispatches_pending_facts_at_least_once() {
                 assert_eq!(*location, None);
                 assert_eq!(alert_nonce, &[21u8; 32]);
             }
-            other => panic!("expected DuressAlertReceived, got {other:?}"),
+            other => panic!("expected EmergencyAlertReceived, got {other:?}"),
         }
     }
 
@@ -435,7 +404,7 @@ fn blocked_contact_alert_is_not_surfaced() {
         &bob_wb,
         &alice_signing_pk,
         &alice_contact_id,
-        AlertKind::Duress,
+        AlertKind::Emergency,
         [31u8; 32],
     );
     process_single_card_update(
@@ -477,7 +446,7 @@ fn nonce_mismatched_fact_is_not_surfaced() {
 
     let bob_identity = bob_wb.identity().unwrap();
     let alert = SafetyAlertPayload::new(
-        AlertKind::Duress,
+        AlertKind::Emergency,
         "help me".into(),
         1_720_000_000,
         None,

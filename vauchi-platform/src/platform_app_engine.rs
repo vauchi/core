@@ -593,9 +593,6 @@ impl PlatformAppEngine {
                     CoreNotificationCategory::EmergencyAlert => {
                         MobileNotificationCategory::EmergencyAlert
                     }
-                    CoreNotificationCategory::DuressAlert => {
-                        MobileNotificationCategory::DuressAlert
-                    }
                     CoreNotificationCategory::ContactAdded => {
                         MobileNotificationCategory::ContactAdded
                     }
@@ -649,9 +646,6 @@ impl PlatformAppEngine {
                 category: match n.category {
                     CoreNotificationCategory::EmergencyAlert => {
                         MobileNotificationCategory::EmergencyAlert
-                    }
-                    CoreNotificationCategory::DuressAlert => {
-                        MobileNotificationCategory::DuressAlert
                     }
                     CoreNotificationCategory::ContactAdded => {
                         MobileNotificationCategory::ContactAdded

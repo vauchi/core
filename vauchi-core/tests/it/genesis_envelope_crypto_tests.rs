@@ -40,7 +40,6 @@ fn signed_alert_bytes(sender: &Identity, recipient: &Identity) -> Vec<u8> {
     VersionedPayload::encode_alert(&alert)
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
 // @internal
 #[test]
 fn genesis_header_is_fresh_and_never_static_device_exchange_key() {
@@ -83,7 +82,6 @@ fn genesis_header_is_fresh_and_never_static_device_exchange_key() {
     assert_eq!(msg1.previous_chain_length, 0);
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
 // @internal
 #[test]
 fn genesis_roundtrip_recovers_alert_registry_and_device() {
@@ -131,7 +129,6 @@ fn genesis_roundtrip_recovers_alert_registry_and_device() {
     }
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
 // @internal
 #[test]
 fn genesis_open_rejects_shared_key_only_when_identities_swapped() {
@@ -170,7 +167,6 @@ fn genesis_open_rejects_shared_key_only_when_identities_swapped() {
     );
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
 // @internal
 #[test]
 fn genesis_open_rejects_header_index_above_bound_before_decrypt() {
@@ -204,7 +200,6 @@ fn genesis_open_rejects_header_index_above_bound_before_decrypt() {
     );
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
 // @internal
 #[test]
 fn genesis_open_fails_for_a_different_shared_key() {
@@ -238,7 +233,6 @@ fn genesis_open_fails_for_a_different_shared_key() {
     );
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
 // @internal
 #[test]
 fn genesis_seal_rejects_an_oversized_payload() {

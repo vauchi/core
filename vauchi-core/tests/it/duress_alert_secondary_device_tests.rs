@@ -57,8 +57,7 @@ use vauchi_core::sync::DeviceLinkIntent;
 use vauchi_core::sync::delta::VersionedPayload;
 use vauchi_core::sync::registry_activation::ActivationTracker;
 use vauchi_core::sync::safety_alert::{AlertKind, SafetyAlertPayload};
-use vauchi_core::types::DuressSettings;
-use vauchi_core::{AuthMode, SymmetricKey, Vauchi};
+use vauchi_core::{SymmetricKey, Vauchi};
 
 /// A secondary linked device's verified state after device-link + owner-device
 /// sync: it holds the exchanged `Bob` contact (shared_key + public_key) but has
@@ -85,10 +84,9 @@ fn secondary_device_after_owner_sync() -> (Vauchi, String) {
 // Controls (pass) — the harness works and the premise holds.
 // ---------------------------------------------------------------------------
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @internal
 /// Control: an emergency alert from a device that DOES hold a ratchet is queued
 /// and received. Isolates the secondary-device failure below as the real gap.
-// @internal
 #[test]
 fn emergency_alert_with_established_ratchet_reaches_recipient() {
     let (mut alice_wb, bob_wb, secret, bob_id_at_alice, alice_id_at_bob) =
@@ -201,11 +199,10 @@ fn real_owner_sync_leaves_secondary_device_without_ratchet_or_registry() {
 // Regression — the safe behavior, now delivered by the ADR-068 genesis path.
 // ---------------------------------------------------------------------------
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @internal
 /// A secondary device must be able to raise an emergency alert to an exchanged
 /// contact. Before genesis the send returned `sent == 0` (silently skipped);
 /// the shared-key-rooted genesis envelope now queues it.
-// @internal
 #[test]
 fn emergency_alert_from_secondary_device_should_reach_recipient() {
     let (secondary, bob_id) = secondary_device_after_owner_sync();
@@ -231,49 +228,11 @@ fn emergency_alert_from_secondary_device_should_reach_recipient() {
     );
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
-/// Most safety-critical: a duress unlock on a secondary device must queue the
-/// disguised alert to the configured contact. Before genesis the unlock
-/// succeeded (`AuthMode::Duress`) while silently queuing nothing — the coerced
-/// user got no signal the alarm failed. Genesis now queues it.
 // @internal
-#[test]
-fn duress_unlock_from_secondary_device_should_queue_alert() {
-    let (secondary, bob_id) = secondary_device_after_owner_sync();
-    let mut secondary = secondary;
-
-    secondary.setup_app_password("normal-pin-1234").unwrap();
-    secondary.setup_duress_password("987654").unwrap();
-    secondary
-        .save_duress_settings(&DuressSettings {
-            alert_contact_ids: vec![bob_id.clone()],
-            alert_message: "I need help".to_string(),
-            include_location: false,
-        })
-        .unwrap();
-
-    let mode = secondary
-        .authenticate("987654")
-        .expect("duress unlock must succeed");
-    assert_eq!(mode, AuthMode::Duress);
-
-    let pending = secondary
-        .storage()
-        .pending()
-        .get_all_pending_updates()
-        .unwrap();
-    assert!(
-        pending.iter().any(|u| u.contact_id == bob_id),
-        "the duress unlock must queue a disguised alert for the configured contact"
-    );
-}
-
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
 /// End-to-end: a secondary device with only `shared_key` seals a genesis
 /// alert; the recipient (holding the matching contact and shared_key, no
 /// session) opens it, surfaces the emergency, and persists a durable fact.
 /// This is the full ADR-068 send→receive path, not just sender pending state.
-// @internal
 #[test]
 fn secondary_device_alert_should_be_surfaced_by_recipient() {
     // Alice's secondary device and Bob's device share one relationship key but
@@ -370,13 +329,12 @@ fn secondary_device_alert_should_be_surfaced_by_recipient() {
     );
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @internal
 /// After registry activation, a sender that is the deterministic responder for
 /// a peer-device ratchet has no sending chain until that peer sends first.
 /// Safety alerts cannot wait for ordinary traffic: they must use the same
 /// device-scoped, non-persistent genesis fallback as responder-side card
 /// deltas.
-// @internal
 #[test]
 fn active_responder_device_genesis_seals_emergency_alert() {
     let sender_seed = [0xa5u8; 32];
@@ -535,12 +493,11 @@ fn non_genesis_ratchet_blob(seed: u8) -> Vec<u8> {
     serde_json::to_vec(&message).unwrap()
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @internal
 /// A session-less contact's genesis-decrypt budget can be exhausted; once it is,
 /// a further attempt returns the retriable `GenesisRateLimited` (which the
 /// receive loop must not ACK), so a burst of undecryptable traffic delays but
 /// never silently drops a legitimate first-contact alert (plan §REVISION F6).
-// @internal
 #[test]
 fn genesis_decrypt_budget_exhaustion_is_retriable_not_dropped() {
     let bob = create_vauchi_with_identity("Bob");
@@ -596,12 +553,11 @@ fn session_less_pair(
     (bob, alice_id, broadcast)
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @internal
 /// A genesis envelope that decrypts and verifies but wraps a NON-alert inner
 /// payload must be rejected — `shared_key` admits the blob to the parser, it
 /// does not authorize an arbitrary payload (plan §REVISION F8). No fact is
 /// created.
-// @internal
 #[test]
 fn genesis_wrapping_a_non_alert_payload_is_rejected() {
     let alice = Identity::create("Alice", 0);
@@ -636,13 +592,12 @@ fn genesis_wrapping_a_non_alert_payload_is_rejected() {
     );
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @internal
 /// A valid genesis envelope (envelope signature checks out) whose INNER alert
 /// carries an invalid sender signature must be rejected: possession of
 /// `shared_key` is admission to the parser, never authority over the alert
 /// content (plan §REVISION F8). The inner alert here is signed by a third party,
 /// not the contact.
-// @internal
 #[test]
 fn genesis_with_a_forged_inner_alert_signature_is_rejected() {
     let alice = Identity::create("Alice", 0);
@@ -692,13 +647,12 @@ fn genesis_with_a_forged_inner_alert_signature_is_rejected() {
     );
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @internal
 /// On the decrypt-failure arm (a `[0;32]` session already exists), a
 /// rate-limited genesis attempt must fall through to the ordinary
 /// `DecryptionFailed` (which is ACKed) rather than the retained
 /// `GenesisRateLimited`, so ordinary undecryptable traffic over an established
 /// session cannot pin blobs on the relay (plan §REVISION C2/F6).
-// @internal
 #[test]
 fn established_session_decrypt_failure_falls_through_when_rate_limited() {
     let bob = create_vauchi_with_identity("Bob");
@@ -745,11 +699,10 @@ fn established_session_decrypt_failure_falls_through_when_rate_limited() {
     );
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @internal
 /// A malformed (non-`RatchetMessage`) blob to a session-less contact is rejected
 /// at the genesis parse boundary before any key derivation or budget charge —
 /// it falls back to the ordinary error and persists nothing.
-// @internal
 #[test]
 fn malformed_blob_to_session_less_contact_falls_back_without_charging_budget() {
     let alice = Identity::create("Alice", 0);
@@ -810,12 +763,11 @@ fn genesis_alert_blob(
     serde_json::to_vec(&message).unwrap()
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @internal
 /// A COMMIT failure while accepting a genesis alert must roll back cleanly:
 /// nothing is persisted, the blob is reported as a storage error (so the
 /// receive loop does not ACK it), and — crucially — a retry succeeds instead of
 /// wedging on a left-open transaction (plan §REVISION C4).
-// @internal
 #[test]
 fn genesis_receive_survives_a_commit_failure_and_retry_succeeds() {
     let alice = Identity::create("Alice", 0);
@@ -883,7 +835,7 @@ fn a1_session_alert_blob(
     serde_json::to_vec(&message).unwrap()
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @internal
 /// Guarded invariant 1 (ADR-064 Amendment 2026-07-24): a sibling's genesis
 /// alert must NOT re-seat the recipient's established `[0;32]` session — doing
 /// so silently severs the exchanging device's channel, and that device is the
@@ -891,7 +843,6 @@ fn a1_session_alert_blob(
 /// (`problems/2026-07-24-genesis-reseat-severs-live-primary-channel`).
 /// Sequence: A1 message decrypts (control) → A2 genesis alert surfaces →
 /// A1's NEXT message on the same chain must still decrypt.
-// @internal
 #[test]
 fn established_primary_channel_survives_sibling_genesis_alert() {
     let alice = Identity::create("Alice", 0);
@@ -947,14 +898,13 @@ fn established_primary_channel_survives_sibling_genesis_alert() {
     );
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @internal
 /// Guarded invariant 2 (ADR-064 Amendment 2026-07-24): the alert send path
 /// must NOT persist the genesis initiator session. If it does, the sibling's
 /// second alert rides an ordinary ratchet message a guarded receiver cannot
 /// decrypt — ACKed and silently lost: exactly one alert per sibling, ever.
 /// The absence of the persisted row IS the contract here, not an
 /// implementation detail.
-// @internal
 #[test]
 fn alert_send_leaves_no_genesis_session_behind() {
     let (secondary, bob_id) = secondary_device_after_owner_sync();
@@ -978,13 +928,12 @@ fn alert_send_leaves_no_genesis_session_behind() {
     );
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @internal
 /// Pairing pin: a SECOND alert from the same session-less sibling must reach
 /// the recipient. Green today (via the unguarded re-seat + persisted sender
 /// session); it is the cell a receive-only guard would silently break, so it
 /// must stay green through the two-sided change (both alerts arrive as
 /// self-contained genesis envelopes once the send-side skip lands).
-// @internal
 #[test]
 fn repeat_sibling_alerts_keep_reaching_recipient() {
     use std::time::{Duration, SystemTime};
@@ -1089,13 +1038,12 @@ fn repeat_sibling_alerts_keep_reaching_recipient() {
     );
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @internal
 /// A signed alert reusing an existing fact's nonce with DIFFERENT bytes is a
 /// deterministic integrity conflict: the accept transaction rolls back, the
 /// pre-existing fact is untouched, and the receive returns the ACKable
 /// `FactConflict` (retrying can never resolve it) rather than a transient
 /// storage failure that would loop forever (plan §REVISION F9/C3).
-// @internal
 #[test]
 fn genesis_receive_rejects_a_conflicting_fact_and_rolls_back() {
     let alice = Identity::create("Alice", 0);

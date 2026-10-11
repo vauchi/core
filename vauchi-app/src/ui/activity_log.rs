@@ -122,10 +122,6 @@ fn format_entry(entry: &ActivityLogEntry, name: &str, locale: Locale) -> (String
             get_string_with_args(locale, "activity_log.emergency_alert", &[("name", name)]),
             None,
         ),
-        ActivityLogEntry::DuressAlertReceived { .. } => (
-            get_string_with_args(locale, "activity_log.duress_alert", &[("name", name)]),
-            None,
-        ),
         ActivityLogEntry::OwnCardUpdated { changed_fields } => {
             let detail = if changed_fields.is_empty() {
                 None

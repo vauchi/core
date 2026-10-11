@@ -261,9 +261,7 @@ pub fn affected_screens(event: &vauchi_core::api::VauchiEvent) -> Vec<&'static s
         VauchiEvent::VisibilityChanged { .. } => {
             vec!["my_info", "contacts"]
         }
-        VauchiEvent::EmergencyAlertReceived { .. }
-        | VauchiEvent::DuressAlertReceived { .. }
-        | VauchiEvent::EmergencyBroadcastSent { .. } => {
+        VauchiEvent::EmergencyAlertReceived { .. } | VauchiEvent::EmergencyBroadcastSent { .. } => {
             vec!["contacts"]
         }
         VauchiEvent::DowngradeDetected { .. } | VauchiEvent::Error { .. } => vec![],

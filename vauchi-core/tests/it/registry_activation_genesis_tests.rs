@@ -70,7 +70,7 @@ fn genesis_alert_blob(
 ) -> Vec<u8> {
     let alice_identity = alice_wb.identity().unwrap();
     let alert = SafetyAlertPayload::new(
-        AlertKind::Duress,
+        AlertKind::Emergency,
         "help".into(),
         1_753_000_000,
         None,

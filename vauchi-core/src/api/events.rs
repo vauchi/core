@@ -209,26 +209,6 @@ pub enum VauchiEvent {
         alert_nonce: [u8; 32],
     },
 
-    /// A duress alert was received from a contact — the sender entered their
-    /// duress PIN. Distinct from `EmergencyAlertReceived` so the recipient can
-    /// respond appropriately (the sender may be under coercion). On the wire
-    /// it was indistinguishable from a card update (ADR-032); the distinction
-    /// only exists here, on the recipient, after decryption.
-    DuressAlertReceived {
-        /// The contact ID who sent the alert.
-        contact_id: String,
-        /// The alert message.
-        message: String,
-        /// Unix timestamp when the alert was created.
-        timestamp: u64,
-        /// Optional location as (latitude, longitude).
-        location: Option<(f64, f64)>,
-        /// The alert's signed nonce — the alert's stable identity. Surfacing
-        /// is at-least-once from durable facts, so consumers dedup on this,
-        /// never on receipt time.
-        alert_nonce: [u8; 32],
-    },
-
     /// An emergency broadcast was sent.
     EmergencyBroadcastSent {
         /// Number of alerts successfully queued for delivery.

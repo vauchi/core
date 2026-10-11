@@ -44,7 +44,6 @@ fn saved_contact(storage: &Storage, seed: u8, name: &str) -> String {
     id
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
 // @internal
 #[test]
 fn per_contact_budget_caps_then_window_reset_restores() {
@@ -80,7 +79,6 @@ fn per_contact_budget_caps_then_window_reset_restores() {
     );
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
 // @internal
 #[test]
 fn global_budget_caps_across_contacts() {
@@ -105,7 +103,6 @@ fn global_budget_caps_across_contacts() {
     );
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
 // @internal
 #[test]
 fn global_cap_denial_leaves_the_contact_counter_uncharged() {
@@ -142,7 +139,6 @@ fn global_cap_denial_leaves_the_contact_counter_uncharged() {
     );
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
 // @internal
 #[test]
 fn backward_clock_correction_resets_an_exhausted_window() {
@@ -179,7 +175,6 @@ fn backward_clock_correction_resets_an_exhausted_window() {
     );
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
 // @internal
 #[test]
 fn budget_counters_are_durable_across_reopen() {

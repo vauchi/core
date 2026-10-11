@@ -37,16 +37,13 @@ const ALERT_DOMAIN: &[u8] = b"vauchi-sync-safety-alert-v1";
 /// Fixed size of the `nonce || signature` prefix on the wire.
 const PREFIX_LEN: usize = 32 + 64;
 
-/// Which safety flow produced the alert. Carried inside the signed envelope
-/// so the recipient can act appropriately (covert for duress, overt for
-/// emergency); invisible on the wire.
+/// Which safety flow produced the alert, carried inside the signed envelope.
+/// Only the emergency broadcast sends one, so an unknown kind fails to decode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AlertKind {
-    /// Voluntary emergency broadcast.
+    /// Voluntary emergency broadcast (ADR-036). A duress unlock sends no
+    /// alert (ADR-032 amendment 2026-10-11).
     Emergency,
-    /// Covert duress alert (ADR-032 — disguised as a card update on the
-    /// sender's wire; the recipient still surfaces it).
-    Duress,
 }
 
 /// Signed content of a safety alert.

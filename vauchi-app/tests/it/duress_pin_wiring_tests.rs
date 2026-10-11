@@ -224,16 +224,15 @@ fn duress_mismatched_confirmation_is_rejected() {
 }
 
 // @scenario: duress_mode :: Duress credential shows decoy contacts
-// ADR-032: the duress PIN unlocks into DECOY mode — silent alert queued,
-// decoy contacts shown, the app plausibly normal to the coercer. A wipe on
-// duress unlock is maximally visible AND destroys the just-queued covert
-// alerts before any sync can deliver them.
+// ADR-032: the duress PIN unlocks into DECOY mode — decoy contacts shown,
+// nothing sent (amendment 2026-10-11), the app plausibly normal to the
+// coercer. A wipe on duress unlock would be maximally visible.
 #[test]
 fn duress_unlock_enters_decoy_mode_without_wiping() {
     let mut engine = engine_ready();
     engine.vauchi_mut().setup_duress_password(PIN).unwrap();
 
-    // Trusted exchanged contact with a ratchet so the covert alert queues.
+    // A ratcheted contact that was once an alert recipient.
     let shared = vauchi_core::SymmetricKey::generate();
     let trusted = Contact::from_exchange([5u8; 32], ContactCard::new("Ally"), shared.clone(), 0);
     let trusted_id = trusted.id().to_string();
@@ -295,12 +294,8 @@ fn duress_unlock_enters_decoy_mode_without_wiping() {
         .unwrap();
     assert_eq!(
         pending.len(),
-        pending_before + 1,
-        "exactly one covert alert must be queued by duress unlock"
-    );
-    assert_eq!(
-        pending[0].contact_id, trusted_id,
-        "the queued alert must be addressed to the configured trusted contact"
+        pending_before,
+        "a duress unlock must queue nothing, even for a former alert recipient"
     );
     let visible = engine.vauchi().list_contacts().unwrap();
     let visible_names: Vec<String> = visible

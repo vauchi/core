@@ -33,33 +33,6 @@ fn prefs_all_off() -> NotificationPreferences {
 
 // @internal
 #[test]
-fn duress_always_produces_notification() {
-    let entries = vec![(
-        "evt-duress".to_string(),
-        ActivityLogEntry::DuressAlertReceived {
-            contact_id: "carol".to_string(),
-        },
-    )];
-
-    // Duress, like emergency, is never gated by preferences.
-    let results = NotificationEmitter::evaluate(
-        &entries,
-        &prefs_all_off(),
-        Locale::English,
-        test_name_resolver,
-    );
-
-    assert_eq!(results.len(), 1);
-    let n = &results[0];
-    assert_eq!(n.event_key, "evt-duress");
-    assert_eq!(n.category, NotificationCategory::DuressAlert);
-    assert_eq!(n.title, "Duress Alert");
-    assert_eq!(n.body, "Carol may be in danger");
-    assert_eq!(n.contact_id, "carol");
-}
-
-// @internal
-#[test]
 fn emergency_always_produces_notification() {
     let entries = vec![(
         "evt-001".to_string(),
@@ -362,12 +335,6 @@ fn contact_bearing_notifications_include_core_owned_deep_link() {
             },
         ),
         (
-            "evt-du".to_string(),
-            ActivityLogEntry::DuressAlertReceived {
-                contact_id: "bob".to_string(),
-            },
-        ),
-        (
             "evt-ca".to_string(),
             ActivityLogEntry::ContactAdded {
                 contact_id: "carol".to_string(),
@@ -388,7 +355,7 @@ fn contact_bearing_notifications_include_core_owned_deep_link() {
         Locale::English,
         test_name_resolver,
     );
-    assert_eq!(results.len(), 4);
+    assert_eq!(results.len(), 3);
     for n in &results {
         assert!(
             n.deep_link_uri.is_some(),

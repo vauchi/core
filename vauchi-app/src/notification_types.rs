@@ -14,10 +14,6 @@ pub use vauchi_core::EventOrigin;
 pub enum NotificationCategory {
     /// Always fires, no toggle.
     EmergencyAlert,
-    /// Always fires, no toggle. Distinct from `EmergencyAlert` so the recipient
-    /// can respond to a coerced sender appropriately (the sender entered their
-    /// duress PIN — 2026-07-04-coercion-safety-alerts-never-received).
-    DuressAlert,
     /// Opt-in, off by default.
     ContactAdded,
     /// A contact updated their card. The product's core heartbeat
@@ -118,9 +114,6 @@ pub enum ActivityLogEntry {
     EmergencyAlertReceived {
         contact_id: String,
     },
-    DuressAlertReceived {
-        contact_id: String,
-    },
     OwnCardUpdated {
         changed_fields: Vec<String>,
     },
@@ -139,7 +132,6 @@ impl ActivityLogEntry {
             Self::CardUpdateFailed { .. } => "card_update_failed",
             Self::ContactAdded { .. } => "contact_added",
             Self::EmergencyAlertReceived { .. } => "emergency_alert_received",
-            Self::DuressAlertReceived { .. } => "duress_alert_received",
             Self::OwnCardUpdated { .. } => "own_card_updated",
             Self::ContactRemoved { .. } => "contact_removed",
         }
@@ -156,7 +148,6 @@ impl ActivityLogEntry {
             | Self::CardUpdateFailed { contact_id, .. }
             | Self::ContactAdded { contact_id, .. }
             | Self::EmergencyAlertReceived { contact_id }
-            | Self::DuressAlertReceived { contact_id }
             | Self::ContactRemoved { contact_id } => contact_id,
             Self::OwnCardUpdated { .. } => "me",
         }

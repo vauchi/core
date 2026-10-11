@@ -87,37 +87,6 @@ fn duplicate_event_returns_empty() {
     assert_eq!(rows.len(), 1, "storage must contain only one row");
 }
 
-// @scenario: activity-log.feature - DuressAlertReceived creates a log entry
-// @internal
-#[test]
-fn duress_alert_creates_log_entry() {
-    let storage = test_storage();
-    let contact_id = "contact-duress".to_owned();
-
-    let events = vec![VauchiEvent::DuressAlertReceived {
-        contact_id: contact_id.clone(),
-        message: "under duress".to_owned(),
-        timestamp: NOW,
-        location: None,
-        alert_nonce: [7u8; 32],
-    }];
-
-    let result = ActivityLogWriter::write(&storage, &events, NOW).unwrap();
-    assert_eq!(result.len(), 1, "exactly one entry should be inserted");
-
-    let (event_key, entry) = &result[0];
-    assert_eq!(
-        event_key,
-        &format!("alert:{contact_id}:{}", hex::encode([7u8; 32]))
-    );
-    match entry {
-        ActivityLogEntry::DuressAlertReceived { contact_id: cid } => {
-            assert_eq!(cid, &contact_id);
-        }
-        other => panic!("unexpected entry variant: {other:?}"),
-    }
-}
-
 // @scenario: activity-log.feature - EmergencyAlertReceived creates a log entry
 // @internal
 #[test]
@@ -340,9 +309,9 @@ fn contact_removed_creates_log_entry() {
 fn alert_log_key_is_nonce_stable_across_redispatch() {
     let storage = test_storage();
     let make = || {
-        vec![VauchiEvent::DuressAlertReceived {
-            contact_id: "contact-duress".to_owned(),
-            message: "under duress".to_owned(),
+        vec![VauchiEvent::EmergencyAlertReceived {
+            contact_id: "contact-alert".to_owned(),
+            message: "help".to_owned(),
             timestamp: NOW,
             location: None,
             alert_nonce: [9u8; 32],
@@ -353,7 +322,7 @@ fn alert_log_key_is_nonce_stable_across_redispatch() {
     assert_eq!(first.len(), 1);
     assert_eq!(
         first[0].0,
-        format!("alert:contact-duress:{}", hex::encode([9u8; 32]))
+        format!("alert:contact-alert:{}", hex::encode([9u8; 32]))
     );
 
     let second = ActivityLogWriter::write(&storage, &make(), NOW + 999).unwrap();

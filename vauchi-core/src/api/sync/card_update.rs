@@ -1092,11 +1092,9 @@ fn decode_versioned_payload(
     }
 }
 
-/// Map a received safety alert to its recipient-side event. Emergency and
-/// duress get distinct events so the recipient can respond appropriately; the
-/// distinction only exists here (post-decryption), never on the wire
-/// (ADR-032). Lives beside `ReceivedAlert` (not in transport code) because
-/// surfacing from durable facts must work without the `network-http` feature.
+/// Map a received safety alert to its recipient-side event. Lives beside
+/// `ReceivedAlert` (not in transport code) because surfacing from durable
+/// facts must work without the `network-http` feature.
 pub(crate) fn alert_event(
     contact_id: String,
     alert: &ReceivedAlert,
@@ -1107,13 +1105,6 @@ pub(crate) fn alert_event(
     let location = alert.location.as_ref().map(|l| (l.latitude, l.longitude));
     match alert.kind {
         AlertKind::Emergency => VauchiEvent::EmergencyAlertReceived {
-            contact_id,
-            message,
-            timestamp,
-            location,
-            alert_nonce: alert.nonce,
-        },
-        AlertKind::Duress => VauchiEvent::DuressAlertReceived {
             contact_id,
             message,
             timestamp,

@@ -35,7 +35,7 @@ fn sample_location() -> GeoLocation {
 fn roundtrip_encode_decode_preserves_content_and_verifies() {
     let (sender, sender_pk, _r, recipient_pk) = keypairs();
     let payload = SafetyAlertPayload::new(
-        AlertKind::Duress,
+        AlertKind::Emergency,
         "help".into(),
         1_720_000_000,
         Some(sample_location()),
@@ -46,7 +46,7 @@ fn roundtrip_encode_decode_preserves_content_and_verifies() {
     .expect("build alert");
 
     let decoded = SafetyAlertPayload::decode(&payload.encode()).expect("decode");
-    assert_eq!(decoded.kind(), AlertKind::Duress);
+    assert_eq!(decoded.kind(), AlertKind::Emergency);
     assert_eq!(decoded.message(), "help");
     assert_eq!(decoded.timestamp(), 1_720_000_000);
     assert_eq!(decoded.location(), Some(&sample_location()));
@@ -55,20 +55,6 @@ fn roundtrip_encode_decode_preserves_content_and_verifies() {
         decoded.verify(&sender_pk, &recipient_pk),
         "a correctly-signed alert must verify"
     );
-}
-
-// @internal
-#[test]
-fn both_kinds_roundtrip() {
-    let (sender, sender_pk, _r, recipient_pk) = keypairs();
-    for kind in [AlertKind::Emergency, AlertKind::Duress] {
-        let p =
-            SafetyAlertPayload::new(kind, "m".into(), 1, None, [1u8; 32], &sender, &recipient_pk)
-                .unwrap();
-        let d = SafetyAlertPayload::decode(&p.encode()).unwrap();
-        assert_eq!(d.kind(), kind);
-        assert!(d.verify(&sender_pk, &recipient_pk));
-    }
 }
 
 // @internal
@@ -102,7 +88,7 @@ fn wrong_sender_key_fails_verification() {
     let (sender, _sender_pk, _r, recipient_pk) = keypairs();
     let attacker_pk = *Identity::create("Mallory", 9).signing_public_key();
     let payload = SafetyAlertPayload::new(
-        AlertKind::Duress,
+        AlertKind::Emergency,
         "m".into(),
         1,
         None,
@@ -123,7 +109,7 @@ fn wrong_recipient_key_fails_verification() {
     let (sender, sender_pk, _r, recipient_pk) = keypairs();
     let other_recipient = *Identity::create("Other", 8).signing_public_key();
     let payload = SafetyAlertPayload::new(
-        AlertKind::Duress,
+        AlertKind::Emergency,
         "m".into(),
         1,
         None,

@@ -11,7 +11,7 @@ use vauchi_core::{Contact, ContactCard};
 
 use crate::common::helpers::create_vauchi_with_identity;
 
-// @internal
+// @scenario: duress_mode :: A duress unlock sends nothing
 #[test]
 fn a_duress_unlock_queues_nothing_even_for_former_alert_recipients() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -49,7 +49,7 @@ fn a_duress_unlock_queues_nothing_even_for_former_alert_recipients() {
     );
 }
 
-// @internal
+// @scenario: duress_mode :: A duress unlock sends nothing
 #[test]
 fn an_alert_claiming_to_be_a_duress_alert_does_not_decode() {
     let mut wire = vec![0u8; 32 + 64];

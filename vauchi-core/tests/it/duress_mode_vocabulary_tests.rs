@@ -122,11 +122,10 @@ fn what_is_made_in_duress_mode_stays_in_the_session() {
     assert_eq!(w.wb.unnamed_exchange_spots().unwrap().len(), 1);
 }
 
-// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @internal
 // Duress sync keeps sending realistic traffic to real contacts; what they
 // receive must still follow the real groups, or real contacts would see
 // entries disappear while the owner is coerced.
-// @internal
 #[test]
 fn real_contacts_still_see_what_the_real_groups_grant() {
     let w = in_duress_mode();

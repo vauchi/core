@@ -72,27 +72,6 @@ impl NotificationEmitter {
                     os_category_options,
                 })
             }
-            ActivityLogEntry::DuressAlertReceived { contact_id } => {
-                let name = name_resolver(contact_id);
-                let (os_category_id, os_channel_id, priority, os_category_options) =
-                    category_hints(NotificationCategory::DuressAlert);
-                Some(PendingNotification {
-                    event_key: event_key.to_string(),
-                    category: NotificationCategory::DuressAlert,
-                    title: get_string(locale, "notification.duress_alert.title"),
-                    body: get_string_with_args(
-                        locale,
-                        "notification.duress_alert.body",
-                        &[("name", &name)],
-                    ),
-                    contact_id: contact_id.clone(),
-                    deep_link_uri: Some(contact_deep_link(contact_id)),
-                    os_category_id,
-                    os_channel_id,
-                    priority,
-                    os_category_options,
-                })
-            }
             ActivityLogEntry::ContactAdded {
                 contact_id,
                 origin: EventOrigin::Synced,
@@ -163,12 +142,6 @@ fn category_hints(
             "alerts".into(),
             NotificationPriority::Urgent,
             vec!["custom_dismiss_action".into()],
-        ),
-        NotificationCategory::DuressAlert => (
-            "duress_alert".into(),
-            "duress".into(),
-            NotificationPriority::Urgent,
-            vec![],
         ),
         NotificationCategory::ContactAdded => (
             "contact_added".into(),

@@ -281,7 +281,6 @@ fn duress_pin_match_to_alerts() {
 }
 
 // @scenario: duress_mode :: Enable duress PIN in settings
-// @scenario: duress_mode :: Configure trusted contacts for duress alerts
 // @internal
 #[test]
 fn duress_alerts_save_enables() {
@@ -568,7 +567,6 @@ fn duress_pin_backspace_removes_last_char() {
 // The ConfigureAlerts step renders a picker over ALL contacts, marking
 // the already-selected ones (2026-07-03-coercion-safety-config-gaps
 // defect 1 — the wizard previously had no way to add a recipient).
-// @scenario: duress_mode :: Configure trusted contacts for duress alerts
 // @internal
 #[test]
 fn duress_alerts_renders_recipient_picker() {

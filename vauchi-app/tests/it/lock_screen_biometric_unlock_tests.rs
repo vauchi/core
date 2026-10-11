@@ -159,6 +159,28 @@ fn a_forged_biometric_press_after_the_unlock_stays_inert() {
     assert_eq!(engine.current_screen().screen_id, "lock_screen");
 }
 
+/// Core acts on its unlock decision itself, so no shell is told about it:
+/// the answer is the next surface alone (#591 T3.3).
+// @scenario: duress_mode.feature :: Biometric unlock with duress
+#[test]
+fn a_biometric_unlock_answers_with_the_surface_alone() {
+    for duress in [false, true] {
+        let mut engine = locked_engine(duress);
+
+        let commands = engine.dispatch(Event::BiometricUnlockSucceeded).unwrap();
+
+        let names: Vec<_> = commands.iter().map(Command::variant_name).collect();
+        assert!(
+            !names.contains(&"SetAuthenticationRequirement"),
+            "duress={duress}: {names:?}"
+        );
+        assert!(
+            names.contains(&"ReplaceSurface"),
+            "duress={duress}: {names:?}"
+        );
+    }
+}
+
 // @scenario: duress_mode.feature :: Biometric unlock without duress
 #[test]
 fn off_the_lock_screen_a_biometric_unlock_does_not_navigate() {

@@ -28,10 +28,18 @@ use crate::version::APP_COMPAT_VERSION;
 /// Header carrying the ticket of an asynchronous request.
 const TICKET_HEADER: &str = "vauchi-ticket";
 
+/// Polls after which a ticket that is still pending counts as lost. The
+/// outer relay drops an answer 2W after forwarding (3W after the post, at
+/// most 45 minutes with W = 900 s); at about a poll a minute, 60 polls
+/// outlast that, and the cap keeps a relay that answers `202` forever from
+/// holding a ticket, and with it every fetch, indefinitely.
+pub const MAX_PENDING_POLLS: u32 = 60;
+
 /// A posted request whose answer has not been collected yet.
 pub struct PendingOhttp {
     ticket: String,
     decryptor: ResponseDecryptor,
+    polls: u32,
 }
 
 impl PendingOhttp {
@@ -59,11 +67,18 @@ pub enum Collected<T> {
     Lost,
 }
 
+/// A pending fetch and the mailbox tokens it covers.
+#[derive(Debug)]
+pub(crate) struct PendingFetch {
+    pub(crate) tokens: Vec<String>,
+    pub(crate) pending: PendingOhttp,
+}
+
 /// Requests posted in earlier sync cycles. The HTTP adapter is rebuilt
 /// every cycle, so this outlives it on the long-lived `Vauchi`.
 #[derive(Debug, Default)]
 pub struct DelayedRequests {
-    pub(crate) fetches: Vec<PendingOhttp>,
+    pub(crate) fetches: Vec<PendingFetch>,
     pub(crate) acks: Vec<PendingOhttp>,
 }
 
@@ -158,7 +173,11 @@ impl HttpTransport {
             .send(encrypted)
             .map_err(Self::map_ureq_error)?;
         self.check_response_status(&resp)?;
-        Ok(PendingOhttp { ticket, decryptor })
+        Ok(PendingOhttp {
+            ticket,
+            decryptor,
+            polls: 0,
+        })
     }
 
     fn collect_delayed(
@@ -170,11 +189,11 @@ impl HttpTransport {
             self.config.relay_url, pending.ticket
         );
         let Ok(resp) = self.get_agent()?.get(&url).call() else {
-            return Ok(Collected::Pending(pending));
+            return Ok(still_pending(pending));
         };
         match resp.status().as_u16() {
             200 => {}
-            202 | 429 => return Ok(Collected::Pending(pending)),
+            202 | 429 => return Ok(still_pending(pending)),
             _ => return Ok(Collected::Lost),
         }
         let encrypted = resp
@@ -186,4 +205,12 @@ impl HttpTransport {
             &padded,
         )?))
     }
+}
+
+fn still_pending<T>(mut pending: PendingOhttp) -> Collected<T> {
+    pending.polls += 1;
+    if pending.polls > MAX_PENDING_POLLS {
+        return Collected::Lost;
+    }
+    Collected::Pending(pending)
 }

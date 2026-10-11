@@ -100,7 +100,8 @@ use super::pinning::PinnedCertificate;
 use super::transport::ProxyConfig;
 
 mod delayed;
-pub use delayed::{Collected, DelayedRequests, PendingOhttp};
+pub(crate) use delayed::PendingFetch;
+pub use delayed::{Collected, DelayedRequests, MAX_PENDING_POLLS, PendingOhttp};
 
 /// Configuration for the HTTP transport.
 #[derive(Debug, Clone)]

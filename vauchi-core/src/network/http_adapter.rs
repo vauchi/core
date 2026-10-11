@@ -31,7 +31,9 @@ use std::sync::{Arc, Mutex, PoisonError};
 use base64::Engine;
 
 use super::error::NetworkError;
-use super::http_transport::{Collected, DelayedRequests, HttpTransport, HttpTransportConfig};
+use super::http_transport::{
+    Collected, DelayedRequests, HttpTransport, HttpTransportConfig, PendingFetch,
+};
 use super::message::{
     EncryptedUpdate, MessageEnvelope, MessagePayload, PROTOCOL_VERSION, RatchetHeader,
 };
@@ -354,38 +356,70 @@ impl HttpTransportAdapter {
         Ok(())
     }
 
-    /// Collects the answers posted in earlier cycles, then posts a new fetch
-    /// unless one is still on its way. Collected acknowledgements only free
-    /// the outer relay's memory; a lost fetch is simply posted again, since
-    /// fetching never removes mail.
+    /// Collects the answers posted in earlier cycles, then posts a fetch for
+    /// every registered token no pending fetch covers. Collected
+    /// acknowledgements only free the outer relay's memory; a lost fetch is
+    /// simply posted again, since fetching never removes mail. The lock is
+    /// released around the network calls, which can each block until the
+    /// transport timeout.
     fn fetch_delayed(&mut self, delayed: &Mutex<DelayedRequests>) -> Result<(), NetworkError> {
-        let mut requests = lock(delayed);
-        for pending in std::mem::take(&mut requests.acks) {
+        let (acks, fetches) = {
+            let mut requests = lock(delayed);
+            (
+                std::mem::take(&mut requests.acks),
+                std::mem::take(&mut requests.fetches),
+            )
+        };
+        let mut pending_acks = Vec::new();
+        for pending in acks {
             if let Ok(Collected::Pending(pending)) = self.http.collect_delayed_ack(pending) {
-                requests.acks.push(pending);
+                pending_acks.push(pending);
             }
         }
-        for pending in std::mem::take(&mut requests.fetches) {
+        let mut failure = None;
+        let mut pending_fetches = Vec::new();
+        for PendingFetch { tokens, pending } in fetches {
             match self.http.collect_delayed_fetch(pending) {
                 Ok(Collected::Ready((blobs, truncated))) => {
                     self.last_truncated |= truncated;
                     self.pending_blobs.extend(blobs);
                 }
-                Ok(Collected::Pending(pending)) => requests.fetches.push(pending),
-                Ok(Collected::Lost) | Err(_) => {}
+                Ok(Collected::Pending(pending)) => {
+                    pending_fetches.push(PendingFetch { tokens, pending });
+                }
+                Ok(Collected::Lost) => {}
+                Err(e) => {
+                    failure.get_or_insert(e);
+                }
             }
         }
-        if !requests.fetches.is_empty() {
-            return Ok(());
-        }
-        for chunk in self.registered_tokens.chunks(MAX_FETCH_TOKENS) {
+        let uncovered: Vec<String> = self
+            .registered_tokens
+            .iter()
+            .filter(|token| !pending_fetches.iter().any(|f| f.tokens.contains(token)))
+            .cloned()
+            .collect();
+        for chunk in uncovered.chunks(MAX_FETCH_TOKENS) {
             match self.http.post_delayed_fetch(chunk) {
-                Ok(pending) => requests.fetches.push(pending),
-                Err(e) if self.pending_blobs.is_empty() => return Err(e),
-                Err(_) => break,
+                Ok(pending) => pending_fetches.push(PendingFetch {
+                    tokens: chunk.to_vec(),
+                    pending,
+                }),
+                Err(e) => {
+                    failure.get_or_insert(e);
+                    break;
+                }
             }
         }
-        Ok(())
+        {
+            let mut requests = lock(delayed);
+            requests.acks.extend(pending_acks);
+            requests.fetches.extend(pending_fetches);
+        }
+        match failure {
+            Some(e) if self.pending_blobs.is_empty() => Err(e),
+            _ => Ok(()),
+        }
     }
 }
 

@@ -45,7 +45,7 @@ fn onboarded_engine_at(mock: &MockRelay) -> (AppEngine, tempfile::TempDir) {
     (engine, dir)
 }
 
-/// Read the `vauchi://exchange` URL the initiator's share screen renders.
+/// Read the exchange link the initiator's share screen renders.
 fn share_url(engine: &AppEngine) -> String {
     engine
         .current_screen()
@@ -80,7 +80,7 @@ fn initiator_and_responder_converge_over_a_shared_escrow_store() {
     alice.navigate_to(AppScreen::LinkExchange);
     assert_eq!(alice.current_screen().screen_id, "exchange_share_url");
     let alice_link = share_url(&alice);
-    assert!(alice_link.starts_with("vauchi://exchange?pk="));
+    assert!(alice_link.starts_with("https://vauchi.app/x#pk="));
 
     // Bob opens Alice's link and grants — the camera-less paste route lands
     // here too, via `LinkOpened`.

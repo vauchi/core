@@ -450,9 +450,10 @@ fn parse_deep_link_round_trips_through_as_parsed() {
 // @internal
 #[test]
 fn parse_deep_link_rejects_non_vauchi_scheme() {
+    // https is the link form since #277, but only for vauchi.app/x.
     assert_eq!(
         parse_exchange_deep_link("https://exchange?pk=AAAA&n=BBBB"),
-        Err(DeepLinkParseError::InvalidScheme),
+        Err(DeepLinkParseError::InvalidHost),
     );
     assert_eq!(
         parse_exchange_deep_link("ftp://exchange?pk=AAAA&n=BBBB"),
@@ -549,15 +550,18 @@ fn parse_deep_link_tolerates_unknown_extra_params() {
 // @internal
 proptest::proptest! {
     /// Parser must never panic on arbitrary input and must never return
-    /// `Ok` for any input that doesn't start with `vauchi://`.
+    /// `Ok` for any input outside the two canonical link forms.
     /// Property test (CC-04) covering scheme/host/payload fuzz.
     #[test]
     fn parse_deep_link_never_panics_or_misclassifies(input in ".*") {
         let result = parse_exchange_deep_link(&input);
         if let Ok(_) = result {
-            // The parser only accepts canonical `vauchi://exchange?...`
-            // shapes — anything else MUST be a typed error.
-            proptest::prop_assert!(input.starts_with("vauchi://exchange?"),
+            // The parser only accepts `https://vauchi.app/x#...` and the
+            // legacy `vauchi://exchange?...` — anything else MUST be a
+            // typed error.
+            proptest::prop_assert!(
+                input.starts_with("https://vauchi.app/x#")
+                    || input.starts_with("vauchi://exchange?"),
                 "parser accepted non-canonical input: {input:?}");
         }
     }

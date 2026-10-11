@@ -48,8 +48,14 @@ const LINK_SHARED_KEY_INFO: &[u8] = b"vauchi-link-shared-key-v1";
 /// Default TTL for escrow deposits (7 days, matching protocol max).
 const DEFAULT_TTL_SECONDS: u32 = 604_800;
 
-/// URL scheme for link exchange.
-const LINK_URL_PREFIX: &str = "vauchi://exchange";
+/// Exchange link a person without the app can open (vauchi/private#277).
+/// Everything the exchange needs travels in the fragment, which browsers
+/// never send to the server, so vauchi.app learns nothing about it.
+const LINK_URL_PREFIX: &str = "https://vauchi.app/x#";
+
+/// Links shared before #277; still accepted while their escrow (7 days)
+/// can complete.
+const LEGACY_LINK_URL_PREFIX: &str = "vauchi://exchange?";
 
 /// Error from Link mode operations.
 #[derive(Debug, thiserror::Error)]
@@ -106,7 +112,7 @@ pub fn initiator_generate() -> (LinkInitiation, Vec<Command>) {
 
     let pk_b64 = URL_SAFE_NO_PAD.encode(public.as_bytes());
     let nonce_b64 = URL_SAFE_NO_PAD.encode(nonce);
-    let url = format!("{LINK_URL_PREFIX}?pk={pk_b64}&n={nonce_b64}");
+    let url = format!("{LINK_URL_PREFIX}pk={pk_b64}&n={nonce_b64}");
 
     let handshake_slot = derive_handshake_slot(&nonce);
     let presence_slot = derive_initiator_presence_slot(&nonce);
@@ -198,8 +204,9 @@ pub struct ParsedLinkUrl {
 ///
 /// Returns None if the URL format is invalid.
 pub fn parse_link_url(url: &str) -> Option<ParsedLinkUrl> {
-    let stripped = url.strip_prefix(LINK_URL_PREFIX)?;
-    let query = stripped.strip_prefix('?')?;
+    let query = url
+        .strip_prefix(LINK_URL_PREFIX)
+        .or_else(|| url.strip_prefix(LEGACY_LINK_URL_PREFIX))?;
 
     let mut pk_bytes = None;
     let mut nonce_bytes = None;
@@ -311,7 +318,16 @@ pub fn parse_exchange_deep_link(uri: &str) -> Result<DeepLinkPayload, DeepLinkPa
     // accepted shape is fully constrained by `LINK_URL_PREFIX`, and
     // every divergence corresponds to one typed error variant.
 
-    // 1. Scheme must be `vauchi`.
+    // 0. The https form (#277): only vauchi.app/x with a fragment payload.
+    if let Some(rest) = uri.strip_prefix("https://") {
+        if !rest.starts_with("vauchi.app/x#") {
+            return Err(DeepLinkParseError::InvalidHost);
+        }
+        let parsed = parse_link_url(uri).ok_or(DeepLinkParseError::MalformedQuery)?;
+        return Ok(DeepLinkPayload { inner: parsed });
+    }
+
+    // 1. Otherwise the scheme must be `vauchi`.
     let after_scheme = uri
         .strip_prefix("vauchi://")
         .ok_or(DeepLinkParseError::InvalidScheme)?;

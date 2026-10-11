@@ -289,6 +289,12 @@ pub struct RelayConfig {
     /// other — see [`Self::ohttp_trust_anchor`]; without one, no rollover
     /// is followed.
     pub ohttp_backup_commitment: Option<[u8; 32]>,
+
+    /// Send fetches and acknowledgements through the outer relay's delayed
+    /// path (`/v2/ohttp-async`, #628) so the gateway does not see them when
+    /// the client connects. Off (default) until outer relays advertise the
+    /// path in the directory.
+    pub ohttp_delayed: bool,
 }
 
 /// SPKI SHA-256 pin for relay.vauchi.app leaf certificate.
@@ -360,6 +366,7 @@ impl Default for RelayConfig {
             ohttp_relay_url: None,       // derived from server_url (see ohttp_endpoint)
             ohttp_anchor: None,          // production resolves to PROD_OHTTP_ANCHOR
             ohttp_backup_commitment: None,
+            ohttp_delayed: false,
         }
     }
 }

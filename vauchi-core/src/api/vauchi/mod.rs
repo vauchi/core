@@ -242,6 +242,10 @@ pub struct Vauchi {
     /// Cached OHTTP key (loaded from Storage on connect).
     #[cfg(feature = "network-http")]
     ohttp_key: Option<crate::network::OhttpClient>,
+    /// Fetches and acknowledgements posted through the outer relay's delayed
+    /// path, collected on later syncs (#628).
+    #[cfg(feature = "network-http")]
+    delayed_ohttp: std::sync::Arc<std::sync::Mutex<crate::network::DelayedRequests>>,
     /// Deadline before which sync() returns TooSoon.
     #[cfg(feature = "network-http")]
     next_sync_allowed: Option<std::time::Instant>,
@@ -387,6 +391,8 @@ impl Vauchi {
             monotonic,
             #[cfg(feature = "network-http")]
             ohttp_key: None,
+            #[cfg(feature = "network-http")]
+            delayed_ohttp: crate::network::DelayedRequests::shared(),
             #[cfg(feature = "network-http")]
             next_sync_allowed: None,
             #[cfg(feature = "network-http")]
@@ -567,6 +573,8 @@ impl Vauchi {
             monotonic: SystemMonotonicClock::shared(),
             #[cfg(feature = "network-http")]
             ohttp_key: None,
+            #[cfg(feature = "network-http")]
+            delayed_ohttp: crate::network::DelayedRequests::shared(),
             #[cfg(feature = "network-http")]
             next_sync_allowed: None,
             #[cfg(feature = "network-http")]

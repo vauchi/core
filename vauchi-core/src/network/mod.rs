@@ -131,7 +131,9 @@ pub use anonymous::{
 pub use pinning::{PinnedCertificate, verify_pin};
 
 #[cfg(feature = "network-http")]
-pub use http_transport::{HttpTransport, HttpTransportConfig};
+pub use http_transport::{
+    Collected, DelayedRequests, HttpTransport, HttpTransportConfig, PendingOhttp,
+};
 #[cfg(feature = "network-http")]
 pub use vauchi_protocol::v2::FetchedBlob;
 

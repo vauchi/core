@@ -99,6 +99,9 @@ use super::ohttp_client::OhttpClient;
 use super::pinning::PinnedCertificate;
 use super::transport::ProxyConfig;
 
+mod delayed;
+pub use delayed::{Collected, DelayedRequests, PendingOhttp};
+
 /// Configuration for the HTTP transport.
 #[derive(Debug, Clone)]
 pub struct HttpTransportConfig {

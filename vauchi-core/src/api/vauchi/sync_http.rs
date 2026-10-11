@@ -136,6 +136,9 @@ impl Vauchi {
             &self.config.relay.server_url,
             self.config.relay.connect_timeout_ms,
         ));
+        if self.config.relay.ohttp_delayed {
+            adapter = adapter.with_delayed(self.delayed_ohttp.clone());
+        }
 
         // Connect adapter (relay health check)
         adapter

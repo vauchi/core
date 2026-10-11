@@ -18,7 +18,7 @@
 
 pub use crate::consent::{ConsentRecord, ConsentType};
 pub use crate::emergency::{
-    BiometricUnlockOutcome, DEFAULT_EMERGENCY_MESSAGE, DuressSettings, EmergencyBroadcastConfig,
+    BiometricUnlockOutcome, DEFAULT_EMERGENCY_MESSAGE, EmergencyBroadcastConfig,
     EmergencyWipeStatus, MAX_TRUSTED_CONTACTS,
 };
 pub use crate::exchange::ExchangeDefaults;

@@ -50,7 +50,7 @@ pub use error::{
 pub use secure::{FileKeyStorage, SecureStorage};
 pub use stores::{
     ActivityLogStore, ConsentStore, ContactStore, DecoyStore, DeliveryStore, DeviceDeliveryStore,
-    DeviceStore, DuressStore, EmergencyStore, FieldNoteStore, GENESIS_CONTACT_ATTEMPTS_PER_WINDOW,
+    DeviceStore, EmergencyStore, FieldNoteStore, GENESIS_CONTACT_ATTEMPTS_PER_WINDOW,
     GENESIS_GLOBAL_ATTEMPTS_PER_WINDOW, GENESIS_WINDOW_SECS, GenesisFactWrite, GenesisLimitStore,
     IdentityStore, LabelStore, OhttpCacheStore, PendingStore, PinCacheStore, PlaceStore,
     RatchetStore, RecoveryStore, ReplayStore, RetryStore, SafetyAlertFactStore,

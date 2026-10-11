@@ -218,13 +218,7 @@ fn change_password_output_redacts_both_credentials() {
 fn duress_pin_output_redacts_pin_in_debug() {
     use vauchi_app::ui::{DuressConfig, DuressPinEngine};
     let engine = DuressPinEngine::new(
-        DuressConfig {
-            enabled: true,
-            available_contacts: vec![],
-            selected_contact_ids: vec![],
-            alert_message: "help".into(),
-            include_location: true,
-        },
+        DuressConfig { enabled: true },
         vauchi_app::i18n::Locale::English,
     );
 
@@ -233,9 +227,6 @@ fn duress_pin_output_redacts_pin_in_debug() {
         panic!("duress engine must expose DuressPin output");
     };
     assert!(setup.enabled);
-    assert_eq!(setup.alert_message, "help");
-    assert!(setup.include_location);
-    assert_eq!(setup.alert_contact_ids, Vec::<String>::new());
     let debug = format!("{output:?}");
     assert!(
         debug.contains("<redacted>"),

@@ -343,17 +343,6 @@ impl From<vauchi_core::BiometricUnlockOutcome> for MobileBiometricUnlockOutcome 
     }
 }
 
-/// Duress alert settings for mobile platforms.
-#[derive(Debug, Clone, uniffi::Record)]
-pub struct MobileDuressSettings {
-    /// Contact IDs of trusted contacts who receive duress alerts.
-    pub alert_contact_ids: Vec<String>,
-    /// Custom alert message included in the alert payload.
-    pub alert_message: String,
-    /// Whether to include device location in the alert.
-    pub include_location: bool,
-}
-
 /// A decoy contact for mobile platforms.
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileDecoyContact {

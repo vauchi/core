@@ -88,99 +88,32 @@ fn type_into(engine: &mut AppEngine, component_id: &str, text: &str) {
     }
 }
 
-fn toggle(engine: &mut AppEngine, component_id: &str, item_id: &str) -> ActionResult {
-    engine.handle_action(UserAction::ItemToggled {
-        component_id: component_id.into(),
-        item_id: item_id.into(),
-    })
-}
-
-/// Overview → EnterPin → ConfirmPin → ConfigureAlerts with matching PINs,
-/// leaving the engine parked on the alerts screen (no recipient chosen).
-fn advance_to_alerts(engine: &mut AppEngine) {
+/// Overview → EnterPin → ConfirmPin with matching PINs; confirming is the
+/// last step.
+fn set_up_duress_pin(engine: &mut AppEngine) -> ActionResult {
     let _ = start_setup(engine);
     type_into(engine, "pin", PIN);
     let _ = press(engine, "continue");
     type_into(engine, "confirm_pin", PIN);
-    let _ = press(engine, "continue");
+    press(engine, "continue")
 }
 
 // @scenario: duress_mode :: Enable duress password (requires app password)
 #[test]
-fn duress_setup_persists_pin_and_recipient_via_core() {
+fn duress_setup_persists_the_pin_via_core() {
     let mut engine = engine_ready();
-    let bob = add_contact(&engine, "Bob");
+    add_contact(&engine, "Bob");
     engine.navigate_to(AppScreen::DuressPin);
 
-    advance_to_alerts(&mut engine);
-    let _ = toggle(&mut engine, "recipients", &bob);
-    let result = press(&mut engine, "save");
+    let result = set_up_duress_pin(&mut engine);
 
     assert!(
         matches!(result, ActionResult::NavigateTo(_)),
-        "save with a recipient completes and navigates back, got {result:?}"
+        "a confirmed PIN completes and navigates back, got {result:?}"
     );
     assert!(
         engine.vauchi().is_duress_enabled().unwrap(),
         "duress PIN must be enabled in storage after the setup flow"
-    );
-    let settings = engine
-        .vauchi()
-        .load_duress_settings()
-        .unwrap()
-        .expect("duress settings persisted");
-    assert_eq!(settings.alert_contact_ids, vec![bob]);
-}
-
-// @scenario: duress_mode :: Enable duress password (requires app password)
-#[test]
-fn duress_setup_completes_with_no_contacts_to_alert() {
-    let mut engine = engine_ready(); // no contacts at all
-    engine.navigate_to(AppScreen::DuressPin);
-
-    advance_to_alerts(&mut engine);
-    let result = press(&mut engine, "save");
-
-    assert!(
-        matches!(result, ActionResult::NavigateTo(_)),
-        "with an empty contact pool the ≥1-recipient gate is unsatisfiable; blocking here would \
-         deny the PIN's decoy protection to every user who has not exchanged yet, got {result:?}"
-    );
-    assert!(
-        engine.vauchi().is_duress_enabled().unwrap(),
-        "duress PIN must be enabled even when there is nobody to alert"
-    );
-    let settings = engine
-        .vauchi()
-        .load_duress_settings()
-        .unwrap()
-        .expect("duress settings persisted");
-    assert!(
-        settings.alert_contact_ids.is_empty(),
-        "no recipients were selectable, so none may be persisted"
-    );
-}
-
-// @internal — the contact-picker rework gates completion on ≥1 recipient
-// (2026-07-03-coercion-safety-config-gaps). Save with none selected must
-// not persist; this is the exact regression that silently broke the
-// downstream TUI humble test.
-#[test]
-fn duress_setup_does_not_complete_without_a_recipient() {
-    let mut engine = engine_ready();
-    add_contact(&engine, "Bob"); // pool is non-empty, but we select no-one
-    engine.navigate_to(AppScreen::DuressPin);
-
-    advance_to_alerts(&mut engine);
-    let result = press(&mut engine, "save");
-
-    assert!(
-        !matches!(result, ActionResult::NavigateTo(_)),
-        "save without a recipient must not complete, got {result:?}"
-    );
-    assert!(
-        !engine.vauchi().is_duress_enabled().unwrap(),
-        "duress must stay disabled when no recipient was chosen"
     );
 }
 
@@ -241,14 +174,6 @@ fn duress_unlock_enters_decoy_mode_without_wiping() {
     engine
         .vauchi()
         .create_ratchet_as_initiator(&trusted_id, &shared, *dh.public_key())
-        .unwrap();
-    engine
-        .vauchi()
-        .save_duress_settings(&vauchi_core::types::DuressSettings {
-            alert_contact_ids: vec![trusted_id.clone()],
-            alert_message: "help".into(),
-            include_location: false,
-        })
         .unwrap();
 
     // Decoy contact: duress mode must present it as the plausible contact list.
@@ -318,20 +243,12 @@ fn duress_unlock_enters_decoy_mode_without_wiping() {
     );
 }
 
-/// Real duress setup (PIN, one alert contact, one decoy), unlocked with the
+/// Real duress setup (PIN, one real contact, one decoy), unlocked with the
 /// given PIN.
 fn unlocked_with(pin: &str) -> AppEngine {
     let mut engine = engine_ready();
-    let ally = add_contact(&engine, "Ally");
+    add_contact(&engine, "Ally");
     engine.vauchi_mut().setup_duress_password(PIN).unwrap();
-    engine
-        .vauchi()
-        .save_duress_settings(&vauchi_core::types::DuressSettings {
-            alert_contact_ids: vec![ally],
-            alert_message: "I need help".into(),
-            include_location: false,
-        })
-        .unwrap();
     engine
         .vauchi()
         .add_decoy_contact("decoy-dora", "Dora", &ContactCard::new("Dora"))

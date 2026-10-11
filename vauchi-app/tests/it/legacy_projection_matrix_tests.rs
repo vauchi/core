@@ -128,21 +128,7 @@ fn sample_editable_contact() -> EditableContact {
 }
 
 fn sample_duress_config() -> DuressConfig {
-    DuressConfig {
-        enabled: false,
-        available_contacts: vec![Item {
-            id: "c1".into(),
-            name: "Emergency Contact".into(),
-            subtitle: None,
-            initials: "E".into(),
-            status: None,
-            actions: vec![],
-            a11y: None,
-        }],
-        selected_contact_ids: vec!["c1".into()],
-        alert_message: "I may be in danger".into(),
-        include_location: true,
-    }
+    DuressConfig { enabled: false }
 }
 
 // ── Onboarding walk ──────────────────────────────────────────────

@@ -461,9 +461,6 @@ impl std::fmt::Debug for PendingBackup {
 pub struct DuressPinSetup {
     pub enabled: bool,
     pub pin: String,
-    pub alert_contact_ids: Vec<String>,
-    pub alert_message: String,
-    pub include_location: bool,
 }
 
 impl std::fmt::Debug for DuressPinSetup {
@@ -471,8 +468,6 @@ impl std::fmt::Debug for DuressPinSetup {
         f.debug_struct("DuressPinSetup")
             .field("enabled", &self.enabled)
             .field("pin", &"<redacted>")
-            .field("alert_contact_ids", &self.alert_contact_ids)
-            .field("include_location", &self.include_location)
             .finish()
     }
 }

@@ -10,13 +10,11 @@
 //! stand-in while `auth_mode` is `Duress`: it starts as "not set up", takes
 //! whatever the coercer enters so the screens look like they work, and is
 //! dropped at the next unlock. The real configuration stays behind the
-//! storage reads used by `authenticate` (covert alert) and the biometric
-//! PIN decision.
+//! storage reads used by `authenticate` and the biometric PIN decision.
 
 use std::sync::{Mutex, MutexGuard};
 
 use crate::contact_card::ContactCard;
-use crate::emergency::DuressSettings;
 use crate::storage::Storage;
 
 use super::{AuthMode, Vauchi};
@@ -24,7 +22,6 @@ use super::{AuthMode, Vauchi};
 #[derive(Default)]
 pub(super) struct ConcealedDuress {
     pub(super) enabled: bool,
-    pub(super) settings: Option<DuressSettings>,
     pub(super) decoys: Vec<(String, String, ContactCard)>,
 }
 

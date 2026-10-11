@@ -944,8 +944,6 @@ impl PlatformAppEngine {
             | DomainCommand::IsPasswordEnabled
             | DomainCommand::IsDuressEnabled
             | DomainCommand::DisableDuress
-            | DomainCommand::ConfigureDuressAlerts { .. }
-            | DomainCommand::GetDuressSettings
             | DomainCommand::AddDecoyContact { .. }
             | DomainCommand::ListDecoyContacts
             | DomainCommand::DeleteDecoyContact { .. }

@@ -47,7 +47,6 @@
 //! - `vauchi` - Main Vauchi orchestrator
 
 pub mod app_password;
-pub mod duress;
 pub mod emergency;
 pub mod storage_reset;
 
@@ -166,9 +165,6 @@ pub use sync::{
 
 // App Password / Duress PIN
 pub use app_password::{AppPasswordConfig, AuthResult};
-
-// Duress Alert System
-pub use duress::{DuressAlert, DuressAlertType};
 
 // Emergency Broadcast System
 pub use crate::types::MAX_TRUSTED_CONTACTS;

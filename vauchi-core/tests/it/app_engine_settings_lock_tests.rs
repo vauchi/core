@@ -9,9 +9,6 @@ use crate::common;
 use common::app_engine_helpers::{engine_with_password, enter_pin, find_settings_toggle};
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
-use vauchi_core::contact::Contact;
-use vauchi_core::contact_card::ContactCard;
-use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::exchange::capability::types::{BiometricType, DeviceCapabilities};
 
 // ── settings toggle persistence tests (HIGH-4) ──────────────────────
@@ -99,15 +96,6 @@ fn duress_pin_setup_persists_via_handle_completion() {
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("123456").unwrap();
     vauchi.authenticate("123456").unwrap(); // settings open in an unlocked app (#639)
-    // A recipient must exist + be chosen for duress setup to complete.
-    let bob = Contact::from_exchange(
-        [7u8; 32],
-        ContactCard::new("Bob"),
-        SymmetricKey::generate(),
-        0,
-    );
-    let bob_id = bob.id().to_string();
-    vauchi.add_contact(bob).unwrap();
     let mut engine = AppEngine::new(vauchi);
 
     engine.navigate_to(AppScreen::DuressPin);
@@ -127,30 +115,19 @@ fn duress_pin_setup_persists_via_handle_completion() {
         action_id: "continue".into(),
     });
 
-    // Step 3: Confirm PIN
+    // Step 3: Confirm PIN (triggers Complete → handle_completion)
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "confirm_pin".into(),
         value: "654321".into(),
     });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-
-    // Choose Bob as the alert recipient (required before Save is enabled).
-    let _ = engine.handle_action(UserAction::ItemToggled {
-        component_id: "recipients".into(),
-        item_id: bob_id.clone(),
-    });
-
-    // Step 4: Save (triggers Complete → handle_completion)
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "save".into(),
+        action_id: "continue".into(),
     });
 
     // Should navigate back (not show error alert)
     assert!(
         matches!(result, ActionResult::NavigateTo(_)),
-        "save should navigate back, got {:?}",
+        "confirming should navigate back, got {:?}",
         result
     );
 

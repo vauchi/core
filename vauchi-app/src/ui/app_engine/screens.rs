@@ -802,25 +802,6 @@ impl AppEngine {
         )
     }
 
-    /// Full contact list as picker `Item`s (the pool duress/emergency pickers
-    /// render). a11y omitted: each maps to a ToggleItem whose label labels it.
-    pub(super) fn picker_contacts(vauchi: &Vauchi) -> Vec<Item> {
-        vauchi
-            .list_contacts()
-            .unwrap_or_default()
-            .into_iter()
-            .map(|c| Item {
-                id: c.id().to_string(),
-                name: c.display_name().to_string(),
-                subtitle: None,
-                initials: initials(c.display_name()),
-                status: None,
-                actions: vec![],
-                a11y: None,
-            })
-            .collect()
-    }
-
     /// Contacts outside a group who see `field_id` now and hold no override
     /// of their own for it: a grant to the group closes the entry to them.
     fn outsiders_losing_entry(vauchi: &Vauchi, outsiders: &[String], field_id: &str) -> usize {

@@ -287,10 +287,12 @@ mod both_shells_agree {
                 prop_assert_eq!(filled(&engine, "confirm_pin"), *expected);
             }
 
-            match press_continue(&mut engine) {
-                ActionResult::NavigateTo(screen) => prop_assert_eq!(screen.screen_id, "duress_alerts"),
-                other => prop_assert!(false, "the two PINs differ: {:?}", other),
-            }
+            let result = press_continue(&mut engine);
+            prop_assert!(
+                matches!(result, ActionResult::Complete),
+                "the two PINs differ: {:?}",
+                result
+            );
         }
     }
 }

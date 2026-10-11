@@ -26,11 +26,14 @@
 //! - `disconnect()` → no-op (HTTP is stateless)
 
 use std::collections::{HashMap, VecDeque};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use base64::Engine;
 
 use super::error::NetworkError;
-use super::http_transport::{HttpTransport, HttpTransportConfig};
+use super::http_transport::{
+    Collected, DelayedRequests, HttpTransport, HttpTransportConfig, PendingFetch,
+};
 use super::message::{
     EncryptedUpdate, MessageEnvelope, MessagePayload, PROTOCOL_VERSION, RatchetHeader,
 };
@@ -38,6 +41,9 @@ use super::ohttp_client::OhttpClient;
 use super::transport::{ConnectionState, TransportConfig, TransportResult};
 use crate::identifiers::ContactId;
 use vauchi_protocol::v2::FetchedBlob;
+
+/// The relay accepts at most this many tokens per fetch request.
+const MAX_FETCH_TOKENS: usize = 100;
 
 /// Adapts [`HttpTransport`] to the `Transport` trait.
 ///
@@ -71,6 +77,9 @@ pub struct HttpTransportAdapter {
     /// forward limit (more blobs remain). Drives the receive phase's
     /// drain-until-empty loop via [`Self::last_fetch_truncated`].
     last_truncated: bool,
+    /// When set, fetches and acknowledgements go through the outer relay's
+    /// delayed path (#628) and their answers are collected on a later cycle.
+    delayed: Option<Arc<Mutex<DelayedRequests>>>,
 }
 
 impl HttpTransportAdapter {
@@ -85,7 +94,17 @@ impl HttpTransportAdapter {
             ack_queue: Vec::new(),
             has_fetched: false,
             last_truncated: false,
+            delayed: None,
         }
+    }
+
+    /// Sends fetches and acknowledgements through the delayed path, keeping
+    /// their pending answers in `delayed` across cycles. Sends stay
+    /// synchronous: the send phase deletes an update once the relay has
+    /// stored it, which a delayed acceptance cannot promise.
+    pub fn with_delayed(mut self, delayed: Arc<Mutex<DelayedRequests>>) -> Self {
+        self.delayed = Some(delayed);
+        self
     }
 
     /// Whether the relay capped the most recent fetch page (more blobs
@@ -260,24 +279,12 @@ impl super::transport::Transport for HttpTransportAdapter {
     }
 
     fn receive(&mut self) -> TransportResult<Option<MessageEnvelope>> {
-        let acks: Vec<_> = self.ack_queue.drain(..).collect();
-        for (recipient_id, blob_id) in acks {
-            // Best-effort ACK — don't fail the receive cycle
-            #[allow(clippy::let_underscore_must_use)]
-            let _ = self.http.acknowledge(&recipient_id, &blob_id);
-            self.fetched_blob_tokens.remove(&blob_id);
-        }
+        self.flush_acks();
 
-        if let Some(blob) = self.pending_blobs.pop_front() {
-            let envelope = Self::blob_to_envelope(&blob)?;
-            if let Some(token) = blob.mailbox_token {
-                self.fetched_blob_tokens.insert(blob.blob_id, token);
-            }
+        if let Some(envelope) = self.next_buffered()? {
             return Ok(Some(envelope));
         }
 
-        // 3. If no buffered blobs and we have tokens, poll the relay (once per cycle).
-        //
         // HTTP polling is single-shot: we fetch once, drain the buffer, then
         // return None. Without this guard, callers using `while let Some(msg) =
         // adapter.receive()` refetch the same unACKed blobs on every iteration
@@ -289,37 +296,135 @@ impl super::transport::Transport for HttpTransportAdapter {
 
         self.has_fetched = true;
         self.last_truncated = false;
-
-        // Relay accepts at most 100 tokens per fetch request.
-        // On rate-limit errors, return what we have so far rather than failing.
-        const MAX_FETCH_TOKENS: usize = 100;
-        for chunk in self.registered_tokens.chunks(MAX_FETCH_TOKENS) {
-            match self.http.fetch_page(chunk) {
-                Ok((blobs, truncated)) => {
-                    self.last_truncated |= truncated;
-                    for blob in blobs {
-                        self.pending_blobs.push_back(blob);
-                    }
-                }
-                Err(NetworkError::RateLimited { .. }) if !self.pending_blobs.is_empty() => break,
-                Err(e) => return Err(e),
-            }
+        match self.delayed.clone() {
+            Some(delayed) => self.fetch_delayed(&delayed)?,
+            None => self.fetch_now()?,
         }
-
-        if let Some(blob) = self.pending_blobs.pop_front() {
-            let envelope = Self::blob_to_envelope(&blob)?;
-            if let Some(token) = blob.mailbox_token {
-                self.fetched_blob_tokens.insert(blob.blob_id, token);
-            }
-            Ok(Some(envelope))
-        } else {
-            Ok(None)
-        }
+        self.next_buffered()
     }
 
     fn has_pending(&self) -> bool {
         !self.pending_blobs.is_empty()
     }
+}
+
+impl HttpTransportAdapter {
+    fn next_buffered(&mut self) -> TransportResult<Option<MessageEnvelope>> {
+        let Some(blob) = self.pending_blobs.pop_front() else {
+            return Ok(None);
+        };
+        let envelope = Self::blob_to_envelope(&blob)?;
+        if let Some(token) = blob.mailbox_token {
+            self.fetched_blob_tokens.insert(blob.blob_id, token);
+        }
+        Ok(Some(envelope))
+    }
+
+    /// Best-effort: an acknowledgement that fails leaves the blob on the
+    /// relay, where the next fetch returns it again and it converges as a
+    /// duplicate.
+    fn flush_acks(&mut self) {
+        for (recipient_id, blob_id) in std::mem::take(&mut self.ack_queue) {
+            match &self.delayed {
+                Some(delayed) => {
+                    if let Ok(pending) = self.http.post_delayed_ack(&recipient_id, &blob_id) {
+                        lock(delayed).acks.push(pending);
+                    }
+                }
+                None => {
+                    #[allow(clippy::let_underscore_must_use)]
+                    let _ = self.http.acknowledge(&recipient_id, &blob_id);
+                }
+            }
+            self.fetched_blob_tokens.remove(&blob_id);
+        }
+    }
+
+    /// On rate-limit errors, returns what was fetched so far rather than
+    /// failing.
+    fn fetch_now(&mut self) -> Result<(), NetworkError> {
+        for chunk in self.registered_tokens.chunks(MAX_FETCH_TOKENS) {
+            match self.http.fetch_page(chunk) {
+                Ok((blobs, truncated)) => {
+                    self.last_truncated |= truncated;
+                    self.pending_blobs.extend(blobs);
+                }
+                Err(NetworkError::RateLimited { .. }) if !self.pending_blobs.is_empty() => break,
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(())
+    }
+
+    /// Collects the answers posted in earlier cycles, then posts a fetch for
+    /// every registered token no pending fetch covers. Collected
+    /// acknowledgements only free the outer relay's memory; a lost fetch is
+    /// simply posted again, since fetching never removes mail. The lock is
+    /// released around the network calls, which can each block until the
+    /// transport timeout.
+    fn fetch_delayed(&mut self, delayed: &Mutex<DelayedRequests>) -> Result<(), NetworkError> {
+        let (acks, fetches) = {
+            let mut requests = lock(delayed);
+            (
+                std::mem::take(&mut requests.acks),
+                std::mem::take(&mut requests.fetches),
+            )
+        };
+        let mut pending_acks = Vec::new();
+        for pending in acks {
+            if let Ok(Collected::Pending(pending)) = self.http.collect_delayed_ack(pending) {
+                pending_acks.push(pending);
+            }
+        }
+        let mut failure = None;
+        let mut pending_fetches = Vec::new();
+        for PendingFetch { tokens, pending } in fetches {
+            match self.http.collect_delayed_fetch(pending) {
+                Ok(Collected::Ready((blobs, truncated))) => {
+                    self.last_truncated |= truncated;
+                    self.pending_blobs.extend(blobs);
+                }
+                Ok(Collected::Pending(pending)) => {
+                    pending_fetches.push(PendingFetch { tokens, pending });
+                }
+                Ok(Collected::Lost) => {}
+                Err(e) => {
+                    failure.get_or_insert(e);
+                }
+            }
+        }
+        let uncovered: Vec<String> = self
+            .registered_tokens
+            .iter()
+            .filter(|token| !pending_fetches.iter().any(|f| f.tokens.contains(token)))
+            .cloned()
+            .collect();
+        for chunk in uncovered.chunks(MAX_FETCH_TOKENS) {
+            match self.http.post_delayed_fetch(chunk) {
+                Ok(pending) => pending_fetches.push(PendingFetch {
+                    tokens: chunk.to_vec(),
+                    pending,
+                }),
+                Err(e) => {
+                    failure.get_or_insert(e);
+                    break;
+                }
+            }
+        }
+        {
+            let mut requests = lock(delayed);
+            requests.acks.extend(pending_acks);
+            requests.fetches.extend(pending_fetches);
+        }
+        match failure {
+            Some(e) if self.pending_blobs.is_empty() => Err(e),
+            _ => Ok(()),
+        }
+    }
+}
+
+fn lock(delayed: &Mutex<DelayedRequests>) -> std::sync::MutexGuard<'_, DelayedRequests> {
+    delayed.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 // INLINE_TEST_REQUIRED: tests validate the Transport trait implementation

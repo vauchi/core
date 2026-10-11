@@ -146,11 +146,9 @@ impl AppEngine {
                 if mode == AuthMode::Duress {
                     // ADR-032 decoy mode: proceed exactly like a normal
                     // unlock — auth_mode already routes every read to the
-                    // decoy set and the covert alert queued by
-                    // authenticate() rides the next sync. Wiping here would
-                    // both reveal the duress entry to the coercer and
-                    // destroy the queued alert before delivery. The cache
-                    // clear drops any pre-lock screens built from real data.
+                    // decoy set. Wiping here would reveal the duress entry
+                    // to the coercer. The cache clear drops any pre-lock
+                    // screens built from real data.
                     self.engine_cache.clear();
                 }
                 self.unlock_session();
@@ -604,7 +602,7 @@ impl AppEngine {
         ActionResult::NavigateTo(screen)
     }
 
-    /// Duress-PIN complete: set up or disable the duress password/settings.
+    /// Duress-PIN complete: set up or disable the duress password.
     pub(super) fn complete_duress_pin(&mut self) -> ActionResult {
         let setup = match self.engine.engine_output() {
             Some(crate::ui::EngineOutput::DuressPin(setup)) => Some(setup),
@@ -615,24 +613,10 @@ impl AppEngine {
         };
         if let Some(setup) = setup {
             if setup.enabled {
-                // An empty PIN means only the alerts were edited (#459).
-                if !setup.pin.is_empty()
-                    && let Err(e) = self.vauchi.setup_duress_password(&setup.pin)
-                {
+                if let Err(e) = self.vauchi.setup_duress_password(&setup.pin) {
                     return ActionResult::ShowAlert {
                         title: self.t("error.title"),
                         message: format!("Failed to set duress PIN: {e}"),
-                    };
-                }
-                let settings = vauchi_core::types::DuressSettings {
-                    alert_contact_ids: setup.alert_contact_ids,
-                    alert_message: setup.alert_message,
-                    include_location: setup.include_location,
-                };
-                if let Err(e) = self.vauchi.save_duress_settings(&settings) {
-                    return ActionResult::ShowAlert {
-                        title: self.t("error.title"),
-                        message: format!("Failed to save duress settings: {e}"),
                     };
                 }
             } else if let Err(e) = self.vauchi.disable_duress() {

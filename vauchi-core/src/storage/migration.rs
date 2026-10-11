@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 80] = [
+const MIGRATIONS: [Migration; 81] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -672,7 +672,16 @@ const MIGRATIONS: [Migration; 80] = [
         name: "encrypt_contact_vcard_uid",
         action: MigrationAction::Callback(migrate_v80_encrypt_contact_vcard_uid),
     },
+    Migration {
+        version: 81,
+        name: "drop_duress_settings",
+        action: MigrationAction::Sql(MIGRATION_V81_DROP_DURESS_SETTINGS),
+    },
 ];
+
+/// Migration v81: a duress unlock sends no alert, so its recipients and
+/// message go (ADR-032 amendment 2026-10-11, vauchi/private#636).
+const MIGRATION_V81_DROP_DURESS_SETTINGS: &str = "DROP TABLE IF EXISTS duress_settings;";
 
 /// Migration v76: the identity's display name is already inside
 /// `backup_data_encrypted`, so the plaintext copy goes (vauchi/private#579).

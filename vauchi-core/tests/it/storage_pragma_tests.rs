@@ -195,7 +195,8 @@ fn test_existing_database_permissions_preserved() {
 // Names are decrypted before sorting and matching (#570), so search and
 // paging cost one decryption per contact: measured 37 ms (release) and
 // 257 ms (debug) for one search plus one page. The 1 s bound catches an
-// algorithmic regression without flaking on a slow debug runner.
+// algorithmic regression; the fastest of three runs is measured, because a
+// single run took 3.2 s once on a loaded CI runner (#625).
 // @internal
 #[test]
 fn search_and_paging_over_1000_encrypted_contacts_stay_interactive() {
@@ -216,15 +217,18 @@ fn search_and_paging_over_1000_encrypted_contacts_stay_interactive() {
         storage.contacts().save_contact(&contact).unwrap();
     }
 
-    let start = Instant::now();
-    let found = storage.contacts().search_contacts("user 05").unwrap();
-    let page = storage.contacts().list_contacts_paginated(500, 20).unwrap();
-    let elapsed = start.elapsed();
+    let mut fastest = std::time::Duration::MAX;
+    for _ in 0..3 {
+        let start = Instant::now();
+        let found = storage.contacts().search_contacts("user 05").unwrap();
+        let page = storage.contacts().list_contacts_paginated(500, 20).unwrap();
+        fastest = fastest.min(start.elapsed());
 
-    assert_eq!(found.len(), 100);
-    assert_eq!(page.first().map(Contact::display_name), Some("User 0500"));
+        assert_eq!(found.len(), 100);
+        assert_eq!(page.first().map(Contact::display_name), Some("User 0500"));
+    }
     assert!(
-        elapsed < std::time::Duration::from_secs(1),
-        "search + one page took {elapsed:?}, expected < 1s"
+        fastest < std::time::Duration::from_secs(1),
+        "fastest of three search + one page runs took {fastest:?}, expected < 1s"
     );
 }

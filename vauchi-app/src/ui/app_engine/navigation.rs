@@ -109,6 +109,9 @@ impl AppScreen {
 
 impl AppEngine {
     pub fn navigate_to(&mut self, screen: AppScreen) -> ScreenModel {
+        if self.refuses_while_locked(&screen) {
+            return self.engine.current_screen();
+        }
         // Clear stale undo data — PII should not linger after user-initiated navigation
         self.pending_field_undo = None;
         self.pending_contact_undo = None;
@@ -145,7 +148,9 @@ impl AppEngine {
     pub fn bootstrap(&mut self) -> ScreenModel {
         let screen = if !self.vauchi().has_identity() {
             AppScreen::Onboarding
-        } else if self.vauchi().is_password_enabled().unwrap_or(false) {
+        } else if self.vauchi().is_password_enabled().unwrap_or(false)
+            && self.vauchi().auth_mode() == vauchi_core::api::AuthMode::Unauthenticated
+        {
             AppScreen::Lock
         } else {
             self.default_screen()
@@ -160,11 +165,28 @@ impl AppEngine {
     /// cannot disagree about what "locked" means
     /// (`problems/2026-08-12-android-app-password-bypass`).
     pub(super) fn is_locked(&self) -> bool {
-        matches!(self.screen, AppScreen::Lock)
+        self.session_locked || matches!(self.screen, AppScreen::Lock)
+    }
+
+    /// Whether a move to `screen` must be refused: the session is locked
+    /// and the target is not the lock screen (vauchi/private#639).
+    fn refuses_while_locked(&self, screen: &AppScreen) -> bool {
+        self.session_locked && !matches!(screen, AppScreen::Lock)
+    }
+
+    /// Opens the session after the password or a biometric unlock without
+    /// a duress PIN; the only way `session_locked` is cleared.
+    pub(super) fn unlock_session(&mut self) {
+        self.session_locked = false;
     }
 
     /// Navigate without pushing to history (used by back-navigation and completion routing).
     pub(super) fn navigate_to_internal(&mut self, screen: AppScreen) -> ScreenModel {
+        if matches!(screen, AppScreen::Lock) {
+            self.session_locked = true;
+        } else if self.session_locked {
+            return self.engine.current_screen();
+        }
         // Refresh identity from storage if a sibling `Vauchi` instance
         // (e.g. `VauchiPlatform` on iOS/Android) wrote one to disk after
         // this AppEngine was constructed. Without this, screen builders
@@ -273,7 +295,7 @@ impl AppEngine {
     }
 
     pub(super) fn activate_surface_engine(&mut self, screen: AppScreen) {
-        if self.screen == screen {
+        if self.screen == screen || self.refuses_while_locked(&screen) {
             return;
         }
         let new_engine = self.engine_cache.remove(&screen).unwrap_or_else(|| {

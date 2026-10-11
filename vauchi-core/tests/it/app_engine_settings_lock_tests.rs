@@ -98,6 +98,7 @@ fn duress_pin_setup_persists_via_handle_completion() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("123456").unwrap();
+    vauchi.authenticate("123456").unwrap(); // settings open in an unlocked app (#639)
     // A recipient must exist + be chosen for duress setup to complete.
     let bob = Contact::from_exchange(
         [7u8; 32],
@@ -167,6 +168,7 @@ fn duress_pin_disable_persists_via_handle_completion() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("123456").unwrap();
+    vauchi.authenticate("123456").unwrap(); // settings open in an unlocked app (#639)
     vauchi.setup_duress_password("654321").unwrap();
     assert!(vauchi.is_duress_enabled().unwrap());
     let mut engine = AppEngine::new(vauchi);
@@ -202,6 +204,7 @@ fn settings_change_password_navigates_to_change_password_screen() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("old-pin-1234").unwrap();
+    vauchi.authenticate("old-pin-1234").unwrap(); // settings open in an unlocked app (#639)
     let mut engine = AppEngine::new(vauchi);
 
     engine.navigate_to(AppScreen::Settings);
@@ -222,6 +225,7 @@ fn change_password_screen_renders_three_password_fields() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("old-pin-1234").unwrap();
+    vauchi.authenticate("old-pin-1234").unwrap(); // settings open in an unlocked app (#639)
     let mut engine = AppEngine::new(vauchi);
 
     let screen = engine.navigate_to(AppScreen::ChangePassword);
@@ -251,6 +255,7 @@ fn change_password_submit_persists_via_handle_completion() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("old-pin-1234").unwrap();
+    vauchi.authenticate("old-pin-1234").unwrap(); // settings open in an unlocked app (#639)
     let mut engine = AppEngine::new(vauchi);
 
     engine.navigate_to(AppScreen::ChangePassword);
@@ -289,6 +294,7 @@ fn change_password_wrong_current_shows_alert_storage_unchanged() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("old-pin-1234").unwrap();
+    vauchi.authenticate("old-pin-1234").unwrap(); // settings open in an unlocked app (#639)
     let mut engine = AppEngine::new(vauchi);
 
     engine.navigate_to(AppScreen::ChangePassword);
@@ -494,6 +500,7 @@ fn change_password_mismatch_disables_submit() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("old-pin-1234").unwrap();
+    vauchi.authenticate("old-pin-1234").unwrap(); // settings open in an unlocked app (#639)
     let mut engine = AppEngine::new(vauchi);
 
     engine.navigate_to(AppScreen::ChangePassword);

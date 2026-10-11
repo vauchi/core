@@ -153,7 +153,15 @@ impl AppEngine {
                     // clear drops any pre-lock screens built from real data.
                     self.engine_cache.clear();
                 }
-                let screen = self.navigate_to_internal(AppScreen::MyInfo);
+                self.unlock_session();
+                // The duress-setup entry flow asked for the password to
+                // reach the duress PIN; anything else opens the app.
+                let target = if self.entry_flow == Some(EntryFlow::DuressSetup) {
+                    AppScreen::DuressPin
+                } else {
+                    AppScreen::MyInfo
+                };
+                let screen = self.navigate_to_internal(target);
                 ActionResult::NavigateTo(screen)
             }
             Err(_) => {

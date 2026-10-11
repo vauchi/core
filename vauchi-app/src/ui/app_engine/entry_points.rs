@@ -5,7 +5,7 @@
 
 use super::{AppEngine, AppScreen, EntryFlow};
 use crate::ui::{DeviceReplacementEngine, ReplacementRole};
-use vauchi_core::api::Vauchi;
+use vauchi_core::api::{AuthMode, Vauchi};
 
 impl AppEngine {
     /// Create the reducer at the duress-setup entry point.
@@ -29,6 +29,13 @@ impl AppEngine {
         app.nav_history.clear();
         app.pending_commands.clear();
         app.contextual_actions.clear();
+        // A Vauchi already opened with the password is unlocked; any other
+        // with a password stays on the lock screen, and the password then
+        // continues to the duress PIN (`complete_lock`). Setting a duress
+        // PIN must not need less than the password (vauchi/private#639).
+        if app.vauchi.auth_mode() != AuthMode::Unauthenticated {
+            app.unlock_session();
+        }
         app.set_initial_screen(screen);
         app
     }

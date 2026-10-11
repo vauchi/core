@@ -192,11 +192,12 @@ fn duress_entry_without_an_app_password_opens_password_setup_first() {
 
 // @scenario: generic_presentation_protocol.feature :: Release contains only the generic action system
 #[test]
-fn duress_entry_with_an_app_password_opens_the_duress_pin_surface_directly() {
+fn duress_entry_unlocked_with_the_app_password_opens_the_duress_pin_surface_directly() {
     let mut vauchi = identity_core();
     vauchi
         .setup_app_password("existing-pin-1234")
         .expect("app password");
+    vauchi.authenticate("existing-pin-1234").expect("unlock");
     let mut app = AppEngine::for_duress_setup(vauchi);
 
     let commands = app
@@ -205,7 +206,41 @@ fn duress_entry_with_an_app_password_opens_the_duress_pin_surface_directly() {
 
     assert!(
         surface_named(&commands, "duress_pin").is_some(),
-        "with a password already configured the flow must skip straight to duress PIN"
+        "with a password already configured and given, the flow must skip straight to duress PIN"
+    );
+}
+
+/// Setting a duress PIN must not need less than the password: without it
+/// the flow starts on the lock screen, and the password continues to the
+/// duress PIN rather than the home screen (vauchi/private#639).
+// @scenario: security.feature :: App lock with PIN
+#[test]
+fn duress_entry_with_an_app_password_asks_for_it_first() {
+    let mut vauchi = identity_core();
+    vauchi
+        .setup_app_password("existing-pin-1234")
+        .expect("app password");
+    let mut app = AppEngine::for_duress_setup(vauchi);
+    let commands = app
+        .initial_commands()
+        .expect("initial duress-entry commands");
+    assert!(
+        surface_named(&commands, "duress_pin").is_none(),
+        "the duress PIN opened without the password"
+    );
+
+    let after_input = fill(&mut app, &commands, "lock", "existing-pin-1234");
+    let (surface_id, interaction_id) = primary_interaction(&after_input);
+    let after_unlock = app
+        .dispatch(Event::ActionActivated {
+            surface_id,
+            interaction_id,
+        })
+        .expect("unlock");
+
+    assert!(
+        surface_named(&after_unlock, "duress_pin").is_some(),
+        "the password must continue to the duress PIN"
     );
 }
 
@@ -244,6 +279,7 @@ fn completing_duress_setup_terminates_the_entry_flow() {
     vauchi
         .setup_app_password("existing-pin-1234")
         .expect("app password");
+    vauchi.authenticate("existing-pin-1234").expect("unlock");
     let mut app = AppEngine::for_duress_setup(vauchi);
     let commands = app
         .initial_commands()

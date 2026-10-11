@@ -237,6 +237,12 @@ pub struct AppEngine {
     /// Set when a shred deleted the storage this engine holds; the host
     /// reopens a fresh install (vauchi/private#599).
     storage_shredded: bool,
+    /// Set on entering the lock screen; only the password, or a biometric
+    /// unlock without a duress PIN, clears it. While set, no navigation or
+    /// surface switch leaves the lock screen, whatever route asks — the
+    /// screen alone was escaped by tab navigation and then by Back, and
+    /// data reads are not gated by the session (vauchi/private#639).
+    session_locked: bool,
     /// Glance (one-sided QR) OOB state. `glance_display_nonce` is the nonce
     /// this device shows in its QR and must require as the responder;
     /// `glance_scanned` is the scanner-side binding built from a scanned QR —
@@ -442,7 +448,11 @@ impl AppEngine {
         // *new* crash window for installs after this commit.
         let screen = if !vauchi.has_identity() {
             AppScreen::Onboarding
-        } else if vauchi.is_password_enabled().unwrap_or(false) {
+        } else if vauchi.is_password_enabled().unwrap_or(false)
+            && vauchi.auth_mode() == vauchi_core::api::AuthMode::Unauthenticated
+        {
+            // A Vauchi already opened with the password (the CLI's --pin)
+            // is unlocked; any other starts on the lock screen (#639).
             AppScreen::Lock
         } else {
             AppScreen::MyInfo
@@ -503,6 +513,7 @@ impl AppEngine {
                 .expect("AppScreen identifiers are valid presentation identifiers"),
         );
 
+        let session_locked = matches!(screen, AppScreen::Lock);
         Self {
             vauchi,
             screen,
@@ -547,6 +558,7 @@ impl AppEngine {
             ble_handshake_session: None,
             pending_ble_terminal_invalidation: false,
             storage_shredded: false,
+            session_locked,
             glance_display_nonce: None,
             glance_scanned: None,
             glance_pre_scan_discoveries: Vec::new(),

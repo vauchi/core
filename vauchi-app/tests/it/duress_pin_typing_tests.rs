@@ -137,6 +137,7 @@ fn set_up_duress_pin(shell: Shell, keys: &str) -> AppEngine {
     let mut vauchi = Vauchi::in_memory().expect("in-memory core");
     vauchi.create_identity("Alice").expect("identity");
     vauchi.setup_app_password(PASSWORD).expect("app password");
+    vauchi.authenticate(PASSWORD).expect("unlock");
     let mut app = AppEngine::for_duress_setup(vauchi);
     let mut commands = app.initial_commands().expect("initial commands");
 
@@ -300,6 +301,7 @@ fn the_pin_field_never_carries_the_digits_back_to_the_shell() {
     let mut vauchi = Vauchi::in_memory().expect("in-memory core");
     vauchi.create_identity("Alice").expect("identity");
     vauchi.setup_app_password(PASSWORD).expect("app password");
+    vauchi.authenticate(PASSWORD).expect("unlock");
     let mut app = AppEngine::for_duress_setup(vauchi);
     let commands = app.initial_commands().expect("initial commands");
     let commands = activate_next(&mut app, &commands);

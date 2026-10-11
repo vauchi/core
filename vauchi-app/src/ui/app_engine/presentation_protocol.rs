@@ -725,6 +725,7 @@ impl AppEngine {
             .checked_add(1)
             .ok_or(AppPresentationError::RevisionExhausted)?;
         if unlocked {
+            self.unlock_session();
             let screen = self.default_screen();
             self.navigate_to_internal(screen);
         } else {

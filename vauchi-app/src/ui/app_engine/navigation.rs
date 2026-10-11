@@ -305,6 +305,11 @@ impl AppEngine {
     /// BACK from an exchange sub-step would tear down the whole Exchange
     /// screen instead of stepping back to mode selection.
     pub fn navigate_back(&mut self) -> ScreenModel {
+        // Refused here as well as in `can_go_back`, so a caller that skips
+        // the check still cannot pop past the lock (vauchi/private#639).
+        if self.is_locked() {
+            return self.engine.current_screen();
+        }
         if self.engine.navigate_back_within() {
             // Re-decorate the same engine's screen exactly as
             // `navigate_to_internal` does for its final return, so the
@@ -330,6 +335,12 @@ impl AppEngine {
     /// don't produce a phantom back arrow) without mutating history,
     /// so `navigate_back` itself remains unchanged.
     pub fn can_go_back(&self) -> bool {
+        // The lock screen is a back-stopper: locking pushes the screen it
+        // covers onto `nav_history`, so popping it returned there without
+        // the password (vauchi/private#639).
+        if self.is_locked() {
+            return false;
+        }
         // Engine-internal step history (exchange sub-flow) makes BACK
         // available even at an AppScreen root: the flow lives under one
         // screen but carries its own back-stack.

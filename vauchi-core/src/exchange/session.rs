@@ -1051,7 +1051,7 @@ impl ExchangeSession {
         let cmds: Vec<Command> = match (&self.state, self.transport) {
             (ExchangeState::DisplayingQr { our_qr }, ExchangeTransport::Qr) => {
                 vec![Command::QrDisplay {
-                    data: our_qr.to_data_string(),
+                    data: our_qr.to_qr_url(),
                 }]
             }
             (ExchangeState::AwaitingNfcTap, ExchangeTransport::Nfc) => {

@@ -375,7 +375,7 @@ impl ExchangeQR {
     pub fn to_qr_image_string(&self) -> String {
         use qrcode::QrCode;
 
-        let data = self.to_data_string();
+        let data = self.to_qr_url();
         let code = QrCode::new(&data).expect("QR generation should not fail");
 
         code.render()

@@ -129,7 +129,7 @@ pub unsafe extern "C" fn vauchi_exchange_destroy(handle: *mut VauchiExchange) {
     }
 }
 
-/// Start QR generation and return the QR data string ("wb://...").
+/// Start QR generation and return the QR data string (`https://vauchi.app/x#q=…`).
 ///
 /// Returns error JSON if the session is in the wrong state.
 /// Caller must free the returned string with `vauchi_string_free`.
@@ -155,7 +155,7 @@ pub unsafe extern "C" fn vauchi_exchange_generate_qr(handle: *mut VauchiExchange
             }
 
             match session.qr() {
-                Some(qr) => to_c_string(&format!("wb://{}", qr.to_data_string())),
+                Some(qr) => to_c_string(&qr.to_qr_url()),
                 None => to_c_string(r#"{"error":"QR not generated"}"#),
             }
         })) {
@@ -167,7 +167,8 @@ pub unsafe extern "C" fn vauchi_exchange_generate_qr(handle: *mut VauchiExchange
 
 /// Process a scanned QR code from the peer.
 ///
-/// `qr_data` should be the full QR string (with or without "wb://" prefix).
+/// `qr_data` is the scanned QR string: the landing URL, the raw payload, or
+/// the raw payload behind the `wb://` prefix older desktop builds showed.
 /// Returns `"ok"` on success, error JSON on failure.
 ///
 /// # Safety

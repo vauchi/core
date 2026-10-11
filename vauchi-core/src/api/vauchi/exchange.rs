@@ -80,7 +80,7 @@ impl Vauchi {
             .ok_or_else(|| VauchiError::InvalidState("QR code not generated".into()))?;
 
         Ok(ExchangeQrData {
-            data: qr.to_data_string(),
+            data: qr.to_qr_url(),
             generated_at: qr.timestamp(),
             expires_in_secs: 300, // 5 minutes, matching QR_EXPIRY_SECONDS
         })

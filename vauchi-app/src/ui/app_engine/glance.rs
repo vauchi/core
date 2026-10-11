@@ -30,10 +30,10 @@ pub(super) struct GlanceDial {
 impl AppEngine {
     /// Begin the Glance one-sided-QR display: build this device's OOB bootstrap
     /// payload and remember the nonce it must require as the responder. Returns
-    /// the base64 payload for a `Component::QrCode`. The QR's exchange key is
-    /// the identity's X3DH public key — the same value the handshake feeds into
-    /// the DH — so the scanner's exchange-key pin accepts the honest peer (a
-    /// fresh ephemeral would be rejected).
+    /// the `https://vauchi.app/x#q=…` URL for a `Component::QrCode`. The QR's
+    /// exchange key is the identity's X3DH public key — the same value the
+    /// handshake feeds into the DH — so the scanner's exchange-key pin accepts
+    /// the honest peer (a fresh ephemeral would be rejected).
     pub fn begin_glance_display(&mut self) -> Option<String> {
         let now = self.vauchi.clock().unix_seconds();
         let qr = {
@@ -44,7 +44,7 @@ impl AppEngine {
             )
         };
         self.glance_display_nonce = Some(qr.oob_nonce());
-        Some(qr.to_data_string())
+        Some(qr.to_qr_url())
     }
 
     /// Apply a scanned Glance QR: verify it (signature + expiry), latch this

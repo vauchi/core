@@ -362,7 +362,7 @@ struct VauchiExchange *vauchi_exchange_create(struct VauchiApp *app);
 void vauchi_exchange_destroy(struct VauchiExchange *handle);
 
 /**
- * Start QR generation and return the QR data string ("wb://...").
+ * Start QR generation and return the QR data string (`https://vauchi.app/x#q=…`).
  *
  * Returns error JSON if the session is in the wrong state.
  * Caller must free the returned string with `vauchi_string_free`.
@@ -375,7 +375,8 @@ char *vauchi_exchange_generate_qr(struct VauchiExchange *handle);
 /**
  * Process a scanned QR code from the peer.
  *
- * `qr_data` should be the full QR string (with or without "wb://" prefix).
+ * `qr_data` is the scanned QR string: the landing URL, the raw payload, or
+ * the raw payload behind the `wb://` prefix older desktop builds showed.
  * Returns `"ok"` on success, error JSON on failure.
  *
  * # Safety

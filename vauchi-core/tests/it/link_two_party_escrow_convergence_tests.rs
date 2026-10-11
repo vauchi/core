@@ -81,6 +81,12 @@ fn initiator_and_responder_converge_over_a_shared_escrow_store() {
     assert_eq!(alice.current_screen().screen_id, "exchange_share_url");
     let alice_link = share_url(&alice);
     assert!(alice_link.starts_with("https://vauchi.app/x#pk="));
+    // The landing page names the sender from the fragment (#277): "Alice"
+    // in base64url.
+    assert!(
+        alice_link.ends_with("&nm=QWxpY2U"),
+        "the share link names Alice: {alice_link}"
+    );
 
     // Bob opens Alice's link and grants — the camera-less paste route lands
     // here too, via `LinkOpened`.

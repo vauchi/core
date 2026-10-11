@@ -595,6 +595,23 @@ fn glance_matching_binding_completes_and_persists() {
 // binding-threading tests: those inject the binding directly).
 // ============================================================
 
+// @internal
+#[test]
+fn glance_qr_shows_the_landing_url_and_the_peer_scans_it() {
+    // A phone camera without the app opens vauchi.app/x (vauchi/private#277).
+    let mut alice = fresh_engine("Alice");
+    let mut bob = fresh_engine("Bob");
+
+    let alice_qr = alice.begin_glance_display().expect("alice shows a QR");
+
+    assert!(
+        alice_qr.starts_with("https://vauchi.app/x#q="),
+        "the Glance QR is the landing URL, got {alice_qr}"
+    );
+    bob.apply_glance_scan(&alice_qr)
+        .expect("bob's scanner accepts the landing URL");
+}
+
 // @scenario: ble_exchange :: Glance symmetric one-sided-QR completes for both peers
 #[test]
 fn glance_orchestration_symmetric_happy_path_both_persist() {

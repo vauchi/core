@@ -765,8 +765,8 @@ mod tests {
             assert!(!qr_ptr.is_null());
             let qr = CStr::from_ptr(qr_ptr).to_str().unwrap();
             assert!(
-                qr.starts_with("wb://"),
-                "QR should start with wb://, got: {}",
+                qr.starts_with("https://vauchi.app/x#q="),
+                "QR should be the landing URL, got: {}",
                 qr
             );
 

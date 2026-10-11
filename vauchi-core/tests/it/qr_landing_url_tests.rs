@@ -10,8 +10,12 @@
 
 use proptest::prelude::*;
 use vauchi_core::exchange::oob_bootstrap::OobBootstrapQr;
-use vauchi_core::exchange::{ExchangeError, ExchangeQR, X3DHKeyPair};
+use vauchi_core::exchange::{
+    ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession, ManualConfirmationVerifier,
+    X3DHKeyPair,
+};
 use vauchi_core::identity::Identity;
+use vauchi_core::{Command, ContactCard, Event, Vauchi};
 
 const QR_URL_PREFIX: &str = "https://vauchi.app/x#q=";
 const NOW: u64 = 1_000;
@@ -122,6 +126,55 @@ fn qr_urls_off_the_landing_page_are_rejected() {
             );
         }
     }
+}
+
+fn displayed_qr(session: &mut ExchangeSession) -> String {
+    session.apply(ExchangeEvent::StartQR).unwrap();
+    session.emit_initial_commands();
+    session
+        .drain_commands()
+        .into_iter()
+        .find_map(|command| match command {
+            Command::QrDisplay { data } => Some(data),
+            _ => None,
+        })
+        .expect("a QR session displays its QR")
+}
+
+fn qr_session(name: &str) -> ExchangeSession {
+    ExchangeSession::new_qr(
+        Identity::create(name, 0),
+        ContactCard::new(name),
+        ManualConfirmationVerifier::new(),
+        vauchi_core::clock::SystemClock::shared(),
+    )
+}
+
+// @internal
+#[test]
+fn qr_session_displays_the_landing_url_and_the_peer_scans_it() {
+    let mut alice = qr_session("Alice");
+    let mut bob = qr_session("Bob");
+
+    let alice_qr = displayed_qr(&mut alice);
+    displayed_qr(&mut bob);
+
+    url_payload(&alice_qr);
+    bob.apply_hardware_event(Event::QrScanned { data: alice_qr })
+        .expect("the peer's scanner accepts the landing URL");
+}
+
+// @internal
+#[test]
+fn generated_exchange_qr_data_is_the_landing_url() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+
+    let qr = vauchi.generate_exchange_qr().unwrap();
+
+    url_payload(&qr.data);
+    let scanned = ExchangeQR::from_data_string(&qr.data).expect("the URL carries the QR");
+    assert_eq!(scanned.display_name(), "Alice");
 }
 
 proptest! {

@@ -31,6 +31,7 @@ mod ceremony_wiring_tests;
 // --all-targets` (no features) compiles the binary cleanly.
 #[cfg(feature = "testing")]
 mod app_engine_stateful_proptest;
+mod app_password_typing_tests;
 mod avatar_editor_tests;
 mod avatar_editor_wiring_tests;
 mod avatar_i18n_tests;

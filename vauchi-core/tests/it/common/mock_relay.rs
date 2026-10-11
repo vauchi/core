@@ -248,6 +248,17 @@ impl MockRelay {
         self.with_gateway(|gateway| gateway.held_polls = polls);
     }
 
+    /// Flips a byte in every held answer, as a tampering relay would.
+    pub fn tamper_async_answers(&self) {
+        self.with_gateway(|gateway| {
+            for answer in gateway.async_answers.values_mut() {
+                if let Some(last) = answer.body.last_mut() {
+                    *last ^= 0x01;
+                }
+            }
+        });
+    }
+
     /// Drops every held answer, as an outer-relay restart does.
     pub fn forget_async_answers(&self) {
         self.with_gateway(|gateway| gateway.async_answers.clear());

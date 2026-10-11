@@ -16,6 +16,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::common::mock_relay::{CannedResponse, MockRelay};
 use crate::common::signed_gateway::{NOW, SignedGateway};
+use vauchi_core::network::http_transport::MAX_PENDING_POLLS;
 use vauchi_core::network::{
     AckStatus, Acknowledgment, Collected, DelayedRequests, HttpTransport, HttpTransportAdapter,
     HttpTransportConfig, MessageEnvelope, MessagePayload, OhttpClient, PROTOCOL_VERSION,
@@ -174,6 +175,73 @@ fn an_answer_the_relay_forgot_is_lost() {
     let collected = http.collect_delayed_fetch(pending).expect("collect");
 
     assert!(matches!(collected, Collected::Lost), "{collected:?}");
+}
+
+// @internal
+#[test]
+fn a_ticket_still_pending_after_the_poll_cap_is_lost() {
+    let mock = gateway_relay();
+    mock.hold_async_answers(MAX_PENDING_POLLS + 1);
+    let http = transport(&mock);
+    let mut pending = http.post_delayed_fetch(&[token()]).expect("posted");
+
+    for poll in 0..MAX_PENDING_POLLS {
+        pending = match http.collect_delayed_fetch(pending).expect("collect") {
+            Collected::Pending(pending) => pending,
+            other => panic!("poll {poll}: still pending, got {other:?}"),
+        };
+    }
+    let collected = http.collect_delayed_fetch(pending).expect("collect");
+
+    assert!(matches!(collected, Collected::Lost), "{collected:?}");
+}
+
+// @internal
+#[test]
+fn a_tampered_answer_is_an_error_and_the_fetch_is_posted_again() {
+    let mock = gateway_relay();
+    mock.set_gateway_blobs(vec![blob("b1")]);
+    let delayed = DelayedRequests::shared();
+    assert!(adapter(&mock, &delayed).receive().expect("r").is_none());
+    mock.tamper_async_answers();
+
+    let error = adapter(&mock, &delayed)
+        .receive()
+        .expect_err("an answer that does not open is reported");
+
+    assert!(
+        error
+            .to_string()
+            .contains("OHTTP response decryption failed"),
+        "{error}"
+    );
+    assert_eq!(posts(&mock), 2, "{:?}", requests(&mock));
+}
+
+// @internal
+#[test]
+fn a_token_registered_while_a_fetch_is_pending_is_fetched_at_once() {
+    let mock = gateway_relay();
+    mock.hold_async_answers(1);
+    let delayed = DelayedRequests::shared();
+    assert!(adapter(&mock, &delayed).receive().expect("r").is_none());
+
+    let mut cycle = adapter(&mock, &delayed);
+    cycle
+        .send(&envelope(MessagePayload::RegisterMailbox(
+            RegisterMailbox {
+                tokens: vec!["cd".repeat(32)],
+            },
+        )))
+        .expect("register");
+    assert!(cycle.receive().expect("r").is_none());
+
+    assert_eq!(posts(&mock), 2, "{:?}", requests(&mock));
+    assert_eq!(
+        mock.received().last().map(|r| r.method.clone()),
+        Some("POST".to_string()),
+        "the new token's fetch is posted after the pending one is polled"
+    );
 }
 
 // @internal

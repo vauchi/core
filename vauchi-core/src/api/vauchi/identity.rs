@@ -721,6 +721,9 @@ impl Vauchi {
         card.set_field_shown(field_id, shown);
         self.storage.contacts().save_own_card(&card)?;
         self.mark_own_card_repropagate()?;
+        // The apps' "Visible to all contacts" toggle lands here; the owner's
+        // other devices must agree on it (private#649).
+        self.journal_own_field(&card, field_id, self.now_timestamp());
         Ok(())
     }
 

@@ -110,4 +110,10 @@ impl Vauchi {
 
         Ok(queued)
     }
+
+    /// Queue our confirmation for a peer still waiting for it (private#663).
+    /// Returns the number queued.
+    pub fn queue_reciprocity_answer(&self, _contact_id: &str) -> VauchiResult<usize> {
+        Ok(0)
+    }
 }

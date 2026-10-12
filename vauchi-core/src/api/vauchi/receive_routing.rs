@@ -114,6 +114,9 @@ pub struct BlobOutcome {
     /// it after processing (ADR-064 Amendment 2026-07-25). Control-plane
     /// only — never drives a user-visible event.
     pub registry_reply: Option<crate::api::sync::RegistryReplyNeeded>,
+    /// Contact to answer with our own confirmation: a verified confirmation
+    /// from a peer still waiting for ours (private#663).
+    pub reciprocity_answer: Option<String>,
 }
 
 impl BlobOutcome {
@@ -252,6 +255,7 @@ pub fn process_received_blobs(
             device_fanout_contact_id,
             alert,
             registry_reply,
+            reciprocity_answer: None,
         });
     }
     outcomes
@@ -499,6 +503,7 @@ mod tests {
             device_fanout_contact_id: contact_id.map(str::to_string),
             alert: None,
             registry_reply: None,
+            reciprocity_answer: None,
         }
     }
 
@@ -538,6 +543,7 @@ mod tests {
                 device_fanout_contact_id: None,
                 alert: None,
                 registry_reply: None,
+                reciprocity_answer: None,
             },
         ];
 

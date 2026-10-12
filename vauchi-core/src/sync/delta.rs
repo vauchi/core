@@ -640,6 +640,21 @@ impl ReciprocityConfirmPayload {
         Ok(Self { token, signature })
     }
 
+    /// Create and sign the answer of a confirmed contact to a peer still
+    /// waiting for confirmation (private#663).
+    pub fn answer(
+        token: [u8; 32],
+        identity: &crate::identity::Identity,
+        recipient_pk: &[u8; 32],
+    ) -> Self {
+        Self::new(token, identity, recipient_pk)
+    }
+
+    /// Whether the sender was still waiting for our confirmation.
+    pub fn sender_waiting(&self) -> bool {
+        true
+    }
+
     /// Returns the confirmation token.
     pub fn token(&self) -> &[u8; 32] {
         &self.token

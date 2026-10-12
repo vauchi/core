@@ -53,6 +53,8 @@ pub mod card_update;
 pub mod device_sync;
 #[allow(dead_code)]
 pub mod field_validation_helpers;
+#[allow(dead_code)]
+pub mod linked_peer;
 #[cfg(feature = "network-http")]
 #[allow(dead_code)]
 pub mod mock_relay;

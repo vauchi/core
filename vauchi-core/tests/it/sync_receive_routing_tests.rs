@@ -17,7 +17,7 @@
 use crate::common;
 
 use common::helpers::create_vauchi_with_identity;
-use vauchi_core::SymmetricKey;
+use common::linked_peer::{LinkedPeer, link_contacts};
 use vauchi_core::api::VauchiEvent;
 use vauchi_core::api::vauchi::{incoming_update_events, process_received_blobs};
 use vauchi_core::contact::Contact;
@@ -35,52 +35,6 @@ use vauchi_core::sync::delta::{
 /// Add an exchanged contact `peer` to `host`. Returns the contact id and
 /// the shared secret. Sets up Double Ratchet state on both sides so
 /// `host` can decrypt updates from `peer`.
-fn link_contacts(
-    host: &vauchi_core::Vauchi,
-    peer: &vauchi_core::Vauchi,
-    label: &str,
-) -> LinkedPeer {
-    let host_pk = *host.identity().unwrap().signing_public_key();
-    let peer_pk = *peer.identity().unwrap().signing_public_key();
-    let shared_secret = SymmetricKey::generate();
-
-    let peer_at_host =
-        Contact::from_exchange(peer_pk, ContactCard::new(label), shared_secret.clone(), 0);
-    let peer_contact_id = peer_at_host.id().to_string();
-    host.add_contact(peer_at_host).unwrap();
-
-    let host_at_peer =
-        Contact::from_exchange(host_pk, ContactCard::new("host"), shared_secret.clone(), 0);
-    let host_contact_id = host_at_peer.id().to_string();
-    peer.add_contact(host_at_peer).unwrap();
-
-    let host_dh = X3DHKeyPair::generate();
-    let peer_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *host_dh.public_key()).unwrap();
-    let host_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, host_dh);
-
-    host.storage()
-        .ratchets()
-        .save_ratchet_state(&peer_contact_id, &host_ratchet, false)
-        .unwrap();
-    peer.storage()
-        .ratchets()
-        .save_ratchet_state(&host_contact_id, &peer_ratchet, true)
-        .unwrap();
-
-    LinkedPeer {
-        peer_contact_id,
-        host_contact_id,
-        shared_secret,
-    }
-}
-
-struct LinkedPeer {
-    peer_contact_id: String,
-    host_contact_id: String,
-    shared_secret: SymmetricKey,
-}
-
 /// Encrypt a card update from `sender` to `recipient`, returning the
 /// JSON-serialized RatchetMessage that flows over the wire.
 fn encrypt_update(

@@ -101,3 +101,36 @@ fn a_late_event_for_the_screen_before_a_shred_is_dropped() {
         "the late event moved the screen"
     );
 }
+
+/// Only screens an engine really showed are inherited: an event for a
+/// surface no engine presented still fails closed after the reopen.
+// @internal
+#[test]
+fn an_event_for_a_surface_never_shown_still_fails_closed_after_a_shred() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = SharedKeychain::new();
+    let engine = open(&dir, &keychain);
+    drive_onboarding(&engine);
+    assert!(matches!(
+        engine.dispatch_domain_command(DomainCommand::PanicShred),
+        Ok(DomainCommandResult::ShredCompleted { .. })
+    ));
+    let fresh = current_surface(&engine);
+
+    let forged = serde_json::json!({
+        "InputFocusEnded": { "surface_id": "never_presented", "binding_id": "confirm" }
+    });
+    let batch: serde_json::Value = serde_json::from_str(
+        &engine
+            .dispatch_json(forged.to_string())
+            .expect("dispatch returns a batch"),
+    )
+    .expect("parse command batch");
+
+    assert_eq!(
+        batch["commands"][0]["PresentAlert"]["alert"]["title"],
+        serde_json::json!("Error"),
+        "an unknown surface must still be refused: {batch}"
+    );
+    assert_eq!(current_surface(&engine), fresh);
+}

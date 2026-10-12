@@ -34,6 +34,7 @@ impl PlatformAppEngine {
         let render_context = previous.render_context().clone();
         let capabilities = previous.device_capabilities().clone();
         let online = previous.is_network_online();
+        let shown_surfaces = previous.shown_surfaces();
         drop(previous);
 
         if let Some(data_dir) = self.storage_path.parent() {
@@ -61,6 +62,7 @@ impl PlatformAppEngine {
                 engine.set_render_context(render_context);
                 engine.set_device_capabilities(capabilities);
                 engine.set_network_online(online);
+                engine.inherit_shown_surfaces(shown_surfaces);
                 *self.engine.lock().map_err(|e| MobileError::Other {
                     detail: format!("Lock failed: {e}"),
                 })? = Some(engine);

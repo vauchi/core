@@ -363,6 +363,17 @@ impl AppEngine {
         &self.transport_readiness
     }
 
+    /// Surfaces this engine has shown that a shell may still report on.
+    pub fn shown_surfaces(&self) -> Vec<vauchi_core::SurfaceId> {
+        self.presentation_coordinator.shown_surfaces()
+    }
+
+    /// Treats `surfaces`, shown by an engine this one replaces, as left
+    /// behind (see `PresentationCoordinator::remember_left_behind`).
+    pub fn inherit_shown_surfaces(&mut self, surfaces: Vec<vauchi_core::SurfaceId>) {
+        self.presentation_coordinator.remember_left_behind(surfaces);
+    }
+
     /// Returns the active render context (locale + theme_id) pushed
     /// by the frontend. Used by `screens.rs` to render Settings
     /// dropdown `selected` values without pulling state from the

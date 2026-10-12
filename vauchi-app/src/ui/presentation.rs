@@ -54,6 +54,34 @@ impl PresentationCoordinator {
         }
     }
 
+    /// Every surface this coordinator has shown that a shell may still
+    /// report on: the visible ones and those recently left behind.
+    pub fn shown_surfaces(&self) -> Vec<SurfaceId> {
+        let mut shown = self.left_behind.clone();
+        shown.extend(self.detail_surface.clone());
+        shown.push(self.active_surface.clone());
+        shown
+    }
+
+    /// Takes surfaces another coordinator showed as left behind here, so an
+    /// event a shell still sends for one of them is dropped as a race, not
+    /// failed — the engine reopened after a shred never showed the screen
+    /// the shred was confirmed on (vauchi/private#293).
+    pub fn remember_left_behind(&mut self, surfaces: Vec<SurfaceId>) {
+        for surface in surfaces {
+            if surface == self.active_surface
+                || surface == self.primary_surface
+                || self.left_behind.contains(&surface)
+            {
+                continue;
+            }
+            self.left_behind.push(surface);
+            if self.left_behind.len() > LEFT_BEHIND_MEMORY {
+                self.left_behind.remove(0);
+            }
+        }
+    }
+
     /// Whether `surface` was shown a moment ago and no longer is: an event
     /// for it is a shell still catching up, not a malformed one. A pane
     /// still on screen but inactive is not left behind; it must be

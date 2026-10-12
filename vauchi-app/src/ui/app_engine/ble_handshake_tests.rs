@@ -612,6 +612,57 @@ fn glance_qr_shows_the_landing_url_and_the_peer_scans_it() {
         .expect("bob's scanner accepts the landing URL");
 }
 
+// @internal
+#[test]
+fn a_glance_qr_opened_from_the_camera_continues_the_exchange() {
+    // A phone camera scans the displayer's QR and the OS opens the app with
+    // https://vauchi.app/x#q=… (vauchi/private#277): Core continues as the
+    // in-app scanner would — Glance screen, scanner latched on that peer.
+    let mut alice = fresh_engine("Alice");
+    let mut bob = fresh_engine("Bob");
+    let alice_qr = alice.begin_glance_display().expect("alice shows a QR");
+
+    bob.dispatch(vauchi_core::Event::DeepLinkOpened { uri: alice_qr })
+        .expect("the link is handled");
+
+    assert_eq!(
+        bob.screen,
+        AppScreen::BleExchange {
+            mode: vauchi_core::exchange::mode::ExchangeMode::Glance
+        }
+    );
+    bob.handle_glance_discovery("alice-device", &signing_key(&alice));
+    assert!(
+        bob.ble_handshake_session_active(),
+        "bob connects to the peer whose QR the camera scanned"
+    );
+}
+
+// @internal
+#[test]
+fn a_tampered_glance_qr_link_is_refused_without_starting_an_exchange() {
+    let alice = {
+        let mut alice = fresh_engine("Alice");
+        alice.begin_glance_display().expect("alice shows a QR")
+    };
+    let payload_start = alice.find("#q=").expect("landing URL") + 3;
+    let mut tampered = alice.into_bytes();
+    tampered[payload_start + 10] = if tampered[payload_start + 10] == b'A' {
+        b'B'
+    } else {
+        b'A'
+    };
+    let tampered = String::from_utf8(tampered).expect("ascii");
+    let mut bob = fresh_engine("Bob");
+    let before = bob.screen.clone();
+
+    bob.dispatch(vauchi_core::Event::DeepLinkOpened { uri: tampered })
+        .expect("the link is handled");
+
+    assert_eq!(bob.screen, before, "no exchange starts from a forged code");
+    assert!(bob.glance_scanned.is_none(), "nothing is latched");
+}
+
 // @scenario: ble_exchange :: Glance symmetric one-sided-QR completes for both peers
 #[test]
 fn glance_orchestration_symmetric_happy_path_both_persist() {

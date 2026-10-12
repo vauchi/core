@@ -406,3 +406,78 @@ fn a_fresh_install_that_could_not_save_its_key_starts_cleanly_next_time() {
     assert!(!second.expect("the second start opens").has_identity());
     assert!(secure.inner.has_key(BOOTSTRAP_KEY_NAME).unwrap());
 }
+
+/// Device linking persists through `config().storage_key` (vauchi-app
+/// `device_link_initiator`), so the config must name the key the database
+/// is under in every state (vauchi/private#647).
+fn assert_config_key_opens(vauchi: &Vauchi, path: &Path) {
+    let key = vauchi
+        .config()
+        .storage_key
+        .clone()
+        .expect("the config names the storage key");
+    Storage::open(path, key).expect("the configured key opens the database");
+}
+
+// @internal
+#[test]
+fn the_configured_key_is_the_bootstrap_key_before_an_identity() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("vauchi.db");
+    let secure = Arc::new(MemoryKeyStorage::new());
+
+    let vauchi = boot(&path, &secure).unwrap();
+
+    assert_config_key_opens(&vauchi, &path);
+}
+
+// @internal
+#[test]
+fn the_configured_key_follows_the_move_to_the_smk() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("vauchi.db");
+    let secure = Arc::new(MemoryKeyStorage::new());
+    let mut vauchi = boot(&path, &secure).unwrap();
+
+    vauchi.create_identity("Alice").unwrap();
+
+    assert_config_key_opens(&vauchi, &path);
+    assert_eq!(
+        vauchi
+            .config()
+            .storage_key
+            .as_ref()
+            .map(SymmetricKey::as_bytes),
+        Some(sek_of(&secure).as_bytes())
+    );
+}
+
+// @internal
+#[test]
+fn the_configured_key_is_the_smk_key_after_a_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("vauchi.db");
+    let secure = Arc::new(MemoryKeyStorage::new());
+    boot(&path, &secure)
+        .unwrap()
+        .create_identity("Alice")
+        .unwrap();
+
+    let vauchi = boot(&path, &secure).unwrap();
+
+    assert_config_key_opens(&vauchi, &path);
+}
+
+// @internal
+#[test]
+fn a_migrated_shell_key_is_replaced_in_the_config() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("vauchi.db");
+    let shell_key = SymmetricKey::generate();
+    legacy_install(&path, shell_key.clone(), true);
+    let secure = Arc::new(MemoryKeyStorage::new());
+
+    let vauchi = boot_with_shell_key(&path, &secure, shell_key).unwrap();
+
+    assert_config_key_opens(&vauchi, &path);
+}

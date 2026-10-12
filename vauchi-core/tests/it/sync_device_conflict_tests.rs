@@ -700,3 +700,39 @@ fn test_card_field_removed_without_id_round_trips_in_the_old_format() {
     );
     assert_eq!(serde_json::to_string(&item).unwrap(), old);
 }
+
+// vauchi/private#659: stamps are whole seconds, so two changes to one entry
+// within a second carry the same stamp. When the second reaches a sibling
+// in a later sync, it is the newer write, not an echo, and must apply
+// (rig run 2026-10-12: off then on left the entry hidden on the sibling).
+// @internal
+#[test]
+fn test_conflict_same_second_successor_in_a_later_batch_applies() {
+    let storage = create_test_storage();
+    let master_seed = [0x42u8; 32];
+    let device_b = create_test_device(&master_seed, 1, "Device B");
+    let registry = create_test_registry(&master_seed, &device_b);
+    let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_b, registry);
+    let field = ContactField::new(FieldType::Phone, "Phone", "5550404", 5000);
+    let hidden = SyncItem::CardFieldSynced {
+        field: field.clone(),
+        field_visibility: Some(vauchi_core::visibility::FieldVisibility::Nobody),
+        timestamp: 5000,
+    };
+    let shown = SyncItem::CardFieldSynced {
+        field,
+        field_visibility: Some(vauchi_core::visibility::FieldVisibility::Everyone),
+        timestamp: 5000,
+    };
+    let sender = [0x07u8; 32];
+
+    let first = orchestrator
+        .process_incoming(vec![hidden], &sender)
+        .unwrap();
+    let second = orchestrator
+        .process_incoming(vec![shown.clone()], &sender)
+        .unwrap();
+
+    assert_eq!(first.len(), 1);
+    assert_eq!(second, vec![shown], "the later same-second write applies");
+}

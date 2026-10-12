@@ -149,7 +149,7 @@ fn card_field_removal_conflicts_with_updates_for_the_same_field() {
 }
 
 /// A same-device remove+add pair (the CLI `card edit` shape) must apply
-/// in order within one batch; the equal-stamp dedup must not drop the
+/// in order within one batch; an equal stamp must not drop the
 /// re-add half and silently lose the edit (ADR-020).
 // @scenario: sync_updates :: Own-card field removals converge across linked devices
 #[test]
@@ -195,8 +195,8 @@ fn same_timestamp_remove_and_readd_both_apply_in_one_batch() {
         "remove+add edit pair must apply in order, got {applied:?}"
     );
 
-    // Redelivery of the same batch (retry/duplicate) must still dedup:
-    // every item's stamp now equals the persisted stamp.
+    // A redelivered batch replays the sender's ordered log: it re-applies
+    // in order and ends on the same write (private#659).
     let redelivered = orchestrator
         .process_incoming(
             vec![
@@ -214,9 +214,9 @@ fn same_timestamp_remove_and_readd_both_apply_in_one_batch() {
             &[0x99u8; 32],
         )
         .unwrap();
-    assert!(
-        redelivered.is_empty(),
-        "redelivered batch must dedup, got {redelivered:?}"
+    assert_eq!(
+        redelivered, applied,
+        "a redelivered batch re-applies in order and converges"
     );
 }
 

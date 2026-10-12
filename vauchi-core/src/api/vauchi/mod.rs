@@ -531,9 +531,14 @@ impl Vauchi {
             )
         });
 
-        // Best-effort — sync recording failures should not break mutations
-        #[allow(clippy::let_underscore_must_use)]
-        let _ = orchestrator.record_local_change(item);
+        // Best-effort — sync recording failures should not break mutations,
+        // but they must be visible: a dropped item silently desyncs the
+        // owner's devices (private#659).
+        let queues = orchestrator.device_count_for_sync();
+        match orchestrator.record_local_change(item) {
+            Ok(()) => tracing::info!(queues, "[DeviceSync] journaled a change"),
+            Err(error) => tracing::warn!(%error, "[DeviceSync] journaling a change failed"),
+        }
     }
 
     /// Creates a new Vauchi instance with in-memory storage (for testing).

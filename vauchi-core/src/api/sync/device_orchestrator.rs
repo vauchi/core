@@ -239,6 +239,11 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             .unwrap_or(&[])
     }
 
+    /// How many linked devices a recorded change is queued for.
+    pub fn device_count_for_sync(&self) -> usize {
+        self.device_states.len()
+    }
+
     /// Returns all device IDs that have pending items.
     pub fn devices_with_pending(&self) -> Vec<[u8; 32]> {
         self.device_states
@@ -655,10 +660,6 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         sender_device_id: &[u8; 32],
     ) -> Result<Vec<SyncItem>, DeviceSyncError> {
         let mut applied = Vec::new();
-        // Conflict keys already touched by this batch: an equal stamp on a
-        // later item of the same batch is the next ordered write (e.g. the
-        // re-add half of a remove+add edit), not a redelivered duplicate.
-        let mut batch_keys = std::collections::HashSet::new();
 
         for item in items {
             let key = Self::conflict_key(&item);
@@ -669,21 +670,16 @@ impl<'a> DeviceSyncOrchestrator<'a> {
                 device_id: *sender_device_id,
             };
 
-            // LWW + device-id tie-break (ADR-020): apply iff the incoming
-            // (timestamp, device_id) is lexicographically greater than the
-            // local stamp. An equal stamp is rejected as an echoed duplicate
-            // unless this batch itself set that stamp — one sender's batch is
-            // an ordered log, so equal-stamp successors must apply in order.
+            // LWW + device-id tie-break (ADR-020). An equal stamp can only
+            // come from the device that set it, whose queue is an ordered
+            // log: it is that device's next write in the same second, in this
+            // batch or a later one (private#659), so it applies. A redelivered
+            // item re-applies the content it already set.
             let local = self.field_timestamps.get(&key).copied();
-            let apply = local.is_none_or(|local| {
-                incoming > local || (incoming == local && batch_keys.contains(&key))
-            });
-            if apply {
-                self.field_timestamps.insert(key.clone(), incoming);
-                batch_keys.insert(key);
+            if local.is_none_or(|local| incoming >= local) {
+                self.field_timestamps.insert(key, incoming);
                 applied.push(item);
             }
-            // Older-or-echoed incoming is rejected (not added to applied).
         }
 
         // Persist the updated timestamps so the LWW gate survives a reload

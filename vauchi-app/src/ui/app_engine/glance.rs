@@ -7,7 +7,10 @@
 
 use super::{AppEngine, AppScreen};
 use crate::orchestrator::ble_handshake_machine::{BleOobBinding, BleRole};
+use crate::ui::action::ActionResult;
 use crate::ui::{EngineOutput, EngineUpdate};
+use vauchi_core::exchange::mode::ExchangeMode;
+use vauchi_core::exchange::oob_bootstrap::OobBootstrapQr;
 
 /// Shortest advertised token prefix a Glance scanner accepts: the phones'
 /// 16-bit service-UUID token. Anything shorter would match nearly everyone.
@@ -68,6 +71,32 @@ impl AppEngine {
             self.handle_glance_discovery(&device_id, &adv_data);
         }
         Ok(())
+    }
+
+    /// A Glance QR the phone's camera scanned, opened as a
+    /// `https://vauchi.app/x#q=…` link (vauchi/private#277): the Glance
+    /// screen with the scanner latched on that peer, as an in-app scan
+    /// leaves it. `None` when the link is not a Glance QR. A stale or forged
+    /// code is refused before the current screen is left.
+    pub(super) fn open_scanned_glance_link(&mut self, uri: &str) -> Option<ActionResult> {
+        OobBootstrapQr::from_data_string(uri).ok()?;
+        let now = self.vauchi.clock().unix_seconds();
+        if let Err(error) = OobBootstrapQr::verified_from_data_string(uri, now) {
+            return Some(ActionResult::ShowAlert {
+                title: self.t("deep_link.invalid_title"),
+                message: error.user_message().to_string(),
+            });
+        }
+        let screen = self.navigate_to(AppScreen::BleExchange {
+            mode: ExchangeMode::Glance,
+        });
+        if let Err(error) = self.apply_glance_scan(uri) {
+            return Some(ActionResult::ShowAlert {
+                title: self.t("deep_link.invalid_title"),
+                message: error.user_message().to_string(),
+            });
+        }
+        Some(ActionResult::NavigateTo(screen))
     }
 
     /// Pin the peer from a Glance code the user typed instead of scanning

@@ -608,11 +608,15 @@ fn apply_sync_empty_card_update_does_not_delete_own_card_field() {
 
 // @scenario: sync_updates :: Own-card field identity and private annotations converge across linked devices
 #[test]
-fn apply_sync_card_field_synced_replaces_same_label_with_stable_field_identity() {
+fn apply_sync_card_field_synced_keeps_a_same_label_entry_with_another_id() {
+    // Owner decision 2026-10-12 (private#649): entries are matched by id.
+    // A same-label entry with another id is a different entry and stays —
+    // a stale legacy copy now shows as a duplicate the owner can delete,
+    // where replacing by label deleted genuine entries.
     let wb = make_vauchi();
-    let stale_field = ContactField::new(FieldType::Custom, "handle", "old-alice", now());
-    let stale_id = stale_field.id().to_string();
-    wb.add_own_field(stale_field).unwrap();
+    let other_field = ContactField::new(FieldType::Custom, "handle", "old-alice", now());
+    let other_id = other_field.id().to_string();
+    wb.add_own_field(other_field).unwrap();
 
     let synced_field = ContactField::new(FieldType::Custom, "handle", "alice", now())
         .with_note("only on my linked devices".to_string());
@@ -628,20 +632,16 @@ fn apply_sync_card_field_synced_replaces_same_label_with_stable_field_identity()
 
     assert_eq!(applied, 1);
     let card = wb.own_card().unwrap().unwrap();
-    let fields: Vec<_> = card
+    let ids: Vec<&str> = card
         .fields()
         .iter()
         .filter(|field| field.label() == "handle")
+        .map(|field| field.id())
         .collect();
-    assert_eq!(
-        fields.len(),
-        1,
-        "the stale same-label field must be replaced"
-    );
-    assert_eq!(fields[0].id(), synced_id);
-    assert_ne!(fields[0].id(), stale_id);
-    assert_eq!(fields[0].value(), "alice");
-    assert_eq!(fields[0].note(), Some("only on my linked devices"));
+    assert_eq!(ids, vec![other_id.as_str(), synced_id.as_str()]);
+    let synced = card.fields().iter().find(|f| f.id() == synced_id).unwrap();
+    assert_eq!(synced.value(), "alice");
+    assert_eq!(synced.note(), Some("only on my linked devices"));
     assert!(card.is_field_shown(&synced_id));
 }
 
@@ -723,6 +723,7 @@ fn apply_sync_card_field_removed_removes_field_and_dispatches_event() {
 
     wb.apply_sync_items(vec![SyncItem::CardFieldRemoved {
         field_label: "status".to_string(),
+        field_id: None,
         timestamp: now(),
     }])
     .unwrap();

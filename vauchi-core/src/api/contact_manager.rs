@@ -95,32 +95,49 @@ impl<'a> ContactManager<'a> {
 
     /// Removes a field from the user's own card by label.
     pub fn remove_field_from_own_card(&self, label: &str) -> VauchiResult<bool> {
+        let card = self
+            .storage
+            .contacts()
+            .load_own_card()?
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        let Some(field_id) = card
+            .fields()
+            .iter()
+            .find(|f| f.label() == label)
+            .map(|f| f.id().to_string())
+        else {
+            return Ok(false);
+        };
+        Ok(self.remove_field_by_id_from_own_card(&field_id)?.is_some())
+    }
+
+    /// Removes the own-card field with `field_id` and returns its label, or
+    /// `None` when there is no such field. Labels are not unique on a card,
+    /// so this is the way to remove one particular entry (private#649).
+    pub fn remove_field_by_id_from_own_card(&self, field_id: &str) -> VauchiResult<Option<String>> {
         let mut card = self
             .storage
             .contacts()
             .load_own_card()?
             .ok_or(VauchiError::IdentityNotInitialized)?;
-
-        // Find field by label
-        let field_id = card
+        let Some(label) = card
             .fields()
             .iter()
-            .find(|f| f.label() == label)
-            .map(|f| f.id().to_string());
-
-        let Some(field_id) = field_id else {
-            return Ok(false);
+            .find(|f| f.id() == field_id)
+            .map(|f| f.label().to_string())
+        else {
+            return Ok(None);
         };
 
-        card.remove_field(&field_id)
+        card.remove_field(field_id)
             .map_err(|_| VauchiError::InvalidState("Field not found".into()))?;
 
         self.storage.contacts().save_own_card(&card)?;
         self.events.dispatch(VauchiEvent::OwnCardUpdated {
-            changed_fields: vec![label.to_string()],
+            changed_fields: vec![label.clone()],
         });
 
-        Ok(true)
+        Ok(Some(label))
     }
 
     // === Contact Operations ===
@@ -568,27 +585,26 @@ impl<'a> ContactManager<'a> {
     fn compute_changed_fields(old: &ContactCard, new: &ContactCard) -> Vec<String> {
         let mut changed = Vec::new();
 
-        // Helper to find field by label
-        fn find_field_by_label<'a>(card: &'a ContactCard, label: &str) -> Option<&'a ContactField> {
-            card.fields().iter().find(|f| f.label() == label)
+        // Matched by id: two entries may share a label (private#649).
+        fn find_field_by_id<'a>(card: &'a ContactCard, id: &str) -> Option<&'a ContactField> {
+            card.fields().iter().find(|f| f.id() == id)
         }
 
-        // Check for modified or removed fields
         for old_field in old.fields() {
-            match find_field_by_label(new, old_field.label()) {
-                Some(new_field) if new_field.value() != old_field.value() => {
-                    changed.push(old_field.label().to_string());
+            match find_field_by_id(new, old_field.id()) {
+                Some(new_field)
+                    if new_field.value() != old_field.value()
+                        || new_field.label() != old_field.label() =>
+                {
+                    changed.push(new_field.label().to_string());
                 }
-                None => {
-                    changed.push(old_field.label().to_string());
-                }
+                None => changed.push(old_field.label().to_string()),
                 _ => {}
             }
         }
 
-        // Check for new fields
         for new_field in new.fields() {
-            if find_field_by_label(old, new_field.label()).is_none() {
+            if find_field_by_id(old, new_field.id()).is_none() {
                 changed.push(new_field.label().to_string());
             }
         }

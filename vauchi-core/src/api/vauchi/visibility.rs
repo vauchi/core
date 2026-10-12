@@ -278,6 +278,8 @@ impl Vauchi {
         // A public-base change is what ungrouped contacts may see — arm the
         // repropagation marker so the next sync pass sends the grant/revoke.
         self.mark_own_card_repropagate()?;
+        // And the owner's other devices must agree on it (private#649).
+        self.journal_own_field(&card, field_id, self.now_timestamp());
         Ok(())
     }
 
@@ -294,6 +296,7 @@ impl Vauchi {
         self.storage.contacts().save_own_card(&card)?;
         // See set_own_field_public: arm the marker so the revoke propagates.
         self.mark_own_card_repropagate()?;
+        self.journal_own_field(&card, field_id, self.now_timestamp());
         Ok(())
     }
 

@@ -559,29 +559,53 @@ impl Vauchi {
 
     /// Updates the user's own contact card.
     pub fn update_own_card(&self, card: &ContactCard) -> VauchiResult<Vec<String>> {
+        let old_card = self.storage.contacts().load_own_card()?;
         let manager = ContactManager::new(&self.storage, self.events.clone());
         let changed_labels = manager.update_own_card(card)?;
         if !changed_labels.is_empty() {
             self.mark_own_card_repropagate()?;
         }
+        // Journaled by entry id: two entries may share a label (private#649).
         let ts = self.now_timestamp();
-        for label in &changed_labels {
-            match card.fields().iter().find(|field| field.label() == label) {
-                Some(field) => self.record_sync_item(crate::sync::SyncItem::CardFieldSynced {
-                    field: field.clone(),
-                    field_visibility: card
-                        .field_visibility()
-                        .contains(field.id())
-                        .then(|| card.field_visibility().get(field.id()).clone()),
+        let old_fields = old_card
+            .as_ref()
+            .map(|old| old.fields())
+            .unwrap_or_default();
+        for field in card.fields() {
+            let unchanged = old_fields.iter().any(|old| old == field)
+                && old_card.as_ref().is_some_and(|old| {
+                    explicit_visibility(old, field.id()) == explicit_visibility(card, field.id())
+                });
+            if !unchanged {
+                self.journal_own_field(card, field.id(), ts);
+            }
+        }
+        for old_field in old_fields {
+            if !card
+                .fields()
+                .iter()
+                .any(|field| field.id() == old_field.id())
+            {
+                self.record_sync_item(crate::sync::SyncItem::CardFieldRemoved {
+                    field_label: old_field.label().to_string(),
+                    field_id: Some(old_field.id().to_string()),
                     timestamp: ts,
-                }),
-                None => self.record_sync_item(crate::sync::SyncItem::CardFieldRemoved {
-                    field_label: label.clone(),
-                    timestamp: ts,
-                }),
+                });
             }
         }
         Ok(changed_labels)
+    }
+
+    /// Journals an own-card field, with its explicit visibility, for the
+    /// owner's other devices.
+    pub(super) fn journal_own_field(&self, card: &ContactCard, field_id: &str, timestamp: u64) {
+        if let Some(field) = card.fields().iter().find(|field| field.id() == field_id) {
+            self.record_sync_item(crate::sync::SyncItem::CardFieldSynced {
+                field: field.clone(),
+                field_visibility: explicit_visibility(card, field_id),
+                timestamp,
+            });
+        }
     }
 
     /// Adds a field to the user's own card. New entries default to hidden;
@@ -622,37 +646,35 @@ impl Vauchi {
 
     /// Removes a field from the user's own card by label.
     pub fn remove_own_field(&self, label: &str) -> VauchiResult<bool> {
-        let manager = ContactManager::new(&self.storage, self.events.clone());
-        let removed = manager.remove_field_from_own_card(label)?;
-        if removed {
-            self.mark_own_card_repropagate()?;
-            self.record_sync_item(crate::sync::SyncItem::CardFieldRemoved {
-                field_label: label.to_string(),
-                timestamp: self.now_timestamp(),
-            });
-        }
-        Ok(removed)
-    }
-
-    /// Removes a field from the user's own card by field ID.
-    pub fn remove_own_field_by_id(&self, field_id: &str) -> VauchiResult<bool> {
         let card = self
             .storage
             .contacts()
             .load_own_card()?
-            .ok_or_else(|| VauchiError::InvalidState("No own card found".into()))?;
-        let label = card
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        let Some(field_id) = card
             .fields()
             .iter()
-            .find(|f| f.id() == field_id)
-            .map(|f| f.label().to_string());
-        let Some(label) = label else {
+            .find(|f| f.label() == label)
+            .map(|f| f.id().to_string())
+        else {
             return Ok(false);
         };
-        // Route through the by-label path so the removal also arms the
-        // repropagation marker and records the device-sync item (the manager
-        // call alone does neither).
-        self.remove_own_field(&label)
+        self.remove_own_field_by_id(&field_id)
+    }
+
+    /// Removes a field from the user's own card by field ID.
+    pub fn remove_own_field_by_id(&self, field_id: &str) -> VauchiResult<bool> {
+        let manager = ContactManager::new(&self.storage, self.events.clone());
+        let Some(label) = manager.remove_field_by_id_from_own_card(field_id)? else {
+            return Ok(false);
+        };
+        self.mark_own_card_repropagate()?;
+        self.record_sync_item(crate::sync::SyncItem::CardFieldRemoved {
+            field_label: label,
+            field_id: Some(field_id.to_string()),
+            timestamp: self.now_timestamp(),
+        });
+        Ok(true)
     }
 
     /// Marks the own card dirty so the next sync tick repropagates it to
@@ -926,4 +948,15 @@ fn ed25519_pk_to_x25519(ed25519_pk: &[u8; 32]) -> VauchiResult<x25519_dalek::Pub
         .map_err(|e| VauchiError::Crypto(format!("invalid Ed25519 public key: {e}")))?;
     let montgomery = verifying_key.to_montgomery();
     Ok(x25519_dalek::PublicKey::from(montgomery.to_bytes()))
+}
+
+/// A field's explicit own-card visibility; `None` keeps the privacy-first
+/// unruled state rather than the `VisibilityRules::get` fallback.
+fn explicit_visibility(
+    card: &ContactCard,
+    field_id: &str,
+) -> Option<crate::visibility::FieldVisibility> {
+    card.field_visibility()
+        .contains(field_id)
+        .then(|| card.field_visibility().get(field_id).clone())
 }

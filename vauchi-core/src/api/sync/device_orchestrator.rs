@@ -715,7 +715,12 @@ impl<'a> DeviceSyncOrchestrator<'a> {
                 format!("contact_activation:{}", contact_id)
             }
             SyncItem::CardUpdated { field_label, .. } => format!("field:{}", field_label),
-            SyncItem::CardFieldSynced { field, .. } => format!("field:{}", field.label()),
+            // Keyed by entry id: two entries may share a label (private#649).
+            SyncItem::CardFieldSynced { field, .. } => format!("field:{}", field.id()),
+            SyncItem::CardFieldRemoved {
+                field_id: Some(field_id),
+                ..
+            } => format!("field:{}", field_id),
             SyncItem::CardFieldRemoved { field_label, .. } => format!("field:{}", field_label),
             SyncItem::VisibilityChanged {
                 contact_id,

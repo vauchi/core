@@ -121,6 +121,7 @@ fn card_field_removal_conflicts_with_updates_for_the_same_field() {
         .process_incoming(
             vec![SyncItem::CardFieldRemoved {
                 field_label: "email".to_string(),
+                field_id: None,
                 timestamp: 1000,
             }],
             &[0x99u8; 32],
@@ -135,6 +136,7 @@ fn card_field_removal_conflicts_with_updates_for_the_same_field() {
         .process_incoming(
             vec![SyncItem::CardFieldRemoved {
                 field_label: "email".to_string(),
+                field_id: None,
                 timestamp: 3000,
             }],
             &[0x99u8; 32],
@@ -174,6 +176,7 @@ fn same_timestamp_remove_and_readd_both_apply_in_one_batch() {
             vec![
                 SyncItem::CardFieldRemoved {
                     field_label: "phone".to_string(),
+                    field_id: None,
                     timestamp: 2000,
                 },
                 SyncItem::CardUpdated {
@@ -199,6 +202,7 @@ fn same_timestamp_remove_and_readd_both_apply_in_one_batch() {
             vec![
                 SyncItem::CardFieldRemoved {
                     field_label: "phone".to_string(),
+                    field_id: None,
                     timestamp: 2000,
                 },
                 SyncItem::CardUpdated {

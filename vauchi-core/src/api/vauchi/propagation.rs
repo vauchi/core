@@ -676,17 +676,6 @@ impl Vauchi {
                             let value = synced_field.value().to_string();
                             synced_field.set_value(&value, existing.updated_at().saturating_add(1));
                         }
-                        if let Some(existing_id) = card
-                            .fields()
-                            .iter()
-                            .find(|existing| {
-                                existing.label() == synced_field.label()
-                                    && existing.id() != synced_field.id()
-                            })
-                            .map(|existing| existing.id().to_string())
-                        {
-                            card.remove_field(&existing_id).map_err(VauchiError::from)?;
-                        }
                         card.add_field(synced_field.clone())
                             .map_err(VauchiError::from)?;
                         match field_visibility {
@@ -711,13 +700,18 @@ impl Vauchi {
                     None => Err(VauchiError::IdentityNotInitialized),
                 },
                 SyncItem::CardFieldRemoved {
-                    ref field_label, ..
+                    ref field_label,
+                    ref field_id,
+                    ..
                 } => match self.storage.contacts().load_own_card()? {
                     Some(mut card) => {
                         if let Some(field_id) = card
                             .fields()
                             .iter()
-                            .find(|field| field.label() == field_label)
+                            .find(|field| match field_id {
+                                Some(id) => field.id() == id,
+                                None => field.label() == field_label,
+                            })
                             .map(|field| field.id().to_string())
                         {
                             card.remove_field(&field_id).map_err(VauchiError::from)?;

@@ -179,6 +179,12 @@ pub enum SyncItem {
     CardFieldRemoved {
         /// Field label that was removed.
         field_label: String,
+        /// Id of the removed field. Labels are not unique on a card (two
+        /// entries both default to "Phone"), so a receiver removes by id when
+        /// one is present and by label only for items from older devices,
+        /// which ignore this key (private#649).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        field_id: Option<String>,
         /// Timestamp of removal.
         timestamp: u64,
     },

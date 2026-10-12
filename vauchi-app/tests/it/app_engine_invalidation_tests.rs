@@ -9,7 +9,7 @@
 //! 2026-07-01-android-contacts-list-stale-after-mutation; also afflicts
 //! the sync-apply path fixed in 5d13a463).
 
-use vauchi_app::ui::{AppEngine, AppScreen, Component, WorkflowEngine};
+use vauchi_app::ui::{AppEngine, AppScreen, Component, UserAction, WorkflowEngine};
 use vauchi_core::ImportSource;
 use vauchi_core::api::Vauchi;
 use vauchi_core::contact::Contact;
@@ -107,5 +107,55 @@ fn invalidate_of_cached_screen_evicts_so_next_visit_is_fresh() {
         contact_names(&engine),
         vec!["Bob".to_string()],
         "a cached invalidated screen must rebuild fresh on next visit"
+    );
+}
+
+fn create_group_through_the_groups_screen(engine: &mut AppEngine, name: &str) {
+    engine.navigate_to(AppScreen::Groups);
+    let actions = [
+        UserAction::ListItemSelected {
+            component_id: "group_actions".into(),
+            item_id: "add_group".into(),
+        },
+        UserAction::TextChanged {
+            component_id: "group_name".into(),
+            value: name.into(),
+        },
+        UserAction::ActionPressed {
+            action_id: "submit".into(),
+        },
+    ];
+    for action in actions {
+        let _ = engine.handle_action(action);
+    }
+}
+
+/// The Exchange engine reads the group list once, when built, and stays
+/// cached while the user is elsewhere — a group created meanwhile must
+/// still reach the exchange flow on return (#653).
+// @internal
+#[test]
+fn group_created_after_exchange_was_opened_reaches_the_exchange_flow() {
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Exchange);
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "exchange",
+        "precondition: with no groups the exchange opens on the mode picker"
+    );
+
+    create_group_through_the_groups_screen(&mut engine, "Family");
+    assert_eq!(
+        engine.vauchi().list_groups().unwrap().len(),
+        1,
+        "precondition: the form created the group"
+    );
+    engine.navigate_to(AppScreen::Exchange);
+
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "exchange_group_selection",
+        "with a group and no stored defaults the exchange must open on \
+         group selection, not on a picker built before the group existed"
     );
 }

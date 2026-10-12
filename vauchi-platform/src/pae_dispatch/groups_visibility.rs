@@ -43,25 +43,10 @@ fn map_visibility_error(e: vauchi_core::VauchiError) -> MobileError {
 /// no-identity cases to the `MobileError` shapes the visibility arms produced
 /// pre-G3 (so frontend-visible error text is unchanged).
 fn resolve_own_field_id(engine: &AppEngine, field_label: &str) -> Result<String, MobileError> {
-    let card = engine
+    engine
         .vauchi()
-        .storage()
-        .contacts()
-        .load_own_card()
-        .map_err(|e| MobileError::StorageError {
-            detail: e.to_string(),
-        })?
-        .ok_or(MobileError::Other {
-            detail: "Identity not found".into(),
-        })?;
-    card.fields()
-        .iter()
-        .find(|f| f.label() == field_label)
-        .map(|f| f.id().to_string())
-        .ok_or_else(|| MobileError::InvalidInput {
-            field: String::new(),
-            detail: format!("Field not found: {field_label}"),
-        })
+        .resolve_own_field_id(field_label)
+        .map_err(map_visibility_error)
 }
 
 /// Hide, show, and per-contact override are one operation: set the contact's

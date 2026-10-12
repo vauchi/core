@@ -374,25 +374,36 @@ impl Vauchi {
             .is_some_and(|card| card.field_visibility().is_explicitly_everyone(field_id)))
     }
 
-    /// Resolves an own-card field label to its field id.
+    /// Resolves an own-card entry, named by its id or its label, to its id.
     ///
-    /// Layer-A visibility rules are keyed by field *id*; UniFFI
-    /// surfaces address fields by *label* — this is the one
-    /// resolution point (was duplicated inline per dispatch arm in
-    /// vauchi-platform).
-    fn own_field_id_by_label(&self, field_label: &str) -> VauchiResult<String> {
+    /// Visibility rules are keyed by entry *id*; the CLI and the bindings may
+    /// name an entry by *label*. Two entries can share a label (private#649),
+    /// so a label naming several is refused with their ids rather than
+    /// resolved to the first (private#651).
+    pub fn resolve_own_field_id(&self, label_or_id: &str) -> VauchiResult<String> {
         let card = self
             .storage
             .contacts()
             .load_own_card()?
             .ok_or(VauchiError::IdentityNotInitialized)?;
-        Ok(card
+        if let Some(field) = card.fields().iter().find(|f| f.id() == label_or_id) {
+            return Ok(field.id().to_string());
+        }
+        let ids: Vec<&str> = card
             .fields()
             .iter()
-            .find(|f| f.label() == field_label)
-            .ok_or_else(|| VauchiError::NotFound(format!("field: {field_label}")))?
-            .id()
-            .to_string())
+            .filter(|f| f.label() == label_or_id)
+            .map(|f| f.id())
+            .collect();
+        match ids.as_slice() {
+            [] => Err(VauchiError::NotFound(format!("field: {label_or_id}"))),
+            [id] => Ok(id.to_string()),
+            several => Err(VauchiError::InvalidState(format!(
+                "{} entries are labelled {label_or_id:?}; name one by its id: {}",
+                several.len(),
+                several.join(", ")
+            ))),
+        }
     }
 
     /// Reads a field's **effective** visibility for one contact, addressed by
@@ -404,7 +415,7 @@ impl Vauchi {
         contact_id: &str,
         field_label: &str,
     ) -> VauchiResult<bool> {
-        let field_id = self.own_field_id_by_label(field_label)?;
+        let field_id = self.resolve_own_field_id(field_label)?;
         self.get_effective_field_visibility(contact_id, &field_id)
     }
 
@@ -434,7 +445,7 @@ impl Vauchi {
             ));
         }
 
-        let field_id = self.own_field_id_by_label(field_label)?;
+        let field_id = self.resolve_own_field_id(field_label)?;
         let new_visible = !self.get_effective_field_visibility(contact_id, &field_id)?;
         self.storage
             .labels()

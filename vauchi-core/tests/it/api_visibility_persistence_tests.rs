@@ -43,7 +43,7 @@ fn setup_with_fields() -> (Vauchi, String) {
 
 /// Resolves an own-card field label to its generated id. Reads via the id,
 /// not the label, must match how every production path resolves visibility
-/// (`is_field_visible_by_label` → `own_field_id_by_label` → id-keyed rules).
+/// (`is_field_visible_by_label` → `resolve_own_field_id` → id-keyed rules).
 /// A test that reads by label would pass even when the toggle writes the
 /// wrong key (F1, 2026-06-14 visibility layering).
 fn own_field_id(wb: &Vauchi, label: &str) -> String {

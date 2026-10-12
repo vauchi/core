@@ -214,6 +214,43 @@ pub struct ParsedLinkUrl {
     pub initiator_public_key: [u8; 32],
     /// Random nonce from the URL.
     pub nonce: [u8; 32],
+    /// The name the link says its sender has (`nm=`). Unchecked: anyone
+    /// can put any name in a link, so it is shown only as a claim.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sender_name: Option<String>,
+}
+
+/// A sender name from a link, or `None` when it cannot be shown as a plain
+/// name. A dropped name never invalidates the link.
+fn decode_sender_name(value: &str) -> Option<String> {
+    let bytes = URL_SAFE_NO_PAD.decode(value).ok()?;
+    if bytes.len() > LINK_NAME_MAX_BYTES {
+        return None;
+    }
+    let name = String::from_utf8(bytes).ok()?;
+    let name = name.trim();
+    if name.is_empty()
+        || name
+            .chars()
+            .any(|c| c.is_control() || hides_or_reorders_text(c))
+    {
+        return None;
+    }
+    Some(name.to_owned())
+}
+
+/// Invisible and text-direction characters that make a displayed name read
+/// differently from what it is (`Zoë\u{202E}knab` shows as "Zoëbank").
+fn hides_or_reorders_text(c: char) -> bool {
+    matches!(
+        c,
+        '\u{00AD}'
+            | '\u{061C}'
+            | '\u{200B}'..='\u{200F}'
+            | '\u{202A}'..='\u{202E}'
+            | '\u{2060}'..='\u{2069}'
+            | '\u{FEFF}'
+    )
 }
 
 fn truncate_to_char_boundary(text: &str, max_bytes: usize) -> &str {
@@ -237,6 +274,7 @@ pub fn parse_link_url(url: &str) -> Option<ParsedLinkUrl> {
 
     let mut pk_bytes = None;
     let mut nonce_bytes = None;
+    let mut sender_name = None;
 
     for param in query.split('&') {
         if let Some((key, value)) = param.split_once('=') {
@@ -259,6 +297,7 @@ pub fn parse_link_url(url: &str) -> Option<ParsedLinkUrl> {
                     arr.copy_from_slice(&decoded);
                     nonce_bytes = Some(arr);
                 }
+                "nm" => sender_name = decode_sender_name(value),
                 _ => {}
             }
         }
@@ -267,6 +306,7 @@ pub fn parse_link_url(url: &str) -> Option<ParsedLinkUrl> {
     Some(ParsedLinkUrl {
         initiator_public_key: pk_bytes?,
         nonce: nonce_bytes?,
+        sender_name,
     })
 }
 
@@ -294,6 +334,12 @@ impl DeepLinkPayload {
     /// Random nonce from the URL.
     pub fn nonce(&self) -> &[u8; 32] {
         &self.inner.nonce
+    }
+
+    /// The sender name the link claims; unchecked, see
+    /// [`ParsedLinkUrl::sender_name`].
+    pub fn sender_name(&self) -> Option<&str> {
+        self.inner.sender_name.as_deref()
     }
 
     /// Borrow the wrapped [`ParsedLinkUrl`] so the responder flow can

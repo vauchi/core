@@ -24,7 +24,7 @@
 //! `2026-04-27-deep-link-responder-flow`) replaces the grant path
 //! with `ActionResult::NavigateTo(...)` toward the responder cycle.
 
-use crate::i18n::{Locale, get_string};
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 use vauchi_core::exchange::link_mode::DeepLinkPayload;
 
@@ -58,10 +58,10 @@ pub struct DeepLinkConsentEngine {
 }
 
 impl DeepLinkConsentEngine {
-    /// Build a fresh engine holding `payload`. The payload stays
-    /// private until the user grants — `current_screen()` does not
-    /// expose any of its bytes (privacy: don't echo unverified
-    /// key material).
+    /// Build a fresh engine holding `payload`. Its key material stays
+    /// private until the user grants — `current_screen()` never echoes
+    /// it. Only the sender name the link claims is shown, worded as
+    /// unchecked (vauchi/private#277).
     pub fn new(payload: DeepLinkPayload) -> Self {
         Self {
             payload,
@@ -94,7 +94,14 @@ impl DeepLinkConsentEngine {
     fn build_screen(&self) -> ScreenModel {
         let components = vec![
             Component::Banner {
-                text: get_string(self.locale, "deep_link_consent.banner_text"),
+                text: match self.payload.sender_name() {
+                    Some(name) => get_string_with_args(
+                        self.locale,
+                        "deep_link_consent.banner_text_named",
+                        &[("name", name)],
+                    ),
+                    None => get_string(self.locale, "deep_link_consent.banner_text"),
+                },
                 action_label: String::new(),
                 action_id: String::new(),
                 a11y: None,

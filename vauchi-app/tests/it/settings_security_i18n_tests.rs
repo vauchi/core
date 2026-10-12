@@ -107,3 +107,16 @@ fn settings_security_groups_english_copy_unchanged() {
         }
     );
 }
+
+// The wipe group names its outcome, not a warning (vauchi/private#655).
+// English is the source language and ships bundled, so pinning it couples
+// nothing external.
+// @internal
+#[test]
+fn the_wipe_group_is_labelled_by_its_outcome() {
+    let advanced = SettingsEngine::new_advanced(config("")).current_screen();
+    let Component::SettingsGroup { label, .. } = find_group(&advanced.components, "danger") else {
+        unreachable!()
+    };
+    assert_eq!(label, "Erase data");
+}

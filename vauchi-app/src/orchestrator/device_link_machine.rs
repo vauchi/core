@@ -415,16 +415,36 @@ impl DeviceLinkInitiatorMachine {
         sender_token: &str,
         now: u64,
     ) -> InitiatorEvent {
-        let (encrypted_response, registry, device_info) =
-            match self.initiator.confirm_link(request, proof, now) {
-                Ok(triple) => triple,
+        // Contacts and own-card entries made before this link predate the
+        // new device in the registry, so device sync never journals them
+        // for it; they travel in the link response (private#658).
+        let sync_payload = match &self.persistence {
+            Some(ctx) => match full_sync_payload(ctx, now) {
+                Ok(json) => Some(json),
                 Err(e) => {
                     self.state = State::Failed;
                     return InitiatorEvent::Failed {
-                        reason: format!("confirm_link: {e}"),
+                        reason: format!("sync payload: {e}"),
                     };
                 }
-            };
+            },
+            None => None,
+        };
+        let confirmed = match &sync_payload {
+            Some(json) => self
+                .initiator
+                .confirm_link_with_sync(request, json, proof, now),
+            None => self.initiator.confirm_link(request, proof, now),
+        };
+        let (encrypted_response, registry, device_info) = match confirmed {
+            Ok(triple) => triple,
+            Err(e) => {
+                self.state = State::Failed;
+                return InitiatorEvent::Failed {
+                    reason: format!("confirm_link: {e}"),
+                };
+            }
+        };
 
         if let Some(ctx) = &self.persistence {
             let save = (|| -> Result<(), String> {
@@ -477,6 +497,28 @@ fn decode_claim(claim_b64: &str) -> Result<(Vec<u8>, String), String> {
     let claim: ClaimPayload =
         serde_json::from_slice(&bytes).map_err(|e| format!("claim parse: {e}"))?;
     Ok((claim.request, claim.response_code))
+}
+
+/// The owner's contacts, own card and owner-private state as of now, for
+/// the device being linked.
+fn full_sync_payload(ctx: &DeviceLinkPersistence, now: u64) -> Result<String, String> {
+    let storage =
+        Storage::open(&ctx.storage_path, ctx.storage_key.clone()).map_err(|e| e.to_string())?;
+    let identity_bytes = storage
+        .identity()
+        .load_identity()
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "identity missing while building the link payload".to_string())?;
+    let identity = Identity::from_storage_bytes(&identity_bytes, now).map_err(|e| e.to_string())?;
+    let registry = storage
+        .device()
+        .load_device_registry()
+        .map_err(|e| e.to_string())?
+        .unwrap_or_else(|| identity.initial_device_registry());
+    let payload = DeviceSyncOrchestrator::new(&storage, identity.create_device_info(now), registry)
+        .create_full_sync_payload(vauchi_core::sync::DeviceLinkIntent::AddDevice)
+        .map_err(|e| e.to_string())?;
+    Ok(payload.to_json())
 }
 
 // INLINE_TEST_REQUIRED: state-machine unit tests drive the machine via

@@ -12,6 +12,7 @@ use crate::common;
 use common::device_sync::{
     create_test_contact, create_test_device, create_test_registry, create_test_storage,
 };
+use vauchi_core::contact_card::{ContactField, FieldType};
 use vauchi_core::crypto::SigningKeyPair;
 use vauchi_core::sync::*;
 use vauchi_core::*;
@@ -644,4 +645,37 @@ fn test_conflict_contact_trust_changed() {
     }];
     let rejected = orchestrator.process_incoming(stale, &[0x99u8; 32]).unwrap();
     assert!(rejected.is_empty(), "Stale trust change should be rejected");
+}
+
+// vauchi/private#649: writes to two different entries that share a label
+// are independent, not one conflict.
+#[test]
+fn test_conflict_same_label_different_entries_are_independent() {
+    let storage = create_test_storage();
+    let master_seed = [0x42u8; 32];
+    let device_b = create_test_device(&master_seed, 1, "Device B");
+    let registry = create_test_registry(&master_seed, &device_b);
+    let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_b, registry);
+    let newer = ContactField::new(FieldType::Phone, "Phone", "5552222", 6000);
+    let older = ContactField::new(FieldType::Phone, "Phone", "5550606", 5000);
+
+    let applied = orchestrator
+        .process_incoming(
+            vec![
+                SyncItem::CardFieldSynced {
+                    field: newer,
+                    field_visibility: None,
+                    timestamp: 6000,
+                },
+                SyncItem::CardFieldSynced {
+                    field: older,
+                    field_visibility: None,
+                    timestamp: 5000,
+                },
+            ],
+            &[0x01u8; 32],
+        )
+        .unwrap();
+
+    assert_eq!(applied.len(), 2, "both entries' writes apply: {applied:?}");
 }

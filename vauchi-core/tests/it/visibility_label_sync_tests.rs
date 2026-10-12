@@ -14,7 +14,9 @@ use std::collections::HashSet;
 
 use vauchi_core::Vauchi;
 use vauchi_core::contact::GroupManager;
+use vauchi_core::contact_card::{ContactField, FieldType};
 use vauchi_core::sync::{GroupSyncData, SyncItem};
+use vauchi_core::visibility::FieldVisibility;
 
 use crate::common::device_sync::{journal_for_tablet, link_tablet};
 use crate::common::two_recipient::add_recipient;
@@ -510,5 +512,42 @@ fn test_label_manager_serialization() {
     assert_eq!(
         restored.get_contact_override("bob", "special-field"),
         Some(true)
+    );
+}
+
+// vauchi/private#649: "Visible to all contacts" must reach the owner's
+// other devices, or each device keeps its own view of who sees the entry.
+// @internal
+#[test]
+fn making_an_own_field_public_or_private_is_journaled_for_linked_devices() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let field = ContactField::new(FieldType::Phone, "Phone", "5550301", now());
+    let field_id = field.id().to_string();
+    vauchi.add_own_field(field).unwrap();
+    let (registry, tablet_id) = link_tablet(&vauchi, [7u8; 32]);
+
+    vauchi.set_own_field_public(&field_id).unwrap();
+    let after_public = journal_for_tablet(&vauchi, registry.clone(), &tablet_id);
+    vauchi.set_own_field_private(&field_id).unwrap();
+    let after_private = journal_for_tablet(&vauchi, registry, &tablet_id);
+
+    let visibility = |journal: &[SyncItem]| {
+        journal.iter().rev().find_map(|item| match item {
+            SyncItem::CardFieldSynced {
+                field,
+                field_visibility,
+                ..
+            } if field.id() == field_id => Some(field_visibility.clone()),
+            _ => None,
+        })
+    };
+    assert_eq!(
+        visibility(&after_public),
+        Some(Some(FieldVisibility::Everyone))
+    );
+    assert_eq!(
+        visibility(&after_private),
+        Some(Some(FieldVisibility::Nobody))
     );
 }

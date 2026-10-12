@@ -975,3 +975,41 @@ fn apply_sync_deletion_scheduled_dispatches_no_invalidation_event() {
         "DeletionScheduled has no mapped invalidation event — must dispatch nothing"
     );
 }
+
+// vauchi/private#649: two entries may share a label (both default to
+// "Phone"); a linked device's write to one must not delete the other.
+// @internal
+#[test]
+fn a_synced_field_keeps_another_entry_with_the_same_label() {
+    let wb = make_vauchi();
+    let edited = ContactField::new(FieldType::Phone, "Phone", "5550404", now());
+    let edited_id = edited.id().to_string();
+    let other = ContactField::new(FieldType::Phone, "Phone", "5550606", now());
+    let other_id = other.id().to_string();
+    wb.add_own_field(edited.clone()).unwrap();
+    wb.add_own_field(other).unwrap();
+    let mut from_sibling = edited;
+    from_sibling.set_value("5552222", now() + 1);
+
+    wb.apply_sync_items(vec![SyncItem::CardFieldSynced {
+        field: from_sibling,
+        field_visibility: Some(FieldVisibility::Everyone),
+        timestamp: now() + 1,
+    }])
+    .unwrap();
+
+    let card = wb.own_card().unwrap().unwrap();
+    let values: Vec<(String, String)> = card
+        .fields()
+        .iter()
+        .map(|field| (field.id().to_string(), field.value().to_string()))
+        .collect();
+    assert!(
+        values.contains(&(edited_id, "5552222".to_string())),
+        "{values:?}"
+    );
+    assert!(
+        values.contains(&(other_id, "5550606".to_string())),
+        "the other Phone entry must survive: {values:?}"
+    );
+}

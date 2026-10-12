@@ -645,7 +645,7 @@ impl InterDeviceSyncState {
 /// timestamp ties deterministically and identically on every device.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct FieldStamp {
-    /// Unix-ms timestamp of the write.
+    /// Unix-seconds timestamp of the write.
     pub timestamp: u64,
     /// Device id that originated the write (ADR-020 tie-breaker).
     pub device_id: [u8; 32],

@@ -852,19 +852,18 @@ mod tests {
         );
     }
 
+    // The wipe has one home, Settings → Advanced, behind the typed
+    // confirmation of the shred screen (vauchi/private#279, #598).
     // @internal
     #[test]
-    fn overview_always_offers_panic_shred() {
+    fn overview_offers_no_wipe() {
         let ids: Vec<String> = engine()
             .current_screen()
             .contextual_actions
             .iter()
             .map(|a| a.id.clone())
             .collect();
-        assert!(
-            ids.contains(&"panic_shred".to_string()),
-            "panic shred is always available"
-        );
+        assert_eq!(ids, ["export", "heirloom", "delete"]);
     }
 
     // @internal

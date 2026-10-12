@@ -408,6 +408,14 @@ impl AppEngine {
         )
     }
 
+    /// Drops cached engines that copied the group list when they were
+    /// built. Exchange stays cached across tab switches, so without this a
+    /// group created, renamed or deleted meanwhile never reaches its group
+    /// choices until the app restarts (#653).
+    pub(super) fn evict_group_snapshots(&mut self) {
+        self.engine_cache.remove(&AppScreen::Exchange);
+    }
+
     /// Invalidates a cached engine for a specific screen.
     /// Next navigation to this screen will create a fresh engine.
     /// When the invalidated screen IS the current one, the live engine is

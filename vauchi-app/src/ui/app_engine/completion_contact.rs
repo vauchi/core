@@ -80,6 +80,7 @@ impl AppEngine {
             };
         }
         self.engine_cache.remove(&AppScreen::Groups);
+        self.evict_group_snapshots();
         let screen = self.navigate_back();
         ActionResult::NavigateTo(screen)
     }

@@ -337,6 +337,9 @@ impl AppEngine {
             };
         }
         let result = self.vauchi.create_group(name.trim()).map(|_| ());
+        if result.is_ok() {
+            self.evict_group_snapshots();
+        }
         self.form_saved(result)
     }
 
@@ -366,6 +369,9 @@ impl AppEngine {
             };
         }
         let result = self.vauchi.rename_group(group_id, name.trim());
+        if result.is_ok() {
+            self.evict_group_snapshots();
+        }
         self.form_saved(result)
     }
 }

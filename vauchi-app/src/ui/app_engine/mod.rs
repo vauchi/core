@@ -865,6 +865,7 @@ impl AppEngine {
     /// the loop by calling this once at launch.
     pub fn on_wakeup(&mut self) -> Vec<PendingNotification> {
         let before = self.current_screen();
+        self.sync_if_due();
         let notifications = self.poll_notifications();
         if self.current_screen() != before {
             self.re_present_after_heartbeat();

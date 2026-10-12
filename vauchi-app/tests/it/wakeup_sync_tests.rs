@@ -9,8 +9,6 @@
 
 #![cfg(feature = "network-http")]
 
-use std::time::{Duration, Instant};
-
 use vauchi_app::ui::{AppEngine, Component, WorkflowEngine};
 use vauchi_core::ImportSource;
 use vauchi_core::api::{Vauchi, VauchiConfig};
@@ -68,7 +66,9 @@ fn a_wakeup_runs_a_due_sync() {
 
 // @internal
 #[test]
+#[cfg(feature = "testing")]
 fn a_wakeup_inside_the_sync_gate_does_not_sync() {
+    use std::time::{Duration, Instant};
     let (mut engine, _dir) = engine_with_unreachable_relay();
     engine
         .vauchi_mut()

@@ -306,6 +306,15 @@ impl Vauchi {
         Ok(())
     }
 
+    /// Whether [`Self::sync`] would pass its identity and C1/C2 timing gates
+    /// now. Cheap: no network, so a frequent wakeup can ask on every tick.
+    pub fn sync_due(&self) -> bool {
+        self.identity.is_some()
+            && self
+                .next_sync_allowed
+                .is_none_or(|deadline| self.monotonic.now() >= deadline)
+    }
+
     /// Whether an OHTTP gateway key is currently cached on this instance.
     ///
     /// Used by platform wrappers and tests to verify that

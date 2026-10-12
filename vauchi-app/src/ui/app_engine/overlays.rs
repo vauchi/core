@@ -418,7 +418,7 @@ impl AppEngine {
         screen
     }
 
-    fn has_someone_to_sync_with(&self) -> bool {
+    pub(super) fn has_someone_to_sync_with(&self) -> bool {
         let has_contacts = matches!(self.vauchi.storage().contacts().has_contacts(), Ok(true));
         has_contacts
             || self

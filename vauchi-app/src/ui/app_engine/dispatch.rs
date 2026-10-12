@@ -82,6 +82,25 @@ impl AppEngine {
         ActionResult::UpdateScreen(self.current_screen())
     }
 
+    /// Syncs with the relay when Core's gate says one is due, so a platform
+    /// wakeup fetches mail without a tap (private#648). Skipped while an
+    /// exchange or Link session is live: their frames ride this heartbeat at
+    /// about one per second, and a sync holds the engine for a network round
+    /// trip.
+    pub(super) fn sync_if_due(&mut self) {
+        #[cfg(feature = "network-http")]
+        if self.vauchi.sync_due()
+            && self.has_someone_to_sync_with()
+            && !self.multi_stage_session_active()
+            && !self.link_session_active()
+        {
+            // The screen it returns is not needed: on_wakeup re-presents
+            // after the heartbeat whenever the screen changed.
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = self.sync_and_rerender();
+        }
+    }
+
     pub(super) fn intercept_global_chrome(&mut self, action: &UserAction) -> Option<ActionResult> {
         // Handle sync_now from the chrome Indicator emitted by
         // apply_sync_chrome_overlay. Updates sync_chrome_status with

@@ -2188,7 +2188,6 @@
   "settings.contact_added_a11y": "New Contact Added toggle",
   "settings.contact_added_hint": "When enabled, sends a notification when a new contact is added",
   "settings.current": "Current",
-  "settings.danger_zone": "Danger Zone",
   "settings.data_export": "Export My Data",
   "settings.data_export_description": "Download all your data in a portable format",
   "settings.debug_mode": "Debug Mode",

@@ -262,7 +262,16 @@ impl AppEngine {
             });
         }
 
-        // 4. Unknown vauchi link (or non-vauchi scheme that the OS somehow
+        // 4. A Glance QR scanned with the phone's camera opens the app with
+        //    https://vauchi.app/x#q=… (vauchi/private#277): continue the
+        //    in-person exchange as the in-app scanner would. The code is
+        //    verified before leaving the current screen, so a stale or
+        //    forged one starts nothing.
+        if let Some(result) = self.open_scanned_glance_link(uri) {
+            return Some(result);
+        }
+
+        // 5. Unknown vauchi link (or non-vauchi scheme that the OS somehow
         //    delivered). Surface a single, core-owned error.
         Some(ActionResult::ShowAlert {
             title: self.t("deep_link.invalid_title"),

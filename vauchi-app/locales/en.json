@@ -650,6 +650,7 @@
   "deep_link.title": "Exchange Request",
   "deep_link_consent.accept_button": "Accept Exchange",
   "deep_link_consent.banner_text": "Someone shared an exchange link with you. Only accept if you trust the source.",
+  "deep_link_consent.banner_text_named": "This link says it is from {name}. Names in links are not checked: only accept if you trust where it came from.",
   "deep_link_consent.decline_button": "Decline",
   "deep_link_consent.title": "Exchange Request",
   "delivery.attempt_of": "Attempt {current} of {max}",

@@ -122,8 +122,15 @@ impl Vauchi {
         let mut orchestrator =
             match DeviceSyncOrchestrator::load(&self.storage, device_info, registry.clone()) {
                 Ok(o) => o,
-                Err(_) => return Ok(0),
+                Err(error) => {
+                    tracing::warn!(%error, "[DeviceSync] loading the sync state failed");
+                    return Ok(0);
+                }
             };
+        tracing::info!(
+            devices = orchestrator.devices_with_pending().len(),
+            "[DeviceSync] flushing"
+        );
 
         let master_seed = identity.master_seed();
         let mut sent = 0usize;
@@ -139,13 +146,16 @@ impl Vauchi {
             };
 
             let version = orchestrator.version_vector().get(&current_id);
+            let items = orchestrator.pending_for_device(&device_id).len();
             match ctrl.send_device_sync(&orchestrator, &device_id, &target_pub, master_seed) {
                 Ok(()) => {
+                    tracing::info!(items, "[DeviceSync] sent a batch to a linked device");
                     orchestrator.mark_synced(&device_id, version)?;
                     sent += 1;
                 }
-                Err(_) => {
+                Err(error) => {
                     // best-effort: leave queued, retry next cycle
+                    tracing::warn!(items, %error, "[DeviceSync] sending a batch failed");
                 }
             }
         }
@@ -243,9 +253,17 @@ impl Vauchi {
             };
             // The decrypting device IS the sender — use its id for the
             // ADR-020 tie-break (no wire field needed).
+            let decoded = items.len();
             let applied = orchestrator
                 .process_incoming(items, &device.device_id)
                 .map_err(VauchiError::DeviceSync)?;
+            // Counts only: which side loses an owner-device change is
+            // otherwise invisible on a device (private#659).
+            tracing::info!(
+                decoded,
+                accepted = applied.len(),
+                "[DeviceSync] received a batch from a linked device"
+            );
             return self.apply_sync_items(applied);
         }
 

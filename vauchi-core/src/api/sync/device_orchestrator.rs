@@ -239,6 +239,11 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             .unwrap_or(&[])
     }
 
+    /// How many linked devices a recorded change is queued for.
+    pub fn device_count_for_sync(&self) -> usize {
+        self.device_states.len()
+    }
+
     /// Returns all device IDs that have pending items.
     pub fn devices_with_pending(&self) -> Vec<[u8; 32]> {
         self.device_states

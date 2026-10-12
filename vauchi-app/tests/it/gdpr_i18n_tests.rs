@@ -121,35 +121,6 @@ fn gdpr_overview_and_delete_review_render_the_active_locale() {
     );
 }
 
-// @scenario: security :: panic shred confirm renders in the active locale
-// @internal
-#[test]
-fn gdpr_panic_shred_confirm_renders_the_active_locale() {
-    load_german();
-
-    let confirm_copy = |locale: Locale| {
-        let mut engine = engine_for(locale);
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "panic_shred".into(),
-        });
-        let confirm = engine.current_screen();
-        (
-            confirm.title.clone(),
-            confirm.subtitle.clone().expect("confirm subtitle present"),
-            action_label(&confirm, "confirm_shred"),
-            action_label(&confirm, "cancel"),
-        )
-    };
-
-    let (de_title, de_subtitle, de_confirm, de_cancel) = confirm_copy(Locale::German);
-    let (en_title, en_subtitle, en_confirm, en_cancel) = confirm_copy(Locale::English);
-
-    assert_translated("panic-shred title", &de_title, &en_title);
-    assert_translated("panic-shred subtitle", &de_subtitle, &en_subtitle);
-    assert_translated("confirm-shred action", &de_confirm, &en_confirm);
-    assert_translated("cancel action", &de_cancel, &en_cancel);
-}
-
 // English stays the canonical key values (two builder literals converge:
 // Export My Data + the consent subtitle) — pinned so future edits go
 // through the locale files, not the builder. English is the source

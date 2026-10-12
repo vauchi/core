@@ -5,7 +5,7 @@
 //! GDPR / privacy engine — data export, deletion, and consent management.
 //! Copy resolves through `i18n::get_string` in the locale threaded at
 //! construction (M3 S3b of `2026-07-03-core-screens-bypass-i18n`); keys
-//! live in the `privacy.*` / `shred.panic_*` + shared `action.*` families.
+//! live in the `privacy.*` + shared `action.*` families.
 
 use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
@@ -80,8 +80,6 @@ enum GdprStep {
     ManageConsent,
     /// Confirm executing a scheduled deletion now (grace elapsed).
     ConfirmExecute,
-    /// Confirm an immediate emergency wipe (panic shred).
-    ConfirmShred,
 }
 
 impl GdprEngine {
@@ -229,13 +227,6 @@ impl GdprEngine {
                         a11y: Some(A11y::labeled(self.t("privacy.delete_identity"))),
                     });
                 }
-                actions.push(ScreenAction {
-                    id: "panic_shred".into(),
-                    label: self.t("shred.panic_title"),
-                    style: ActionStyle::Destructive,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("shred.panic_title"))),
-                });
                 actions
             },
             progress: None,
@@ -413,50 +404,12 @@ impl GdprEngine {
         }
     }
 
-    fn build_confirm_shred(&self) -> ScreenModel {
-        ScreenModel {
-            screen_id: "confirm_panic_shred".into(),
-            title: self.t("shred.panic_title"),
-            subtitle: Some(self.t("shred.panic_subtitle")),
-            components: vec![Component::InfoPanel {
-                id: "shred_warning".into(),
-                icon: Some("warning".into()),
-                title: self.t("shred.panic_panel_title"),
-                items: vec![InfoItem {
-                    icon: Some("warning".into()),
-                    title: self.t("privacy.delete.irreversible_title"),
-                    detail: self.t("shred.panic_detail"),
-                }],
-                a11y: None,
-            }],
-            contextual_actions: vec![
-                ScreenAction {
-                    id: "confirm_shred".into(),
-                    label: self.t("shred.panic_confirm_button"),
-                    style: ActionStyle::Destructive,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("shred.panic_confirm_button"))),
-                },
-                ScreenAction {
-                    id: "cancel".into(),
-                    label: self.t("action.cancel"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
-                },
-            ],
-            progress: None,
-            ..Default::default()
-        }
-    }
-
     fn build_screen(&self) -> ScreenModel {
         match self.step {
             GdprStep::Overview => self.build_overview(),
             GdprStep::ConfirmDelete => self.build_confirm_delete(),
             GdprStep::ManageConsent => self.build_consent(),
             GdprStep::ConfirmExecute => self.build_confirm_execute(),
-            GdprStep::ConfirmShred => self.build_confirm_shred(),
             GdprStep::ConfirmHeirloom => self.build_confirm_heirloom(),
         }
     }
@@ -511,13 +464,6 @@ impl WorkflowEngine for GdprEngine {
                 self.step = GdprStep::ConfirmExecute;
                 ActionResult::NavigateTo(self.build_screen())
             }
-            // Overview: panic shred navigates to its confirmation screen
-            (GdprStep::Overview, UserAction::ActionPressed { action_id })
-                if action_id == "panic_shred" =>
-            {
-                self.step = GdprStep::ConfirmShred;
-                ActionResult::NavigateTo(self.build_screen())
-            }
             // Confirmation: confirm triggers deletion
             (GdprStep::ConfirmDelete, UserAction::ActionPressed { action_id })
                 if action_id == "confirm_delete" =>
@@ -532,19 +478,9 @@ impl WorkflowEngine for GdprEngine {
                 self.last_action = Some("execute".into());
                 ActionResult::Complete
             }
-            // Shred confirmation: confirm triggers the emergency wipe
-            (GdprStep::ConfirmShred, UserAction::ActionPressed { action_id })
-                if action_id == "confirm_shred" =>
-            {
-                self.last_action = Some("shred".into());
-                ActionResult::Complete
-            }
             // Any confirmation screen: cancel goes back to overview
             (
-                GdprStep::ConfirmDelete
-                | GdprStep::ConfirmExecute
-                | GdprStep::ConfirmShred
-                | GdprStep::ConfirmHeirloom,
+                GdprStep::ConfirmDelete | GdprStep::ConfirmExecute | GdprStep::ConfirmHeirloom,
                 UserAction::ActionPressed { action_id },
             ) if action_id == "cancel" => {
                 self.step = GdprStep::Overview;
@@ -599,7 +535,6 @@ impl WorkflowEngine for GdprEngine {
             Some("delete") => GdprChoice::Delete,
             Some("cancel_deletion") => GdprChoice::CancelDeletion,
             Some("execute") => GdprChoice::Execute,
-            Some("shred") => GdprChoice::Shred,
             Some("heirloom") => GdprChoice::Heirloom,
             _ => return None,
         };
@@ -639,12 +574,6 @@ mod tests {
             .find(|a| a.id == "delete")
             .expect("delete action present");
         assert_eq!(delete.style, ActionStyle::Serious);
-        let shred = screen
-            .contextual_actions
-            .iter()
-            .find(|a| a.id == "panic_shred")
-            .expect("panic shred present");
-        assert_eq!(shred.style, ActionStyle::Destructive);
     }
 
     #[test]
@@ -898,21 +827,6 @@ mod tests {
             Some(crate::ui::EngineOutput::Gdpr(
                 crate::ui::GdprChoice::Execute
             ))
-        );
-    }
-
-    // @internal
-    #[test]
-    fn confirm_shred_completes_with_shred_action() {
-        let mut e = engine();
-        e.step = GdprStep::ConfirmShred;
-        let r = e.handle_action(UserAction::ActionPressed {
-            action_id: "confirm_shred".into(),
-        });
-        assert!(matches!(r, ActionResult::Complete));
-        assert_eq!(
-            e.engine_output(),
-            Some(crate::ui::EngineOutput::Gdpr(crate::ui::GdprChoice::Shred))
         );
     }
 

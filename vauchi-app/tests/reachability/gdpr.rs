@@ -8,11 +8,10 @@
 //! exclusive, so two factories are needed:
 //!
 //! - **default** (no deletion scheduled): overview offers `export` /
-//!   `delete` / `panic_shred`; `delete` -> `delete_identity_summary`
-//!   (`confirm_delete` / `cancel`); `panic_shred` -> `confirm_panic_shred`
-//!   (`confirm_shred` / `cancel`).
+//!   `delete`; `delete` -> `delete_identity_summary`
+//!   (`confirm_delete` / `cancel`).
 //! - **scheduled + grace elapsed**: overview offers `export` /
-//!   `cancel_deletion` / `execute_deletion` / `panic_shred`;
+//!   `cancel_deletion` / `execute_deletion`;
 //!   `execute_deletion` -> `confirm_execute_deletion` (`confirm_execute`
 //!   / `cancel`).
 //!
@@ -30,9 +29,7 @@ const HANDLED_DEFAULT: &[&str] = &[
     "heirloom",
     "confirm_heirloom",
     "delete",
-    "panic_shred",
     "confirm_delete",
-    "confirm_shred",
     "cancel",
 ];
 
@@ -42,9 +39,7 @@ const HANDLED_SCHEDULED: &[&str] = &[
     "confirm_heirloom",
     "cancel_deletion",
     "execute_deletion",
-    "panic_shred",
     "confirm_execute",
-    "confirm_shred",
     "cancel",
 ];
 

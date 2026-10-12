@@ -649,6 +649,7 @@ fn test_conflict_contact_trust_changed() {
 
 // vauchi/private#649: writes to two different entries that share a label
 // are independent, not one conflict.
+// @internal
 #[test]
 fn test_conflict_same_label_different_entries_are_independent() {
     let storage = create_test_storage();
@@ -678,4 +679,24 @@ fn test_conflict_same_label_different_entries_are_independent() {
         .unwrap();
 
     assert_eq!(applied.len(), 2, "both entries' writes apply: {applied:?}");
+}
+
+// vauchi/private#649: the id is optional on the wire — items from older
+// devices decode without it, and a missing id is not written out.
+// @internal
+#[test]
+fn test_card_field_removed_without_id_round_trips_in_the_old_format() {
+    let old = r#"{"CardFieldRemoved":{"field_label":"Phone","timestamp":7}}"#;
+
+    let item: SyncItem = serde_json::from_str(old).unwrap();
+
+    assert_eq!(
+        item,
+        SyncItem::CardFieldRemoved {
+            field_label: "Phone".to_string(),
+            field_id: None,
+            timestamp: 7,
+        }
+    );
+    assert_eq!(serde_json::to_string(&item).unwrap(), old);
 }

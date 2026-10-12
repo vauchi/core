@@ -617,3 +617,51 @@ fn removing_an_entry_by_id_removes_that_entry_and_journals_its_id() {
         "{journal:?}"
     );
 }
+
+// vauchi/private#649: re-saving a card whose entries only got a new
+// timestamp journals nothing.
+// @internal
+#[test]
+fn re_saving_unchanged_entries_journals_nothing() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let (first_id, _) = two_phone_entries(&vauchi);
+    let (registry, tablet_id) = link_tablet(&vauchi, [29u8; 32]);
+    let before = journal_for_tablet(&vauchi, registry.clone(), &tablet_id).len();
+    let mut card = vauchi.own_card().unwrap().unwrap();
+    card.update_field_value(&first_id, "5550404", now() + 5)
+        .unwrap();
+
+    vauchi.update_own_card(&card).unwrap();
+
+    assert_eq!(
+        journal_for_tablet(&vauchi, registry, &tablet_id).len(),
+        before
+    );
+}
+
+// vauchi/private#649 review: a duress session shares the real storage, so
+// its own-card visibility changes must not reach the owner's other
+// devices (ADR-032).
+// @internal
+#[test]
+fn in_duress_mode_visibility_changes_are_not_journaled() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let field = ContactField::new(FieldType::Phone, "Phone", "5550301", now());
+    let field_id = field.id().to_string();
+    vauchi.add_own_field(field).unwrap();
+    let (registry, tablet_id) = link_tablet(&vauchi, [31u8; 32]);
+    vauchi.setup_app_password("app-password-123").unwrap();
+    vauchi.setup_duress_password("135790").unwrap();
+    vauchi.authenticate("135790").unwrap();
+    let before = journal_for_tablet(&vauchi, registry.clone(), &tablet_id).len();
+
+    let _ = vauchi.set_own_field_public(&field_id);
+    let _ = vauchi.set_own_field_private(&field_id);
+
+    assert_eq!(
+        journal_for_tablet(&vauchi, registry, &tablet_id).len(),
+        before
+    );
+}

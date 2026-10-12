@@ -1013,3 +1013,34 @@ fn a_synced_field_keeps_another_entry_with_the_same_label() {
         "the other Phone entry must survive: {values:?}"
     );
 }
+
+// vauchi/private#649: a removal carrying an entry id removes that entry,
+// not the first entry with its label.
+// @internal
+#[test]
+fn a_removal_with_an_id_removes_that_entry_only() {
+    let wb = make_vauchi();
+    let first = ContactField::new(FieldType::Phone, "Phone", "5550404", now());
+    let first_id = first.id().to_string();
+    let second = ContactField::new(FieldType::Phone, "Phone", "5550606", now());
+    let second_id = second.id().to_string();
+    wb.add_own_field(first).unwrap();
+    wb.add_own_field(second).unwrap();
+
+    wb.apply_sync_items(vec![SyncItem::CardFieldRemoved {
+        field_label: "Phone".to_string(),
+        field_id: Some(second_id),
+        timestamp: now() + 1,
+    }])
+    .unwrap();
+
+    let ids: Vec<String> = wb
+        .own_card()
+        .unwrap()
+        .unwrap()
+        .fields()
+        .iter()
+        .map(|field| field.id().to_string())
+        .collect();
+    assert_eq!(ids, vec![first_id]);
+}

@@ -551,3 +551,69 @@ fn making_an_own_field_public_or_private_is_journaled_for_linked_devices() {
         Some(Some(FieldVisibility::Nobody))
     );
 }
+
+fn two_phone_entries(vauchi: &Vauchi) -> (String, String) {
+    let first = ContactField::new(FieldType::Phone, "Phone", "5550404", now());
+    let second = ContactField::new(FieldType::Phone, "Phone", "5550606", now());
+    let ids = (first.id().to_string(), second.id().to_string());
+    vauchi.add_own_field(first).unwrap();
+    vauchi.add_own_field(second).unwrap();
+    ids
+}
+
+// vauchi/private#649: an edit to the second of two same-label entries is
+// journaled under that entry's id.
+// @internal
+#[test]
+fn editing_the_second_same_label_entry_is_journaled_by_its_id() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let (_, second_id) = two_phone_entries(&vauchi);
+    let (registry, tablet_id) = link_tablet(&vauchi, [19u8; 32]);
+    let mut card = vauchi.own_card().unwrap().unwrap();
+    card.update_field_value(&second_id, "5559999", now() + 1)
+        .unwrap();
+
+    vauchi.update_own_card(&card).unwrap();
+
+    let journal = journal_for_tablet(&vauchi, registry, &tablet_id);
+    assert!(
+        journal.iter().any(|item| matches!(
+            item,
+            SyncItem::CardFieldSynced { field, .. }
+                if field.id() == second_id && field.value() == "5559999"
+        )),
+        "{journal:?}"
+    );
+}
+
+// vauchi/private#649: removing an entry by id removes that entry, here and
+// on the owner's other devices, never a same-label sibling.
+// @internal
+#[test]
+fn removing_an_entry_by_id_removes_that_entry_and_journals_its_id() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let (first_id, second_id) = two_phone_entries(&vauchi);
+    let (registry, tablet_id) = link_tablet(&vauchi, [23u8; 32]);
+
+    assert!(vauchi.remove_own_field_by_id(&second_id).unwrap());
+
+    let ids: Vec<String> = vauchi
+        .own_card()
+        .unwrap()
+        .unwrap()
+        .fields()
+        .iter()
+        .map(|field| field.id().to_string())
+        .collect();
+    assert_eq!(ids, vec![first_id]);
+    let journal = journal_for_tablet(&vauchi, registry, &tablet_id);
+    assert!(
+        journal.iter().any(|item| matches!(
+            item,
+            SyncItem::CardFieldRemoved { field_id: Some(id), .. } if *id == second_id
+        )),
+        "{journal:?}"
+    );
+}

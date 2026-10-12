@@ -73,14 +73,15 @@ pub(super) fn delete_bootstrap_key(secure: &dyn SecureStorage) {
     }
 }
 
-/// Opens storage under secure-storage keys. `shell_key` is a storage key a
-/// shell kept itself before keys moved to secure storage; it is adopted, so
-/// the shell can drop it once Core has opened.
+/// Opens storage under secure-storage keys and returns the key the data is
+/// under. `shell_key` is a storage key a shell kept itself before keys moved
+/// to secure storage; it is adopted, so the shell can drop it once Core has
+/// opened.
 pub(super) fn open_storage(
     path: &Path,
     shell_key: Option<SymmetricKey>,
     secure: &dyn SecureStorage,
-) -> VauchiResult<Storage> {
+) -> VauchiResult<(Storage, SymmetricKey)> {
     let bootstrap = load_key(secure, BOOTSTRAP_KEY_NAME)?
         .map(|bytes| {
             SymmetricKey::try_from_bytes(bytes).map_err(|_| {
@@ -96,16 +97,16 @@ pub(super) fn open_storage(
         match Storage::open(path, sek.clone()) {
             Ok(storage) => {
                 delete_bootstrap_key(secure);
-                return Ok(storage);
+                return Ok((storage, sek));
             }
             Err(StorageError::WrongKey) => {}
             Err(e) => return Err(e.into()),
         }
         let (mut storage, _) =
             open_with_first(path, bootstrap.into_iter().chain(shell_key).collect())?;
-        storage.rekey(sek)?;
+        storage.rekey(sek.clone())?;
         delete_bootstrap_key(secure);
-        return Ok(storage);
+        return Ok((storage, sek));
     }
 
     let stored_bootstrap = bootstrap.clone();
@@ -120,7 +121,7 @@ pub(super) fn open_storage(
         secure
             .save_key(BOOTSTRAP_KEY_NAME, fresh.as_bytes())
             .map_err(keychain_error)?;
-        return Ok(Storage::open(path, fresh)?);
+        return Ok((Storage::open(path, fresh.clone())?, fresh));
     }
     let (storage, key) = open_with_first(path, candidates)?;
     if stored_bootstrap.as_ref().map(SymmetricKey::as_bytes) != Some(key.as_bytes()) {
@@ -128,5 +129,5 @@ pub(super) fn open_storage(
             .save_key(BOOTSTRAP_KEY_NAME, key.as_bytes())
             .map_err(keychain_error)?;
     }
-    Ok(storage)
+    Ok((storage, key))
 }

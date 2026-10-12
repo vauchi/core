@@ -327,11 +327,17 @@ impl Vauchi {
                 .map_err(|e| VauchiError::Configuration(e.to_string()))?;
         }
         let storage = match secure_storage.as_deref() {
-            Some(secure) => storage_keys::open_storage(
-                &config.storage_path,
-                config.storage_key.clone(),
-                secure,
-            )?,
+            Some(secure) => {
+                let (storage, key) = storage_keys::open_storage(
+                    &config.storage_path,
+                    config.storage_key.clone(),
+                    secure,
+                )?;
+                // Device linking persists through `config.storage_key`, so it
+                // must name the key the data is under (private#647).
+                config.storage_key = Some(key);
+                storage
+            }
             None => Storage::open(
                 &config.storage_path,
                 config

@@ -75,9 +75,10 @@ impl Vauchi {
 
             // Derive SEK and rekey storage
             let sek = smk.derive_sek();
-            self.storage.rekey(sek).map_err(|e| {
+            self.storage.rekey(sek.clone()).map_err(|e| {
                 VauchiError::Configuration(format!("Failed to rekey storage: {}", e))
             })?;
+            self.config.storage_key = Some(sek);
             storage_keys::delete_bootstrap_key(ss.as_ref());
         }
 
@@ -155,8 +156,9 @@ impl Vauchi {
         // Derive SEK and rekey storage
         let sek = smk.derive_sek();
         self.storage
-            .rekey(sek)
+            .rekey(sek.clone())
             .map_err(|e| VauchiError::Configuration(format!("Failed to rekey storage: {}", e)))?;
+        self.config.storage_key = Some(sek);
         storage_keys::delete_bootstrap_key(ss.as_ref());
 
         Ok(())

@@ -562,22 +562,21 @@ impl Vauchi {
         let old_card = self.storage.contacts().load_own_card()?;
         let manager = ContactManager::new(&self.storage, self.events.clone());
         let changed_labels = manager.update_own_card(card)?;
-        if !changed_labels.is_empty() {
-            self.mark_own_card_repropagate()?;
-        }
         // Journaled by entry id: two entries may share a label (private#649).
         let ts = self.now_timestamp();
         let old_fields = old_card
             .as_ref()
             .map(|old| old.fields())
             .unwrap_or_default();
+        let mut journaled = false;
         for field in card.fields() {
-            let unchanged = old_fields.iter().any(|old| old == field)
+            let unchanged = old_fields.iter().any(|old| same_content(old, field))
                 && old_card.as_ref().is_some_and(|old| {
                     explicit_visibility(old, field.id()) == explicit_visibility(card, field.id())
                 });
             if !unchanged {
                 self.journal_own_field(card, field.id(), ts);
+                journaled = true;
             }
         }
         for old_field in old_fields {
@@ -586,12 +585,13 @@ impl Vauchi {
                 .iter()
                 .any(|field| field.id() == old_field.id())
             {
-                self.record_sync_item(crate::sync::SyncItem::CardFieldRemoved {
-                    field_label: old_field.label().to_string(),
-                    field_id: Some(old_field.id().to_string()),
-                    timestamp: ts,
-                });
+                self.journal_own_field_removed(old_field, ts);
+                journaled = true;
             }
+        }
+        // A visibility-only change also reaches contacts.
+        if journaled || !changed_labels.is_empty() {
+            self.mark_own_card_repropagate()?;
         }
         Ok(changed_labels)
     }
@@ -599,6 +599,11 @@ impl Vauchi {
     /// Journals an own-card field, with its explicit visibility, for the
     /// owner's other devices.
     pub(super) fn journal_own_field(&self, card: &ContactCard, field_id: &str, timestamp: u64) {
+        // A duress session shares the real storage; nothing it does may
+        // reach the owner's other devices (ADR-032).
+        if self.in_duress_mode() {
+            return;
+        }
         if let Some(field) = card.fields().iter().find(|field| field.id() == field_id) {
             self.record_sync_item(crate::sync::SyncItem::CardFieldSynced {
                 field: field.clone(),
@@ -669,12 +674,23 @@ impl Vauchi {
             return Ok(false);
         };
         self.mark_own_card_repropagate()?;
+        self.journal_own_field_removed_by(label, field_id, self.now_timestamp());
+        Ok(true)
+    }
+
+    fn journal_own_field_removed(&self, field: &ContactField, timestamp: u64) {
+        self.journal_own_field_removed_by(field.label().to_string(), field.id(), timestamp);
+    }
+
+    fn journal_own_field_removed_by(&self, label: String, field_id: &str, timestamp: u64) {
+        if self.in_duress_mode() {
+            return;
+        }
         self.record_sync_item(crate::sync::SyncItem::CardFieldRemoved {
             field_label: label,
             field_id: Some(field_id.to_string()),
-            timestamp: self.now_timestamp(),
+            timestamp,
         });
-        Ok(true)
     }
 
     /// Marks the own card dirty so the next sync tick repropagates it to
@@ -959,4 +975,14 @@ fn explicit_visibility(
     card.field_visibility()
         .contains(field_id)
         .then(|| card.field_visibility().get(field_id).clone())
+}
+
+/// Same entry content, ignoring the edit stamp: a client that re-saves a
+/// card with fresh stamps has changed nothing worth syncing.
+fn same_content(old: &ContactField, new: &ContactField) -> bool {
+    old.id() == new.id()
+        && old.field_type() == new.field_type()
+        && old.label() == new.label()
+        && old.value() == new.value()
+        && old.note() == new.note()
 }

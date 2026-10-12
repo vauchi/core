@@ -716,6 +716,10 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             }
             SyncItem::CardUpdated { field_label, .. } => format!("field:{}", field_label),
             // Keyed by entry id: two entries may share a label (private#649).
+            // Items from older devices (CardUpdated, an id-less removal) keep
+            // their label key, so during a mixed-version rollout they are not
+            // ordered against id-keyed writes; accepted, as no current
+            // version sends them.
             SyncItem::CardFieldSynced { field, .. } => format!("field:{}", field.id()),
             SyncItem::CardFieldRemoved {
                 field_id: Some(field_id),

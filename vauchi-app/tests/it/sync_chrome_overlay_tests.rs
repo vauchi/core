@@ -16,6 +16,7 @@ use vauchi_core::ImportSource;
 use vauchi_core::api::Vauchi;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
+use vauchi_core::identity::DeviceInfo;
 
 fn test_engine() -> AppEngine {
     let vauchi = Vauchi::in_memory().unwrap();
@@ -92,6 +93,34 @@ fn sync_indicator_appears_once_first_contact_exists() {
     assert!(
         find_sync_indicator(&engine.current_screen().components).is_some(),
         "sync indicator should appear once a contact exists"
+    );
+}
+
+// @internal
+#[test]
+fn a_linked_device_without_contacts_gets_the_sync_indicator() {
+    // A device that joined an identity has the owner's other devices to
+    // sync with, and its contacts only arrive by syncing; without the chip
+    // a freshly linked phone could never fetch them (vauchi/private#7 rig
+    // run, 2026-10-12).
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut registry = vauchi.identity().unwrap().initial_device_registry();
+    registry
+        .add_device_unsigned(
+            DeviceInfo::derive(&[9u8; 32], 1, "Laptop".into(), 0).to_registered(&[9u8; 32]),
+        )
+        .unwrap();
+    vauchi
+        .storage()
+        .device()
+        .save_device_registry(&registry)
+        .unwrap();
+    let engine = AppEngine::new(vauchi);
+
+    assert!(
+        find_sync_indicator(&engine.current_screen().components).is_some(),
+        "a linked device must be able to sync before it has contacts"
     );
 }
 

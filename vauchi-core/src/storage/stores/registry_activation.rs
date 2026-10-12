@@ -21,8 +21,8 @@ use crate::sync::registry_activation::ActivationTracker;
 use std::sync::Arc;
 
 /// Raw `registry_activation` row: `(push_nonce, pushed_version,
-/// our_version_acked, peer_version_held)`.
-type ActivationRow = (Option<Vec<u8>>, Option<i64>, Option<i64>, Option<i64>);
+/// our_version_acked, peer_version_held, repush_allowed)`.
+type ActivationRow = (Option<Vec<u8>>, Option<i64>, Option<i64>, Option<i64>, bool);
 
 /// Scoped persistence view for F4 registry-activation handshake state.
 pub struct RegistryActivationStore<'a> {
@@ -54,12 +54,12 @@ impl RegistryActivationStore<'_> {
         self.conn.execute(
             "INSERT INTO registry_activation
                  (contact_id, push_nonce, pushed_version, our_version_acked,
-                  peer_version_held, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                  peer_version_held, updated_at, repush_allowed)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
                  ON CONFLICT(contact_id) DO UPDATE SET
                      push_nonce = ?2, pushed_version = ?3,
                      our_version_acked = ?4, peer_version_held = ?5,
-                     updated_at = ?6",
+                     updated_at = ?6, repush_allowed = ?7",
             params![
                 contact_id,
                 push_nonce,
@@ -67,6 +67,7 @@ impl RegistryActivationStore<'_> {
                 tracker.our_version_acked().map(|v| v as i64),
                 tracker.peer_version_held().map(|v| v as i64),
                 self.clock.unix_seconds() as i64,
+                tracker.repush_allowed(),
             ],
         )?;
         Ok(())
@@ -98,13 +99,21 @@ impl RegistryActivationStore<'_> {
         let row: Option<ActivationRow> = self
             .conn
             .query_row(
-                "SELECT push_nonce, pushed_version, our_version_acked, peer_version_held
+                "SELECT push_nonce, pushed_version, our_version_acked, peer_version_held,
+                        repush_allowed
                      FROM registry_activation WHERE contact_id = ?1",
                 params![contact_id],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
             )
             .optional()?;
-        let Some((push_nonce, pushed_version, our_version_acked, peer_version_held)) = row else {
+        let Some((
+            push_nonce,
+            pushed_version,
+            our_version_acked,
+            peer_version_held,
+            repush_allowed,
+        )) = row
+        else {
             return Ok(None);
         };
         // This table is written only by this store with u64 inputs, so a
@@ -131,10 +140,13 @@ impl RegistryActivationStore<'_> {
                 ));
             }
         };
-        Ok(Some(ActivationTracker::from_parts(
-            outstanding_push,
-            our_version_acked.map(checked_version).transpose()?,
-            peer_version_held.map(checked_version).transpose()?,
-        )))
+        Ok(Some(
+            ActivationTracker::from_parts(
+                outstanding_push,
+                our_version_acked.map(checked_version).transpose()?,
+                peer_version_held.map(checked_version).transpose()?,
+            )
+            .with_repush_allowed(repush_allowed),
+        ))
     }
 }

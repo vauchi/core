@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 81] = [
+const MIGRATIONS: [Migration; 82] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -677,7 +677,17 @@ const MIGRATIONS: [Migration; 81] = [
         name: "drop_duress_settings",
         action: MigrationAction::Sql(MIGRATION_V81_DROP_DURESS_SETTINGS),
     },
+    Migration {
+        version: 82,
+        name: "registry_activation_repush_allowed",
+        action: MigrationAction::Sql(MIGRATION_V82_REGISTRY_ACTIVATION_REPUSH_ALLOWED),
+    },
 ];
+
+/// Migration v82: an unacked registry push is re-sent only after hearing
+/// from the contact (vauchi/private#662). Existing rows may re-push once.
+const MIGRATION_V82_REGISTRY_ACTIVATION_REPUSH_ALLOWED: &str =
+    "ALTER TABLE registry_activation ADD COLUMN repush_allowed INTEGER NOT NULL DEFAULT 1;";
 
 /// Migration v81: a duress unlock sends no alert, so its recipients and
 /// message go (ADR-032 amendment 2026-10-11, vauchi/private#636).

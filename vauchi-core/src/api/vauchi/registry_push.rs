@@ -108,6 +108,12 @@ impl Vauchi {
             if confirmed {
                 continue;
             }
+            // Once per version; again only after hearing from the contact, so
+            // a contact who never comes back is not sent a blob every sync
+            // (private#662).
+            if !tracker.may_push(own_version) {
+                continue;
+            }
             // One handshake message in flight per contact. Ordinary pending
             // updates must not suppress this bootstrap: they may themselves
             // be blocked until the handshake activates device-scoped routing.

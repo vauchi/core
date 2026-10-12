@@ -72,6 +72,7 @@ pub struct ActivationTracker {
     outstanding_push: Option<([u8; NONCE_LEN], u64)>,
     our_version_acked: Option<u64>,
     peer_version_held: Option<u64>,
+    repush_allowed: bool,
 }
 
 impl ActivationTracker {
@@ -81,6 +82,7 @@ impl ActivationTracker {
             outstanding_push: None,
             our_version_acked: None,
             peer_version_held: None,
+            repush_allowed: true,
         }
     }
 
@@ -100,6 +102,31 @@ impl ActivationTracker {
     /// pushing a newer version demotes to `Pushed` until re-acked.
     pub fn record_push_sent(&mut self, nonce: [u8; NONCE_LEN], version: u64) {
         self.outstanding_push = Some((nonce, version));
+        self.repush_allowed = false;
+    }
+
+    /// A message from the peer arrived: it is online, so an unacked push may
+    /// go out once more (private#662).
+    pub fn record_heard_from_peer(&mut self) {
+        self.repush_allowed = true;
+    }
+
+    /// Whether the sync-cycle scanner may push `own_version` now: always for
+    /// a version not yet pushed, otherwise only after hearing from the peer
+    /// since the last push (private#662).
+    pub fn may_push(&self, own_version: u64) -> bool {
+        self.repush_allowed || self.outstanding_push.map(|(_, pushed)| pushed) != Some(own_version)
+    }
+
+    /// Whether an unacked push may go out again (persistence snapshot).
+    pub fn repush_allowed(&self) -> bool {
+        self.repush_allowed
+    }
+
+    /// Restore the persisted re-push flag after [`Self::from_parts`].
+    pub fn with_repush_allowed(mut self, repush_allowed: bool) -> Self {
+        self.repush_allowed = repush_allowed;
+        self
     }
 
     /// Record the peer's ack. Accepted only when it answers the
@@ -195,6 +222,7 @@ impl ActivationTracker {
         };
         if incoming_wins {
             self.outstanding_push = other.outstanding_push;
+            self.repush_allowed = other.repush_allowed;
         }
     }
 
@@ -208,6 +236,7 @@ impl ActivationTracker {
             outstanding_push,
             our_version_acked,
             peer_version_held,
+            repush_allowed: true,
         }
     }
 }

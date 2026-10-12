@@ -256,6 +256,9 @@ pub fn process_received_blobs(
             }
             None => (false, false, None, None, None, None, None),
         };
+        if decrypted && let Some(contact_id) = token_to_contact.get(&mailbox_token_hex) {
+            note_heard_from(storage, contact_id);
+        }
         outcomes.push(BlobOutcome {
             message_id,
             token_resolved,
@@ -269,6 +272,23 @@ pub fn process_received_blobs(
         });
     }
     outcomes
+}
+
+/// A message from `contact_id` decrypted: it is online, so an unacked
+/// registry push may go out once more (private#662). Best-effort, like the
+/// handshake itself: a failure only delays the re-push.
+fn note_heard_from(storage: &crate::storage::Storage, contact_id: &str) {
+    let activations = storage.registry_activation();
+    let Ok(Some(mut tracker)) = activations.load_activation(contact_id) else {
+        return;
+    };
+    if tracker.repush_allowed() {
+        return;
+    }
+    tracker.record_heard_from_peer();
+    if let Err(error) = activations.save_activation(contact_id, &tracker) {
+        tracing::warn!(%error, "[Registry] recording a message from a contact failed");
+    }
 }
 
 /// P3: resolve a signature-verified reciprocity confirmation. Derives the

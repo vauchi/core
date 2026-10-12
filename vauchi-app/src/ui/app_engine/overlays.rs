@@ -387,14 +387,15 @@ impl AppEngine {
         if !self.network_online {
             return screen;
         }
-        // No contacts → nobody to sync with: keep the chip hidden
-        // during and after onboarding until the first contact exists
-        // (`problems/2026-07-31-sync-chip-before-first-contact`).
-        // Storage errors fail closed — a chip that might fail
-        // underneath is worse than a missing chip for one render.
-        match self.vauchi.storage().contacts().has_contacts() {
-            Ok(true) => {}
-            Ok(false) | Err(_) => return screen,
+        // Nobody to sync with: keep the chip hidden during and after
+        // onboarding until the first contact exists
+        // (`problems/2026-07-31-sync-chip-before-first-contact`), unless
+        // the identity has another device — a linked device's contacts
+        // only arrive by syncing (private#648). Storage errors fail
+        // closed — a chip that might fail underneath is worse than a
+        // missing chip for one render.
+        if !self.has_someone_to_sync_with() {
+            return screen;
         }
         let already_present = screen
             .components
@@ -415,6 +416,15 @@ impl AppEngine {
             },
         );
         screen
+    }
+
+    fn has_someone_to_sync_with(&self) -> bool {
+        let has_contacts = matches!(self.vauchi.storage().contacts().has_contacts(), Ok(true));
+        has_contacts
+            || self
+                .vauchi
+                .list_devices()
+                .is_ok_and(|devices| devices.iter().filter(|d| d.is_active).count() > 1)
     }
 
     /// Inject the global Settings chrome action on the home screen. Core

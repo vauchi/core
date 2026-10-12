@@ -477,3 +477,94 @@ fn the_joiner_gets_nothing_until_the_user_confirms_on_the_host() {
          joiner that skipped it must hold nothing"
     );
 }
+
+/// A device linked after the owner exchanged with someone and filled in
+/// their card receives those contacts and entries in the link response;
+/// they predate it in the registry, so device sync never journals them
+/// for it (vauchi/private#658, rig run 2026-10-12).
+// @internal
+#[test]
+fn a_device_linked_after_contacts_exist_receives_them_with_the_own_card() {
+    use vauchi_app::orchestrator::device_link_machine::DeviceLinkPersistence;
+    use vauchi_core::api::{Vauchi, VauchiConfig};
+    use vauchi_core::contact::Contact;
+    use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
+    use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::sync::DeviceSyncPayload;
+
+    // The initiator stamps its invitation with the real clock.
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let dir = tempfile::tempdir().unwrap();
+    let storage_path = dir.path().join("vauchi.db");
+    let storage_key = SymmetricKey::generate();
+    let mut vauchi = Vauchi::new(
+        VauchiConfig::with_storage_path(&storage_path).with_storage_key(storage_key.clone()),
+    )
+    .unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    vauchi
+        .add_contact(Contact::from_exchange(
+            [0x42u8; 32],
+            ContactCard::new("Bob"),
+            SymmetricKey::generate(),
+            now,
+        ))
+        .unwrap();
+    vauchi
+        .add_own_field(ContactField::new(FieldType::Phone, "Phone", "5550301", now))
+        .unwrap();
+    let initiator = vauchi.device_link_initiator().unwrap();
+    let broker = RelayLikeBroker::new();
+    let mut host = DeviceLinkInitiatorMachine::new(
+        initiator,
+        "alice-identity".to_string(),
+        TIMEOUT_SECS,
+        Some(DeviceLinkPersistence {
+            storage_path,
+            storage_key,
+        }),
+    );
+    assert!(matches!(
+        host.advance(&broker, now),
+        InitiatorEvent::QrReady { .. }
+    ));
+    let mut joiner = DeviceLinkResponderMachine::new(
+        host.join_invitation().unwrap(),
+        "AliceS7".to_string(),
+        TIMEOUT_SECS,
+    )
+    .unwrap();
+    let ResponderEvent::RequestPosted { confirmation_code } = joiner.advance(&broker, now) else {
+        panic!("expected RequestPosted");
+    };
+    assert!(matches!(
+        host.advance(&broker, now),
+        InitiatorEvent::ConfirmationRequired { .. }
+    ));
+    let _ = host.confirm_manual(confirmation_code, now);
+    let completed = host.advance(&broker, now);
+    assert!(
+        matches!(completed, InitiatorEvent::Completed { .. }),
+        "{completed:?}"
+    );
+    assert!(matches!(
+        joiner.advance(&broker, now),
+        ResponderEvent::ResponseReady
+    ));
+
+    let response = joiner.take_response().unwrap();
+    let payload = DeviceSyncPayload::from_json(response.sync_payload_json())
+        .expect("the link response carries a sync payload");
+    let names: Vec<&str> = payload
+        .contacts
+        .iter()
+        .map(|contact| contact.display_name.as_str())
+        .collect();
+    assert_eq!(names, vec!["Bob"]);
+    let own_card: ContactCard = serde_json::from_str(&payload.own_card_json).unwrap();
+    let values: Vec<&str> = own_card.fields().iter().map(|f| f.value()).collect();
+    assert_eq!(values, vec!["5550301"]);
+}

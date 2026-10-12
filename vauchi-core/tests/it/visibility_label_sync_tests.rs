@@ -665,3 +665,41 @@ fn in_duress_mode_visibility_changes_are_not_journaled() {
         before
     );
 }
+
+// vauchi/private#649 rig re-run 2026-10-12: the apps' "Visible to all
+// contacts" toggle calls set_field_shown, which must reach the owner's
+// other devices like set_own_field_public does.
+// @internal
+#[test]
+fn the_entry_visibility_toggle_is_journaled_for_linked_devices() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let field = ContactField::new(FieldType::Phone, "Phone", "5550404", now());
+    let field_id = field.id().to_string();
+    vauchi.add_own_field(field).unwrap();
+    let (registry, tablet_id) = link_tablet(&vauchi, [37u8; 32]);
+
+    vauchi.set_field_shown(&field_id, true).unwrap();
+    let after_shown = journal_for_tablet(&vauchi, registry.clone(), &tablet_id);
+    vauchi.set_field_shown(&field_id, false).unwrap();
+    let after_hidden = journal_for_tablet(&vauchi, registry, &tablet_id);
+
+    let visibility = |journal: &[SyncItem]| {
+        journal.iter().rev().find_map(|item| match item {
+            SyncItem::CardFieldSynced {
+                field,
+                field_visibility,
+                ..
+            } if field.id() == field_id => Some(field_visibility.clone()),
+            _ => None,
+        })
+    };
+    assert_eq!(
+        visibility(&after_shown),
+        Some(Some(FieldVisibility::Everyone))
+    );
+    assert_eq!(
+        visibility(&after_hidden),
+        Some(Some(FieldVisibility::Nobody))
+    );
+}

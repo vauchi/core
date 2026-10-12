@@ -6,6 +6,52 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.81.0] — 2026-10-12
+
+### Added
+
+- Exchange links and QRs open a landing page for people without the app
+  (vauchi/private#277). A link is `https://vauchi.app/x#pk=…&n=…`, with
+  the sender's name as `nm=<base64url>` (cut to 64 bytes) when the share
+  screen makes it; a QR shows `https://vauchi.app/x#q=<base64url>` through
+  `ExchangeQR::to_qr_url` and `OobBootstrapQr::to_qr_url`. The payload stays
+  in the URL fragment, which browsers never send to a server.
+- Delayed fetch and acknowledgement through the outer relay (#628), off by
+  default (`RelayConfig::ohttp_delayed`): a sync posts its fetches under a
+  ticket and collects the answers on a later sync. Sends stay
+  synchronous. `Vauchi::sync_collecting_delayed` waits within one call for
+  the answers it posted, for processes that sync once and exit.
+
+### Changed
+
+- The link and QR parsers accept the https form and the old forms
+  (`vauchi://exchange?…`, the raw QR payload, `wb://` on the C ABI), so
+  links and codes from older apps still work. A payload under another
+  host, path, scheme or parameter is rejected, and a scanned QR over
+  4 KiB is refused before decoding. `parse_exchange_deep_link` answers
+  `InvalidHost` for an https URL off `vauchi.app/x#`.
+- The C ABI's `vauchi_exchange_generate_qr` returns the https URL instead
+  of `wb://…`. USB and radio payloads keep the raw form.
+
+### Removed
+
+- Duress alerts (#636, ADR-032 amendment 2026-10-11): a duress unlock
+  sends nothing. `AlertKind::Duress`, the `DuressAlertReceived` event, the
+  duress notification category and activity-log entry, `DuressSettings`
+  with its store and API, and the platform's `ConfigureDuressAlerts` /
+  `GetDuressSettings` commands are gone. Duress setup ends at the
+  confirmed PIN; migration v81 drops `duress_settings`. A received duress
+  alert no longer decodes.
+
+### Fixed
+
+- The exchange picker starts only the modes it offers (private#271); a
+  mode removed from the picker cannot be started through its id.
+- A delayed sync's send phase no longer collects, and drops, delayed fetch
+  answers (#628); pending tickets are bounded, an answer that fails to
+  open is reported, and a token registered while a fetch is pending is
+  fetched in the same cycle.
+
 ## [0.80.2] — 2026-10-11
 
 ### Fixed

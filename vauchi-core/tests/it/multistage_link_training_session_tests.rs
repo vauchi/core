@@ -143,6 +143,24 @@ fn a_session_drops_its_own_frames_and_counts_them() {
 
 // @internal
 #[test]
+fn a_session_counts_the_peers_frames_apart_from_its_own() {
+    // The rig measures how often a phone reads the peer's code against its
+    // own reflection (vauchi/private#450, plan step 8.4).
+    let mut alice = MultiStageSession::new(card(0xA1));
+    let mut bob = MultiStageSession::new(card(0xB2));
+    let own_opening = alice.get_display_qr().expect("alice advertises");
+    let bob_opening = bob.get_display_qr().expect("bob advertises");
+
+    alice.process_scanned_qr(&own_opening.data);
+    alice.process_scanned_qr(&bob_opening.data);
+    alice.process_scanned_qr(&bob_opening.data);
+
+    assert_eq!(alice.own_frames_seen(), 1);
+    assert_eq!(alice.peer_frames_seen(), 2);
+}
+
+// @internal
+#[test]
 fn a_session_drops_its_own_data_frames_mid_transfer() {
     let (_, mut alice, _bob) = exchange(&EVERY_LAYOUT, &EVERY_LAYOUT, 2);
     assert!(

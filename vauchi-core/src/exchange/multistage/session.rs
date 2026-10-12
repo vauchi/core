@@ -391,6 +391,7 @@ pub struct MultiStageSession {
     /// Frames read that carry our own session id: this phone's code seen in
     /// a reflection or in the peer's preview. Dropped, never processed.
     own_frames_seen: u32,
+    peer_frames_seen: u32,
     /// Reads per window the bound peer reported in its latest header.
     peer_reported_reads: u8,
     /// When frames in the retired format were first and last read, while
@@ -505,6 +506,7 @@ impl MultiStageSession {
             accel_local_envelope: Vec::new(),
             trainer: LinkTrainer::starting_at(0),
             own_frames_seen: 0,
+            peer_frames_seen: 0,
             peer_reported_reads: 0,
             old_format_seen: None,
             logged_training: None,
@@ -571,6 +573,12 @@ impl MultiStageSession {
     /// How many frames carrying this session's own id were read and dropped.
     pub fn own_frames_seen(&self) -> u32 {
         self.own_frames_seen
+    }
+
+    /// Frames read from any other session, the count to set against
+    /// [`Self::own_frames_seen`] when a camera sees both codes.
+    pub fn peer_frames_seen(&self) -> u32 {
+        self.peer_frames_seen
     }
 
     /// Replace the [`MonotonicClock`] driving this session's timeout and
@@ -1277,6 +1285,7 @@ impl MultiStageSession {
             self.own_frames_seen = self.own_frames_seen.saturating_add(1);
             return self.state.clone();
         }
+        self.peer_frames_seen = self.peer_frames_seen.saturating_add(1);
         // Only the phone we are exchanging with trains us; before a peer is
         // bound, any opening frame may be it.
         if self.peer_session_id.is_none_or(|peer| peer == *sender) {

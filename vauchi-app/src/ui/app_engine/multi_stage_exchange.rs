@@ -298,6 +298,15 @@ impl AppEngine {
                 {
                     let _ = self.apply_multi_stage_qr_payload(&final_frame);
                 }
+                // Dev instrumentation (dev-logging only; counts, no QR data):
+                // own reflection against peer reads (vauchi/private#450).
+                if let Some((own, peer)) = self
+                    .multi_stage_session
+                    .as_ref()
+                    .map(|h| h.machine.frame_counts())
+                {
+                    tracing::info!("[MSX] finalized: frames own={own} peer={peer}");
+                }
                 let state_applied =
                     self.apply_multi_stage_state(vauchi_core::exchange::ProtocolState::Finalized);
                 // Persist the exchanged contact now (atomic — both sides

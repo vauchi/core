@@ -667,6 +667,11 @@ impl MultiStageMachine {
         self.inner.finalization_qr()
     }
 
+    /// Frames this phone read of its own code and of the peer's.
+    pub fn frame_counts(&self) -> (u32, u32) {
+        (self.inner.own_frames_seen(), self.inner.peer_frames_seen())
+    }
+
     /// Build the role-correct Double Ratchet for the finalized exchange.
     /// `None` if the transport key / ephemerals aren't available (the
     /// AppEngine then persists the contact without the update channel

@@ -1835,7 +1835,7 @@
   "qr.failed_to_generate": "Failed to generate QR code",
   "qr.paste_from_clipboard": "Paste from Clipboard",
   "qr.paste_instead": "Or paste QR data instead",
-  "qr.paste_placeholder": "Paste QR data (wb://...)",
+  "qr.paste_placeholder": "Paste QR data or link",
   "qr.point_camera": "Point your camera at the QR code",
   "qr.scan": "Scan QR code",
   "qr.scan_button": "Scan QR Code",

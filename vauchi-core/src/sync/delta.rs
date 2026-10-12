@@ -34,7 +34,8 @@ pub struct ValidationSummary {
 
 /// Version byte for CEK-wrapped payloads (crypto-shredding enabled).
 pub const PAYLOAD_VERSION_CEK: u8 = 0x02;
-/// Version byte for reciprocity confirmation payload.
+/// Version byte for a reciprocity confirmation from a sender still waiting
+/// for ours.
 pub const PAYLOAD_VERSION_RECIPROCITY: u8 = 0x03;
 /// Version byte for a safety-alert payload (emergency broadcast / duress).
 /// Inside the ratchet ciphertext, so indistinguishable on the wire (ADR-032).
@@ -45,6 +46,10 @@ pub const PAYLOAD_VERSION_REGISTRY_PUSH: u8 = 0x05;
 
 /// Version byte for F4 registry-ack payloads.
 pub const PAYLOAD_VERSION_REGISTRY_ACK: u8 = 0x06;
+
+/// Version byte for a reciprocity confirmation from a sender that already
+/// counts us as confirmed: an answer, never answered (private#663).
+pub const PAYLOAD_VERSION_RECIPROCITY_ANSWER: u8 = 0x07;
 
 /// Delta encoding error types.
 #[derive(Error, Debug)]
@@ -518,7 +523,7 @@ impl VersionedPayload {
     pub fn encode_reciprocity(payload: &ReciprocityConfirmPayload) -> Vec<u8> {
         let inner = payload.encode();
         let mut buf = Vec::with_capacity(1 + inner.len());
-        buf.push(PAYLOAD_VERSION_RECIPROCITY);
+        buf.push(payload.version_byte());
         buf.extend_from_slice(&inner);
         buf
     }
@@ -566,7 +571,11 @@ impl VersionedPayload {
                 Ok(VersionedPayload::CekWrapped(payload))
             }
             PAYLOAD_VERSION_RECIPROCITY => {
-                let payload = ReciprocityConfirmPayload::decode(&data[1..])?;
+                let payload = ReciprocityConfirmPayload::decode(&data[1..], true)?;
+                Ok(VersionedPayload::ReciprocityConfirm(payload))
+            }
+            PAYLOAD_VERSION_RECIPROCITY_ANSWER => {
+                let payload = ReciprocityConfirmPayload::decode(&data[1..], false)?;
                 Ok(VersionedPayload::ReciprocityConfirm(payload))
             }
             PAYLOAD_VERSION_ALERT => {
@@ -589,15 +598,21 @@ impl VersionedPayload {
 }
 
 const RECIPROCITY_DOMAIN: &[u8] = b"vauchi-sync-reciprocity-confirm-v1";
+// Its own domain, so an answer's signature cannot pass as a waiting
+// confirmation's and demand another answer (private#663).
+const RECIPROCITY_ANSWER_DOMAIN: &[u8] = b"vauchi-sync-reciprocity-answer-v1";
 
-/// Reciprocity confirmation payload (version byte 0x03).
+/// Reciprocity confirmation payload: version byte 0x03 from a sender still
+/// waiting for ours, 0x07 for the answer of a sender that is not.
 ///
-/// Wire format: `0x03 || token(32) || signature(64)` = 97 bytes.
-/// Signature covers: `domain(34) || sender_pk(32) || recipient_pk(32) || token(32)` = 130 bytes.
+/// Wire format: `version || token(32) || signature(64)` = 97 bytes.
+/// Signature covers: `domain || sender_pk(32) || recipient_pk(32) || token(32)`,
+/// with a different domain per version.
 #[derive(Debug)]
 pub struct ReciprocityConfirmPayload {
     token: [u8; 32],
     signature: [u8; 64],
+    sender_waiting: bool,
 }
 
 impl ReciprocityConfirmPayload {
@@ -607,11 +622,7 @@ impl ReciprocityConfirmPayload {
         identity: &crate::identity::Identity,
         recipient_pk: &[u8; 32],
     ) -> Self {
-        let message =
-            Self::build_signed_message(&token, identity.signing_public_key(), recipient_pk);
-        let sig = identity.sign(&message);
-        let signature = *sig.as_bytes();
-        Self { token, signature }
+        Self::signed(token, identity, recipient_pk, true)
     }
 
     /// Encode to wire format (without version byte prefix).
@@ -626,7 +637,8 @@ impl ReciprocityConfirmPayload {
     }
 
     /// Decode from wire format (after version byte has been stripped).
-    pub fn decode(data: &[u8]) -> Result<Self, DeltaError> {
+    /// `sender_waiting` comes from that version byte.
+    pub fn decode(data: &[u8], sender_waiting: bool) -> Result<Self, DeltaError> {
         if data.len() != 96 {
             return Err(DeltaError::InvalidPayload(format!(
                 "reciprocity confirm: expected 96 bytes, got {}",
@@ -637,7 +649,11 @@ impl ReciprocityConfirmPayload {
         token.copy_from_slice(&data[..32]);
         let mut signature = [0u8; 64];
         signature.copy_from_slice(&data[32..96]);
-        Ok(Self { token, signature })
+        Ok(Self {
+            token,
+            signature,
+            sender_waiting,
+        })
     }
 
     /// Create and sign the answer of a confirmed contact to a peer still
@@ -647,12 +663,40 @@ impl ReciprocityConfirmPayload {
         identity: &crate::identity::Identity,
         recipient_pk: &[u8; 32],
     ) -> Self {
-        Self::new(token, identity, recipient_pk)
+        Self::signed(token, identity, recipient_pk, false)
+    }
+
+    fn signed(
+        token: [u8; 32],
+        identity: &crate::identity::Identity,
+        recipient_pk: &[u8; 32],
+        sender_waiting: bool,
+    ) -> Self {
+        let message = Self::build_signed_message(
+            sender_waiting,
+            &token,
+            identity.signing_public_key(),
+            recipient_pk,
+        );
+        let signature = *identity.sign(&message).as_bytes();
+        Self {
+            token,
+            signature,
+            sender_waiting,
+        }
     }
 
     /// Whether the sender was still waiting for our confirmation.
     pub fn sender_waiting(&self) -> bool {
-        true
+        self.sender_waiting
+    }
+
+    fn version_byte(&self) -> u8 {
+        if self.sender_waiting {
+            PAYLOAD_VERSION_RECIPROCITY
+        } else {
+            PAYLOAD_VERSION_RECIPROCITY_ANSWER
+        }
     }
 
     /// Returns the confirmation token.
@@ -663,19 +707,26 @@ impl ReciprocityConfirmPayload {
     /// Verify the Ed25519 signature against sender and recipient public keys.
     pub fn verify(&self, sender_pk: &[u8; 32], recipient_pk: &[u8; 32]) -> bool {
         use crate::crypto::signing::{PublicKey, Signature};
-        let message = Self::build_signed_message(&self.token, sender_pk, recipient_pk);
+        let message =
+            Self::build_signed_message(self.sender_waiting, &self.token, sender_pk, recipient_pk);
         let pk = PublicKey::from_bytes(*sender_pk);
         let sig = Signature::from_bytes(self.signature);
         pk.verify(&message, &sig)
     }
 
     fn build_signed_message(
+        sender_waiting: bool,
         token: &[u8; 32],
         sender_pk: &[u8; 32],
         recipient_pk: &[u8; 32],
     ) -> Vec<u8> {
-        let mut msg = Vec::with_capacity(130);
-        msg.extend_from_slice(RECIPROCITY_DOMAIN);
+        let domain = if sender_waiting {
+            RECIPROCITY_DOMAIN
+        } else {
+            RECIPROCITY_ANSWER_DOMAIN
+        };
+        let mut msg = Vec::with_capacity(domain.len() + 96);
+        msg.extend_from_slice(domain);
         msg.extend_from_slice(sender_pk);
         msg.extend_from_slice(recipient_pk);
         msg.extend_from_slice(token);

@@ -119,7 +119,12 @@ pub enum ReceiveOutcome {
     /// that it completed and persisted the exchange. Carries the peer's token
     /// for the app layer to match against the contact's `expected_their_token`
     /// and resolve reciprocity to `Confirmed`.
-    ReciprocityConfirm { sender_id: String, token: [u8; 32] },
+    ReciprocityConfirm {
+        sender_id: String,
+        token: [u8; 32],
+        /// The sender still waits for our confirmation (private#663).
+        sender_waiting: bool,
+    },
     /// An F4 registry push was received and its broadcast persisted; the
     /// caller must queue the described ack reply (ADR-064 Amendment
     /// 2026-07-25). Never activates our send side — bilaterality.
@@ -514,6 +519,7 @@ fn process_single_card_update_for_device_with_budget(
             return Err(CardUpdateError::SignatureInvalid);
         }
         let token = *confirm.token();
+        let sender_waiting = confirm.sender_waiting();
         // Persist the advanced ratchet (decrypt consumed a message). No card,
         // no nonce store — the token match + Confirmed transition are app-layer.
         storage.begin_transaction()?;
@@ -533,6 +539,7 @@ fn process_single_card_update_for_device_with_budget(
         return Ok(ReceiveOutcome::ReciprocityConfirm {
             sender_id: sender_id.to_string(),
             token,
+            sender_waiting,
         });
     }
 

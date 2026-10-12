@@ -163,6 +163,7 @@ pub fn process_received_blobs(
 
     let mut outcomes = Vec::with_capacity(blobs.len());
     for (message_id, mailbox_token_hex, ciphertext, origin_hint) in blobs {
+        let mut reciprocity_answer = None;
         let (
             token_resolved,
             decrypted,
@@ -230,8 +231,17 @@ pub fn process_received_blobs(
                     // over a wrong token never confirms. On confirm, surface
                     // it like a card update so the frontend reloads and the
                     // reciprocity banner clears.
-                    Ok(ReceiveOutcome::ReciprocityConfirm { sender_id, token }) => {
+                    // A waiting sender is answered once it verifies, so a lost
+                    // confirmation of ours cannot leave it waiting (private#663).
+                    Ok(ReceiveOutcome::ReciprocityConfirm {
+                        sender_id,
+                        token,
+                        sender_waiting,
+                    }) => {
                         if resolve_reciprocity_confirm(identity, storage, &sender_id, &token) {
+                            if sender_waiting {
+                                reciprocity_answer = Some(sender_id.clone());
+                            }
                             (true, true, None, Some(sender_id), None, None, None)
                         } else {
                             (true, true, None, None, None, None, None)
@@ -255,7 +265,7 @@ pub fn process_received_blobs(
             device_fanout_contact_id,
             alert,
             registry_reply,
-            reciprocity_answer: None,
+            reciprocity_answer,
         });
     }
     outcomes

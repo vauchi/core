@@ -117,12 +117,17 @@ fn received_reciprocity_confirm_is_verified_and_surfaced() {
         ReceiveOutcome::ReciprocityConfirm {
             sender_id,
             token: got,
+            sender_waiting,
         } => {
             assert_eq!(
                 sender_id, bob_contact_id,
                 "attributed to the sending contact"
             );
             assert_eq!(got, token, "the peer's token is surfaced verbatim");
+            assert!(
+                sender_waiting,
+                "a 0x03 confirmation comes from a waiting sender"
+            );
         }
         other => panic!("expected ReciprocityConfirm, got {other:?}"),
     }

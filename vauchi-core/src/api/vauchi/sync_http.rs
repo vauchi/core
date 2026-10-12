@@ -515,6 +515,16 @@ impl Vauchi {
             }
         }
 
+        // 3d. Answer peers still waiting for our confirmation (private#663).
+        // Best-effort like the acks: the peer re-sends while it waits.
+        for outcome in &outcomes {
+            if let Some(contact_id) = outcome.reciprocity_answer.as_deref()
+                && let Err(error) = self.queue_reciprocity_answer(contact_id)
+            {
+                tracing::warn!("reciprocity answer queue failed: {error}");
+            }
+        }
+
         let received = outcomes.iter().filter(|o| o.decrypted).count();
         let rejected = outcomes
             .iter()

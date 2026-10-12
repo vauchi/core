@@ -15,6 +15,10 @@
 //! contact with no shared key (imported) yields no token and is skipped, so the
 //! confirmable-set and the Pending gate together form the syncability gate.
 //!
+//! A peer whose confirmation reaches us while it still waits for ours gets an
+//! answer (private#663): our own confirmation, marked as one, so it is never
+//! answered in turn.
+//!
 //! [`ReciprocityConfirmPayload`]: crate::sync::delta::ReciprocityConfirmPayload
 
 use crate::rng::SecureRngExt;
@@ -34,6 +38,37 @@ impl Vauchi {
     /// `pub` so integration tests can exercise the send path without a relay.
     pub fn queue_reciprocity_confirmations(&self) -> VauchiResult<usize> {
         use crate::exchange::reciprocity::Reciprocity;
+
+        let now = self.clock.unix_seconds();
+        let mut queued = 0;
+        for contact in &self.storage.contacts().list_contacts()? {
+            if contact.reciprocity(now) == Reciprocity::Pending
+                && self.queue_reciprocity_payload(contact, true)?
+            {
+                queued += 1;
+            }
+        }
+        Ok(queued)
+    }
+
+    /// Queue our confirmation, as an answer, for a peer still waiting for it
+    /// (private#663). Returns the number queued. Driven by the receive phase.
+    pub fn queue_reciprocity_answer(&self, contact_id: &str) -> VauchiResult<usize> {
+        let Some(contact) = self.storage.contacts().load_contact(contact_id)? else {
+            return Ok(0);
+        };
+        Ok(usize::from(
+            self.queue_reciprocity_payload(&contact, false)?,
+        ))
+    }
+
+    /// Queue our signed confirmation token for `contact`; `sender_waiting`
+    /// says whether we still wait for theirs. Returns whether one was queued.
+    fn queue_reciprocity_payload(
+        &self,
+        contact: &crate::contact::Contact,
+        sender_waiting: bool,
+    ) -> VauchiResult<bool> {
         use crate::storage::{PendingUpdate, UpdateStatus};
         use crate::sync::delta::{ReciprocityConfirmPayload, VersionedPayload};
 
@@ -41,79 +76,69 @@ impl Vauchi {
             .identity
             .as_ref()
             .ok_or(VauchiError::IdentityNotInitialized)?;
-        let our_id = *identity.signing_public_key();
-        let now = self.clock.unix_seconds();
-        let contacts = self.storage.contacts().list_contacts()?;
-        let mut queued = 0;
-
-        for contact in &contacts {
-            // Gate: only confirmable exchanges still awaiting confirmation.
-            if contact.reciprocity(now) != Reciprocity::Pending || contact.is_blocked() {
-                continue;
-            }
-            let Some((our_token, _expected)) = contact.derive_reciprocity_tokens(&our_id) else {
-                continue;
-            };
-            let Some(recipient_pk) = contact.public_key().copied() else {
-                continue;
-            };
-            let contact_id = contact.id().to_string();
-            // Slice D: one confirmation in flight per contact is enough — it is
-            // idempotent and ratchet-deduped on receipt. Skip while any prior
-            // update is still queued, so an unreachable relay (or an offline
-            // peer whose mailbox we can't yet reach) can't pile up duplicate
-            // confirmations cycle after cycle. Once the queued one delivers and
-            // clears, the next Pending cycle re-queues.
-            if self.storage.pending().count_pending_updates(&contact_id)? > 0 {
-                continue;
-            }
-            let confirm = ReciprocityConfirmPayload::new(*our_token, identity, &recipient_pk);
-            let payload = VersionedPayload::encode_reciprocity(&confirm);
-            let prepared =
-                match self.encrypt_payload_for_contact_devices(identity, contact, &payload) {
-                    Ok(prepared) => prepared,
-                    Err(VauchiError::NotFound(_))
-                    | Err(VauchiError::InvalidState(_))
-                    | Err(VauchiError::SendDeferred) => continue,
-                    Err(error) => return Err(error),
-                };
-            self.storage.with_savepoint(|| -> VauchiResult<()> {
-                for payload in prepared {
-                    if payload.persist_session {
-                        self.storage.ratchets().save_ratchet_state_for_device(
-                            &contact_id,
-                            &payload.peer_device_id,
-                            &payload.session,
-                            payload.is_initiator,
-                        )?;
-                    }
-                    let target_device_id = payload.target_device_id();
-                    let update = PendingUpdate {
-                        id: self.rng.uuid_v4(),
-                        contact_id: contact_id.clone(),
-                        // Indistinguishable from a card update on the wire (ADR-032),
-                        // like the safety-alert send path.
-                        update_type: "card_delta".to_string(),
-                        payload: payload.encrypted,
-                        created_at: now,
-                        retry_count: 0,
-                        status: UpdateStatus::Pending,
-                        target_relay_url: None,
-                        target_device_id,
-                    };
-                    self.storage.pending().queue_update(&update)?;
-                }
-                Ok(())
-            })?;
-            queued += 1;
+        if contact.is_blocked() {
+            return Ok(false);
         }
-
-        Ok(queued)
-    }
-
-    /// Queue our confirmation for a peer still waiting for it (private#663).
-    /// Returns the number queued.
-    pub fn queue_reciprocity_answer(&self, _contact_id: &str) -> VauchiResult<usize> {
-        Ok(0)
+        let Some((our_token, _expected)) =
+            contact.derive_reciprocity_tokens(identity.signing_public_key())
+        else {
+            return Ok(false);
+        };
+        let Some(recipient_pk) = contact.public_key().copied() else {
+            return Ok(false);
+        };
+        let contact_id = contact.id().to_string();
+        // Slice D: one confirmation in flight per contact is enough — it is
+        // idempotent and ratchet-deduped on receipt. Skip while any prior
+        // update is still queued, so an unreachable relay (or an offline
+        // peer whose mailbox we can't yet reach) can't pile up duplicate
+        // confirmations cycle after cycle. Once the queued one delivers and
+        // clears, the next Pending cycle re-queues.
+        if self.storage.pending().count_pending_updates(&contact_id)? > 0 {
+            return Ok(false);
+        }
+        let confirm = if sender_waiting {
+            ReciprocityConfirmPayload::new(*our_token, identity, &recipient_pk)
+        } else {
+            ReciprocityConfirmPayload::answer(*our_token, identity, &recipient_pk)
+        };
+        let payload = VersionedPayload::encode_reciprocity(&confirm);
+        let prepared = match self.encrypt_payload_for_contact_devices(identity, contact, &payload) {
+            Ok(prepared) => prepared,
+            Err(VauchiError::NotFound(_))
+            | Err(VauchiError::InvalidState(_))
+            | Err(VauchiError::SendDeferred) => return Ok(false),
+            Err(error) => return Err(error),
+        };
+        let now = self.clock.unix_seconds();
+        self.storage.with_savepoint(|| -> VauchiResult<()> {
+            for payload in prepared {
+                if payload.persist_session {
+                    self.storage.ratchets().save_ratchet_state_for_device(
+                        &contact_id,
+                        &payload.peer_device_id,
+                        &payload.session,
+                        payload.is_initiator,
+                    )?;
+                }
+                let target_device_id = payload.target_device_id();
+                let update = PendingUpdate {
+                    id: self.rng.uuid_v4(),
+                    contact_id: contact_id.clone(),
+                    // Indistinguishable from a card update on the wire (ADR-032),
+                    // like the safety-alert send path.
+                    update_type: "card_delta".to_string(),
+                    payload: payload.encrypted,
+                    created_at: now,
+                    retry_count: 0,
+                    status: UpdateStatus::Pending,
+                    target_relay_url: None,
+                    target_device_id,
+                };
+                self.storage.pending().queue_update(&update)?;
+            }
+            Ok(())
+        })?;
+        Ok(true)
     }
 }

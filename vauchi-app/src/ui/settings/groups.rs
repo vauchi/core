@@ -491,7 +491,7 @@ impl SettingsEngine {
     pub(super) fn danger_group(&self) -> Component {
         Component::SettingsGroup {
             id: "danger".into(),
-            label: self.t("settings.danger_zone"),
+            label: self.t("settings.erase_data"),
             items: vec![SettingsItem {
                 id: "emergency_wipe".into(),
                 label: self.t("emergency.wipe_button"),

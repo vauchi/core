@@ -134,3 +134,40 @@ fn an_event_for_a_surface_never_shown_still_fails_closed_after_a_shred() {
     );
     assert_eq!(current_surface(&engine), fresh);
 }
+
+fn current_revision(engine: &PlatformAppEngine) -> u64 {
+    let batch: serde_json::Value =
+        serde_json::from_str(&engine.initial_commands_json().expect("initial commands"))
+            .expect("parse command batch");
+    batch["commands"]
+        .as_array()
+        .and_then(|commands| commands.iter().find_map(|c| c.get("ReplaceSurface")))
+        .and_then(|replace| replace["surface"]["revision"].as_u64())
+        .expect("command batch replaces a surface")
+}
+
+/// A shell drops an envelope older than what it shows, and every onboarding
+/// step is the one `onboarding` surface: a reopened engine counting from 1
+/// again left a shell that had just onboarded showing its last step instead
+/// of Welcome (iPhone SE, vauchi/private#293). Revisions keep rising across
+/// the reopen.
+// @internal
+#[test]
+fn the_first_screen_after_a_shred_is_newer_than_any_before_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = SharedKeychain::new();
+    let engine = open(&dir, &keychain);
+    drive_onboarding(&engine);
+    let before_shred = current_revision(&engine);
+    assert!(matches!(
+        engine.dispatch_domain_command(DomainCommand::PanicShred),
+        Ok(DomainCommandResult::ShredCompleted { .. })
+    ));
+
+    let after_shred = current_revision(&engine);
+
+    assert!(
+        after_shred > before_shred,
+        "revision went from {before_shred} to {after_shred}; a shell drops it as out of order"
+    );
+}

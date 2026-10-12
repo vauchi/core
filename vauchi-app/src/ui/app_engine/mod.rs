@@ -374,6 +374,19 @@ impl AppEngine {
         self.presentation_coordinator.remember_left_behind(surfaces);
     }
 
+    /// The revision of the last surface this engine sent.
+    pub fn surface_revision(&self) -> u64 {
+        self.surface_revision
+    }
+
+    /// Counts surface revisions on from `revision`, sent by an engine this
+    /// one replaces: a shell drops an envelope older than the one it shows,
+    /// so a replacement starting at 1 again would not be shown
+    /// (vauchi/private#293).
+    pub fn continue_revisions_after(&mut self, revision: u64) {
+        self.surface_revision = self.surface_revision.max(revision.saturating_add(1));
+    }
+
     /// Returns the active render context (locale + theme_id) pushed
     /// by the frontend. Used by `screens.rs` to render Settings
     /// dropdown `selected` values without pulling state from the

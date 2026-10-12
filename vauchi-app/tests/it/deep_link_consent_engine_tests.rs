@@ -13,10 +13,12 @@
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use vauchi_app::ui::{
-    ActionResult, ActionStyle, ConsentDecision, DEEP_LINK_ACTION_DENY, DEEP_LINK_ACTION_GRANT,
-    DeepLinkConsentEngine, UserAction, WorkflowEngine,
+    ActionResult, ActionStyle, Component, ConsentDecision, DEEP_LINK_ACTION_DENY,
+    DEEP_LINK_ACTION_GRANT, DeepLinkConsentEngine, UserAction, WorkflowEngine,
 };
-use vauchi_core::exchange::link_mode::{initiator_generate, parse_exchange_deep_link};
+use vauchi_core::exchange::link_mode::{
+    initiator_generate, initiator_generate_named, parse_exchange_deep_link,
+};
 
 fn fresh_engine() -> DeepLinkConsentEngine {
     let (init, _) = initiator_generate();
@@ -57,6 +59,41 @@ fn screen_does_not_leak_payload_bytes() {
     assert!(
         !serialized.contains(&nonce_b64),
         "nonce bytes leaked into ScreenModel"
+    );
+}
+
+fn banner_text(engine: &DeepLinkConsentEngine) -> String {
+    engine
+        .current_screen()
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::Banner { text, .. } => Some(text.clone()),
+            _ => None,
+        })
+        .expect("the consent screen has a banner")
+}
+
+// The name a link carries is shown, and said to be unchecked: anyone can
+// put any name in a link (vauchi/private#277, owner decision 2026-10-12).
+// @internal
+#[test]
+fn a_named_link_shows_its_sender_name_marked_as_unchecked() {
+    let (init, _) = initiator_generate_named("Zoë");
+    let engine = DeepLinkConsentEngine::new(parse_exchange_deep_link(&init.url).expect("parses"));
+
+    assert_eq!(
+        banner_text(&engine),
+        "This link says it is from Zoë. Names in links are not checked: only accept if you trust where it came from."
+    );
+}
+
+// @internal
+#[test]
+fn a_link_without_a_name_keeps_the_generic_banner() {
+    assert_eq!(
+        banner_text(&fresh_engine()),
+        "Someone shared an exchange link with you. Only accept if you trust the source."
     );
 }
 

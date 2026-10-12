@@ -56,6 +56,64 @@ fn named_link_carries_the_sender_name_and_still_parses() {
     assert!(parse_exchange_deep_link(&init.url).is_ok());
 }
 
+// The consent screen shows the name a link carries, marked as unchecked
+// (vauchi/private#277, owner decision 2026-10-12).
+// @internal
+#[test]
+fn a_named_link_hands_its_sender_name_to_the_consent_screen() {
+    let (init, _) = initiator_generate_named("Zoë Example");
+
+    let payload = parse_exchange_deep_link(&init.url).expect("named link parses");
+
+    assert_eq!(payload.sender_name(), Some("Zoë Example"));
+}
+
+// @internal
+#[test]
+fn a_link_without_a_name_hands_on_none() {
+    let (init, _) = initiator_generate_named("");
+
+    let payload = parse_exchange_deep_link(&init.url).expect("unnamed link parses");
+
+    assert_eq!(payload.sender_name(), None);
+}
+
+fn with_name_value(url: &str, value: &str) -> String {
+    let base = url.split("&nm=").next().unwrap();
+    format!("{base}&nm={value}")
+}
+
+// A name is attacker-controlled text: anything that cannot be shown as a
+// plain name is dropped, and the link itself still opens (CC-14).
+// @internal
+#[test]
+fn a_name_that_cannot_be_shown_safely_is_dropped_but_the_link_still_parses() {
+    let (init, _) = initiator_generate_named("Zoë");
+    let b64 = |bytes: &[u8]| base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes);
+    let hostile = [
+        ("not base64url", "!!!".to_owned()),
+        ("invalid UTF-8", b64(&[0xff, 0xfe, 0x41])),
+        ("empty", String::new()),
+        ("only spaces", b64("   ".as_bytes())),
+        ("over 64 bytes", b64("a".repeat(65).as_bytes())),
+        ("newline", b64("Zoë\nYour bank".as_bytes())),
+        ("right-to-left override", b64("Zoë\u{202E}knab".as_bytes())),
+        ("zero-width joiner", b64("Zo\u{200D}ë".as_bytes())),
+        ("byte order mark", b64("\u{FEFF}Zoë".as_bytes())),
+    ];
+
+    for (case, value) in hostile {
+        let url = with_name_value(&init.url, &value);
+        let payload = parse_exchange_deep_link(&url)
+            .unwrap_or_else(|e| panic!("{case}: the link must still parse, got {e:?}"));
+        assert_eq!(
+            payload.sender_name(),
+            None,
+            "{case}: the name must be dropped"
+        );
+    }
+}
+
 // @internal
 #[test]
 fn unnamed_link_has_no_name_param() {

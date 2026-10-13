@@ -27,6 +27,7 @@
 /// The Core crate version, as shown on the Help screen's About row.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+mod byte_reader;
 pub mod clock;
 pub mod monotonic;
 pub mod rng;

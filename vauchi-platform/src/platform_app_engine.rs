@@ -18,7 +18,8 @@
 //! replacement batch.
 
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Condvar, Mutex};
 
 use crate::types::{
     MobileLocale, MobileNotificationCategory, MobileNotificationPriority,
@@ -97,6 +98,12 @@ pub struct PlatformAppEngine {
     /// cycle-thread bridge was retired in Slice 32m.
     /// `None` while the locked start below holds storage closed.
     pub(crate) engine: Mutex<Option<AppEngine>>,
+    /// Set while a shredded engine is out of `engine` being reopened; it
+    /// changes only under the `engine` lock, so `reopened` never misses a
+    /// waiter (vauchi/private#293).
+    pub(crate) reopening: AtomicBool,
+    /// Signalled, with the `engine` lock, when a reopen ends.
+    pub(crate) reopened: Condvar,
     /// Core's storage-lock screens until storage opens (vauchi/private#580);
     /// `None` once it has.
     pub(crate) locked: Mutex<Option<crate::platform_app_engine_locked::LockedStart>>,
@@ -348,6 +355,8 @@ impl PlatformAppEngine {
     ) -> Arc<Self> {
         Arc::new(Self {
             engine: Mutex::new(engine),
+            reopening: AtomicBool::new(false),
+            reopened: Condvar::new(),
             locked: Mutex::new(locked),
             pending_release: Mutex::new(None),
             event_handler_id: Mutex::new(None),

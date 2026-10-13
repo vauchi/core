@@ -9,6 +9,7 @@
 //! `platform_app_engine.rs`.
 
 use std::path::PathBuf;
+use std::sync::atomic::Ordering;
 
 use vauchi_app::ui::{AppEngine, AppScreen};
 use vauchi_core::api::Vauchi;
@@ -313,24 +314,36 @@ impl PlatformAppEngine {
     /// The engine slot. An engine whose storage a shred deleted is
     /// replaced by one opened on a fresh install first (vauchi/private#599);
     /// the slot is released while reopening, so the locked-start lock is
-    /// never taken while the engine lock is held.
+    /// never taken while the engine lock is held. A caller arriving
+    /// mid-reopen waits for it instead of finding the slot empty
+    /// (vauchi/private#293).
     pub(crate) fn lock_engine(
         &self,
     ) -> Result<std::sync::MutexGuard<'_, Option<AppEngine>>, MobileError> {
-        let mut slot = self.engine.lock().map_err(|e| MobileError::Other {
+        let lock_failed = |e: String| MobileError::Other {
             detail: format!("Lock failed: {e}"),
-        })?;
+        };
+        let mut slot = self.engine.lock().map_err(|e| lock_failed(e.to_string()))?;
+        while slot.is_none() && self.reopening.load(Ordering::SeqCst) {
+            slot = self
+                .reopened
+                .wait(slot)
+                .map_err(|e| lock_failed(e.to_string()))?;
+        }
         if !slot.as_mut().is_some_and(AppEngine::take_storage_shredded) {
             return Ok(slot);
         }
         let Some(shredded) = slot.take() else {
             return Ok(slot);
         };
+        self.reopening.store(true, Ordering::SeqCst);
         drop(slot);
-        self.reopen_after_shred(shredded)?;
-        self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })
+        let reopened = self.reopen_after_shred(shredded);
+        let slot = self.engine.lock().map_err(|e| lock_failed(e.to_string()));
+        self.reopening.store(false, Ordering::SeqCst);
+        self.reopened.notify_all();
+        reopened?;
+        slot
     }
 
     pub(crate) fn lock_locked_start(

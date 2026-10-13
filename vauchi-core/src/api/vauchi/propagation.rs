@@ -805,33 +805,15 @@ impl Vauchi {
                     ref note,
                     ..
                 } => {
-                    // The wire payload is plaintext; notes are stored
-                    // encrypted at rest (ADR-021), so the apply arm must
-                    // encrypt with the contact's shared key exactly like
-                    // add_personal_note — storing raw bytes would make the
-                    // note undecryptable via read_personal_note.
-                    let contact = match self.storage.contacts().load_contact(contact_id)? {
-                        Some(contact) => contact,
-                        None => {
-                            // A note cannot recreate an owner-removed contact.
-                            continue;
-                        }
-                    };
-                    let shared_key = match contact.shared_key() {
-                        Some(key) => key,
-                        None => {
-                            return Err(VauchiError::InvalidState(format!(
-                                "PersonalNoteChanged for contact {contact_id} without shared key"
-                            )));
-                        }
-                    };
-                    let encrypted =
-                        crate::crypto::encrypt(shared_key, note.as_bytes()).map_err(|error| {
-                            VauchiError::Configuration(format!("Encryption failed: {error}"))
-                        })?;
+                    // A note cannot recreate an owner-removed contact.
+                    if self.storage.contacts().load_contact(contact_id)?.is_none() {
+                        continue;
+                    }
+                    // Plain text, encrypted at rest by the storage layer: the
+                    // one note format (private#452).
                     self.storage
                         .contacts()
-                        .save_personal_notes(contact_id, &encrypted)
+                        .save_personal_notes(contact_id, note.as_bytes())
                         .map_err(|e| e.into())
                 }
                 SyncItem::PersonalNoteRemoved { ref contact_id, .. } => self

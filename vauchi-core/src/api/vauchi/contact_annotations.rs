@@ -20,27 +20,17 @@ impl Vauchi {
 
     /// Adds or replaces a personal note for a contact.
     ///
-    /// Encrypts the plaintext note using the contact's shared key.
-    /// Frontends MUST use this instead of calling crypto::encrypt directly.
-    ///
-    /// The change is journaled for linked devices — otherwise the note
-    /// stays device-local and the owner-private state diverges (RG-10).
+    /// Stored as plain text, encrypted at rest by the storage layer, the one
+    /// note format every path reads (private#452). The change is journaled
+    /// for linked devices — otherwise the note stays device-local and the
+    /// owner-private state diverges (RG-10).
     pub fn add_personal_note(&self, contact_id: &str, note_text: &str) -> VauchiResult<()> {
-        use crate::crypto::encrypt;
-
-        let contact = self
-            .storage
-            .contacts()
-            .load_contact(contact_id)?
-            .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
-        let shared_key = contact
-            .shared_key()
-            .ok_or_else(|| VauchiError::Configuration("Contact has no shared key".into()))?;
-        let encrypted = encrypt(shared_key, note_text.as_bytes())
-            .map_err(|e| VauchiError::Configuration(format!("Encryption failed: {}", e)))?;
+        if self.storage.contacts().load_contact(contact_id)?.is_none() {
+            return Err(VauchiError::ContactNotFound(contact_id.to_string()));
+        }
         self.storage
             .contacts()
-            .save_personal_notes(contact_id, &encrypted)?;
+            .save_personal_notes(contact_id, note_text.as_bytes())?;
         self.record_sync_item(crate::sync::SyncItem::PersonalNoteChanged {
             contact_id: contact_id.to_string(),
             note: note_text.to_string(),
@@ -49,37 +39,36 @@ impl Vauchi {
         Ok(())
     }
 
-    /// Reads the personal note for a contact, decrypting it.
+    /// Reads the personal note for a contact.
     ///
-    /// Returns None if no note exists.
+    /// Returns None if no note exists. A note written before private#452
+    /// carries an extra layer under the contact's shared key; the AEAD tag
+    /// tells it apart from plain text, so it still reads.
     pub fn read_personal_note(&self, contact_id: &str) -> VauchiResult<Option<String>> {
-        use crate::crypto::decrypt;
-
         if self.conceals_contact(contact_id)? {
             return Ok(None);
         }
-        let encrypted = match self.storage.contacts().load_personal_notes(contact_id)? {
-            Some(data) => data,
-            None => return Ok(None),
+        let Some(stored) = self.storage.contacts().load_personal_notes(contact_id)? else {
+            return Ok(None);
         };
-        let contact = self
+        let legacy = self
             .storage
             .contacts()
             .load_contact(contact_id)?
-            .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
-        let shared_key = contact
-            .shared_key()
-            .ok_or_else(|| VauchiError::Configuration("Contact has no shared key".into()))?;
-        let plaintext = decrypt(shared_key, &encrypted)
-            .map_err(|e| VauchiError::Configuration(format!("Decryption failed: {}", e)))?;
-        Ok(Some(String::from_utf8(plaintext).map_err(|e| {
+            .and_then(|contact| {
+                contact
+                    .shared_key()
+                    .and_then(|key| crate::crypto::decrypt(key, &stored).ok())
+            });
+        let text = legacy.unwrap_or(stored);
+        Ok(Some(String::from_utf8(text).map_err(|e| {
             VauchiError::Configuration(format!("Note is not valid UTF-8: {}", e))
         })?))
     }
 
-    /// Saves encrypted personal notes for a contact (raw bytes).
-    ///
-    /// Low-level API for sync/migration. Prefer `add_personal_note()`.
+    /// Stores a contact's personal note bytes without journaling them for
+    /// linked devices. Low-level API for sync/migration; the app saves through
+    /// `add_personal_note()`.
     pub fn save_personal_notes(
         &self,
         contact_id: &str,
@@ -91,9 +80,8 @@ impl Vauchi {
         Ok(())
     }
 
-    /// Loads encrypted personal notes for a contact (raw bytes).
-    ///
-    /// Low-level API for sync/migration. Prefer `read_personal_note()`.
+    /// Loads a contact's stored personal note bytes. Low-level API for
+    /// sync/migration; prefer `read_personal_note()`.
     pub fn load_personal_notes(&self, contact_id: &str) -> VauchiResult<Option<Vec<u8>>> {
         if self.conceals_contact(contact_id)? {
             return Ok(None);

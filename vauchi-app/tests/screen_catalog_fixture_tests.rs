@@ -197,6 +197,36 @@ fn screen_catalog_every_catalog_entry_replaces_one_surface_then_installs_its_nav
     }
 }
 
+/// A shell with no layout profile falls back to the alphabetically first
+/// surface, so a sub-screen batch that also replaces its parent showed the
+/// parent: `settings_advanced` rendered Settings (vauchi/private#420).
+/// Live shells report their window and get a profile; the catalog must
+/// carry one too.
+// @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
+#[test]
+fn screen_catalog_every_entry_names_its_own_surface_active() {
+    let catalog = checked_in_catalog();
+    let wrong: Vec<String> = catalog
+        .screens
+        .iter()
+        .filter_map(|entry| {
+            let active = entry
+                .commands
+                .iter()
+                .rev()
+                .find_map(|command| match command {
+                    Command::SetPresentationProfile { profile } => {
+                        Some(profile.active_surface.as_str().to_owned())
+                    }
+                    _ => None,
+                });
+            (active.as_deref() != Some(entry_surface_id(entry)))
+                .then(|| format!("{}/{}: active {active:?}", entry.code_id, entry.locale))
+        })
+        .collect();
+    assert_eq!(wrong, Vec::<String>::new());
+}
+
 // @internal
 #[test]
 fn screen_catalog_checked_in_catalog_matches_a_fresh_build_structurally() {

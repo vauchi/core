@@ -203,17 +203,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "onboarding",
-              "detail_surface": null,
-              "active_surface": "onboarding"
-            }
-          }
         }
       ]
     },
@@ -453,17 +442,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "my_info",
-              "detail_surface": null,
-              "active_surface": "my_info"
-            }
-          }
         }
       ]
     },
@@ -609,17 +587,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "contacts",
-              "detail_surface": null,
-              "active_surface": "contacts"
             }
           }
         }
@@ -891,17 +858,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "exchange",
-              "detail_surface": null,
-              "active_surface": "exchange"
-            }
-          }
         }
       ]
     },
@@ -979,17 +935,6 @@
             "revision": 1,
             "navigation": {
               "items": []
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "lock",
-              "detail_surface": null,
-              "active_surface": "lock"
             }
           }
         }
@@ -1346,17 +1291,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "my_info",
-              "detail_surface": null,
-              "active_surface": "my_info"
             }
           }
         }
@@ -1825,17 +1759,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "contacts",
-              "detail_surface": null,
-              "active_surface": "contacts"
-            }
-          }
         }
       ]
     },
@@ -2295,7 +2218,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_4911b3ce565a4b00",
+                    "id": "field_46f3c2d6bafc60cc",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2326,13 +2249,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:4911b3ce565a4b00",
+                    "id": "field_note:46f3c2d6bafc60cc",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:4911b3ce565a4b00",
+                          "id": "field_note:46f3c2d6bafc60cc",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2372,7 +2295,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_ab05272a2d9ad2dc",
+                    "id": "field_a05c01f1204dab97",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2403,13 +2326,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:ab05272a2d9ad2dc",
+                    "id": "field_note:a05c01f1204dab97",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:ab05272a2d9ad2dc",
+                          "id": "field_note:a05c01f1204dab97",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2449,7 +2372,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_bc2df7e6aba92f4d",
+                    "id": "field_a7f860adfb85ff11",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2480,13 +2403,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:bc2df7e6aba92f4d",
+                    "id": "field_note:a7f860adfb85ff11",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:bc2df7e6aba92f4d",
+                          "id": "field_note:a7f860adfb85ff11",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2877,17 +2800,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "contacts",
-              "detail_surface": "contact_detail",
-              "active_surface": "contact_detail"
             }
           }
         }
@@ -3533,17 +3445,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "contacts",
-              "detail_surface": "contact_edit",
-              "active_surface": "contact_edit"
             }
           }
         }
@@ -4324,17 +4225,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "contacts",
-              "detail_surface": "contact_visibility",
-              "active_surface": "contact_visibility"
-            }
-          }
         }
       ]
     },
@@ -4753,10 +4643,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "66D1 7D38 7E96 BB7F B313 B8C2 EFB9 2E12 6538 1A74 5BE4 3B77 1866 1DB9 B16F 71A7",
+                    "content": "23AE 406A DD86 499E 7B69 53CD 0732 A473 10C9 6F13 8056 E092 80DF 6575 35C3 80AA",
                     "style": "body",
                     "accessibility": {
-                      "label": "66D1 7D38 7E96 BB7F B313 B8C2 EFB9 2E12 6538 1A74 5BE4 3B77 1866 1DB9 B16F 71A7",
+                      "label": "23AE 406A DD86 499E 7B69 53CD 0732 A473 10C9 6F13 8056 E092 80DF 6575 35C3 80AA",
                       "description": null
                     }
                   }
@@ -4775,10 +4665,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "B3D9 64BA 631A 8F2D D43D 0D70 DAF0 D5DE 61B3 CBDE 917C 8350 E863 94E9 5E25 8CFC",
+                    "content": "C0B1 DA00 4535 24C3 2AA3 25AD D5F6 93E4 FEF5 F0F2 BB68 8792 849F FBEE E31B F0BB",
                     "style": "body",
                     "accessibility": {
-                      "label": "B3D9 64BA 631A 8F2D D43D 0D70 DAF0 D5DE 61B3 CBDE 917C 8350 E863 94E9 5E25 8CFC",
+                      "label": "C0B1 DA00 4535 24C3 2AA3 25AD D5F6 93E4 FEF5 F0F2 BB68 8792 849F FBEE E31B F0BB",
                       "description": null
                     }
                   }
@@ -4968,17 +4858,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "contacts",
-              "detail_surface": "verify_fingerprint",
-              "active_surface": "verify_fingerprint"
-            }
-          }
         }
       ]
     },
@@ -5155,17 +5034,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "exchange",
-              "detail_surface": null,
-              "active_surface": "exchange"
             }
           }
         }
@@ -5719,17 +5587,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "settings",
-              "detail_surface": null,
-              "active_surface": "settings"
             }
           }
         }
@@ -6825,17 +6682,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "settings",
-              "detail_surface": "settings_advanced",
-              "active_surface": "settings_advanced"
-            }
-          }
         }
       ]
     },
@@ -7650,17 +7496,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "settings",
-              "detail_surface": "settings_appearance",
-              "active_surface": "settings_appearance"
-            }
-          }
         }
       ]
     },
@@ -8385,17 +8220,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "settings",
-              "detail_surface": "settings_accessibility",
-              "active_surface": "settings_accessibility"
-            }
-          }
         }
       ]
     },
@@ -8961,17 +8785,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "help",
-              "detail_surface": null,
-              "active_surface": "help"
-            }
-          }
         }
       ]
     },
@@ -9180,17 +8993,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "backup",
-              "detail_surface": null,
-              "active_surface": "backup"
             }
           }
         }
@@ -9501,17 +9303,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "device_management",
-              "detail_surface": "device_linking",
-              "active_surface": "device_linking"
-            }
-          }
         }
       ]
     },
@@ -9689,17 +9480,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "device_management",
-              "detail_surface": null,
-              "active_surface": "device_management"
             }
           }
         }
@@ -9893,17 +9673,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "duress_pin",
-              "detail_surface": null,
-              "active_surface": "duress_pin"
-            }
-          }
         }
       ]
     },
@@ -10082,17 +9851,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "change_password",
-              "detail_surface": null,
-              "active_surface": "change_password"
             }
           }
         }
@@ -10289,17 +10047,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "decoy_contacts",
-              "detail_surface": null,
-              "active_surface": "decoy_contacts"
             }
           }
         }
@@ -10537,17 +10284,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "emergency_shred",
-              "detail_surface": null,
-              "active_surface": "emergency_shred"
-            }
-          }
         }
       ]
     },
@@ -10722,17 +10458,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "delivery_status",
-              "detail_surface": null,
-              "active_surface": "delivery_status"
             }
           }
         }
@@ -10974,17 +10699,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "recovery",
-              "detail_surface": null,
-              "active_surface": "recovery"
             }
           }
         }
@@ -11441,17 +11155,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "recovery",
-              "detail_surface": "recovery_help",
-              "active_surface": "recovery_help"
-            }
-          }
         }
       ]
     },
@@ -11677,17 +11380,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "groups",
-              "detail_surface": null,
-              "active_surface": "groups"
             }
           }
         }
@@ -12339,17 +12031,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "groups",
-              "detail_surface": "group_detail",
-              "active_surface": "group_detail"
-            }
-          }
         }
       ]
     },
@@ -12498,17 +12179,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "tags",
-              "detail_surface": null,
-              "active_surface": "tags"
-            }
-          }
         }
       ]
     },
@@ -12655,17 +12325,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "places",
-              "detail_surface": null,
-              "active_surface": "places"
             }
           }
         }
@@ -12921,17 +12580,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "privacy",
-              "detail_surface": null,
-              "active_surface": "privacy"
-            }
-          }
         }
       ]
     },
@@ -13113,17 +12761,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "support",
-              "detail_surface": null,
-              "active_surface": "support"
             }
           }
         }
@@ -13870,17 +13507,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "my_info",
-              "detail_surface": "entry_detail",
-              "active_surface": "entry_detail"
-            }
-          }
         }
       ]
     },
@@ -14513,17 +14139,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "contacts",
-              "detail_surface": "contact_duplicates",
-              "active_surface": "contact_duplicates"
             }
           }
         }
@@ -15241,17 +14856,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "contacts",
-              "detail_surface": "contact_merge",
-              "active_surface": "contact_merge"
-            }
-          }
         }
       ]
     },
@@ -15395,17 +14999,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "activity_log",
-              "detail_surface": null,
-              "active_surface": "activity_log"
             }
           }
         }
@@ -16009,17 +15602,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "contacts",
-              "detail_surface": "archived_contacts",
-              "active_surface": "archived_contacts"
-            }
-          }
         }
       ]
     },
@@ -16355,17 +15937,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "device_management",
-              "detail_surface": "device_replacement",
-              "active_surface": "device_replacement"
-            }
-          }
         }
       ]
     },
@@ -16583,17 +16154,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "avatar_editor",
-              "detail_surface": null,
-              "active_surface": "avatar_editor"
             }
           }
         }
@@ -16956,17 +16516,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "recovery",
-              "detail_surface": "recovery_claim_review",
-              "active_surface": "recovery_claim_review"
-            }
-          }
         }
       ]
     },
@@ -17045,7 +16594,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "https://vauchi.app/x#pk=HM-w2h9AnraSsryPezFSc-LR8j-gEMKNTbINKNXrYz0&n=tCCJTrMVO2HMbGHFlifwKTo4hjmnBTbbMKObHfUaJvY&nm=QWRhIExvdmVsYWNl",
+                    "content": "https://vauchi.app/x#pk=wI2Xdz7K-ebGyI9NijK5R4VHRlJExXg4iHx7LVw742Q&n=grOR6lqsXmKmjYW9UmH00BC1dBOzY_0CO7sA2J3-2kI&nm=QWRhIExvdmVsYWNl",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -17160,17 +16709,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "link_exchange",
-              "detail_surface": null,
-              "active_surface": "link_exchange"
             }
           }
         },
@@ -17405,17 +16943,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "nfc_exchange",
-              "detail_surface": null,
-              "active_surface": "nfc_exchange"
-            }
-          }
         }
       ]
     },
@@ -17590,19 +17117,8 @@
           }
         },
         {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "direct_transport",
-              "detail_surface": null,
-              "active_surface": "direct_transport"
-            }
-          }
-        },
-        {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,79,122,50,87,83,54,89,120,113,80,76,100,81,57,68,88,68,97,56,78,88,101,89,98,80,76,51,112,70,56,103,49,68,111,89,53,84,112,88,105,87,77,47,79,53,75,50,85,100,117,114,117,120,83,52,122,49,107,108,113,114,97,108,89,97,100,66,67,117,86,85,86,106,79,117,43,100,121,115,52,79,84,107,101,107,122,112,72,117,43,87,106,80,79,99,85,79,97,77,68,101,78,74,119,113,88,72,87,52,69,82,88,112,116,116,68,84,68,108,103,53,113,69,43,114,74,78,47,100,72,81,52,76,68,101,111,104,102,75,85,116,68,122,105,73,87,68,47,105,112,65,65,65,65,65,71,114,79,80,57,107,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,65,75,77,74,43,108,99,90,88,107,68,77,99,88,56,72,106,107,80,72,105,69,65,115,71,66,105,84,87,70,89,109,55,98,121,105,50,101,49,98,90,72,77,69,73,74,81,103,72,87,115,122,100,105,72,67,66,86,99,72,121,77,108,83,73,72,85,65,112,48,82,118,114,110,68,101,84,72,80,74,53,102,102,106,111,68],
+            "payload": [86,48,74,70,87,65,80,65,115,100,111,65,82,84,85,107,119,121,113,106,74,97,51,86,57,112,80,107,47,118,88,119,56,114,116,111,104,53,75,69,110,47,118,117,52,120,118,119,117,56,90,97,108,118,109,43,85,90,99,43,48,118,110,84,82,114,99,90,82,54,113,85,66,48,53,56,101,118,113,73,82,119,81,50,113,52,85,115,106,83,111,53,103,74,52,107,55,51,77,79,118,100,86,48,84,74,110,115,57,105,101,83,55,73,115,47,71,50,66,111,82,119,119,121,90,116,114,47,117,71,116,78,89,90,76,43,74,48,65,66,54,100,68,112,77,121,68,106,99,67,47,53,43,85,120,75,65,65,65,65,65,71,114,79,101,90,69,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,65,68,116,122,65,108,107,51,67,107,85,105,115,56,85,84,51,114,114,43,99,70,106,84,118,99,69,104,73,66,84,80,97,98,47,115,113,75,77,121,69,103,67,89,53,83,100,106,114,56,66,100,117,101,118,122,68,57,78,104,98,81,71,117,51,55,75,120,107,51,111,105,51,87,47,105,79,81,67,55,114,69,88,97,107,75],
             "is_initiator": true
           }
         }
@@ -17662,7 +17178,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI30:0:0:00NQI3P8PF6NZO:XDV.D*17HX6/$MFKHWOT59WB*H+2M01BAGCYVBB9RI08C8A$R6VTPK:1:85J92BWM9FA%W44SK-A8$.RSG0.%L+5HGIG R5NLS0D17L76N911Vauchi User00"
+                      "INI30:0:0:00-S1/I7:54N-1TOSHZOY7VD3L/G6SISZS05JJ5N5/JN*A7QSA J43YMR+S1I7K$MHF88R9 5BLFJJ11LKC5UQ:/2OSTCY4Y2HSYGY51EGF993ECE.TC0/RO6A11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -17844,17 +17360,6 @@
           }
         },
         {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "multi_stage_exchange",
-              "detail_surface": null,
-              "active_surface": "multi_stage_exchange"
-            }
-          }
-        },
-        {
           "SetScreenBrightness": {
             "level": 0.35
           }
@@ -17879,8 +17384,8 @@
             "earliest_secs": 1,
             "deadline_secs": 1,
             "min_interval_secs": 1,
-            "earliest_millis": 107,
-            "delay_millis": 107
+            "earliest_millis": 86,
+            "delay_millis": 86
           }
         }
       ]
@@ -18102,17 +17607,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "multi_stage_exchange",
-              "detail_surface": null,
-              "active_surface": "multi_stage_exchange"
             }
           }
         },
@@ -18392,17 +17886,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "multi_stage_exchange",
-              "detail_surface": null,
-              "active_surface": "multi_stage_exchange"
-            }
-          }
         }
       ]
     },
@@ -18577,17 +18060,6 @@
           }
         },
         {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "ble_exchange",
-              "detail_surface": null,
-              "active_surface": "ble_exchange"
-            }
-          }
-        },
-        {
           "SetScreenBrightness": {
             "level": null
           }
@@ -18605,7 +18077,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [179,217,100,186,99,26,143,45,212,61,13,112,218,240,213,222,97,179,203,222,145,124,131,80,232,99,148,233,94,37,140,252]
+            "payload": [192,177,218,0,69,53,36,195,42,163,37,173,213,246,147,228,254,245,240,242,187,104,135,146,132,159,251,238,227,27,240,187]
           }
         },
         {
@@ -18786,20 +18258,9 @@
           }
         },
         {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "ble_exchange",
-              "detail_surface": null,
-              "active_surface": "ble_exchange"
-            }
-          }
-        },
-        {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [179,217,100,186,99,26,143,45,212,61,13,112,218,240,213,222,97,179,203,222,145,124,131,80,232,99,148,233,94,37,140,252]
+            "payload": [192,177,218,0,69,53,36,195,42,163,37,173,213,246,147,228,254,245,240,242,187,104,135,146,132,159,251,238,227,27,240,187]
           }
         },
         {
@@ -18980,20 +18441,9 @@
           }
         },
         {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "ble_exchange",
-              "detail_surface": null,
-              "active_surface": "ble_exchange"
-            }
-          }
-        },
-        {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [179,217,100,186,99,26,143,45,212,61,13,112,218,240,213,222,97,179,203,222,145,124,131,80,232,99,148,233,94,37,140,252]
+            "payload": [192,177,218,0,69,53,36,195,42,163,37,173,213,246,147,228,254,245,240,242,187,104,135,146,132,159,251,238,227,27,240,187]
           }
         },
         {
@@ -20203,17 +19653,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "form_dialog",
-              "detail_surface": null,
-              "active_surface": "form_dialog"
-            }
-          }
         }
       ]
     },
@@ -20397,17 +19836,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "form_dialog",
-              "detail_surface": null,
-              "active_surface": "form_dialog"
-            }
-          }
         }
       ]
     },
@@ -20562,17 +19990,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "form_dialog",
-              "detail_surface": null,
-              "active_surface": "form_dialog"
             }
           }
         }
@@ -20747,17 +20164,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "form_dialog",
-              "detail_surface": null,
-              "active_surface": "form_dialog"
-            }
-          }
         }
       ]
     },
@@ -20914,17 +20320,6 @@
               ]
             }
           }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "form_dialog",
-              "detail_surface": null,
-              "active_surface": "form_dialog"
-            }
-          }
         }
       ]
     },
@@ -21079,17 +20474,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "form_dialog",
-              "detail_surface": null,
-              "active_surface": "form_dialog"
             }
           }
         }
@@ -21295,17 +20679,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "onboarding",
-              "detail_surface": null,
-              "active_surface": "onboarding"
             }
           }
         }
@@ -21662,17 +21035,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "my_info",
-              "detail_surface": null,
-              "active_surface": "my_info"
             }
           }
         }
@@ -22139,17 +21501,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "contacts",
-              "detail_surface": null,
-              "active_surface": "contacts"
             }
           }
         }
@@ -22703,17 +22054,6 @@
                   "badge_count": 0
                 }
               ]
-            }
-          }
-        },
-        {
-          "SetPresentationProfile": {
-            "profile": {
-              "window_class": "compact",
-              "pane_layout": "single",
-              "primary_surface": "settings",
-              "detail_surface": null,
-              "active_surface": "settings"
             }
           }
         }

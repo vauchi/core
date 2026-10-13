@@ -384,6 +384,7 @@ mod per_contact_relay_routing_tests;
 mod performance_batch_sync_tests;
 mod performance_pagination_tests;
 mod performance_threshold_tests;
+mod personal_note_format_tests;
 mod phase3_engine_proptest;
 mod pin_cache_tests;
 mod pin_config_verification_tests;

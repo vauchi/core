@@ -242,3 +242,38 @@ fn rekey_heals_plaintext_with_arbitrary_byte_content() {
     let decrypted = decrypt(&key2, &blob).expect("rekey must heal arbitrary-bytes plaintext");
     assert_eq!(decrypted, plaintext);
 }
+
+// @scenario: security :: rekey refuses to heal a ciphertext it cannot decrypt
+// @internal
+#[test]
+fn rekey_fails_rather_than_re_encrypting_a_ciphertext_it_cannot_decrypt() {
+    // A real ciphertext under some other key (wrong key, or AD-bound) is not
+    // plaintext from the encryption gap; healing it would wrap the ciphertext
+    // in another layer and the value would never decrypt again
+    // (vauchi/private#286 P1.6).
+    let (_dir, mut storage) = open_storage_with_contact();
+    let foreign = vauchi_core::crypto::encrypt(&SymmetricKey::generate(), b"loves dogs").unwrap();
+    storage
+        .connection()
+        .execute(
+            "UPDATE contacts SET personal_notes_encrypted = ?1 WHERE id = ?2",
+            params![foreign.clone(), CONTACT_ID],
+        )
+        .unwrap();
+
+    let result = storage.rekey(SymmetricKey::generate());
+
+    assert!(
+        result.is_err(),
+        "an undecryptable ciphertext must stop the rekey"
+    );
+    let blob: Vec<u8> = storage
+        .connection()
+        .query_row(
+            "SELECT personal_notes_encrypted FROM contacts WHERE id = ?1",
+            [&CONTACT_ID],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(blob, foreign, "the value is left exactly as it was");
+}

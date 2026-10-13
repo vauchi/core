@@ -171,3 +171,46 @@ fn the_first_screen_after_a_shred_is_newer_than_any_before_it() {
         "revision went from {before_shred} to {after_shred}; a shell drops it as out of order"
     );
 }
+
+/// The engine reopens lazily, on the first call after a shred, and iOS makes
+/// two at once: the main thread reloads the screen on `ResetApplication`
+/// while its engine queue still delivers the confirmation field's focus
+/// event. A caller arriving mid-reopen was told "Storage is locked", and the
+/// person saw an error alert over Welcome (iPhone SE, vauchi/private#293).
+// @internal
+#[test]
+fn calls_racing_the_reopen_after_a_shred_wait_for_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = SharedKeychain::new();
+    let engine = open(&dir, &keychain);
+    drive_onboarding(&engine);
+    assert!(matches!(
+        engine.dispatch_domain_command(DomainCommand::PanicShred),
+        Ok(DomainCommandResult::ShredCompleted { .. })
+    ));
+
+    let callers = 8;
+    let start = Arc::new(std::sync::Barrier::new(callers));
+    let outcomes: Vec<Result<String, String>> = (0..callers)
+        .map(|_| {
+            let engine = Arc::clone(&engine);
+            let start = Arc::clone(&start);
+            std::thread::spawn(move || {
+                start.wait();
+                engine
+                    .initial_commands_json()
+                    .map_err(|error| format!("{error:?}"))
+            })
+        })
+        .collect::<Vec<_>>()
+        .into_iter()
+        .map(|caller| caller.join().expect("caller thread"))
+        .collect();
+
+    let failures: Vec<&String> = outcomes.iter().filter_map(|o| o.as_ref().err()).collect();
+    assert_eq!(
+        failures,
+        Vec::<&String>::new(),
+        "callers racing the reopen failed"
+    );
+}

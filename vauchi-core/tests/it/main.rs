@@ -209,6 +209,7 @@ mod duress_pin_tests;
 mod duress_pin_validation_tests;
 mod duress_sends_nothing_tests;
 mod edge_cases_tests;
+mod emergency_alert_fresh_responder_tests;
 mod emergency_broadcast_tests;
 mod emergency_shred_engine_tests;
 mod encryption_coverage_tests;

@@ -640,6 +640,38 @@ fn a_glance_qr_opened_from_the_camera_continues_the_exchange() {
 
 // @internal
 #[test]
+fn a_glance_link_opened_while_glance_is_showing_starts_the_radio_again() {
+    // The Pixel, still on the result screen of its last Glance exchange,
+    // opened the next peer's link: the camera came up but no BLE scan
+    // started, so the peer was never found (vauchi/private#672). Moving to
+    // the screen it is already on skipped the entry that starts the radio.
+    let glance = AppScreen::BleExchange {
+        mode: vauchi_core::exchange::mode::ExchangeMode::Glance,
+    };
+    let mut alice = fresh_engine("Alice");
+    let mut bob = fresh_engine("Bob");
+    bob.navigate_to(glance.clone());
+    bob.drain_pending_commands();
+    let alice_qr = alice.begin_glance_display().expect("alice shows a QR");
+
+    let mut commands = bob
+        .dispatch(vauchi_core::Event::DeepLinkOpened { uri: alice_qr })
+        .expect("the link is handled");
+    commands.extend(bob.drain_pending_commands());
+
+    assert_eq!(bob.screen, glance);
+    assert!(
+        commands
+            .iter()
+            .any(|c| matches!(c, vauchi_core::Command::BleStartScanning { .. })),
+        "the link starts a BLE scan: {commands:?}"
+    );
+    bob.handle_glance_discovery("alice-device", &signing_key(&alice));
+    assert!(bob.ble_handshake_session_active());
+}
+
+// @internal
+#[test]
 fn a_tampered_glance_qr_link_is_refused_without_starting_an_exchange() {
     let alice = {
         let mut alice = fresh_engine("Alice");

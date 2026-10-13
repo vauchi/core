@@ -73,9 +73,15 @@ pub enum BleRole {
 /// tokens. Both peers advertise + scan symmetrically; the device whose
 /// token is lexicographically smaller becomes the **initiator**
 /// (central, connects + sends the KeyOffer), the other the
-/// **responder** (peripheral). Equal tokens — effectively impossible
-/// for distinct identities — default to responder so neither side
-/// double-connects.
+/// **responder** (peripheral).
+///
+/// Both sides compare at the width the peer advertised (two bytes on
+/// iOS), because comparing a full key against the short token made the
+/// longer side "greater" on both phones whenever the prefixes matched,
+/// and nobody dialled. Equal prefixes resolve to **initiator**: both
+/// dial and the glare handling keeps one link (owner decision
+/// 2026-10-13, vauchi/private#275). An empty peer token stays responder,
+/// so a malformed advertisement never makes this side dial.
 ///
 /// This is the single source of truth for the tiebreak, shared by the
 /// chrome-side [`super::super::ui::exchange::ble::BleExchangeFlow`]
@@ -83,10 +89,13 @@ pub enum BleRole {
 /// `AppEngine::start_ble_handshake_on_discovery` (decides the session
 /// role). Keeping it in one place means the two can never disagree.
 pub fn decide_ble_role(own_token: &[u8], peer_token: &[u8]) -> BleRole {
-    if own_token < peer_token {
-        BleRole::Initiator
-    } else {
-        BleRole::Responder
+    if peer_token.is_empty() {
+        return BleRole::Responder;
+    }
+    let width = own_token.len().min(peer_token.len());
+    match own_token[..width].cmp(&peer_token[..width]) {
+        std::cmp::Ordering::Less | std::cmp::Ordering::Equal => BleRole::Initiator,
+        std::cmp::Ordering::Greater => BleRole::Responder,
     }
 }
 

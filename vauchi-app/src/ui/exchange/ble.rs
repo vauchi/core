@@ -266,8 +266,7 @@ impl BleExchangeFlow {
     /// Whether this device should initiate the BLE connection (become
     /// central) given the peer's advertised tiebreak token. The smaller
     /// token wins and connects; the other waits as responder
-    /// (peripheral). Equal tokens — effectively impossible for distinct
-    /// identities — default to responder so neither side double-connects.
+    /// (peripheral). See [`decide_ble_role`] for the tie rule.
     fn decides_initiator(&self, peer_token: &[u8]) -> bool {
         // Single source of truth — the AppEngine's session-role decision
         // uses the same fn, so chrome and crypto can never disagree.
@@ -680,9 +679,10 @@ mod tests {
 
     // @internal
     #[test]
-    fn discovery_equal_tokens_default_to_responder() {
-        // Astronomically rare for distinct identities, but equal tokens
-        // must still not double-connect: both default to responder.
+    fn discovery_equal_tokens_connect() {
+        // Equal advertised tokens left both sides waiting as responder,
+        // so nobody dialled; both now dial and glare keeps one link
+        // (owner decision 2026-10-13, vauchi/private#275).
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic, vec![0x05]);
         let outcome = flow.handle_event(&Event::BleDeviceDiscovered {
             id: "device-1".into(),
@@ -691,7 +691,11 @@ mod tests {
         });
         match outcome {
             BleHardwareOutcome::StepAdvanced { commands } => {
-                assert!(commands.is_empty(), "equal tokens must not connect");
+                assert_eq!(commands.len(), 1);
+                assert!(matches!(
+                    &commands[0],
+                    Command::BleConnect { device_id } if device_id == "device-1"
+                ));
             }
             other => panic!("Expected StepAdvanced, got {other:?}"),
         }

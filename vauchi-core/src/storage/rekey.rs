@@ -145,14 +145,17 @@ pub const REKEY_SKIP_COLUMNS: &[(&str, &str, &str)] = &[
     ),
 ];
 
-/// Try to decrypt data with the old key; if decryption fails, treat it as
-/// plaintext and encrypt directly with the new key. This self-heals columns
-/// that were written as plaintext due to the V4/V32 encryption gap (columns
-/// named `_encrypted` but never actually encrypted by callers).
+/// Try to decrypt data with the old key; if it is not a ciphertext at all,
+/// treat it as plaintext and encrypt directly with the new key. This
+/// self-heals columns that were written as plaintext due to the V4/V32
+/// encryption gap (columns named `_encrypted` but never actually encrypted by
+/// callers).
 ///
-/// Safety: valid ciphertexts start with algorithm tag 0x02 or 0x03. UTF-8 text
-/// never starts with these bytes, so a decrypt failure unambiguously means the
-/// data is plaintext.
+/// A value shaped like a ciphertext (algorithm tag 0x02 or 0x03, long enough
+/// for nonce and tag) that does not decrypt is a wrong-key or AD-bound
+/// ciphertext, not gap plaintext: healing it would wrap it in a second layer
+/// that never decrypts back to the data, so the error is returned instead
+/// (vauchi/private#286).
 fn rekey_or_heal(
     new_key: &SymmetricKey,
     old_key: &SymmetricKey,
@@ -160,10 +163,8 @@ fn rekey_or_heal(
 ) -> Result<Vec<u8>, EncryptionError> {
     match decrypt(old_key, data) {
         Ok(plain) => encrypt(new_key, &plain),
-        Err(_) => {
-            // Data is plaintext (pre-encryption gap) — encrypt with new key.
-            encrypt(new_key, data)
-        }
+        Err(e) if crate::crypto::encryption::looks_like_ciphertext(data) => Err(e),
+        Err(_) => encrypt(new_key, data),
     }
 }
 

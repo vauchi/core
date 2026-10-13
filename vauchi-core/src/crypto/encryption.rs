@@ -108,6 +108,17 @@ impl SymmetricKey {
     }
 }
 
+/// Whether `data` has the shape of a ciphertext this module produces: a
+/// known algorithm tag followed by room for the nonce and the AEAD tag.
+/// Storage's rekey uses it to tell plaintext left by the old encryption gap
+/// from a ciphertext it cannot decrypt (vauchi/private#286).
+pub(crate) fn looks_like_ciphertext(data: &[u8]) -> bool {
+    matches!(
+        data.first(),
+        Some(&ALG_TAG_XCHACHA20) | Some(&ALG_TAG_XCHACHA20_AD)
+    ) && data.len() >= 1 + XCHACHA20_NONCE_SIZE + TAG_SIZE
+}
+
 /// Encrypts data using XChaCha20-Poly1305 (default algorithm).
 ///
 /// Output format: `0x02 || nonce (24 bytes) || ciphertext || tag (16 bytes)`

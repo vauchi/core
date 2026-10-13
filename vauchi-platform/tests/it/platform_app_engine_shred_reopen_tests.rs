@@ -214,3 +214,58 @@ fn calls_racing_the_reopen_after_a_shred_wait_for_it() {
         "callers racing the reopen failed"
     );
 }
+
+fn activate(engine: &PlatformAppEngine, surface: &str) -> serde_json::Value {
+    let activated = serde_json::json!({ "SurfaceActivated": { "surface_id": surface } });
+    serde_json::from_str(
+        &engine
+            .dispatch_json(activated.to_string())
+            .expect("dispatch returns a batch"),
+    )
+    .expect("parse command batch")
+}
+
+fn is_error_alert(batch: &serde_json::Value) -> bool {
+    batch["commands"]
+        .as_array()
+        .is_some_and(|commands| commands.iter().any(|c| c.get("PresentAlert").is_some()))
+}
+
+/// iOS reports its window once, at start, and every screen it brings up as
+/// activated. The engine reopened after a shred never heard the window, so
+/// it refused each activation and the person saw an error alert on Welcome
+/// and on every onboarding step (iPhone SE, vauchi/private#293).
+// @internal
+#[test]
+fn the_window_reported_before_a_shred_still_counts_after_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = SharedKeychain::new();
+    let engine = open(&dir, &keychain);
+    let window = serde_json::json!({"PresentationEnvironmentChanged": {
+        "available_width": 375, "available_height": 667,
+        "input_modes": ["touch"], "motion": "full",
+    }});
+    engine
+        .dispatch_json(window.to_string())
+        .expect("environment accepted");
+    drive_onboarding(&engine);
+    let before_shred = activate(&engine, &current_surface(&engine));
+    assert!(
+        !is_error_alert(&before_shred),
+        "precondition: activation works before the shred: {before_shred}"
+    );
+    assert!(matches!(
+        engine.dispatch_domain_command(DomainCommand::PanicShred),
+        Ok(DomainCommandResult::ShredCompleted { .. })
+    ));
+
+    let after_shred = activate(&engine, &current_surface(&engine));
+
+    assert!(!is_error_alert(&after_shred), "{after_shred}");
+    assert!(
+        after_shred["commands"][0]
+            .get("SetPresentationProfile")
+            .is_some(),
+        "{after_shred}"
+    );
+}

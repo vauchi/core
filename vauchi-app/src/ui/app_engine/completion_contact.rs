@@ -54,7 +54,7 @@ impl AppEngine {
             })
             .and_then(|()| {
                 edited_note.map_or(Ok(()), |note| {
-                    self.vauchi.save_personal_notes(contact_id, note.as_bytes())
+                    self.vauchi.add_personal_note(contact_id, &note)
                 })
             });
         if let Err(e) = saved {

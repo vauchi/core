@@ -36,13 +36,8 @@ impl AppEngine {
         ) && let Some(value) =
             editable_text_value(&self.engine.current_screen(), "personal_note")
         {
-            // Encryption handled at the storage layer (save_personal_notes encrypts
-            // with the storage encryption key). Legacy plaintext rows are self-healed
-            // on next load+save cycle. See: problems/2026-03-27-notes-encryption-gap.
-            if let Err(e) = self
-                .vauchi
-                .save_personal_notes(contact_id, value.as_bytes())
-            {
+            // add_personal_note journals the note for linked devices (private#452).
+            if let Err(e) = self.vauchi.add_personal_note(contact_id, &value) {
                 let _ = e; // Silently ignore — UI already shows the field unchanged
             }
         }

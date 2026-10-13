@@ -107,12 +107,10 @@ impl AppEngine {
                         }),
                     };
 
-                    // Load personal note (stored as raw UTF-8 bytes by the app layer)
                     let personal_note = vauchi
-                        .load_personal_notes(contact_id)
+                        .read_personal_note(contact_id)
                         .ok()
                         .flatten()
-                        .and_then(|bytes| String::from_utf8(bytes).ok())
                         .unwrap_or_default();
 
                     // Load per-field notes — convert raw bytes to UTF-8 strings
@@ -274,10 +272,9 @@ impl AppEngine {
             AppScreen::ContactEdit { contact_id } => match vauchi.get_contact(contact_id) {
                 Ok(Some(contact)) => {
                     let personal_note = vauchi
-                        .load_personal_notes(contact_id)
+                        .read_personal_note(contact_id)
                         .ok()
                         .flatten()
-                        .and_then(|bytes| String::from_utf8(bytes).ok())
                         .unwrap_or_default();
                     Box::new(
                         ContactEditEngine::new(EditableContact {

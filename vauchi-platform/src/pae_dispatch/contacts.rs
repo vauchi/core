@@ -299,11 +299,10 @@ impl PlatformAppEngine {
                 Ok(DomainCommandResult::Unit)
             }
             DomainCommand::SetContactNote { contact_id, note } => {
+                // Through the API so linked devices get the note (private#452).
                 engine
                     .vauchi()
-                    .storage()
-                    .contacts()
-                    .save_personal_notes(&contact_id, note.as_bytes())
+                    .add_personal_note(&contact_id, &note)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
                     })?;
@@ -313,23 +312,17 @@ impl PlatformAppEngine {
                 Ok(DomainCommandResult::Unit)
             }
             DomainCommand::GetContactNote { contact_id } => {
-                let bytes = engine
+                let value = engine
                     .vauchi()
-                    .storage()
-                    .contacts()
-                    .load_personal_notes(&contact_id)
+                    .read_personal_note(&contact_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
                     })?;
-                Ok(DomainCommandResult::StringOpt {
-                    value: bytes.and_then(|b| String::from_utf8(b).ok()),
-                })
+                Ok(DomainCommandResult::StringOpt { value })
             }
             DomainCommand::DeleteContactNote { contact_id } => {
                 engine
                     .vauchi()
-                    .storage()
-                    .contacts()
                     .delete_personal_notes(&contact_id)
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),

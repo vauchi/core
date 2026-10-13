@@ -48,7 +48,7 @@ fn a_note_saved_in_the_app_is_journaled_for_linked_devices() {
             action_id: "save_personal_note".into(),
         },
     ] {
-        engine.handle_action(action);
+        let _ = engine.handle_action(action);
     }
 
     let journal = journal_for_tablet(engine.vauchi(), registry, &tablet_id);

@@ -14,7 +14,9 @@ use vauchi_core::exchange::QrPayload;
 use vauchi_core::exchange::capability::types::{BiometricType, DeviceCapabilities, Platform};
 use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::types::AudioCapability;
-use vauchi_core::{Command, Event, PresentationNode, SurfaceId, Vauchi};
+use vauchi_core::{
+    Command, Event, InputMode, MotionPreference, PresentationNode, SurfaceId, Vauchi,
+};
 
 use seed::SeededWorld;
 
@@ -147,6 +149,18 @@ impl<'a> Recorder<'a> {
         // rebuild it under the pushed one, the way a shell's boot does.
         let boot_screen = engine.current_app_screen().clone();
         engine.set_initial_screen(boot_screen);
+        // Shells report their window at boot, and only then does Core name
+        // the active surface; without it a shell draws a sub-screen's
+        // parent (vauchi/private#420). Taller than the short-window
+        // threshold, so exchange screens keep their regular layout (#513).
+        engine
+            .dispatch(Event::PresentationEnvironmentChanged {
+                available_width: 390,
+                available_height: 844,
+                input_modes: vec![InputMode::Touch],
+                motion: MotionPreference::Full,
+            })
+            .expect("phone window accepted");
         Recorder {
             engine,
             locale,

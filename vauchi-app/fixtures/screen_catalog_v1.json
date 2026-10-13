@@ -203,6 +203,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "onboarding",
+              "detail_surface": null,
+              "active_surface": "onboarding"
+            }
+          }
         }
       ]
     },
@@ -442,6 +453,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "my_info",
+              "detail_surface": null,
+              "active_surface": "my_info"
+            }
+          }
         }
       ]
     },
@@ -587,6 +609,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "contacts",
+              "detail_surface": null,
+              "active_surface": "contacts"
             }
           }
         }
@@ -858,6 +891,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "exchange",
+              "detail_surface": null,
+              "active_surface": "exchange"
+            }
+          }
         }
       ]
     },
@@ -935,6 +979,17 @@
             "revision": 1,
             "navigation": {
               "items": []
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "lock",
+              "detail_surface": null,
+              "active_surface": "lock"
             }
           }
         }
@@ -1291,6 +1346,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "my_info",
+              "detail_surface": null,
+              "active_surface": "my_info"
             }
           }
         }
@@ -1759,6 +1825,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "contacts",
+              "detail_surface": null,
+              "active_surface": "contacts"
+            }
+          }
         }
       ]
     },
@@ -2218,7 +2295,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_fb7e9135b3fd9a4c",
+                    "id": "field_e59cfdf84d5da797",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2249,13 +2326,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:fb7e9135b3fd9a4c",
+                    "id": "field_note:e59cfdf84d5da797",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:fb7e9135b3fd9a4c",
+                          "id": "field_note:e59cfdf84d5da797",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2295,7 +2372,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_005c11a802dd92d7",
+                    "id": "field_94f926837f8bb3a4",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2326,13 +2403,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:005c11a802dd92d7",
+                    "id": "field_note:94f926837f8bb3a4",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:005c11a802dd92d7",
+                          "id": "field_note:94f926837f8bb3a4",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2372,7 +2449,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_c87a110ae3dc3847",
+                    "id": "field_61d118219b147640",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2403,13 +2480,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:c87a110ae3dc3847",
+                    "id": "field_note:61d118219b147640",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:c87a110ae3dc3847",
+                          "id": "field_note:61d118219b147640",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2800,6 +2877,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "contacts",
+              "detail_surface": "contact_detail",
+              "active_surface": "contact_detail"
             }
           }
         }
@@ -3445,6 +3533,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "contacts",
+              "detail_surface": "contact_edit",
+              "active_surface": "contact_edit"
             }
           }
         }
@@ -4225,6 +4324,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "contacts",
+              "detail_surface": "contact_visibility",
+              "active_surface": "contact_visibility"
+            }
+          }
         }
       ]
     },
@@ -4643,10 +4753,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "D6AB DF24 B91B 9CFC 47FD FDB6 B29C 03C0 778A C85C 412E 819B C464 E410 A363 1C4C",
+                    "content": "39B3 624A A7F1 D5E3 80CB 17C6 544F A7C6 6807 254E C252 4C59 8D87 5D7F 9E56 7386",
                     "style": "body",
                     "accessibility": {
-                      "label": "D6AB DF24 B91B 9CFC 47FD FDB6 B29C 03C0 778A C85C 412E 819B C464 E410 A363 1C4C",
+                      "label": "39B3 624A A7F1 D5E3 80CB 17C6 544F A7C6 6807 254E C252 4C59 8D87 5D7F 9E56 7386",
                       "description": null
                     }
                   }
@@ -4665,10 +4775,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "B3E4 5852 26BB 7537 901F 0A4F 96EF C970 F8F4 E454 3026 8411 1F44 05C7 243E 8B29",
+                    "content": "54C0 67F5 09FE C2A8 4D49 488F FFB4 6E37 2544 1E03 3956 6E33 FB27 A438 516C 3C3B",
                     "style": "body",
                     "accessibility": {
-                      "label": "B3E4 5852 26BB 7537 901F 0A4F 96EF C970 F8F4 E454 3026 8411 1F44 05C7 243E 8B29",
+                      "label": "54C0 67F5 09FE C2A8 4D49 488F FFB4 6E37 2544 1E03 3956 6E33 FB27 A438 516C 3C3B",
                       "description": null
                     }
                   }
@@ -4858,6 +4968,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "contacts",
+              "detail_surface": "verify_fingerprint",
+              "active_surface": "verify_fingerprint"
+            }
+          }
         }
       ]
     },
@@ -5034,6 +5155,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "exchange",
+              "detail_surface": null,
+              "active_surface": "exchange"
             }
           }
         }
@@ -5587,6 +5719,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "settings",
+              "detail_surface": null,
+              "active_surface": "settings"
             }
           }
         }
@@ -6419,7 +6562,7 @@
                       {
                         "title": "Version",
                         "subtitle": null,
-                        "detail": "0.73.0",
+                        "detail": "0.81.0",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": null,
@@ -6482,7 +6625,7 @@
                 {
                   "List": {
                     "id": "danger",
-                    "label": "Danger Zone",
+                    "label": "Erase data",
                     "rows": [
                       {
                         "title": "Emergency Wipe",
@@ -6513,7 +6656,7 @@
                     "searchable": false,
                     "paging": null,
                     "accessibility": {
-                      "label": "Danger Zone",
+                      "label": "Erase data",
                       "description": null
                     }
                   }
@@ -6680,6 +6823,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "settings",
+              "detail_surface": "settings_advanced",
+              "active_surface": "settings_advanced"
             }
           }
         }
@@ -7496,6 +7650,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "settings",
+              "detail_surface": "settings_appearance",
+              "active_surface": "settings_appearance"
+            }
+          }
         }
       ]
     },
@@ -8220,6 +8385,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "settings",
+              "detail_surface": "settings_accessibility",
+              "active_surface": "settings_accessibility"
+            }
+          }
         }
       ]
     },
@@ -8612,7 +8788,7 @@
                             },
                             {
                               "title": "About",
-                              "subtitle": "Vauchi 0.73.0 · core 0.73.0",
+                              "subtitle": "Vauchi 0.81.0 · core 0.81.0",
                               "detail": null,
                               "icon_token": null,
                               "image_data": null,
@@ -8783,6 +8959,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "help",
+              "detail_surface": null,
+              "active_surface": "help"
             }
           }
         }
@@ -8993,6 +9180,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "backup",
+              "detail_surface": null,
+              "active_surface": "backup"
             }
           }
         }
@@ -9303,6 +9501,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "device_management",
+              "detail_surface": "device_linking",
+              "active_surface": "device_linking"
+            }
+          }
         }
       ]
     },
@@ -9482,6 +9691,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "device_management",
+              "detail_surface": null,
+              "active_surface": "device_management"
+            }
+          }
         }
       ]
     },
@@ -9532,10 +9752,10 @@
                 {
                   "Text": {
                     "id": "duress_intro",
-                    "content": "A secondary PIN that, when entered, silently alerts your chosen contacts while appearing to unlock normally.",
+                    "content": "A secondary PIN that, when entered, shows your decoy contacts while appearing to unlock normally. It alerts no one.",
                     "style": "body",
                     "accessibility": {
-                      "label": "A secondary PIN that, when entered, silently alerts your chosen contacts while appearing to unlock normally.",
+                      "label": "A secondary PIN that, when entered, shows your decoy contacts while appearing to unlock normally. It alerts no one.",
                       "description": null
                     }
                   }
@@ -9671,6 +9891,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "duress_pin",
+              "detail_surface": null,
+              "active_surface": "duress_pin"
             }
           }
         }
@@ -9851,6 +10082,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "change_password",
+              "detail_surface": null,
+              "active_surface": "change_password"
             }
           }
         }
@@ -10047,6 +10289,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "decoy_contacts",
+              "detail_surface": null,
+              "active_surface": "decoy_contacts"
             }
           }
         }
@@ -10284,6 +10537,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "emergency_shred",
+              "detail_surface": null,
+              "active_surface": "emergency_shred"
+            }
+          }
         }
       ]
     },
@@ -10458,6 +10722,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "delivery_status",
+              "detail_surface": null,
+              "active_surface": "delivery_status"
             }
           }
         }
@@ -10699,6 +10974,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "recovery",
+              "detail_surface": null,
+              "active_surface": "recovery"
             }
           }
         }
@@ -11155,6 +11441,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "recovery",
+              "detail_surface": "recovery_help",
+              "active_surface": "recovery_help"
+            }
+          }
         }
       ]
     },
@@ -11380,6 +11677,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "groups",
+              "detail_surface": null,
+              "active_surface": "groups"
             }
           }
         }
@@ -12031,6 +12339,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "groups",
+              "detail_surface": "group_detail",
+              "active_surface": "group_detail"
+            }
+          }
         }
       ]
     },
@@ -12179,6 +12498,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "tags",
+              "detail_surface": null,
+              "active_surface": "tags"
+            }
+          }
         }
       ]
     },
@@ -12325,6 +12655,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "places",
+              "detail_surface": null,
+              "active_surface": "places"
             }
           }
         }
@@ -12580,6 +12921,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "privacy",
+              "detail_surface": null,
+              "active_surface": "privacy"
+            }
+          }
         }
       ]
     },
@@ -12761,6 +13113,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "support",
+              "detail_surface": null,
+              "active_surface": "support"
             }
           }
         }
@@ -13507,6 +13870,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "my_info",
+              "detail_surface": "entry_detail",
+              "active_surface": "entry_detail"
+            }
+          }
         }
       ]
     },
@@ -14139,6 +14513,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "contacts",
+              "detail_surface": "contact_duplicates",
+              "active_surface": "contact_duplicates"
             }
           }
         }
@@ -14856,6 +15241,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "contacts",
+              "detail_surface": "contact_merge",
+              "active_surface": "contact_merge"
+            }
+          }
         }
       ]
     },
@@ -14999,6 +15395,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "activity_log",
+              "detail_surface": null,
+              "active_surface": "activity_log"
             }
           }
         }
@@ -15602,6 +16009,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "contacts",
+              "detail_surface": "archived_contacts",
+              "active_surface": "archived_contacts"
+            }
+          }
         }
       ]
     },
@@ -15937,6 +16355,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "device_management",
+              "detail_surface": "device_replacement",
+              "active_surface": "device_replacement"
+            }
+          }
         }
       ]
     },
@@ -16154,6 +16583,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "avatar_editor",
+              "detail_surface": null,
+              "active_surface": "avatar_editor"
             }
           }
         }
@@ -16516,6 +16956,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "recovery",
+              "detail_surface": "recovery_claim_review",
+              "active_surface": "recovery_claim_review"
+            }
+          }
         }
       ]
     },
@@ -16594,7 +17045,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "vauchi://exchange?pk=AHGGHuCQmW6_KQLnlASRT1At8PLveWn_m8QmVIBvfWI&n=5R95gygEqgbY4JZfc9HI_8R3EmNShzSGD0yQoRyCl8g",
+                    "content": "https://vauchi.app/x#pk=-_i6569Hlvk6FTaEnAXGo7Nmb_76uogKyu2YOkyXFD0&n=b5yQ-kIakwVN68bXCZhLtZLavdu--bWYyN3fCR-4dcE&nm=QWRhIExvdmVsYWNl",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -16709,6 +17160,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "link_exchange",
+              "detail_surface": null,
+              "active_surface": "link_exchange"
             }
           }
         },
@@ -16943,6 +17405,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "nfc_exchange",
+              "detail_surface": null,
+              "active_surface": "nfc_exchange"
+            }
+          }
         }
       ]
     },
@@ -17117,8 +17590,19 @@
           }
         },
         {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "direct_transport",
+              "detail_surface": null,
+              "active_surface": "direct_transport"
+            }
+          }
+        },
+        {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,79,122,53,70,104,83,74,114,116,49,78,53,65,102,67,107,43,87,55,56,108,119,43,80,84,107,86,68,65,109,104,66,69,102,82,65,88,72,74,68,54,76,75,88,122,108,68,104,84,73,121,116,54,53,85,111,106,118,73,83,107,56,119,112,77,74,84,84,48,98,73,88,87,118,79,103,51,51,109,102,50,108,99,80,74,86,54,104,97,108,116,79,50,99,72,100,79,47,122,78,114,114,79,81,74,87,53,81,98,85,84,106,102,85,88,85,97,113,77,122,108,82,52,107,90,82,104,55,47,76,69,90,55,86,70,75,114,81,48,109,109,104,106,88,120,76,78,90,56,107,65,65,65,65,65,71,114,70,69,77,65,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,67,56,51,47,106,112,73,120,68,79,111,90,69,99,74,88,67,71,90,113,48,98,86,117,114,117,117,49,88,80,52,81,52,51,72,68,55,77,66,70,86,47,76,89,122,100,54,105,101,74,68,118,118,82,115,104,100,77,111,56,99,107,122,49,122,69,113,70,52,121,114,71,110,71,122,119,107,118,66,90,76,88,43,83,48,79],
+            "payload": [86,48,74,70,87,65,78,85,119,71,102,49,67,102,55,67,113,69,49,74,83,73,47,47,116,71,52,51,74,85,81,101,65,122,108,87,98,106,80,55,74,54,81,52,85,87,119,56,79,54,122,56,80,80,109,120,115,108,85,103,122,110,122,122,56,85,56,79,49,85,114,52,102,104,74,43,87,107,71,106,52,80,122,52,82,101,84,71,97,74,107,66,116,55,108,68,67,88,48,80,89,68,79,86,106,54,49,66,109,115,105,113,84,52,52,75,99,122,119,70,80,49,83,80,81,71,83,105,86,57,53,84,50,101,69,43,75,113,101,98,103,109,50,52,121,112,56,79,116,121,54,75,122,98,112,53,65,65,65,65,65,71,114,79,69,84,111,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,65,75,122,84,102,82,98,113,110,106,122,51,116,76,78,53,78,108,103,97,47,55,54,100,80,65,53,54,74,121,73,118,121,43,116,121,117,108,98,106,100,57,97,99,98,114,108,75,101,78,67,66,80,75,65,55,99,79,90,83,102,74,99,101,89,48,54,73,100,103,120,47,67,43,106,78,99,57,54,82,113,109,76,76,69,73],
             "is_initiator": true
           }
         }
@@ -17178,7 +17662,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI30:0:0:00NY5ZVHTTA-71XSI/IB8VO /UP9BL+2RAH20AZSAQJ9*J5O.7YX12L46WGCNC7GP/DF%-UXE4O1F699JDCCIR28CRO47M2M$D%T39Y9RE86.7TX51X2O7W-6Q11Vauchi User00"
+                      "INI30:0:0:00ZJD+L75T4*APFBF*4AGHRLRF/6U4 GBOS:REK0N3.0I4I3 A2XFGLMOOA/$LG-C-Z161KA%UJPK3IA*BUDN5G$LQ/DE23 0T1IDWOC-75-VVQH08HT%V9OML11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -17360,6 +17844,17 @@
           }
         },
         {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "multi_stage_exchange",
+              "detail_surface": null,
+              "active_surface": "multi_stage_exchange"
+            }
+          }
+        },
+        {
           "SetScreenBrightness": {
             "level": 0.35
           }
@@ -17384,8 +17879,8 @@
             "earliest_secs": 1,
             "deadline_secs": 1,
             "min_interval_secs": 1,
-            "earliest_millis": 105,
-            "delay_millis": 105
+            "earliest_millis": 95,
+            "delay_millis": 95
           }
         }
       ]
@@ -17607,6 +18102,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "multi_stage_exchange",
+              "detail_surface": null,
+              "active_surface": "multi_stage_exchange"
             }
           }
         },
@@ -17886,6 +18392,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "multi_stage_exchange",
+              "detail_surface": null,
+              "active_surface": "multi_stage_exchange"
+            }
+          }
         }
       ]
     },
@@ -18060,6 +18577,17 @@
           }
         },
         {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "ble_exchange",
+              "detail_surface": null,
+              "active_surface": "ble_exchange"
+            }
+          }
+        },
+        {
           "SetScreenBrightness": {
             "level": null
           }
@@ -18077,7 +18605,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [179,228,88,82,38,187,117,55,144,31,10,79,150,239,201,112,248,244,228,84,48,38,132,17,31,68,5,199,36,62,139,41]
+            "payload": [84,192,103,245,9,254,194,168,77,73,72,143,255,180,110,55,37,68,30,3,57,86,110,51,251,39,164,56,81,108,60,59]
           }
         },
         {
@@ -18258,9 +18786,20 @@
           }
         },
         {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "ble_exchange",
+              "detail_surface": null,
+              "active_surface": "ble_exchange"
+            }
+          }
+        },
+        {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [179,228,88,82,38,187,117,55,144,31,10,79,150,239,201,112,248,244,228,84,48,38,132,17,31,68,5,199,36,62,139,41]
+            "payload": [84,192,103,245,9,254,194,168,77,73,72,143,255,180,110,55,37,68,30,3,57,86,110,51,251,39,164,56,81,108,60,59]
           }
         },
         {
@@ -18441,9 +18980,20 @@
           }
         },
         {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "ble_exchange",
+              "detail_surface": null,
+              "active_surface": "ble_exchange"
+            }
+          }
+        },
+        {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [179,228,88,82,38,187,117,55,144,31,10,79,150,239,201,112,248,244,228,84,48,38,132,17,31,68,5,199,36,62,139,41]
+            "payload": [84,192,103,245,9,254,194,168,77,73,72,143,255,180,110,55,37,68,30,3,57,86,110,51,251,39,164,56,81,108,60,59]
           }
         },
         {
@@ -19653,6 +20203,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "form_dialog",
+              "detail_surface": null,
+              "active_surface": "form_dialog"
+            }
+          }
         }
       ]
     },
@@ -19836,6 +20397,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "form_dialog",
+              "detail_surface": null,
+              "active_surface": "form_dialog"
+            }
+          }
         }
       ]
     },
@@ -19990,6 +20562,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "form_dialog",
+              "detail_surface": null,
+              "active_surface": "form_dialog"
             }
           }
         }
@@ -20164,6 +20747,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "form_dialog",
+              "detail_surface": null,
+              "active_surface": "form_dialog"
+            }
+          }
         }
       ]
     },
@@ -20320,6 +20914,17 @@
               ]
             }
           }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "form_dialog",
+              "detail_surface": null,
+              "active_surface": "form_dialog"
+            }
+          }
         }
       ]
     },
@@ -20474,6 +21079,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "form_dialog",
+              "detail_surface": null,
+              "active_surface": "form_dialog"
             }
           }
         }
@@ -20679,6 +21295,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "onboarding",
+              "detail_surface": null,
+              "active_surface": "onboarding"
             }
           }
         }
@@ -21035,6 +21662,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "my_info",
+              "detail_surface": null,
+              "active_surface": "my_info"
             }
           }
         }
@@ -21501,6 +22139,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "contacts",
+              "detail_surface": null,
+              "active_surface": "contacts"
             }
           }
         }
@@ -22054,6 +22703,17 @@
                   "badge_count": 0
                 }
               ]
+            }
+          }
+        },
+        {
+          "SetPresentationProfile": {
+            "profile": {
+              "window_class": "compact",
+              "pane_layout": "single",
+              "primary_surface": "settings",
+              "detail_surface": null,
+              "active_surface": "settings"
             }
           }
         }

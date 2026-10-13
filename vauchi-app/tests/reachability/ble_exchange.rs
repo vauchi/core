@@ -60,7 +60,6 @@ const GLANCE_CAMERA_HANDLED: &[&str] = &[
     BLE_EXCHANGE_ACTION_ENTER_CODE,
     BLE_EXCHANGE_ACTION_CONNECT_CODE,
     BLE_EXCHANGE_ACTION_RETRY,
-    "fallback_qr",
     "fallback_relay",
     BLE_EXCHANGE_ACTION_CANCEL,
 ];

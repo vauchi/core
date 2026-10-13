@@ -492,6 +492,12 @@ impl BleExchangeEngine {
         ActionResult::StartLinkExchange
     }
 
+    /// Glance is the QR mode, so from Glance a switch to QR would only start
+    /// Glance again and meet the same failure (private#669).
+    fn offers_qr_fallback(&self) -> bool {
+        self.has_camera && self.mode != ExchangeMode::Glance
+    }
+
     fn build_failed_screen(&self, detail: Option<String>) -> ScreenModel {
         let mut actions = vec![ScreenAction {
             id: ACTION_RETRY.into(),
@@ -500,7 +506,7 @@ impl BleExchangeEngine {
             enabled: true,
             a11y: None,
         }];
-        if self.has_camera {
+        if self.offers_qr_fallback() {
             actions.push(ScreenAction {
                 id: ACTION_FALLBACK_QR.into(),
                 label: self.t("exchange.terminal.switch_qr"),
@@ -576,7 +582,7 @@ impl BleExchangeEngine {
             enabled: true,
             a11y: None,
         }];
-        if self.has_camera {
+        if self.offers_qr_fallback() {
             actions.push(ScreenAction {
                 id: ACTION_FALLBACK_QR.into(),
                 label: self.t("exchange.terminal.switch_qr"),

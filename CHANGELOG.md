@@ -6,6 +6,75 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.82.0] — 2026-10-14
+
+### Added
+
+- Link-mode exchange as a domain API (vauchi/private#670):
+  `Vauchi::start_link_exchange`, `accept_link_exchange` and
+  `advance_link_exchange` run the ceremony the apps run, so a shell without
+  the presentation protocol (the CLI) can share or accept a link.
+- `Vauchi::resolve_own_field_id` names an own entry by id or by a label
+  only one entry has; a label several entries share is refused with their
+  ids (vauchi/private#651).
+- `Vauchi::time_until_sync_due` reports how long until the next sync is
+  due (vauchi/private#603).
+- A Glance QR opened from the camera continues the exchange, and the
+  consent screen names a link's sender, marked unchecked
+  (vauchi/private#277).
+- A confirmed contact answers a peer still waiting for confirmation with
+  a new reciprocity payload (`0x07`, signed under its own domain), so a
+  lost confirmation no longer leaves the peer re-sending on every sync
+  (vauchi/private#663).
+- Device-sync logs count journaled, sent, decoded and accepted items
+  (vauchi/private#659).
+- Multi-stage sessions log own and peer frame counts at finalize
+  (vauchi/private#450).
+
+### Changed
+
+- The heartbeat wakes when the drawn sync gap ends instead of on its 30 s
+  beat, so the exponential schedule reaches the relay (vauchi/private#603).
+- A registry push is re-sent only after a message from the contact or a
+  registry change, not on every sync (vauchi/private#662). Migration v82
+  adds `registry_activation.repush_allowed`.
+- One personal-note format: plain text, encrypted at rest by storage.
+  `add_personal_note` stores it and journals it; notes written under the
+  contact's shared key still read (vauchi/private#452).
+- A waiting delayed sync stops only after the outer relay's delay window
+  (`RelayConfig::ohttp_delay_window`, 900 s by default), so its last
+  connection does not reveal the forward time (vauchi/private#628).
+- The Advanced wipe group reads "Erase data", and the wipe leaves the
+  privacy overview (vauchi/private#655, vauchi/private#279).
+
+### Fixed
+
+- A same-second owner-device change arriving in a later sync applies
+  (vauchi/private#659).
+- Own-card device sync matches entries by id, the apps' visibility toggle
+  reaches linked devices, and re-stamps journal nothing
+  (vauchi/private#649).
+- A device link carries the owner's contacts and own card
+  (vauchi/private#658); a linked device syncs before it has contacts, and
+  a platform wakeup syncs when due (vauchi/private#648).
+- Personal notes saved or deleted in the app reach linked devices
+  (vauchi/private#452).
+- An emergency alert to a contact not yet heard from is genesis-sealed
+  instead of skipped (vauchi/private#633).
+- A failed Glance no longer offers to switch to Glance
+  (vauchi/private#669); a Glance link opened while Glance shows restarts
+  the radio (vauchi/private#672); equal advertised BLE tokens make both
+  devices dial (vauchi/private#275).
+- After a shred, the reopened engine waits for in-flight calls, drops late
+  events for the old screen, and keeps its surface revisions and window
+  (vauchi/private#293).
+- Device-link request and identity bytes parse through a checked cursor;
+  rekey fails on a ciphertext it cannot decrypt (vauchi/private#286).
+- Group changes reach the cached Exchange picker (vauchi/private#653);
+  the sync chip and backup frequency render in the screen language
+  (vauchi/private#423); the screen catalog renders at each shell's own
+  size (vauchi/private#420).
+
 ## [0.81.0] — 2026-10-12
 
 ### Added

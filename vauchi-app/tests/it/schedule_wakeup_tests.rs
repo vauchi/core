@@ -530,6 +530,7 @@ proptest::proptest! {
     }
 }
 
+#[cfg(feature = "testing")]
 fn engine_with_a_contact_and_sync_due_in(secs: u64) -> AppEngine {
     use vauchi_core::{Contact, ContactCard, SymmetricKey};
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -546,6 +547,7 @@ fn engine_with_a_contact_and_sync_due_in(secs: u64) -> AppEngine {
     AppEngine::new(vauchi)
 }
 
+#[cfg(feature = "testing")]
 fn scheduled_wakeup_ms(engine: &mut AppEngine) -> u32 {
     let _ = engine.on_wakeup();
     engine
@@ -568,6 +570,7 @@ fn scheduled_wakeup_ms(engine: &mut AppEngine) -> u32 {
 // @scenario: sync :: a sync fires at its drawn time, not on the next heartbeat
 // @internal
 #[test]
+#[cfg(feature = "testing")]
 fn the_heartbeat_wakes_when_the_drawn_sync_is_due() {
     let mut engine = engine_with_a_contact_and_sync_due_in(12);
 
@@ -581,6 +584,7 @@ fn the_heartbeat_wakes_when_the_drawn_sync_is_due() {
 
 // @internal
 #[test]
+#[cfg(feature = "testing")]
 fn with_no_one_to_sync_with_the_heartbeat_stays_idle() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();

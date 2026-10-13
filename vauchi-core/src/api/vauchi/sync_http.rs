@@ -315,6 +315,18 @@ impl Vauchi {
                 .is_none_or(|deadline| self.monotonic.now() >= deadline)
     }
 
+    /// How long until [`Self::sync`]'s timing gate opens; zero when a sync is
+    /// already due, `None` without an identity. Lets the heartbeat wake at
+    /// the drawn gap instead of its own cadence (#603).
+    pub fn time_until_sync_due(&self) -> Option<std::time::Duration> {
+        self.identity.as_ref()?;
+        Some(
+            self.next_sync_allowed
+                .map(|deadline| deadline.saturating_duration_since(self.monotonic.now()))
+                .unwrap_or_default(),
+        )
+    }
+
     /// Whether an OHTTP gateway key is currently cached on this instance.
     ///
     /// Used by platform wrappers and tests to verify that

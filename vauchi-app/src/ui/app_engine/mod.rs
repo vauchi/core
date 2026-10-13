@@ -918,6 +918,22 @@ impl AppEngine {
         if self.link_session_active() {
             return vauchi_core::Command::schedule_wakeup(1, 1, 1, None);
         }
+        // Wake when the drawn sync gap ends, not on the next 30 s beat: on
+        // the beat, every gap the relay saw was a multiple of 30 s (KU-9,
+        // #603), which undoes the exponential schedule.
+        #[cfg(feature = "network-http")]
+        if let Some(until) = self.vauchi.time_until_sync_due()
+            && until < std::time::Duration::from_secs(30)
+            && self.has_someone_to_sync_with()
+        {
+            let millis = u32::try_from(until.as_millis()).unwrap_or(u32::MAX).max(1);
+            return vauchi_core::Command::schedule_wakeup(
+                millis.div_ceil(1000),
+                90,
+                1,
+                Some(millis),
+            );
+        }
         vauchi_core::Command::schedule_wakeup(30, 90, 30, None)
     }
 

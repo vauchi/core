@@ -282,3 +282,39 @@ fn backup_reminders_renders_as_link_so_renderers_emit_list_item_selected() {
         "backup_reminders must render as a tappable Link with the current frequency as detail"
     );
 }
+
+/// The frequency was shown as its English enum label, so German Advanced
+/// Settings read "Backup-Erinnerungen: Weekly" (vauchi/private#423).
+// @internal
+#[test]
+fn backup_reminder_frequency_renders_in_the_settings_language() {
+    super::i18n_support::load_german();
+    let backup_detail = |language_id: &str| {
+        let engine = SettingsEngine::new_advanced(SettingsConfig {
+            language_id: language_id.into(),
+            ..sample_settings_config()
+        });
+        engine
+            .current_screen()
+            .components
+            .iter()
+            .find_map(|c| match c {
+                Component::SettingsGroup { id, items, .. } if id == "backup" => items
+                    .iter()
+                    .find(|i| i.id == "backup_reminders")
+                    .map(|i| i.kind.clone()),
+                _ => None,
+            })
+            .expect("backup_reminders item")
+    };
+    let detail = |kind: SettingsItemKind| match kind {
+        SettingsItemKind::Link { detail } => detail.expect("frequency detail"),
+        other => panic!("backup_reminders is a Link, got {other:?}"),
+    };
+
+    super::i18n_support::assert_translated(
+        "backup_reminders detail",
+        &detail(backup_detail("de")),
+        &detail(backup_detail("en")),
+    );
+}

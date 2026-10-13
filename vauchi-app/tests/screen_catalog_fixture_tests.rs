@@ -227,6 +227,38 @@ fn screen_catalog_every_entry_names_its_own_surface_active() {
     assert_eq!(wrong, Vec::<String>::new());
 }
 
+fn sync_chip_title(catalog: &ScreenCatalogFixture, code_id: &str) -> String {
+    let entry = catalog
+        .screens
+        .iter()
+        .find(|entry| entry.code_id == code_id)
+        .unwrap_or_else(|| panic!("{code_id} recorded"));
+    let surface = replaced_surface(&entry.commands, entry_surface_id(entry));
+    surface
+        .nodes
+        .iter()
+        .find_map(|node| match node {
+            PresentationNode::Status { title, .. } => Some(title.clone()),
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("{code_id} shows the sync chip"))
+}
+
+/// The sync chip's text was hardcoded English, so German screens read
+/// "Sync" (vauchi/private#423). Differing from the English render is the
+/// check; what the German says is the locales repo's business.
+// @internal
+#[test]
+fn screen_catalog_the_sync_chip_renders_in_the_screen_language() {
+    init_fixture_i18n();
+    let catalog = build_catalog();
+
+    assert_ne!(
+        sync_chip_title(&catalog, "settings-de"),
+        sync_chip_title(&catalog, "settings")
+    );
+}
+
 // @internal
 #[test]
 fn screen_catalog_checked_in_catalog_matches_a_fresh_build_structurally() {

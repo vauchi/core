@@ -57,6 +57,8 @@ pub use exchange::ExchangeQrData;
 pub use exchange_relay::{RelayExchangeOffer, RelayExchangeResult};
 pub use import::{ImportResult, ImportWarning};
 #[cfg(feature = "network-http")]
+#[allow(unused_imports)]
+// re-exported for the CLI (private#670); lint can't see external consumers
 pub use link_exchange::{LinkExchange, LinkExchangeProgress};
 #[cfg(feature = "network-http")]
 #[allow(unused_imports)]

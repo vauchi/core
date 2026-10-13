@@ -1132,22 +1132,15 @@ fn role_is_decided_by_the_advertised_prefix() {
     );
 }
 
-/// Two devices whose identity keys share their leading two bytes both
-/// compute `Responder`, so neither dials and the exchange cannot start.
-///
-/// **This documents a defect, not desired behaviour.** It passes because
-/// it pins what the code does today; do not read the green as approval.
-/// Whether the tie should instead resolve to `Initiator` — glare is
-/// handled, deadlock is not — is a design decision, recorded in
-/// `problems/2026-06-27-ios-android-ble-discovery-gap`.
-///
-/// `decides_initiator` in `ui/exchange/ble.rs` reasons that equal tokens
-/// are "effectively impossible for distinct identities", which holds for
-/// full keys. It stops holding once the peer side is truncated to the two
-/// bytes iOS can advertise: the collision only has to land in that prefix.
+/// Two devices whose identity keys share their leading two bytes see the
+/// same advertised token on both sides. Each compares its own key with
+/// the two bytes the other advertises; both used to compute `Responder`,
+/// so neither dialled and the exchange never started. A tie now dials on
+/// both sides and the glare handling keeps one link (owner decision
+/// 2026-10-13, `problems/2026-06-27-ios-android-ble-discovery-gap`).
 // @internal
 #[test]
-fn a_shared_two_byte_prefix_deadlocks_both_devices_as_responder() {
+fn a_shared_two_byte_prefix_makes_both_devices_dial() {
     let mut alice = [0xAAu8; 32];
     let mut bob = [0xAAu8; 32];
     // Distinct identities — they differ well past the advertised prefix.
@@ -1158,11 +1151,35 @@ fn a_shared_two_byte_prefix_deadlocks_both_devices_as_responder() {
 
     assert_eq!(
         decide_ble_role(&alice, &advertised(&bob)),
-        BleRole::Responder
+        BleRole::Initiator
     );
     assert_eq!(
         decide_ble_role(&bob, &advertised(&alice)),
-        BleRole::Responder,
-        "both sides wait for the other to dial — nobody connects"
+        BleRole::Initiator
     );
+}
+
+proptest::proptest! {
+    /// Whatever the keys, the two devices compare the same two bytes:
+    /// different prefixes give exactly one initiator, equal ones give two.
+    // @internal
+    #[test]
+    fn roles_from_advertised_prefixes_never_leave_both_waiting(
+        alice in proptest::array::uniform32(proptest::num::u8::ANY),
+        bob in proptest::array::uniform32(proptest::num::u8::ANY),
+        shared_prefix in proptest::bool::ANY,
+    ) {
+        let mut bob = bob;
+        if shared_prefix {
+            bob[..2].copy_from_slice(&alice[..2]);
+        }
+        let alice_role = decide_ble_role(&alice, &bob[..2]);
+        let bob_role = decide_ble_role(&bob, &alice[..2]);
+
+        if alice[..2] == bob[..2] {
+            proptest::prop_assert_eq!((alice_role, bob_role), (BleRole::Initiator, BleRole::Initiator));
+        } else {
+            proptest::prop_assert_ne!(alice_role, bob_role);
+        }
+    }
 }

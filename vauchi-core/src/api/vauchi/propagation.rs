@@ -451,19 +451,19 @@ impl Vauchi {
                 // each peer device gets its own copy. The receiver opens both
                 // payload forms through the genesis arm in `card_update.rs`.
                 //
-                // This is deliberately NOT the pre-Active `[0;32]` exchange
-                // bootstrap (`target` is `None` there): a fresh responder must
-                // still defer and retry — the initiator's first message is
-                // imminent, so genesis-sealing would be wasteful and would break
-                // the normal two-party bootstrap. Other payloads keep the prior
-                // defer because their own genesis paths cover what needs one.
+                // A card delta on the pre-Active `[0;32]` exchange bootstrap
+                // (`target` is `None` there) still defers: the initiator's first
+                // message is imminent and re-arms the owed repropagation, so
+                // genesis-sealing would be wasteful. A safety alert is sealed
+                // there too, because nothing re-queues a deferred alert and the
+                // contact may never send first (private#633). Other payloads
+                // keep the defer because their own genesis paths cover what
+                // needs one.
                 Err(crate::crypto::ratchet::RatchetError::NoSendingChain)
-                    if target.is_some()
-                        && matches!(
-                            payload.first(),
-                            Some(&crate::sync::delta::PAYLOAD_VERSION_CEK)
-                                | Some(&crate::sync::delta::PAYLOAD_VERSION_ALERT)
-                        ) =>
+                    if payload.first() == Some(&crate::sync::delta::PAYLOAD_VERSION_ALERT)
+                        || (target.is_some()
+                            && payload.first()
+                                == Some(&crate::sync::delta::PAYLOAD_VERSION_CEK)) =>
                 {
                     let mut sealed = self.genesis_seal_for_cold_start(identity, ex, payload)?;
                     sealed.peer_device_id = peer_device_id;

@@ -109,15 +109,16 @@ impl Vauchi {
         Ok(BroadcastResult { sent, total })
     }
 
-    /// Queue disguised safety alerts (emergency or duress) to a set of
-    /// recipient contacts.
+    /// Queue disguised emergency alerts to a set of recipient contacts.
     ///
-    /// For each recipient with an established ratchet, builds a signed
-    /// [`SafetyAlertPayload`], encrypts it with the ratchet, and queues it as a
-    /// `card_delta` `PendingUpdate` — indistinguishable from a normal card
+    /// For each recipient, builds a signed [`SafetyAlertPayload`], encrypts it
+    /// with the ratchet, or seals it in the genesis envelope when this device
+    /// cannot send on the ratchet yet (ADR-068, private#633), and queues it as
+    /// a `card_delta` `PendingUpdate`, indistinguishable from a normal card
     /// update on the wire (ADR-032). Returns the number queued. Recipients
-    /// without a local contact/ratchet, or blocked, are skipped. Shared by the
-    /// emergency broadcast and the duress-unlock alert path.
+    /// without a local contact, or blocked, are skipped. A duress unlock sends
+    /// no alert (ADR-032 amendment 2026-10-11), so the emergency broadcast is
+    /// the only caller.
     ///
     /// [`SafetyAlertPayload`]: crate::sync::safety_alert::SafetyAlertPayload
     pub(crate) fn queue_safety_alerts(

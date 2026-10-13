@@ -112,6 +112,7 @@ impl SymmetricKey {
 /// known algorithm tag followed by room for the nonce and the AEAD tag.
 /// Storage's rekey uses it to tell plaintext left by the old encryption gap
 /// from a ciphertext it cannot decrypt (vauchi/private#286).
+#[cfg(feature = "storage")]
 pub(crate) fn looks_like_ciphertext(data: &[u8]) -> bool {
     matches!(
         data.first(),

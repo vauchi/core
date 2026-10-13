@@ -87,9 +87,19 @@ impl AppEngine {
                 message: error.user_message().to_string(),
             });
         }
-        let screen = self.navigate_to(AppScreen::BleExchange {
+        let glance = AppScreen::BleExchange {
             mode: ExchangeMode::Glance,
-        });
+        };
+        let screen = if self.screen == glance {
+            // Moving to the screen already shown skips the entry that starts
+            // the radio, so a link opened on a finished Glance never scanned
+            // (vauchi/private#672). Leave and re-enter; the back history
+            // already holds what Glance was opened from.
+            self.navigate_to_internal(AppScreen::Exchange);
+            self.navigate_to_internal(glance)
+        } else {
+            self.navigate_to(glance)
+        };
         if let Err(error) = self.apply_glance_scan(uri) {
             return Some(ActionResult::ShowAlert {
                 title: self.t("deep_link.invalid_title"),

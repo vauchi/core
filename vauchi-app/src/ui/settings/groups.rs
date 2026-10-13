@@ -365,6 +365,19 @@ impl SettingsEngine {
         }
     }
 
+    /// The config keeps the frequency's English enum label, which
+    /// `cycle_backup_reminders` parses back; only the display is localized
+    /// (vauchi/private#423).
+    fn backup_reminder_frequency_label(&self) -> String {
+        use vauchi_core::types::ReminderFrequency;
+        let key = match ReminderFrequency::from_label(&self.config.backup_reminder_frequency) {
+            ReminderFrequency::Weekly => "settings.backup_frequency_weekly",
+            ReminderFrequency::Monthly => "settings.backup_frequency_monthly",
+            ReminderFrequency::Never => "settings.backup_frequency_never",
+        };
+        self.t(key)
+    }
+
     pub(super) fn backup_group(&self) -> Component {
         Component::SettingsGroup {
             id: "backup".into(),
@@ -377,7 +390,7 @@ impl SettingsEngine {
                 label: self.t("settings.backup_reminders"),
                 subtitle: None,
                 kind: SettingsItemKind::Link {
-                    detail: Some(self.config.backup_reminder_frequency.clone()),
+                    detail: Some(self.backup_reminder_frequency_label()),
                 },
                 a11y: Some(A11y {
                     label: Some(self.t("settings.backup_reminders_a11y")),

@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use vauchi_core::version::{AppUpdateStatus, unix_secs_to_date_string};
 
 use super::{AppEngine, AppScreen};
+use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::component::{Component, TextStyle};
 use crate::ui::screen::{ActionStyle, ScreenAction, ScreenLayout, ScreenModel};
 
@@ -107,14 +108,26 @@ impl SyncChromeStatus {
     }
 
     /// Label and kind of the chrome chip for this status.
-    pub fn chip(&self) -> (String, crate::ui::component::IndicatorKind) {
+    pub fn chip(&self, locale: Locale) -> (String, crate::ui::component::IndicatorKind) {
         use crate::ui::component::IndicatorKind;
         match self {
-            SyncChromeStatus::Idle => ("Sync".to_string(), IndicatorKind::Neutral),
-            SyncChromeStatus::Synced { .. } => ("Synced".to_string(), IndicatorKind::Active),
-            SyncChromeStatus::Failed => ("Sync failed".to_string(), IndicatorKind::Error),
+            SyncChromeStatus::Idle => {
+                (get_string(locale, "sync.chip_idle"), IndicatorKind::Neutral)
+            }
+            SyncChromeStatus::Synced { .. } => (
+                get_string(locale, "sync.chip_synced"),
+                IndicatorKind::Active,
+            ),
+            SyncChromeStatus::Failed => (
+                get_string(locale, "sync.error_failed"),
+                IndicatorKind::Error,
+            ),
             SyncChromeStatus::Throttled { retry_after_secs } => (
-                format!("Sync in {retry_after_secs} s"),
+                get_string_with_args(
+                    locale,
+                    "sync.chip_retry_in",
+                    &[("seconds", &retry_after_secs.to_string())],
+                ),
                 IndicatorKind::Neutral,
             ),
         }
@@ -404,7 +417,9 @@ impl AppEngine {
         if already_present {
             return screen;
         }
-        let (label, kind) = self.sync_chrome_status.chip();
+        let (label, kind) = self
+            .sync_chrome_status
+            .chip(self.render_context.resolved_locale());
         screen.components.insert(
             0,
             Component::Indicator {

@@ -48,32 +48,13 @@ impl DeviceLinkRequest {
 
     /// Deserializes a request from bytes.
     pub fn from_bytes(data: &[u8]) -> Result<Self, ExchangeError> {
-        if data.len() < 4 + 32 + 8 {
-            return Err(ExchangeError::InvalidQRFormat);
-        }
+        let mut reader = crate::byte_reader::ByteReader::new(data);
+        let invalid = || ExchangeError::InvalidQRFormat;
 
-        let name_len = u32::from_le_bytes(
-            data[..4]
-                .try_into()
-                .map_err(|_| ExchangeError::InvalidQRFormat)?,
-        ) as usize;
-
-        if data.len() < 4 + name_len + 32 + 8 {
-            return Err(ExchangeError::InvalidQRFormat);
-        }
-
-        let device_name = String::from_utf8(data[4..4 + name_len].to_vec())
-            .map_err(|_| ExchangeError::InvalidQRFormat)?;
-
-        let nonce: [u8; 32] = data[4 + name_len..4 + name_len + 32]
-            .try_into()
-            .map_err(|_| ExchangeError::InvalidQRFormat)?;
-
-        let timestamp = u64::from_le_bytes(
-            data[4 + name_len + 32..4 + name_len + 40]
-                .try_into()
-                .map_err(|_| ExchangeError::InvalidQRFormat)?,
-        );
+        let device_name = String::from_utf8(reader.prefixed().ok_or_else(invalid)?.to_vec())
+            .map_err(|_| invalid())?;
+        let nonce: [u8; 32] = reader.array().ok_or_else(invalid)?;
+        let timestamp = u64::from_le_bytes(reader.array().ok_or_else(invalid)?);
 
         Ok(DeviceLinkRequest {
             device_name,

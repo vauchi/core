@@ -417,55 +417,15 @@ impl Identity {
 
     /// Parses the decrypted backup plaintext into an Identity.
     fn parse_backup_plaintext(plaintext: &[u8], now: u64) -> Result<Self, IdentityError> {
-        if plaintext.len() < 4 + 32 {
-            return Err(IdentityError::RestoreFailed);
-        }
+        let mut reader = crate::byte_reader::ByteReader::new(plaintext);
+        let failed = || IdentityError::RestoreFailed;
 
-        let name_len = u32::from_le_bytes(
-            plaintext[..4]
-                .try_into()
-                .map_err(|_| IdentityError::RestoreFailed)?,
-        ) as usize;
-
-        if plaintext.len() < 4 + name_len + 32 {
-            return Err(IdentityError::RestoreFailed);
-        }
-
-        let display_name = String::from_utf8(plaintext[4..4 + name_len].to_vec())
-            .map_err(|_| IdentityError::RestoreFailed)?;
-
-        let master_seed: [u8; 32] = plaintext[4 + name_len..4 + name_len + 32]
-            .try_into()
-            .map_err(|_| IdentityError::RestoreFailed)?;
-
-        let base_offset = 4 + name_len + 32;
-        if plaintext.len() < base_offset + 8 {
-            return Err(IdentityError::RestoreFailed);
-        }
-        let (device_index, device_name) = {
-            let device_index = u32::from_le_bytes(
-                plaintext[base_offset..base_offset + 4]
-                    .try_into()
-                    .map_err(|_| IdentityError::RestoreFailed)?,
-            );
-
-            let device_name_len = u32::from_le_bytes(
-                plaintext[base_offset + 4..base_offset + 8]
-                    .try_into()
-                    .map_err(|_| IdentityError::RestoreFailed)?,
-            ) as usize;
-
-            if plaintext.len() < base_offset + 8 + device_name_len {
-                return Err(IdentityError::RestoreFailed);
-            }
-
-            let device_name = String::from_utf8(
-                plaintext[base_offset + 8..base_offset + 8 + device_name_len].to_vec(),
-            )
-            .map_err(|_| IdentityError::RestoreFailed)?;
-
-            (device_index, device_name)
-        };
+        let display_name = String::from_utf8(reader.prefixed().ok_or_else(failed)?.to_vec())
+            .map_err(|_| failed())?;
+        let master_seed: [u8; 32] = reader.array().ok_or_else(failed)?;
+        let device_index = reader.u32_le().ok_or_else(failed)?;
+        let device_name = String::from_utf8(reader.prefixed().ok_or_else(failed)?.to_vec())
+            .map_err(|_| failed())?;
 
         Ok(Self::from_seed_with_device(
             master_seed,

@@ -37,11 +37,12 @@ fn make_response(master_seed: [u8; 32], display_name: &str) -> DeviceLinkRespons
     let mut responder = DeviceLinkResponder::from_qr(qr, "My Phone".into(), now()).unwrap();
     let encrypted_request = responder.create_request(now()).unwrap();
 
-    let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
-    let proof = ProximityProof::Ultrasonic {
-        challenge_response: initiator.proximity_challenge(),
-        verified_at: now(),
-    };
+    let (confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
+    let proof = ProximityProof::manual_confirmation(
+        initiator.qr().link_key(),
+        &confirmation.confirmation_code,
+        now(),
+    );
     let (encrypted_response, _registry, _new_device) =
         initiator.confirm_link(&request, &proof, now()).unwrap();
 
@@ -97,11 +98,12 @@ fn make_response_with_sync(
     let mut responder = DeviceLinkResponder::from_qr(qr, "My Phone".into(), now()).unwrap();
     let encrypted_request = responder.create_request(now()).unwrap();
 
-    let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
-    let proof = ProximityProof::Ultrasonic {
-        challenge_response: initiator.proximity_challenge(),
-        verified_at: now(),
-    };
+    let (confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
+    let proof = ProximityProof::manual_confirmation(
+        initiator.qr().link_key(),
+        &confirmation.confirmation_code,
+        now(),
+    );
 
     let synced_card = ContactCard::new(synced_own_card_name);
     let sync_json = serde_json::to_string(&DeviceSyncPayload::new(&[], &synced_card, 1)).unwrap();

@@ -62,20 +62,18 @@ impl AppEngine {
 
     /// Cycle-thread bridge for
     /// `DeviceLinkSessionListener::on_confirmation_required` —
-    /// surface the peer's name + confirmation code + proximity
-    /// challenge so the user can approve manually.
+    /// surface the peer's name + confirmation code so the user can approve
+    /// manually.
     pub fn device_link_request_received(
         &mut self,
         device_name: String,
         confirmation_code: String,
-        challenge_hex: String,
     ) -> Option<ScreenModel> {
         self.engine
             .apply_update(EngineUpdate::DeviceLink(
                 DeviceLinkUpdate::RequestReceived {
                     device_name,
                     confirmation_code,
-                    challenge_hex,
                 },
             ))
             .then(|| self.engine.current_screen())

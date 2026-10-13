@@ -548,13 +548,14 @@ mod tests {
             let bytes = BASE64.decode(&claim_b64).expect("claim is valid base64");
             serde_json::from_slice(&bytes).expect("claim parses")
         };
-        let (_confirmation, request) = initiator
+        let (confirmation, request) = initiator
             .prepare_confirmation(&claim.request)
             .expect("prepare confirmation");
-        let proof = ProximityProof::Ultrasonic {
-            challenge_response: initiator.proximity_challenge(),
-            verified_at: now,
-        };
+        let proof = ProximityProof::manual_confirmation(
+            initiator.qr().link_key(),
+            &confirmation.confirmation_code,
+            now,
+        );
         let (encrypted_response, _registry, _new_device) = initiator
             .confirm_link(&request, &proof, now)
             .expect("confirm link");

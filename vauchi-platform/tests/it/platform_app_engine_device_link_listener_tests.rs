@@ -294,11 +294,7 @@ fn request_received_bridge_advances_engine_to_confirming_device() {
     let (engine, _dir) = create_engine_with_identity();
     navigate_to_device_linking_quiescent(&engine);
     engine
-        .apply_device_link_request_received_for_test(
-            "New iPad".into(),
-            "112233".into(),
-            "deadbeef".into(),
-        )
+        .apply_device_link_request_received_for_test("New iPad".into(), "112233".into())
         .expect("apply request_received");
     assert!(
         surface_titles(&engine).contains(&"Device Wants to Link".to_string()),
@@ -331,11 +327,7 @@ fn codes_match_action_emits_typed_action_result_json() {
     let (engine, _dir) = create_engine_with_identity();
     navigate_to_device_linking_quiescent(&engine);
     engine
-        .apply_device_link_request_received_for_test(
-            "New iPad".into(),
-            "654321".into(),
-            "deadbeef".into(),
-        )
+        .apply_device_link_request_received_for_test("New iPad".into(), "654321".into())
         .expect("apply request_received");
     // Confirming via the context bar primary feeds the displayed code to
     // the engine-owned machine (DeviceLinkConfirmManual is consumed
@@ -353,11 +345,7 @@ fn deny_action_emits_device_link_deny_json() {
     let (engine, _dir) = create_engine_with_identity();
     navigate_to_device_linking_quiescent(&engine);
     engine
-        .apply_device_link_request_received_for_test(
-            "New iPad".into(),
-            "654321".into(),
-            "deadbeef".into(),
-        )
+        .apply_device_link_request_received_for_test("New iPad".into(), "654321".into())
         .expect("apply request_received");
     // Deny lives in the secondary action menu (destructive item). Through
     // the generic envelope the DeviceLinkDeny result is consumed

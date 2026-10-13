@@ -8,7 +8,7 @@ use super::super::ExchangeError;
 use super::qr::DeviceLinkQR;
 use super::request::DeviceLinkRequest;
 use super::response::DeviceLinkResponse;
-use super::types::{derive_confirmation_code, derive_proximity_challenge};
+use super::types::derive_confirmation_code;
 
 /// State machine for device linking from the new device's perspective.
 pub struct DeviceLinkResponder {
@@ -32,14 +32,6 @@ impl DeviceLinkResponder {
             device_name,
             last_request_nonce: None,
         })
-    }
-
-    /// Derives a 16-byte proximity challenge from the link key.
-    ///
-    /// Both the initiator and responder derive the same challenge from the
-    /// shared link key, enabling proximity verification.
-    pub fn proximity_challenge(&self) -> [u8; 16] {
-        derive_proximity_challenge(self.qr.link_key())
     }
 
     /// Creates a request to send to the existing device.

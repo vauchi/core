@@ -47,12 +47,6 @@ enum DeviceLinkStep {
     ConfirmingDevice {
         device_name: String,
         code: String,
-        // Dormant until the deferred ultrasonic-approve flow lands and a
-        // proximity step re-consumes it to sign; the handshake already
-        // plumbs it here (ADR-031 hardware events). Kept rather than
-        // torn out of the EngineUpdate/bridge boundary for one release.
-        #[allow(dead_code)]
-        challenge_hex: String,
     },
     Syncing,
     /// The PIN is asked before any link code exists (#469).
@@ -209,19 +203,9 @@ impl DeviceLinkingEngine {
     }
 
     /// Receiver-side bridge: a peer device wants to link. Show the
-    /// device name + confirmation code, hold the challenge for the
-    /// proximity step.
-    pub fn transition_to_confirming_device(
-        &mut self,
-        device_name: String,
-        code: String,
-        challenge_hex: String,
-    ) {
-        self.step = DeviceLinkStep::ConfirmingDevice {
-            device_name,
-            code,
-            challenge_hex,
-        };
+    /// device name + confirmation code for the user to compare.
+    pub fn transition_to_confirming_device(&mut self, device_name: String, code: String) {
+        self.step = DeviceLinkStep::ConfirmingDevice { device_name, code };
     }
 
     /// Receiver-side bridge: proximity has been confirmed manually and
@@ -805,10 +789,7 @@ impl WorkflowEngine for DeviceLinkingEngine {
             U::RequestReceived {
                 device_name,
                 confirmation_code,
-                challenge_hex,
-            } => {
-                self.transition_to_confirming_device(device_name, confirmation_code, challenge_hex)
-            }
+            } => self.transition_to_confirming_device(device_name, confirmation_code),
             U::Completed => self.transition_to_link_success(),
             U::Failed(reason) => self.transition_to_link_failed(reason),
             U::PinRequired => {

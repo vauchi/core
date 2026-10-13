@@ -199,7 +199,7 @@ fn transition_to_qr_expired_shows_retry_and_cancel() {
 #[test]
 fn confirming_device_screen_shows_name_and_code() {
     let mut e = DeviceLinkingEngine::new("qr-data".into());
-    e.transition_to_confirming_device("New iPad".into(), "654321".into(), "deadbeef".into());
+    e.transition_to_confirming_device("New iPad".into(), "654321".into());
     let screen = e.current_screen();
     assert_eq!(screen.screen_id, "link_confirming_device");
     assert_eq!(screen.subtitle.as_deref(), Some("Device: New iPad"));
@@ -224,7 +224,7 @@ fn confirming_device_screen_shows_name_and_code() {
 #[test]
 fn deny_from_confirming_device_emits_device_link_deny() {
     let mut e = DeviceLinkingEngine::new("qr-data".into());
-    e.transition_to_confirming_device("New iPad".into(), "654321".into(), "deadbeef".into());
+    e.transition_to_confirming_device("New iPad".into(), "654321".into());
     let result = e.handle_action(UserAction::ActionPressed {
         action_id: DENY_ACTION_ID.into(),
     });
@@ -241,7 +241,7 @@ fn deny_from_confirming_device_emits_device_link_deny() {
 #[test]
 fn codes_match_emits_confirm_manual_and_advances_to_completing() {
     let mut e = DeviceLinkingEngine::new("qr-data".into());
-    e.transition_to_confirming_device("New iPad".into(), "654321".into(), "deadbeef".into());
+    e.transition_to_confirming_device("New iPad".into(), "654321".into());
     let result = e.handle_action(UserAction::ActionPressed {
         action_id: CODES_MATCH_ACTION_ID.into(),
     });
@@ -256,7 +256,7 @@ fn codes_match_emits_confirm_manual_and_advances_to_completing() {
 #[test]
 fn transition_to_completing_uses_completing_screen() {
     let mut e = DeviceLinkingEngine::new("qr-data".into());
-    e.transition_to_confirming_device("New iPad".into(), "654321".into(), "deadbeef".into());
+    e.transition_to_confirming_device("New iPad".into(), "654321".into());
     e.transition_to_completing();
     assert_eq!(e.current_screen().screen_id, "link_completing");
 }
@@ -336,9 +336,7 @@ fn cancel_is_terminal_from_every_new_state() {
         |e: &mut DeviceLinkingEngine| e.transition_to_qr_pending(),
         |e: &mut DeviceLinkingEngine| e.transition_to_waiting_for_request("qr".into(), 1),
         |e: &mut DeviceLinkingEngine| e.transition_to_qr_expired(),
-        |e: &mut DeviceLinkingEngine| {
-            e.transition_to_confirming_device("D".into(), "1".into(), "ab".into())
-        },
+        |e: &mut DeviceLinkingEngine| e.transition_to_confirming_device("D".into(), "1".into()),
         |e: &mut DeviceLinkingEngine| e.transition_to_completing(),
         |e: &mut DeviceLinkingEngine| e.transition_to_link_failed("x".into()),
     ] {

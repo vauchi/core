@@ -52,12 +52,12 @@ mod tests {
         )
     }
 
-    /// Creates a valid ultrasonic proximity proof for testing.
-    fn create_valid_proof(initiator_challenge: [u8; 16]) -> ProximityProof {
-        ProximityProof::Ultrasonic {
-            challenge_response: initiator_challenge,
-            verified_at: 0u64, /* test now */
-        }
+    /// The manual-confirmation proof a user produces by confirming the code
+    /// both screens show for this request.
+    fn create_valid_proof(qr: &DeviceLinkQR, request: &DeviceLinkRequest) -> ProximityProof {
+        let link_key = qr.link_key();
+        let code = super::types::derive_confirmation_code(link_key, &request.nonce);
+        ProximityProof::manual_confirmation(link_key, &code, 0u64)
     }
 
     #[test]
@@ -163,7 +163,6 @@ mod tests {
         let registry_a = create_test_registry(&identity_a);
 
         let initiator = DeviceLinkInitiator::new(master_seed_a, &identity_a, registry_a, 0u64);
-        let proof = create_valid_proof(initiator.proximity_challenge());
         let qr = initiator.qr();
 
         let qr_string = qr.to_data_string();
@@ -174,8 +173,13 @@ mod tests {
         let encrypted_request = responder.create_request(0u64).unwrap();
 
         let (_, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
-        let (encrypted_response, updated_registry, new_device) =
-            initiator.confirm_link(&request, &proof, 0u64).unwrap();
+        let (encrypted_response, updated_registry, new_device) = initiator
+            .confirm_link(
+                &request,
+                &create_valid_proof(initiator.qr(), &request),
+                0u64,
+            )
+            .unwrap();
 
         let response = responder.process_response(&encrypted_response).unwrap();
 
@@ -475,7 +479,6 @@ mod tests {
         let sync_json = serde_json::to_string(&sync_payload).unwrap();
 
         let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry.clone(), 0u64);
-        let proof = create_valid_proof(initiator.proximity_challenge());
 
         let qr_string = initiator.qr().to_data_string();
         let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
@@ -486,7 +489,12 @@ mod tests {
 
         let (_, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
         let (encrypted_response, _updated_registry, _new_device) = initiator
-            .confirm_link_with_sync(&request, &sync_json, &proof, 0u64)
+            .confirm_link_with_sync(
+                &request,
+                &sync_json,
+                &create_valid_proof(initiator.qr(), &request),
+                0u64,
+            )
             .unwrap();
 
         let response = responder.process_response(&encrypted_response).unwrap();
@@ -525,7 +533,6 @@ mod tests {
         let restored_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
         let restored_initiator =
             DeviceLinkInitiatorRestored::new(master_seed, &identity, registry, restored_qr);
-        let proof = create_valid_proof(restored_initiator.proximity_challenge());
 
         let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
         let mut responder =
@@ -536,7 +543,11 @@ mod tests {
             .prepare_confirmation(&encrypted_request)
             .unwrap();
         let (encrypted_response, updated_registry, new_device) = restored_initiator
-            .confirm_link(&request, &proof, 0u64)
+            .confirm_link(
+                &request,
+                &create_valid_proof(restored_initiator.qr(), &request),
+                0u64,
+            )
             .unwrap();
 
         let response = responder.process_response(&encrypted_response).unwrap();
@@ -611,9 +622,13 @@ mod tests {
         let (confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
         assert_eq!(confirmation.device_name, "My Phone");
 
-        let proof = create_valid_proof(initiator.proximity_challenge());
-        let (encrypted_response, updated_registry, new_device) =
-            initiator.confirm_link(&request, &proof, 0u64).unwrap();
+        let (encrypted_response, updated_registry, new_device) = initiator
+            .confirm_link(
+                &request,
+                &create_valid_proof(initiator.qr(), &request),
+                0u64,
+            )
+            .unwrap();
 
         let response = responder.process_response(&encrypted_response).unwrap();
 
@@ -652,9 +667,13 @@ mod tests {
 
         let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
-        let proof = create_valid_proof(initiator.proximity_challenge());
         let (encrypted_response, _updated_registry, _new_device) = initiator
-            .confirm_link_with_sync(&request, &sync_json, &proof, 0u64)
+            .confirm_link_with_sync(
+                &request,
+                &sync_json,
+                &create_valid_proof(initiator.qr(), &request),
+                0u64,
+            )
             .unwrap();
 
         let response = responder.process_response(&encrypted_response).unwrap();
@@ -726,7 +745,6 @@ mod tests {
         let registry = create_test_registry(&identity);
 
         let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry, 0u64);
-        let proof = create_valid_proof(initiator.proximity_challenge());
 
         let qr_string = initiator.qr().to_data_string();
         let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
@@ -736,8 +754,13 @@ mod tests {
         let encrypted_request = responder.create_request(0u64).unwrap();
 
         let (_, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
-        let (encrypted_response, updated_registry, new_device) =
-            initiator.confirm_link(&request, &proof, 0u64).unwrap();
+        let (encrypted_response, updated_registry, new_device) = initiator
+            .confirm_link(
+                &request,
+                &create_valid_proof(initiator.qr(), &request),
+                0u64,
+            )
+            .unwrap();
 
         let response = responder.process_response(&encrypted_response).unwrap();
 
@@ -772,9 +795,12 @@ mod tests {
         let responder_code = responder.compute_confirmation_code().unwrap();
         assert_eq!(confirmation.confirmation_code, responder_code);
 
-        let proof = create_valid_proof(restored_initiator.proximity_challenge());
         let (encrypted_response, updated_registry, new_device) = restored_initiator
-            .confirm_link(&request, &proof, 0u64)
+            .confirm_link(
+                &request,
+                &create_valid_proof(restored_initiator.qr(), &request),
+                0u64,
+            )
             .unwrap();
 
         let response = responder.process_response(&encrypted_response).unwrap();

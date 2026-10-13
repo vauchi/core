@@ -236,15 +236,10 @@ impl AppEngine {
             InitiatorEvent::ConfirmationRequired {
                 device_name,
                 confirmation_code,
-                identity_fingerprint,
-                challenge,
-            } => {
-                // Concatenate fingerprint + challenge into the engine's
-                // opaque hex payload (matches the prior bridge encoding).
-                let challenge_hex = format!("{identity_fingerprint}:{}", hex::encode(&challenge));
-                self.device_link_request_received(device_name, confirmation_code, challenge_hex)
-                    .is_some()
-            }
+                ..
+            } => self
+                .device_link_request_received(device_name, confirmation_code)
+                .is_some(),
             InitiatorEvent::Completed { .. } => self.device_link_completed().is_some(),
             InitiatorEvent::Failed { reason } => match reason.as_str() {
                 "qr_expired" => self.device_link_qr_expired().is_some(),

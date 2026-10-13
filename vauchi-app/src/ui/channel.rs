@@ -200,7 +200,6 @@ pub enum DeviceLinkUpdate {
     RequestReceived {
         device_name: String,
         confirmation_code: String,
-        challenge_hex: String,
     },
     Completed,
     Failed(String),

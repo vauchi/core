@@ -261,10 +261,11 @@ fn full_join_completes() {
     let (confirmation, request) = initiator.prepare_confirmation(&claim.request).unwrap();
     assert_eq!(confirmation.confirmation_code, confirmation_code);
 
-    let proof = ProximityProof::Ultrasonic {
-        challenge_response: initiator.proximity_challenge(),
-        verified_at: NOW,
-    };
+    let proof = ProximityProof::manual_confirmation(
+        initiator.qr().link_key(),
+        &confirmation.confirmation_code,
+        NOW,
+    );
     let (encrypted_response, _registry, _new_device) =
         initiator.confirm_link(&request, &proof, NOW).unwrap();
 

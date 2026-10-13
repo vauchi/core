@@ -16,7 +16,7 @@ use super::request::DeviceLinkRequest;
 use super::response::DeviceLinkResponse;
 use super::types::{
     DeviceLinkConfirmation, PROXIMITY_PROOF_MAX_AGE_SECS, ProximityProof, compute_confirmation_mac,
-    derive_confirmation_code, derive_proximity_challenge,
+    derive_confirmation_code,
 };
 
 /// State machine for device linking from the existing device's perspective.
@@ -60,15 +60,6 @@ impl DeviceLinkInitiator {
     /// Returns the QR code to display.
     pub fn qr(&self) -> &DeviceLinkQR {
         &self.qr
-    }
-
-    /// Derives a 16-byte proximity challenge from the link key.
-    ///
-    /// Both the initiator and responder can derive the same challenge since
-    /// they share the link key (from QR). The challenge is used for proximity
-    /// verification (e.g., ultrasonic audio or manual confirmation).
-    pub fn proximity_challenge(&self) -> [u8; 16] {
-        derive_proximity_challenge(self.qr.link_key())
     }
 
     /// Decrypts a link request and returns confirmation details for the user.
@@ -244,13 +235,6 @@ impl DeviceLinkInitiatorRestored {
         &self.qr
     }
 
-    /// Derives a 16-byte proximity challenge from the link key.
-    ///
-    /// See `DeviceLinkInitiator::proximity_challenge()` for details.
-    pub fn proximity_challenge(&self) -> [u8; 16] {
-        derive_proximity_challenge(self.qr.link_key())
-    }
-
     /// Decrypts a link request and returns confirmation details for the user.
     ///
     /// See `DeviceLinkInitiator::prepare_confirmation()` for details.
@@ -390,19 +374,6 @@ fn validate_proximity_proof(
     now: u64,
 ) -> Result<(), ExchangeError> {
     match proof {
-        ProximityProof::Ultrasonic {
-            challenge_response,
-            verified_at,
-        } => {
-            if now.saturating_sub(*verified_at) > PROXIMITY_PROOF_MAX_AGE_SECS {
-                return Err(ExchangeError::ProximityExpired);
-            }
-            let expected = derive_proximity_challenge(link_key);
-            if !bool::from(challenge_response.ct_eq(&expected)) {
-                return Err(ExchangeError::ProximityNotVerified);
-            }
-            Ok(())
-        }
         ProximityProof::ManualConfirmation {
             confirmation_code_mac,
             confirmed_at,

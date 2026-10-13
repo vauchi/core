@@ -20,9 +20,6 @@ pub(super) const DEVICE_LINK_VERSION: u8 = 1;
 /// Link QR expiration time in seconds: 5 minutes (ADR-035).
 pub(super) const LINK_QR_EXPIRY_SECONDS: u64 = 300;
 
-/// Domain separator for deriving the proximity challenge from the link key.
-pub(super) const PROXIMITY_DOMAIN: &[u8] = b"vauchi-device-link-proximity-v1";
-
 /// Maximum age (seconds) of a proximity proof before it's considered expired.
 pub(super) const PROXIMITY_PROOF_MAX_AGE_SECS: u64 = 60;
 
@@ -39,13 +36,6 @@ pub(super) const CONFIRMATION_CODE_DOMAIN: &[u8] = b"vauchi-device-link-confirm-
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum ProximityProof {
-    /// Ultrasonic challenge-response completed successfully.
-    Ultrasonic {
-        /// The 16-byte challenge response received from the other device.
-        challenge_response: [u8; 16],
-        /// Unix timestamp (seconds) when verification completed.
-        verified_at: u64,
-    },
     /// Manual confirmation: user compared codes on both screens.
     /// Weaker than ultrasonic but time-bound and session-bound.
     ManualConfirmation {
@@ -114,18 +104,6 @@ pub fn generate_numeric_code() -> String {
     format!("{:03}-{:03}", value / 1000, value % 1000)
 }
 
-/// Derives a 16-byte proximity challenge from the link key using HKDF.
-///
-/// Both sides of the device linking protocol can derive the same challenge
-/// deterministically, since they share the link key (from the QR code).
-pub(super) fn derive_proximity_challenge(link_key: &[u8; 32]) -> [u8; 16] {
-    let derived = HKDF::derive(None, link_key, PROXIMITY_DOMAIN, 16)
-        .expect("16 bytes is valid HKDF output length");
-    let mut challenge = [0u8; 16];
-    challenge.copy_from_slice(&derived);
-    challenge
-}
-
 /// Derives a 6-digit confirmation code from the link key and request nonce.
 ///
 /// Both the initiator and responder can compute this independently since they
@@ -134,10 +112,10 @@ pub(super) fn derive_proximity_challenge(link_key: &[u8; 32]) -> [u8; 16] {
 /// message, then takes the first 3 bytes modulo 1_000_000 for a 6-digit code.
 pub(super) fn derive_confirmation_code(link_key: &[u8; 32], request_nonce: &[u8; 32]) -> String {
     // Domain-separate the key derivation (ADR-007), matching the sibling
-    // `compute_confirmation_mac` / `derive_proximity_challenge`. The raw
-    // `link_key` must not be used directly as an HMAC key: every derivation
-    // path off the link key gets its own info string so the code, the MAC,
-    // and the proximity challenge are cryptographically independent.
+    // `compute_confirmation_mac`. The raw `link_key` must not be used
+    // directly as an HMAC key: every derivation path off the link key gets
+    // its own info string so the code and the MAC are cryptographically
+    // independent.
     let derived_key = HKDF::derive(None, link_key, CONFIRMATION_CODE_DOMAIN, 32)
         .expect("32 bytes is valid HKDF output length");
     let mut mac = HmacSha256::new_from_slice(&derived_key).expect("HMAC accepts any key length");

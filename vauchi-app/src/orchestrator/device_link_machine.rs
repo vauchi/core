@@ -91,7 +91,6 @@ pub enum InitiatorEvent {
         device_name: String,
         confirmation_code: String,
         identity_fingerprint: String,
-        challenge: Vec<u8>,
     },
     /// Link completed; new device registered.
     Completed {
@@ -293,38 +292,6 @@ impl DeviceLinkInitiatorMachine {
         }
     }
 
-    /// User completed ultrasonic proximity verification.
-    pub fn confirm_ultrasonic(&mut self, challenge_response: Vec<u8>, at: u64) -> InitiatorEvent {
-        match std::mem::replace(&mut self.state, State::Failed) {
-            State::AwaitingConfirmation {
-                request,
-                sender_token,
-            } => match <[u8; 16]>::try_from(challenge_response.as_slice()) {
-                Ok(bytes) => {
-                    self.state = State::Finalizing {
-                        request,
-                        proof: ProximityProof::Ultrasonic {
-                            challenge_response: bytes,
-                            verified_at: at,
-                        },
-                        sender_token,
-                    };
-                    InitiatorEvent::None
-                }
-                Err(_) => {
-                    self.state = State::Failed;
-                    InitiatorEvent::Failed {
-                        reason: "challenge_response must be exactly 16 bytes".to_string(),
-                    }
-                }
-            },
-            other => {
-                self.state = other;
-                InitiatorEvent::None
-            }
-        }
-    }
-
     /// User declined the link → `Failed("user_denied")`.
     pub fn deny(&mut self) -> InitiatorEvent {
         if matches!(self.state, State::AwaitingConfirmation { .. }) {
@@ -383,7 +350,6 @@ impl DeviceLinkInitiatorMachine {
         };
         match self.initiator.prepare_confirmation(&request_bytes) {
             Ok((confirmation, request)) => {
-                let challenge = self.initiator.proximity_challenge().to_vec();
                 self.confirm_deadline_unix = Some(now.saturating_add(USER_CONFIRM_TIMEOUT_S));
                 self.state = State::AwaitingConfirmation {
                     request,
@@ -393,7 +359,6 @@ impl DeviceLinkInitiatorMachine {
                     device_name: confirmation.device_name,
                     confirmation_code: confirmation.confirmation_code,
                     identity_fingerprint: confirmation.identity_fingerprint,
-                    challenge,
                 }
             }
             Err(e) => {

@@ -94,7 +94,6 @@ pub trait PlatformAppEngineTestHelpers {
         &self,
         device_name: String,
         confirmation_code: String,
-        challenge_hex: String,
     ) -> Result<(), MobileError>;
 
     /// Test-only: simulate `on_failed("qr_expired")`.
@@ -193,11 +192,10 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
         &self,
         device_name: String,
         confirmation_code: String,
-        challenge_hex: String,
     ) -> Result<(), MobileError> {
         let mut engine_slot = self.lock_engine()?;
         let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
-        let _ = engine.device_link_request_received(device_name, confirmation_code, challenge_hex);
+        let _ = engine.device_link_request_received(device_name, confirmation_code);
         Ok(())
     }
 

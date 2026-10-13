@@ -73,7 +73,7 @@ fn qr_expired_bridge_renders_expired_screen() {
 fn request_received_bridge_renders_confirming_device_screen() {
     let mut engine = engine_on_device_linking();
     let screen = engine
-        .device_link_request_received("New iPad".into(), "112233".into(), "abcd".into())
+        .device_link_request_received("New iPad".into(), "112233".into())
         .expect("on device linking screen");
     assert_eq!(screen.screen_id, "link_confirming_device");
     assert_eq!(screen.subtitle.as_deref(), Some("Device: New iPad"));
@@ -87,7 +87,7 @@ fn request_received_bridge_renders_confirming_device_screen() {
 #[test]
 fn codes_match_emits_confirm_manual_and_advances_to_completing() {
     let mut engine = engine_on_device_linking();
-    let _ = engine.device_link_request_received("New iPad".into(), "112233".into(), "abcd".into());
+    let _ = engine.device_link_request_received("New iPad".into(), "112233".into());
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "codes_match".into(),
     });
@@ -102,7 +102,7 @@ fn codes_match_emits_confirm_manual_and_advances_to_completing() {
 #[test]
 fn deny_emits_device_link_deny_result() {
     let mut engine = engine_on_device_linking();
-    let _ = engine.device_link_request_received("New iPad".into(), "112233".into(), "abcd".into());
+    let _ = engine.device_link_request_received("New iPad".into(), "112233".into());
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "deny".into(),
     });
@@ -233,7 +233,7 @@ fn cancel_from_any_step_navigates_away_from_device_linking() {
     // wiring will additionally call `MobileDeviceLinkSession::cancel`
     // before this navigation lands.
     let mut engine = engine_on_device_linking();
-    let _ = engine.device_link_request_received("New iPad".into(), "112233".into(), "abcd".into());
+    let _ = engine.device_link_request_received("New iPad".into(), "112233".into());
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel".into(),
     });
@@ -266,7 +266,7 @@ fn bridges_return_none_when_not_on_device_linking_screen() {
     assert!(engine.device_link_qr_expired().is_none());
     assert!(
         engine
-            .device_link_request_received("d".into(), "c".into(), "ab".into())
+            .device_link_request_received("d".into(), "c".into())
             .is_none()
     );
     assert!(engine.device_link_completed().is_none());

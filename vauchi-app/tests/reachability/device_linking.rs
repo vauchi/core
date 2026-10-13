@@ -57,7 +57,7 @@ fn verify_code_factory() -> DeviceLinkingEngine {
 
 fn confirming_factory() -> DeviceLinkingEngine {
     let mut e = DeviceLinkingEngine::new("qr-data".into());
-    e.transition_to_confirming_device("New iPad".into(), "123456".into(), "deadbeef".into());
+    e.transition_to_confirming_device("New iPad".into(), "123456".into());
     e
 }
 
@@ -81,7 +81,7 @@ fn qr_expired_factory() -> DeviceLinkingEngine {
 
 fn completing_factory() -> DeviceLinkingEngine {
     let mut e = DeviceLinkingEngine::new("qr-data".into());
-    e.transition_to_confirming_device("New iPad".into(), "123456".into(), "deadbeef".into());
+    e.transition_to_confirming_device("New iPad".into(), "123456".into());
     e.transition_to_completing();
     e
 }

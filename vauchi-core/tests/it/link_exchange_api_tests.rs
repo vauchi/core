@@ -9,7 +9,7 @@
 #![cfg(feature = "network-http")]
 
 use vauchi_core::api::VauchiConfig;
-use vauchi_core::api::vauchi::{LinkExchange, LinkExchangeProgress, VauchiBuilder};
+use vauchi_core::api::{LinkExchange, LinkExchangeProgress, VauchiBuilder};
 
 use crate::common::mock_relay::MockRelay;
 

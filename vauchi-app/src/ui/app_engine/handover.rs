@@ -7,6 +7,7 @@
 //! engine (vauchi/private#599, #293).
 
 use super::AppEngine;
+use crate::ui::ReportedWindow;
 
 impl AppEngine {
     /// Surfaces this engine has shown that a shell may still report on.
@@ -18,6 +19,19 @@ impl AppEngine {
     /// behind (see `PresentationCoordinator::remember_left_behind`).
     pub fn inherit_shown_surfaces(&mut self, surfaces: Vec<vauchi_core::SurfaceId>) {
         self.presentation_coordinator.remember_left_behind(surfaces);
+    }
+
+    /// The window the shell reported to this engine.
+    pub fn reported_window(&self) -> ReportedWindow {
+        self.presentation_coordinator.reported_window()
+    }
+
+    /// Takes over the window a shell reported to the engine this one
+    /// replaces: without it every activation fails as if the shell had
+    /// never reported one.
+    pub fn inherit_reported_window(&mut self, window: ReportedWindow) {
+        self.presentation_coordinator
+            .inherit_reported_window(window);
     }
 
     /// The revision of the last surface this engine sent.

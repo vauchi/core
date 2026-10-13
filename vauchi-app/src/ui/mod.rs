@@ -180,7 +180,7 @@ pub use my_info_entry_detail::{EntryContactInfo, EntryViewerVia, MyInfoEntryDeta
 pub use onboarding::{FieldSetup, GroupSetup, OnboardingData, OnboardingEngine};
 pub use places_list::{PlaceSummary, PlacesEngine, UnnamedPlace};
 pub use prepared_surface::{PreparedSurface, PreparedSurfaceError};
-pub use presentation::{PresentationCoordinator, PresentationCoordinatorError};
+pub use presentation::{PresentationCoordinator, PresentationCoordinatorError, ReportedWindow};
 pub use presentation_contract_fixture::presentation_contract_fixture_json;
 pub use recovery_help::{ParsedClaimSummary, RecoveryHelpEngine};
 pub use recovery_status::RecoveryEngine;

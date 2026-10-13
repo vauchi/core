@@ -35,6 +35,7 @@ impl PlatformAppEngine {
         let capabilities = previous.device_capabilities().clone();
         let online = previous.is_network_online();
         let shown_surfaces = previous.shown_surfaces();
+        let window = previous.reported_window();
         let last_revision = previous.surface_revision();
         drop(previous);
 
@@ -64,6 +65,7 @@ impl PlatformAppEngine {
                 engine.set_device_capabilities(capabilities);
                 engine.set_network_online(online);
                 engine.inherit_shown_surfaces(shown_surfaces);
+                engine.inherit_reported_window(window);
                 engine.continue_revisions_after(last_revision);
                 *self.engine.lock().map_err(|e| MobileError::Other {
                     detail: format!("Lock failed: {e}"),

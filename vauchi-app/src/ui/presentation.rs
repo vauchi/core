@@ -20,6 +20,15 @@ pub enum PresentationCoordinatorError {
 /// flight for one of them reads as a race, not a defect (vauchi/private#438).
 const LEFT_BEHIND_MEMORY: usize = 4;
 
+/// The window a shell last reported. A shell reports it when it starts and
+/// when it resizes, not again for an engine that replaces another, so the
+/// replacement takes it over (vauchi/private#293).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ReportedWindow {
+    window_class: Option<WindowClass>,
+    available_height: Option<u32>,
+}
+
 #[derive(Clone, Debug)]
 pub struct PresentationCoordinator {
     primary_surface: SurfaceId,
@@ -61,6 +70,18 @@ impl PresentationCoordinator {
         shown.extend(self.detail_surface.clone());
         shown.push(self.active_surface.clone());
         shown
+    }
+
+    pub fn reported_window(&self) -> ReportedWindow {
+        ReportedWindow {
+            window_class: self.window_class,
+            available_height: self.available_height,
+        }
+    }
+
+    pub fn inherit_reported_window(&mut self, window: ReportedWindow) {
+        self.window_class = window.window_class;
+        self.available_height = window.available_height;
     }
 
     /// Takes surfaces another coordinator showed as left behind here, so an

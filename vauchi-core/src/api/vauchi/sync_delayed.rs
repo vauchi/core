@@ -17,10 +17,16 @@ const MIN_POLL: Duration = Duration::from_millis(100);
 
 impl Vauchi {
     /// Syncs, then, when fetches go through the delayed path
-    /// (`RelayConfig::ohttp_delayed`), keeps syncing every `poll` until a
-    /// fetch answer has been collected or `max_wait` of pauses has passed.
-    /// A lost answer is posted again and waited for. Counts are summed over
-    /// the cycles. Without delayed mode this is [`Self::sync`].
+    /// (`RelayConfig::ohttp_delayed`), keeps syncing every `poll` until the
+    /// outer relay's delay window (`RelayConfig::ohttp_delay_window`) has
+    /// passed and a fetch answer has been collected, or `max_wait` of pauses
+    /// has passed. A lost answer is posted again and waited for. Counts are
+    /// summed over the cycles. Without delayed mode this is [`Self::sync`].
+    ///
+    /// Stopping at the first answer would end the last connection within one
+    /// poll of the forward the gateway sees, which links the client's IP to
+    /// its token (#628 step 2); after the window, the stop says nothing more
+    /// than the post did.
     pub fn sync_collecting_delayed(
         &mut self,
         poll: Duration,
@@ -33,7 +39,10 @@ impl Vauchi {
         }
         let poll = poll.max(MIN_POLL);
         let mut waited = Duration::ZERO;
-        while self.answered_delayed_fetches() == answered_before && waited < max_wait {
+        let window = self.config.relay.ohttp_delay_window;
+        while (waited < window || self.answered_delayed_fetches() == answered_before)
+            && waited < max_wait
+        {
             self.sleeper.sleep(poll);
             waited += poll;
             let next = self.sync_inner()?;

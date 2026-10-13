@@ -23,6 +23,8 @@ mod features;
 mod heirloom;
 mod identity;
 mod import;
+#[cfg(feature = "network-http")]
+mod link_exchange;
 mod merge;
 mod ohttp_key_error;
 mod onboarding;
@@ -54,6 +56,8 @@ pub use exchange::ExchangeQrData;
 #[cfg(feature = "network-http")]
 pub use exchange_relay::{RelayExchangeOffer, RelayExchangeResult};
 pub use import::{ImportResult, ImportWarning};
+#[cfg(feature = "network-http")]
+pub use link_exchange::{LinkExchange, LinkExchangeProgress};
 #[cfg(feature = "network-http")]
 #[allow(unused_imports)]
 // re-exported for integration tests; lint can't see external consumers

@@ -529,3 +529,63 @@ proptest::proptest! {
         proptest::prop_assert_eq!(delay_millis_on_the_wire(&command), Some(expected));
     }
 }
+
+fn engine_with_a_contact_and_sync_due_in(secs: u64) -> AppEngine {
+    use vauchi_core::{Contact, ContactCard, SymmetricKey};
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    vauchi
+        .add_contact(Contact::from_exchange(
+            [7; 32],
+            ContactCard::new("Bob"),
+            SymmetricKey::generate(),
+            0,
+        ))
+        .unwrap();
+    vauchi.set_next_sync_allowed(std::time::Instant::now() + std::time::Duration::from_secs(secs));
+    AppEngine::new(vauchi)
+}
+
+fn scheduled_wakeup_ms(engine: &mut AppEngine) -> u32 {
+    let _ = engine.on_wakeup();
+    engine
+        .drain_pending_commands()
+        .into_iter()
+        .rev()
+        .find_map(|command| match command {
+            Command::ScheduleWakeup {
+                earliest_secs,
+                earliest_millis,
+                ..
+            } => Some(earliest_millis.unwrap_or(earliest_secs * 1000)),
+            _ => None,
+        })
+        .expect("a ScheduleWakeup")
+}
+
+// KU-9 (#603, 2026-10-13): syncs fired only on the 30 s heartbeat, so the
+// drawn exponential gaps reached the relay as multiples of 30 s.
+// @scenario: sync :: a sync fires at its drawn time, not on the next heartbeat
+// @internal
+#[test]
+fn the_heartbeat_wakes_when_the_drawn_sync_is_due() {
+    let mut engine = engine_with_a_contact_and_sync_due_in(12);
+
+    let ms = scheduled_wakeup_ms(&mut engine);
+
+    assert!(
+        (10_000..=12_500).contains(&ms),
+        "wake at the drawn 12 s, not the 30 s heartbeat: {ms} ms"
+    );
+}
+
+// @internal
+#[test]
+fn with_no_one_to_sync_with_the_heartbeat_stays_idle() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    vauchi.set_next_sync_allowed(std::time::Instant::now() + std::time::Duration::from_secs(12));
+    let mut engine = AppEngine::new(vauchi);
+
+    assert_eq!(scheduled_wakeup_ms(&mut engine), 30_000);
+}

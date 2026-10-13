@@ -295,6 +295,11 @@ pub struct RelayConfig {
     /// the client connects. Off (default) until outer relays advertise the
     /// path in the directory.
     pub ohttp_delayed: bool,
+
+    /// The outer relay's forwarding delay bound W (D-F2, #628). A waiting
+    /// sync keeps polling until this long after its post, so when it stops
+    /// does not reveal when the gateway saw the fetch.
+    pub ohttp_delay_window: std::time::Duration,
 }
 
 /// SPKI SHA-256 pin for relay.vauchi.app leaf certificate.
@@ -367,6 +372,7 @@ impl Default for RelayConfig {
             ohttp_anchor: None,          // production resolves to PROD_OHTTP_ANCHOR
             ohttp_backup_commitment: None,
             ohttp_delayed: false,
+            ohttp_delay_window: std::time::Duration::from_secs(900),
         }
     }
 }

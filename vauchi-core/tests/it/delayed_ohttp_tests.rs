@@ -390,6 +390,16 @@ fn vauchi_sleeping_on(
     delayed: bool,
     sleeper: Arc<FakeSleeper>,
 ) -> (vauchi_core::api::Vauchi, tempfile::TempDir) {
+    vauchi_waiting_window(outer, delayed, sleeper, None)
+}
+
+#[cfg(feature = "testing")]
+fn vauchi_waiting_window(
+    outer: &MockRelay,
+    delayed: bool,
+    sleeper: Arc<FakeSleeper>,
+    window: Option<Duration>,
+) -> (vauchi_core::api::Vauchi, tempfile::TempDir) {
     use vauchi_core::api::{Vauchi, VauchiConfig};
     let application = MockRelay::start();
     let dir = tempfile::tempdir().expect("temp dir");
@@ -398,6 +408,9 @@ fn vauchi_sleeping_on(
         .with_relay_url(application.url())
         .with_ohttp_relay_url(outer.url());
     config.relay.ohttp_delayed = delayed;
+    if let Some(window) = window {
+        config.relay.ohttp_delay_window = window;
+    }
     let mut vauchi = Vauchi::new(config)
         .expect("create Vauchi")
         .with_sleeper(sleeper.clone());
@@ -552,4 +565,29 @@ fn without_delayed_mode_a_waiting_sync_never_sleeps() {
 
     assert!(fetched(&outcome) >= 1, "the mail arrived: {outcome:?}");
     assert!(sleeper.calls().is_empty());
+}
+
+// The CLI stopped at its first answer, so its last connection fell within
+// one poll after the gateway saw the forward: one hop plus netflow linked
+// every CLI client on its own IP within a day (#628 step 2, ku2collect).
+// @internal
+#[test]
+#[cfg(feature = "testing")]
+fn a_waiting_sync_keeps_polling_until_the_delay_window_has_passed() {
+    let outer = gateway_relay();
+    outer.set_gateway_blobs(vec![blob("b1")]);
+    outer.hold_async_answers(1);
+    let sleeper = Arc::new(FakeSleeper::new());
+    let (mut vauchi, _dir) = vauchi_waiting_window(&outer, true, sleeper.clone(), Some(4 * POLL));
+
+    let outcome = vauchi
+        .sync_collecting_delayed(POLL, MAX_WAIT)
+        .expect("sync");
+
+    assert!(fetched(&outcome) >= 1, "the mail arrived: {outcome:?}");
+    assert_eq!(
+        sleeper.calls(),
+        vec![POLL; 4],
+        "an early answer does not end the wait before the window"
+    );
 }

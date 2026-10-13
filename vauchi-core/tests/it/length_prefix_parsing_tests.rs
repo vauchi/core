@@ -42,13 +42,19 @@ proptest! {
     // @internal
     #[test]
     fn a_link_request_parser_never_panics(data in proptest::collection::vec(any::<u8>(), 0..256)) {
-        let _ = DeviceLinkRequest::from_bytes(&data);
+        // Whatever parses never claims more bytes than it was given.
+        if let Ok(request) = DeviceLinkRequest::from_bytes(&data) {
+            prop_assert!(request.to_bytes().len() <= data.len());
+        }
     }
 
     // @internal
     #[test]
     fn an_identity_parser_never_panics(data in proptest::collection::vec(any::<u8>(), 0..256)) {
-        let _ = Identity::from_storage_bytes(&data, 0);
+        // Whatever parses never claims more bytes than it was given.
+        if let Ok(identity) = Identity::from_storage_bytes(&data, 0) {
+            prop_assert!(identity.to_storage_bytes().len() <= data.len());
+        }
     }
 
     // @internal

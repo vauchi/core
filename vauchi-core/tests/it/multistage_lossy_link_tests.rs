@@ -527,17 +527,22 @@ fn an_acked_chunk_is_not_shown_while_others_are_outstanding() {
     ours.process_scanned_qr(&pi.data);
     peer.process_scanned_qr(&oi.data);
 
-    // The peer reports holding our chunk 2 and nothing else — the device
-    // state, arriving on a DATA frame the way a real ack does.
-    let mut held = vauchi_core::exchange::multistage::types::ChunkBitmap::new(3);
-    held.mark_received(2);
-    let ack_frame = vauchi_core::exchange::multistage::qr_codec::format_data_qr(
-        &peer.session_id(),
-        0,
-        3,
-        &held.to_bytes(),
-        b"whatever-the-peer-sent",
-    );
+    // The peer receives our chunk 2 and nothing else — the device state —
+    // and reports it on one of its own DATA frames, the only kind whose ACK
+    // counts (vauchi/private#676).
+    let chunk_two = loop {
+        let qr = ours.get_display_qr().expect("we show a frame");
+        if let Ok(StageQr::Data { chunk_idx: 2, .. }) = parse_qr(&qr.data) {
+            break qr.data;
+        }
+    };
+    peer.process_scanned_qr(&chunk_two);
+    let ack_frame = loop {
+        let qr = peer.get_display_qr().expect("the peer shows a frame");
+        if matches!(parse_qr(&qr.data), Ok(StageQr::Data { .. })) {
+            break qr.data;
+        }
+    };
     ours.process_scanned_qr(&ack_frame);
 
     let mut shown = Vec::new();

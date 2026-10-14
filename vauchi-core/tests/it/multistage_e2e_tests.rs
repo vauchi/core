@@ -754,7 +754,7 @@ fn test_adaptive_display_durations() {
     // (2026-08-18-multistage-data-frames-too-brief-to-capture).
     let data_qr = (0..60)
         .filter_map(|_| alice.get_display_qr())
-        .find(|qr| qr.data.starts_with("DAT3"))
+        .find(|qr| qr.data.starts_with("DAT4"))
         .expect("a Transferring session shows DATA");
     assert!(
         (240..=360).contains(&data_qr.display_duration_ms),

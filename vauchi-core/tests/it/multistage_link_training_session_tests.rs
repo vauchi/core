@@ -363,7 +363,7 @@ fn data_frame_lengths_for_a_peer_reporting(peer_reads: u8) -> Vec<usize> {
 
     (0..80)
         .filter_map(|_| alice.get_display_qr())
-        .filter(|frame| frame.data.starts_with("DAT3"))
+        .filter(|frame| frame.data.starts_with("DAT4"))
         .map(|frame| frame.data.len())
         .collect()
 }
@@ -395,7 +395,7 @@ fn data_frames_stay_in_qr_version_6_while_acking_a_24_chunk_peer() {
     // Alice learns Bob's chunk count from his first DATA frame.
     let bob_data = (0..40)
         .filter_map(|_| bob.get_display_qr())
-        .find(|frame| frame.data.starts_with("DAT3"))
+        .find(|frame| frame.data.starts_with("DAT4"))
         .expect("bob shows DATA");
     let Ok(StageQr::Data { chunk_total, .. }) = parse_qr(&bob_data.data) else {
         panic!("not a DATA frame");
@@ -405,7 +405,7 @@ fn data_frames_stay_in_qr_version_6_while_acking_a_24_chunk_peer() {
 
     let longest = (0..80)
         .filter_map(|_| alice.get_display_qr())
-        .filter(|frame| frame.data.starts_with("DAT3"))
+        .filter(|frame| frame.data.starts_with("DAT4"))
         .map(|frame| frame.data.len())
         .max()
         .expect("alice shows DATA");
@@ -520,7 +520,7 @@ fn every_frame_a_session_shows_fits_the_module_count_the_design_names() {
 
     assert_eq!(
         seen.into_iter().collect::<Vec<_>>(),
-        ["BTH3", "DAT3", "DON3", "FIN3", "INI3"],
+        ["BTH3", "DAT4", "DON3", "FIN3", "INI3"],
         "the run showed every frame type"
     );
 }

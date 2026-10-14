@@ -119,7 +119,7 @@ fn next_frame(session: &mut MultiStageSession) -> String {
 fn next_ending_frame(session: &mut MultiStageSession) -> String {
     for _ in 0..50 {
         let frame = next_frame(session);
-        if !frame.starts_with("DAT3") {
+        if !frame.starts_with("DAT4") {
             return frame;
         }
     }

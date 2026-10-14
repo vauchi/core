@@ -167,7 +167,7 @@ const FLAG_HAS_RELAY_URL: u8 = 0x01;
 /// Stage prefixes (4 chars each).
 const PREFIX_LEN: usize = 4;
 const PREFIXES: [&str; 8] = [
-    "INI3", "IN3D", "DAT3", "FIN3", "DON3", "BTH3", "FAI3", "SHK3",
+    "INI3", "IN3D", "DAT4", "FIN3", "DON3", "BTH3", "FAI3", "SHK3",
 ];
 
 fn decode_fixed<const N: usize>(encoded: &str) -> Result<[u8; N], QrCodecError> {
@@ -209,8 +209,10 @@ fn frame(prefix: &str, body: &str) -> String {
 }
 
 /// Stage prefixes of the format used before every frame carried a header.
-const OLD_FORMAT_PREFIXES: [&str; 9] = [
+const OLD_FORMAT_PREFIXES: [&str; 10] = [
     "INI2", "IN2D", "DATA", "VRFY", "CONF", "RDYY", "FAIL", "SHAK", "CMBO",
+    // DAT3 chunks did not authenticate the ACK they carried (#676).
+    "DAT3",
 ];
 
 /// Split a frame into its stage prefix, training header and body.
@@ -358,7 +360,7 @@ pub fn format_in2d_qr(
 
 /// Format a DATA stage QR string with CRC-16 integrity check.
 ///
-/// Layout: `DAT3<header:8><sid:24><idx:4>/<total:4><ack_len:2><ack:variable><crc:3><payload>`
+/// Layout: `DAT4<header:8><sid:24><idx:4>/<total:4><ack_len:2><ack:variable><crc:3><payload>`
 ///
 /// # Panics
 ///
@@ -377,7 +379,7 @@ pub fn format_data_qr(
         "ack bitmap exceeds what the two-digit length field can count"
     );
     frame(
-        "DAT3",
+        "DAT4",
         &format!(
             "{sid}{idx:04}/{total:04}{ack_len_high}{ack_len_low}{ack}{crc}{data}",
             sid = base45::encode(session_id),
@@ -461,7 +463,7 @@ pub fn parse_frame(raw: &str) -> Result<Frame, QrCodecError> {
     let stage = match prefix {
         "INI3" => parse_ini2(body),
         "IN3D" => parse_in2d(body),
-        "DAT3" => parse_data(body),
+        "DAT4" => parse_data(body),
         "FIN3" => parse_final_body(body).map(|(session_id, reveal_key, tag)| StageQr::Final {
             session_id,
             reveal_key,

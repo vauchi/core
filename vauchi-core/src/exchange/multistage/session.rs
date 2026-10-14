@@ -64,6 +64,9 @@ const REJOIN_COOLDOWN: Duration = Duration::from_secs(5);
 /// HKDF info string for transport key derivation.
 const HKDF_INFO: &[u8] = b"vauchi-multistage-v1";
 
+/// Domain prefix of a DATA frame chunk's associated data (`DAT4`).
+const DATA_FRAME_AD_DOMAIN: &[u8] = b"vauchi-multistage-data-v4";
+
 /// How long to keep showing the final frame after Finalized, so the peer
 /// can read it and finalize too. The user sees "Contact exchanged!"
 /// immediately (save on Finalized) while the code stays up in the
@@ -1303,13 +1306,13 @@ impl MultiStageSession {
                 relay_url,
             } => self.handle_init(session_id, ephemeral, commitment_hash, relay_url),
             StageQr::Data {
-                session_id: _,
+                session_id,
                 chunk_idx,
                 chunk_total,
                 ack_bitmap,
                 crc: _,
                 payload,
-            } => self.handle_data(chunk_idx, chunk_total, ack_bitmap, payload),
+            } => self.handle_data(session_id, chunk_idx, chunk_total, ack_bitmap, payload),
             StageQr::Final {
                 session_id,
                 reveal_key,
@@ -1467,6 +1470,7 @@ impl MultiStageSession {
 
     fn handle_data(
         &mut self,
+        frame_session_id: [u8; 16],
         chunk_idx: u16,
         chunk_total: u16,
         ack_bitmap_bytes: Vec<u8>,
@@ -1506,7 +1510,8 @@ impl MultiStageSession {
         // or tampered" (site 1 of silent-failures-in-security-paths). The
         // buffer/bitmap stay untouched so a legitimate retransmit at this
         // chunk_idx still succeeds — the counter is purely observational.
-        match self.transport_decrypt(&transport_key, chunk_idx, &encrypted_payload) {
+        let ad = data_frame_ad(&frame_session_id, chunk_idx, chunk_total, &ack_bitmap_bytes);
+        match self.transport_decrypt(&transport_key, &ad, &encrypted_payload) {
             Ok(decrypted) => {
                 if let Some(ref mut buffer) = self.inbound_buffer {
                     buffer.insert(chunk_idx, decrypted);
@@ -1514,6 +1519,13 @@ impl MultiStageSession {
                 if let Some(ref mut bitmap) = self.inbound_bitmap {
                     bitmap.mark_received(chunk_idx);
                 }
+                // The bitmap is authenticated with the chunk, so it counts
+                // only now; a misread or forged one would stop us showing
+                // chunks the peer lacks (vauchi/private#676).
+                self.peer_ack_bitmap = Some(ChunkBitmap::from_bytes(
+                    &ack_bitmap_bytes,
+                    self.outbound_total,
+                ));
             }
             Err(_) => {
                 self.transport_decrypt_failures = self.transport_decrypt_failures.saturating_add(1);
@@ -1527,12 +1539,6 @@ impl MultiStageSession {
                 );
             }
         }
-
-        // Update peer's ACK bitmap (tells us which of our chunks they've received)
-        self.peer_ack_bitmap = Some(ChunkBitmap::from_bytes(
-            &ack_bitmap_bytes,
-            self.outbound_total,
-        ));
 
         // Dev instrumentation (dev-logging only; no PII — indices only). Which
         // chunk the peer actually *chose to show* is not derivable from our own
@@ -1767,16 +1773,16 @@ impl MultiStageSession {
         let total = chunker.total_chunks();
         self.outbound_total = total;
 
-        let transport_key = match &self.transport_key {
-            Some(k) => *k,
-            None => return,
-        };
+        if self.transport_key.is_none() {
+            return;
+        }
 
+        // Kept unencrypted (they are already the sealed commitment): each
+        // frame encrypts its chunk together with the ACK it carries.
         let mut chunks = Vec::with_capacity(total as usize);
         for i in 0..total {
             if let Some(chunk_data) = chunker.chunk(i) {
-                let encrypted = self.transport_encrypt(&transport_key, i, chunk_data);
-                chunks.push(encrypted);
+                chunks.push(chunk_data.to_vec());
             }
         }
         self.outbound_chunks = chunks;
@@ -1819,9 +1825,12 @@ impl MultiStageSession {
             .map(|b| b.to_bytes())
             .unwrap_or_default();
 
-        let chunk_data = &self.outbound_chunks[idx as usize];
+        let transport_key = self.transport_key?;
+        let ad = data_frame_ad(&self.session_id, idx, total, &ack_bytes);
+        let encrypted =
+            self.transport_encrypt(&transport_key, &ad, &self.outbound_chunks[idx as usize]);
         let qr_data =
-            qr_codec::format_data_qr(&self.session_id, idx, total, &ack_bytes, chunk_data);
+            qr_codec::format_data_qr(&self.session_id, idx, total, &ack_bytes, &encrypted);
 
         // Dev instrumentation (dev-logging only; no PII — indices only). Pairs
         // with `[MSX] rx`: together the two sides' logs say whether a chunk the
@@ -1930,16 +1939,17 @@ impl MultiStageSession {
         key
     }
 
-    fn transport_encrypt(&self, key: &[u8; 32], chunk_idx: u16, plaintext: &[u8]) -> Vec<u8> {
+    /// A fresh random nonce per call, so re-encrypting a chunk for each
+    /// frame (with that frame's ACK as AD) never reuses a nonce.
+    fn transport_encrypt(&self, key: &[u8; 32], ad: &[u8], plaintext: &[u8]) -> Vec<u8> {
         let nonce_bytes: [u8; 12] = crate::crypto::random_bytes();
-        let idx_aad = chunk_idx.to_le_bytes();
 
         let cipher = ChaCha20Poly1305::new(key.into());
         let nonce = chacha20poly1305::Nonce::from_slice(&nonce_bytes);
 
         let payload = Payload {
             msg: plaintext,
-            aad: &idx_aad,
+            aad: ad,
         };
         let ciphertext = cipher.encrypt(nonce, payload).expect("encryption failed");
 
@@ -1968,21 +1978,20 @@ impl MultiStageSession {
     fn transport_decrypt(
         &self,
         key: &[u8; 32],
-        chunk_idx: u16,
+        ad: &[u8],
         ciphertext: &[u8],
     ) -> Result<Vec<u8>, TransportDecryptError> {
         if ciphertext.len() < 12 + 16 {
             return Err(TransportDecryptError::CiphertextTooShort);
         }
         let (nonce_bytes, encrypted) = ciphertext.split_at(12);
-        let idx_aad = chunk_idx.to_le_bytes();
 
         let cipher = ChaCha20Poly1305::new(key.into());
         let nonce = chacha20poly1305::Nonce::from_slice(nonce_bytes);
 
         let payload = Payload {
             msg: encrypted,
-            aad: &idx_aad,
+            aad: ad,
         };
         cipher
             .decrypt(nonce, payload)
@@ -2291,6 +2300,19 @@ impl MultiStageSession {
         self.received_data = None;
         self.accel_local_envelope.clear();
     }
+}
+
+/// Associated data of a DATA frame's chunk: every field the frame carries
+/// besides the chunk, so none of them can be misread or swapped without
+/// the chunk failing to authenticate (vauchi/private#676).
+fn data_frame_ad(session_id: &[u8; 16], chunk_idx: u16, chunk_total: u16, ack: &[u8]) -> Vec<u8> {
+    let mut ad = Vec::with_capacity(DATA_FRAME_AD_DOMAIN.len() + 16 + 4 + ack.len());
+    ad.extend_from_slice(DATA_FRAME_AD_DOMAIN);
+    ad.extend_from_slice(session_id);
+    ad.extend_from_slice(&chunk_idx.to_le_bytes());
+    ad.extend_from_slice(&chunk_total.to_le_bytes());
+    ad.extend_from_slice(ack);
+    ad
 }
 
 impl Drop for MultiStageSession {

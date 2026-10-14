@@ -119,6 +119,9 @@ pub struct PlatformAppEngine {
     /// `on_presentation_invalidated` directly when the engine state changes
     /// from a listener callback (Pair 4 of pure-humble-ui-retire-native-screens).
     pub(crate) direct_listener: DirectListenerSlot,
+    /// Delivers to the registered listener from its own thread, so the
+    /// listener never runs under the engine lock (vauchi/private#677).
+    pub(crate) event_notifier: Mutex<Option<Arc<vauchi_app::event_notifier::EventNotifier>>>,
     /// Storage path retained for in-place session creation. Mirrors
     /// `VauchiPlatform::storage_path` so content-update internals can
     /// resolve the data directory without a sibling `VauchiPlatform`.
@@ -361,6 +364,7 @@ impl PlatformAppEngine {
             pending_release: Mutex::new(None),
             event_handler_id: Mutex::new(None),
             direct_listener: Arc::new(Mutex::new(None)),
+            event_notifier: Mutex::new(None),
             storage_path,
             platform_keychain: Mutex::new(platform_keychain),
             relay_url,
@@ -783,17 +787,31 @@ impl PlatformAppEngine {
             engine.vauchi().remove_event_handler(old_id);
         }
 
-        // Register a new handler that maps VauchiEvents to screen IDs
-        let listener_clone = Arc::clone(&listener);
+        // The engine handler only records the event; the notifier's thread
+        // calls the listener, outside the engine lock (vauchi/private#677).
+        let delivered_to = Arc::clone(&listener);
+        let notifier = Arc::new(
+            vauchi_app::event_notifier::EventNotifier::spawn(move |_screens| {
+                delivered_to.on_presentation_invalidated();
+            })
+            .map_err(|e| MobileError::Other {
+                detail: format!("Event thread failed to start: {e}"),
+            })?,
+        );
+        let handler_notifier = Arc::clone(&notifier);
         let new_id = engine
             .vauchi()
             .add_event_handler(Arc::new(move |event: VauchiEvent| {
-                if !vauchi_app::ui::affected_screens(&event).is_empty() {
-                    listener_clone.on_presentation_invalidated();
+                let screens = vauchi_app::ui::affected_screens(&event);
+                if !screens.is_empty() {
+                    handler_notifier.notify(screens);
                 }
             }));
 
         *handler_id_slot = Some(new_id);
+        *self.event_notifier.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })? = Some(notifier);
 
         // Mirror the listener arc into the direct-call slot used by
         // bridges (Pair 4 multi-stage exchange) that bypass the

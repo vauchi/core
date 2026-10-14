@@ -2,18 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Maps `VauchiEvent` to affected screen IDs for the C ABI event callback.
+//! Formats affected screen IDs for the C ABI event callback.
 
-use vauchi_core::api::VauchiEvent;
-
-/// Returns a JSON array of screen IDs affected by the given event.
-///
-/// Example: `["contacts","contact_detail"]`
-pub fn affected_screens_json(event: &VauchiEvent) -> String {
-    let ids = vauchi_app::ui::affected_screens(event);
-    if ids.is_empty() {
-        return "[]".to_string();
-    }
+/// A JSON array of screen IDs, as the event callback receives it.
+pub fn screens_json(ids: &[String]) -> String {
     let inner: Vec<String> = ids.iter().map(|s| format!("\"{s}\"")).collect();
     format!("[{}]", inner.join(","))
 }

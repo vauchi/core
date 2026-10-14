@@ -709,6 +709,7 @@ fn event_listener_receives_invalidation_on_card_update() {
     // via ContactManager, unlike update_display_name which skips dispatch.
     add_field_via_dialog(&engine, "Email", "test@example.com");
 
+    engine.flush_events_for_test();
     // Verify the generic presentation listener was called.
     let recorded = calls.lock().unwrap();
     assert!(
@@ -1003,6 +1004,7 @@ fn navigate_to_multi_stage_auto_creates_session_no_frontend_call_needed() {
     // wall-clock sleeps are not needed (CC-06 — no real waits in
     // tests, the cycle thread that needed them is retired).
     engine.poll_notifications().expect("poll");
+    engine.flush_events_for_test();
     let calls = invalidations.lock().expect("lock").clone();
     assert!(
         !calls.is_empty(),
@@ -1015,9 +1017,11 @@ fn navigate_to_multi_stage_auto_creates_session_no_frontend_call_needed() {
     engine
         .navigate_back()
         .expect("navigate back away from multi_stage_exchange");
+    engine.flush_events_for_test();
     let pre_count = invalidations.lock().expect("lock").len();
     engine.poll_notifications().expect("poll");
     engine.poll_notifications().expect("poll");
+    engine.flush_events_for_test();
     let post_count = invalidations.lock().expect("lock").len();
     assert_eq!(
         pre_count, post_count,
@@ -1269,6 +1273,7 @@ fn cancel_action_on_multi_stage_screen_stops_session_after_navigate() {
         "cancel must navigate away; still on multi_stage_exchange",
     );
 
+    engine.flush_events_for_test();
     // Explicit polls advance any active session synchronously. Once cancel has
     // removed the session they must not produce another invalidation.
     let pre_count = invalidations.lock().expect("lock").len();
@@ -1276,6 +1281,7 @@ fn cancel_action_on_multi_stage_screen_stops_session_after_navigate() {
     engine
         .poll_notifications()
         .expect("second post-cancel poll");
+    engine.flush_events_for_test();
     let post_count = invalidations.lock().expect("lock").len();
     assert_eq!(
         pre_count, post_count,
@@ -1332,6 +1338,7 @@ fn ble_machine_terminal_event_fires_invalidation_and_flips_chrome() {
         "Failed",
         "terminal machine failure must flip the chrome to the failed screen"
     );
+    engine.flush_events_for_test();
     assert!(
         !calls.lock().unwrap().is_empty(),
         "terminal BLE machine event must fire a presentation invalidation"
@@ -1362,11 +1369,13 @@ fn poll_notifications_on_ble_discovery_fires_invalidation() {
     engine
         .navigate_to_json_for_test(r#"{"BleExchange":{"mode":"magic"}}"#.into())
         .expect("navigate to BLE exchange");
+    engine.flush_events_for_test();
     calls.lock().unwrap().clear(); // ignore navigation-time fires
 
     // No hardware event — just a bare poll, the cadence the frontend pump runs.
     engine.poll_notifications().expect("poll");
 
+    engine.flush_events_for_test();
     assert!(
         !calls.lock().unwrap().is_empty(),
         "a bare poll on the BLE discovering screen must fire \
@@ -1536,6 +1545,7 @@ fn ble_terminal_event_via_dispatch_json_fires_invalidation_like_the_typed_seam()
         "Failed",
         "terminal machine failure must flip the chrome to the failed screen"
     );
+    engine.flush_events_for_test();
     assert!(
         !calls.lock().unwrap().is_empty(),
         "canonical envelope must fire a presentation invalidation on terminal BLE events"

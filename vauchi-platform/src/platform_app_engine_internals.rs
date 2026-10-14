@@ -217,13 +217,13 @@ impl PlatformAppEngine {
     /// batch reaches the frontend on its own (machine-held protocol
     /// advances).
     pub(crate) fn fire_presentation_invalidated(&self) {
-        let listener = self
-            .direct_listener
+        let notifier = self
+            .event_notifier
             .lock()
             .ok()
             .and_then(|guard| guard.clone());
-        if let Some(listener) = listener {
-            listener.on_presentation_invalidated();
+        if let Some(notifier) = notifier {
+            notifier.notify(std::iter::empty::<String>());
         }
     }
 }

@@ -36,6 +36,10 @@ use crate::types::{MobileLocale, MobileTabInfo, MobileTabLayout};
 /// surface frontends route through.
 #[doc(hidden)]
 pub trait PlatformAppEngineTestHelpers {
+    /// Test-only: wait until every pending engine event has reached the
+    /// registered listener, which runs on its own thread (#677).
+    fn flush_events_for_test(&self);
+
     /// Query the retired form-factor-specific navigation list in tests.
     fn nav_items(
         &self,
@@ -147,6 +151,17 @@ pub trait PlatformAppEngineTestHelpers {
 }
 
 impl PlatformAppEngineTestHelpers for PlatformAppEngine {
+    fn flush_events_for_test(&self) {
+        let notifier = self
+            .event_notifier
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone());
+        if let Some(notifier) = notifier {
+            notifier.flush();
+        }
+    }
+
     fn nav_items(
         &self,
         layout: MobileTabLayout,

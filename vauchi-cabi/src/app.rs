@@ -647,13 +647,13 @@ pub type VauchiEventCallback =
 /// device link) change data that affects rendered screens. Pass null
 /// to unregister. `user_data` is forwarded to each callback invocation.
 ///
-/// # Threading — IMPORTANT
+/// # Threading
 ///
-/// The callback may fire **on the same thread** that called
-/// `vauchi_app_dispatch` (synchronous event dispatch). The callback
-/// **must not** call back into any `vauchi_app_*` function directly —
-/// doing so would deadlock on the internal Mutex. Always defer
-/// processing to a separate thread or event loop iteration.
+/// The callback runs on a dedicated core thread, never under the engine
+/// lock, so it may call back into `vauchi_app_*` (vauchi/private#677).
+/// Events that arrive before it runs are merged into one call whose
+/// `screen_ids_json` lists every affected screen. UI work still belongs on
+/// the shell's own UI thread.
 ///
 /// # Safety
 /// `handle` must be a valid `VauchiApp` pointer. `callback` (if non-null)
@@ -701,10 +701,18 @@ pub(crate) fn register_event_callback(app: &VauchiApp, handler: Option<EventCall
         }
 
         if let Some(handler) = handler {
+            // The engine handler only records the event; the notifier's
+            // thread calls the C callback, outside the engine lock, so a
+            // callback may call back into vauchi_app_* (vauchi/private#677).
+            let Ok(notifier) = vauchi_app::event_notifier::EventNotifier::spawn(move |screens| {
+                handler.dispatch(&screens);
+            }) else {
+                return;
+            };
             let new_id = engine
                 .vauchi()
                 .add_event_handler(std::sync::Arc::new(move |event| {
-                    handler.dispatch(&event);
+                    notifier.notify(vauchi_app::ui::affected_screens(&event));
                 }));
             *handler_id_slot = Some(new_id);
         }
@@ -729,14 +737,14 @@ unsafe impl Send for EventCallbackHandler {}
 unsafe impl Sync for EventCallbackHandler {}
 
 impl EventCallbackHandler {
-    fn dispatch(&self, event: &vauchi_core::api::VauchiEvent) {
+    fn dispatch(&self, screens: &[String]) {
         // Defensive: validate callback pointer before dereferencing (C14).
         // The C API contract says the caller guarantees validity, but
         // a null check is cheap and prevents UB on misbehaving callers.
         if self.cb as usize == 0 {
             return;
         }
-        let screen_ids = crate::platform_event::affected_screens_json(event);
+        let screen_ids = crate::platform_event::screens_json(screens);
         if let Ok(json) = std::ffi::CString::new(screen_ids) {
             // SAFETY: caller guarantees callback + user_data are valid;
             // we verified cb is non-null above.

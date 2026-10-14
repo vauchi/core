@@ -216,13 +216,13 @@ int32_t vauchi_app_create_identity(struct VauchiApp *handle, const char *display
  * device link) change data that affects rendered screens. Pass null
  * to unregister. `user_data` is forwarded to each callback invocation.
  *
- * # Threading — IMPORTANT
+ * # Threading
  *
- * The callback may fire **on the same thread** that called
- * `vauchi_app_dispatch` (synchronous event dispatch). The callback
- * **must not** call back into any `vauchi_app_*` function directly —
- * doing so would deadlock on the internal Mutex. Always defer
- * processing to a separate thread or event loop iteration.
+ * The callback runs on a dedicated core thread, never under the engine
+ * lock, so it may call back into `vauchi_app_*` (vauchi/private#677).
+ * Events that arrive before it runs are merged into one call whose
+ * `screen_ids_json` lists every affected screen. UI work still belongs on
+ * the shell's own UI thread.
  *
  * # Safety
  * `handle` must be a valid `VauchiApp` pointer. `callback` (if non-null)

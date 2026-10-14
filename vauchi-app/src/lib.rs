@@ -46,6 +46,7 @@ pub use theme::{
 
 #[cfg(feature = "content-updates")]
 pub mod content;
+pub mod event_notifier;
 
 pub mod aha_moments;
 pub use aha_moments::{aha_moment_message_localized, aha_moment_title_localized};

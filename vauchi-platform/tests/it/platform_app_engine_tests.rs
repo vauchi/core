@@ -1595,3 +1595,46 @@ fn glance_discovery_via_dispatch_json_connects_to_the_scanned_peer_like_the_type
         "A must connect specifically to the scanned peer via the canonical envelope, got: {discovery}",
     );
 }
+
+/// A listener that calls back into the engine from inside its callback,
+/// then signals. Delivered under the engine lock, the call back in would
+/// deadlock and the signal never arrive (vauchi/private#677).
+struct ReentrantListener {
+    engine: std::sync::Weak<PlatformAppEngine>,
+    called_back: std::sync::mpsc::Sender<bool>,
+}
+
+impl PlatformEventListener for ReentrantListener {
+    fn on_presentation_invalidated(&self) {
+        if let Some(engine) = self.engine.upgrade() {
+            let answered = engine.has_identity().is_ok();
+            let _ = self.called_back.send(answered);
+        }
+    }
+}
+
+// @scenario: event-listener.feature - A listener may call back into the engine
+// @internal
+#[test]
+fn a_listener_that_calls_back_into_the_engine_does_not_deadlock() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+    let (called_back, signal) = std::sync::mpsc::channel();
+    engine
+        .set_event_listener(Box::new(ReentrantListener {
+            engine: Arc::downgrade(&engine),
+            called_back,
+        }))
+        .expect("register listener");
+
+    // On a helper thread, so a deadlock fails the test at the timeout
+    // instead of hanging the run.
+    let editor = Arc::clone(&engine);
+    std::thread::spawn(move || add_field_via_dialog(&editor, "Email", "test@example.com"));
+
+    assert_eq!(
+        signal.recv_timeout(std::time::Duration::from_secs(10)),
+        Ok(true),
+        "the listener's call back into the engine must complete"
+    );
+}

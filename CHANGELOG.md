@@ -6,6 +6,15 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.82.1] — 2026-10-14
+
+### Fixed
+
+- `LinkExchange` and `LinkExchangeProgress` are exported from `api`
+  (vauchi/private#670). 0.82.0 re-exported them only under the crate's
+  private `api::vauchi` module, so no consumer could name them and the
+  CLI's `vauchi exchange link` could not build against it.
+
 ## [0.82.0] — 2026-10-14
 
 ### Added

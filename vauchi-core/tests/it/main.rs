@@ -326,6 +326,7 @@ mod migration_v72_test;
 mod monotonic_tests;
 mod multi_device_delivery_tests;
 mod multi_relay_integration_tests;
+mod multistage_ack_auth_tests;
 mod multistage_base45_tests;
 mod multistage_card_update_round_trip_tests;
 mod multistage_chunker_tests;

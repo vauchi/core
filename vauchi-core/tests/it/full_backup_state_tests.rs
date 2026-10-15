@@ -15,7 +15,7 @@ use vauchi_core::{ContactField, FieldType, Vauchi};
 
 const PASSWORD: &str = "correct-horse-battery-staple";
 
-// @scenario: backup_format_versioning :: Full backup includes identity, contacts, own card, and labels
+// @scenario: backup_format_versioning :: Password backup preserves sharing and contact state
 #[test]
 fn full_backup_state_removed_fields_do_not_make_export_unrestorable() {
     let (source, bob, email, phone) = setup();
@@ -50,7 +50,7 @@ fn full_backup_state_removed_fields_do_not_make_export_unrestorable() {
     );
 }
 
-// @scenario: backup_format_versioning :: Full backup includes identity, contacts, own card, and labels
+// @scenario: backup_format_versioning :: Password backup preserves sharing and contact state
 #[test]
 fn full_backup_state_deleted_group_members_are_not_resurrected() {
     let (source, bob, _, _) = setup();
@@ -88,6 +88,41 @@ fn full_backup_state_deleted_group_members_are_not_resurrected() {
     );
 }
 
+// @scenario: backup_format_versioning :: Password backup preserves sharing and contact state
+#[test]
+fn full_backup_state_preserves_valid_avatars() {
+    let (source, bob, _, _) = setup();
+    let mut png = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::new_rgba8(1, 1)
+        .write_to(&mut png, image::ImageFormat::Png)
+        .unwrap();
+    let mut card = source
+        .storage()
+        .contacts()
+        .load_own_card()
+        .unwrap()
+        .unwrap();
+    card.set_avatar(png.get_ref().clone()).unwrap();
+    source.storage().contacts().save_own_card(&card).unwrap();
+    let mut group = Group::new("work".into(), "Work", 10);
+    group.add_contact(&bob, 20);
+    group.set_avatar_override(Some(png.get_ref()), 30).unwrap();
+    source.storage().labels().save_group(&group).unwrap();
+    let mut target = Vauchi::in_memory().unwrap();
+    target
+        .import_full_backup(&source.export_full_backup(PASSWORD).unwrap(), PASSWORD)
+        .unwrap();
+    let restored_card = target
+        .storage()
+        .contacts()
+        .load_own_card()
+        .unwrap()
+        .unwrap();
+    let restored_group = target.storage().labels().load_group("work").unwrap();
+    assert_eq!(restored_card.avatar(), card.avatar());
+    assert_eq!(restored_group.avatar_override(), group.avatar_override());
+}
+
 fn setup() -> (Vauchi, String, String, String) {
     let mut source = Vauchi::in_memory().unwrap();
     source.create_identity("Alice").unwrap();
@@ -108,7 +143,7 @@ fn setup() -> (Vauchi, String, String, String) {
     (source, bob_id, email_id, phone_id)
 }
 
-// @scenario: backup_format_versioning :: Full backup includes identity, contacts, own card, and labels
+// @scenario: backup_format_versioning :: Password backup preserves sharing and contact state
 #[test]
 fn full_backup_state_preserves_complete_groups_and_explicit_allow_and_deny() {
     let (source, bob, email, phone) = setup();
@@ -148,7 +183,7 @@ fn full_backup_state_preserves_complete_groups_and_explicit_allow_and_deny() {
     );
 }
 
-// @scenario: backup_format_versioning :: Full backup includes identity, contacts, own card, and labels
+// @scenario: backup_format_versioning :: Password backup preserves sharing and contact state
 #[test]
 fn full_backup_state_preserves_blocked_ignored_archived_contacts() {
     let (source, bob_id, _, _) = setup();
@@ -186,7 +221,7 @@ fn full_backup_state_preserves_blocked_ignored_archived_contacts() {
     assert!(target.list_contacts().unwrap().is_empty());
 }
 
-// @scenario: backup_format_versioning :: Unknown version byte is rejected
+// @scenario: backup_format_versioning :: Password backup preserves sharing and contact state
 #[test]
 fn full_backup_state_old_reader_rejects_richer_password_backup() {
     let (source, _, _, _) = setup();
@@ -201,7 +236,7 @@ fn full_backup_state_old_reader_rejects_richer_password_backup() {
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(12))]
-    // @scenario: backup_format_versioning :: Full backup includes identity, contacts, own card, and labels
+    // @scenario: backup_format_versioning :: Password backup preserves sharing and contact state
     #[test]
     fn full_backup_state_override_roundtrip(allow_email in any::<bool>(), allow_phone in any::<bool>()) {
         let (source, bob, email, phone) = setup();

@@ -23,7 +23,7 @@ const HKDF_INFO: &[u8] = b"vauchi-backup-v6-state";
 fn derive_key(password: &str, salt: &[u8; 16]) -> Result<SymmetricKey, BackupError> {
     let base =
         derive_key_argon2id(password.as_bytes(), salt).map_err(|_| BackupError::KeyDerivation)?;
-    let prk = HKDF::extract(None, base.as_bytes());
+    let prk = Zeroizing::new(HKDF::extract(None, base.as_bytes()));
     let expanded =
         Zeroizing::new(HKDF::expand(&prk, HKDF_INFO, 32).map_err(|_| BackupError::KeyDerivation)?);
     let bytes = Zeroizing::new(

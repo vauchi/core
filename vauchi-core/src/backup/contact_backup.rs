@@ -78,6 +78,34 @@ pub(crate) struct ContactBackupEntry {
     kind: ContactBackupKind,
 }
 
+impl Drop for ContactBackupEntry {
+    fn drop(&mut self) {
+        self.id.zeroize();
+        self.display_name.zeroize();
+        self.card_json.zeroize();
+        match &mut self.kind {
+            ContactBackupKind::Exchanged {
+                public_key_b64,
+                shared_key_b64,
+                visibility_rules_json,
+                ..
+            } => {
+                public_key_b64.zeroize();
+                shared_key_b64.zeroize();
+                visibility_rules_json.zeroize();
+            }
+            ContactBackupKind::Imported {
+                source_json,
+                original_uid,
+                ..
+            } => {
+                source_json.zeroize();
+                original_uid.zeroize();
+            }
+        }
+    }
+}
+
 /// Kind-specific data stored in the backup.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -191,6 +219,7 @@ mod base64_option {
 }
 
 impl ContactBackupEntry {
+    #[cfg(feature = "network-rustls")]
     pub(super) fn id(&self) -> &str {
         &self.id
     }

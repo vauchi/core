@@ -81,6 +81,10 @@ impl SnapshotContact {
             || contact
                 .exchange_timestamp()
                 .is_some_and(|at| at > i64::MAX as u64)
+            || contact
+                .kind()
+                .imported_data()
+                .is_some_and(|data| data.imported_at > i64::MAX as u64)
         {
             return Err(BackupError::Deserialization("Invalid contact state".into()));
         }

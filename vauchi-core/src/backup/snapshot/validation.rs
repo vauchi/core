@@ -22,6 +22,22 @@ fn valid_name(name: &str, maximum: usize) -> bool {
     !name.trim().is_empty() && name.chars().count() <= maximum
 }
 
+fn validate_avatar(bytes: &[u8]) -> Result<(), BackupError> {
+    if bytes.is_empty() || bytes.len() > MAX_AVATAR_SIZE {
+        return Err(invalid());
+    }
+    let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|_| invalid())?;
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(512);
+    limits.max_image_height = Some(512);
+    limits.max_alloc = Some(4 * 1024 * 1024);
+    reader.limits(limits);
+    reader.decode().map_err(|_| invalid())?;
+    Ok(())
+}
+
 fn unique<'a>(values: impl IntoIterator<Item = &'a str>) -> Result<HashSet<&'a str>, BackupError> {
     let mut set = HashSet::new();
     for value in values {
@@ -48,6 +64,9 @@ fn validate_card(card: &ContactCard) -> Result<HashSet<&str>, BackupError> {
         field.validate().map_err(|_| invalid())?;
     }
     card.validate_size().map_err(|_| invalid())?;
+    if let Some(avatar) = card.avatar() {
+        validate_avatar(avatar)?;
+    }
     unique(card.fields().iter().map(|field| field.id()))
 }
 
@@ -55,6 +74,7 @@ impl BackupSnapshot {
     pub fn validate(&self) -> Result<Vec<Contact>, BackupError> {
         if !valid_name(&self.identity.display_name, MAX_DISPLAY_NAME_LENGTH)
             || self.identity.device_name.trim().is_empty()
+            || self.identity.device_name.len() > 1024
             || self.created_at > i64::MAX as u64
             || self.groups.len() > MAX_LABELS
         {
@@ -91,6 +111,9 @@ impl BackupSnapshot {
                 || group.modified_at > i64::MAX as u64
             {
                 return Err(invalid());
+            }
+            if let Some(avatar) = &group.avatar_override {
+                validate_avatar(avatar)?;
             }
             let members = unique(group.contact_ids.iter().map(String::as_str))?;
             let fields = unique(group.visible_fields.iter().map(String::as_str))?;

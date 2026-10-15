@@ -87,7 +87,7 @@ fn full_backup_validation_rejects_invalid_state_before_mutation() {
         .unwrap();
     assert_eq!(target.identity().unwrap().display_name(), "Alice");
     let mut accepted = Vec::new();
-    for case in 0..14 {
+    for case in 0..18 {
         let mut malformed = valid.clone();
         match case {
             0 => malformed["version"] = json!(7),
@@ -113,6 +113,16 @@ fn full_backup_validation_rejects_invalid_state_before_mutation() {
             11 => malformed["groups"][0]["bio_override"] = json!("x".repeat(161)),
             12 => malformed["own_card"]["fields"][0]["value"] = json!("x".repeat(1001)),
             13 => malformed["contacts"][0]["relationship"] = Value::Null,
+            14 => malformed["groups"][0]["avatar_override"] = json!([1, 2, 3]),
+            15 => malformed["own_card"]["avatar"] = json!([1, 2, 3]),
+            16 => {
+                malformed["contacts"][0]["entry"]["kind"] = json!({
+                    "type": "imported", "source_json": "\"vcard_file\"",
+                    "imported_at": u64::MAX, "original_uid": null
+                });
+                malformed["contacts"][0]["relationship"] = Value::Null;
+            }
+            17 => malformed["identity"]["device_name"] = json!("x".repeat(1025)),
             _ => unreachable!(),
         }
         let mut target = Vauchi::in_memory().unwrap();

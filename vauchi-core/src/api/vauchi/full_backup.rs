@@ -22,6 +22,7 @@ impl Vauchi {
             .ok_or(VauchiError::IdentityNotInitialized)?;
         let snapshot = BackupSnapshot::capture(&self.storage, identity, self.clock.unix_seconds())
             .map_err(backup_error)?;
+        snapshot.validate().map_err(backup_error)?;
         let blob = snapshot::encode(&snapshot, password).map_err(backup_error)?;
         // The completion timestamp is a UX hint, not part of backup integrity.
         #[allow(clippy::let_underscore_must_use)]

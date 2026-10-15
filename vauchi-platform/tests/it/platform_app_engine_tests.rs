@@ -745,6 +745,7 @@ fn replacing_event_listener_unregisters_previous() {
 
     // Trigger an event via add-field (dispatches OwnCardUpdated)
     add_field_via_dialog(&engine, "Phone", "+1234567890");
+    engine.flush_events_for_test();
 
     // First listener should NOT have been called (unregistered)
     let recorded_1 = calls_1.lock().unwrap();

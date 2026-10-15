@@ -44,14 +44,14 @@ trap 'rm -rf "$BINDINGS_DIR"' EXIT
 echo "Generating default-feature Kotlin bindings into $BINDINGS_DIR ..."
 (
   cd "$PROJECT_ROOT"
-  cargo build -p vauchi-platform --quiet
-  cargo run --quiet --bin uniffi-bindgen -p vauchi-platform -- generate \
-    --library "target/debug/libvauchi_platform.dylib" \
-    --language kotlin \
-    --out-dir "$BINDINGS_DIR" \
-    --no-format 2>/dev/null \
-  || cargo run --quiet --bin uniffi-bindgen -p vauchi-platform -- generate \
-    --library "target/debug/libvauchi_platform.so" \
+  cargo build --locked -p vauchi-platform
+  case "$(uname -s)" in
+    Darwin) library="target/debug/libvauchi_platform.dylib" ;;
+    Linux) library="target/debug/libvauchi_platform.so" ;;
+    *) echo "Unsupported binding-guard host" >&2; exit 1 ;;
+  esac
+  cargo run --locked --bin uniffi-bindgen -p vauchi-platform -- generate \
+    --library "$library" \
     --language kotlin \
     --out-dir "$BINDINGS_DIR" \
     --no-format
@@ -94,7 +94,7 @@ for name in $FOUND; do
 done
 
 if [[ ${#VIOLATIONS[@]} -eq 0 ]]; then
-  echo -e "${GREEN}PASS${NC}: no unexpected diagnostic_* symbols in default-feature bindings"
+  printf '%b\n' "${GREEN}PASS${NC}: no unexpected diagnostic_* symbols in default-feature bindings"
   if [[ -n "$FOUND" ]]; then
     echo "  Allowlisted (transition):"
     for name in $FOUND; do
@@ -104,12 +104,12 @@ if [[ ${#VIOLATIONS[@]} -eq 0 ]]; then
   exit 0
 fi
 
-echo -e "${RED}FAIL${NC}: diagnostic_* symbols leaked into default-feature bindings:"
+printf '%b\n' "${RED}FAIL${NC}: diagnostic_* symbols leaked into default-feature bindings:"
 for v in "${VIOLATIONS[@]}"; do
   echo "  - $v"
 done
 echo
-echo -e "${YELLOW}Hint${NC}: gate the offending UniFFI export with"
+printf '%b\n' "${YELLOW}Hint${NC}: gate the offending UniFFI export with"
 echo "  #[cfg(feature = \"diagnostic-scanner\")]"
 echo "in vauchi-platform/src/diagnostic.rs (and its re-export in lib.rs)."
 echo "If a symbol is a legitimate production alias during a transition,"

@@ -1027,7 +1027,9 @@ lint:module-boundaries:
 # Diagnostics must only ship in --features diagnostic-scanner builds
 # (test/debug). See 2026-04-19-diagnostics-out-of-production-plan.md.
 lint:no-diagnostic-in-default:
-  extends: [.linux-runner-nocache]
+  # This guard compiles the platform and binding generator from scratch.
+  # Share the cold-build queue and pull cache instead of competing unbounded.
+  extends: [.linux-runner-readonly, .timeout-cold-rebuild]
   stage: lint
   needs: []
   script:

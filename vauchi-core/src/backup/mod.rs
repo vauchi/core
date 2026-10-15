@@ -22,15 +22,6 @@ pub(crate) use guardian_recovery::recover_from_shards;
 
 pub use contact_backup::{BackupError, export_contact_backup, import_contact_backup};
 
-/// Authenticates and validates a password backup without changing local state.
-///
-/// Accepts v6 snapshots and legacy v3 envelopes. Callers replacing an existing
-/// installation must complete this validation before discarding its state.
-#[cfg(feature = "network-rustls")]
-pub fn validate_full_backup(backup_data: &str, password: &str) -> Result<(), BackupError> {
-    let bytes = full_backup::decode_full_backup_hex(backup_data)?;
-    snapshot::decode(&bytes, password)?.validate().map(|_| ())
-}
 #[cfg(feature = "network-rustls")]
 pub(crate) use full_backup::guardian_backup_key_matches;
 pub use full_backup::{

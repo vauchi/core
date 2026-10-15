@@ -420,6 +420,7 @@ mod recovery_guardian_api_tests;
 mod recovery_readiness_tests;
 mod recovery_storage_tests;
 mod recovery_tests;
+mod recovery_upload_tests;
 mod recovery_voucher_bytes_tests;
 mod recovery_voucher_v2_tests;
 mod registry_activation_genesis_tests;

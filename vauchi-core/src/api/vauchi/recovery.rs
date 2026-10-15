@@ -209,6 +209,12 @@ impl Vauchi {
             )));
         }
 
+        if progress.started_at > self.clock.unix_seconds() {
+            return Err(VauchiError::InvalidState(
+                "Recovery start time is in the future".into(),
+            ));
+        }
+
         let mut proof = RecoveryProof::new(
             *progress.claim.old_pk(),
             *progress.claim.new_pk(),

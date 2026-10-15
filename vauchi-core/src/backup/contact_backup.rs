@@ -191,6 +191,10 @@ mod base64_option {
 }
 
 impl ContactBackupEntry {
+    pub(super) fn id(&self) -> &str {
+        &self.id
+    }
+
     /// Creates a backup entry from a `Contact`.
     pub(crate) fn from_contact(contact: &Contact) -> Result<Self, BackupError> {
         let backup_card = BackupContactCard::from(contact.card());

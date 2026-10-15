@@ -14,6 +14,7 @@ pub mod full_backup;
 #[cfg(feature = "network-rustls")]
 mod guardian_recovery;
 mod key_shard;
+#[cfg(feature = "network-rustls")]
 pub(crate) mod snapshot;
 
 #[cfg(feature = "network-rustls")]

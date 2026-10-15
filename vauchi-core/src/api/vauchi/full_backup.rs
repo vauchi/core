@@ -38,7 +38,7 @@ impl Vauchi {
         }
         let bytes = crate::backup::decode_full_backup_hex(backup_data).map_err(backup_error)?;
         let snapshot = snapshot::decode(&bytes, password).map_err(backup_error)?;
-        let contacts = snapshot.restore_contacts().map_err(backup_error)?;
+        let contacts = snapshot.validate().map_err(backup_error)?;
         let groups = snapshot.restore_groups();
         let seed = crate::backup::extract_master_seed(&snapshot.identity).map_err(backup_error)?;
         let identity = Identity::from_device_link(

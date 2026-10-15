@@ -67,7 +67,24 @@ impl SnapshotContact {
     }
 
     pub fn from_legacy(entry: ContactBackupEntry) -> Result<Self, BackupError> {
-        Self::capture(&entry.to_contact()?)
+        let mut snapshot = Self::capture(&entry.to_contact()?)?;
+        snapshot.entry = entry;
+        Ok(snapshot)
+    }
+
+    pub fn validate(&self, contact: &Contact) -> Result<(), BackupError> {
+        if self.entry.id() != contact.id()
+            || self.relationship.is_some() != contact.is_exchanged()
+            || self.archived_at.is_some_and(|at| at > i64::MAX as u64)
+            || self.ignored_at.is_some_and(|at| at > i64::MAX as u64)
+            || self.card_updated_at.is_some_and(|at| at > i64::MAX as u64)
+            || contact
+                .exchange_timestamp()
+                .is_some_and(|at| at > i64::MAX as u64)
+        {
+            return Err(BackupError::Deserialization("Invalid contact state".into()));
+        }
+        Ok(())
     }
 
     pub fn restore(&self) -> Result<Contact, BackupError> {

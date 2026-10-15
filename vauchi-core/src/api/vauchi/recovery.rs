@@ -192,9 +192,8 @@ impl Vauchi {
 
     /// Uploads the completed recovery proof to the relay.
     ///
-    /// The proof contains the claim + all collected vouchers. It's stored
-    /// on the relay keyed by hash(old_pk) for the old identity's contacts
-    /// to verify and accept.
+    /// The canonical proof binds the old and new keys to the collected
+    /// vouchers. It is stored under hash(old_pk) for contacts to verify.
     pub fn upload_recovery_proof(&self) -> VauchiResult<()> {
         let progress = self
             .storage
@@ -210,9 +209,23 @@ impl Vauchi {
             )));
         }
 
-        // Serialize progress as the proof payload
-        let proof_bytes =
-            serde_json::to_vec(&progress).map_err(|e| VauchiError::Serialization(e.to_string()))?;
+        let mut proof = RecoveryProof::new(
+            *progress.claim.old_pk(),
+            *progress.claim.new_pk(),
+            progress.threshold,
+            progress.started_at,
+        );
+        for voucher in progress.vouchers {
+            proof
+                .add_voucher(voucher)
+                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        }
+        proof
+            .validate()
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        let proof_bytes = proof
+            .to_bytes()
+            .map_err(|e| VauchiError::Serialization(e.to_string()))?;
 
         // Key: hash(old_pk) — same key contacts will query
         let key_hash = hex::encode(Sha256::digest(progress.claim.old_pk()));

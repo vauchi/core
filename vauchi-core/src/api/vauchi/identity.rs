@@ -285,6 +285,9 @@ impl Vauchi {
         let envelope = crate::backup::import_full_backup(&bytes, password)
             .map_err(|e| VauchiError::Configuration(format!("Full backup import failed: {e}")))?;
 
+        let contacts = crate::backup::restore_contacts_from_envelope(&envelope)
+            .map_err(|e| VauchiError::Configuration(format!("Contact restore failed: {e}")))?;
+
         // Restore identity from envelope
         let seed = crate::backup::extract_master_seed(&envelope.sections.identity)
             .map_err(|e| VauchiError::Configuration(format!("Seed extraction failed: {e}")))?;
@@ -303,44 +306,52 @@ impl Vauchi {
         // out on restart (no startup loader has that password) and
         // re-ran password-strength validation at restore time
         // (2026-06-11-restore-identity-unloadable-after-restart).
-        self.storage
-            .identity()
-            .save_identity(&identity.to_storage_bytes())?;
+        self.storage.begin_transaction()?;
+        let restored = (|| -> VauchiResult<()> {
+            self.storage
+                .identity()
+                .save_identity(&identity.to_storage_bytes())?;
 
-        // Restore own card
-        if let Some(card) = &envelope.sections.own_card {
-            self.storage.contacts().save_own_card(card)?;
-        } else {
-            let card = crate::contact_card::ContactCard::new(identity.display_name());
-            self.storage.contacts().save_own_card(&card)?;
-        }
+            // Restore own card
+            if let Some(card) = &envelope.sections.own_card {
+                self.storage.contacts().save_own_card(card)?;
+            } else {
+                let card = crate::contact_card::ContactCard::new(identity.display_name());
+                self.storage.contacts().save_own_card(&card)?;
+            }
 
-        // Restore contacts
-        let contacts = crate::backup::restore_contacts_from_envelope(&envelope)
-            .map_err(|e| VauchiError::Configuration(format!("Contact restore failed: {e}")))?;
-        for contact in &contacts {
-            self.storage.contacts().save_contact(contact)?;
-        }
+            // Restore contacts
+            for contact in &contacts {
+                self.storage.contacts().save_contact(contact)?;
+            }
 
-        // Restore labels
-        for label in &envelope.sections.labels {
-            let contacts: std::collections::HashSet<String> =
-                label.contacts.iter().cloned().collect();
-            let now = self.clock.unix_seconds();
-            let group = crate::contact::Group::from_storage(
-                label.label_id.clone(),
-                label.name.clone(),
-                contacts,
-                std::collections::HashSet::new(),
-                // The backup label section carries no presentation overrides
-                // (display name / bio / avatar) — restore them empty.
-                None,
-                None,
-                None,
-                now,
-                now,
-            );
-            self.storage.labels().save_group(&group)?;
+            // Restore labels
+            for label in &envelope.sections.labels {
+                let contacts: std::collections::HashSet<String> =
+                    label.contacts.iter().cloned().collect();
+                let now = self.clock.unix_seconds();
+                let group = crate::contact::Group::from_storage(
+                    label.label_id.clone(),
+                    label.name.clone(),
+                    contacts,
+                    std::collections::HashSet::new(),
+                    // The backup label section carries no presentation overrides
+                    // (display name / bio / avatar) — restore them empty.
+                    None,
+                    None,
+                    None,
+                    now,
+                    now,
+                );
+                self.storage.labels().save_group(&group)?;
+            }
+
+            self.storage.commit()?;
+            Ok(())
+        })();
+        if let Err(error) = restored {
+            self.storage.rollback();
+            return Err(error);
         }
 
         self.identity = Some(identity);

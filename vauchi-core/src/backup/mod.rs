@@ -14,6 +14,7 @@ pub mod full_backup;
 #[cfg(feature = "network-rustls")]
 mod guardian_recovery;
 mod key_shard;
+pub(crate) mod snapshot;
 
 #[cfg(feature = "network-rustls")]
 pub(crate) use guardian_recovery::recover_from_shards;

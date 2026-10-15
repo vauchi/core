@@ -64,7 +64,7 @@ pub(crate) const MAX_GUARDIAN_BACKUP_BYTES: usize = 32 * 1024 * 1024;
 pub const MAX_FULL_BACKUP_BYTES: usize = 32 * 1024 * 1024;
 
 /// Maximum decompressed JSON size for any full backup (64 MiB).
-const MAX_DECOMPRESSED_BACKUP_BYTES: usize = 64 * 1024 * 1024;
+pub(super) const MAX_DECOMPRESSED_BACKUP_BYTES: usize = 64 * 1024 * 1024;
 
 /// HKDF domain separation info for v3 backup key derivation.
 const HKDF_INFO: &[u8] = b"vauchi-backup-v3";
@@ -115,7 +115,7 @@ impl std::fmt::Debug for FullBackupEnvelope {
 /// Serde adapter that routes `Option<ContactCard>` through [`BackupContactCard`]
 /// so the avatar is serialized as base64 in backups while the public type
 /// remains `Option<ContactCard>`.
-mod backup_contact_card {
+pub(super) mod backup_contact_card {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     use crate::backup::contact_backup::BackupContactCard;
@@ -241,7 +241,7 @@ const ZLIB_MAGIC: u8 = 0x78;
 
 /// Compresses plaintext with zlib. Best compression is acceptable because
 /// backup creation is not latency-critical.
-fn compress_backup(plaintext: &[u8]) -> Result<Vec<u8>, BackupError> {
+pub(super) fn compress_backup(plaintext: &[u8]) -> Result<Vec<u8>, BackupError> {
     let mut encoder = ZlibEncoder::new(Vec::new(), Compression::best());
     std::io::Write::write_all(&mut encoder, plaintext)
         .map_err(|e| BackupError::Serialization(format!("compression failed: {e}")))?;
@@ -252,7 +252,7 @@ fn compress_backup(plaintext: &[u8]) -> Result<Vec<u8>, BackupError> {
 
 /// Decompresses zlib-compressed plaintext; anything that is not a zlib
 /// stream is refused.
-fn decompress_backup(data: &[u8]) -> Result<Vec<u8>, BackupError> {
+pub(super) fn decompress_backup(data: &[u8]) -> Result<Vec<u8>, BackupError> {
     decompress_backup_with_limit(data, MAX_DECOMPRESSED_BACKUP_BYTES)
 }
 

@@ -20,6 +20,7 @@ mod exchange;
 #[cfg(feature = "network-http")]
 mod exchange_relay;
 mod features;
+mod full_backup;
 mod heirloom;
 mod identity;
 mod import;

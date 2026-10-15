@@ -78,7 +78,7 @@ impl BackupSnapshot {
                 }));
             }
         }
-        Ok(Self {
+        let mut snapshot = Self {
             version: SNAPSHOT_VERSION.into(),
             created_at: now,
             identity: IdentitySection {
@@ -94,7 +94,9 @@ impl BackupSnapshot {
                 .collect::<Result<_, _>>()?,
             groups: groups.iter().map(GroupSyncData::from_group).collect(),
             overrides,
-        })
+        };
+        snapshot.normalize_references()?;
+        Ok(snapshot)
     }
 
     pub fn from_legacy(envelope: FullBackupEnvelope) -> Result<Self, BackupError> {
@@ -129,7 +131,7 @@ impl BackupSnapshot {
                 SnapshotContact::from_legacy(entry)
             })
             .collect::<Result<_, _>>()?;
-        Ok(Self {
+        let mut snapshot = Self {
             version: 3,
             created_at: envelope.created_at,
             identity: envelope.sections.identity,
@@ -137,7 +139,32 @@ impl BackupSnapshot {
             contacts,
             groups,
             overrides: Vec::new(),
-        })
+        };
+        snapshot.normalize_references()?;
+        Ok(snapshot)
+    }
+
+    // Deletions leave inert label rows (#64); normalize only local capture and
+    // legacy conversion. Authenticated v6 input must pass strict validation.
+    fn normalize_references(&mut self) -> Result<(), BackupError> {
+        let contacts = self.restore_contacts()?;
+        let ids: std::collections::HashSet<_> =
+            contacts.iter().map(|contact| contact.id()).collect();
+        let fields: std::collections::HashSet<_> = self
+            .own_card
+            .iter()
+            .flat_map(|card| card.fields().iter().map(|field| field.id()))
+            .collect();
+        for group in &mut self.groups {
+            group.contact_ids.retain(|id| ids.contains(id.as_str()));
+            group
+                .visible_fields
+                .retain(|id| fields.contains(id.as_str()));
+        }
+        self.overrides.retain(|item| {
+            ids.contains(item.contact_id.as_str()) && fields.contains(item.field_id.as_str())
+        });
+        Ok(())
     }
 
     pub fn restore_contacts(&self) -> Result<Vec<Contact>, BackupError> {

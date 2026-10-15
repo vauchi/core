@@ -16,7 +16,7 @@ use zeroize::Zeroizing;
 
 const PASSWORD: &str = "correct-horse-battery-staple";
 
-fn legacy_backup() -> Vec<u8> {
+pub(super) fn legacy_backup() -> Vec<u8> {
     let mut source = Vauchi::in_memory().unwrap();
     source.create_identity("Alice").unwrap();
     let identity = source.identity().unwrap();
@@ -43,7 +43,7 @@ fn legacy_backup() -> Vec<u8> {
     .unwrap()
 }
 
-fn encode_legacy(envelope: &FullBackupEnvelope) -> String {
+pub(super) fn encode_legacy(envelope: &FullBackupEnvelope) -> String {
     let plaintext = Zeroizing::new(serde_json::to_vec(envelope).unwrap());
     let mut compressor = ZlibEncoder::new(Vec::new(), Compression::fast());
     compressor.write_all(&plaintext).unwrap();
@@ -152,4 +152,24 @@ fn full_backup_atomic_commit_failure_rolls_back_and_allows_retry() {
     target.import_full_backup(&backup, PASSWORD).unwrap();
     assert_eq!(target.identity().unwrap().display_name(), "Alice");
     assert_eq!(target.storage().contacts().count_contacts().unwrap(), 1);
+}
+
+// @scenario: backup_format_versioning :: Full backup includes identity, contacts, own card, and labels
+#[test]
+fn full_backup_atomic_legacy_omitted_group_members_do_not_prevent_restore() {
+    let mut envelope = vauchi_core::backup::import_full_backup(&legacy_backup(), PASSWORD).unwrap();
+    envelope.sections.labels[0]
+        .contacts
+        .push("omitted-archived-contact".into());
+    let mut target = Vauchi::in_memory().unwrap();
+    target
+        .import_full_backup(&encode_legacy(&envelope), PASSWORD)
+        .unwrap();
+    let contacts = target.storage().contacts().list_contacts().unwrap();
+    assert_eq!(contacts.len(), 1);
+    let group = target.storage().labels().load_group("work").unwrap();
+    assert_eq!(
+        group.contacts(),
+        &std::collections::HashSet::from([contacts[0].id().to_owned()])
+    );
 }

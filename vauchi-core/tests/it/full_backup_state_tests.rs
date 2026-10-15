@@ -15,6 +15,79 @@ use vauchi_core::{ContactField, FieldType, Vauchi};
 
 const PASSWORD: &str = "correct-horse-battery-staple";
 
+// @scenario: backup_format_versioning :: Full backup includes identity, contacts, own card, and labels
+#[test]
+fn full_backup_state_removed_fields_do_not_make_export_unrestorable() {
+    let (source, bob, email, phone) = setup();
+    let mut group = Group::new("work".into(), "Work", 10);
+    group.add_contact(&bob, 20);
+    group.set_visible_fields(HashSet::from([email.clone(), phone.clone()]), 30);
+    source.storage().labels().save_group(&group).unwrap();
+    source
+        .storage()
+        .labels()
+        .save_contact_override(&bob, &email, false)
+        .unwrap();
+    source
+        .storage()
+        .labels()
+        .save_contact_override(&bob, &phone, false)
+        .unwrap();
+    assert!(source.remove_own_field_by_id(&email).unwrap());
+    let mut target = Vauchi::in_memory().unwrap();
+    target
+        .import_full_backup(&source.export_full_backup(PASSWORD).unwrap(), PASSWORD)
+        .unwrap();
+    let restored = target.storage().labels().load_group("work").unwrap();
+    assert_eq!(restored.visible_fields(), &HashSet::from([phone.clone()]));
+    assert_eq!(
+        target
+            .storage()
+            .labels()
+            .load_contact_overrides(&bob)
+            .unwrap(),
+        std::collections::HashMap::from([(phone, false)])
+    );
+}
+
+// @scenario: backup_format_versioning :: Full backup includes identity, contacts, own card, and labels
+#[test]
+fn full_backup_state_deleted_group_members_are_not_resurrected() {
+    let (source, bob, _, _) = setup();
+    let mut contact = source
+        .storage()
+        .contacts()
+        .load_contact(&bob)
+        .unwrap()
+        .unwrap();
+    let mut group = Group::new("work".into(), "Work", 10);
+    group.add_contact(&bob, 20);
+    source.storage().labels().save_group(&group).unwrap();
+    contact.soft_delete(30);
+    source.storage().contacts().save_contact(&contact).unwrap();
+    let mut target = Vauchi::in_memory().unwrap();
+    target
+        .import_full_backup(&source.export_full_backup(PASSWORD).unwrap(), PASSWORD)
+        .unwrap();
+    assert!(
+        target
+            .storage()
+            .contacts()
+            .load_contact(&bob)
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        target
+            .storage()
+            .labels()
+            .load_group("work")
+            .unwrap()
+            .contacts()
+            .is_empty()
+    );
+}
+
 fn setup() -> (Vauchi, String, String, String) {
     let mut source = Vauchi::in_memory().unwrap();
     source.create_identity("Alice").unwrap();

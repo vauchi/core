@@ -716,6 +716,7 @@ mod tests {
         }
     }
 
+    // @scenario: device_management :: Verify device during linking
     #[test]
     fn test_identity_fingerprint_matches_both_sides() {
         let master_seed = [0x42u8; 32];

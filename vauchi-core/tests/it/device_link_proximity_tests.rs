@@ -183,6 +183,7 @@ fn now_unix_secs() -> u64 {
 }
 
 // @scenario: device_management :: Linking with manual confirmation proof succeeds
+// @scenario: device_management :: Verify device during linking
 // @internal
 #[test]
 fn test_confirm_link_with_manual_proof_succeeds() {

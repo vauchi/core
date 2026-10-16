@@ -141,6 +141,11 @@ struct MockGateway {
     /// mock forwards at once; `held_polls` collects answer `202` first.
     async_answers: std::collections::HashMap<String, CannedResponse>,
     held_polls: u32,
+    /// `Vauchi-Ohttp-Delay-Window` on every synchronous answer, as an outer
+    /// relay advertises its delayed path (#628 D-F6 amendment).
+    delay_window_header: Option<String>,
+    /// Answer `404` on `/v2/ohttp-async`, as a relay without the path does.
+    async_refused: bool,
 }
 
 pub struct MockRelay {
@@ -225,6 +230,8 @@ impl MockRelay {
             blobs: Vec::new(),
             async_answers: std::collections::HashMap::new(),
             held_polls: 0,
+            delay_window_header: None,
+            async_refused: false,
         });
     }
 
@@ -257,6 +264,17 @@ impl MockRelay {
                 }
             }
         });
+    }
+
+    /// Advertises `value` as the delay window on every synchronous answer;
+    /// `None` stops advertising.
+    pub fn advertise_delay_window(&self, value: Option<&str>) {
+        self.with_gateway(|gateway| gateway.delay_window_header = value.map(str::to_string));
+    }
+
+    /// Refuses `/v2/ohttp-async` with `404`, as a relay without the path.
+    pub fn refuse_async_path(&self) {
+        self.with_gateway(|gateway| gateway.async_refused = true);
     }
 
     /// Drops every held answer, as an outer-relay restart does.
@@ -423,9 +441,13 @@ fn serve_ohttp(gateway: &mut MockGateway, body: &[u8]) -> CannedResponse {
     gateway.actions.push(action);
     let padded_reply =
         vauchi_core::crypto::padding::pad(&serde_json::to_vec(&reply).expect("reply serializes"));
+    let mut headers = vec![("Content-Type".into(), "message/ohttp-res".into())];
+    if let Some(window) = &gateway.delay_window_header {
+        headers.push(("Vauchi-Ohttp-Delay-Window".into(), window.clone()));
+    }
     CannedResponse {
         status: 200,
-        headers: vec![("Content-Type".into(), "message/ohttp-res".into())],
+        headers,
         body: server_response
             .encapsulate(&padded_reply)
             .expect("encapsulate reply"),
@@ -526,7 +548,11 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<State>>) -> std::io
         } else if let (Some(gateway), true) =
             (s.gateway.as_mut(), path.starts_with("/v2/ohttp-async"))
         {
-            serve_ohttp_async(gateway, &method, &path, &headers, &body)
+            if gateway.async_refused {
+                CannedResponse::status(404)
+            } else {
+                serve_ohttp_async(gateway, &method, &path, &headers, &body)
+            }
         } else {
             s.default
                 .clone()

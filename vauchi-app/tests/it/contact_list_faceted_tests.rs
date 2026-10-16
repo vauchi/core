@@ -52,6 +52,45 @@ fn facet_items(screen: &vauchi_app::ui::ScreenModel) -> Vec<(String, bool)> {
 
 // ── Engine-level ───────────────────────────────────────────────────────────
 
+fn component_ids(screen: &vauchi_app::ui::ScreenModel) -> Vec<String> {
+    screen
+        .components
+        .iter()
+        .filter_map(|c| match c {
+            Component::TextInput { id, .. }
+            | Component::ToggleList { id, .. }
+            | Component::List { id, .. } => Some(id.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+// On a 1920 px phone the three facet toggles filled the first screen, so
+// the first contact sat below the fold and the tab looked empty (#698).
+// @internal
+#[test]
+fn the_list_follows_the_search_field() {
+    let engine = ContactListEngine::new(vec![item("a", "Alice")]);
+
+    let screen = engine.current_screen();
+
+    let ids = component_ids(&screen);
+    let search = ids
+        .iter()
+        .position(|id| id == "contact_search")
+        .expect("search field");
+    assert_eq!(
+        ids.get(search + 1).map(String::as_str),
+        Some("contacts"),
+        "{ids:?}"
+    );
+    assert_eq!(
+        facet_items(&screen).len(),
+        3,
+        "the facets stay on screen, below the list"
+    );
+}
+
 // @internal
 #[test]
 fn renders_search_facets_toggle_default_off() {

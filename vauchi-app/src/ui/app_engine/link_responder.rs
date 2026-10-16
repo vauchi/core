@@ -2,21 +2,17 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Link-mode responder lifecycle on `AppEngine` (slice 32l Phase 2).
+//! Link-mode responder lifecycle on `AppEngine`.
 //!
-//! The `AppEngine` owns the pure-core `LinkResponderSession` state
-//! machine while the active screen is `AppScreen::DeepLinkResponder`,
-//! replacing the retired `vauchi-platform` cycle-thread wrapper. The
-//! machine is built on entry (its `RelayEscrowDeposit`/`Check` commands
-//! flow out through the `pending_commands` queue), driven by
-//! `RelayEscrow*` hardware events via `handle_hardware_event` (follow-up
-//! commands surface as `ActionResult::Commands`), and dropped on exit.
-//! On `Finalized` core completes the exchange via
-//! `complete_link_exchange` (ADR-050 T5b) — a v2 bootstrap establishes a
-//! live, updatable `Exchanged` Link contact + Double Ratchet, a v1 peer
-//! falls back to a frozen `import_received_link_card`; on `Failed` it
-//! renders `link_responder_failed`. Frontends pull no session object and
-//! own no workflow logic (ADR-021/043 Humble UI; ADR-031 command/event).
+//! While the active screen is `AppScreen::DeepLinkResponder` (a link whose
+//! consent was granted), the engine holds a Core
+//! [`LinkExchange`](vauchi_core::api::LinkExchange) accepted with
+//! `Vauchi::accept_link_exchange_payload` and advances it on each heartbeat
+//! with `Vauchi::advance_link_exchange`, which runs the relay escrow and
+//! completes the contact (ADR-049, ADR-050 T5b). The engine only maps the
+//! outcome to `link_responder_completed` or `link_responder_failed`. The
+//! same API serves the CLI, so the ceremony's loop exists once, in Core
+//! (private#670). Frontends own no workflow logic (ADR-021/043, ADR-031).
 //!
 //! Design: `_private/docs/designs/2026-05-25-slice-32l-phase-2-responder-screen-driven-design.md`.
 
@@ -24,38 +20,7 @@ use super::{AppEngine, AppScreen};
 use crate::ui::ActionResult;
 use crate::ui::ScreenModel;
 
-#[cfg(all(feature = "network-http", feature = "storage"))]
-use vauchi_core::Command;
 use vauchi_core::Event;
-use vauchi_core::contact_card::ContactCard;
-use vauchi_core::exchange::X3DHKeyPair;
-use vauchi_core::exchange::link_mode::{
-    DeepLinkPayload, responder_respond_with_card_bytes, serialize_card_payload_v2,
-};
-use vauchi_core::exchange::link_responder::{
-    LinkResponderFailureReason, LinkResponderSession, LinkResponderState,
-};
-use vauchi_core::{VauchiError, exchange::ExchangeError};
-
-/// Map a completion failure to the stable `LinkResponder` failure id.
-///
-/// Everything reaching here happened *after* a successful AEAD decrypt, so
-/// none of it is a decryption failure. The two deterministic cases get
-/// their own id because "please try again" is wrong advice for both — no
-/// retry resolves exchanging with yourself or a full contact list.
-pub(super) fn link_completion_failure_id(error: &VauchiError) -> String {
-    match error {
-        VauchiError::Exchange(ExchangeError::SelfExchange) => "self_exchange",
-        VauchiError::ContactLimitReached(_) => "contact_limit",
-        _ => "completion_failed",
-    }
-    .to_string()
-}
-
-/// Responder polling budget — mirrors the ADR-035 device-link window
-/// (300 s). After this many seconds without a `RelayEscrowReady`, a
-/// `tick` transitions the machine to `Failed(PollingTimedOut)`.
-const RESPONDER_POLL_DEADLINE_SECS: u64 = 300;
 
 impl AppEngine {
     /// Terminal success — the sender's card was retrieved and persisted.
@@ -86,274 +51,99 @@ impl AppEngine {
             .then(|| self.engine.current_screen())
     }
 
-    /// Build / drop the engine-owned responder machine as navigation
-    /// enters or leaves `AppScreen::DeepLinkResponder`. Called from
-    /// `navigate_to_internal` after the screen-presentation lifecycle
-    /// hooks. On entry the responder machine is built (ADR-049); its
-    /// initial escrow commands stay *in the machine* for the core poll
-    /// (`advance_link_responder_session`) to drive — they are no longer
-    /// pushed onto the frontend `pending_commands` queue.
+    /// Accept / drop the responder exchange as navigation enters or leaves
+    /// `AppScreen::DeepLinkResponder`. Called from `navigate_to_internal`.
     pub(super) fn sync_link_responder_lifecycle(&mut self, old: &AppScreen, new: &AppScreen) {
         let was = matches!(old, AppScreen::DeepLinkResponder { .. });
         let is = matches!(new, AppScreen::DeepLinkResponder { .. });
+        #[cfg(all(feature = "network-http", feature = "storage"))]
         match (was, is) {
-            (true, false) => {
-                self.link_responder = None;
-                self.link_responder_x3dh = None;
-            }
+            (true, false) => self.link_responder = None,
             (false, true) => {
                 if let AppScreen::DeepLinkResponder { payload } = new {
-                    let payload = payload.clone();
-                    self.build_link_responder(&payload);
+                    // No identity or a key-derive failure leaves the screen
+                    // on its waiting state; both are rare and non-fatal here.
+                    self.link_responder = self.vauchi.accept_link_exchange_payload(payload).ok();
+                    self.reschedule_wakeup_for_new_session();
                 }
             }
             _ => {}
         }
+        #[cfg(not(all(feature = "network-http", feature = "storage")))]
+        let _ = (was, is);
     }
 
-    /// Construct the responder machine for `payload` and store it
-    /// (ADR-049). The machine's initial `RelayEscrowDeposit + RelayEscrowCheck`
-    /// commands stay queued *in the machine* so the core poll
-    /// (`advance_link_responder_session`) drains and executes them over the
-    /// relay — they are no longer surfaced to the frontend `pending_commands`
-    /// queue, which no frontend ever executed (the gap this ADR closes).
-    /// No-op (leaving the screen on its waiting state) if no identity exists
-    /// or the ECDH / key-derive fails — both rare and non-fatal here.
-    fn build_link_responder(&mut self, payload: &DeepLinkPayload) {
-        // Fresh per-exchange X3DH keypair: its public half is signed into the
-        // v2 bootstrap; its secret completes the exchange on `Finalized`.
-        let x3dh = X3DHKeyPair::generate();
-        let card_bytes = match self.build_link_card_bytes_v2(x3dh.public_key()) {
-            Some(bytes) => bytes,
-            None => return,
-        };
-        let (keys, deposits) =
-            match responder_respond_with_card_bytes(payload.as_parsed(), &card_bytes) {
-                Ok(parts) => parts,
-                Err(_) => return,
-            };
-        let deadline = self.vauchi.clock().unix_seconds() + RESPONDER_POLL_DEADLINE_SECS;
-        self.link_responder = Some(LinkResponderSession::new(keys, deposits, deadline));
-        self.link_responder_x3dh = Some(x3dh);
-        self.reschedule_wakeup_for_new_session();
-    }
-
-    /// Build the v2 symmetric-exchange bootstrap (ADR-050) we deposit: our
-    /// card + identity signature over `x3dh_pubkey` and our relay routing, so
-    /// the peer can verify it and establish a live update channel. Shared by
-    /// both link builders. `None` if no identity / card read fails (rare,
-    /// non-fatal — the caller leaves the screen on its waiting state).
-    pub(super) fn build_link_card_bytes_v2(&self, x3dh_pubkey: &[u8; 32]) -> Option<Vec<u8>> {
-        let identity = self.vauchi.identity()?;
-        let identity_pubkey = *identity.signing_public_key();
-        let display_name = identity.display_name().to_string();
-        let card = match self.vauchi.own_card() {
-            Ok(Some(card)) => card,
-            Ok(None) => ContactCard::new(&display_name),
-            Err(_) => return None,
-        };
-        Some(serialize_card_payload_v2(
-            &identity_pubkey,
-            identity.signing_keypair(),
-            x3dh_pubkey,
-            self.vauchi.relay_server_url(),
-            &card,
-        ))
-    }
-
-    /// Feed a `RelayEscrow*` hardware event to the engine-owned responder
-    /// machine and reconcile the screen with its new state. Returns
-    /// `ActionResult::Commands` for the follow-up `RelayEscrowRetrieve`
-    /// while still polling/retrieving, and `None` once a terminal screen
-    /// has been rendered. A no-op (returns `None`) off the responder
-    /// screen, for non-`RelayEscrow*` events, or when no machine is live —
-    /// so the caller can pass every hardware event through unconditionally.
+    /// Hand a relay hardware event to the responder exchange and reconcile
+    /// the screen. A no-op off the responder screen, for unrelated events,
+    /// or with no live exchange. Core runs any follow-up relay step itself.
     pub(super) fn route_link_responder_hardware_event(
         &mut self,
         event: &Event,
     ) -> Option<ActionResult> {
-        if !matches!(self.screen, AppScreen::DeepLinkResponder { .. }) {
-            return None;
-        }
-        if !matches!(
-            event,
-            Event::RelayEscrowReady { .. }
-                | Event::RelayEscrowFailed { .. }
-                | Event::RelayEscrowBlobReceived { .. }
-        ) {
-            return None;
-        }
-        let (state, new_commands) = {
-            let machine = self.link_responder.as_mut()?;
-            machine.apply_hardware_event(event.clone());
-            (
-                machine.current_state().clone(),
-                machine.drain_pending_commands(),
+        if !matches!(self.screen, AppScreen::DeepLinkResponder { .. })
+            || !matches!(
+                event,
+                Event::RelayEscrowReady { .. }
+                    | Event::RelayEscrowFailed { .. }
+                    | Event::RelayEscrowBlobReceived { .. }
             )
-        };
-        self.present_link_responder_state(state, new_commands)
-    }
-
-    /// Reconcile the screen with the machine's state: terminal states
-    /// render their outcome and drop the machine; live states hand back
-    /// the follow-up relay commands, if any.
-    fn present_link_responder_state(
-        &mut self,
-        state: LinkResponderState,
-        new_commands: Vec<vauchi_core::Command>,
-    ) -> Option<ActionResult> {
-        match state {
-            LinkResponderState::Finalized { card_bytes } => {
-                let completed = match self.link_responder_x3dh.as_ref() {
-                    Some(x3dh) => self.complete_link_card_bytes(&card_bytes, x3dh),
-                    // The key is stored with the session, so a finalized
-                    // session without one is a broken state, not a v1 peer (#574).
-                    None => Err(VauchiError::Exchange(ExchangeError::InvalidState(
-                        "link session has no exchange key".into(),
-                    ))),
-                };
-                match completed {
-                    Ok(contact_id) => {
-                        self.link_responder_completed(&contact_id);
-                    }
-                    Err(e) => {
-                        self.link_responder_failed(link_completion_failure_id(&e));
-                    }
-                }
-                self.link_responder = None;
-                self.link_responder_x3dh = None;
-                None
-            }
-            LinkResponderState::Failed(reason) => {
-                self.link_responder_failed(link_responder_failure_id(&reason));
-                self.link_responder = None;
-                None
-            }
-            LinkResponderState::Polling | LinkResponderState::Retrieving => {
-                if new_commands.is_empty() {
-                    None
-                } else {
-                    Some(ActionResult::Commands {
-                        commands: new_commands,
-                    })
-                }
-            }
+        {
+            return None;
         }
+        #[cfg(all(feature = "network-http", feature = "storage"))]
+        {
+            let mut exchange = self.link_responder.take()?;
+            let progress = self
+                .vauchi
+                .feed_link_exchange_event(&mut exchange, event.clone())
+                .ok()?;
+            self.present_link_responder(exchange, progress);
+        }
+        None
     }
 
-    /// Complete a link exchange from the peer's finalized payload using the
-    /// retained X3DH secret (ADR-050 T5b): a v2 bootstrap yields a live,
-    /// updatable `Exchanged` contact + Double Ratchet; a v1 payload is
-    /// refused. The frontend
-    /// never sees the bytes. Shared by both link finalize paths.
-    /// Returns the persisted contact id (for building the success summary).
-    pub(super) fn complete_link_card_bytes(
-        &self,
-        card_bytes: &[u8],
-        our_x3dh: &X3DHKeyPair,
-    ) -> Result<String, VauchiError> {
-        self.vauchi.complete_link_exchange(card_bytes, our_x3dh)
-    }
-
-    /// Advance the engine-owned link responder one relay step (ADR-049).
-    ///
-    /// Called each `poll_notifications` tick (a no-op off the responder
-    /// screen / with no live machine). Core — not the frontend — now
-    /// drives the escrow round-trip: it executes the machine's queued
-    /// deposit/retrieve commands via `Vauchi::run_escrow_command` and
-    /// feeds the resulting `RelayEscrow*` events back through
-    /// `route_link_responder_hardware_event`. Because the machine queues a
-    /// gate `Check` only once, while it is still `Polling` we re-issue one
-    /// per tick to detect both escrow slots filling; a `Ready` then drives
-    /// the queued `Retrieve` in the same tick so an already-deposited peer
-    /// completes immediately. Finally `tick` enforces the polling
-    /// deadline. Returns `true` if any machine event was applied.
+    /// Advance the responder exchange one relay step (ADR-049). Called each
+    /// `poll_notifications` tick; a no-op off the responder screen. Returns
+    /// `true` once the exchange has ended.
     #[cfg(all(feature = "network-http", feature = "storage"))]
     pub(crate) fn advance_link_responder_session(&mut self) -> bool {
         if !matches!(self.screen, AppScreen::DeepLinkResponder { .. }) {
             return false;
         }
-        let now = self.vauchi.clock().unix_seconds();
-        let mut advanced = false;
-
-        // 1. Execute whatever the machine has queued (initial deposits +
-        //    its one Check on entry). Each event may cascade into follow-up
-        //    commands (Ready → Retrieve → Finalized) handled by the helper.
-        let queued = match self.link_responder.as_mut() {
-            Some(machine) => machine.drain_pending_commands(),
-            None => return false,
-        };
-        for command in queued {
-            advanced |= self.run_and_feed_escrow_command(&command);
-        }
-
-        // 2. Active gate poll while still waiting (the machine queues a
-        //    Check only on entry; re-issue one per tick until the gate
-        //    fills). A Ready here cascades into the Retrieve.
-        let polling_gate = self.link_responder.as_ref().and_then(|machine| {
-            matches!(machine.current_state(), LinkResponderState::Polling)
-                .then(|| machine.gate_hash_bytes())
-        });
-        if let Some(gate_hash) = polling_gate {
-            let check = Command::RelayEscrowCheck {
-                gate_hash,
-                suggested_interval_ms: 0,
-            };
-            advanced |= self.run_and_feed_escrow_command(&check);
-        }
-
-        // 3. Enforce the polling deadline (Failed(PollingTimedOut)) and show
-        //    it: the deadline is the one transition no relay event announces.
-        let timed_out = self.link_responder.as_mut().is_some_and(|machine| {
-            machine.tick(now);
-            matches!(machine.current_state(), LinkResponderState::Failed(_))
-        });
-        if timed_out {
-            let state = self
-                .link_responder
-                .as_ref()
-                .map(|m| m.current_state().clone());
-            if let Some(state) = state {
-                self.present_link_responder_state(state, Vec::new());
-                advanced = true;
-            }
-        }
-        advanced
-    }
-
-    /// Execute one escrow command over the relay, feed the resulting
-    /// `RelayEscrow*` event into the responder machine, and recursively run
-    /// any follow-up commands the machine queues in response (e.g. the
-    /// `Retrieve` it emits on `Ready`).
-    /// `route_link_responder_hardware_event` drains those follow-ups and
-    /// returns them as `ActionResult::Commands` — under ADR-049 core runs
-    /// them itself instead of handing them to a frontend. Returns `true` if
-    /// an event applied. Recursion is bounded by the machine's terminal
-    /// states (`Finalized` / `Failed` drain nothing).
-    #[cfg(all(feature = "network-http", feature = "storage"))]
-    fn run_and_feed_escrow_command(&mut self, command: &Command) -> bool {
-        let Some(event) = self.vauchi.run_escrow_command(command) else {
+        let Some(mut exchange) = self.link_responder.take() else {
             return false;
         };
-        if let Some(ActionResult::Commands { commands }) =
-            self.route_link_responder_hardware_event(&event)
-        {
-            for command in commands {
-                self.run_and_feed_escrow_command(&command);
+        match self.vauchi.advance_link_exchange(&mut exchange) {
+            Ok(progress) => self.present_link_responder(exchange, progress),
+            Err(_) => {
+                self.link_responder = Some(exchange);
+                false
             }
         }
-        true
     }
-}
 
-/// Map a `LinkResponderFailureReason` to the stable failure id the
-/// `LinkResponderEngine` renderer keys its message off of.
-fn link_responder_failure_id(reason: &LinkResponderFailureReason) -> String {
-    match reason {
-        LinkResponderFailureReason::PollingTimedOut => "polling_timed_out",
-        LinkResponderFailureReason::DepositRejected => "deposit_rejected",
-        LinkResponderFailureReason::DecryptError { .. } => "decrypt_error",
-        LinkResponderFailureReason::Cancelled => "cancelled",
+    /// Success and failure end the exchange and show their screen; while
+    /// waiting the screen stays as it is.
+    #[cfg(all(feature = "network-http", feature = "storage"))]
+    fn present_link_responder(
+        &mut self,
+        exchange: vauchi_core::api::LinkExchange,
+        progress: vauchi_core::api::LinkExchangeProgress,
+    ) -> bool {
+        use vauchi_core::api::LinkExchangeProgress;
+        match progress {
+            LinkExchangeProgress::Completed { contact_id } => {
+                self.link_responder_completed(&contact_id);
+                true
+            }
+            LinkExchangeProgress::Failed { reason } => {
+                self.link_responder_failed(reason);
+                true
+            }
+            LinkExchangeProgress::Waiting => {
+                self.link_responder = Some(exchange);
+                false
+            }
+        }
     }
-    .to_string()
 }

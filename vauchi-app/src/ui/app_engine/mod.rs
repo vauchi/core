@@ -183,17 +183,14 @@ pub struct AppEngine {
     /// contact id is derived from the peer's key, so both look identical.
     /// Read by `build_exchange_summary` for the terminal screen's wording.
     exchange_was_reconnection: bool,
-    /// Engine-owned link-mode responder machine (slice 32l Phase 2), live
-    /// only on `AppScreen::DeepLinkResponder`. See `app_engine/link_responder.rs`.
-    link_responder: Option<vauchi_core::exchange::link_responder::LinkResponderSession>,
-    /// Per-exchange X3DH keypair retained for the responder — signed into
-    /// the v2 bootstrap, completes the exchange (ADR-050 T5b).
-    link_responder_x3dh: Option<vauchi_core::exchange::X3DHKeyPair>,
-    /// Engine-owned link-mode **initiator** machine (slice 32l Phase 3), live
-    /// only on `AppScreen::LinkExchange`. See `app_engine/link_exchange.rs`.
-    link_initiator: Option<vauchi_core::exchange::link_initiator::LinkInitiatorSession>,
-    /// The initiator half of `link_responder_x3dh` (ADR-050 T5b).
-    link_initiator_x3dh: Option<vauchi_core::exchange::X3DHKeyPair>,
+    /// Engine-owned link-mode responder exchange, live only on
+    /// `AppScreen::DeepLinkResponder`. See `app_engine/link_responder.rs`.
+    #[cfg(all(feature = "network-http", feature = "storage"))]
+    link_responder: Option<vauchi_core::api::LinkExchange>,
+    /// Engine-owned link-mode **initiator** exchange, live only on
+    /// `AppScreen::LinkExchange`. See `app_engine/link_exchange.rs`.
+    #[cfg(all(feature = "network-http", feature = "storage"))]
+    link_initiator: Option<vauchi_core::api::LinkExchange>,
     /// Engine-owned device-link **initiator** machine (slice 32l T3.1b), live
     /// only on `AppScreen::DeviceLinking`. See `app_engine/device_link_initiator.rs`.
     #[cfg(all(feature = "network-http", feature = "storage"))]
@@ -546,10 +543,10 @@ impl AppEngine {
             pending_location_contact: None,
             legacy_exchange_persisted: None,
             exchange_was_reconnection: false,
+            #[cfg(all(feature = "network-http", feature = "storage"))]
             link_responder: None,
-            link_responder_x3dh: None,
+            #[cfg(all(feature = "network-http", feature = "storage"))]
             link_initiator: None,
-            link_initiator_x3dh: None,
             #[cfg(all(feature = "network-http", feature = "storage"))]
             device_link_initiator: None,
             device_link_pin_failures: 0,
@@ -941,21 +938,14 @@ impl AppEngine {
     /// the deep-link screen) is still waiting on the relay. Terminal machines
     /// are dropped by their advance, so "held" means "live".
     pub fn link_session_active(&self) -> bool {
-        use vauchi_core::exchange::link_initiator::LinkInitiatorState;
-        use vauchi_core::exchange::link_responder::LinkResponderState;
-        let initiator_live = self.link_initiator.as_ref().is_some_and(|machine| {
-            matches!(
-                machine.current_state(),
-                LinkInitiatorState::Polling | LinkInitiatorState::Retrieving
-            )
-        });
-        let responder_live = self.link_responder.as_ref().is_some_and(|machine| {
-            matches!(
-                machine.current_state(),
-                LinkResponderState::Polling | LinkResponderState::Retrieving
-            )
-        });
-        initiator_live || responder_live
+        #[cfg(all(feature = "network-http", feature = "storage"))]
+        {
+            [&self.link_initiator, &self.link_responder]
+                .iter()
+                .any(|exchange| exchange.as_ref().is_some_and(|e| e.is_live()))
+        }
+        #[cfg(not(all(feature = "network-http", feature = "storage")))]
+        false
     }
 
     /// Convert `ValidationError` into `UpdateScreen` with the error injected

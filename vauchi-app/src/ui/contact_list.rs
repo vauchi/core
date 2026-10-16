@@ -396,7 +396,6 @@ impl WorkflowEngine for ContactListEngine {
             };
             let mut components = vec![
                 self.search_input(),
-                self.search_facets_toggle(),
                 Component::List {
                     id: "contacts".into(),
                     items: window_items.iter().map(|&i| i.clone()).collect(),
@@ -409,6 +408,11 @@ impl WorkflowEngine for ContactListEngine {
             if let Some(rows) = self.window_rows(total_count, offset) {
                 components.push(rows);
             }
+            // After the list: above it they filled the first screen of a
+            // small phone and hid every contact (#698). They stay whatever
+            // the query, since a typed query must not change the surface's
+            // bindings (that would close the keyboard mid-typing).
+            components.push(self.search_facets_toggle());
             components
         };
 

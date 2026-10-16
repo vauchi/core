@@ -78,8 +78,8 @@ pub enum LinkResponderState {
 pub struct LinkResponderSession {
     state: LinkResponderState,
     keys: EscrowKeys,
-    /// Unix-seconds deadline for the polling phase. Once reached
-    /// without `RelayEscrowReady`, transitions to
+    /// Unix-seconds deadline for the whole exchange. Once reached before
+    /// the card arrives (polling or retrieving), transitions to
     /// `Failed(PollingTimedOut)`. Unix-secs (not `Instant`) so the
     /// deadline is injectable from the engine's `Clock` seam and
     /// deterministic in tests (slice 32l Phase 2 R1).
@@ -197,8 +197,9 @@ impl LinkResponderSession {
         if self.is_terminal() {
             return;
         }
-        if now_unix >= self.poll_deadline_unix && matches!(self.state, LinkResponderState::Polling)
-        {
+        // Retrieving too: a retrieve that never answers would otherwise
+        // hold the responder forever (vauchi/private#697).
+        if now_unix >= self.poll_deadline_unix {
             self.fail(LinkResponderFailureReason::PollingTimedOut);
         }
     }

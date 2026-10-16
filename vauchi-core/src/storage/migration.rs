@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 82] = [
+const MIGRATIONS: [Migration; 83] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -682,7 +682,22 @@ const MIGRATIONS: [Migration; 82] = [
         name: "registry_activation_repush_allowed",
         action: MigrationAction::Sql(MIGRATION_V82_REGISTRY_ACTIVATION_REPUSH_ALLOWED),
     },
+    Migration {
+        version: 83,
+        name: "ohttp_delay_window",
+        action: MigrationAction::Sql(MIGRATION_V83_OHTTP_DELAY_WINDOW),
+    },
 ];
+
+/// Migration v83: the delay window each outer relay advertises (#628 D-F6
+/// amendment). Kept so a restarted process fetches through the delayed path
+/// from its first sync instead of learning it again over a synchronous fetch.
+const MIGRATION_V83_OHTTP_DELAY_WINDOW: &str = "
+    CREATE TABLE IF NOT EXISTS ohttp_delay_window (
+        relay_url TEXT PRIMARY KEY,
+        seconds INTEGER NOT NULL
+    );
+";
 
 /// Migration v82: an unacked registry push is re-sent only after hearing
 /// from the contact (vauchi/private#662). Existing rows may re-push once.

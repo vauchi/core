@@ -101,7 +101,10 @@ use super::transport::ProxyConfig;
 
 mod delayed;
 pub(crate) use delayed::PendingFetch;
-pub use delayed::{Collected, DelayedRequests, MAX_PENDING_POLLS, PendingOhttp};
+pub use delayed::{
+    Collected, DelayWindowAdvert, DelayedRequests, MAX_PENDING_POLLS, PendingOhttp,
+    parse_delay_window,
+};
 
 /// Configuration for the HTTP transport.
 #[derive(Debug, Clone)]
@@ -180,6 +183,8 @@ pub struct HttpTransport {
     /// across the round-trip, so concurrent requests still proceed.
     ohttp: RwLock<Option<OhttpClient>>,
     last_version_policy: Mutex<Option<VersionPolicy>>,
+    /// The outer relay's delayed-path advertisement (#628 D-F6 amendment).
+    delay_window_advert: Mutex<Option<delayed::DelayWindowAdvert>>,
     /// Count of `post_action` calls that took the direct-HTTP branch
     /// because OHTTP was not configured. Every tick represents one
     /// request where the relay saw the client's source IP — a privacy
@@ -212,6 +217,7 @@ impl HttpTransport {
             agent,
             ohttp: RwLock::new(None),
             last_version_policy: Mutex::new(None),
+            delay_window_advert: Mutex::new(None),
             direct_fallback_count: AtomicU64::new(0),
             signed: Mutex::new(None),
         }
@@ -947,6 +953,7 @@ impl HttpTransport {
             .content_type("message/ohttp-req")
             .send(encrypted)
             .map_err(Self::map_ureq_error)?;
+        self.note_delay_window(&resp);
         let policy = self.check_response_status(&resp)?;
         if let (Some(p), Ok(mut stored)) = (policy, self.last_version_policy.lock()) {
             *stored = Some(p);

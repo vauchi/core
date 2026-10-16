@@ -11,15 +11,14 @@ use std::time::Duration;
 
 use super::{Vauchi, VauchiSyncOutcome};
 use crate::api::error::VauchiResult;
+use crate::network::DelayWindowAdvert;
 
 /// Shortest pause between collects, so a zero interval cannot spin.
 const MIN_POLL: Duration = Duration::from_millis(100);
 
 impl Vauchi {
-    /// Syncs, then, when fetches go through the delayed path
-    /// (`RelayConfig::ohttp_delayed`), keeps syncing every `poll` until the
-    /// outer relay's delay window (`RelayConfig::ohttp_delay_window`) has
-    /// passed and a fetch answer has been collected, or `max_wait` of pauses
+    /// Syncs, then, when fetches go through the delayed path, keeps syncing
+    /// every `poll` until the outer relay's delay window has passed and a fetch answer has been collected, or `max_wait` of pauses
     /// has passed. A lost answer is posted again and waited for. Counts are
     /// summed over the cycles. Without delayed mode this is [`Self::sync`].
     ///
@@ -34,12 +33,14 @@ impl Vauchi {
     ) -> VauchiResult<VauchiSyncOutcome> {
         let answered_before = self.answered_delayed_fetches();
         let mut outcome = self.sync()?;
-        if !self.config.relay.ohttp_delayed || !matches!(outcome, VauchiSyncOutcome::Ok { .. }) {
+        let Some(window) = self.delayed_window() else {
+            return Ok(outcome);
+        };
+        if !matches!(outcome, VauchiSyncOutcome::Ok { .. }) {
             return Ok(outcome);
         }
         let poll = poll.max(MIN_POLL);
         let mut waited = Duration::ZERO;
-        let window = self.config.relay.ohttp_delay_window;
         while (waited < window || self.answered_delayed_fetches() == answered_before)
             && waited < max_wait
         {
@@ -50,6 +51,37 @@ impl Vauchi {
             outcome = summed(outcome, next);
         }
         Ok(outcome)
+    }
+
+    /// The window of the delayed path when fetches take it: the one the
+    /// outer relay advertised (D-F6 amendment 2026-10-16), else the
+    /// configured one when `RelayConfig::ohttp_delayed` forces the path on.
+    pub(super) fn delayed_window(&self) -> Option<Duration> {
+        let advertised = self
+            .storage
+            .ohttp_cache()
+            .load_delay_window(&self.config.relay.ohttp_endpoint())
+            .ok()
+            .flatten();
+        advertised.or_else(|| {
+            self.config
+                .relay
+                .ohttp_delayed
+                .then_some(self.config.relay.ohttp_delay_window)
+        })
+    }
+
+    /// Keeps or forgets the outer relay's window as its last answer said.
+    pub(super) fn keep_delay_window_advert(&self, advert: Option<DelayWindowAdvert>) {
+        let relay = self.config.relay.ohttp_endpoint();
+        let cache = self.storage.ohttp_cache();
+        // Best-effort: a failed write only defers the switch to a later sync.
+        #[allow(clippy::let_underscore_must_use)]
+        let _ = match advert {
+            Some(DelayWindowAdvert::Advertised(window)) => cache.save_delay_window(&relay, window),
+            Some(DelayWindowAdvert::Withdrawn) => cache.clear_delay_window(&relay),
+            None => Ok(()),
+        };
     }
 
     fn answered_delayed_fetches(&self) -> u64 {

@@ -63,6 +63,49 @@ impl OhttpCacheStore<'_> {
             Err(e) => Err(StorageError::Database(e)),
         }
     }
+    /// Keep `window` as the delay window `relay_url` advertises (#628).
+    pub fn save_delay_window(
+        &self,
+        relay_url: &str,
+        window: std::time::Duration,
+    ) -> Result<(), StorageError> {
+        let seconds = i64::try_from(window.as_secs())
+            .map_err(|_| StorageError::Serialization("delay window out of range".into()))?;
+        self.conn.execute(
+            "INSERT OR REPLACE INTO ohttp_delay_window (relay_url, seconds) VALUES (?1, ?2)",
+            params![relay_url, seconds],
+        )?;
+        Ok(())
+    }
+
+    /// The delay window `relay_url` last advertised, if it still does.
+    pub fn load_delay_window(
+        &self,
+        relay_url: &str,
+    ) -> Result<Option<std::time::Duration>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT seconds FROM ohttp_delay_window WHERE relay_url = ?1",
+            params![relay_url],
+            |row| row.get::<_, i64>(0),
+        );
+        match result {
+            Ok(seconds) => Ok(u64::try_from(seconds)
+                .ok()
+                .map(std::time::Duration::from_secs)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
+    /// Forget `relay_url`'s delay window: it stopped advertising one.
+    pub fn clear_delay_window(&self, relay_url: &str) -> Result<(), StorageError> {
+        self.conn.execute(
+            "DELETE FROM ohttp_delay_window WHERE relay_url = ?1",
+            params![relay_url],
+        )?;
+        Ok(())
+    }
+
     /// Keep `held` as the signed key for `relay_url` (#288), replacing the
     /// one held before.
     #[cfg(feature = "network-rustls")]

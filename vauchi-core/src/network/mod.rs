@@ -132,7 +132,8 @@ pub use pinning::{PinnedCertificate, verify_pin};
 
 #[cfg(feature = "network-http")]
 pub use http_transport::{
-    Collected, DelayedRequests, HttpTransport, HttpTransportConfig, PendingOhttp,
+    Collected, DelayWindowAdvert, DelayedRequests, HttpTransport, HttpTransportConfig,
+    PendingOhttp, parse_delay_window,
 };
 #[cfg(feature = "network-http")]
 pub use vauchi_protocol::v2::FetchedBlob;

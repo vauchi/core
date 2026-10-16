@@ -16,6 +16,7 @@
 //! peeks and an acknowledgement converges like any duplicate.
 
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use serde::Serialize;
 use vauchi_protocol::v2::{FetchedBlob, V2AckRequest, V2FetchRequest, V2Response};
@@ -27,6 +28,35 @@ use crate::version::APP_COMPAT_VERSION;
 
 /// Header carrying the ticket of an asynchronous request.
 const TICKET_HEADER: &str = "vauchi-ticket";
+
+/// Header in which the outer relay advertises its delayed path and its
+/// delay window W (design D-F6, amended 2026-10-16: no relay directory yet).
+const DELAY_WINDOW_HEADER: &str = "vauchi-ohttp-delay-window";
+
+/// The longest window a client accepts; a relay advertising more is treated
+/// as not advertising, so it cannot make a waiting sync hang on.
+const MAX_DELAY_WINDOW_SECS: u64 = 3600;
+
+/// What the outer relay last said about its delayed path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DelayWindowAdvert {
+    /// It forwards delayed requests within this window.
+    Advertised(Duration),
+    /// An answer without a valid window, or a refused delayed post.
+    Withdrawn,
+}
+
+/// W from the header's value: decimal seconds from 1 to 3600, nothing else
+/// (the header is unauthenticated input, DC-01).
+pub fn parse_delay_window(value: &str) -> Option<Duration> {
+    if value.is_empty() || value.len() > 4 || !value.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let seconds: u64 = value.parse().ok()?;
+    (1..=MAX_DELAY_WINDOW_SECS)
+        .contains(&seconds)
+        .then(|| Duration::from_secs(seconds))
+}
 
 /// Polls after which a ticket that is still pending counts as lost. The
 /// outer relay drops an answer 2W after forwarding (3W after the post, at
@@ -95,6 +125,33 @@ impl DelayedRequests {
 }
 
 impl HttpTransport {
+    /// What the outer relay last said about its delayed path, if any of its
+    /// answers has been seen.
+    pub fn delay_window_advert(&self) -> Option<DelayWindowAdvert> {
+        *self
+            .delay_window_advert
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    /// Notes the window a synchronous OHTTP answer advertises, or its absence.
+    pub(super) fn note_delay_window<B>(&self, resp: &ureq::http::Response<B>) {
+        let advert = resp
+            .headers()
+            .get(DELAY_WINDOW_HEADER)
+            .and_then(|value| value.to_str().ok())
+            .and_then(parse_delay_window)
+            .map_or(DelayWindowAdvert::Withdrawn, DelayWindowAdvert::Advertised);
+        self.record_delay_window(advert);
+    }
+
+    fn record_delay_window(&self, advert: DelayWindowAdvert) {
+        *self
+            .delay_window_advert
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(advert);
+    }
+
     /// Posts a fetch for `mailbox_tokens`; its blobs arrive on a later
     /// [`Self::collect_delayed_fetch`].
     pub fn post_delayed_fetch(
@@ -178,6 +235,9 @@ impl HttpTransport {
             .content_type("message/ohttp-req")
             .send(encrypted)
             .map_err(Self::map_ureq_error)?;
+        if resp.status().as_u16() == 404 {
+            self.record_delay_window(DelayWindowAdvert::Withdrawn);
+        }
         self.check_response_status(&resp)?;
         Ok(PendingOhttp {
             ticket,

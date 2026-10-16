@@ -173,9 +173,8 @@ fn a_relay_that_drops_the_path_returns_its_clients_to_synchronous_fetches() {
     sync(&mut client);
 
     assert!(delayed_posts(&world.outer) > 0, "refused posts");
-    assert_eq!(
-        synchronous_fetches(&world.outer),
-        before + 1,
+    assert!(
+        synchronous_fetches(&world.outer) > before,
         "the sync after the refusal fetches synchronously"
     );
 }

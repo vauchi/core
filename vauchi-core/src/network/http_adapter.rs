@@ -150,6 +150,11 @@ impl HttpTransportAdapter {
         self.http.last_version_policy()
     }
 
+    /// What the outer relay last said about its delayed path (#628).
+    pub fn delay_window_advert(&self) -> Option<super::DelayWindowAdvert> {
+        self.http.delay_window_advert()
+    }
+
     /// Set the OHTTP client for encrypted requests.
     pub fn set_ohttp(&mut self, client: OhttpClient) {
         self.http.set_ohttp(client);

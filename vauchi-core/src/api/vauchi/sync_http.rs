@@ -136,7 +136,7 @@ impl Vauchi {
             &self.config.relay.server_url,
             self.config.relay.connect_timeout_ms,
         ));
-        if self.config.relay.ohttp_delayed {
+        if self.delayed_window().is_some() {
             adapter = adapter.with_delayed(self.delayed_ohttp.clone());
         }
 
@@ -145,8 +145,12 @@ impl Vauchi {
             .connect(&TransportConfig::default())
             .map_err(VauchiError::Network)?;
 
-        let (received, fetched, rejected, unresolved, reject_reasons) =
-            self.run_receive_phase(identity, &contacts, &mut adapter)?;
+        // Kept even when the phase fails: a refused delayed post fails it,
+        // and only the withdrawal it records returns fetches to the
+        // synchronous path.
+        let receive = self.run_receive_phase(identity, &contacts, &mut adapter);
+        self.keep_delay_window_advert(adapter.delay_window_advert());
+        let (received, fetched, rejected, unresolved, reject_reasons) = receive?;
 
         // Capture version policy from relay response headers before adapter is moved.
         let version_policy = adapter.last_version_policy();

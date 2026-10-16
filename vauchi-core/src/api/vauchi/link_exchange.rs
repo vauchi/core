@@ -54,6 +54,18 @@ pub enum LinkExchangeProgress {
     Failed { reason: String },
 }
 
+impl LinkExchange {
+    /// Still waiting on the other side or the relay.
+    pub fn is_live(&self) -> bool {
+        false
+    }
+
+    /// The other side's card is being fetched.
+    pub fn is_retrieving(&self) -> bool {
+        false
+    }
+}
+
 impl Vauchi {
     /// Start a link-mode exchange as the initiator: returns the link to send
     /// and the exchange to advance.
@@ -92,6 +104,23 @@ impl Vauchi {
             x3dh,
             finished: None,
         })
+    }
+
+    /// Accept an already parsed (and consented) exchange link.
+    pub fn accept_link_exchange_payload(
+        &self,
+        _payload: &crate::exchange::link_mode::DeepLinkPayload,
+    ) -> VauchiResult<LinkExchange> {
+        Err(VauchiError::InvalidState("not implemented".into()))
+    }
+
+    /// Feed one relay event to the exchange and report progress.
+    pub fn feed_link_exchange_event(
+        &self,
+        _exchange: &mut LinkExchange,
+        _event: Event,
+    ) -> VauchiResult<LinkExchangeProgress> {
+        Ok(LinkExchangeProgress::Waiting)
     }
 
     /// Run the exchange's pending relay steps once and report progress. Once

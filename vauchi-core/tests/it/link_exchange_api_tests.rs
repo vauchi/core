@@ -123,3 +123,59 @@ fn accepting_your_own_link_never_completes_an_exchange_with_yourself() {
     );
     assert!(alice.get_contact(&contact_id(&alice)).unwrap().is_none());
 }
+
+// AppEngine holds a consented, parsed link rather than its text.
+// @internal
+#[test]
+fn a_parsed_link_accepted_by_the_peer_completes_on_both_sides() {
+    let mock = MockRelay::start();
+    mock.enable_escrow_store();
+    let (alice, _a) = user_at(&mock, "Alice");
+    let (bob, _b) = user_at(&mock, "Bob");
+    let (link, mut alice_exchange) = alice.start_link_exchange().expect("share");
+    let payload = vauchi_core::exchange::link_mode::parse_exchange_deep_link(&link).expect("parse");
+
+    let mut bob_exchange = bob.accept_link_exchange_payload(&payload).expect("accept");
+    let progress = advance_until_done([(&alice, &mut alice_exchange), (&bob, &mut bob_exchange)]);
+
+    assert!(
+        progress
+            .iter()
+            .all(|p| matches!(p, LinkExchangeProgress::Completed { .. })),
+        "{progress:?}"
+    );
+    assert!(!alice_exchange.is_live() && !bob_exchange.is_live());
+}
+
+// The share screen shows "waiting" until the peer's card is being retrieved.
+// @internal
+#[test]
+fn a_fresh_exchange_is_live_and_not_yet_retrieving() {
+    let mock = MockRelay::start();
+    let (alice, _a) = user_at(&mock, "Alice");
+
+    let (_link, exchange) = alice.start_link_exchange().expect("share");
+
+    assert!(exchange.is_live());
+    assert!(!exchange.is_retrieving());
+}
+
+// @internal
+#[test]
+fn an_unrelated_event_leaves_the_exchange_waiting() {
+    let mock = MockRelay::start();
+    let (alice, _a) = user_at(&mock, "Alice");
+    let (_link, mut exchange) = alice.start_link_exchange().expect("share");
+
+    let progress = alice
+        .feed_link_exchange_event(
+            &mut exchange,
+            vauchi_core::Event::RelayEscrowReady {
+                gate_hash: vec![0; 32],
+            },
+        )
+        .expect("feed");
+
+    assert_eq!(progress, LinkExchangeProgress::Waiting);
+    assert!(exchange.is_live());
+}

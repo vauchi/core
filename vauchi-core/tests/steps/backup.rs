@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use cucumber::{given, then, when};
+use vauchi_core::api::VauchiError;
 
 use crate::VauchiWorld;
 
@@ -177,13 +178,18 @@ fn backup_treated_as_v2(world: &mut VauchiWorld) {
     );
 }
 
-/// Replaces backup_data with invalid-base64 bytes so import_backup fails at decode.
-#[when("the first byte is not a known version (0x02 identity, 0x03 full)")]
+/// Keeps valid hex encoding while replacing the format byte with an unknown version.
+#[when(
+    "the first byte is not a known version (0x02 identity, 0x03 legacy full, 0x06 password snapshot)"
+)]
 fn first_byte_unknown_version(world: &mut VauchiWorld) {
-    world.backup_data = Some(b"NOT_VALID_BASE64_OR_VERSION".to_vec());
+    let encoded = world.backup_data.as_ref().expect("no backup data");
+    let mut data = hex::decode(encoded).expect("backup is valid hex");
+    data[0] = u8::MAX;
+    world.backup_data = Some(hex::encode(data).into_bytes());
 }
 
-/// Calls import_backup with the (tampered) backup_data and asserts it returns an error.
+/// Asserts the exact restore failure for the tampered format byte.
 #[then("restoration should fail with RestoreFailed")]
 fn restoration_fails(world: &mut VauchiWorld) {
     let data = world
@@ -193,10 +199,12 @@ fn restoration_fails(world: &mut VauchiWorld) {
         .expect("no backup data");
     let pw = world.pending_password.as_deref().unwrap_or(BACKUP_TEST_PW);
     let result = world.vauchi.import_backup(&data, pw);
-    assert!(
-        result.is_err(),
-        "expected RestoreFailed but import_backup succeeded"
-    );
+    match result {
+        Err(VauchiError::Configuration(message)) => {
+            assert_eq!(message, "Import failed: RestoreFailed");
+        }
+        other => panic!("expected RestoreFailed for the unknown format version, got {other:?}"),
+    }
 }
 
 // ── Restore error paths ───────────────────────────────────────────────────

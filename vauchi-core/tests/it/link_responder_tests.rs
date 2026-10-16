@@ -304,6 +304,37 @@ fn tick_past_deadline_transitions_to_failed_polling_timed_out() {
     );
 }
 
+// An accepted link whose gate already held both cards from an earlier
+// exchange moved the s7 to Retrieving, and it waited there past 7 minutes
+// with nothing left to answer (rig, 2026-10-16).
+// @internal
+#[test]
+fn tick_past_deadline_fails_a_responder_stuck_retrieving() {
+    let now = NOW;
+    let deadline = now + 1;
+    let mut session = make_session(deadline);
+    let _ = session.drain_pending_commands();
+    let our_gate = session.gate_hash_bytes();
+    session.apply_hardware_event(Event::RelayEscrowReady {
+        gate_hash: our_gate,
+    });
+    assert!(matches!(
+        session.current_state(),
+        LinkResponderState::Retrieving
+    ));
+
+    session.tick(deadline + 1);
+
+    assert!(
+        matches!(
+            session.current_state(),
+            LinkResponderState::Failed(LinkResponderFailureReason::PollingTimedOut)
+        ),
+        "a retrieve that never answers must end at the deadline, got {:?}",
+        session.current_state()
+    );
+}
+
 // @internal
 #[test]
 fn cancel_from_polling_transitions_to_failed_cancelled() {

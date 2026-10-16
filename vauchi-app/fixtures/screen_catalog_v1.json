@@ -1357,55 +1357,6 @@
                   }
                 },
                 {
-                  "Group": {
-                    "id": "search_facets",
-                    "label": "Also search",
-                    "axis": "vertical",
-                    "children": [
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.0",
-                          "label": "Tags",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Tags, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      },
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.1",
-                          "label": "Notes",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Notes, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      },
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.2",
-                          "label": "Places",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Places, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      }
-                    ],
-                    "accessibility": {
-                      "label": "Also search in",
-                      "description": "Choose which annotations the search matches."
-                    }
-                  }
-                },
-                {
                   "List": {
                     "id": "contacts",
                     "label": null,
@@ -1664,6 +1615,55 @@
                       "description": null
                     }
                   }
+                },
+                {
+                  "Group": {
+                    "id": "search_facets",
+                    "label": "Also search",
+                    "axis": "vertical",
+                    "children": [
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.0",
+                          "label": "Tags",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Tags, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.1",
+                          "label": "Notes",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Notes, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.2",
+                          "label": "Places",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Places, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      }
+                    ],
+                    "accessibility": {
+                      "label": "Also search in",
+                      "description": "Choose which annotations the search matches."
+                    }
+                  }
                 }
               ]
             }
@@ -1797,55 +1797,6 @@
                     "accessibility": {
                       "label": "Search contacts",
                       "description": null
-                    }
-                  }
-                },
-                {
-                  "Group": {
-                    "id": "search_facets",
-                    "label": "Also search",
-                    "axis": "vertical",
-                    "children": [
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.0",
-                          "label": "Tags",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Tags, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      },
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.1",
-                          "label": "Notes",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Notes, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      },
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.2",
-                          "label": "Places",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Places, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      }
-                    ],
-                    "accessibility": {
-                      "label": "Also search in",
-                      "description": "Choose which annotations the search matches."
                     }
                   }
                 },
@@ -2108,6 +2059,55 @@
                       "description": null
                     }
                   }
+                },
+                {
+                  "Group": {
+                    "id": "search_facets",
+                    "label": "Also search",
+                    "axis": "vertical",
+                    "children": [
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.0",
+                          "label": "Tags",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Tags, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.1",
+                          "label": "Notes",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Notes, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.2",
+                          "label": "Places",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Places, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      }
+                    ],
+                    "accessibility": {
+                      "label": "Also search in",
+                      "description": "Choose which annotations the search matches."
+                    }
+                  }
                 }
               ]
             }
@@ -2218,7 +2218,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_46f3c2d6bafc60cc",
+                    "id": "field_e06453247709968c",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2249,13 +2249,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:46f3c2d6bafc60cc",
+                    "id": "field_note:e06453247709968c",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:46f3c2d6bafc60cc",
+                          "id": "field_note:e06453247709968c",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2295,7 +2295,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_a05c01f1204dab97",
+                    "id": "field_dc4c4234f472eef8",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2326,13 +2326,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:a05c01f1204dab97",
+                    "id": "field_note:dc4c4234f472eef8",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:a05c01f1204dab97",
+                          "id": "field_note:dc4c4234f472eef8",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2372,7 +2372,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_a7f860adfb85ff11",
+                    "id": "field_78fb94f224eadc6c",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2403,13 +2403,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:a7f860adfb85ff11",
+                    "id": "field_note:78fb94f224eadc6c",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:a7f860adfb85ff11",
+                          "id": "field_note:78fb94f224eadc6c",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2844,55 +2844,6 @@
                   }
                 },
                 {
-                  "Group": {
-                    "id": "search_facets",
-                    "label": "Also search",
-                    "axis": "vertical",
-                    "children": [
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.0",
-                          "label": "Tags",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Tags, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      },
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.1",
-                          "label": "Notes",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Notes, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      },
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.2",
-                          "label": "Places",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Places, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      }
-                    ],
-                    "accessibility": {
-                      "label": "Also search in",
-                      "description": "Choose which annotations the search matches."
-                    }
-                  }
-                },
-                {
                   "List": {
                     "id": "contacts",
                     "label": null,
@@ -3149,6 +3100,55 @@
                     "accessibility": {
                       "label": "",
                       "description": null
+                    }
+                  }
+                },
+                {
+                  "Group": {
+                    "id": "search_facets",
+                    "label": "Also search",
+                    "axis": "vertical",
+                    "children": [
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.0",
+                          "label": "Tags",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Tags, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.1",
+                          "label": "Notes",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Notes, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.2",
+                          "label": "Places",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Places, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      }
+                    ],
+                    "accessibility": {
+                      "label": "Also search in",
+                      "description": "Choose which annotations the search matches."
                     }
                   }
                 }
@@ -4267,55 +4267,6 @@
                   }
                 },
                 {
-                  "Group": {
-                    "id": "search_facets",
-                    "label": "Also search",
-                    "axis": "vertical",
-                    "children": [
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.0",
-                          "label": "Tags",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Tags, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      },
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.1",
-                          "label": "Notes",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Notes, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      },
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.2",
-                          "label": "Places",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Places, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      }
-                    ],
-                    "accessibility": {
-                      "label": "Also search in",
-                      "description": "Choose which annotations the search matches."
-                    }
-                  }
-                },
-                {
                   "List": {
                     "id": "contacts",
                     "label": null,
@@ -4574,6 +4525,55 @@
                       "description": null
                     }
                   }
+                },
+                {
+                  "Group": {
+                    "id": "search_facets",
+                    "label": "Also search",
+                    "axis": "vertical",
+                    "children": [
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.0",
+                          "label": "Tags",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Tags, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.1",
+                          "label": "Notes",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Notes, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.2",
+                          "label": "Places",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Places, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      }
+                    ],
+                    "accessibility": {
+                      "label": "Also search in",
+                      "description": "Choose which annotations the search matches."
+                    }
+                  }
                 }
               ]
             }
@@ -4643,10 +4643,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "23AE 406A DD86 499E 7B69 53CD 0732 A473 10C9 6F13 8056 E092 80DF 6575 35C3 80AA",
+                    "content": "3477 32C2 63F9 0AAD E9E4 ED0B C6E3 9735 CAF3 D876 6FE5 A6F4 D6FB 8458 F00E E18A",
                     "style": "body",
                     "accessibility": {
-                      "label": "23AE 406A DD86 499E 7B69 53CD 0732 A473 10C9 6F13 8056 E092 80DF 6575 35C3 80AA",
+                      "label": "3477 32C2 63F9 0AAD E9E4 ED0B C6E3 9735 CAF3 D876 6FE5 A6F4 D6FB 8458 F00E E18A",
                       "description": null
                     }
                   }
@@ -4665,10 +4665,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "C0B1 DA00 4535 24C3 2AA3 25AD D5F6 93E4 FEF5 F0F2 BB68 8792 849F FBEE E31B F0BB",
+                    "content": "8055 6A6F 136F AFF2 808F 6495 8171 5132 4521 D431 B6A4 2975 1514 E1CE AE79 63BA",
                     "style": "body",
                     "accessibility": {
-                      "label": "C0B1 DA00 4535 24C3 2AA3 25AD D5F6 93E4 FEF5 F0F2 BB68 8792 849F FBEE E31B F0BB",
+                      "label": "8055 6A6F 136F AFF2 808F 6495 8171 5132 4521 D431 B6A4 2975 1514 E1CE AE79 63BA",
                       "description": null
                     }
                   }
@@ -13549,55 +13549,6 @@
                   }
                 },
                 {
-                  "Group": {
-                    "id": "search_facets",
-                    "label": "Also search",
-                    "axis": "vertical",
-                    "children": [
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.0",
-                          "label": "Tags",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Tags, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      },
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.1",
-                          "label": "Notes",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Notes, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      },
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.2",
-                          "label": "Places",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Places, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      }
-                    ],
-                    "accessibility": {
-                      "label": "Also search in",
-                      "description": "Choose which annotations the search matches."
-                    }
-                  }
-                },
-                {
                   "List": {
                     "id": "contacts",
                     "label": null,
@@ -13854,6 +13805,55 @@
                     "accessibility": {
                       "label": "",
                       "description": null
+                    }
+                  }
+                },
+                {
+                  "Group": {
+                    "id": "search_facets",
+                    "label": "Also search",
+                    "axis": "vertical",
+                    "children": [
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.0",
+                          "label": "Tags",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Tags, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.1",
+                          "label": "Notes",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Notes, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.2",
+                          "label": "Places",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Places, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      }
+                    ],
+                    "accessibility": {
+                      "label": "Also search in",
+                      "description": "Choose which annotations the search matches."
                     }
                   }
                 }
@@ -14183,55 +14183,6 @@
                   }
                 },
                 {
-                  "Group": {
-                    "id": "search_facets",
-                    "label": "Also search",
-                    "axis": "vertical",
-                    "children": [
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.0",
-                          "label": "Tags",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Tags, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      },
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.1",
-                          "label": "Notes",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Notes, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      },
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.2",
-                          "label": "Places",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Places, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      }
-                    ],
-                    "accessibility": {
-                      "label": "Also search in",
-                      "description": "Choose which annotations the search matches."
-                    }
-                  }
-                },
-                {
                   "List": {
                     "id": "contacts",
                     "label": null,
@@ -14488,6 +14439,55 @@
                     "accessibility": {
                       "label": "",
                       "description": null
+                    }
+                  }
+                },
+                {
+                  "Group": {
+                    "id": "search_facets",
+                    "label": "Also search",
+                    "axis": "vertical",
+                    "children": [
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.0",
+                          "label": "Tags",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Tags, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.1",
+                          "label": "Notes",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Notes, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.2",
+                          "label": "Places",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Places, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      }
+                    ],
+                    "accessibility": {
+                      "label": "Also search in",
+                      "description": "Choose which annotations the search matches."
                     }
                   }
                 }
@@ -15043,55 +15043,6 @@
                   }
                 },
                 {
-                  "Group": {
-                    "id": "search_facets",
-                    "label": "Also search",
-                    "axis": "vertical",
-                    "children": [
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.0",
-                          "label": "Tags",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Tags, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      },
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.1",
-                          "label": "Notes",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Notes, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      },
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.2",
-                          "label": "Places",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Places, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      }
-                    ],
-                    "accessibility": {
-                      "label": "Also search in",
-                      "description": "Choose which annotations the search matches."
-                    }
-                  }
-                },
-                {
                   "List": {
                     "id": "contacts",
                     "label": null,
@@ -15348,6 +15299,55 @@
                     "accessibility": {
                       "label": "",
                       "description": null
+                    }
+                  }
+                },
+                {
+                  "Group": {
+                    "id": "search_facets",
+                    "label": "Also search",
+                    "axis": "vertical",
+                    "children": [
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.0",
+                          "label": "Tags",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Tags, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.1",
+                          "label": "Notes",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Notes, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.2",
+                          "label": "Places",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Places, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      }
+                    ],
+                    "accessibility": {
+                      "label": "Also search in",
+                      "description": "Choose which annotations the search matches."
                     }
                   }
                 }
@@ -21101,55 +21101,6 @@
                   }
                 },
                 {
-                  "Group": {
-                    "id": "search_facets",
-                    "label": "Auch suchen in",
-                    "axis": "vertical",
-                    "children": [
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.0",
-                          "label": "Tags",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Suche Tags, aus",
-                            "description": "Zum Umschalten doppelt tippen"
-                          }
-                        }
-                      },
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.1",
-                          "label": "Notizen",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Suche Notizen, aus",
-                            "description": "Zum Umschalten doppelt tippen"
-                          }
-                        }
-                      },
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.2",
-                          "label": "Orte",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Suche Orte, aus",
-                            "description": "Zum Umschalten doppelt tippen"
-                          }
-                        }
-                      }
-                    ],
-                    "accessibility": {
-                      "label": "Auch suchen in",
-                      "description": "Wähle, welche Anmerkungen die Suche einbezieht."
-                    }
-                  }
-                },
-                {
                   "List": {
                     "id": "contacts",
                     "label": null,
@@ -21406,6 +21357,55 @@
                     "accessibility": {
                       "label": "",
                       "description": null
+                    }
+                  }
+                },
+                {
+                  "Group": {
+                    "id": "search_facets",
+                    "label": "Auch suchen in",
+                    "axis": "vertical",
+                    "children": [
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.0",
+                          "label": "Tags",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Suche Tags, aus",
+                            "description": "Zum Umschalten doppelt tippen"
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.1",
+                          "label": "Notizen",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Suche Notizen, aus",
+                            "description": "Zum Umschalten doppelt tippen"
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.2",
+                          "label": "Orte",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Suche Orte, aus",
+                            "description": "Zum Umschalten doppelt tippen"
+                          }
+                        }
+                      }
+                    ],
+                    "accessibility": {
+                      "label": "Auch suchen in",
+                      "description": "Wähle, welche Anmerkungen die Suche einbezieht."
                     }
                   }
                 }

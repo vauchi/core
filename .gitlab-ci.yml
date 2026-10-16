@@ -38,7 +38,7 @@
 include:
   - project: 'vauchi/scripts'
     # Pin the commit because tags are not protected.
-    ref: ea3bfb1d139b56a6e2708f7f4757d48552aebd1d
+    ref: 1e039df4a5488fdca44d7254cec79157dc408edf
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -90,12 +90,18 @@ include:
   - local: ci/prebuild.yml
   - local: ci/internal-dev-bindings.yml
 
+# Temporary containment for the allyson compiler stall (vauchi/private#198).
+# A tiny compile probe passed while real dependency compilation still hung.
+.self-hosted:
+  variables:
+    RUSTC_WRAPPER: ""
+
 variables:
   # MUST match the include: ref above. The templates come from that ref and
   # the scripts this variable fetches at job runtime come from this one; two
   # different commits would mix template and script versions silently.
-  # Bumped 2026-10-16 to ea3bfb1 for the bounded compiler cache probe
-  # and job-local uncached fallback (vauchi/private#198).
+  # Bumped 2026-10-16 to 1e039df for the bounded compiler cache probe,
+  # job-local uncached fallback, and non-circular benchmark helper (#198).
   # Previously 2026-10-08 to 16dbb7b so quality:metrics-dashboard and the
   # other scripts checkouts fetch this SHA instead of `clone --branch`,
   # which rejects one (vauchi/private#556, vauchi/scripts!612); before
@@ -119,7 +125,7 @@ variables:
   # keeps the SHA form because tags here are not protected), the lint:typos
   # linux tag (vauchi/scripts!552) and retired_boundary_vocabulary
   # (vauchi/scripts!502).
-  VAUCHI_SCRIPTS_REF: "ea3bfb1d139b56a6e2708f7f4757d48552aebd1d"
+  VAUCHI_SCRIPTS_REF: "1e039df4a5488fdca44d7254cec79157dc408edf"
   # cargo audit runs with --deny warnings; every entry here is an
   # advisory with no fix available to us, not one we chose to skip.
   #   RUSTSEC-2026-0192  ttf-parser unmaintained, reached through

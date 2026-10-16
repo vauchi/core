@@ -57,12 +57,19 @@ pub enum LinkExchangeProgress {
 impl LinkExchange {
     /// Still waiting on the other side or the relay.
     pub fn is_live(&self) -> bool {
-        false
+        self.finished.is_none() && matches!(outcome(&self.role), Outcome::Waiting)
     }
 
     /// The other side's card is being fetched.
     pub fn is_retrieving(&self) -> bool {
-        false
+        match &self.role {
+            Role::Initiator(session) => {
+                matches!(session.current_state(), LinkInitiatorState::Retrieving)
+            }
+            Role::Responder(session) => {
+                matches!(session.current_state(), LinkResponderState::Retrieving)
+            }
+        }
     }
 }
 
@@ -94,6 +101,14 @@ impl Vauchi {
     pub fn accept_link_exchange(&self, link: &str) -> VauchiResult<LinkExchange> {
         let payload = parse_exchange_deep_link(link.trim())
             .map_err(|e| VauchiError::InvalidState(format!("not an exchange link: {e}")))?;
+        self.accept_link_exchange_payload(&payload)
+    }
+
+    /// Accept an already parsed (and consented) exchange link.
+    pub fn accept_link_exchange_payload(
+        &self,
+        payload: &crate::exchange::link_mode::DeepLinkPayload,
+    ) -> VauchiResult<LinkExchange> {
         let x3dh = X3DHKeyPair::generate();
         let card_bytes = self.link_card_bytes(x3dh.public_key())?;
         let (keys, deposits) = responder_respond_with_card_bytes(payload.as_parsed(), &card_bytes)
@@ -106,21 +121,18 @@ impl Vauchi {
         })
     }
 
-    /// Accept an already parsed (and consented) exchange link.
-    pub fn accept_link_exchange_payload(
-        &self,
-        _payload: &crate::exchange::link_mode::DeepLinkPayload,
-    ) -> VauchiResult<LinkExchange> {
-        Err(VauchiError::InvalidState("not implemented".into()))
-    }
-
-    /// Feed one relay event to the exchange and report progress.
+    /// Feed one relay event to the exchange, run what it queues, and report
+    /// progress. For events that arrive from outside the advance loop.
     pub fn feed_link_exchange_event(
         &self,
-        _exchange: &mut LinkExchange,
-        _event: Event,
+        exchange: &mut LinkExchange,
+        event: Event,
     ) -> VauchiResult<LinkExchangeProgress> {
-        Ok(LinkExchangeProgress::Waiting)
+        if let Some(done) = &exchange.finished {
+            return Ok(done.clone());
+        }
+        self.apply_and_follow(&mut exchange.role, event);
+        Ok(self.settle(exchange))
     }
 
     /// Run the exchange's pending relay steps once and report progress. Once
@@ -156,8 +168,14 @@ impl Vauchi {
             Role::Responder(session) => session.tick(now),
         }
 
+        Ok(self.settle(exchange))
+    }
+
+    /// Report progress; on a terminal state, complete the exchange once and
+    /// remember the outcome.
+    fn settle(&self, exchange: &mut LinkExchange) -> LinkExchangeProgress {
         let progress = match outcome(&exchange.role) {
-            Outcome::Waiting => return Ok(LinkExchangeProgress::Waiting),
+            Outcome::Waiting => return LinkExchangeProgress::Waiting,
             Outcome::Finalized(card_bytes) => {
                 match self.complete_link_exchange(&card_bytes, &exchange.x3dh) {
                     Ok(contact_id) => LinkExchangeProgress::Completed { contact_id },
@@ -169,7 +187,7 @@ impl Vauchi {
             Outcome::Failed(reason) => LinkExchangeProgress::Failed { reason },
         };
         exchange.finished = Some(progress.clone());
-        Ok(progress)
+        progress
     }
 
     /// Our signed v2 bootstrap (ADR-050): card, identity signature over the
@@ -195,9 +213,13 @@ impl Vauchi {
     /// follow-ups it queues. The initiator's handshake-gate blob is the
     /// responder's ephemeral key, which it takes as `LinkOpened`.
     fn run_and_feed(&self, role: &mut Role, command: &Command) {
-        let Some(mut event) = self.run_escrow_command(command) else {
-            return;
-        };
+        if let Some(event) = self.run_escrow_command(command) {
+            self.apply_and_follow(role, event);
+        }
+    }
+
+    /// Apply one event to the machine and run the follow-ups it queues.
+    fn apply_and_follow(&self, role: &mut Role, mut event: Event) {
         let follow_ups = match role {
             Role::Initiator(session) => {
                 if let Event::RelayEscrowBlobReceived { gate_hash, blob } = &event
@@ -278,6 +300,7 @@ fn responder_failure(reason: &LinkResponderFailureReason) -> String {
 fn completion_failure(error: &VauchiError) -> String {
     match error {
         VauchiError::Exchange(crate::exchange::ExchangeError::SelfExchange) => "self_exchange",
+        VauchiError::ContactLimitReached(_) => "contact_limit",
         _ => "completion_failed",
     }
     .to_string()

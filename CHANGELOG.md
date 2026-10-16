@@ -6,6 +6,24 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.83.0] — 2026-10-16
+
+### Changed
+
+- Password-protected full backups write version 6, preserving group
+  visibility and presentation overrides, explicit contact sharing choices
+  and contact lifecycle state. Restore still reads legacy version 3;
+  older readers explicitly reject version 6.
+
+### Fixed
+
+- Full restore validates snapshot contents before changing storage and
+  commits the restored state in one transaction. Failed imports leave a
+  fresh installation uninitialized (vauchi/private#64).
+- Recovery-proof upload validates the stored vouchers and posts the proof
+  through the configured relay transport. A failed upload retains recovery
+  progress for retry (vauchi/private#265).
+
 ## [0.82.1] — 2026-10-14
 
 ### Fixed

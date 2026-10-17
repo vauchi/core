@@ -6,6 +6,27 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.84.0] — 2026-10-17
+
+### Added
+
+- Fetches and acknowledgements switch to the outer relay's delayed path
+  when it advertises one (`Vauchi-Ohttp-Delay-Window`, 1–3600 s), so the
+  gateway no longer sees a fetch when the client connects. The window is
+  kept per outer relay (storage migration v83), a waiting sync waits it,
+  and a relay that stops advertising returns its clients to the
+  synchronous path. `RelayConfig::ohttp_delayed` stays as a force-on
+  switch (vauchi/private#628).
+
+### Fixed
+
+- A link responder times out while retrieving the other card, not only
+  while polling: an accepted expired link ends in "Link Failed" instead
+  of waiting forever (vauchi/private#697).
+- Contacts lists the contacts right after the search field; the "Also
+  search" toggles follow the list, so a small phone no longer shows an
+  apparently empty tab (vauchi/private#698).
+
 ## [0.83.0] — 2026-10-16
 
 ### Changed

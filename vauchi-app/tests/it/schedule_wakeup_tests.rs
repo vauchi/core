@@ -593,3 +593,56 @@ fn with_no_one_to_sync_with_the_heartbeat_stays_idle() {
 
     assert_eq!(scheduled_wakeup_ms(&mut engine), 30_000);
 }
+
+#[cfg(feature = "testing")]
+fn wire_delay_ms(engine: &mut AppEngine) -> u64 {
+    let _ = engine.on_wakeup();
+    engine
+        .drain_pending_commands()
+        .iter()
+        .rev()
+        .find_map(delay_millis_on_the_wire)
+        .expect("a ScheduleWakeup")
+}
+
+const TEN_MINUTES_MS: std::ops::RangeInclusive<u64> = 598_000..=600_500;
+
+// #603 option 2: in the background the scheduler wakes once, at the drawn
+// gap (15-min mean), so the wakeup names the whole gap rather than the 30 s
+// beat an open app polls at. An engine no window has rendered is a
+// background run (Android's WorkManager starts it cold).
+// @internal
+#[test]
+#[cfg(feature = "testing")]
+fn in_the_background_the_wakeup_names_the_whole_drawn_gap() {
+    let mut engine = engine_with_a_contact_and_sync_due_in(600);
+
+    let ms = wire_delay_ms(&mut engine);
+
+    assert!(TEN_MINUTES_MS.contains(&ms), "{ms} ms");
+}
+
+// @internal
+#[test]
+#[cfg(feature = "testing")]
+fn an_open_app_keeps_the_30_s_beat() {
+    let mut engine = engine_with_a_contact_and_sync_due_in(600);
+    engine.initial_commands().expect("presentation");
+
+    assert_eq!(wire_delay_ms(&mut engine), 30_000);
+}
+
+// @internal
+#[test]
+#[cfg(feature = "testing")]
+fn a_backgrounded_app_wakes_at_the_whole_gap_again() {
+    let mut engine = engine_with_a_contact_and_sync_due_in(600);
+    engine.initial_commands().expect("presentation");
+    engine
+        .dispatch(vauchi_core::Event::AppBackgrounded)
+        .expect("backgrounded");
+
+    let ms = wire_delay_ms(&mut engine);
+
+    assert!(TEN_MINUTES_MS.contains(&ms), "{ms} ms");
+}

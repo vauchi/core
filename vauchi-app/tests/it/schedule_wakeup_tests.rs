@@ -647,3 +647,38 @@ fn a_backgrounded_app_wakes_at_the_whole_gap_again() {
 
     assert!(TEN_MINUTES_MS.contains(&ms), "{ms} ms");
 }
+
+// The background worker re-arms from its own tick, not from the heartbeat's
+// wakeup: with the app open the heartbeat beats every 30 s, and following it
+// made WorkManager run the worker every 30 s beside the app (#603, rig
+// 2026-10-18). The tick names a gap from the background schedule either way.
+#[cfg(all(feature = "testing", feature = "network-http"))]
+fn next_tick_delay_ms(engine: &mut AppEngine) -> u64 {
+    let (_, next) = engine.scheduler_sync_tick().expect("tick");
+    delay_millis_on_the_wire(&next).expect("a ScheduleWakeup")
+}
+
+// @internal
+#[test]
+#[cfg(all(feature = "testing", feature = "network-http"))]
+fn the_scheduler_tick_names_a_background_gap_for_its_next_run() {
+    let mut engine = engine_with_a_contact_and_sync_due_in(0);
+
+    let ms = next_tick_delay_ms(&mut engine);
+
+    assert!((60_000..=3_600_000).contains(&ms), "{ms} ms");
+}
+
+// @internal
+#[test]
+#[cfg(all(feature = "testing", feature = "network-http"))]
+fn an_open_app_s_tick_names_a_background_gap_and_keeps_its_deadline() {
+    let mut engine = engine_with_a_contact_and_sync_due_in(20);
+    engine.initial_commands().expect("presentation");
+
+    let ms = next_tick_delay_ms(&mut engine);
+
+    assert!((60_000..=3_600_000).contains(&ms), "{ms} ms");
+    let until = engine.vauchi().time_until_sync_due().expect("identity");
+    assert!(until <= std::time::Duration::from_secs(20), "{until:?}");
+}

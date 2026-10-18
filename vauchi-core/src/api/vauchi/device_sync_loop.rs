@@ -23,17 +23,13 @@
 //! §2). `register_tokens` lives here too: it registers the same self-token
 //! the receive partition keys on.
 
-use std::collections::HashSet;
-
 use super::Vauchi;
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::api::send_phase::SendPhase;
 use crate::api::sync::DeviceSyncOrchestrator;
 use crate::contact::Contact;
 use crate::identity::Identity;
-use crate::network::mailbox_token::{
-    batch_register_tokens_with_device_sync, compute_device_sync_token, current_day_epoch, token_hex,
-};
+use crate::network::mailbox_token::{current_day_epoch, padded_registration_batches};
 use crate::network::{
     HttpTransportAdapter, MessagePayload, RegisterMailbox, Transport, create_envelope,
 };
@@ -52,33 +48,18 @@ impl Vauchi {
         contacts: &[Contact],
         adapter: &mut HttpTransportAdapter,
     ) -> VauchiResult<()> {
-        // Collect shared keys from exchanged contacts
-        let contact_keys: Vec<[u8; 32]> = contacts
-            .iter()
-            .filter_map(|c| c.shared_key().map(|k| *k.as_bytes()))
-            .collect();
-
         let day = current_day_epoch(self.clock.unix_seconds());
-        let master_seed = identity.master_seed();
-        adapter.set_mailbox_context(crate::network::mailbox_context::MailboxContext {
-            identity: *identity.signing_public_key(),
-            device: *identity.device_id(),
-            application_relay: self.config.relay.server_url.clone(),
-            ohttp_relay: self.config.relay.ohttp_endpoint(),
+        let context = std::sync::Arc::new(super::receive_context::registered_mailboxes(
+            identity,
+            contacts,
+            &self.config.relay,
             day,
-        });
-
-        // Build padded token batches (256 per batch, shuffled). `own_pubkey`
-        // keys our directional receive tokens to our identity.
-        let batches = batch_register_tokens_with_device_sync(
+        ));
+        let batches = padded_registration_batches(
             self.rng.as_ref(),
-            &contact_keys,
-            identity.signing_public_key(),
-            master_seed,
-            identity.device_id(),
-            day,
-            0,
+            context.routes.keys().cloned().collect(),
         );
+        adapter.set_mailbox_context(context);
 
         // Register each batch with the adapter
         for tokens in batches {
@@ -265,17 +246,8 @@ impl Vauchi {
     }
 }
 
-/// Recipient-specific self tokens around a locally captured registration day.
-pub(super) fn self_token_hexes(identity: &Identity, day: u64) -> HashSet<String> {
-    let seed = identity.master_seed();
-    [day.saturating_sub(1), day, day.saturating_add(1)]
-        .iter()
-        .map(|d| token_hex(&compute_device_sync_token(seed, identity.device_id(), *d)))
-        .collect()
-}
-
 // INLINE_TEST_REQUIRED: exercises the pub(super) device-sync drivers
-// (run_device_sync_send / apply_device_sync_blob / self_token_hexes),
+// (run_device_sync_send / apply_device_sync_blob),
 // crate-internal by design and unreachable from the tests/ crate without
 // widening the public Vauchi surface.
 #[cfg(test)]
@@ -309,30 +281,6 @@ mod tests {
             archived_at: None,
             ignored_at: None,
         }
-    }
-
-    /// `self_token_hexes` accepts the recipient-specific today/±1-day tokens.
-    // @internal
-    #[test]
-    fn self_token_hexes_covers_recipient_specific_days() {
-        let mut b = Vauchi::in_memory().unwrap();
-        b.create_identity("Alice").unwrap();
-        let identity = b.identity().unwrap();
-
-        let day = current_day_epoch(b.clock.unix_seconds());
-        let tokens = self_token_hexes(identity, day);
-        assert_eq!(tokens.len(), 3, "recipient-specific today/±1 days");
-
-        let seed = identity.master_seed();
-        for d in [day - 1, day, day + 1] {
-            let device_token = token_hex(&compute_device_sync_token(seed, identity.device_id(), d));
-            assert!(
-                tokens.contains(&device_token),
-                "missing device-specific self-token for day {d}"
-            );
-        }
-        // Each hex token is 64 chars (32 bytes).
-        assert!(tokens.iter().all(|t| t.len() == 64));
     }
 
     /// End-to-end receive: a `ContactAdded` sealed by a peer device for B's

@@ -118,14 +118,17 @@ impl HttpTransportAdapter {
         self
     }
 
-    pub(crate) fn set_mailbox_context(&mut self, context: MailboxContext) {
-        self.mailbox_context = Some(Arc::new(context));
+    pub(crate) fn set_mailbox_context(&mut self, context: Arc<MailboxContext>) {
+        self.mailbox_context = Some(context);
     }
 
-    pub(crate) fn received_context(&self, blob_id: &str, token: &str) -> Option<&MailboxContext> {
+    pub(crate) fn take_received_context(
+        &mut self,
+        blob_id: &str,
+        token: &str,
+    ) -> Option<Arc<MailboxContext>> {
         self.fetched_contexts
-            .get(&(blob_id.to_string(), token.to_string()))
-            .map(Arc::as_ref)
+            .remove(&(blob_id.to_string(), token.to_string()))
     }
 
     /// Whether the relay capped the most recent fetch page (more blobs
@@ -233,6 +236,8 @@ impl super::transport::Transport for HttpTransportAdapter {
         self.registered_tokens.clear();
         self.pending_blobs.clear();
         self.fetched_blob_tokens.clear();
+        self.fetched_contexts.clear();
+        self.mailbox_context = None;
         self.has_fetched = false;
         Ok(())
     }
@@ -343,7 +348,16 @@ impl HttpTransportAdapter {
         let Some(blob) = self.pending_blobs.pop_front() else {
             return Ok(None);
         };
-        let envelope = Self::blob_to_envelope(&blob)?;
+        let envelope = match Self::blob_to_envelope(&blob) {
+            Ok(envelope) => envelope,
+            Err(error) => {
+                if let Some(token) = &blob.mailbox_token {
+                    self.fetched_contexts
+                        .remove(&(blob.blob_id.clone(), token.clone()));
+                }
+                return Err(error);
+            }
+        };
         if let Some(token) = blob.mailbox_token {
             self.fetched_blob_tokens.insert(blob.blob_id, token);
         }
@@ -367,6 +381,7 @@ impl HttpTransportAdapter {
                 }
             }
             self.fetched_blob_tokens.remove(&blob_id);
+            self.fetched_contexts.remove(&(blob_id, recipient_id));
         }
     }
 
@@ -377,12 +392,16 @@ impl HttpTransportAdapter {
             match self.http.fetch_page(chunk) {
                 Ok((blobs, truncated)) => {
                     self.last_truncated |= truncated;
+                    let context = self
+                        .mailbox_context
+                        .as_ref()
+                        .map(|context| Arc::new(context.for_tokens(chunk)));
                     buffer_fetch_response(
                         &mut self.pending_blobs,
                         &mut self.fetched_contexts,
                         blobs,
                         chunk,
-                        &self.mailbox_context,
+                        &context,
                     );
                 }
                 Err(NetworkError::RateLimited { .. }) if !self.pending_blobs.is_empty() => break,
@@ -457,7 +476,10 @@ impl HttpTransportAdapter {
                 Ok(pending) => pending_fetches.push(PendingFetch {
                     tokens: chunk.to_vec(),
                     pending,
-                    context: self.mailbox_context.clone(),
+                    context: self
+                        .mailbox_context
+                        .as_ref()
+                        .map(|context| Arc::new(context.for_tokens(chunk))),
                 }),
                 Err(e) => {
                     failure.get_or_insert(e);
@@ -526,6 +548,23 @@ mod tests {
     fn test_adapter_starts_disconnected() {
         let adapter = make_adapter(true);
         assert_eq!(adapter.state(), ConnectionState::Disconnected);
+    }
+
+    // @internal: Disconnect releases the active registration context instead of retaining obsolete routes.
+    #[test]
+    fn disconnect_releases_the_registration_context() {
+        let mut adapter = make_adapter(true);
+        let context = Arc::new(MailboxContext {
+            identity: [1; 32],
+            device: [2; 32],
+            application_relay: "https://gateway.invalid".into(),
+            ohttp_relay: "https://forwarder.invalid".into(),
+            routes: HashMap::new(),
+        });
+        let weak = Arc::downgrade(&context);
+        adapter.set_mailbox_context(context);
+        adapter.disconnect().unwrap();
+        assert!(weak.upgrade().is_none());
     }
 
     // @internal

@@ -428,8 +428,13 @@ impl Vauchi {
             if let MessagePayload::EncryptedUpdate(update) = envelope.payload {
                 fetched += 1;
                 let scope_matches = adapter
-                    .received_context(envelope.message_id.as_str(), update.recipient_id.as_str())
-                    .is_some_and(|captured| context.include(captured));
+                    .take_received_context(
+                        envelope.message_id.as_str(),
+                        update.recipient_id.as_str(),
+                    )
+                    .is_some_and(|captured| {
+                        context.include(&captured, update.recipient_id.as_str())
+                    });
                 if !scope_matches {
                     unscoped += 1;
                     continue;

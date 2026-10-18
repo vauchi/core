@@ -203,7 +203,7 @@ fn registration_tokens(
 
 /// Pad, split, and shuffle real registration tokens without revealing their
 /// count or stable position to the relay.
-fn padded_registration_batches(
+pub(crate) fn padded_registration_batches(
     rng: &dyn crate::rng::SecureRng,
     mut all_tokens: Vec<String>,
 ) -> Vec<Vec<String>> {

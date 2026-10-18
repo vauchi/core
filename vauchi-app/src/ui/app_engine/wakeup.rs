@@ -10,18 +10,34 @@ use crate::notification_types::PendingNotification;
 use crate::ui::WorkflowEngine;
 
 impl AppEngine {
-    /// The platform scheduler's sync tick: in the background it draws the next
-    /// deadline from the background schedule, while an open app keeps the
-    /// 60 s one so a tick cannot stall its syncs (#603 option 2).
+    /// The platform scheduler's sync tick, and the `ScheduleWakeup` for its
+    /// next run. In the background it draws the next deadline from the
+    /// background schedule and wakes at it; an open app keeps its 60 s
+    /// schedule, so a tick cannot stall its syncs, and the scheduler's next
+    /// run still comes at a background gap rather than at the heartbeat's
+    /// 30 s beat (#603 option 2).
     #[cfg(feature = "network-http")]
     pub fn scheduler_sync_tick(
         &mut self,
-    ) -> vauchi_core::VauchiResult<vauchi_core::VauchiSyncOutcome> {
-        if self.in_foreground {
-            self.vauchi.periodic_sync_tick()
+    ) -> vauchi_core::VauchiResult<(vauchi_core::VauchiSyncOutcome, vauchi_core::Command)> {
+        let (outcome, gap) = if self.in_foreground {
+            let outcome = self.vauchi.periodic_sync_tick()?;
+            (outcome, self.vauchi.draw_background_sync_gap())
         } else {
-            self.vauchi.background_sync_tick()
-        }
+            let outcome = self.vauchi.background_sync_tick()?;
+            let gap = self
+                .vauchi
+                .time_until_sync_due()
+                .filter(|until| !until.is_zero())
+                .unwrap_or_else(|| self.vauchi.draw_background_sync_gap());
+            (outcome, gap)
+        };
+        let millis = u32::try_from(gap.as_millis()).unwrap_or(u32::MAX).max(1);
+        let secs = millis.div_ceil(1000);
+        Ok((
+            outcome,
+            vauchi_core::Command::schedule_wakeup(secs, secs, 1, Some(millis)),
+        ))
     }
 
     /// The shell's platform wakeup fired — a desktop in-process interval, an

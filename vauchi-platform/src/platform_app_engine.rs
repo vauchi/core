@@ -498,14 +498,15 @@ impl PlatformAppEngine {
     pub fn periodic_sync_tick(&self) -> Result<String, MobileError> {
         let mut engine_slot = self.lock_engine()?;
         let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
-        let outcome = engine
-            .scheduler_sync_tick()
-            .map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
-        serde_json::to_string(&format!("{outcome:?}")).map_err(|e| MobileError::Other {
-            detail: format!("serialize sync outcome: {e}"),
-        })
+        let (_outcome, next_run) =
+            engine
+                .scheduler_sync_tick()
+                .map_err(|e| MobileError::Other {
+                    detail: e.to_string(),
+                })?;
+        // The scheduler re-arms from this ScheduleWakeup, never from the
+        // heartbeat's (#603): the same envelope as `on_wakeup`.
+        wakeup_envelope_to_json(&[], &[next_run])
     }
 
     /// Push render-context preferences (locale + theme_id) from

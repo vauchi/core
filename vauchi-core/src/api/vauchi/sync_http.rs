@@ -256,6 +256,13 @@ impl Vauchi {
         self.sync()
     }
 
+    /// A gap drawn from the background schedule, for a scheduler's next run.
+    pub fn draw_background_sync_gap(&self) -> std::time::Duration {
+        self.config
+            .sync
+            .next_background_sync_interval(self.rng.as_ref())
+    }
+
     /// [`Self::periodic_sync_tick`] for a scheduler running while the app is
     /// in the background: the next deadline is drawn from the background
     /// schedule whatever the sync answered, because the scheduler wakes at

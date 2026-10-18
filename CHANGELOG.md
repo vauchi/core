@@ -6,6 +6,17 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.84.1] — 2026-10-18
+
+### Fixed
+
+- A completed BLE exchange releases its link: the initiator, which
+  completes last, disconnects after its reciprocity ack. The dialling
+  phone no longer keeps the link up on its Success screen, which made the
+  other phone's next Glance stick on "Exchanging" (vauchi/private#673).
+  iOS also needs vauchi-platform-swift 0.84.1, which decodes the
+  addressed `BleDisconnect`.
+
 ## [0.84.0] — 2026-10-17
 
 ### Added

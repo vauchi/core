@@ -22,6 +22,12 @@ pub(super) struct ReceiveContext<'a> {
     pub(super) self_tokens: HashSet<String>,
 }
 
+// INLINE_TEST_REQUIRED: request context is crate-private authorization state;
+// exercise its API without exporting it to application shells.
+#[cfg(test)]
+#[path = "receive_context_tests.rs"]
+mod tests;
+
 impl<'a> ReceiveContext<'a> {
     pub(super) fn new(
         identity: &'a Identity,

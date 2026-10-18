@@ -4,6 +4,7 @@
 //! In-memory mailbox behavior for local OHTTP delivery tests. This is not
 //! a relay implementation: TTL, federation, quotas and auth are not modeled.
 
+use base64::Engine;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use vauchi_core::clock::Clock;
@@ -42,6 +43,20 @@ impl MailboxStore {
     }
 
     fn send(&mut self, request: V2SendRequest) -> serde_json::Value {
+        if request.recipient_id.len() != 64
+            || !request
+                .recipient_id
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit())
+        {
+            return serde_json::json!({ "status": "error", "error": "recipient_id must be 64 hex characters" });
+        }
+        if base64::engine::general_purpose::STANDARD
+            .decode(&request.ciphertext)
+            .is_err()
+        {
+            return serde_json::json!({ "status": "error", "error": "ciphertext must be valid base64" });
+        }
         self.sequence = self
             .sequence
             .checked_add(1)
@@ -58,6 +73,11 @@ impl MailboxStore {
     }
 
     fn fetch(&self, request: V2FetchRequest) -> serde_json::Value {
+        // Match handle_fetch_logic's limit so planner tests cannot pass with
+        // batches the application relay rejects (private#691).
+        if !(1..=100).contains(&request.mailbox_tokens.len()) {
+            return serde_json::json!({ "status": "error", "error": "mailbox_tokens must contain 1-100 entries" });
+        }
         let mut matching: Vec<_> = self
             .blobs
             .iter()

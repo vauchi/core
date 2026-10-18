@@ -5,10 +5,11 @@
 
 #![cfg(feature = "network-http")]
 
+use base64::Engine;
 use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
 use vauchi_core::clock::FakeClock;
-use vauchi_core::network::{HttpTransport, HttpTransportConfig, OhttpClient};
+use vauchi_core::network::{HttpTransport, HttpTransportConfig, NetworkError, OhttpClient};
 use vauchi_protocol::ohttp_key::window_of;
 
 use crate::common::mock_relay::MockRelay;
@@ -30,7 +31,10 @@ fn historical_mailbox_store_filters_fetches_and_requires_the_matching_ack() {
     let (_relay, http, clock) = mailbox_stack();
     let alice = "11".repeat(32);
     let bob = "22".repeat(32);
-    let first = http.send_update(&alice, "YWxwaGE=", None).unwrap();
+    let hint = base64::engine::general_purpose::STANDARD.encode([0x42; 72]);
+    let first = http
+        .send_update(&alice, "YWxwaGE=", Some(hint.clone()))
+        .unwrap();
     let second = http.send_update(&bob, "YmV0YQ==", None).unwrap();
 
     assert!(http.fetch(&["33".repeat(32)]).unwrap().is_empty());
@@ -41,6 +45,7 @@ fn historical_mailbox_store_filters_fetches_and_requires_the_matching_ack() {
     assert_eq!(fetched[0].ciphertext, "YWxwaGE=");
     assert_eq!(fetched[0].mailbox_token.as_deref(), Some(alice.as_str()));
     assert_eq!(fetched[0].created_at, NOW);
+    assert_eq!(fetched[0].origin_hint.as_deref(), Some(hint.as_str()));
 
     assert!(!http.acknowledge(&bob, &first).unwrap());
     assert_eq!(
@@ -88,4 +93,43 @@ fn historical_mailbox_store_pages_without_deleting_unacknowledged_blobs() {
     assert_eq!(last.len(), 1);
     assert_eq!(last[0].blob_id, third);
     assert_eq!(last[0].created_at, NOW + 2);
+}
+
+// @internal
+#[test]
+fn historical_mailbox_store_rejects_fetches_outside_the_relay_token_limit() {
+    let (_relay, http, _clock) = mailbox_stack();
+    for count in [0, 101] {
+        let tokens = vec!["55".repeat(32); count];
+        let error = http
+            .fetch(&tokens)
+            .expect_err("production rejects this token count");
+        assert!(matches!(error, NetworkError::InvalidMessage(message)
+            if message == "fetch failed: mailbox_tokens must contain 1-100 entries"));
+    }
+    assert!(http.fetch(&vec!["55".repeat(32); 100]).unwrap().is_empty());
+}
+
+// @internal
+#[test]
+fn historical_mailbox_store_rejects_malformed_sends_without_mutating_mail() {
+    let (_relay, http, _clock) = mailbox_stack();
+    let token = "66".repeat(32);
+    let saved = http.send_update(&token, "c2F2ZWQ=", None).unwrap();
+    for recipient in [String::new(), "gg".repeat(32), "ab".repeat(31)] {
+        let error = http
+            .send_update(&recipient, "c2VhbGVk", None)
+            .expect_err("recipient must match the production shape");
+        assert!(matches!(error, NetworkError::InvalidMessage(message)
+            if message == "send failed: recipient_id must be 64 hex characters"));
+    }
+    let error = http
+        .send_update(&token, "!invalid!", None)
+        .expect_err("ciphertext must be valid base64");
+    assert!(matches!(error, NetworkError::InvalidMessage(message)
+        if message == "send failed: ciphertext must be valid base64"));
+    let fetched = http.fetch(&[token]).unwrap();
+    assert_eq!(fetched.len(), 1);
+    assert_eq!(fetched[0].blob_id, saved);
+    assert_eq!(fetched[0].ciphertext, "c2F2ZWQ=");
 }

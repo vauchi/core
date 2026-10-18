@@ -36,6 +36,30 @@ fn navigate_to_pushes_history() {
     );
 }
 
+// #534 (retire-the-context-bar design): outside onboarding the Exchange
+// Mode picker offers no Skip; its only way out is the tab bar.
+// @internal
+#[test]
+fn the_exchange_mode_picker_offers_no_skip_outside_onboarding() {
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Exchange);
+
+    let screen = engine.current_screen();
+
+    assert_eq!(screen.screen_id, "exchange");
+    let actions: Vec<(String, String)> = screen
+        .contextual_actions
+        .iter()
+        .map(|action| (action.id.clone(), action.label.clone()))
+        .collect();
+    assert!(
+        actions
+            .iter()
+            .all(|(id, label)| id != "skip" && !label.eq_ignore_ascii_case("skip")),
+        "{actions:?}"
+    );
+}
+
 // @internal
 #[test]
 fn navigate_back_chain_returns_through_history() {

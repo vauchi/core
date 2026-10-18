@@ -499,8 +499,7 @@ impl PlatformAppEngine {
         let mut engine_slot = self.lock_engine()?;
         let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
         let outcome = engine
-            .vauchi_mut()
-            .periodic_sync_tick()
+            .scheduler_sync_tick()
             .map_err(|e| MobileError::Other {
                 detail: e.to_string(),
             })?;

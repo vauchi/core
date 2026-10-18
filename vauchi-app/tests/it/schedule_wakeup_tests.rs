@@ -605,6 +605,7 @@ fn wire_delay_ms(engine: &mut AppEngine) -> u64 {
         .expect("a ScheduleWakeup")
 }
 
+#[cfg(feature = "testing")]
 const TEN_MINUTES_MS: std::ops::RangeInclusive<u64> = 598_000..=600_500;
 
 // #603 option 2: in the background the scheduler wakes once, at the drawn

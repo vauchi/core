@@ -267,6 +267,11 @@ pub struct AppEngine {
     retained_detail_screen: Option<AppScreen>,
     /// Monotonic generation of the atomic generic surface command.
     surface_revision: u64,
+    /// A window has rendered Core's presentation and not been backgrounded
+    /// since. Until then this is a background run (Android's WorkManager
+    /// starts the engine cold), which wakes at the drawn background gap
+    /// (#603 option 2).
+    in_foreground: bool,
     /// Contextual roles and causal Undo state retained per visible surface.
     contextual_actions: HashMap<vauchi_core::SurfaceId, crate::ui::ContextualActionCoordinator>,
     /// The overlay Core currently believes is presented, if any.
@@ -567,6 +572,7 @@ impl AppEngine {
             presentation_coordinator,
             retained_detail_screen: None,
             surface_revision: 1,
+            in_foreground: false,
             contextual_actions: HashMap::new(),
             open_overlay: None,
             entry_flow: None,
@@ -644,6 +650,20 @@ impl AppEngine {
 
     pub fn has_identity(&self) -> bool {
         self.vauchi.has_identity()
+    }
+
+    /// The platform scheduler's sync tick: in the background it draws the next
+    /// deadline from the background schedule, while an open app keeps the
+    /// 60 s one so a tick cannot stall its syncs (#603 option 2).
+    #[cfg(feature = "network-http")]
+    pub fn scheduler_sync_tick(
+        &mut self,
+    ) -> vauchi_core::VauchiResult<vauchi_core::VauchiSyncOutcome> {
+        if self.in_foreground {
+            self.vauchi.periodic_sync_tick()
+        } else {
+            self.vauchi.background_sync_tick()
+        }
     }
 
     /// Notify core that the app was backgrounded (or is about to resume).
@@ -914,6 +934,18 @@ impl AppEngine {
         // ~90 s; the escrow phase is meant to poll about once a second.
         if self.link_session_active() {
             return vauchi_core::Command::schedule_wakeup(1, 1, 1, None);
+        }
+        // In the background the scheduler wakes once, at the drawn gap, so
+        // the wakeup names all of it (#603 option 2).
+        #[cfg(feature = "network-http")]
+        if !self.in_foreground
+            && let Some(until) = self.vauchi.time_until_sync_due()
+            && !until.is_zero()
+            && self.has_someone_to_sync_with()
+        {
+            let millis = u32::try_from(until.as_millis()).unwrap_or(u32::MAX).max(1);
+            let secs = millis.div_ceil(1000);
+            return vauchi_core::Command::schedule_wakeup(secs, secs, 1, Some(millis));
         }
         // Wake when the drawn sync gap ends, not on the next 30 s beat: on
         // the beat, every gap the relay saw was a multiple of 30 s (KU-9,

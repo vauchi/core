@@ -552,6 +552,16 @@ pub struct SyncConfig {
     /// Longest gap between background syncs, in milliseconds.
     pub sync_interval_max_ms: u64,
 
+    /// Mean gap between the platform scheduler's background ticks, in
+    /// milliseconds (#603 option 2); exponential, clamped to the bounds below.
+    pub background_sync_interval_ms: u64,
+
+    /// Shortest gap between background ticks, in milliseconds.
+    pub background_sync_interval_min_ms: u64,
+
+    /// Longest gap between background ticks, in milliseconds.
+    pub background_sync_interval_max_ms: u64,
+
     /// Maximum pending updates before forcing sync.
     pub max_pending_updates: usize,
 
@@ -578,9 +588,12 @@ impl Default for SyncConfig {
     fn default() -> Self {
         SyncConfig {
             auto_sync: true,
-            sync_interval_ms: 60_000,      // 1 minute mean
-            sync_interval_min_ms: 10_000,  // 10 seconds
-            sync_interval_max_ms: 300_000, // 5 minutes
+            sync_interval_ms: 60_000,                   // 1 minute mean
+            sync_interval_min_ms: 10_000,               // 10 seconds
+            sync_interval_max_ms: 300_000,              // 5 minutes
+            background_sync_interval_ms: 900_000,       // 15 minutes mean
+            background_sync_interval_min_ms: 60_000,    // 1 minute
+            background_sync_interval_max_ms: 3_600_000, // 60 minutes
             max_pending_updates: 50,
             batch_size: Some(20),
             post_exchange_delay_min_ms: 30_000,  // 30 seconds
@@ -605,26 +618,53 @@ impl SyncConfig {
         Duration::from_millis(ms)
     }
 
-    /// The gap before the next background sync: exponential around
+    /// The gap before the next sync while the app runs: exponential around
     /// `sync_interval_ms`, clamped to `[sync_interval_min_ms,
     /// sync_interval_max_ms]`. Memoryless gaps leave no fixed period for a
-    /// relay hop to recognise; the same schedule applies whether or not the
-    /// app is open (owner decision 2026-10-10, private#603).
+    /// relay hop to recognise (owner decision 2026-10-10, private#603). The
+    /// platform scheduler's background ticks draw from
+    /// [`Self::next_background_sync_interval`] instead (2026-10-18).
     pub fn next_sync_interval(&self, rng: &dyn crate::rng::SecureRng) -> Duration {
-        let mean = self.sync_interval_ms;
-        if mean == 0 {
-            return Duration::ZERO;
-        }
-        let (min, max) = (
+        exponential_gap(
+            self.sync_interval_ms,
             self.sync_interval_min_ms,
-            self.sync_interval_max_ms.max(self.sync_interval_min_ms),
-        );
-        // u in (0, 1]: 53 random bits, offset by one so ln(u) stays finite.
-        let u = (rng.random_u64() >> 11).saturating_add(1) as f64 / (1u64 << 53) as f64;
-        let sample = -(mean as f64) * u.ln();
-        let ms = sample.clamp(min as f64, max as f64).round() as u64;
-        Duration::from_millis(ms)
+            self.sync_interval_max_ms,
+            rng,
+        )
     }
+
+    /// The gap before the platform scheduler's next background tick:
+    /// exponential around `background_sync_interval_ms`, clamped to its
+    /// bounds. Android's background cannot reach the 60 s mean, and its
+    /// fixed 15-min period was a recognisable fingerprint (KU-9 rerun); the
+    /// owner chose a drawn 15-min mean there (2026-10-18, private#603).
+    pub fn next_background_sync_interval(&self, rng: &dyn crate::rng::SecureRng) -> Duration {
+        exponential_gap(
+            self.background_sync_interval_ms,
+            self.background_sync_interval_min_ms,
+            self.background_sync_interval_max_ms,
+            rng,
+        )
+    }
+}
+
+/// A memoryless gap: exponential around `mean_ms`, clamped to
+/// `[min_ms, max_ms]`; zero when `mean_ms` is zero (manual sync only).
+fn exponential_gap(
+    mean_ms: u64,
+    min_ms: u64,
+    max_ms: u64,
+    rng: &dyn crate::rng::SecureRng,
+) -> Duration {
+    if mean_ms == 0 {
+        return Duration::ZERO;
+    }
+    let max_ms = max_ms.max(min_ms);
+    // u in (0, 1]: 53 random bits, offset by one so ln(u) stays finite.
+    let u = (rng.random_u64() >> 11).saturating_add(1) as f64 / (1u64 << 53) as f64;
+    let sample = -(mean_ms as f64) * u.ln();
+    let ms = sample.clamp(min_ms as f64, max_ms as f64).round() as u64;
+    Duration::from_millis(ms)
 }
 
 /// OHTTP privacy configuration.

@@ -256,6 +256,26 @@ impl Vauchi {
         self.sync()
     }
 
+    /// [`Self::periodic_sync_tick`] for a scheduler running while the app is
+    /// in the background: the next deadline is drawn from the background
+    /// schedule whatever the sync answered, because the scheduler wakes at
+    /// it (#603 option 2). A foreground caller keeps the 60 s schedule.
+    pub fn background_sync_tick(&mut self) -> VauchiResult<VauchiSyncOutcome> {
+        let outcome = self.periodic_sync_tick()?;
+        if matches!(
+            outcome,
+            VauchiSyncOutcome::NoIdentity | VauchiSyncOutcome::NotConnected
+        ) {
+            return Ok(outcome);
+        }
+        let gap = self
+            .config
+            .sync
+            .next_background_sync_interval(self.rng.as_ref());
+        self.next_sync_allowed = Some(self.monotonic.now() + gap);
+        Ok(outcome)
+    }
+
     /// Disconnect: clear the cached OHTTP key and sync timing state.
     ///
     /// After calling this, `sync()` returns `NotConnected` until `connect()` is

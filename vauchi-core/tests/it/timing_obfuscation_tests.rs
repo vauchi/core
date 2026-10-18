@@ -107,6 +107,52 @@ fn test_sync_intervals_are_exponential_around_a_60s_mean() {
     );
 }
 
+// Owner decision 2026-10-18 (#603 option 2): Android's background cannot
+// reach a 60 s mean, and its 15-min WorkManager period is the fixed period
+// the KU-9 rerun measured. Background ticks draw their own exponential gap,
+// 15-min mean, clamped to 1-60 min.
+fn sample_background_intervals(n: usize) -> Vec<f64> {
+    let config = SyncConfig::default();
+    let rng = vauchi_core::rng::OsSecureRng::new();
+    (0..n)
+        .map(|_| config.next_background_sync_interval(&rng).as_secs_f64())
+        .collect()
+}
+
+// @internal
+#[test]
+fn test_background_intervals_stay_within_bounds() {
+    for gap in sample_background_intervals(5_000) {
+        assert!(
+            (60.0..=3_600.0).contains(&gap),
+            "gap {gap}s outside 1-60 min"
+        );
+    }
+}
+
+// @internal
+#[test]
+fn test_background_intervals_are_exponential_around_a_15_min_mean() {
+    let gaps = sample_background_intervals(20_000);
+    let n = gaps.len() as f64;
+    let mean = gaps.iter().sum::<f64>() / n;
+    // Clamping moves the mean of Exp(900 s) to about 885 s.
+    assert!((850.0..=920.0).contains(&mean), "mean {mean}s");
+    // An exponential puts 1 - 1/e = 0.632 below its mean; a fixed 15-min
+    // period puts all or nothing there.
+    let below_mean = gaps.iter().filter(|g| **g < 900.0).count() as f64 / n;
+    assert!(
+        (0.60..=0.66).contains(&below_mean),
+        "P(gap < 900 s) = {below_mean}"
+    );
+    // P(X <= 60 s) = 1 - e^(-1/15) = 0.064, clamped to the floor.
+    let at_floor = gaps.iter().filter(|g| **g <= 60.0).count() as f64 / n;
+    assert!(
+        (0.05..=0.08).contains(&at_floor),
+        "P(gap = 60 s) = {at_floor}"
+    );
+}
+
 // @internal
 #[test]
 fn test_equal_bounds_pin_the_interval() {

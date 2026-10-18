@@ -485,15 +485,32 @@ fn fetched(outcome: &vauchi_core::api::VauchiSyncOutcome) -> usize {
     }
 }
 
+#[cfg(feature = "testing")]
+fn blob_for_client(client: &vauchi_core::api::Vauchi, id: &str) -> FetchedBlob {
+    use vauchi_core::network::mailbox_token::{
+        compute_device_sync_token, current_day_epoch, token_hex,
+    };
+    let identity = client.identity().unwrap();
+    let token = compute_device_sync_token(
+        identity.master_seed(),
+        identity.device_id(),
+        current_day_epoch(client.storage().clock().unix_seconds()),
+    );
+    FetchedBlob {
+        mailbox_token: Some(token_hex(&token)),
+        ..blob(id)
+    }
+}
+
 // @internal
 #[test]
 #[cfg(feature = "testing")]
 fn a_waiting_sync_returns_the_mail_its_delayed_fetch_brought() {
     let outer = gateway_relay();
-    outer.set_gateway_blobs(vec![blob("b1")]);
     outer.hold_async_answers(2);
     let sleeper = Arc::new(FakeSleeper::new());
     let (mut vauchi, _dir) = vauchi_sleeping_on(&outer, true, sleeper.clone());
+    outer.set_gateway_blobs(vec![blob_for_client(&vauchi, "b1")]);
 
     let outcome = vauchi
         .sync_collecting_delayed(POLL, MAX_WAIT)
@@ -535,10 +552,10 @@ fn a_waiting_sync_gives_up_after_its_maximum_wait() {
 #[cfg(feature = "testing")]
 fn a_lost_answer_is_waited_for_again() {
     let outer = gateway_relay();
-    outer.set_gateway_blobs(vec![blob("b1")]);
     outer.hold_async_answers(1);
     let sleeper = Arc::new(FakeSleeper::new());
     let (mut vauchi, _dir) = vauchi_sleeping_on(&outer, true, sleeper.clone());
+    outer.set_gateway_blobs(vec![blob_for_client(&vauchi, "b1")]);
     vauchi.sync().expect("a sync that posts the first fetch");
     outer.forget_async_answers();
     vauchi.set_next_sync_allowed(std::time::Instant::now());
@@ -555,9 +572,9 @@ fn a_lost_answer_is_waited_for_again() {
 #[cfg(feature = "testing")]
 fn without_delayed_mode_a_waiting_sync_never_sleeps() {
     let outer = gateway_relay();
-    outer.set_gateway_blobs(vec![blob("b1")]);
     let sleeper = Arc::new(FakeSleeper::new());
     let (mut vauchi, _dir) = vauchi_sleeping_on(&outer, false, sleeper.clone());
+    outer.set_gateway_blobs(vec![blob_for_client(&vauchi, "b1")]);
 
     let outcome = vauchi
         .sync_collecting_delayed(POLL, MAX_WAIT)
@@ -575,10 +592,10 @@ fn without_delayed_mode_a_waiting_sync_never_sleeps() {
 #[cfg(feature = "testing")]
 fn a_waiting_sync_keeps_polling_until_the_delay_window_has_passed() {
     let outer = gateway_relay();
-    outer.set_gateway_blobs(vec![blob("b1")]);
     outer.hold_async_answers(1);
     let sleeper = Arc::new(FakeSleeper::new());
     let (mut vauchi, _dir) = vauchi_waiting_window(&outer, true, sleeper.clone(), Some(4 * POLL));
+    outer.set_gateway_blobs(vec![blob_for_client(&vauchi, "b1")]);
 
     let outcome = vauchi
         .sync_collecting_delayed(POLL, MAX_WAIT)

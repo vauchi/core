@@ -477,3 +477,68 @@ mod fault_schedule_props {
         }
     }
 }
+
+// After a Glance the iPhone dialled, the iPhone sat on Success with its
+// link still up; the Pixel's next Glance found that stale central already
+// connected and stuck on "Exchanging" (vauchi/private#673). The initiator
+// completes last (on the responder's reveal), so it is the side that can
+// release the link without cutting off a message the peer still needs.
+// @internal
+#[test]
+fn the_completed_initiator_releases_its_link_and_the_responder_does_not() {
+    for (mut pair, initiator_is_alice) in [
+        (Pair::connected(), true),
+        (Pair::connected_reversed(), false),
+    ] {
+        pair.pump();
+        pair.assert_both_completed_and_cross_verified();
+        let (initiator, responder) = if initiator_is_alice {
+            (&pair.alice, &pair.bob)
+        } else {
+            (&pair.bob, &pair.alice)
+        };
+
+        assert!(
+            matches!(
+                initiator.link_release_command(),
+                Some(Command::BleDisconnect {
+                    direction: BleLinkDirection::Outbound,
+                    ..
+                })
+            ),
+            "the initiator drops the link it dialled: {:?}",
+            initiator.link_release_command()
+        );
+        assert_eq!(responder.link_release_command(), None);
+    }
+}
+
+// @internal
+#[test]
+fn a_link_released_after_completion_leaves_the_responder_completed() {
+    let mut pair = Pair::connected();
+    pair.pump();
+    pair.exchange_reciprocity_acks();
+
+    let (event, commands) = pair
+        .bob
+        // An empty id is the unaddressed wildcard, which fails a live
+        // handshake; only completion may make it harmless.
+        .on_disconnected("", BleLinkDirection::Inbound, "central released");
+
+    assert!(matches!(event, BleMachineEvent::None), "{event:?}");
+    assert!(commands.is_empty());
+    assert_eq!(pair.bob.phase(), BleMachinePhase::Completed);
+}
+
+// @internal
+#[test]
+fn an_unfinished_or_cancelled_machine_has_no_link_to_release() {
+    let pair = Pair::connected();
+    assert_eq!(pair.alice.link_release_command(), None, "not completed yet");
+
+    let mut cancelled = Pair::connected();
+    cancelled.pump();
+    let _ = cancelled.alice.cancel();
+    assert_eq!(cancelled.alice.link_release_command(), None);
+}

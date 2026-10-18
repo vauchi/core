@@ -269,3 +269,41 @@ fn the_window_reported_before_a_shred_still_counts_after_it() {
         "{after_shred}"
     );
 }
+
+/// After `ResetApplication` the shells drop their state and reload the
+/// initial commands; they report their window only when it changes, so the
+/// profile has to come with that reload (vauchi/private#678).
+// @internal
+#[test]
+fn the_initial_commands_after_a_shred_carry_the_reported_profile() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = SharedKeychain::new();
+    let engine = open(&dir, &keychain);
+    let window = serde_json::json!({"PresentationEnvironmentChanged": {
+        "available_width": 375, "available_height": 667,
+        "input_modes": ["touch"], "motion": "full",
+    }});
+    engine
+        .dispatch_json(window.to_string())
+        .expect("environment accepted");
+    drive_onboarding(&engine);
+    assert!(matches!(
+        engine.dispatch_domain_command(DomainCommand::PanicShred),
+        Ok(DomainCommandResult::ShredCompleted { .. })
+    ));
+
+    let reloaded: serde_json::Value = serde_json::from_str(
+        &engine
+            .initial_commands_json()
+            .expect("initial commands after the shred"),
+    )
+    .expect("parse initial commands");
+
+    let profiles: Vec<_> = reloaded["commands"]
+        .as_array()
+        .expect("command list")
+        .iter()
+        .filter_map(|command| command.get("SetPresentationProfile"))
+        .collect();
+    assert_eq!(profiles.len(), 1, "{reloaded}");
+}

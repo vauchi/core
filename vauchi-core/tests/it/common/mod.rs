@@ -56,6 +56,8 @@ pub mod field_validation_helpers;
 #[allow(dead_code)]
 pub mod linked_peer;
 #[cfg(feature = "network-http")]
+mod mailbox_store;
+#[cfg(feature = "network-http")]
 #[allow(dead_code)]
 pub mod mock_relay;
 #[cfg(feature = "network-http")]

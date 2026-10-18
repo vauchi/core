@@ -286,6 +286,7 @@ mod guardian_token_tests;
 mod heirloom_tests;
 mod help_engine_tests;
 mod hidden_contact_tests;
+mod historical_mailbox_store_tests;
 mod http_adapter_truncation_tests;
 mod http_transport_endpoint_tests;
 mod http_transport_mock_response_tests;

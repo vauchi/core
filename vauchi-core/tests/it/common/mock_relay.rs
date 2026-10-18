@@ -128,6 +128,7 @@ struct State {
 /// through [`MockRelay::set_gateway_blobs`] (none by default) and `ack`
 /// with `acknowledged: true`.
 struct MockGateway {
+    mailboxes: Option<super::mailbox_store::MailboxStore>,
     server: ohttp::Server,
     /// The encoded key config the gateway decapsulates with.
     key_config: Vec<u8>,
@@ -223,6 +224,7 @@ impl MockRelay {
         let signed_record = signer.record_for(window, encoded_config.clone()).encode();
         let server = ohttp::Server::new(config).expect("ohttp::Server::new");
         self.state.lock().unwrap().gateway = Some(MockGateway {
+            mailboxes: None,
             server,
             key_config: encoded_config,
             signed_record,
@@ -232,6 +234,18 @@ impl MockRelay {
             held_polls: 0,
             delay_window_header: None,
             async_refused: false,
+        });
+    }
+
+    /// Opt into token-filtered in-memory send/fetch/ack behavior for delivery
+    /// tests. TTL, federation, quotas and authentication remain unmodeled.
+    pub fn enable_gateway_mailboxes(
+        &self,
+        clock: Arc<dyn vauchi_core::clock::Clock>,
+        page_size: usize,
+    ) {
+        self.with_gateway(|gateway| {
+            gateway.mailboxes = Some(super::mailbox_store::MailboxStore::new(clock, page_size))
         });
     }
 
@@ -429,14 +443,24 @@ fn serve_ohttp(gateway: &mut MockGateway, body: &[u8]) -> CannedResponse {
     let Ok((padded_request, server_response)) = gateway.server.decapsulate(body) else {
         return CannedResponse::status(400);
     };
-    let action = vauchi_core::crypto::padding::unpad(&padded_request)
+    let request = vauchi_core::crypto::padding::unpad(&padded_request)
         .and_then(|request| serde_json::from_slice::<serde_json::Value>(&request).ok())
-        .and_then(|request| request.get("action")?.as_str().map(str::to_string))
         .unwrap_or_default();
-    let reply = match action.as_str() {
-        "fetch" => serde_json::json!({ "status": "ok", "blobs": gateway.blobs }),
-        "ack" => serde_json::json!({ "status": "ok", "acknowledged": true }),
-        _ => serde_json::json!({ "status": "error", "error": "unsupported by the mock gateway" }),
+    let action = request
+        .get("action")
+        .and_then(|value| value.as_str())
+        .unwrap_or_default()
+        .to_string();
+    let reply = if let Some(mailboxes) = &mut gateway.mailboxes {
+        mailboxes.reply(&action, request)
+    } else {
+        match action.as_str() {
+            "fetch" => serde_json::json!({ "status": "ok", "blobs": gateway.blobs }),
+            "ack" => serde_json::json!({ "status": "ok", "acknowledged": true }),
+            _ => {
+                serde_json::json!({ "status": "error", "error": "unsupported by the mock gateway" })
+            }
+        }
     };
     gateway.actions.push(action);
     let padded_reply =

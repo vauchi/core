@@ -57,8 +57,7 @@ fn a_capped_fetch_page_is_reported_as_truncated() {
     }
 }
 
-const ONE_BLOB_PAGE: &str =
-    r#"{"status":"ok","blobs":[{"blob_id":"b1","ciphertext":"AQID","created_at":7}]}"#;
+const ONE_BLOB_PAGE: &str = r#"{"status":"ok","blobs":[{"blob_id":"b1","ciphertext":"AQID","created_at":7,"mailbox_token":"0000000000000000000000000000000000000000000000000000000000000000"}]}"#;
 
 // @internal
 #[test]
@@ -72,6 +71,10 @@ fn a_rate_limit_after_a_delivered_chunk_keeps_what_arrived() {
 
     assert_eq!(envelope.message_id.to_string(), "b1");
     assert_eq!(envelope.timestamp, 7);
+    let MessagePayload::EncryptedUpdate(update) = envelope.payload else {
+        panic!("expected the fetched update");
+    };
+    assert_eq!(update.recipient_id.as_str(), "0".repeat(64));
     assert!(adapter.receive().unwrap().is_none());
 }
 

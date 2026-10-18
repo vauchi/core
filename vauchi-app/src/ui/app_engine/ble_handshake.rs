@@ -412,6 +412,15 @@ impl AppEngine {
                         crate::ui::exchange::ceremony::exchange_celebrate(),
                     ]);
                 }
+                // After the ack: a link left up kept the advertiser's next
+                // Glance stuck on "Exchanging" (vauchi/private#673).
+                let release = self
+                    .ble_handshake_session
+                    .as_ref()
+                    .and_then(|h| h.machine.link_release_command());
+                if let Some(cmd) = release {
+                    self.extend_pending_commands(vec![cmd]);
+                }
                 // Drive the chrome to its terminal Success screen with the
                 // rich summary (M2 S6) — who you met + what they shared. The
                 // hollow `BleExchangeFlow` no longer self-completes from

@@ -307,6 +307,20 @@ impl BleHandshakeMachine {
         self.role
     }
 
+    /// The disconnect that ends a completed exchange's link, sent after the
+    /// reciprocity ack. Only the initiator offers it: it completes last, on
+    /// the responder's reveal, so nothing the peer needs is still in flight.
+    /// A link left up kept the next Glance on the advertiser stuck on
+    /// "Exchanging" (vauchi/private#673).
+    pub fn link_release_command(&self) -> Option<Command> {
+        (self.phase == BleMachinePhase::Completed && self.role == BleRole::Initiator).then(|| {
+            Command::BleDisconnect {
+                device_id: self.link_device_id(),
+                direction: self.link_direction(),
+            }
+        })
+    }
+
     /// The handshake's derived session key, once key agreement has
     /// produced it. Used to persist the exchanged contact (transport
     /// key + Double Ratchet seed) when the machine reaches `Completed`.

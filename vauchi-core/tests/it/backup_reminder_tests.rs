@@ -122,7 +122,7 @@ fn is_reminder_due_after_30_days_monthly() {
     assert!(!state.is_reminder_due(now_early, 0));
 }
 
-// @scenario: backup_reminder :: monthly frequency triggers at 30 days
+// @scenario: backup_reminder :: Monthly frequency fires at 30 days
 // @internal
 #[test]
 fn is_reminder_due_monthly_frequency() {

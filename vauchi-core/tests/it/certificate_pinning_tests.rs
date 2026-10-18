@@ -119,7 +119,7 @@ fn test_mitm_detection_different_certificate() {
     assert!(!verify_pin(&attacker_cert, &[legit_pin]));
 }
 
-/// @scenario: certificate_pinning :: Connection succeeds with matching pin
+/// @scenario: certificate_pinning :: Connection succeeds with matching certificate pin
 #[test]
 fn test_mitm_detection_matching_certificate_passes() {
     let server_cert = build_test_cert(b"relay-server-key");

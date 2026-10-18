@@ -160,7 +160,7 @@ fn test_identity_revoked_serialization_roundtrip() {
 
 // === Revocation Processing ===
 
-// @scenario: privacy_compliance :: Identity deletion sends revocation signal to all contacts
+// @scenario: privacy_compliance :: Account deletion sends revocation signal to all contacts
 // @internal
 #[test]
 fn test_process_revocation_deletes_contact_and_records_tombstone() {
@@ -278,7 +278,7 @@ fn test_update_after_revocation_discarded_via_tombstone() {
     assert!(storage.contacts().is_sender_revoked("alice_id").unwrap());
 }
 
-// @scenario: privacy_compliance :: Identity deletion sends revocation signal to all contacts
+// @scenario: privacy_compliance :: Account deletion sends revocation signal to all contacts
 // @internal
 #[test]
 fn test_revocation_only_deletes_matching_sender() {
@@ -335,7 +335,7 @@ fn test_revocation_with_future_timestamp() {
     );
 }
 
-// @scenario: privacy_compliance :: Identity deletion sends revocation signal to all contacts
+// @scenario: privacy_compliance :: Account deletion sends revocation signal to all contacts
 // @internal
 #[test]
 fn test_revocation_with_minimum_valid_timestamp() {
@@ -365,7 +365,7 @@ fn test_revocation_with_minimum_valid_timestamp() {
     );
 }
 
-// @scenario: privacy_compliance :: Identity deletion sends revocation signal to all contacts
+// @scenario: privacy_compliance :: Account deletion sends revocation signal to all contacts
 /// Imported contacts have UUID IDs (not hex-encoded public keys).
 /// `IdentityRevoked::create` must not panic for non-hex recipient IDs.
 /// The resulting message is meaningless (imported contacts don't participate

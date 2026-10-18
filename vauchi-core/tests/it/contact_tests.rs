@@ -135,7 +135,7 @@ fn test_contact_set_display_name() {
     assert_eq!(contact.card().display_name(), "New Name");
 }
 
-// @scenario: contact_card_management :: Display name must not be empty
+// @scenario: contact_card_management :: Display name cannot be empty
 // @internal
 #[test]
 fn test_contact_set_display_name_empty_error() {

@@ -9,7 +9,7 @@
 
 use vauchi_core::sync::device_sync::SyncItem;
 
-// @scenario: privacy_compliance :: Identity deletion propagates across all user devices
+// @scenario: privacy_compliance :: Account deletion propagates across all user devices
 // @internal
 #[test]
 fn test_deletion_scheduled_sync_item() {

@@ -16,7 +16,7 @@ fn test_create_card() {
 }
 
 // @scenario: contact_card_management :: Add field to contact card
-// @scenario: contact_card_management :: Remove field from contact card
+// @scenario: contact_card_management :: Remove a field from contact card
 #[test]
 fn test_add_and_remove_field() {
     let mut card = ContactCard::new("Test");

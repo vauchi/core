@@ -48,7 +48,7 @@ fn now() -> u64 {
 // DeletionScheduled / DeletionCancelled
 // ============================================================
 
-// @scenario: privacy_compliance :: Identity deletion propagates across all user devices
+// @scenario: privacy_compliance :: Account deletion propagates across all user devices
 // @internal
 #[test]
 fn apply_sync_deletion_scheduled_writes_state_to_storage() {

@@ -285,7 +285,7 @@ fn test_blocked_uri_scheme_returns_none(#[case] value: &str) {
     assert!(uri.is_none(), "{value} should be blocked");
 }
 
-// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
+// @scenario: contact_actions :: Allowed URI schemes whitelist
 #[rstest::rstest]
 #[case("tel")]
 #[case("mailto")]
@@ -300,7 +300,7 @@ fn test_allowed_scheme(#[case] scheme: &str) {
     );
 }
 
-// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
+// @scenario: contact_actions :: Allowed URI schemes whitelist
 #[rstest::rstest]
 #[case("javascript")]
 #[case("file")]
@@ -758,7 +758,7 @@ fn test_action_type_categorization() {
 
 /// Security test: XSS attempt in website field blocked
 /// Maps to: contact_actions.feature #45 — "URLs are validated before opening"
-// @scenario: contact_actions :: URLs are validated before opening (#45)
+// @scenario: contact_actions :: URLs are validated before opening
 // @internal
 #[test]
 fn test_xss_in_website_blocked() {
@@ -778,7 +778,7 @@ fn test_xss_in_website_blocked() {
 
 /// Security test: Data URI scheme blocked
 /// Maps to: contact_actions.feature #46 — "Only safe URI schemes are allowed"
-// @scenario: contact_actions :: Only safe URI schemes are allowed (#46)
+// @scenario: contact_actions :: Only safe URI schemes are allowed
 // @internal
 #[test]
 fn test_data_uri_blocked() {
@@ -797,7 +797,7 @@ fn test_data_uri_blocked() {
 
 /// Security test: FTP scheme blocked
 /// Maps to: contact_actions.feature #46 — "Only safe URI schemes are allowed"
-// @scenario: contact_actions :: Only safe URI schemes are allowed (#46)
+// @scenario: contact_actions :: Only safe URI schemes are allowed
 // @internal
 #[test]
 fn test_ftp_scheme_blocked() {
@@ -808,7 +808,7 @@ fn test_ftp_scheme_blocked() {
 
 /// Security test: Custom field with malicious content
 /// Maps to: contact_actions.feature #46 — "Only safe URI schemes are allowed"
-// @scenario: contact_actions :: Only safe URI schemes are allowed (#46)
+// @scenario: contact_actions :: Only safe URI schemes are allowed
 // @internal
 #[test]
 fn test_custom_field_malicious_url_blocked() {

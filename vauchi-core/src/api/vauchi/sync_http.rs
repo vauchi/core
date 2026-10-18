@@ -38,7 +38,8 @@ pub const PERIODIC_SYNC_INTERVAL_SECONDS: u64 = 900;
 pub const PERIODIC_SYNC_MAX_RETRIES: u32 = 3;
 
 use super::ohttp_key_error::should_refetch_key_and_retry;
-use super::receive_routing::{incoming_update_events, process_received_blobs};
+use super::receive_context::ReceiveContext;
+use super::receive_routing::{incoming_update_events, process_received_blobs_with_routes};
 use super::{Vauchi, VauchiSyncOutcome};
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::api::send_phase::SendPhase;
@@ -417,17 +418,25 @@ impl Vauchi {
         //    blob arrived for, populated by the relay per ADR-029 addendum
         //    2026-04-27. Blobs whose token doesn't resolve to a known
         //    contact are dropped (post-Step 2: no brute-force fallback).
-        let self_tokens = self.self_token_hexes(identity);
+        let mut context = ReceiveContext::new(identity, contacts, &self.config.relay);
         let mut fetched = 0usize;
+        let mut unscoped = 0usize;
         let mut device_blobs: Vec<(String, Vec<u8>)> = Vec::new();
         let mut revocations: Vec<(String, crate::network::IdentityRevoked)> = Vec::new();
         let mut update_blobs: Vec<(String, String, Vec<u8>, Option<String>)> = Vec::new();
         while let Some(envelope) = adapter.receive().map_err(VauchiError::Network)? {
             if let MessagePayload::EncryptedUpdate(update) = envelope.payload {
                 fetched += 1;
+                let scope_matches = adapter
+                    .received_context(envelope.message_id.as_str(), update.recipient_id.as_str())
+                    .is_some_and(|captured| context.include(captured));
+                if !scope_matches {
+                    unscoped += 1;
+                    continue;
+                }
                 let origin_hint = update.origin_hint;
                 match classify_inbound_blob(
-                    &self_tokens,
+                    &context.self_tokens,
                     envelope.message_id.into_string(),
                     update.recipient_id.into_string(),
                     update.ciphertext,
@@ -507,7 +516,13 @@ impl Vauchi {
         }
 
         // 3. Route + apply each contact blob, build per-blob ACK envelopes.
-        let outcomes = process_received_blobs(identity, &self.storage, contacts, update_blobs);
+        let outcomes = process_received_blobs_with_routes(
+            identity,
+            &self.storage,
+            contacts,
+            update_blobs,
+            &context.contact_tokens,
+        );
 
         // 3b. Persist peer-card fan-out before acknowledging the relay blob.
         // If queue persistence fails, return without ACK so the relay retries.
@@ -546,7 +561,7 @@ impl Vauchi {
             .iter()
             .filter(|o| o.token_resolved && !o.decrypted)
             .count();
-        let unresolved = outcomes.iter().filter(|o| !o.token_resolved).count();
+        let unresolved = outcomes.iter().filter(|o| !o.token_resolved).count() + unscoped;
         // Per-category reject tally (PII-free, sorted) so the device can name
         // WHICH receive step failed when card updates don't apply
         // (2026-06-28-sync-delivery-sent-not-received). E.g. "decrypt:2".

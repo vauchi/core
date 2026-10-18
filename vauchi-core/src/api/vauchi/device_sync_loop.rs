@@ -60,6 +60,13 @@ impl Vauchi {
 
         let day = current_day_epoch(self.clock.unix_seconds());
         let master_seed = identity.master_seed();
+        adapter.set_mailbox_context(crate::network::mailbox_context::MailboxContext {
+            identity: *identity.signing_public_key(),
+            device: *identity.device_id(),
+            application_relay: self.config.relay.server_url.clone(),
+            ohttp_relay: self.config.relay.ohttp_endpoint(),
+            day,
+        });
 
         // Build padded token batches (256 per batch, shuffled). `own_pubkey`
         // keys our directional receive tokens to our identity.
@@ -85,19 +92,6 @@ impl Vauchi {
         }
 
         Ok(())
-    }
-
-    /// Self-token hexes for today and ±1 day (clock-drift tolerance).
-    ///
-    /// These identify inbound device-sync blobs sent to this device's opaque
-    /// recipient-specific mailbox.
-    pub(super) fn self_token_hexes(&self, identity: &Identity) -> HashSet<String> {
-        let day = current_day_epoch(self.clock.unix_seconds());
-        let seed = identity.master_seed();
-        [day.saturating_sub(1), day, day.saturating_add(1)]
-            .iter()
-            .map(|d| token_hex(&compute_device_sync_token(seed, identity.device_id(), *d)))
-            .collect()
     }
 
     /// Flush queued device-sync items to every linked device.
@@ -271,6 +265,15 @@ impl Vauchi {
     }
 }
 
+/// Recipient-specific self tokens around a locally captured registration day.
+pub(super) fn self_token_hexes(identity: &Identity, day: u64) -> HashSet<String> {
+    let seed = identity.master_seed();
+    [day.saturating_sub(1), day, day.saturating_add(1)]
+        .iter()
+        .map(|d| token_hex(&compute_device_sync_token(seed, identity.device_id(), *d)))
+        .collect()
+}
+
 // INLINE_TEST_REQUIRED: exercises the pub(super) device-sync drivers
 // (run_device_sync_send / apply_device_sync_blob / self_token_hexes),
 // crate-internal by design and unreachable from the tests/ crate without
@@ -316,10 +319,10 @@ mod tests {
         b.create_identity("Alice").unwrap();
         let identity = b.identity().unwrap();
 
-        let tokens = b.self_token_hexes(identity);
+        let day = current_day_epoch(b.clock.unix_seconds());
+        let tokens = self_token_hexes(identity, day);
         assert_eq!(tokens.len(), 3, "recipient-specific today/±1 days");
 
-        let day = current_day_epoch(b.clock.unix_seconds());
         let seed = identity.master_seed();
         for d in [day - 1, day, day + 1] {
             let device_token = token_hex(&compute_device_sync_token(seed, identity.device_id(), d));

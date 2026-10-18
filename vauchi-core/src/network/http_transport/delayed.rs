@@ -102,6 +102,7 @@ pub enum Collected<T> {
 pub(crate) struct PendingFetch {
     pub(crate) tokens: Vec<String>,
     pub(crate) pending: PendingOhttp,
+    pub(crate) context: Option<Arc<crate::network::mailbox_context::MailboxContext>>,
 }
 
 /// Requests posted in earlier sync cycles. The HTTP adapter is rebuilt

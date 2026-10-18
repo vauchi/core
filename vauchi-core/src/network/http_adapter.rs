@@ -40,6 +40,7 @@ use super::message::{
 use super::ohttp_client::OhttpClient;
 use super::transport::{ConnectionState, TransportConfig, TransportResult};
 use crate::identifiers::ContactId;
+use crate::network::mailbox_context::MailboxContext;
 use vauchi_protocol::v2::FetchedBlob;
 
 /// The relay accepts at most this many tokens per fetch request.
@@ -85,6 +86,8 @@ pub struct HttpTransportAdapter {
     /// `receive()` and drops incoming updates, so a later collect there
     /// would consume an answer and lose its mail until the next fetch.
     delayed_polled: bool,
+    mailbox_context: Option<Arc<MailboxContext>>,
+    fetched_contexts: HashMap<(String, String), Arc<MailboxContext>>,
 }
 
 impl HttpTransportAdapter {
@@ -101,6 +104,8 @@ impl HttpTransportAdapter {
             last_truncated: false,
             delayed: None,
             delayed_polled: false,
+            mailbox_context: None,
+            fetched_contexts: HashMap::new(),
         }
     }
 
@@ -111,6 +116,16 @@ impl HttpTransportAdapter {
     pub fn with_delayed(mut self, delayed: Arc<Mutex<DelayedRequests>>) -> Self {
         self.delayed = Some(delayed);
         self
+    }
+
+    pub(crate) fn set_mailbox_context(&mut self, context: MailboxContext) {
+        self.mailbox_context = Some(Arc::new(context));
+    }
+
+    pub(crate) fn received_context(&self, blob_id: &str, token: &str) -> Option<&MailboxContext> {
+        self.fetched_contexts
+            .get(&(blob_id.to_string(), token.to_string()))
+            .map(Arc::as_ref)
     }
 
     /// Whether the relay capped the most recent fetch page (more blobs
@@ -362,7 +377,13 @@ impl HttpTransportAdapter {
             match self.http.fetch_page(chunk) {
                 Ok((blobs, truncated)) => {
                     self.last_truncated |= truncated;
-                    self.pending_blobs.extend(blobs);
+                    buffer_fetch_response(
+                        &mut self.pending_blobs,
+                        &mut self.fetched_contexts,
+                        blobs,
+                        chunk,
+                        &self.mailbox_context,
+                    );
                 }
                 Err(NetworkError::RateLimited { .. }) if !self.pending_blobs.is_empty() => break,
                 Err(e) => return Err(e),
@@ -394,15 +415,30 @@ impl HttpTransportAdapter {
         let mut failure = None;
         let mut answered = 0;
         let mut pending_fetches = Vec::new();
-        for PendingFetch { tokens, pending } in fetches {
+        for PendingFetch {
+            tokens,
+            pending,
+            context,
+        } in fetches
+        {
             match self.http.collect_delayed_fetch(pending) {
                 Ok(Collected::Ready((blobs, truncated))) => {
                     answered += 1;
                     self.last_truncated |= truncated;
-                    self.pending_blobs.extend(blobs);
+                    buffer_fetch_response(
+                        &mut self.pending_blobs,
+                        &mut self.fetched_contexts,
+                        blobs,
+                        &tokens,
+                        &context,
+                    );
                 }
                 Ok(Collected::Pending(pending)) => {
-                    pending_fetches.push(PendingFetch { tokens, pending });
+                    pending_fetches.push(PendingFetch {
+                        tokens,
+                        pending,
+                        context,
+                    });
                 }
                 Ok(Collected::Lost) => {}
                 Err(e) => {
@@ -421,6 +457,7 @@ impl HttpTransportAdapter {
                 Ok(pending) => pending_fetches.push(PendingFetch {
                     tokens: chunk.to_vec(),
                     pending,
+                    context: self.mailbox_context.clone(),
                 }),
                 Err(e) => {
                     failure.get_or_insert(e);
@@ -438,6 +475,27 @@ impl HttpTransportAdapter {
             Some(e) if self.pending_blobs.is_empty() => Err(e),
             _ => Ok(()),
         }
+    }
+}
+
+fn buffer_fetch_response(
+    pending: &mut VecDeque<FetchedBlob>,
+    contexts: &mut HashMap<(String, String), Arc<MailboxContext>>,
+    blobs: Vec<FetchedBlob>,
+    requested_tokens: &[String],
+    context: &Option<Arc<MailboxContext>>,
+) {
+    for blob in blobs {
+        let Some(token) = blob.mailbox_token.as_ref() else {
+            continue;
+        };
+        if !requested_tokens.contains(token) {
+            continue;
+        }
+        if let Some(context) = context {
+            contexts.insert((blob.blob_id.clone(), token.clone()), context.clone());
+        }
+        pending.push_back(blob);
     }
 }
 

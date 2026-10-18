@@ -147,6 +147,7 @@ mod crypto_tests;
 #[cfg(feature = "diagnostic-scanner")]
 mod debug_session_tests;
 mod delay_window_advert_tests;
+mod delayed_mailbox_routing_tests;
 mod delayed_ohttp_tests;
 mod deletion_manager_tests;
 mod deletion_sync_tests;

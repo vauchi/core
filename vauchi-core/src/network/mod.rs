@@ -35,6 +35,7 @@
 //! ```
 
 pub mod anonymous;
+pub(crate) mod mailbox_context;
 pub mod mailbox_token;
 pub mod origin_hint;
 

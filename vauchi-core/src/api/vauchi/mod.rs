@@ -32,6 +32,7 @@ mod onboarding;
 mod personal_data;
 mod places;
 mod propagation;
+mod receive_context;
 #[cfg(feature = "network-http")]
 mod receive_routing;
 mod reciprocity_send;

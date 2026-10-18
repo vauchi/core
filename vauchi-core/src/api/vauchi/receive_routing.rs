@@ -161,6 +161,16 @@ pub fn process_received_blobs(
         day,
     );
 
+    process_received_blobs_with_routes(identity, storage, contacts, blobs, &token_to_contact)
+}
+
+pub(super) fn process_received_blobs_with_routes(
+    identity: &crate::identity::Identity,
+    storage: &crate::storage::Storage,
+    contacts: &[Contact],
+    blobs: Vec<(String, String, Vec<u8>, Option<String>)>,
+    token_to_contact: &HashMap<String, String>,
+) -> Vec<BlobOutcome> {
     let mut outcomes = Vec::with_capacity(blobs.len());
     for (message_id, mailbox_token_hex, ciphertext, origin_hint) in blobs {
         let mut reciprocity_answer = None;

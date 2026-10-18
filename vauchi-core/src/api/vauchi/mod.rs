@@ -32,6 +32,7 @@ mod onboarding;
 mod personal_data;
 mod places;
 mod propagation;
+#[cfg(feature = "network-http")]
 mod receive_context;
 #[cfg(feature = "network-http")]
 mod receive_routing;
@@ -60,10 +61,12 @@ pub use exchange_relay::{RelayExchangeOffer, RelayExchangeResult};
 pub use import::{ImportResult, ImportWarning};
 #[cfg(feature = "network-http")]
 pub use link_exchange::{LinkExchange, LinkExchangeProgress};
+#[cfg(all(feature = "network-http", feature = "testing"))]
+pub use receive_routing::process_received_blobs;
 #[cfg(feature = "network-http")]
 #[allow(unused_imports)]
 // re-exported for integration tests; lint can't see external consumers
-pub use receive_routing::{BlobOutcome, incoming_update_events, process_received_blobs};
+pub use receive_routing::{BlobOutcome, incoming_update_events};
 pub use search::SearchFacets;
 pub use security::{BIOMETRIC_UNLOCK_MIN_DURATION, validate_duress_pin};
 pub use setup::SetupProgress;

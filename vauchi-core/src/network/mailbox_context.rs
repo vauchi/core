@@ -80,7 +80,7 @@ mod tests {
             request.routes.get(&first),
             Some(MailboxRoute::DeviceSync { day: 0 })
         ));
-        assert!(request.routes.get(&second).is_none());
+        assert!(!request.routes.contains_key(&second));
         assert_eq!(request.routes.len(), 1);
     }
 }

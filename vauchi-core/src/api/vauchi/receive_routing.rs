@@ -4,31 +4,18 @@
 
 //! Receive-phase blob routing for **contact card updates**.
 //!
-//! Owns the per-blob routing logic that `sync_http::run_receive_phase`
-//! delegates to: build a `mailbox_token → contact_id` map from the local
-//! contact list (O(N) HKDF), then resolve each fetched blob in O(1) via
-//! `FetchedBlob.mailbox_token` (ADR-029 addendum 2026-04-27).
-//!
-//! Step 2 of the receive-phase-token-attribution plan removed the
-//! brute-force fallback. The relay now always populates `mailbox_token`
-//! (deployed 2026-04-27). Blobs whose token doesn't appear in the local
-//! map cannot be card updates from any contact we know — the recipient
-//! registered the token, so a blob arriving for it must come from a
-//! contact whose token we just computed. Anything else is malformed or
-//! out-of-protocol; ACK as `Stored` and move on.
+//! Applies contact blobs using locally verified mailbox attribution
+//! (ADR-029 addendum 2026-04-27). Production receive supplies routes from
+//! the original fetch context, revalidated against current relationships.
+//! Unknown tokens never trigger blind ratchet attempts. Attribution does
+//! not replace ratchet authentication, signatures or origin-hint checks.
 //!
 //! ## Scope: contact updates only
 //!
 //! Device-sync inbound (blobs sent to `compute_device_sync_token`, see
 //! `network/relay_client.rs::send_device_sync_message`) is **not** handled
-//! here. The recipient registers those tokens via
-//! `batch_register_tokens_with_device_sync`, so the relay may return self-token blobs in
-//! the same fetch response — this function returns `TokenUnresolved`
-//! for them and the receive loop ACKs them as `Stored`. A separate path
-//! (`send_phase::process_device_sync` /
-//! `sync::device_orchestrator::DeviceSyncOrchestrator`) is responsible
-//! for device-sync; this module's `token_to_contact_map` intentionally
-//! omits self-tokens.
+//! here. The receive loop partitions verified self-token blobs first.
+//! This module intentionally omits self-tokens.
 //!
 //! Pure with respect to network I/O — the caller drives ACKs from the
 //! returned outcomes. Storage is only mutated on successful decryption
@@ -42,7 +29,8 @@ use crate::api::sync::{
     process_single_card_update_for_authenticated_device,
 };
 use crate::contact::Contact;
-use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
+#[cfg(any(test, feature = "testing"))]
+use crate::network::mailbox_token::{compute_mailbox_token, token_hex};
 
 /// Opens an origin-device hint (if present) to the sender device id, using the
 /// resolved contact's shared key. Returns `None` when there is no hint, the
@@ -133,12 +121,12 @@ impl BlobOutcome {
     }
 }
 
-/// Route and apply a batch of received blobs.
+/// Integration-test seam for the recent-day contact routing window.
 ///
 /// Each blob is resolved via its mailbox token in a local
 /// `token → contact_id` map (O(1)). Blobs whose token isn't in the map
-/// are dropped — the recipient registered every legitimate token, so a
-/// non-resolvable token indicates a malformed or out-of-protocol blob.
+/// produce unresolved outcomes. Production receive instead supplies the
+/// original request's locally captured, revalidated token routes.
 /// Returns one outcome per input blob in the same order.
 ///
 /// Pure with respect to network I/O — caller is responsible for sending
@@ -147,13 +135,14 @@ impl BlobOutcome {
 ///
 /// Exposed for integration tests so they can exercise the receive-phase
 /// routing logic without spinning up a transport.
+#[cfg(feature = "testing")]
 pub fn process_received_blobs(
     identity: &crate::identity::Identity,
     storage: &crate::storage::Storage,
     contacts: &[Contact],
     blobs: Vec<(String, String, Vec<u8>, Option<String>)>,
 ) -> Vec<BlobOutcome> {
-    let day = current_day_epoch(storage.clock().unix_seconds());
+    let day = crate::network::mailbox_token::current_day_epoch(storage.clock().unix_seconds());
     let token_to_contact = build_token_to_contact_map(
         contacts,
         identity.signing_public_key(),
@@ -395,6 +384,7 @@ fn reject_category(e: &CardUpdateError) -> &'static str {
 /// O(N) HKDF derivations per call, where N = number of exchanged
 /// non-blocked contacts. Tokens are hex-encoded so they compare directly
 /// against `FetchedBlob.mailbox_token`.
+#[cfg(any(test, feature = "testing"))]
 pub(crate) fn build_token_to_contact_map(
     contacts: &[Contact],
     own_pubkey: &[u8; 32],

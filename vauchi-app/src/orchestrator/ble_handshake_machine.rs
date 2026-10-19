@@ -227,12 +227,18 @@ pub struct BleHandshakeMachine {
     /// [`BleMachinePhase::Cancelled`].
     cancelled: bool,
     /// Peer device id of the link this machine drives, latched on
-    /// `on_connected`. Stamped onto every outgoing BLE command so shells
+    /// `on_connected` for a central and on the accepted KeyOffer for a
+    /// peripheral. Stamped onto every outgoing BLE command so shells
     /// route writes/disconnects to this link under glare (`device_id +
     /// direction` is the connection id — design doc §synthesized final).
     link_device: Option<String>,
     /// Physical direction of the latched link (see `link_device`).
     link_direction: Option<BleLinkDirection>,
+    /// A peripheral's most recent inbound connection before it accepts an
+    /// offer. Reported by `active_link` so a disconnect is judged as before
+    /// the latch moved to the accepted offer; never used by the stale-link
+    /// gate (vauchi/private#706).
+    inbound_candidate: Option<(String, BleLinkDirection)>,
 }
 
 impl BleHandshakeMachine {
@@ -262,6 +268,7 @@ impl BleHandshakeMachine {
             cancelled: false,
             link_device: None,
             link_direction: None,
+            inbound_candidate: None,
         }
     }
 
@@ -291,6 +298,7 @@ impl BleHandshakeMachine {
             cancelled: false,
             link_device: None,
             link_direction: None,
+            inbound_candidate: None,
         }
     }
 
@@ -381,7 +389,7 @@ impl BleHandshakeMachine {
     pub fn active_link(&self) -> Option<(String, BleLinkDirection)> {
         match (&self.link_device, self.link_direction) {
             (Some(device), Some(direction)) => Some((device.clone(), direction)),
-            _ => None,
+            _ => self.inbound_candidate.clone(),
         }
     }
 
@@ -438,7 +446,18 @@ impl BleHandshakeMachine {
         // inner session is role-agnostic (initiator/responder build
         // identically), so flipping `role` here needs no session rebuild.
         if matches!(self.inner.state(), BleHandshakeState::Idle) {
-            self.link_device = Some(device_id.to_string());
+            // A peripheral can be connected to by several clients before any
+            // offers — everyone in line of sight of a displayed Glance code.
+            // It latches the link whose KeyOffer it accepts, not the last
+            // one to connect, which took the link from a scanner already
+            // connected (vauchi/private#706).
+            self.link_device = match direction {
+                BleLinkDirection::Inbound => {
+                    self.inbound_candidate = Some((device_id.to_string(), direction));
+                    None
+                }
+                _ => Some(device_id.to_string()),
+            };
             self.link_direction = Some(direction);
             self.role = match direction {
                 BleLinkDirection::Outbound => BleRole::Initiator,
@@ -676,6 +695,10 @@ impl BleHandshakeMachine {
                 // Phase 1 responder ingress: KeyOffer.
                 match self.inner.process_key_offer(data, now) {
                     Ok((ack_bytes, encrypted_card)) => {
+                        if self.link_device.is_none() {
+                            self.link_device = Some(link.to_string());
+                            self.link_direction = Some(direction);
+                        }
                         let mut cmds =
                             Vec::with_capacity(2 + chunk_count(&encrypted_card, self.mtu_usable));
                         // KeyAck on handshake notify.

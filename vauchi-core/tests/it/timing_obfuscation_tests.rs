@@ -153,6 +153,54 @@ fn test_background_intervals_are_exponential_around_a_15_min_mean() {
     );
 }
 
+// #603 option 1 (owner, 2026-10-19): when the OS allows only N background
+// runs per window (Android's standby buckets), the mean stretches to
+// window / N so the allowance lasts the window instead of being spent in
+// the first hour; the draw stays exponential.
+fn sample_budgeted(window: std::time::Duration, runs: u32, n: usize) -> Vec<f64> {
+    let config = SyncConfig::default();
+    let rng = vauchi_core::rng::OsSecureRng::new();
+    let budget = vauchi_core::api::BackgroundBudget { window, runs };
+    (0..n)
+        .map(|_| {
+            config
+                .next_background_sync_interval_within(Some(budget), &rng)
+                .as_secs_f64()
+        })
+        .collect()
+}
+
+// @internal
+#[test]
+fn test_a_tight_budget_stretches_the_mean_to_window_over_runs() {
+    // 6 runs a day: mean about 4 h, ceiling the day.
+    let gaps = sample_budgeted(std::time::Duration::from_secs(86_400), 6, 20_000);
+    let mean = gaps.iter().sum::<f64>() / gaps.len() as f64;
+    assert!((13_000.0..=15_000.0).contains(&mean), "mean {mean}s");
+    assert!(gaps.iter().all(|g| (60.0..=86_400.0).contains(g)));
+    let below_mean = gaps.iter().filter(|g| **g < 14_400.0).count() as f64 / gaps.len() as f64;
+    assert!(
+        (0.60..=0.66).contains(&below_mean),
+        "P(gap < 4 h) = {below_mean}"
+    );
+}
+
+// @internal
+#[test]
+fn test_a_loose_budget_keeps_the_15_min_mean() {
+    // 75 runs an hour allows more than the 15-min schedule asks for.
+    let gaps = sample_budgeted(std::time::Duration::from_secs(3_600), 75, 20_000);
+    let mean = gaps.iter().sum::<f64>() / gaps.len() as f64;
+    assert!((850.0..=920.0).contains(&mean), "mean {mean}s");
+}
+
+// @internal
+#[test]
+fn test_a_budget_of_no_runs_is_no_budget() {
+    let gaps = sample_budgeted(std::time::Duration::from_secs(86_400), 0, 5_000);
+    assert!(gaps.iter().all(|g| (60.0..=3_600.0).contains(g)));
+}
+
 // @internal
 #[test]
 fn test_equal_bounds_pin_the_interval() {

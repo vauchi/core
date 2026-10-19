@@ -654,7 +654,15 @@ fn a_backgrounded_app_wakes_at_the_whole_gap_again() {
 // 2026-10-18). The tick names a gap from the background schedule either way.
 #[cfg(all(feature = "testing", feature = "network-http"))]
 fn next_tick_delay_ms(engine: &mut AppEngine) -> u64 {
-    let (_, next) = engine.scheduler_sync_tick().expect("tick");
+    next_budgeted_tick_delay_ms(engine, None)
+}
+
+#[cfg(all(feature = "testing", feature = "network-http"))]
+fn next_budgeted_tick_delay_ms(
+    engine: &mut AppEngine,
+    budget: Option<vauchi_core::api::BackgroundBudget>,
+) -> u64 {
+    let (_, next) = engine.scheduler_sync_tick(budget).expect("tick");
     delay_millis_on_the_wire(&next).expect("a ScheduleWakeup")
 }
 
@@ -681,4 +689,28 @@ fn an_open_app_s_tick_names_a_background_gap_and_keeps_its_deadline() {
     assert!((60_000..=3_600_000).contains(&ms), "{ms} ms");
     let until = engine.vauchi().time_until_sync_due().expect("identity");
     assert!(until <= std::time::Duration::from_secs(20), "{until:?}");
+}
+
+// #603 option 1: Android allows a rationed app a few runs a day; the next
+// run is drawn so the allowance lasts the day.
+// @internal
+#[test]
+#[cfg(all(feature = "testing", feature = "network-http"))]
+fn a_one_run_a_day_budget_draws_gaps_beyond_the_hour() {
+    let mut engine = engine_with_a_contact_and_sync_due_in(0);
+    let budget = vauchi_core::api::BackgroundBudget {
+        window: std::time::Duration::from_secs(86_400),
+        runs: 1,
+    };
+
+    let delays: Vec<u64> = (0..20)
+        .map(|_| next_budgeted_tick_delay_ms(&mut engine, Some(budget)))
+        .collect();
+
+    assert!(
+        delays.iter().all(|ms| (60_000..=86_400_000).contains(ms)),
+        "{delays:?}"
+    );
+    // All 20 within the hour happens with p = (1 - e^(-1/24))^20, about 1e-28.
+    assert!(delays.iter().any(|ms| *ms > 3_600_000), "{delays:?}");
 }

@@ -12,7 +12,9 @@ use vauchi_app::orchestrator::ble_handshake_machine::{
 };
 use vauchi_core::Command;
 use vauchi_core::crypto::X3DHKeyPair;
-use vauchi_core::exchange::{BleCardPayload, CHAR_HANDSHAKE_NOTIFY, CHAR_HANDSHAKE_WRITE};
+use vauchi_core::exchange::{
+    BleCardPayload, CHAR_DATA_NOTIFY, CHAR_DATA_WRITE, CHAR_HANDSHAKE_NOTIFY, CHAR_HANDSHAKE_WRITE,
+};
 use vauchi_core::platform::BleLinkDirection;
 
 const DISPLAYED_NONCE: [u8; 16] = [7u8; 16];
@@ -145,4 +147,114 @@ fn a_second_scanner_on_an_unaddressed_link_gets_no_answer() {
     let answers_to_mallory = key_acks_for(&mut alice, "", &mallory_offer);
 
     assert_eq!(answers_to_mallory, 0);
+}
+
+fn writes_on(commands: &[Command], characteristic: &str) -> Vec<Vec<u8>> {
+    commands
+        .iter()
+        .filter_map(|command| match command {
+            Command::BleWriteCharacteristic { uuid, data, .. }
+                if uuid.as_str() == characteristic =>
+            {
+                Some(data.clone())
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+/// What the displayer reports once the first scanner's card has arrived, when
+/// a second scanner's KeyOffer lands between that scanner's commitment and
+/// card (vauchi/private#705).
+fn exchange_with_a_second_offer_between_commitment_and_card(
+    bob_link: &str,
+    mallory_link: &str,
+) -> BleMachineEvent {
+    let mut alice = displayer();
+    let mut bob = scanner_of_the_displayed_code(1, "bob");
+    let mallory_offer = key_offer(
+        &mut scanner_of_the_displayed_code(5, "mallory"),
+        mallory_link,
+    );
+    let bob_offer = key_offer(&mut bob, bob_link);
+    let (_event, phase2) = alice.on_data_received(
+        bob_link,
+        BleLinkDirection::Inbound,
+        CHAR_HANDSHAKE_WRITE,
+        &bob_offer,
+        0,
+    );
+    let mut phase3 = Vec::new();
+    for ack in writes_on(&phase2, CHAR_HANDSHAKE_NOTIFY) {
+        phase3.extend(
+            bob.on_data_received(
+                bob_link,
+                BleLinkDirection::Outbound,
+                CHAR_HANDSHAKE_NOTIFY,
+                &ack,
+                0,
+            )
+            .1,
+        );
+    }
+    for chunk in writes_on(&phase2, CHAR_DATA_NOTIFY) {
+        phase3.extend(
+            bob.on_data_received(
+                bob_link,
+                BleLinkDirection::Outbound,
+                CHAR_DATA_NOTIFY,
+                &chunk,
+                0,
+            )
+            .1,
+        );
+    }
+    let commitment = writes_on(&phase3, CHAR_HANDSHAKE_WRITE)
+        .pop()
+        .expect("bob sends his commitment");
+    alice.on_data_received(
+        bob_link,
+        BleLinkDirection::Inbound,
+        CHAR_HANDSHAKE_WRITE,
+        &commitment,
+        0,
+    );
+    alice.on_data_received(
+        mallory_link,
+        BleLinkDirection::Inbound,
+        CHAR_HANDSHAKE_WRITE,
+        &mallory_offer,
+        0,
+    );
+    let mut last_event = BleMachineEvent::None;
+    for chunk in writes_on(&phase3, CHAR_DATA_WRITE) {
+        last_event = alice
+            .on_data_received(
+                bob_link,
+                BleLinkDirection::Inbound,
+                CHAR_DATA_WRITE,
+                &chunk,
+                0,
+            )
+            .0;
+    }
+    last_event
+}
+
+// @internal
+#[test]
+fn a_second_scanners_offer_mid_exchange_leaves_the_first_exchange_intact() {
+    let event = exchange_with_a_second_offer_between_commitment_and_card("bob", "mallory");
+
+    assert!(matches!(event, BleMachineEvent::Completed(_)), "{event:?}");
+}
+
+/// Shells that cannot name the link report an empty device id, which the
+/// stale-link gate treats as a wildcard.
+// @internal
+#[test]
+fn a_second_scanners_offer_mid_exchange_on_an_unaddressed_link_leaves_it_intact() {
+    let event = exchange_with_a_second_offer_between_commitment_and_card("", "");
+
+    assert!(matches!(event, BleMachineEvent::Completed(_)), "{event:?}");
 }

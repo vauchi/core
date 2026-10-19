@@ -61,6 +61,9 @@ use vauchi_core::exchange::{
 };
 use vauchi_core::platform::BleLinkDirection;
 
+/// The initiator's Phase 3 commitment: a SHA-256 over its encrypted card.
+const COMMITMENT_SIZE: usize = 32;
+
 /// Role on the BLE exchange — initiator sends the KeyOffer first,
 /// responder waits for it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -691,11 +694,13 @@ impl BleHandshakeMachine {
                 }
             }
             _ => {
-                // Phase 3 responder ingress: commitment (first 32 B)
-                // followed by chunked encrypted card on data write.
-                // Stash the commitment; the chunks arrive separately.
-                if data.len() >= 32 {
-                    self.pending_intermediate = Some(data[..32].to_vec());
+                // Phase 3 responder ingress: the commitment, followed by the
+                // chunked encrypted card on data write. Only the first write
+                // of exactly a commitment's size is taken: a second scanner of
+                // a displayed code writes its KeyOffer here too, and stashing
+                // it replaced the real commitment (vauchi/private#705).
+                if data.len() == COMMITMENT_SIZE && self.pending_intermediate.is_none() {
+                    self.pending_intermediate = Some(data.to_vec());
                     if let Some(card) = self.pending_encrypted_card.take() {
                         self.on_remote_encrypted_card_received(&card, now)
                     } else {

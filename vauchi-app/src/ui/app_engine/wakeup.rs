@@ -10,6 +10,28 @@ use crate::notification_types::PendingNotification;
 use crate::ui::WorkflowEngine;
 
 impl AppEngine {
+    /// Keep the OS's allowance of background runs the shell reported, for
+    /// the scheduler's next draws. Out of range is refused and changes
+    /// nothing (it comes from the shell, CC-14); `runs` 0 clears it.
+    pub(super) fn observe_background_budget(
+        &mut self,
+        window_secs: u32,
+        runs: u32,
+    ) -> Result<Vec<vauchi_core::Command>, super::presentation_protocol::AppPresentationError> {
+        const MAX_WINDOW_SECS: u32 = 7 * 24 * 3600;
+        const MAX_RUNS: u32 = 100_000;
+        if !(1..=MAX_WINDOW_SECS).contains(&window_secs) || runs > MAX_RUNS {
+            return Err(
+                super::presentation_protocol::AppPresentationError::InvalidBackgroundBudget,
+            );
+        }
+        self.background_budget = (runs > 0).then(|| vauchi_core::api::BackgroundBudget {
+            window: std::time::Duration::from_secs(u64::from(window_secs)),
+            runs,
+        });
+        Ok(Vec::new())
+    }
+
     /// The platform scheduler's sync tick, and the `ScheduleWakeup` for its
     /// next run. In the background it draws the next deadline from the
     /// background schedule and wakes at it; an open app keeps its 60 s
@@ -20,16 +42,17 @@ impl AppEngine {
     pub fn scheduler_sync_tick(
         &mut self,
     ) -> vauchi_core::VauchiResult<(vauchi_core::VauchiSyncOutcome, vauchi_core::Command)> {
+        let budget = self.background_budget;
         let (outcome, gap) = if self.in_foreground {
             let outcome = self.vauchi.periodic_sync_tick()?;
-            (outcome, self.vauchi.draw_background_sync_gap())
+            (outcome, self.vauchi.draw_background_sync_gap(budget))
         } else {
-            let outcome = self.vauchi.background_sync_tick()?;
+            let outcome = self.vauchi.background_sync_tick(budget)?;
             let gap = self
                 .vauchi
                 .time_until_sync_due()
                 .filter(|until| !until.is_zero())
-                .unwrap_or_else(|| self.vauchi.draw_background_sync_gap());
+                .unwrap_or_else(|| self.vauchi.draw_background_sync_gap(budget));
             (outcome, gap)
         };
         let millis = u32::try_from(gap.as_millis()).unwrap_or(u32::MAX).max(1);

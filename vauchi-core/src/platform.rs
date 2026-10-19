@@ -914,6 +914,10 @@ pub enum Event {
     DeepLinkOpened { uri: String },
     /// The application moved to the background or lost its active session.
     AppBackgrounded,
+    /// The OS allows this app `runs` background executions per `window_secs`
+    /// (Android's App Standby bucket); `runs` 0 means no known limit. An
+    /// observation only: Core draws the background schedule within it.
+    BackgroundBudgetObserved { window_secs: u32, runs: u32 },
     /// Core reported that background state changed outside an interaction.
     ///
     /// Shells receive only a parameter-free wake signal, then return this

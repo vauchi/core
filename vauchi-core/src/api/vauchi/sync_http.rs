@@ -257,17 +257,24 @@ impl Vauchi {
     }
 
     /// A gap drawn from the background schedule, for a scheduler's next run.
-    pub fn draw_background_sync_gap(&self) -> std::time::Duration {
+    /// Within `budget`, the OS's allowance of background runs, when known.
+    pub fn draw_background_sync_gap(
+        &self,
+        budget: Option<crate::api::BackgroundBudget>,
+    ) -> std::time::Duration {
         self.config
             .sync
-            .next_background_sync_interval(self.rng.as_ref())
+            .next_background_sync_interval_within(budget, self.rng.as_ref())
     }
 
     /// [`Self::periodic_sync_tick`] for a scheduler running while the app is
     /// in the background: the next deadline is drawn from the background
     /// schedule whatever the sync answered, because the scheduler wakes at
     /// it (#603 option 2). A foreground caller keeps the 60 s schedule.
-    pub fn background_sync_tick(&mut self) -> VauchiResult<VauchiSyncOutcome> {
+    pub fn background_sync_tick(
+        &mut self,
+        budget: Option<crate::api::BackgroundBudget>,
+    ) -> VauchiResult<VauchiSyncOutcome> {
         let outcome = self.periodic_sync_tick()?;
         if matches!(
             outcome,
@@ -275,10 +282,7 @@ impl Vauchi {
         ) {
             return Ok(outcome);
         }
-        let gap = self
-            .config
-            .sync
-            .next_background_sync_interval(self.rng.as_ref());
+        let gap = self.draw_background_sync_gap(budget);
         self.next_sync_allowed = Some(self.monotonic.now() + gap);
         Ok(outcome)
     }

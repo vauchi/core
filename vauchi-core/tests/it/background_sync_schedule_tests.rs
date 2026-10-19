@@ -45,7 +45,7 @@ fn a_background_tick_draws_the_next_sync_from_the_background_schedule() {
     let mut gaps = Vec::new();
     for _ in 0..10 {
         vauchi.set_next_sync_allowed(std::time::Instant::now());
-        vauchi.background_sync_tick().expect("tick");
+        vauchi.background_sync_tick(None).expect("tick");
         gaps.push(vauchi.time_until_sync_due().expect("identity"));
     }
 

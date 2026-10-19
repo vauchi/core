@@ -271,6 +271,9 @@ pub struct AppEngine {
     /// starts the engine cold), which wakes at the drawn background gap
     /// (#603 option 2).
     in_foreground: bool,
+    /// The OS's allowance of background runs, as the shell last reported it
+    /// (`Event::BackgroundBudgetObserved`, #603 option 1).
+    background_budget: Option<vauchi_core::api::BackgroundBudget>,
     /// Contextual roles and causal Undo state retained per visible surface.
     contextual_actions: HashMap<vauchi_core::SurfaceId, crate::ui::ContextualActionCoordinator>,
     /// The overlay Core currently believes is presented, if any.
@@ -572,6 +575,7 @@ impl AppEngine {
             retained_detail_screen: None,
             surface_revision: 1,
             in_foreground: false,
+            background_budget: None,
             contextual_actions: HashMap::new(),
             open_overlay: None,
             entry_flow: None,

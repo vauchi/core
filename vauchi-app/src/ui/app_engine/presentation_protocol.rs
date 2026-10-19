@@ -31,6 +31,8 @@ pub enum AppPresentationError {
     ContextualAction(#[from] crate::ui::ContextualActionCoordinatorError),
     #[error("authentication transition failed: {0}")]
     Authentication(String),
+    #[error("background budget out of range")]
+    InvalidBackgroundBudget,
 }
 
 impl AppPresentationError {
@@ -44,6 +46,7 @@ impl AppPresentationError {
             Self::Prepared(_) => "prepared",
             Self::ContextualAction(_) => "contextual_action",
             Self::Authentication(_) => "authentication",
+            Self::InvalidBackgroundBudget => "invalid_background_budget",
         }
     }
 }
@@ -182,6 +185,10 @@ impl AppEngine {
 
         if let Event::DeepLinkOpened { uri } = &event {
             return self.reduce_user_action(UserAction::LinkOpened { uri: uri.clone() }, None);
+        }
+
+        if let Event::BackgroundBudgetObserved { window_secs, runs } = event {
+            return self.observe_background_budget(window_secs, runs);
         }
 
         if matches!(event, Event::AppBackgrounded) {

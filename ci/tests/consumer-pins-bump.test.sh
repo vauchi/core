@@ -181,4 +181,30 @@ if git -C "$T/remotes/gtk2.git" rev-parse -q --verify "refs/heads/chore/bump-cor
     fail "without a bot identity nothing may be pushed"
 fi
 
+# GitLab's pre-receive call can fail for one push and pass the next
+# (cli, Core 0.84.1: "calling pre_receive endpoint: http post to gitlab
+# api /pre_receive endpoint"). A declined push is retried, so one blip does
+# not leave a consumer unbumped.
+remote flaky Cargo.toml "$CARGO_TOML" Cargo.lock "# lock
+"
+cat > "$T/remotes/flaky.git/hooks/pre-receive" <<HOOK
+#!/bin/sh
+[ -f "$T/flaky-declined" ] && exit 0
+: > "$T/flaky-declined"
+echo "calling pre_receive endpoint: http post to gitlab api /pre_receive endpoint" >&2
+exit 1
+HOOK
+chmod +x "$T/remotes/flaky.git/hooks/pre-receive"
+printf '%s\n' '{ "consumers": [ { "repo": "flaky", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" } ] }' > "$T/table3.json"
+status=0
+PATH="$T/bin:$PATH" FAKE_LOG="$T/log3" PROJECT_ACCESS_TOKEN=token PUSH_RETRY_DELAY=0 \
+    CI_API_V4_URL=https://gitlab.example/api/v4 CONSUMER_GIT_BASE="$T/remotes" \
+    bash "$HERE/scripts/bump-consumer-pins.sh" v0.70.0 "$T/table3.json" "$CORE_PINS" \
+    > "$T/out3" 2>&1 || status=$?
+cat "$T/out3"
+[ "$status" -eq 0 ] || fail "a push declined once must be retried and the job stay green"
+git -C "$T/remotes/flaky.git" rev-parse -q --verify "refs/heads/chore/bump-core-0.70.0" >/dev/null \
+    || fail "the retried push must land the bump branch"
+[ "$(grep -c '^POST .*vauchi%2Fflaky/merge_requests' "$T/log3")" -eq 1 ] || fail "flaky must get exactly one MR"
+
 echo "consumer-pins-bump: OK"

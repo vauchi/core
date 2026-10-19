@@ -145,7 +145,9 @@ pub use shred::{
 pub use error::{VauchiError, VauchiResult};
 
 // Configuration
-pub use config::{OhttpConfig, RecoveryConfig, RelayConfig, SyncConfig, VauchiConfig};
+pub use config::{
+    BackgroundBudget, OhttpConfig, RecoveryConfig, RelayConfig, SyncConfig, VauchiConfig,
+};
 
 // Events
 pub use events::{EventCallback, EventDispatcher, EventOrigin, HandlerId, VauchiEvent};

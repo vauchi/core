@@ -648,6 +648,39 @@ impl SyncConfig {
     }
 }
 
+/// How many background runs the OS allows per window (Android's App Standby
+/// bucket, #603 option 1), as the shell observes it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BackgroundBudget {
+    pub window: Duration,
+    pub runs: u32,
+}
+
+impl SyncConfig {
+    /// [`Self::next_background_sync_interval`] under the OS's budget: the
+    /// mean stretches to `window / runs` so the allowance lasts the window
+    /// rather than being spent early and then silent, and never drops below
+    /// the background mean; the window becomes the ceiling. A budget of no
+    /// runs is no budget.
+    pub fn next_background_sync_interval_within(
+        &self,
+        budget: Option<BackgroundBudget>,
+        rng: &dyn crate::rng::SecureRng,
+    ) -> Duration {
+        let Some(budget) = budget.filter(|b| b.runs > 0) else {
+            return self.next_background_sync_interval(rng);
+        };
+        let window_ms = u64::try_from(budget.window.as_millis()).unwrap_or(u64::MAX);
+        let mean_ms = (window_ms / u64::from(budget.runs)).max(self.background_sync_interval_ms);
+        exponential_gap(
+            mean_ms,
+            self.background_sync_interval_min_ms,
+            self.background_sync_interval_max_ms.max(window_ms),
+            rng,
+        )
+    }
+}
+
 /// A memoryless gap: exponential around `mean_ms`, clamped to
 /// `[min_ms, max_ms]`; zero when `mean_ms` is zero (manual sync only).
 fn exponential_gap(

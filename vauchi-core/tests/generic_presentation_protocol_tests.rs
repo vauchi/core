@@ -330,6 +330,25 @@ fn test_native_lifecycle_events_preserve_raw_shell_facts() {
     );
 }
 
+// Shells write this event by hand (Android's worker reports its standby
+// bucket's allowance, #603), so its wire shape is a cross-language contract.
+// @internal
+#[test]
+fn the_background_budget_event_keeps_its_wire_shape() {
+    let wire = json!({"BackgroundBudgetObserved": {"window_secs": 86_400, "runs": 3}});
+
+    let event: Event = serde_json::from_value(wire.clone()).expect("decode");
+
+    assert_eq!(
+        event,
+        Event::BackgroundBudgetObserved {
+            window_secs: 86_400,
+            runs: 3
+        }
+    );
+    assert_eq!(serde_json::to_value(&event).expect("encode"), wire);
+}
+
 /// Feature: generic_presentation_protocol.feature
 /// Scenario: Consequential actions carry a tone that is neither standard nor destructive
 // @scenario: generic_presentation_protocol.feature :: Contextual controls expose four stable roles

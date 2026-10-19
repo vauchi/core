@@ -98,7 +98,18 @@ bump_one() {
     git -C "$dir" -c user.name="$BOT_NAME" -c user.email="$BOT_EMAIL" commit -q -a \
         -m "chore: pin Core to v$VERSION" \
         -m "Opened by Core's release pipeline (bump:consumer-pins). $repo pinned $current."
-    git -C "$dir" push -q -u origin "$BRANCH"
+    # GitLab's internal pre-receive call can fail for one push and pass the
+    # next; one blip left cli unbumped for Core 0.84.1 (#704).
+    local attempt=1
+    until git -C "$dir" push -q -u origin "$BRANCH"; do
+        if [ "$attempt" -ge 3 ]; then
+            echo "$repo: ERROR: push of $BRANCH declined $attempt times" >&2
+            return 1
+        fi
+        echo "$repo: push declined, retrying ($attempt of 3)" >&2
+        attempt=$((attempt + 1))
+        sleep "${PUSH_RETRY_DELAY:-10}"
+    done
 
     local body
     body=$(python3 -c 'import json, sys

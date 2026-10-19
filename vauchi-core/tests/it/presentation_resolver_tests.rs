@@ -55,6 +55,7 @@ fn ungrouped_contact_resolves_to_default() {
     assert_eq!(resolved, default);
 }
 
+// @scenario: visibility_labels :: Per-group display name override
 // @internal
 #[test]
 fn single_group_overrides_win() {
@@ -75,6 +76,7 @@ fn single_group_overrides_win() {
     assert_eq!(resolved.avatar.as_deref(), Some(b"group-avatar".as_slice()));
 }
 
+// @scenario: visibility_labels :: Per-group display name override
 // @internal
 #[test]
 fn overrides_fall_back_field_by_field() {

@@ -62,6 +62,7 @@ fn create_visibility_update(id: &str, contact_id: &str, field_id: &str) -> Pendi
 /// - Create a visibility group
 /// - Add contact to group updates their visibility
 /// - Remove contact from group updates their visibility
+// @scenario: visibility_labels :: Groups mode visibility
 // @scenario: visibility_control :: Create a visibility group
 // @scenario: visibility_control :: Add contact to group updates their visibility
 // @scenario: visibility_control :: Remove contact from group updates their visibility

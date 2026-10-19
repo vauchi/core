@@ -16,6 +16,7 @@ fn create_vauchi_with_identity(name: &str) -> Vauchi {
     wb
 }
 
+// @scenario: visibility_labels :: Transition from groups to no-group mode
 // @scenario: visibility_control :: Delete last group migrates fields to field_visibility
 #[test]
 fn test_transition_to_no_group_mode() {

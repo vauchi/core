@@ -64,6 +64,7 @@ fn texts(screen: &ScreenModel) -> Vec<String> {
         .collect()
 }
 
+// @scenario: visibility_labels :: Label with no contacts still exists
 // @internal
 #[test]
 fn each_row_counts_contacts_and_the_entries_they_see() {
@@ -151,6 +152,7 @@ fn no_groups_says_what_groups_do_and_offers_add_group() {
     assert!(rows(&screen).is_empty());
 }
 
+// @scenario: visibility_labels :: Label with no contacts still exists
 // @internal
 #[test]
 fn a_row_opens_its_group() {

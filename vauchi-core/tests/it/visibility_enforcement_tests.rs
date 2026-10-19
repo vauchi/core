@@ -87,6 +87,7 @@ fn test_default_visibility_is_everyone() {
 
 /// A new field propagates to nobody until its Visible toggle is set, then
 /// reaches every contact alike (field-centric model, 2026-07-10).
+// @scenario: visibility_labels :: No-group mode visibility
 // @scenario: visibility_control :: New fields default to hidden for ungrouped contacts
 #[test]
 fn test_new_field_propagates_only_after_visible_toggle() {
@@ -425,6 +426,7 @@ fn content_edit_reaches_only_the_granting_group() {
 // group members, while a Visible-toggled unassigned field reaches every
 // contact alike — grouped and ungrouped. Brackets both audience changes so
 // neither direction regresses.
+// @scenario: visibility_labels :: Contact sees fields based on label membership
 // @scenario: visibility_control :: A content edit reaches ungrouped contacts via the public base card
 #[test]
 fn content_edit_partitions_group_assigned_and_toggled_fields() {

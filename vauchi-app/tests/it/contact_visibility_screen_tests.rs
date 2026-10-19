@@ -167,6 +167,7 @@ fn each_switch_shows_what_the_contact_really_receives() {
     }
 }
 
+// @scenario: visibility_labels :: View effective visibility for a contact
 // @internal
 #[test]
 fn each_entry_says_why_the_contact_sees_it_or_not() {

@@ -55,6 +55,7 @@ fn create_manager_with_labels(names: &[&str]) -> (GroupManager, Vec<String>) {
 /// - Rename an existing label
 /// - Cannot rename to existing label name
 /// - Delete a label
+// @scenario: visibility_labels :: Create custom label with any name
 // @scenario: visibility_labels :: Create a new visibility label
 // @scenario: visibility_labels :: Cannot create duplicate label names
 // @scenario: visibility_labels :: Rename an existing label
@@ -220,6 +221,8 @@ fn test_label_max_limit() {
 /// - Remove a contact from a label
 /// - Contact in multiple labels
 /// - View all labels for a contact
+// @scenario: visibility_labels :: Add multiple contacts to a label at once
+// @scenario: visibility_labels :: View all labels for a contact
 // @scenario: visibility_labels :: Add a contact to a label
 // @scenario: visibility_labels :: Remove a contact from a label
 // @scenario: visibility_labels :: Contact in multiple labels
@@ -330,6 +333,8 @@ fn test_contact_assignment_to_label() {
 /// - Adding contact to label grants visibility
 /// - Removing contact from label revokes visibility
 /// - Contact sees fields based on label membership
+// @scenario: visibility_labels :: Apply label template to new contact
+// @scenario: visibility_labels :: Remove field from label visibility
 // @scenario: visibility_labels :: Adding contact to label grants visibility
 // @scenario: visibility_labels :: Removing contact from label revokes visibility
 #[test]
@@ -469,6 +474,11 @@ fn test_cascading_visibility_changes() {
 /// - Associate field with multiple labels
 /// - Remove field from label visibility
 /// - Per-contact override takes precedence over label
+// @scenario: visibility_labels :: Associate field with multiple labels
+// @scenario: visibility_labels :: Clear per-contact overrides
+// @scenario: visibility_labels :: Grant visibility to contact not in label
+// @scenario: visibility_labels :: Non-member does not see label-restricted fields
+// @scenario: visibility_labels :: Revoke visibility from contact in label
 // @scenario: visibility_labels :: Associate a field with a label
 // @scenario: visibility_labels :: Per-contact override takes precedence over label
 #[test]

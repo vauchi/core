@@ -258,3 +258,90 @@ fn a_second_scanners_offer_mid_exchange_on_an_unaddressed_link_leaves_it_intact(
 
     assert!(matches!(event, BleMachineEvent::Completed(_)), "{event:?}");
 }
+
+/// Both shells report each inbound connection to the displayer with its
+/// device id before any data arrives (vauchi/private#706).
+// @internal
+#[test]
+fn a_scanner_connecting_after_the_first_does_not_take_its_link() {
+    let mut alice = displayer();
+    let bob_offer = key_offer(&mut scanner_of_the_displayed_code(1, "bob"), "bob");
+    alice.on_connected("bob", BleLinkDirection::Inbound, 0);
+    alice.on_connected("mallory", BleLinkDirection::Inbound, 0);
+
+    let answers_to_bob = key_acks_for(&mut alice, "bob", &bob_offer);
+
+    assert_eq!(answers_to_bob, 1);
+}
+
+/// A client that connected earlier but never offered must not be able to
+/// write a commitment-sized value into the exchange the displayer accepted.
+// @internal
+#[test]
+fn a_connected_client_that_never_offered_cannot_write_into_the_accepted_exchange() {
+    let mut alice = displayer();
+    let mut bob = scanner_of_the_displayed_code(1, "bob");
+    alice.on_connected("bob", BleLinkDirection::Inbound, 0);
+    alice.on_connected("mallory", BleLinkDirection::Inbound, 0);
+    let bob_offer = key_offer(&mut bob, "bob");
+    let (_event, phase2) = alice.on_data_received(
+        "bob",
+        BleLinkDirection::Inbound,
+        CHAR_HANDSHAKE_WRITE,
+        &bob_offer,
+        0,
+    );
+    let mut phase3 = Vec::new();
+    for ack in writes_on(&phase2, CHAR_HANDSHAKE_NOTIFY) {
+        phase3.extend(
+            bob.on_data_received(
+                "bob",
+                BleLinkDirection::Outbound,
+                CHAR_HANDSHAKE_NOTIFY,
+                &ack,
+                0,
+            )
+            .1,
+        );
+    }
+    for chunk in writes_on(&phase2, CHAR_DATA_NOTIFY) {
+        phase3.extend(
+            bob.on_data_received(
+                "bob",
+                BleLinkDirection::Outbound,
+                CHAR_DATA_NOTIFY,
+                &chunk,
+                0,
+            )
+            .1,
+        );
+    }
+    alice.on_data_received(
+        "mallory",
+        BleLinkDirection::Inbound,
+        CHAR_HANDSHAKE_WRITE,
+        &[9u8; 32],
+        0,
+    );
+    let commitment = writes_on(&phase3, CHAR_HANDSHAKE_WRITE)
+        .pop()
+        .expect("bob sends his commitment");
+    alice.on_data_received(
+        "bob",
+        BleLinkDirection::Inbound,
+        CHAR_HANDSHAKE_WRITE,
+        &commitment,
+        0,
+    );
+    let mut last_event = BleMachineEvent::None;
+    for chunk in writes_on(&phase3, CHAR_DATA_WRITE) {
+        last_event = alice
+            .on_data_received("bob", BleLinkDirection::Inbound, CHAR_DATA_WRITE, &chunk, 0)
+            .0;
+    }
+
+    assert!(
+        matches!(last_event, BleMachineEvent::Completed(_)),
+        "{last_event:?}"
+    );
+}

@@ -376,6 +376,7 @@ fn test_contact_trust_for_recovery_rejects_standard_trust() {
     );
 }
 
+// @scenario: contact_recovery :: Blocked contact cannot be recovery-trusted
 // @scenario: identity_management :: Social recovery setup
 // @internal
 #[test]

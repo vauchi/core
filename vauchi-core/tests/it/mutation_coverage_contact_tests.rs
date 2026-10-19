@@ -222,6 +222,7 @@ fn mark_fingerprint_unverified_fails_on_imported() {
 // accept_recovery_with_card
 // ============================================================
 
+// @scenario: contact_recovery :: Contact card is refreshed after recovery
 // @internal
 #[test]
 fn accept_recovery_with_card_updates_key_and_card() {

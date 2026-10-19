@@ -23,6 +23,7 @@ mod app_undo_protocol_tests;
 mod ble_handshake_app_engine_tests;
 mod ble_link_release_tests;
 mod event_notifier_tests;
+mod glance_displayed_code_tests;
 mod glance_failed_screen_tests;
 mod glance_manual_code_entry_tests;
 mod schedule_wakeup_tests;

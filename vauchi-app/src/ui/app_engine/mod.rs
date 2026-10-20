@@ -29,6 +29,7 @@ mod device_link_responder;
 mod dispatch;
 mod entry_points;
 mod entry_viewers;
+mod export_verification;
 mod help_catalog;
 // INLINE_TEST_REQUIRED: drives the `pub(super)` create_engine factory and the
 // `pub(crate)` DirectTransportEngine::outgoing_card seam — crate-internal.
@@ -722,6 +723,10 @@ impl WorkflowEngine for AppEngine {
         // a denied OS permission and re-render the picker. See
         // `screens_exchange::intercept_grant_permission`.
         if let Some(result) = self.intercept_device_link_pin(&action) {
+            return result;
+        }
+
+        if let Some(result) = self.intercept_export_pin(&action) {
             return result;
         }
 

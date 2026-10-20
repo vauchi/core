@@ -22,9 +22,13 @@ fn engine_with_bob() -> AppEngine {
     );
     vauchi.add_contact(bob).unwrap();
     let mut engine = AppEngine::new(vauchi);
+    engine.vauchi_mut().setup_app_password(APP_PIN).unwrap();
+    engine.vauchi_mut().authenticate(APP_PIN).unwrap();
     engine.navigate_to(AppScreen::Privacy);
     engine
 }
+
+const APP_PIN: &str = "app-password-123";
 
 fn press(engine: &mut AppEngine, action_id: &str) -> ActionResult {
     engine.handle_action(UserAction::ActionPressed {
@@ -81,7 +85,12 @@ fn confirming_exports_the_heirloom_document() {
     let mut engine = engine_with_bob();
     let _ = press(&mut engine, "heirloom");
 
-    let html = match press(&mut engine, "confirm_heirloom") {
+    let _ = press(&mut engine, "confirm_heirloom");
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "pin".into(),
+        value: APP_PIN.into(),
+    });
+    let html = match press(&mut engine, "confirm_pin") {
         ActionResult::HeirloomExportComplete { html } => html,
         other => panic!("expected HeirloomExportComplete, got {other:?}"),
     };

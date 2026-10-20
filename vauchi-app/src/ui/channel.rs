@@ -53,6 +53,9 @@ pub enum EngineOutput {
     /// PIN typed to confirm a device link (redacted in `Debug`). Absent
     /// while the entry is empty or the screen is past the PIN step.
     DeviceLinkPin { pin: String },
+    /// PIN typed to confirm a data export (redacted in `Debug`). Absent
+    /// while the entry is empty or the screen is past the PIN step.
+    ExportPin { pin: String },
     /// A verified Glance peer code the user typed instead of scanning;
     /// the AppEngine pins the peer from it as from a camera scan. Absent
     /// until a code is accepted. `Debug` prints the length only: a code
@@ -161,6 +164,7 @@ pub enum EngineUpdate {
     /// The biometric prompt succeeded but a duress PIN is set, so the lock
     /// screen asks for the password only (ADR-032, #591).
     BiometricUnlockPassed,
+    GdprExport(GdprExportUpdate),
 }
 
 /// Cycle-thread bridge updates for the multi-stage exchange engine.
@@ -184,6 +188,13 @@ pub enum MultiStageUpdate {
     /// The other phone said it saved too; from
     /// `MultiStageMachine::peer_confirmed` on the same ticks (plan 5.3).
     PeerConfirmed(bool),
+}
+
+/// The AppEngine's verdict on the PIN typed to confirm a data export.
+pub enum GdprExportUpdate {
+    /// The PIN that opened the session: run the pending export once.
+    Verified,
+    PinRejected,
 }
 
 /// Cycle-thread bridge updates for the device-linking engine.
@@ -410,6 +421,10 @@ impl EngineUpdate {
             Self::ConfirmPendingDelete => "ConfirmPendingDelete",
             Self::DeviceCapabilities(_) => "DeviceCapabilities",
             Self::BiometricUnlockPassed => "BiometricUnlockPassed",
+            Self::GdprExport(u) => match u {
+                GdprExportUpdate::Verified => "GdprExport::Verified",
+                GdprExportUpdate::PinRejected => "GdprExport::PinRejected",
+            },
             Self::MyInfoEntryDetail(u) => match u {
                 MyInfoEntryDetailUpdate::GroupVisibility { .. } => {
                     "MyInfoEntryDetail::GroupVisibility"
@@ -558,6 +573,10 @@ impl std::fmt::Debug for EngineOutput {
             Self::Lock { .. } => f.debug_struct("Lock").field("pin", &"<redacted>").finish(),
             Self::DeviceLinkPin { .. } => f
                 .debug_struct("DeviceLinkPin")
+                .field("pin", &"<redacted>")
+                .finish(),
+            Self::ExportPin { .. } => f
+                .debug_struct("ExportPin")
                 .field("pin", &"<redacted>")
                 .finish(),
             Self::GlancePeerCode { data } => f

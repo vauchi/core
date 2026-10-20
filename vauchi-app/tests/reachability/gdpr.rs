@@ -18,6 +18,11 @@
 //! Both states also offer `heirloom` -> `confirm_heirloom` (`confirm_heirloom`
 //! / `cancel`), the paper heirloom export (private#363).
 //!
+//! Every export first asks for the session password (#712): without an app
+//! password `export_needs_app_password` (`set_app_password`, handled by the
+//! AppEngine, / `cancel`); with one `export_confirm_pin` (`confirm_pin`,
+//! checked by the AppEngine, / `cancel`).
+//!
 //! The `consent_actions` `ActionList` rows (`view_data` / `manage_consent`)
 //! are `ListItemSelected` pass-throughs and are not walked here.
 
@@ -28,6 +33,17 @@ const HANDLED_DEFAULT: &[&str] = &[
     "export",
     "heirloom",
     "confirm_heirloom",
+    "set_app_password",
+    "delete",
+    "confirm_delete",
+    "cancel",
+];
+
+const HANDLED_WITH_APP_PASSWORD: &[&str] = &[
+    "export",
+    "heirloom",
+    "confirm_heirloom",
+    "confirm_pin",
     "delete",
     "confirm_delete",
     "cancel",
@@ -40,6 +56,7 @@ const HANDLED_SCHEDULED: &[&str] = &[
     "cancel_deletion",
     "execute_deletion",
     "confirm_execute",
+    "set_app_password",
     "cancel",
 ];
 
@@ -49,6 +66,10 @@ fn factory() -> GdprEngine {
         "Consent summary".into(),
         vauchi_app::i18n::Locale::English,
     )
+}
+
+fn app_password_factory() -> GdprEngine {
+    factory().with_app_password_set(true)
 }
 
 fn scheduled_factory() -> GdprEngine {
@@ -73,4 +94,10 @@ fn gdpr_screens_are_reachable() {
 #[test]
 fn gdpr_scheduled_screens_are_reachable() {
     assert_reachability_across_screens(scheduled_factory, HANDLED_SCHEDULED);
+}
+
+// @internal
+#[test]
+fn gdpr_export_pin_screen_is_reachable() {
+    assert_reachability_across_screens(app_password_factory, HANDLED_WITH_APP_PASSWORD);
 }

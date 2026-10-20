@@ -18,7 +18,6 @@
 use super::AppEngine;
 use crate::ui::ScreenModel;
 use crate::ui::device_link_pin::CONFIRM_PIN_ACTION_ID;
-use crate::ui::lock_screen::DEFAULT_LOCK_MAX_ATTEMPTS;
 use crate::ui::{
     ActionResult, AppScreen, DeviceLinkUpdate, EngineOutput, EngineUpdate, UserAction,
 };
@@ -128,12 +127,8 @@ impl AppEngine {
             self.ensure_device_link_session();
             return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
         }
-        self.confirm_pin_failures += 1;
-        if self.confirm_pin_failures >= DEFAULT_LOCK_MAX_ATTEMPTS {
-            self.confirm_pin_failures = 0;
-            if let Some(locked) = self.handle_app_backgrounded() {
-                return Some(ActionResult::NavigateTo(locked));
-            }
+        if let Some(locked) = self.record_confirm_pin_miss() {
+            return Some(locked);
         }
         let _ = self
             .engine

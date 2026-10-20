@@ -18,12 +18,14 @@ fn a_phone_link_carries_no_whitespace() {
     assert_eq!(field.to_uri().as_deref(), Some("tel:+442079460958"));
 }
 
+// @scenario: contact_actions :: Various phone number formats are normalized for dialer
 #[test]
 fn a_phone_link_keeps_the_punctuation_dialers_accept() {
     let field = ContactField::new(FieldType::Phone, "Home", "(555) 123-4567", 0);
     assert_eq!(field.to_uri().as_deref(), Some("tel:(555)123-4567"));
 }
 
+// @internal
 #[test]
 fn each_map_provider_searches_for_the_address() {
     let expected = [
@@ -50,6 +52,7 @@ fn each_map_provider_searches_for_the_address() {
     }
 }
 
+// @internal
 #[test]
 fn a_blank_address_has_no_map_link() {
     for provider in [MapProvider::System, MapProvider::OrganicMaps] {
@@ -57,6 +60,7 @@ fn a_blank_address_has_no_map_link() {
     }
 }
 
+// @internal
 #[test]
 fn an_address_cannot_break_out_of_its_query() {
     let url = map_uri(
@@ -71,6 +75,7 @@ fn an_address_cannot_break_out_of_its_query() {
 }
 
 proptest! {
+    // @internal
     #[test]
     fn every_map_link_is_a_safe_url_without_whitespace(address in "\\PC{1,80}") {
         for provider in [

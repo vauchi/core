@@ -178,6 +178,7 @@ fn tapping_an_address_opens_the_systems_maps_app() {
     );
 }
 
+// @scenario: contact_actions :: Address opens Apple Maps on iOS
 #[test]
 fn on_ios_tapping_an_address_opens_apple_maps() {
     assert_eq!(
@@ -189,6 +190,7 @@ fn on_ios_tapping_an_address_opens_apple_maps() {
     );
 }
 
+// @scenario: contact_actions :: Address opens Google Maps on Android
 #[test]
 fn on_android_an_address_also_offers_google_maps_and_the_open_maps() {
     assert_eq!(
@@ -210,6 +212,7 @@ fn on_android_an_address_also_offers_google_maps_and_the_open_maps() {
     );
 }
 
+// @internal
 #[test]
 fn elsewhere_an_address_also_offers_the_open_maps() {
     for platform in [Platform::Ios, Platform::Desktop] {
@@ -230,6 +233,7 @@ fn elsewhere_an_address_also_offers_the_open_maps() {
     }
 }
 
+// @internal
 #[test]
 fn a_field_with_nothing_to_open_is_not_tappable() {
     for field in [

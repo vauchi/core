@@ -385,7 +385,14 @@ fn duress_mode_gdpr_export_holds_no_real_contacts() {
     let _ = engine.vauchi_mut().authenticate(PIN).unwrap();
 
     engine.navigate_to(AppScreen::Privacy);
-    let json = match press(&mut engine, "export") {
+    let _ = press(&mut engine, "export");
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "pin".into(),
+        value: PIN.into(),
+    });
+    // Under duress the duress PIN is the one that confirms (#712 D5):
+    // refusing it would tell a coercer the session is a duress one.
+    let json = match press(&mut engine, "confirm_pin") {
         ActionResult::GdprExportComplete { json } => json,
         other => panic!("expected GdprExportComplete, got {other:?}"),
     };

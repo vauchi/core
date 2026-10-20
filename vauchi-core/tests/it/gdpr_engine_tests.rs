@@ -137,7 +137,7 @@ fn gdpr_delete_navigates_to_confirmation() {
 
 // @internal
 #[test]
-fn gdpr_confirm_delete_completes() {
+fn gdpr_confirm_delete_without_trusted_contacts_erases_everything() {
     let mut engine = GdprEngine::new(
         None,
         "All consents granted".into(),
@@ -152,7 +152,7 @@ fn gdpr_confirm_delete_completes() {
     assert_eq!(result, ActionResult::Complete);
     assert_eq!(
         engine.engine_output(),
-        Some(EngineOutput::Gdpr(GdprChoice::Delete))
+        Some(EngineOutput::Gdpr(GdprChoice::DeleteErasingEverything))
     );
 }
 

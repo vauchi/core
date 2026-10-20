@@ -502,7 +502,10 @@ impl std::fmt::Debug for DuressPinSetup {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GdprChoice {
     Export,
+    /// Schedule the deletion, keeping the relay's list of trusted contacts.
     Delete,
+    /// Schedule the deletion; its purge also erases that list (#711).
+    DeleteErasingEverything,
     CancelDeletion,
     Execute,
     Shred,

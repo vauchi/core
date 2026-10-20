@@ -72,6 +72,9 @@ pub struct GdprEngine {
     /// The shell can seal a secret behind the OS user-presence check, the
     /// export's verification when no app password is set (#712).
     user_presence_available: bool,
+    /// Someone is trusted for recovery, so deleting asks whether to keep
+    /// the relay's list of them (#711).
+    has_trusted_contacts: bool,
     /// The export waiting on the PIN step: `"export"` or `"heirloom"`.
     pending_export: Option<&'static str>,
     entered_pin: EnteredPin,
@@ -109,6 +112,8 @@ enum GdprStep {
     ExportPassword,
     /// The readable formats leave the app unprotected: say so first.
     ReadableExportWarning,
+    /// Keep recovery possible or erase everything (#711).
+    ChooseRecoveryKeep,
 }
 
 impl GdprEngine {
@@ -124,6 +129,7 @@ impl GdprEngine {
             deletion_executable: false,
             app_password_set: false,
             user_presence_available: false,
+            has_trusted_contacts: false,
             pending_export: None,
             entered_pin: EnteredPin::default(),
             pin_error: None,
@@ -467,6 +473,7 @@ impl GdprEngine {
             GdprStep::ChooseExportFormat => self.build_choose_export_format(),
             GdprStep::ExportPassword => self.build_export_password(),
             GdprStep::ReadableExportWarning => self.build_readable_export_warning(),
+            GdprStep::ChooseRecoveryKeep => self.build_recovery_choice(),
         }
     }
 }
@@ -535,8 +542,12 @@ impl WorkflowEngine for GdprEngine {
             (GdprStep::ConfirmDelete, UserAction::ActionPressed { action_id })
                 if action_id == "confirm_delete" =>
             {
-                self.last_action = Some("delete".into());
-                ActionResult::Complete
+                self.confirm_delete()
+            }
+            (GdprStep::ChooseRecoveryKeep, UserAction::ActionPressed { action_id })
+                if action_id != "cancel" =>
+            {
+                self.choose_recovery(&action_id)
             }
             // Execute confirmation: confirm triggers immediate execution
             (GdprStep::ConfirmExecute, UserAction::ActionPressed { action_id })
@@ -555,7 +566,8 @@ impl WorkflowEngine for GdprEngine {
                 | GdprStep::ExportAwaitPresence
                 | GdprStep::ChooseExportFormat
                 | GdprStep::ExportPassword
-                | GdprStep::ReadableExportWarning,
+                | GdprStep::ReadableExportWarning
+                | GdprStep::ChooseRecoveryKeep,
                 UserAction::ActionPressed { action_id },
             ) if action_id == "cancel" => {
                 self.abandon_export();
@@ -626,6 +638,7 @@ impl WorkflowEngine for GdprEngine {
         let choice = match self.last_action.as_deref() {
             Some("export") => GdprChoice::Export,
             Some("delete") => GdprChoice::Delete,
+            Some("delete_erasing_everything") => GdprChoice::DeleteErasingEverything,
             Some("cancel_deletion") => GdprChoice::CancelDeletion,
             Some("execute") => GdprChoice::Execute,
             Some("heirloom") => GdprChoice::Heirloom,
@@ -643,6 +656,8 @@ impl WorkflowEngine for GdprEngine {
     }
 }
 
+#[path = "gdpr_deletion.rs"]
+mod deletion;
 #[path = "gdpr_export.rs"]
 mod export;
 #[cfg(feature = "network-rustls")]
@@ -748,7 +763,7 @@ mod tests {
     }
 
     #[test]
-    fn confirm_delete_completes_with_delete_action() {
+    fn confirm_delete_without_trusted_contacts_erases_everything() {
         let mut e = engine();
         e.step = GdprStep::ConfirmDelete;
         let result = e.handle_action(UserAction::ActionPressed {
@@ -757,7 +772,9 @@ mod tests {
         assert!(matches!(result, ActionResult::Complete));
         assert_eq!(
             e.engine_output(),
-            Some(crate::ui::EngineOutput::Gdpr(crate::ui::GdprChoice::Delete))
+            Some(crate::ui::EngineOutput::Gdpr(
+                crate::ui::GdprChoice::DeleteErasingEverything
+            ))
         );
     }
 

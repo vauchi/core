@@ -419,10 +419,11 @@ impl AppEngine {
                 let result = self.export_as(choice);
                 self.finish_export(result)
             }
-            Some(GdprChoice::Delete) => {
+            Some(choice @ (GdprChoice::Delete | GdprChoice::DeleteErasingEverything)) => {
                 match vauchi_core::api::DeletionManager::new(self.vauchi.storage())
-                    .schedule_deletion()
-                {
+                    .schedule_deletion_erasing_guardian_set(
+                        choice == GdprChoice::DeleteErasingEverything,
+                    ) {
                     Ok(_) => {
                         let _ = self.navigate_back();
                         // Rebuild Privacy fresh on revisit so it shows the
@@ -466,6 +467,10 @@ impl AppEngine {
                 // Borrow `identity` only long enough to run the delete and
                 // capture the relay deliveries (signed pre-shred); then the
                 // cache can be cleared (all data is gone).
+                let erase_guardian_set =
+                    vauchi_core::api::DeletionManager::new(self.vauchi.storage())
+                        .scheduled_erases_guardian_set()
+                        .unwrap_or(false);
                 let deliveries = match self.vauchi.identity() {
                     Some(identity) => vauchi_core::api::DeletionManager::new(self.vauchi.storage())
                         .execute_deletion(identity)
@@ -481,18 +486,17 @@ impl AppEngine {
                         // only — without a relay transport there is nowhere to
                         // send (the `recovery` module is `network-http`-gated).
                         // Then purge what the relay holds for the identity,
-                        // signed while its key still exists. The guardian set
-                        // is kept (it expires after 365 days) until the user
-                        // can choose otherwise (#711 step 5).
+                        // signed while its key still exists, with the choice
+                        // made when the deletion was scheduled (#711).
                         #[cfg(feature = "network-http")]
                         {
                             let _ = self.vauchi.broadcast_identity_revocations(&deliveries);
-                            if self.vauchi.purge_relay_data(false).is_err() {
+                            if self.vauchi.purge_relay_data(erase_guardian_set).is_err() {
                                 tracing::warn!("relay purge failed; local deletion continues");
                             }
                         }
                         #[cfg(not(feature = "network-http"))]
-                        let _ = &deliveries;
+                        let _ = (&deliveries, erase_guardian_set);
                         self.engine_cache.clear();
                         ActionResult::WipeComplete
                     }

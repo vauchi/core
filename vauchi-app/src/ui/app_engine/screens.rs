@@ -573,6 +573,10 @@ impl AppEngine {
             }
             AppScreen::Privacy => {
                 let contact_count = vauchi.contact_count().unwrap_or(0);
+                let has_trusted_contacts = vauchi
+                    .list_contacts()
+                    .map(|contacts| contacts.iter().any(|c| c.is_recovery_trusted()))
+                    .unwrap_or(false);
                 let consent = crate::ui::gdpr::ConsentStatus::from_consent_records(
                     &vauchi.export_consent_log().unwrap_or_default(),
                 );
@@ -606,6 +610,7 @@ impl AppEngine {
                     .with_consent(consent)
                     .with_app_password_set(vauchi.is_password_enabled().unwrap_or(false))
                     .with_user_presence_available(device_capabilities.can_seal_user_presence)
+                    .with_trusted_contacts(has_trusted_contacts)
                     .with_deletion_scheduled(scheduled)
                     .with_deletion_executable(executable),
                 )

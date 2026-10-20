@@ -27,6 +27,10 @@
 //! `export_json` -> `export_readable_warning` (`confirm_readable_export` /
 //! `cancel`).
 //!
+//! With someone trusted for recovery, `confirm_delete` ->
+//! `delete_recovery_choice` (`keep_recovery` / `erase_everything` /
+//! `cancel`) (#711).
+//!
 //! The `consent_actions` `ActionList` rows (`view_data` / `manage_consent`)
 //! are `ListItemSelected` pass-throughs and are not walked here.
 
@@ -161,3 +165,25 @@ const HANDLED_DEFAULT_PRESENCE: &[&str] = &[
     "confirm_delete",
     "cancel",
 ];
+
+const HANDLED_WITH_TRUSTED_CONTACTS: &[&str] = &[
+    "export",
+    "heirloom",
+    "confirm_heirloom",
+    "set_app_password",
+    "delete",
+    "confirm_delete",
+    "keep_recovery",
+    "erase_everything",
+    "cancel",
+];
+
+fn trusted_contacts_factory() -> GdprEngine {
+    factory().with_trusted_contacts(true)
+}
+
+// @internal
+#[test]
+fn gdpr_deletion_recovery_choice_is_reachable() {
+    assert_reachability_across_screens(trusted_contacts_factory, HANDLED_WITH_TRUSTED_CONTACTS);
+}

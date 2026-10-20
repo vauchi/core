@@ -10,7 +10,7 @@ use std::net::TcpListener;
 use std::sync::mpsc;
 
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
-use vauchi_core::api::DeletionManager;
+use vauchi_core::storage::DeletionState;
 use vauchi_core::{Vauchi, VauchiConfig};
 
 /// A relay that answers every POST with `{"status":"ok"}` and reports the
@@ -58,9 +58,9 @@ fn recording_relay() -> (String, mpsc::Receiver<(String, String)>) {
     (url, received)
 }
 
-// @internal
-#[test]
-fn executing_the_deletion_purges_the_relay_before_the_wipe() {
+/// Runs a deletion scheduled with `erase_guardian_set` and returns the
+/// purges the relay received and the identity's public key.
+fn execute_scheduled_deletion(erase_guardian_set: bool) -> (Vec<serde_json::Value>, String) {
     let (relay_url, received) = recording_relay();
     let mut config = VauchiConfig::default().with_relay_url(&relay_url);
     config.ohttp.allow_direct = true;
@@ -70,8 +70,14 @@ fn executing_the_deletion_purges_the_relay_before_the_wipe() {
     let mut vauchi = Vauchi::new(config).unwrap();
     vauchi.create_identity("Alice").unwrap();
     let public_key = hex::encode(vauchi.identity().unwrap().signing_public_key());
-    DeletionManager::new(vauchi.storage())
-        .schedule_deletion_with_execute_at(1, 1)
+    vauchi
+        .storage()
+        .consent()
+        .save_deletion_state(&DeletionState::Scheduled {
+            scheduled_at: 1,
+            execute_at: 1,
+            erase_guardian_set,
+        })
         .unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::Privacy);
@@ -84,11 +90,29 @@ fn executing_the_deletion_purges_the_relay_before_the_wipe() {
     });
 
     assert!(matches!(result, ActionResult::WipeComplete));
-    let purges: Vec<serde_json::Value> = received
+    let purges = received
         .try_iter()
         .filter(|(path, _)| path == "/v2/purge")
         .map(|(_, body)| serde_json::from_str(&body).unwrap())
         .collect();
+    (purges, public_key)
+}
+
+// @internal
+#[test]
+fn executing_the_deletion_purges_the_relay_before_the_wipe() {
+    let (purges, public_key) = execute_scheduled_deletion(false);
+
     assert_eq!(purges.len(), 1, "one purge reaches the relay");
     assert_eq!(purges[0]["public_key"], public_key);
+    assert!(purges[0].get("erase_guardian_set").is_none());
+}
+
+// @internal
+#[test]
+fn a_deletion_scheduled_to_erase_everything_purges_the_guardian_set_too() {
+    let (purges, _) = execute_scheduled_deletion(true);
+
+    assert_eq!(purges.len(), 1);
+    assert_eq!(purges[0]["erase_guardian_set"], true);
 }

@@ -4,6 +4,7 @@
 
 //! vCard 4.0 Export/Import (RFC 6350)
 
+use crate::contact::Contact;
 use crate::contact_card::{ContactCard, ContactField, FieldType};
 
 /// Exports a ContactCard to vCard 4.0 format.
@@ -61,6 +62,24 @@ pub fn export_vcard(card: &ContactCard) -> String {
 
     lines.push("END:VCARD".to_string());
     lines.join("\r\n")
+}
+
+/// A contact's card as vCard 4.0 with Vauchi's origin markers: its id and
+/// whether it was exchanged or imported, as RFC 6350 §6.10 private `X-`
+/// properties. A re-import into Vauchi matches the contact by the id; other
+/// apps ignore both (#712).
+pub fn export_contact_vcard(contact: &Contact) -> String {
+    let card = export_vcard(contact.card());
+    let body = card.strip_suffix("END:VCARD").unwrap_or(&card);
+    let kind = if contact.is_imported() {
+        "imported"
+    } else {
+        "exchanged"
+    };
+    format!(
+        "{body}X-VAUCHI-ID:{}\r\nX-VAUCHI-KIND:{kind}\r\nEND:VCARD",
+        escape_vcard(contact.id())
+    )
 }
 
 /// Imports a vCard string into a ContactCard.

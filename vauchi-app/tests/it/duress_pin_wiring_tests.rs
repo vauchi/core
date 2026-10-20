@@ -392,7 +392,9 @@ fn duress_mode_gdpr_export_holds_no_real_contacts() {
     });
     // Under duress the duress PIN is the one that confirms (#712 D5):
     // refusing it would tell a coercer the session is a duress one.
-    let json = match press(&mut engine, "confirm_pin") {
+    let _ = press(&mut engine, "confirm_pin");
+    let _ = press(&mut engine, "export_json");
+    let json = match press(&mut engine, "confirm_readable_export") {
         ActionResult::GdprExportComplete { json } => json,
         other => panic!("expected GdprExportComplete, got {other:?}"),
     };

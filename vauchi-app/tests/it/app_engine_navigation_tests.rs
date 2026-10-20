@@ -237,8 +237,14 @@ fn gdpr_export_returns_serialized_data() {
         component_id: "pin".into(),
         value: "app-password-123".into(),
     });
-    let result = engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "confirm_pin".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "export_json".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "confirm_readable_export".into(),
     });
     match result {
         ActionResult::GdprExportComplete { json } => {

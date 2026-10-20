@@ -71,10 +71,13 @@ fn the_pin_that_unlocked_the_app_exports_once() {
     let mut engine = privacy_screen(true);
     let _ = press(&mut engine, "export");
 
-    let result = enter_pin(&mut engine, APP_PIN);
+    let _ = enter_pin(&mut engine, APP_PIN);
+    let _ = press(&mut engine, "export_json");
+
+    let result = press(&mut engine, "confirm_readable_export");
 
     let ActionResult::GdprExportComplete { json } = result else {
-        panic!("the right PIN exports, got {result:?}");
+        panic!("the right PIN lets one export through, got {result:?}");
     };
     assert!(
         json.contains("\"Alice\""),

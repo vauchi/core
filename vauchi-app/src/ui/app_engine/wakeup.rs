@@ -11,8 +11,11 @@ use crate::ui::WorkflowEngine;
 
 impl AppEngine {
     /// Keep the OS's allowance of background runs the shell reported, for
-    /// the scheduler's next draws. Out of range is refused and changes
-    /// nothing (it comes from the shell, CC-14); `runs` 0 clears it.
+    /// the scheduler's next draws, and answer with the next background run
+    /// drawn within it. A job armed under a tighter allowance keeps its long
+    /// gap otherwise: 24 h in `rare`, even after the app is opened (#603 run
+    /// A2). Out of range is refused and changes nothing (it comes from the
+    /// shell, CC-14); `runs` 0 clears it.
     pub(super) fn observe_background_budget(
         &mut self,
         window_secs: u32,
@@ -29,6 +32,12 @@ impl AppEngine {
             window: std::time::Duration::from_secs(u64::from(window_secs)),
             runs,
         });
+        #[cfg(feature = "network-http")]
+        {
+            let gap = self.vauchi.draw_background_sync_gap(self.background_budget);
+            Ok(vec![background_wakeup(gap)])
+        }
+        #[cfg(not(feature = "network-http"))]
         Ok(Vec::new())
     }
 
@@ -55,12 +64,7 @@ impl AppEngine {
                 .unwrap_or_else(|| self.vauchi.draw_background_sync_gap(budget));
             (outcome, gap)
         };
-        let millis = u32::try_from(gap.as_millis()).unwrap_or(u32::MAX).max(1);
-        let secs = millis.div_ceil(1000);
-        Ok((
-            outcome,
-            vauchi_core::Command::schedule_wakeup(secs, secs, 1, Some(millis)),
-        ))
+        Ok((outcome, background_wakeup(gap)))
     }
 
     /// The shell's platform wakeup fired — a desktop in-process interval, an
@@ -176,4 +180,11 @@ impl AppEngine {
         #[cfg(not(all(feature = "network-http", feature = "storage")))]
         false
     }
+}
+
+#[cfg(feature = "network-http")]
+fn background_wakeup(gap: std::time::Duration) -> vauchi_core::Command {
+    let millis = u32::try_from(gap.as_millis()).unwrap_or(u32::MAX).max(1);
+    let secs = millis.div_ceil(1000);
+    vauchi_core::Command::schedule_wakeup(secs, secs, 1, Some(millis))
 }

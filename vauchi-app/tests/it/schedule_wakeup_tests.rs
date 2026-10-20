@@ -707,6 +707,35 @@ fn a_one_run_a_day_budget_draws_gaps_beyond_the_hour() {
     assert!(delays.iter().any(|ms| *ms > 3_600_000), "{delays:?}");
 }
 
+// A job armed in a quiet `rare` spell kept its 24 h gap after the user
+// opened the app (#603 run A2): reporting the budget answers with the next
+// background run drawn within it, so the shell can re-arm from it.
+// @internal
+#[test]
+#[cfg(all(feature = "testing", feature = "network-http"))]
+fn reporting_the_budget_names_the_next_background_run_within_it() {
+    let mut engine = engine_with_a_contact_and_sync_due_in(0);
+
+    let delays: Vec<u64> = (0..20)
+        .map(|_| {
+            let commands = engine.dispatch(budget_event(86_400, 1)).expect("budget");
+            let wakeups: Vec<u64> = commands
+                .iter()
+                .filter_map(delay_millis_on_the_wire)
+                .collect();
+            assert_eq!(wakeups.len(), 1, "{commands:?}");
+            wakeups[0]
+        })
+        .collect();
+
+    assert!(
+        delays.iter().all(|ms| (60_000..=86_400_000).contains(ms)),
+        "{delays:?}"
+    );
+    // All 20 within the hour happens with p = (1 - e^(-1/24))^20, about 1e-28.
+    assert!(delays.iter().any(|ms| *ms > 3_600_000), "{delays:?}");
+}
+
 // CC-14: the budget comes from the shell; out-of-range values are refused
 // and leave the schedule as it was.
 // @internal

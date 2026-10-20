@@ -122,15 +122,15 @@ impl AppEngine {
         let confirmed = self.vauchi.confirm_session_password(&pin).unwrap_or(false);
         pin.zeroize();
         if confirmed {
-            self.device_link_pin_failures = 0;
+            self.confirm_pin_failures = 0;
             let _ = self.device_link_qr_pending();
             #[cfg(all(feature = "network-http", feature = "storage"))]
             self.ensure_device_link_session();
             return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
         }
-        self.device_link_pin_failures += 1;
-        if self.device_link_pin_failures >= DEFAULT_LOCK_MAX_ATTEMPTS {
-            self.device_link_pin_failures = 0;
+        self.confirm_pin_failures += 1;
+        if self.confirm_pin_failures >= DEFAULT_LOCK_MAX_ATTEMPTS {
+            self.confirm_pin_failures = 0;
             if let Some(locked) = self.handle_app_backgrounded() {
                 return Some(ActionResult::NavigateTo(locked));
             }

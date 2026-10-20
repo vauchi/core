@@ -15,6 +15,7 @@ use crate::ui::component::{
 use crate::ui::contact_detail::{ContactDetailEngine, ContactNotFoundEngine, DeliverySummary};
 use crate::ui::contact_detail_rules::{ContactPlace, ContactTag};
 use crate::ui::contact_edit::{ContactEditEngine, EditableContact};
+use crate::ui::contact_field_links::{FieldLink, field_links};
 use crate::ui::contact_list::{ContactListEngine, IndexedItem};
 use crate::ui::contact_merge::{ContactMergeEngine, MergePreview};
 use crate::ui::contact_visibility::ContactVisibilityEngine;
@@ -23,11 +24,13 @@ use crate::ui::engine::WorkflowEngine;
 use crate::ui::fingerprint_verify::FingerprintVerifyEngine;
 use std::collections::HashMap;
 use vauchi_core::api::Vauchi;
+use vauchi_core::exchange::capability::Platform;
 
 impl AppEngine {
     pub(super) fn create_contacts_engine(
         vauchi: &Vauchi,
         screen: &AppScreen,
+        platform: &Platform,
         render_context: &crate::ui::RenderContext,
     ) -> Box<dyn WorkflowEngine> {
         match screen {
@@ -61,6 +64,16 @@ impl AppEngine {
             }
             AppScreen::ContactDetail { contact_id } => match vauchi.get_contact(contact_id) {
                 Ok(Some(contact)) => {
+                    let field_links: HashMap<String, Vec<FieldLink>> = contact
+                        .card()
+                        .fields()
+                        .iter()
+                        .map(|f| {
+                            let links = field_links(f, platform, render_context.resolved_locale());
+                            (f.id().to_string(), links)
+                        })
+                        .filter(|(_, links)| !links.is_empty())
+                        .collect();
                     let fields: Vec<Field> = contact
                         .card()
                         .fields()
@@ -216,6 +229,7 @@ impl AppEngine {
                             .with_tags(tags)
                             .with_exchange_place(exchange_place)
                             .with_field_notes(field_notes)
+                            .with_field_links(field_links)
                             .with_trust(trust_level, proposal_trusted)
                             .with_reciprocity(reciprocity_status)
                             .with_hidden(is_hidden)

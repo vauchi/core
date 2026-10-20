@@ -169,9 +169,12 @@ impl AppEngine {
             | AppScreen::ContactDuplicates
             | AppScreen::ArchivedContacts
             | AppScreen::ContactMerge { .. }
-            | AppScreen::VerifyFingerprint { .. } => {
-                Self::create_contacts_engine(vauchi, screen, render_context)
-            }
+            | AppScreen::VerifyFingerprint { .. } => Self::create_contacts_engine(
+                vauchi,
+                screen,
+                &device_capabilities.platform,
+                render_context,
+            ),
             AppScreen::Settings
             | AppScreen::SettingsAdvanced
             | AppScreen::SettingsAppearance

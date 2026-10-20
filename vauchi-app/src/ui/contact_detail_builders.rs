@@ -39,6 +39,7 @@ impl ContactDetailEngine {
             exchange_place: None,
             place_input: String::new(),
             place_suggestions: Vec::new(),
+            field_links: HashMap::new(),
             locale: Locale::English,
         }
     }
@@ -78,6 +79,7 @@ impl ContactDetailEngine {
             exchange_place: None,
             place_input: String::new(),
             place_suggestions: Vec::new(),
+            field_links: HashMap::new(),
             locale: Locale::English,
         }
     }
@@ -90,6 +92,13 @@ impl ContactDetailEngine {
 
     /// Set the render locale (defaults to English) — threaded from the
     /// frontend-pushed RenderContext at the AppEngine factory (M3 S5-12).
+    /// How each of their fields opens outside the app, keyed by field id.
+    #[cfg(feature = "network-rustls")]
+    pub(crate) fn with_field_links(mut self, field_links: HashMap<String, Vec<FieldLink>>) -> Self {
+        self.field_links = field_links;
+        self
+    }
+
     pub fn with_locale(mut self, locale: Locale) -> Self {
         self.locale = locale;
         self

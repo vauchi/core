@@ -21,6 +21,7 @@ mod component;
 mod contact_detail;
 mod contact_detail_rules;
 mod contact_edit;
+mod contact_field_links;
 pub(crate) mod contact_list;
 mod contact_merge;
 mod contact_visibility;
@@ -92,9 +93,9 @@ pub use channel::{
     OnboardingSnapshot, OnboardingUpdate, PendingBackup, RecoveryHelpUpdate, RecoveryUpdate,
 };
 pub use component::{
-    A11y, AccessibilityRole, ActionListItem, Component, DropdownOption, Field, IndicatorKind,
-    InfoItem, InputType, Item, ListItemAction, ListItemActionKind, PreviewVariant, QrMode,
-    ScanQuality, Section, SettingsItem, SettingsItemKind, Status, TextStyle, ToggleItem,
+    A11y, AccessibilityRole, ActionListItem, Component, DropdownOption, Field, FieldRowAction,
+    IndicatorKind, InfoItem, InputType, Item, ListItemAction, ListItemActionKind, PreviewVariant,
+    QrMode, ScanQuality, Section, SettingsItem, SettingsItemKind, Status, TextStyle, ToggleItem,
     UiFieldVisibility, VisibilityMode, visibility_label,
 };
 pub use contact_detail::{

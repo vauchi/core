@@ -8,7 +8,8 @@ use vauchi_core::{
 
 use super::{Projection, ValueRoute, accessibility, group, indicator_tone};
 use crate::ui::{
-    A11y, Component, Field, PreparedSurfaceError, UiFieldVisibility, UserAction, VisibilityMode,
+    A11y, Component, Field, FieldRowAction, PreparedSurfaceError, UiFieldVisibility, UserAction,
+    VisibilityMode,
 };
 
 mod interaction_nodes;
@@ -25,8 +26,17 @@ impl Projection {
                 fields,
                 visibility_mode,
                 available_scopes,
+                row_actions,
                 a11y,
-            } => self.field_list(id, title, fields, visibility_mode, available_scopes, a11y),
+            } => self.field_list(
+                id,
+                title,
+                fields,
+                visibility_mode,
+                available_scopes,
+                row_actions,
+                a11y,
+            ),
             Component::InlineConfirm {
                 id,
                 warning,
@@ -175,6 +185,7 @@ impl Projection {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn field_list(
         &mut self,
         id: &str,
@@ -182,10 +193,26 @@ impl Projection {
         fields: &[Field],
         mode: &VisibilityMode,
         scopes: &[String],
+        row_actions: &[FieldRowAction],
         a11y: &Option<A11y>,
     ) -> Result<PresentationNode, PreparedSurfaceError> {
         let mut rows = Vec::with_capacity(fields.len());
         for field in fields {
+            let mut actions = Vec::new();
+            for row_action in row_actions.iter().filter(|a| a.field_id == field.id) {
+                actions.push(self.action(
+                    &row_action.label,
+                    AccessibilitySpec::label(&row_action.label),
+                    ActionTone::Standard,
+                    UserAction::ListItemAction {
+                        component_id: id.to_owned(),
+                        item_id: field.id.clone(),
+                        action_id: row_action.action_id.clone(),
+                    },
+                )?);
+            }
+            let mut actions = actions.into_iter();
+            let activation = actions.next();
             rows.push(PresentationRow {
                 title: field.label.clone(),
                 subtitle: Some(field.value.clone()),
@@ -195,8 +222,8 @@ impl Projection {
                 fallback_text: None,
                 selected: matches!(field.visibility, UiFieldVisibility::Shown),
                 enabled: true,
-                activation: None,
-                secondary_actions: Vec::new(),
+                activation,
+                secondary_actions: actions.collect(),
                 info: None,
                 controls: self.visibility_controls(field, mode, scopes)?,
                 accessibility: accessibility(&field.a11y, &field.label),

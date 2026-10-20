@@ -393,6 +393,7 @@ impl MyInfoEngine {
                 fields: vec![field.clone()],
                 visibility_mode: VisibilityMode::ReadOnly,
                 available_scopes: vec![],
+                row_actions: Vec::new(),
                 a11y: Some(A11y {
                     label: Some(self.t("my_info.preview.fields_a11y_label")),
                     hint: None,

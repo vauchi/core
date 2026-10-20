@@ -127,6 +127,7 @@ pub(super) fn build_field_preview_screen(
                 fields,
                 visibility_mode: VisibilityMode::ReadOnly,
                 available_scopes: vec![],
+                row_actions: Vec::new(),
                 a11y: Some(A11y {
                     label: Some(t("exchange.preview.fields_a11y")),
                     hint: None,

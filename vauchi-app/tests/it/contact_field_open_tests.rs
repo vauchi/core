@@ -234,7 +234,7 @@ fn elsewhere_an_address_also_offers_the_open_maps() {
 fn a_field_with_nothing_to_open_is_not_tappable() {
     for field in [
         ContactField::new(FieldType::Custom, "Note", "likes tea", 0),
-        ContactField::new(FieldType::Phone, "Mobile", "not a number", 0),
+        ContactField::new(FieldType::Birthday, "Birthday", "1990-05-01", 0),
     ] {
         let (screen, field_id) = contact_screen(Platform::Android, field);
         let (activation, secondary) = screen.field_row(&field_id);

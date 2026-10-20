@@ -43,11 +43,37 @@ pub(crate) fn confirm_pin_screen(
     entered: &str,
     error: Option<&str>,
 ) -> ScreenModel {
+    confirm_pin_screen_for(
+        locale,
+        PinStepCopy {
+            screen_id: "link_confirm_pin",
+            title_key: "device_link.title",
+            hint_key: "devices.link.confirm_password_hint",
+        },
+        entered,
+        error,
+    )
+}
+
+/// What a PIN re-confirmation step is called and what it says, so every
+/// step asking for the session PIN again shares one screen.
+pub(crate) struct PinStepCopy {
+    pub(crate) screen_id: &'static str,
+    pub(crate) title_key: &'static str,
+    pub(crate) hint_key: &'static str,
+}
+
+pub(crate) fn confirm_pin_screen_for(
+    locale: Locale,
+    copy: PinStepCopy,
+    entered: &str,
+    error: Option<&str>,
+) -> ScreenModel {
     let t = |key: &str| get_string(locale, key);
     ScreenModel {
-        screen_id: "link_confirm_pin".into(),
-        title: t("device_link.title"),
-        subtitle: Some(t("devices.link.confirm_password_hint")),
+        screen_id: copy.screen_id.into(),
+        title: t(copy.title_key),
+        subtitle: Some(t(copy.hint_key)),
         components: vec![Component::TextInput {
             id: PIN_INPUT_ID.into(),
             label: t("auth.unlock.field_label"),
@@ -58,7 +84,7 @@ pub(crate) fn confirm_pin_screen(
             input_type: InputType::Password,
             a11y: Some(A11y {
                 label: Some(t("lock_screen.password_entry_a11y")),
-                hint: Some(t("devices.link.confirm_password_hint")),
+                hint: Some(t(copy.hint_key)),
                 role: None,
             }),
             info_key: None,

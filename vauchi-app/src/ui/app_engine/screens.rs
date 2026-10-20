@@ -604,6 +604,7 @@ impl AppEngine {
                         device_count: 1,
                     })
                     .with_consent(consent)
+                    .with_app_password_set(vauchi.is_password_enabled().unwrap_or(false))
                     .with_deletion_scheduled(scheduled)
                     .with_deletion_executable(executable),
                 )

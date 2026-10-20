@@ -8,6 +8,7 @@
 //! live in the `privacy.*` + shared `action.*` families.
 
 use crate::i18n::{Locale, get_string, get_string_with_args};
+use crate::ui::device_link_pin::{EnteredPin, PIN_INPUT_ID};
 use crate::ui::*;
 
 mod heirloom;
@@ -65,6 +66,13 @@ pub struct GdprEngine {
     /// Whether a scheduled deletion's grace period has elapsed, so it can
     /// be executed now. Drives the "Delete Now" action.
     deletion_executable: bool,
+    /// Whether an app password is set: an export then asks for it; without
+    /// one the user is sent to set one first (#712).
+    app_password_set: bool,
+    /// The export waiting on the PIN step: `"export"` or `"heirloom"`.
+    pending_export: Option<&'static str>,
+    entered_pin: EnteredPin,
+    pin_error: Option<String>,
     locale: Locale,
 }
 
@@ -80,6 +88,10 @@ enum GdprStep {
     ManageConsent,
     /// Confirm executing a scheduled deletion now (grace elapsed).
     ConfirmExecute,
+    /// The session PIN, asked immediately before each export (#712).
+    ConfirmExportPin,
+    /// No app password is set: set one before exporting (#712).
+    ExportNeedsAppPassword,
 }
 
 impl GdprEngine {
@@ -93,6 +105,10 @@ impl GdprEngine {
             consent: ConsentStatus::default(),
             deletion_scheduled: false,
             deletion_executable: false,
+            app_password_set: false,
+            pending_export: None,
+            entered_pin: EnteredPin::default(),
+            pin_error: None,
             locale,
         }
     }
@@ -128,6 +144,12 @@ impl GdprEngine {
 
     /// Mark whether a scheduled deletion can be executed now (grace
     /// elapsed), so the overview offers "Delete Now".
+    /// Whether an app password is set, which the export asks for (#712).
+    pub fn with_app_password_set(mut self, set: bool) -> Self {
+        self.app_password_set = set;
+        self
+    }
+
     pub fn with_deletion_executable(mut self, executable: bool) -> Self {
         self.deletion_executable = executable;
         self
@@ -411,6 +433,8 @@ impl GdprEngine {
             GdprStep::ManageConsent => self.build_consent(),
             GdprStep::ConfirmExecute => self.build_confirm_execute(),
             GdprStep::ConfirmHeirloom => self.build_confirm_heirloom(),
+            GdprStep::ConfirmExportPin => self.build_confirm_export_pin(),
+            GdprStep::ExportNeedsAppPassword => self.build_export_needs_app_password(),
         }
     }
 }
@@ -422,12 +446,11 @@ impl WorkflowEngine for GdprEngine {
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match (&self.step, action) {
-            // Overview: export triggers completion
+            // Overview: export first asks for the session PIN (#712)
             (GdprStep::Overview, UserAction::ActionPressed { action_id })
                 if action_id == "export" =>
             {
-                self.last_action = Some("export".into());
-                ActionResult::Complete
+                self.begin_export("export")
             }
             // Overview: the heirloom first shows its plaintext warning
             (GdprStep::Overview, UserAction::ActionPressed { action_id })
@@ -436,12 +459,21 @@ impl WorkflowEngine for GdprEngine {
                 self.step = GdprStep::ConfirmHeirloom;
                 ActionResult::NavigateTo(self.build_screen())
             }
-            // Heirloom warning: confirming triggers the export
+            // Heirloom warning: confirming asks for the session PIN (#712)
             (GdprStep::ConfirmHeirloom, UserAction::ActionPressed { action_id })
                 if action_id == "confirm_heirloom" =>
             {
-                self.last_action = Some("heirloom".into());
-                ActionResult::Complete
+                self.begin_export("heirloom")
+            }
+            (
+                GdprStep::ConfirmExportPin,
+                UserAction::TextChanged {
+                    component_id,
+                    value,
+                },
+            ) if component_id == PIN_INPUT_ID => {
+                self.entered_pin.set(value);
+                ActionResult::UpdateScreen(self.build_screen())
             }
             // Overview: cancel a scheduled deletion (routing performs it)
             (GdprStep::Overview, UserAction::ActionPressed { action_id })
@@ -480,9 +512,14 @@ impl WorkflowEngine for GdprEngine {
             }
             // Any confirmation screen: cancel goes back to overview
             (
-                GdprStep::ConfirmDelete | GdprStep::ConfirmExecute | GdprStep::ConfirmHeirloom,
+                GdprStep::ConfirmDelete
+                | GdprStep::ConfirmExecute
+                | GdprStep::ConfirmHeirloom
+                | GdprStep::ConfirmExportPin
+                | GdprStep::ExportNeedsAppPassword,
                 UserAction::ActionPressed { action_id },
             ) if action_id == "cancel" => {
+                self.abandon_export();
                 self.step = GdprStep::Overview;
                 ActionResult::NavigateTo(self.build_screen())
             }
@@ -530,6 +567,15 @@ impl WorkflowEngine for GdprEngine {
 
     fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
         use crate::ui::GdprChoice;
+        match self.step {
+            GdprStep::ConfirmExportPin if !self.entered_pin.as_str().is_empty() => {
+                return Some(crate::ui::EngineOutput::ExportPin {
+                    pin: self.entered_pin.as_str().to_owned(),
+                });
+            }
+            GdprStep::ConfirmExportPin | GdprStep::ExportNeedsAppPassword => return None,
+            _ => {}
+        }
         let choice = match self.last_action.as_deref() {
             Some("export") => GdprChoice::Export,
             Some("delete") => GdprChoice::Delete,
@@ -540,7 +586,19 @@ impl WorkflowEngine for GdprEngine {
         };
         Some(crate::ui::EngineOutput::Gdpr(choice))
     }
+
+    fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
+        match update {
+            crate::ui::EngineUpdate::GdprExport(update) => self.apply_export_update(update),
+            _ => false,
+        }
+    }
 }
+
+#[path = "gdpr_export.rs"]
+mod export;
+#[cfg(feature = "network-rustls")]
+pub(crate) use export::SET_APP_PASSWORD_ACTION_ID;
 
 // INLINE_TEST_REQUIRED: Tests access private GdprStep enum and internal engine state
 #[cfg(test)]
@@ -671,16 +729,14 @@ mod tests {
     }
 
     #[test]
-    fn export_completes_from_overview() {
-        let mut e = engine();
+    fn export_waits_on_the_pin_and_names_no_choice_until_verified() {
+        let mut e = engine().with_app_password_set(true);
         let result = e.handle_action(UserAction::ActionPressed {
             action_id: "export".into(),
         });
-        assert!(matches!(result, ActionResult::Complete));
-        assert_eq!(
-            e.engine_output(),
-            Some(crate::ui::EngineOutput::Gdpr(crate::ui::GdprChoice::Export))
-        );
+        assert!(matches!(result, ActionResult::NavigateTo(_)));
+        assert_eq!(e.step, GdprStep::ConfirmExportPin);
+        assert_eq!(e.engine_output(), None);
     }
 
     #[test]

@@ -58,7 +58,7 @@ fn gdpr_shows_no_deletion_requested_when_none() {
 
 // @internal
 #[test]
-fn gdpr_export_completes() {
+fn gdpr_export_without_an_app_password_asks_to_set_one() {
     let mut engine = GdprEngine::new(
         None,
         "All consents granted".into(),
@@ -67,20 +67,36 @@ fn gdpr_export_completes() {
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "export".into(),
     });
-    assert_eq!(result, ActionResult::Complete);
+    let ActionResult::NavigateTo(screen) = result else {
+        panic!("export must not complete without verification, got {result:?}");
+    };
+    assert_eq!(screen.screen_id, "export_needs_app_password");
+    assert_eq!(engine.engine_output(), None);
 }
 
 // @internal
 #[test]
-fn gdpr_export_engine_output() {
+fn gdpr_export_engine_output_waits_on_the_verified_pin() {
     let mut engine = GdprEngine::new(
         None,
         "All consents granted".into(),
         vauchi_app::i18n::Locale::English,
-    );
+    )
+    .with_app_password_set(true);
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "export".into(),
     });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "pin".into(),
+        value: "1234".into(),
+    });
+    assert_eq!(
+        engine.engine_output(),
+        Some(EngineOutput::ExportPin { pin: "1234".into() })
+    );
+
+    assert!(engine.apply_update(EngineUpdate::GdprExport(GdprExportUpdate::Verified)));
+
     assert_eq!(
         engine.engine_output(),
         Some(EngineOutput::Gdpr(GdprChoice::Export))

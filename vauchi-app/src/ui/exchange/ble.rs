@@ -573,6 +573,7 @@ mod tests {
 
     // ── Discovery tests ────────────────────────────────────────────
 
+    // @scenario: ble_exchange_modes :: Magic mode connects on device discovery
     // @internal
     #[test]
     fn discovery_initiator_with_smaller_token_emits_connect() {
@@ -714,6 +715,7 @@ mod tests {
 
     // ── Connection tests ───────────────────────────────────────────
 
+    // @scenario: ble_exchange_modes :: Magic mode starts audio proximity on connection
     // @internal
     #[test]
     fn connection_starts_proximity_and_advances_to_exchanging() {
@@ -753,6 +755,7 @@ mod tests {
         }
     }
 
+    // @scenario: ble_exchange_modes :: Bump mode starts accelerometer on connection
     // @internal
     #[test]
     fn bump_connection_starts_accelerometer() {

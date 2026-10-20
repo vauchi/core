@@ -180,6 +180,7 @@ fn v2_purge_request_roundtrip() {
         purge_token: "bb".repeat(32),
         signature: "cc".repeat(64),
         timestamp: 1700000000,
+        erase_guardian_set: false,
     };
     let json = serde_json::to_string(&req).unwrap();
     let parsed: V2PurgeRequest = serde_json::from_str(&json).unwrap();

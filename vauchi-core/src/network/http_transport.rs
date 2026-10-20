@@ -556,6 +556,7 @@ impl HttpTransport {
             purge_token: purge_token.to_string(),
             signature: signature.to_string(),
             timestamp,
+            erase_guardian_set: false,
         };
         let resp = self.post_action("purge", &req)?;
         if resp.status == "ok" {
@@ -642,6 +643,9 @@ impl HttpTransport {
         let req = V2RecoveryStoreRequest {
             key_hash: key_hash.to_string(),
             proof_data: proof_data_b64.to_string(),
+            owner_pk: None,
+            timestamp: None,
+            signature: None,
         };
         let resp = self.post_action("recovery_store", &req)?;
         if resp.status == "ok" {

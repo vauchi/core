@@ -203,7 +203,9 @@ fn main() {
     // scenario loses its binding. Bump this when you wire more step
     // definitions; if CI reports a drop, a wired scenario lost its binding —
     // investigate the binding, don't just lower the floor.
-    const MIN_WIRED_SCENARIOS: usize = 135;
+    // 133 since 2026-10-20: features deleted the two WhatNext reading
+    // scenarios, whose options left the app 2026-05-21 (private#631).
+    const MIN_WIRED_SCENARIOS: usize = 133;
     if scenarios.passed < MIN_WIRED_SCENARIOS {
         eprintln!(
             "cucumber GATE failed: {} wired scenario(s) passed, expected at least \

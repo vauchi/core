@@ -446,6 +446,7 @@ mod rekey_coverage_tests;
 mod rekey_self_heal_tests;
 mod relay_exchange_tests;
 mod relay_proptests;
+mod relay_purge_tests;
 mod relay_simulation_tests;
 mod relay_url_validator_tests;
 mod repeat_exchange_rekey_tests;

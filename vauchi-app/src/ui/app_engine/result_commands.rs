@@ -165,4 +165,50 @@ mod tests {
             other => panic!("expected one ExportFile, got {other:?}"),
         }
     }
+
+    // @internal
+    #[test]
+    fn vcard_result_becomes_a_vcf_file_export() {
+        let mut commands = Vec::new();
+
+        append_result_commands(
+            ActionResult::VcardExportComplete {
+                vcf: "BEGIN:VCARD".into(),
+            },
+            &mut commands,
+        )
+        .unwrap();
+
+        match commands.as_slice() {
+            [Command::ExportFile { file }] => {
+                assert_eq!(file.suggested_name, "vauchi-contacts.vcf");
+                assert_eq!(file.mime_type, "text/vcard");
+                assert_eq!(file.data, b"BEGIN:VCARD");
+            }
+            other => panic!("expected one ExportFile, got {other:?}"),
+        }
+    }
+
+    // @internal
+    #[test]
+    fn encrypted_export_result_becomes_a_binary_file_export() {
+        let mut commands = Vec::new();
+
+        append_result_commands(
+            ActionResult::EncryptedExportComplete {
+                data: vec![1, 2, 3],
+            },
+            &mut commands,
+        )
+        .unwrap();
+
+        match commands.as_slice() {
+            [Command::ExportFile { file }] => {
+                assert_eq!(file.suggested_name, "vauchi-data-export.enc");
+                assert_eq!(file.mime_type, "application/octet-stream");
+                assert_eq!(file.data, vec![1, 2, 3]);
+            }
+            other => panic!("expected one ExportFile, got {other:?}"),
+        }
+    }
 }

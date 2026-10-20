@@ -221,9 +221,24 @@ fn show_help_icons_toggle_persists_to_settings_flags_and_config() {
 #[test]
 fn gdpr_export_returns_serialized_data() {
     let mut engine = engine_with_identity();
+    engine
+        .vauchi_mut()
+        .setup_app_password("app-password-123")
+        .unwrap();
+    engine
+        .vauchi_mut()
+        .authenticate("app-password-123")
+        .unwrap();
     engine.navigate_to(AppScreen::Privacy);
-    let result = engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "export".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "pin".into(),
+        value: "app-password-123".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "confirm_pin".into(),
     });
     match result {
         ActionResult::GdprExportComplete { json } => {

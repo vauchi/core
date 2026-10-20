@@ -69,6 +69,7 @@ mod contact_visibility_screen_tests;
 mod contextual_surface_tests;
 #[path = "../contextual_undo_tests.rs"]
 mod contextual_undo_tests;
+mod data_export_verification_tests;
 mod deep_link_consent_engine_tests;
 mod delivery_screen_tests;
 mod demo_presentation_tests;

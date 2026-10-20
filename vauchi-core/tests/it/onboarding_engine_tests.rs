@@ -808,6 +808,7 @@ fn contact_info_corrected_value_then_continue_collects_field() {
 
 // ── Screen 4: WhatNext ─────────────────────────────────────────────
 
+// @scenario: onboarding :: User chooses next action after onboarding
 /// Final onboarding step: one filled primary ("Start using the app"
 /// — the natural finish line) plus two outlined shortcuts (Exchange,
 /// Import). "Read about security" / "Read about backup" came off
@@ -840,6 +841,7 @@ fn what_next_has_three_actions_with_start_app_as_primary() {
     ));
 }
 
+// @scenario: onboarding :: User chooses next action after onboarding
 #[test]
 fn what_next_exchange_emits_onboarding_complete_with_exchange() {
     let mut engine = OnboardingEngine::new();
@@ -855,6 +857,7 @@ fn what_next_exchange_emits_onboarding_complete_with_exchange() {
     ));
 }
 
+// @scenario: onboarding :: User chooses next action after onboarding
 #[test]
 fn what_next_start_app_emits_onboarding_complete_with_main_screen() {
     let mut engine = OnboardingEngine::new();
@@ -870,6 +873,7 @@ fn what_next_start_app_emits_onboarding_complete_with_main_screen() {
     ));
 }
 
+// @scenario: onboarding :: User chooses next action after onboarding
 #[test]
 fn what_next_import_contacts_emits_onboarding_complete_with_import() {
     let mut engine = OnboardingEngine::new();
@@ -885,6 +889,7 @@ fn what_next_import_contacts_emits_onboarding_complete_with_import() {
     ));
 }
 
+// @scenario: onboarding :: User chooses next action after onboarding
 /// "Read about security" / "Read about backup" are no longer surfaced
 /// from the final onboarding step (G3 of
 /// `2026-05-21-mobile-onboarding-final-step-and-skip-fold`). The

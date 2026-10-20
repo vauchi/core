@@ -122,6 +122,7 @@ fn drive_full_onboarding_with_phone_and_email(engine: &mut AppEngine, display_na
     );
 }
 
+// @scenario: onboarding :: User enters default name during onboarding
 // @internal
 #[test]
 fn onboarding_completion_persists_phone_and_email_fields_to_own_card() {

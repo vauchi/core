@@ -173,6 +173,7 @@ fn settings_row_action(engine: &mut AppEngine, item_id: &str) -> UserAction {
         .unwrap_or_else(|| panic!("no settings row routes item id `{item_id}`"))
 }
 
+// @scenario: navigation :: Navigation shows 5 tabs
 // @internal
 #[test]
 fn primary_destinations_are_the_five_option_a_screens() {
@@ -184,6 +185,7 @@ fn primary_destinations_are_the_five_option_a_screens() {
     );
 }
 
+// @scenario: navigation :: Navigation shows 5 tabs
 // @internal
 #[test]
 fn both_shell_shapes_render_the_primary_destinations() {
@@ -288,6 +290,7 @@ fn every_top_level_screen_highlights_a_rendered_destination() {
 
 /// Each demoted screen is reached by activating the affordance declared
 /// for it, and lands on the screen that affordance claims to reach.
+// @scenario: navigation :: Navigation shows 5 tabs
 // @internal
 #[test]
 fn every_screen_demoted_from_the_nav_is_still_reachable() {

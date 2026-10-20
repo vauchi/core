@@ -497,6 +497,7 @@ fn test_deletion_state_encrypted_roundtrip() {
     let state = DeletionState::Scheduled {
         scheduled_at: 1000,
         execute_at: 2000,
+        erase_guardian_set: false,
     };
     storage.consent().save_deletion_state(&state).unwrap();
 
@@ -513,6 +514,7 @@ fn test_deletion_state_stored_encrypted() {
     let state = DeletionState::Scheduled {
         scheduled_at: 1000,
         execute_at: 2000,
+        erase_guardian_set: false,
     };
     storage.consent().save_deletion_state(&state).unwrap();
 
@@ -707,6 +709,7 @@ fn test_rekey_preserves_deletion_state() {
     let state = DeletionState::Scheduled {
         scheduled_at: 1000,
         execute_at: 2000,
+        erase_guardian_set: false,
     };
     storage.consent().save_deletion_state(&state).unwrap();
 

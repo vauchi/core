@@ -19,6 +19,10 @@ pub enum DeletionState {
         scheduled_at: u64,
         /// When deletion can be executed (Unix timestamp).
         execute_at: u64,
+        /// Whether the relay purge also erases the guardian set; `false`
+        /// keeps social recovery possible until it expires (#711).
+        #[serde(default)]
+        erase_guardian_set: bool,
     },
     /// Deletion has been executed.
     Executed {

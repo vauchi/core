@@ -125,8 +125,18 @@ impl<'a> DeletionManager<'a> {
         Ok(self.storage.consent().load_deletion_state()?)
     }
 
-    /// Schedules identity deletion with a 7-day grace period.
+    /// Schedules identity deletion with a 7-day grace period, keeping the
+    /// guardian set.
     pub fn schedule_deletion(&self) -> Result<(), DeletionError> {
+        self.schedule_deletion_erasing_guardian_set(false)
+    }
+
+    /// Schedules identity deletion with a 7-day grace period; the purge at
+    /// execution erases the guardian set when `erase_guardian_set` is set.
+    pub fn schedule_deletion_erasing_guardian_set(
+        &self,
+        erase_guardian_set: bool,
+    ) -> Result<(), DeletionError> {
         let current = self.storage.consent().load_deletion_state()?;
         if matches!(current, DeletionState::Scheduled { .. }) {
             return Err(DeletionError::AlreadyScheduled);
@@ -137,6 +147,7 @@ impl<'a> DeletionManager<'a> {
         let state = DeletionState::Scheduled {
             scheduled_at: now,
             execute_at,
+            erase_guardian_set,
         };
         self.storage.consent().save_deletion_state(&state)?;
         Ok(())
@@ -151,9 +162,22 @@ impl<'a> DeletionManager<'a> {
         let state = DeletionState::Scheduled {
             scheduled_at,
             execute_at,
+            erase_guardian_set: false,
         };
         self.storage.consent().save_deletion_state(&state)?;
         Ok(())
+    }
+
+    /// Whether the scheduled deletion erases the guardian set; `false` when
+    /// nothing is scheduled.
+    pub fn scheduled_erases_guardian_set(&self) -> Result<bool, DeletionError> {
+        Ok(matches!(
+            self.storage.consent().load_deletion_state()?,
+            DeletionState::Scheduled {
+                erase_guardian_set: true,
+                ..
+            }
+        ))
     }
 
     /// Cancels a scheduled deletion during the grace period.

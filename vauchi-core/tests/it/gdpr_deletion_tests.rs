@@ -31,6 +31,7 @@ fn test_schedule_deletion_sets_grace_period() {
         DeletionState::Scheduled {
             scheduled_at,
             execute_at,
+            ..
         } => {
             // Grace period should be ~7 days (604800 seconds)
             let grace_period = execute_at - scheduled_at;

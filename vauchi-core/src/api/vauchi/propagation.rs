@@ -784,11 +784,13 @@ impl Vauchi {
                 SyncItem::DeletionScheduled {
                     scheduled_at,
                     execute_at,
+                    erase_guardian_set,
                     ..
                 } => {
                     let state = crate::storage::DeletionState::Scheduled {
                         scheduled_at,
                         execute_at,
+                        erase_guardian_set,
                     };
                     self.storage
                         .consent()

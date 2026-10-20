@@ -258,6 +258,10 @@ pub enum SyncItem {
         scheduled_at: u64,
         /// When the deletion should execute (after grace period).
         execute_at: u64,
+        /// Whether the purge also erases the guardian set (#711); absent
+        /// from devices that predate the choice, which keep it.
+        #[serde(default)]
+        erase_guardian_set: bool,
         /// Timestamp of this sync event.
         timestamp: u64,
     },

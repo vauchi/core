@@ -61,6 +61,7 @@ fn apply_sync_deletion_scheduled_writes_state_to_storage() {
             scheduled_at,
             execute_at,
             timestamp: scheduled_at,
+            erase_guardian_set: false,
         }])
         .unwrap();
 
@@ -70,12 +71,37 @@ fn apply_sync_deletion_scheduled_writes_state_to_storage() {
         DeletionState::Scheduled {
             scheduled_at: got_scheduled,
             execute_at: got_execute,
+            ..
         } => {
             assert_eq!(got_scheduled, scheduled_at);
             assert_eq!(got_execute, execute_at);
         }
         other => panic!("expected DeletionState::Scheduled, got {other:?}"),
     }
+}
+
+// A linked device runs the same purge, so it must keep the user's choice.
+// @internal
+#[test]
+fn apply_sync_deletion_scheduled_keeps_the_guardian_set_choice() {
+    let wb = make_vauchi();
+    let scheduled_at = now();
+
+    wb.apply_sync_items(vec![SyncItem::DeletionScheduled {
+        scheduled_at,
+        execute_at: scheduled_at + 7 * 24 * 60 * 60,
+        timestamp: scheduled_at,
+        erase_guardian_set: true,
+    }])
+    .unwrap();
+
+    assert!(matches!(
+        wb.storage().consent().load_deletion_state().unwrap(),
+        DeletionState::Scheduled {
+            erase_guardian_set: true,
+            ..
+        }
+    ));
 }
 
 // @internal
@@ -87,6 +113,7 @@ fn apply_sync_deletion_cancelled_clears_state() {
         .save_deletion_state(&DeletionState::Scheduled {
             scheduled_at: 100,
             execute_at: 200,
+            erase_guardian_set: false,
         })
         .unwrap();
 
@@ -966,6 +993,7 @@ fn apply_sync_deletion_scheduled_dispatches_no_invalidation_event() {
         scheduled_at: now(),
         execute_at: now() + 1,
         timestamp: now(),
+        erase_guardian_set: false,
     }])
     .unwrap();
 

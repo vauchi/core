@@ -107,6 +107,7 @@ impl From<&vauchi_core::storage::DeletionState> for MobileDeletionInfo {
             vauchi_core::storage::DeletionState::Scheduled {
                 scheduled_at,
                 execute_at,
+                ..
             } => MobileDeletionInfo {
                 state: MobileDeletionState::Scheduled,
                 scheduled_at: *scheduled_at,

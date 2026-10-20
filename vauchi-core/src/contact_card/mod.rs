@@ -23,8 +23,8 @@ pub mod vcard_import;
 pub use catalog::{CatalogEntry, FieldCategory, FieldTypeCatalog};
 pub use field::{ContactField, FieldType, ValidationError, validate_value};
 pub use uri::{
-    ContactAction, is_allowed_scheme, is_blocked_scheme, is_safe_url, is_valid_email,
-    is_valid_phone, is_valid_relay_url,
+    ContactAction, MapProvider, is_allowed_scheme, is_blocked_scheme, is_safe_url, is_valid_email,
+    is_valid_phone, is_valid_relay_url, map_uri,
 };
 
 use image::ImageReader;

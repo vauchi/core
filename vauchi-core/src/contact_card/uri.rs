@@ -31,7 +31,9 @@ pub enum ContactAction {
 }
 
 /// Allowed URI schemes (security whitelist).
-const ALLOWED_SCHEMES: &[&str] = &["tel", "mailto", "sms", "https", "http", "geo"];
+/// `om` is Organic Maps' search link, offered beside the system's maps app
+/// for addresses (vauchi/private#709).
+const ALLOWED_SCHEMES: &[&str] = &["tel", "mailto", "sms", "https", "http", "geo", "om"];
 
 /// Blocked URI schemes (explicit blocklist for dangerous schemes).
 const BLOCKED_SCHEMES: &[&str] = &["javascript", "vbscript", "data", "file", "ftp", "blob"];
@@ -221,6 +223,36 @@ fn parse_mastodon_federated(username: &str) -> Option<String> {
     None
 }
 
+/// A maps app or service an address can be opened in.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MapProvider {
+    /// Whatever app the system hands a `geo:` link to.
+    System,
+    AppleMaps,
+    GoogleMaps,
+    OpenStreetMap,
+    OrganicMaps,
+}
+
+/// A link that searches `provider` for `address`, `None` for a blank address.
+pub fn map_uri(address: &str, provider: MapProvider) -> Option<String> {
+    let address = address.trim();
+    if address.is_empty() {
+        return None;
+    }
+    let query = url_encode(address);
+    Some(match provider {
+        MapProvider::System => format!("geo:0,0?q={query}"),
+        MapProvider::AppleMaps => format!("https://maps.apple.com/?q={query}"),
+        MapProvider::GoogleMaps => {
+            format!("https://www.google.com/maps/search/?api=1&query={query}")
+        }
+        MapProvider::OpenStreetMap => format!("https://www.openstreetmap.org/search?query={query}"),
+        MapProvider::OrganicMaps => format!("om://search?query={query}"),
+    })
+}
+
 /// URL encode a string for use in query parameters.
 fn url_encode(s: &str) -> String {
     let mut result = String::with_capacity(s.len() * 3);
@@ -265,7 +297,8 @@ impl ContactField {
         match effective_type {
             FieldType::Phone => {
                 if is_valid_phone(value) {
-                    Some(format!("tel:{}", value))
+                    let dialable: String = value.chars().filter(|c| !c.is_whitespace()).collect();
+                    Some(format!("tel:{dialable}"))
                 } else {
                     None
                 }
@@ -273,7 +306,7 @@ impl ContactField {
             FieldType::Email => Some(format!("mailto:{}", value)),
             FieldType::Website => self.website_to_uri(value),
             FieldType::Social => self.social_to_uri(value),
-            FieldType::Address => Some(format!("geo:0,0?q={}", url_encode(value))),
+            FieldType::Address => map_uri(value, MapProvider::System),
             FieldType::Birthday => None, // Birthday dates don't have a direct URI action
             FieldType::Custom => None,   // No heuristic match, no URI
         }

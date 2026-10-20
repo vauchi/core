@@ -527,6 +527,7 @@ mod vauchi_signed_ohttp_key_tests;
 mod vauchi_sync_http_tests;
 mod vcard_import_tests;
 mod vcard_tests;
+mod vcard_vauchi_marker_tests;
 mod version_tests;
 mod visibility_control_tests;
 mod visibility_e2e_tests;

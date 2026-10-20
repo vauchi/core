@@ -140,11 +140,6 @@ fn onboarding_completion_persists_phone_and_email_fields_to_own_card() {
     let v = engine.vauchi();
     assert!(v.has_identity(), "identity must be created on Complete");
 
-    // The slice 32c assertion: fields collected during onboarding
-    // (phone, email) must land on the user's own card. Today this
-    // assertion FAILS because handle_completion (routing.rs:240)
-    // does not walk `onboarding_data().fields[]` — only display_name
-    // and selected_groups are persisted.
     let card = v
         .own_card()
         .expect("own_card lookup")

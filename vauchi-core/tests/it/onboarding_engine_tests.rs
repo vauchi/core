@@ -39,6 +39,7 @@ fn advance_to_what_next(engine: &mut OnboardingEngine) {
 
 // ── Pre-gate: IdentityCheck ─────────────────────────────────────────
 
+// @scenario: onboarding :: Identity check on first launch
 // @internal
 #[test]
 fn starts_at_identity_check() {
@@ -51,6 +52,7 @@ fn starts_at_identity_check() {
     );
 }
 
+// @scenario: onboarding :: Identity check on first launch
 // @internal
 #[test]
 fn identity_check_has_info_panel_one_primary_action_and_the_have_identity_rows() {
@@ -395,6 +397,7 @@ fn groups_continue_goes_to_contact_info() {
     }
 }
 
+// @scenario: onboarding :: Minimum viable card
 // @internal
 #[test]
 fn groups_skip_goes_to_contact_info() {
@@ -569,6 +572,7 @@ fn contact_info_continue_syncs_fields_to_data() {
     assert!(email.unwrap().shown);
 }
 
+// @scenario: onboarding :: Minimum viable card
 // @scenario: onboarding :: Quick add phone and email
 // @internal
 #[test]
@@ -913,6 +917,7 @@ fn what_next_legacy_docs_action_ids_no_longer_complete() {
 
 // ── Full flow ───────────────────────────────────────────────────────
 
+// @scenario: onboarding :: Minimum viable card
 // @internal
 #[test]
 fn full_flow_to_completion() {

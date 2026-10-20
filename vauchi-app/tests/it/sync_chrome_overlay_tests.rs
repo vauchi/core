@@ -79,6 +79,7 @@ fn no_contacts_emit_no_sync_indicator() {
     );
 }
 
+// @scenario: onboarding :: No sync chip before the first contact
 // @internal
 #[test]
 fn sync_indicator_appears_once_first_contact_exists() {

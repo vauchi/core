@@ -157,6 +157,7 @@ fn test_exit_preview_returns_to_edit_mode() {
     assert_eq!(screen.screen_id, "my_info");
 }
 
+// @scenario: navigation :: Exit preview returns to edit mode
 // @internal
 #[test]
 fn test_exit_preview_removes_banner() {
@@ -184,6 +185,7 @@ fn test_exit_preview_removes_banner() {
     );
 }
 
+// @scenario: navigation :: Exit preview returns to edit mode
 // @internal
 #[test]
 fn test_exit_preview_screen_has_normal_my_info_actions() {

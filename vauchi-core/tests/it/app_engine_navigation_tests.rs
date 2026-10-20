@@ -672,6 +672,7 @@ fn default_screen_is_my_info_when_no_contacts() {
     assert_eq!(engine.default_screen(), AppScreen::MyInfo);
 }
 
+// @scenario: navigation :: Dynamic default screen with contacts
 // @internal
 #[test]
 fn default_screen_is_contacts_when_has_contacts() {

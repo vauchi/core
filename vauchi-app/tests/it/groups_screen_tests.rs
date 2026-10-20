@@ -64,6 +64,7 @@ fn texts(screen: &ScreenModel) -> Vec<String> {
         .collect()
 }
 
+// @scenario: navigation :: Groups tab shows group list
 // @scenario: visibility_labels :: Label with no contacts still exists
 // @internal
 #[test]

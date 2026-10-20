@@ -98,7 +98,7 @@ fn execute_scheduled_deletion(erase_guardian_set: bool) -> (Vec<serde_json::Valu
     (purges, public_key)
 }
 
-// @internal
+// @scenario: privacy_compliance :: The relay purge carries my recovery choice
 #[test]
 fn executing_the_deletion_purges_the_relay_before_the_wipe() {
     let (purges, public_key) = execute_scheduled_deletion(false);
@@ -108,7 +108,7 @@ fn executing_the_deletion_purges_the_relay_before_the_wipe() {
     assert!(purges[0].get("erase_guardian_set").is_none());
 }
 
-// @internal
+// @scenario: privacy_compliance :: The relay purge carries my recovery choice
 #[test]
 fn a_deletion_scheduled_to_erase_everything_purges_the_guardian_set_too() {
     let (purges, _) = execute_scheduled_deletion(true);

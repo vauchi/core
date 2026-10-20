@@ -111,7 +111,7 @@ fn test_erasure_blocked_during_grace_period() {
 /// Uses `schedule_deletion_with_execute_at` with past timestamps to bypass the
 /// wall-clock wait. Verifies that one `IdentityRevoked` message is generated per
 /// contact and that the deletion state transitions to `Executed`.
-// @scenario: privacy_compliance :: Delete my account
+// @scenario: privacy_compliance :: Delete my identity
 // @scenario: privacy_compliance :: Full erasure after grace period
 // @internal
 #[test]

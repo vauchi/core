@@ -48,7 +48,7 @@ fn verifies(request: &serde_json::Value, owner: [u8; 32], message: &[u8]) -> boo
     PublicKey::from_bytes(owner).verify(message, &Signature::from_bytes(signature))
 }
 
-// @internal
+// @scenario: privacy_compliance :: The relay purge carries my recovery choice
 #[test]
 fn erasing_everything_signs_the_guardian_set_choice_into_the_purge() {
     let relay = MockRelay::start();
@@ -75,7 +75,7 @@ fn erasing_everything_signs_the_guardian_set_choice_into_the_purge() {
 }
 
 // A relay that predates the flag verifies exactly the bytes it always did.
-// @internal
+// @scenario: privacy_compliance :: The relay purge carries my recovery choice
 #[test]
 fn keeping_recovery_sends_the_purge_old_relays_accept() {
     let relay = MockRelay::start();

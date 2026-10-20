@@ -14,7 +14,7 @@ fn storage() -> Storage {
     Storage::in_memory(SymmetricKey::generate()).unwrap()
 }
 
-// @internal
+// @scenario: privacy_compliance :: The relay purge carries my recovery choice
 #[test]
 fn erasing_everything_is_remembered_with_the_schedule() {
     let storage = storage();
@@ -34,7 +34,7 @@ fn erasing_everything_is_remembered_with_the_schedule() {
     ));
 }
 
-// @internal
+// @scenario: privacy_compliance :: The relay purge carries my recovery choice
 #[test]
 fn keeping_recovery_is_remembered_with_the_schedule() {
     let storage = storage();
@@ -74,7 +74,7 @@ fn nothing_scheduled_erases_nothing() {
 
 // A schedule saved before the choice existed, or synced from a device that
 // predates it, keeps recovery.
-// @internal
+// @scenario: privacy_compliance :: The relay purge carries my recovery choice
 #[test]
 fn a_schedule_from_before_the_choice_keeps_recovery() {
     let old: DeletionState =

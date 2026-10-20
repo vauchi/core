@@ -58,7 +58,7 @@ fn erases_guardian_set(engine: &AppEngine) -> bool {
         .unwrap()
 }
 
-// @internal
+// @scenario: privacy_compliance :: Deleting my identity asks whether recovery stays possible
 #[test]
 fn with_trusted_contacts_the_user_chooses_before_anything_is_scheduled() {
     let mut engine = privacy(true);
@@ -76,7 +76,7 @@ fn with_trusted_contacts_the_user_chooses_before_anything_is_scheduled() {
     assert_eq!(state(&engine), DeletionState::None);
 }
 
-// @internal
+// @scenario: privacy_compliance :: Deleting my identity asks whether recovery stays possible
 #[test]
 fn erasing_everything_schedules_a_deletion_that_erases_the_guardian_set() {
     let mut engine = privacy(true);
@@ -88,7 +88,7 @@ fn erasing_everything_schedules_a_deletion_that_erases_the_guardian_set() {
     assert!(erases_guardian_set(&engine));
 }
 
-// @internal
+// @scenario: privacy_compliance :: Deleting my identity asks whether recovery stays possible
 #[test]
 fn keeping_recovery_schedules_a_deletion_that_keeps_the_guardian_set() {
     let mut engine = privacy(true);
@@ -100,7 +100,7 @@ fn keeping_recovery_schedules_a_deletion_that_keeps_the_guardian_set() {
     assert!(!erases_guardian_set(&engine));
 }
 
-// @internal
+// @scenario: privacy_compliance :: Deleting my identity asks whether recovery stays possible
 #[test]
 fn cancelling_the_choice_schedules_nothing() {
     let mut engine = privacy(true);
@@ -112,7 +112,7 @@ fn cancelling_the_choice_schedules_nothing() {
     assert_eq!(state(&engine), DeletionState::None);
 }
 
-// @internal
+// @scenario: privacy_compliance :: With nobody trusted for recovery, deleting erases everything
 #[test]
 fn without_trusted_contacts_there_is_nothing_to_keep_and_no_question() {
     let mut engine = privacy(false);

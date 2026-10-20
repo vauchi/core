@@ -135,7 +135,7 @@ fn gdpr_delete_navigates_to_confirmation() {
     }
 }
 
-// @internal
+// @scenario: privacy_compliance :: With nobody trusted for recovery, deleting erases everything
 #[test]
 fn gdpr_confirm_delete_without_trusted_contacts_erases_everything() {
     let mut engine = GdprEngine::new(

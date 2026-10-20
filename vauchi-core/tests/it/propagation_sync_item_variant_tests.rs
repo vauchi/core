@@ -48,7 +48,7 @@ fn now() -> u64 {
 // DeletionScheduled / DeletionCancelled
 // ============================================================
 
-// @scenario: privacy_compliance :: Account deletion propagates across all user devices
+// @scenario: privacy_compliance :: Identity deletion propagates across all user devices
 // @internal
 #[test]
 fn apply_sync_deletion_scheduled_writes_state_to_storage() {
@@ -81,7 +81,7 @@ fn apply_sync_deletion_scheduled_writes_state_to_storage() {
 }
 
 // A linked device runs the same purge, so it must keep the user's choice.
-// @internal
+// @scenario: privacy_compliance :: The relay purge carries my recovery choice
 #[test]
 fn apply_sync_deletion_scheduled_keeps_the_guardian_set_choice() {
     let wb = make_vauchi();

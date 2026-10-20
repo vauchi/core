@@ -22,7 +22,13 @@ targets = [
 version = 2
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
-ignore = []
+ignore = [
+    # basic-toml is unmaintained — transitive via uniffi -> uniffi_bindgen ->
+    # askama -> askama_derive. Build-time proc-macro only, no runtime risk;
+    # askama_derive 0.16.1 (latest) still uses it. Remove once uniffi's
+    # askama moves to `toml` (private#718).
+    "RUSTSEC-2026-0374",
+]
 
 [licenses]
 version = 2

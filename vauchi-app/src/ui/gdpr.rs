@@ -164,8 +164,6 @@ impl GdprEngine {
         self
     }
 
-    /// Mark whether a scheduled deletion can be executed now (grace
-    /// elapsed), so the overview offers "Delete Now".
     /// Whether the shell can run the OS user-presence check (#712).
     pub fn with_user_presence_available(mut self, available: bool) -> Self {
         self.user_presence_available = available;
@@ -178,6 +176,8 @@ impl GdprEngine {
         self
     }
 
+    /// Mark whether a scheduled deletion can be executed now (grace
+    /// elapsed), so the overview offers "Delete Now".
     pub fn with_deletion_executable(mut self, executable: bool) -> Self {
         self.deletion_executable = executable;
         self

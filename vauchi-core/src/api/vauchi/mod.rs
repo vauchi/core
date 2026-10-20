@@ -51,6 +51,7 @@ mod sync_delayed;
 #[cfg(feature = "network-http")]
 mod sync_http;
 mod tags;
+mod user_presence;
 mod visibility;
 
 pub use builder::VauchiBuilder;

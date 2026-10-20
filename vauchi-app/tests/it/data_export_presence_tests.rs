@@ -52,7 +52,7 @@ fn enrolled(engine: &mut AppEngine) {
     let _ = press(engine, "export");
     let _ = presence_request(engine);
     let _ = engine.handle_hardware_event(Event::UserPresenceSecretCreated {
-        secret: SECRET.to_vec(),
+        secret: SECRET.to_vec().into(),
     });
     let _ = press(engine, "cancel");
 }
@@ -70,7 +70,7 @@ fn the_first_export_has_the_shell_seal_a_secret_and_continues_once_it_does() {
     };
     assert!(!prompt.is_empty(), "the OS prompt carries Core's copy");
     let _ = engine.handle_hardware_event(Event::UserPresenceSecretCreated {
-        secret: SECRET.to_vec(),
+        secret: SECRET.to_vec().into(),
     });
     assert_eq!(screen_id(&engine), "export_choose_format");
     assert!(engine.vauchi().has_user_presence_secret().unwrap());
@@ -89,7 +89,7 @@ fn a_later_export_has_the_shell_reveal_the_secret_and_checks_it() {
         Some(Command::RevealUserPresenceSecret { .. })
     ));
     let _ = engine.handle_hardware_event(Event::UserPresenceSecretRevealed {
-        secret: SECRET.to_vec(),
+        secret: SECRET.to_vec().into(),
     });
     assert_eq!(screen_id(&engine), "export_choose_format");
 }
@@ -105,10 +105,10 @@ fn a_wrong_secret_or_a_second_enrolment_exports_nothing() {
     let _ = presence_request(&mut engine);
 
     let _ = engine.handle_hardware_event(Event::UserPresenceSecretRevealed {
-        secret: vec![1; 32],
+        secret: vec![1; 32].into(),
     });
     let _ = engine.handle_hardware_event(Event::UserPresenceSecretCreated {
-        secret: vec![1; 32],
+        secret: vec![1; 32].into(),
     });
 
     assert_ne!(screen_id(&engine), "export_choose_format");
@@ -122,7 +122,7 @@ fn a_secret_nobody_asked_for_is_ignored() {
     enrolled(&mut engine);
 
     let _ = engine.handle_hardware_event(Event::UserPresenceSecretRevealed {
-        secret: SECRET.to_vec(),
+        secret: SECRET.to_vec().into(),
     });
 
     assert_eq!(screen_id(&engine), "privacy_settings");

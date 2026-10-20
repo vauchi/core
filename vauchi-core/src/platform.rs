@@ -459,6 +459,48 @@ pub enum Command {
     /// holds what it protected in secure storage (vauchi/private#580). The
     /// handle is the shell's own opaque name, echoed back unchanged.
     ForgetStoredSecret { handle: String },
+    /// Make 32 random bytes and seal them in the platform keystore so that
+    /// reading them back needs the operating system's own user-presence
+    /// check (biometric or device credential) every time; run that check
+    /// now, with `prompt` as its reason, and answer
+    /// [`Event::UserPresenceSecretCreated`]. A shell that cannot answers
+    /// [`Event::HardwareUnavailable`] (#712).
+    CreateUserPresenceSecret { prompt: String },
+    /// Run the operating system's user-presence check with `prompt` as its
+    /// reason, unseal the secret from [`Command::CreateUserPresenceSecret`]
+    /// and answer [`Event::UserPresenceSecretRevealed`] (#712).
+    RevealUserPresenceSecret { prompt: String },
+}
+
+/// A secret a shell sealed behind the platform's user-presence check:
+/// transparent on the wire, never printed, wiped when dropped (#712).
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SealedSecret(Vec<u8>);
+
+impl SealedSecret {
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl From<Vec<u8>> for SealedSecret {
+    fn from(bytes: Vec<u8>) -> Self {
+        Self(bytes)
+    }
+}
+
+impl std::fmt::Debug for SealedSecret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("<redacted>")
+    }
+}
+
+impl Drop for SealedSecret {
+    fn drop(&mut self) {
+        zeroize::Zeroize::zeroize(&mut self.0);
+    }
 }
 
 /// Haptic intent for [`Command::Celebrate`]. Closed enum — platforms map
@@ -645,6 +687,8 @@ impl Command {
             Self::PostNotification { .. } => "PostNotification",
             Self::RequestBiometricUnlock => "RequestBiometricUnlock",
             Self::ForgetStoredSecret { .. } => "ForgetStoredSecret",
+            Self::CreateUserPresenceSecret { .. } => "CreateUserPresenceSecret",
+            Self::RevealUserPresenceSecret { .. } => "RevealUserPresenceSecret",
         }
     }
 }
@@ -946,6 +990,17 @@ pub enum Event {
     /// Phase C of
     /// `_private/docs/planning/todo/2026-07-20-exchange-modes-regression-safe-completion-plan.md`.
     BleGattReady { device_id: String },
+
+    // ── User presence (#712) ───────────────────────────────────────
+    // Appended to preserve serde discriminant ordering.
+    /// The operating system confirmed the user and the shell sealed a fresh
+    /// secret, answering [`Command::CreateUserPresenceSecret`].
+    UserPresenceSecretCreated { secret: SealedSecret },
+    /// The operating system confirmed the user and the shell unsealed the
+    /// secret, answering [`Command::RevealUserPresenceSecret`].
+    UserPresenceSecretRevealed { secret: SealedSecret },
+    /// The user dismissed the operating system's user-presence check.
+    UserPresenceCheckCancelled,
 }
 
 // INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access

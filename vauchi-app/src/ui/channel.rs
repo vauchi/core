@@ -56,6 +56,8 @@ pub enum EngineOutput {
     /// PIN typed to confirm a data export (redacted in `Debug`). Absent
     /// while the entry is empty or the screen is past the PIN step.
     ExportPin { pin: String },
+    /// The export waits on the OS user-presence check (#712).
+    AwaitingUserPresence,
     /// The export password the encrypted data export is sealed with
     /// (redacted in `Debug`) (#712).
     GdprExportEncrypted { password: String },
@@ -201,6 +203,8 @@ pub enum GdprExportUpdate {
     /// The export ran (or failed): forget its passwords and return to the
     /// overview, so nothing of it outlives the one export.
     Finished,
+    /// The shell cannot run the OS user-presence check after all.
+    UserPresenceUnavailable,
 }
 
 /// Cycle-thread bridge updates for the device-linking engine.
@@ -431,6 +435,7 @@ impl EngineUpdate {
                 GdprExportUpdate::Verified => "GdprExport::Verified",
                 GdprExportUpdate::PinRejected => "GdprExport::PinRejected",
                 GdprExportUpdate::Finished => "GdprExport::Finished",
+                GdprExportUpdate::UserPresenceUnavailable => "GdprExport::UserPresenceUnavailable",
             },
             Self::MyInfoEntryDetail(u) => match u {
                 MyInfoEntryDetailUpdate::GroupVisibility { .. } => {
@@ -588,6 +593,7 @@ impl std::fmt::Debug for EngineOutput {
                 .debug_struct("ExportPin")
                 .field("pin", &"<redacted>")
                 .finish(),
+            Self::AwaitingUserPresence => f.write_str("AwaitingUserPresence"),
             Self::GdprExportEncrypted { .. } => f
                 .debug_struct("GdprExportEncrypted")
                 .field("password", &"<redacted>")

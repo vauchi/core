@@ -22,6 +22,8 @@ impl GdprEngine {
         self.pending_export = Some(kind);
         self.step = if self.app_password_set {
             GdprStep::ConfirmExportPin
+        } else if self.user_presence_available {
+            GdprStep::ExportAwaitPresence
         } else {
             GdprStep::ExportNeedsAppPassword
         };
@@ -40,7 +42,12 @@ impl GdprEngine {
 
     pub(super) fn apply_export_update(&mut self, update: GdprExportUpdate) -> bool {
         match update {
-            GdprExportUpdate::Verified if matches!(self.step, GdprStep::ConfirmExportPin) => {
+            GdprExportUpdate::Verified
+                if matches!(
+                    self.step,
+                    GdprStep::ConfirmExportPin | GdprStep::ExportAwaitPresence
+                ) =>
+            {
                 self.entered_pin.clear();
                 self.pin_error = None;
                 match self.pending_export.take() {
@@ -54,6 +61,14 @@ impl GdprEngine {
             GdprExportUpdate::PinRejected if matches!(self.step, GdprStep::ConfirmExportPin) => {
                 self.entered_pin.clear();
                 self.pin_error = Some(self.t("lock_screen.wrong_password"));
+            }
+            GdprExportUpdate::PinRejected if matches!(self.step, GdprStep::ExportAwaitPresence) => {
+                self.pin_error = Some(self.t("privacy.export_presence_rejected"));
+            }
+            GdprExportUpdate::UserPresenceUnavailable
+                if matches!(self.step, GdprStep::ExportAwaitPresence) =>
+            {
+                self.step = GdprStep::ExportNeedsAppPassword;
             }
             GdprExportUpdate::Finished => {
                 self.abandon_export();
@@ -156,6 +171,31 @@ impl GdprEngine {
             "privacy.set_app_password",
             ActionStyle::Primary,
         )
+    }
+
+    pub(super) fn build_export_await_presence(&self) -> ScreenModel {
+        let body = self
+            .pin_error
+            .clone()
+            .unwrap_or_else(|| self.t("privacy.export_presence_waiting"));
+        ScreenModel {
+            screen_id: "export_await_presence".into(),
+            title: self.t("privacy.export_data"),
+            components: vec![Component::Text {
+                id: "export_await_presence_body".into(),
+                content: body.clone(),
+                style: TextStyle::Body,
+                a11y: Some(A11y::labeled(body)),
+            }],
+            contextual_actions: vec![ScreenAction {
+                id: "cancel".into(),
+                label: self.t("action.cancel"),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: None,
+            }],
+            ..Default::default()
+        }
     }
 
     pub(super) fn build_readable_export_warning(&self) -> ScreenModel {

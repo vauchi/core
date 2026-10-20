@@ -104,6 +104,7 @@ fn make_caps(nfc: bool, ble: bool, camera: bool) -> DeviceCapabilities {
         has_internet: false,
         has_usb_port: false,
         device_name: None,
+        can_seal_user_presence: false,
     }
 }
 
@@ -172,6 +173,7 @@ fn test_device_capabilities_serde_roundtrip() {
         has_internet: false,
         has_usb_port: false,
         device_name: None,
+        can_seal_user_presence: false,
     };
 
     let json = serde_json::to_string(&caps).expect("serialize");
@@ -538,6 +540,7 @@ mod proptest_capability {
                         has_internet,
                         has_usb_port: false,
                         device_name: None,
+                        can_seal_user_presence: false,
                     }
                 },
             )

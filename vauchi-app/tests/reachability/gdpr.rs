@@ -140,3 +140,24 @@ fn gdpr_export_format_screens_are_reachable() {
     );
     assert_reachability_across_screens(format_choice_factory, HANDLED_FORMAT_CHOICE);
 }
+
+/// No app password, but the shell can run the OS user-presence check: the
+/// export waits on it (`cancel` only; the answer is a hardware event).
+fn user_presence_factory() -> GdprEngine {
+    factory().with_user_presence_available(true)
+}
+
+// @internal
+#[test]
+fn gdpr_export_presence_screen_is_reachable() {
+    assert_reachability_across_screens(user_presence_factory, HANDLED_DEFAULT_PRESENCE);
+}
+
+const HANDLED_DEFAULT_PRESENCE: &[&str] = &[
+    "export",
+    "heirloom",
+    "confirm_heirloom",
+    "delete",
+    "confirm_delete",
+    "cancel",
+];

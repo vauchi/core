@@ -160,6 +160,10 @@ impl AppEngine {
         // ADR-070: a platform fact, not a screen interaction — recorded
         // whatever is on screen, because the next device-link ceremony
         // needs it and the network can change at any time.
+        if let Some(result) = self.handle_user_presence_event(&event) {
+            return Some(result);
+        }
+
         if let Event::LocalNetworkAddressChanged { address } = &event {
             self.set_local_network_address(address.clone());
             return None;

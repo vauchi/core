@@ -107,6 +107,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("ux_state", "relay_url_encrypted"),
     // V74 persisted relay's OHTTP anchor
     ("ux_state", "relay_anchor_encrypted"),
+    // V84 this device's user-presence secret digest (#712)
+    ("ux_state", "user_presence_digest_encrypted"),
     // V55 own-card repropagation marker
     ("ux_state", "own_card_repropagate_encrypted"),
     // V58 last-used exchange defaults (M2 S1)
@@ -283,6 +285,7 @@ impl Storage {
             report(&mut completed, "field_validations");
 
             self.rekey_ux_state(old_key, &new_key)?;
+            self.rekey_user_presence_digest(old_key, &new_key)?;
             report(&mut completed, "ux_state");
 
             self.rekey_audit_log(old_key, &new_key)?;
@@ -1434,6 +1437,36 @@ impl Storage {
 
     /// Re-encrypt ux_state: aha_tracker, demo_contact, onboarding_progress,
     /// backup_reminder, settings_flags
+    /// Re-encrypts the user-presence digest (#712); kept apart from
+    /// `rekey_ux_state`'s one-row tuple so that tuple does not grow again.
+    fn rekey_user_presence_digest(
+        &self,
+        old_key: &SymmetricKey,
+        new_key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        let result = self.conn.query_row(
+            "SELECT id, user_presence_digest_encrypted FROM ux_state WHERE id = 1",
+            [],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<Vec<u8>>>(1)?)),
+        );
+        let (id, enc) = match result {
+            Ok((id, Some(enc))) if !enc.is_empty() => (id, enc),
+            Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(()),
+            Err(e) => return Err(StorageError::Database(e)),
+        };
+        let plain = decrypt(old_key, &enc)
+            .map_err(|e| StorageError::Migration(format!("Decrypt user_presence_digest: {}", e)))?;
+        let new_enc = encrypt(new_key, &plain)
+            .map_err(|e| StorageError::Migration(format!("Encrypt user_presence_digest: {}", e)))?;
+        self.conn
+            .execute(
+                "UPDATE ux_state SET user_presence_digest_encrypted = ?1 WHERE id = ?2",
+                params![new_enc, id],
+            )
+            .map_err(|e| StorageError::Migration(format!("Update user_presence_digest: {}", e)))?;
+        Ok(())
+    }
+
     fn rekey_ux_state(
         &self,
         old_key: &SymmetricKey,

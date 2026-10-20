@@ -69,6 +69,9 @@ pub struct GdprEngine {
     /// Whether an app password is set: an export then asks for it; without
     /// one the user is sent to set one first (#712).
     app_password_set: bool,
+    /// The shell can seal a secret behind the OS user-presence check, the
+    /// export's verification when no app password is set (#712).
+    user_presence_available: bool,
     /// The export waiting on the PIN step: `"export"` or `"heirloom"`.
     pending_export: Option<&'static str>,
     entered_pin: EnteredPin,
@@ -98,6 +101,8 @@ enum GdprStep {
     ConfirmExportPin,
     /// No app password is set: set one before exporting (#712).
     ExportNeedsAppPassword,
+    /// No app password, but the OS can check the user: waiting on it.
+    ExportAwaitPresence,
     /// Verified: encrypted, vCard or JSON (#712).
     ChooseExportFormat,
     /// The encrypted export's own password, typed twice.
@@ -118,6 +123,7 @@ impl GdprEngine {
             deletion_scheduled: false,
             deletion_executable: false,
             app_password_set: false,
+            user_presence_available: false,
             pending_export: None,
             entered_pin: EnteredPin::default(),
             pin_error: None,
@@ -160,6 +166,12 @@ impl GdprEngine {
 
     /// Mark whether a scheduled deletion can be executed now (grace
     /// elapsed), so the overview offers "Delete Now".
+    /// Whether the shell can run the OS user-presence check (#712).
+    pub fn with_user_presence_available(mut self, available: bool) -> Self {
+        self.user_presence_available = available;
+        self
+    }
+
     /// Whether an app password is set, which the export asks for (#712).
     pub fn with_app_password_set(mut self, set: bool) -> Self {
         self.app_password_set = set;
@@ -451,6 +463,7 @@ impl GdprEngine {
             GdprStep::ConfirmHeirloom => self.build_confirm_heirloom(),
             GdprStep::ConfirmExportPin => self.build_confirm_export_pin(),
             GdprStep::ExportNeedsAppPassword => self.build_export_needs_app_password(),
+            GdprStep::ExportAwaitPresence => self.build_export_await_presence(),
             GdprStep::ChooseExportFormat => self.build_choose_export_format(),
             GdprStep::ExportPassword => self.build_export_password(),
             GdprStep::ReadableExportWarning => self.build_readable_export_warning(),
@@ -539,6 +552,7 @@ impl WorkflowEngine for GdprEngine {
                 | GdprStep::ConfirmHeirloom
                 | GdprStep::ConfirmExportPin
                 | GdprStep::ExportNeedsAppPassword
+                | GdprStep::ExportAwaitPresence
                 | GdprStep::ChooseExportFormat
                 | GdprStep::ExportPassword
                 | GdprStep::ReadableExportWarning,
@@ -597,6 +611,9 @@ impl WorkflowEngine for GdprEngine {
                 return Some(crate::ui::EngineOutput::ExportPin {
                     pin: self.entered_pin.as_str().to_owned(),
                 });
+            }
+            GdprStep::ExportAwaitPresence => {
+                return Some(crate::ui::EngineOutput::AwaitingUserPresence);
             }
             GdprStep::ConfirmExportPin | GdprStep::ExportNeedsAppPassword => return None,
             _ => {}

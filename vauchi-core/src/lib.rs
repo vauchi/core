@@ -119,8 +119,8 @@ pub use platform::{
     PresentationImageShape, PresentationInputKind, PresentationListStyle, PresentationNode,
     PresentationPaging, PresentationProfile, PresentationQrErrorCorrection, PresentationQrPurpose,
     PresentationQrSize, PresentationRow, PresentationTextStyle, PresentationTokens,
-    PresentationTone, QrPlacement, StandardShortcut, SurfaceId, SurfaceLayout, SurfaceSpec,
-    ToastSpec, WindowClass, event_from_json,
+    PresentationTone, QrPlacement, SealedSecret, StandardShortcut, SurfaceId, SurfaceLayout,
+    SurfaceSpec, ToastSpec, WindowClass, event_from_json,
 };
 
 pub mod recovery;

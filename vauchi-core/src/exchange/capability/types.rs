@@ -48,6 +48,13 @@ pub struct DeviceCapabilities {
     #[serde(default)]
     pub platform: Platform,
 
+    /// The shell can seal a secret behind the operating system's own
+    /// user-presence check (biometric or device credential) and answers
+    /// `Command::CreateUserPresenceSecret` / `RevealUserPresenceSecret`
+    /// (#712). Off until a shell implements them.
+    #[serde(default)]
+    pub can_seal_user_presence: bool,
+
     /// Device has an accelerometer (for Bump/Shake proximity).
     #[serde(default)]
     pub has_accelerometer: bool,

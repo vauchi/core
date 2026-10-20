@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 83] = [
+const MIGRATIONS: [Migration; 84] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -686,6 +686,11 @@ const MIGRATIONS: [Migration; 83] = [
         version: 83,
         name: "ohttp_delay_window",
         action: MigrationAction::Sql(MIGRATION_V83_OHTTP_DELAY_WINDOW),
+    },
+    Migration {
+        version: 84,
+        name: "user_presence_digest",
+        action: MigrationAction::Sql(MIGRATION_V84_USER_PRESENCE_DIGEST),
     },
 ];
 
@@ -1387,6 +1392,12 @@ const MIGRATION_V53_SETTINGS_FLAGS: &str =
 /// Migration v54: persisted relay URL singleton column on ux_state
 /// (mobile-relay-url-editor-noop).
 const MIGRATION_V54_RELAY_URL: &str = "ALTER TABLE ux_state ADD COLUMN relay_url_encrypted BLOB;";
+
+/// Migration v84: the digest of the secret this device's shell sealed behind
+/// the OS user-presence check (#712). Device-local: each device's keystore
+/// holds its own secret, so the digest must not follow the user's settings.
+const MIGRATION_V84_USER_PRESENCE_DIGEST: &str =
+    "ALTER TABLE ux_state ADD COLUMN user_presence_digest_encrypted BLOB;";
 
 /// Migration v74: the persisted relay's OHTTP trust anchor, next to its URL
 /// (#288, plan 6.1).

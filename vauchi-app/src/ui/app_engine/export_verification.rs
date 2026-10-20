@@ -13,7 +13,12 @@ use crate::ui::lock_screen::DEFAULT_LOCK_MAX_ATTEMPTS;
 use crate::ui::{
     ActionResult, EngineOutput, EngineUpdate, GdprChoice, GdprExportUpdate, UserAction,
 };
+use vauchi_core::{Command, Event};
 use zeroize::Zeroize;
+
+/// The `transport` a shell names in `HardwareUnavailable` when it cannot
+/// run the user-presence check.
+const USER_PRESENCE_TRANSPORT: &str = "user_presence";
 
 impl AppEngine {
     pub(super) fn intercept_export_pin(&mut self, action: &UserAction) -> Option<ActionResult> {
@@ -26,6 +31,16 @@ impl AppEngine {
         if action_id == SET_APP_PASSWORD_ACTION_ID {
             let screen = self.navigate_to(AppScreen::ChangePassword);
             return Some(ActionResult::NavigateTo(screen));
+        }
+        if action_id == "export" || action_id == "confirm_heirloom" {
+            let result = self.engine.handle_action(action.clone());
+            if matches!(
+                self.engine.engine_output(),
+                Some(EngineOutput::AwaitingUserPresence)
+            ) {
+                self.request_user_presence();
+            }
+            return Some(result);
         }
         if action_id != CONFIRM_PIN_ACTION_ID {
             return None;
@@ -42,6 +57,71 @@ impl AppEngine {
                 .engine
                 .apply_update(EngineUpdate::GdprExport(GdprExportUpdate::Verified));
             // The heirloom exports now; the data export first asks for a format.
+            if matches!(self.engine.engine_output(), Some(EngineOutput::Gdpr(_))) {
+                return Some(self.complete_privacy());
+            }
+            return Some(ActionResult::NavigateTo(self.engine.current_screen()));
+        }
+        if let Some(locked) = self.record_confirm_pin_miss() {
+            return Some(locked);
+        }
+        let _ = self
+            .engine
+            .apply_update(EngineUpdate::GdprExport(GdprExportUpdate::PinRejected));
+        Some(ActionResult::UpdateScreen(self.engine.current_screen()))
+    }
+
+    /// Asks the shell for the OS user-presence check: to seal a fresh secret
+    /// the first time on this device, to reveal it after that.
+    fn request_user_presence(&mut self) {
+        let prompt = self.t("privacy.export_presence_prompt");
+        let command = if self.vauchi.has_user_presence_secret().unwrap_or(false) {
+            Command::RevealUserPresenceSecret { prompt }
+        } else {
+            Command::CreateUserPresenceSecret { prompt }
+        };
+        self.pending_commands.push_back(command);
+    }
+
+    /// The shell's answer to the user-presence check. `None` unless an
+    /// export is waiting on it: a secret nobody asked for confirms nothing.
+    pub(super) fn handle_user_presence_event(&mut self, event: &Event) -> Option<ActionResult> {
+        if !matches!(self.screen, AppScreen::Privacy)
+            || !matches!(
+                self.engine.engine_output(),
+                Some(EngineOutput::AwaitingUserPresence)
+            )
+        {
+            return None;
+        }
+        let confirmed = match event {
+            Event::UserPresenceSecretCreated { secret } => self
+                .vauchi
+                .enroll_user_presence_secret(secret.as_bytes())
+                .unwrap_or(false),
+            Event::UserPresenceSecretRevealed { secret } => self
+                .vauchi
+                .confirm_user_presence_secret(secret.as_bytes())
+                .unwrap_or(false),
+            Event::UserPresenceCheckCancelled => {
+                let _ = self
+                    .engine
+                    .apply_update(EngineUpdate::GdprExport(GdprExportUpdate::Finished));
+                return Some(ActionResult::NavigateTo(self.engine.current_screen()));
+            }
+            Event::HardwareUnavailable { transport } if transport == USER_PRESENCE_TRANSPORT => {
+                let _ = self.engine.apply_update(EngineUpdate::GdprExport(
+                    GdprExportUpdate::UserPresenceUnavailable,
+                ));
+                return Some(ActionResult::NavigateTo(self.engine.current_screen()));
+            }
+            _ => return None,
+        };
+        if confirmed {
+            self.confirm_pin_failures = 0;
+            let _ = self
+                .engine
+                .apply_update(EngineUpdate::GdprExport(GdprExportUpdate::Verified));
             if matches!(self.engine.engine_output(), Some(EngineOutput::Gdpr(_))) {
                 return Some(self.complete_privacy());
             }

@@ -36,6 +36,7 @@ pub fn phone_capabilities() -> DeviceCapabilities {
         has_internet: true,
         has_usb_port: false,
         device_name: Some("iPhone".to_owned()),
+        can_seal_user_presence: false,
     }
 }
 

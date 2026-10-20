@@ -87,7 +87,7 @@ fn validation_error(engine: &AppEngine) -> Option<String> {
         })
 }
 
-// @internal
+// @scenario: privacy_compliance :: An encrypted file is the first export choice
 #[test]
 fn after_the_password_the_user_chooses_a_format_encrypted_first() {
     let engine = choosing_a_format();
@@ -99,7 +99,7 @@ fn after_the_password_the_user_chooses_a_format_encrypted_first() {
     );
 }
 
-// @internal
+// @scenario: privacy_compliance :: An encrypted file is the first export choice
 #[test]
 fn the_encrypted_export_opens_only_with_its_own_password() {
     let mut engine = choosing_a_format();
@@ -116,7 +116,7 @@ fn the_encrypted_export_opens_only_with_its_own_password() {
     assert!(import_encrypted(&data, APP_PIN).is_err());
 }
 
-// @internal
+// @scenario: privacy_compliance :: An encrypted file is the first export choice
 #[test]
 fn a_weak_or_mismatched_export_password_exports_nothing() {
     let mut engine = choosing_a_format();
@@ -140,7 +140,7 @@ fn a_weak_or_mismatched_export_password_exports_nothing() {
     }
 }
 
-// @internal
+// @scenario: privacy_compliance :: Readable exports warn before writing an unprotected file
 #[test]
 fn the_vcard_export_warns_then_writes_every_contact() {
     let mut engine = choosing_a_format();
@@ -159,7 +159,7 @@ fn the_vcard_export_warns_then_writes_every_contact() {
     assert!(vcf.contains("X-VAUCHI-ID:"), "{vcf}");
 }
 
-// @internal
+// @scenario: privacy_compliance :: Readable exports warn before writing an unprotected file
 #[test]
 fn the_json_export_warns_then_writes_everything() {
     let mut engine = choosing_a_format();
@@ -175,7 +175,7 @@ fn the_json_export_warns_then_writes_everything() {
     assert!(json.contains("\"Bob\""), "{json}");
 }
 
-// @internal
+// @scenario: privacy_compliance :: One confirmation covers one export
 #[test]
 fn backing_out_of_the_warning_exports_nothing_and_the_next_export_asks_again() {
     let mut engine = choosing_a_format();

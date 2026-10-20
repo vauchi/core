@@ -51,7 +51,7 @@ fn screen_id(engine: &AppEngine) -> String {
     engine.current_screen().screen_id
 }
 
-// @internal
+// @scenario: privacy_compliance :: Export asks for my app password first
 #[test]
 fn export_asks_for_the_pin_before_any_file() {
     let mut engine = privacy_screen(true);
@@ -65,7 +65,7 @@ fn export_asks_for_the_pin_before_any_file() {
     assert_eq!(screen_id(&engine), "export_confirm_pin");
 }
 
-// @internal
+// @scenario: privacy_compliance :: One confirmation covers one export
 #[test]
 fn the_pin_that_unlocked_the_app_exports_once() {
     let mut engine = privacy_screen(true);
@@ -91,7 +91,7 @@ fn the_pin_that_unlocked_the_app_exports_once() {
     );
 }
 
-// @internal
+// @scenario: privacy_compliance :: Export asks for my app password first
 #[test]
 fn a_wrong_pin_exports_nothing_and_never_changes_the_session() {
     let mut engine = privacy_screen(true);
@@ -115,7 +115,7 @@ fn a_wrong_pin_exports_nothing_and_never_changes_the_session() {
 
 // Someone holding the unlocked phone could otherwise try PINs here for
 // ever; after as many misses as the lock screen allows, lock the app.
-// @internal
+// @scenario: privacy_compliance :: Export asks for my app password first
 #[test]
 fn five_wrong_pins_lock_the_app() {
     let mut engine = privacy_screen(true);
@@ -161,7 +161,7 @@ fn cancelling_the_pin_returns_to_privacy_without_exporting() {
 
 // Until the device-credential check exists (#712 step 5), a user with no
 // app password sets one before exporting.
-// @internal
+// @scenario: privacy_compliance :: Export asks me to set an app password when nothing else can check it is me
 #[test]
 fn without_an_app_password_export_asks_to_set_one_first() {
     let mut engine = privacy_screen(false);

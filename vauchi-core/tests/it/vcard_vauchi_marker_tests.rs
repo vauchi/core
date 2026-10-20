@@ -34,7 +34,7 @@ fn imported(id: &str, name: &str) -> Contact {
     )
 }
 
-// @internal
+// @scenario: privacy_compliance :: A vCard export carries Vauchi origin markers
 #[test]
 fn an_exported_contact_carries_its_vauchi_id_and_kind() {
     let bob = exchanged("Bob");
@@ -62,7 +62,7 @@ fn an_exported_contact_carries_its_vauchi_id_and_kind() {
     );
 }
 
-// @internal
+// @scenario: privacy_compliance :: A vCard export carries Vauchi origin markers
 #[test]
 fn reimporting_the_export_matches_the_contacts_instead_of_duplicating_them() {
     let vauchi = Vauchi::in_memory().unwrap();

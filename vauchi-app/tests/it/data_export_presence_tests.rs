@@ -152,7 +152,7 @@ fn a_shell_without_the_hardware_falls_back_to_setting_an_app_password() {
     assert_eq!(screen_id(&engine), "export_needs_app_password");
 }
 
-// @internal
+// @scenario: privacy_compliance :: Export asks me to set an app password when nothing else can check it is me
 #[test]
 fn without_the_capability_export_still_asks_for_an_app_password() {
     let mut engine = privacy_screen(false);

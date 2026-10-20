@@ -245,7 +245,7 @@ impl Vauchi {
         let transport = self.create_guardian_transport();
         let (owner_pk, ts, sig) =
             sign_recovery_store(identity, &key_hash, &proof_bytes, self.clock.unix_seconds());
-        transport.recovery_store(&key_hash, &proof_b64, &owner_pk, ts, &sig)?;
+        transport.recovery_store_owned(&key_hash, &proof_b64, &owner_pk, ts, &sig)?;
 
         // Clear local progress — proof is now on the relay
         self.storage.recovery().clear_recovery_progress()?;

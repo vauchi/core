@@ -220,13 +220,7 @@ fn recovery_store_returns_unit_on_success() {
     mock.queue("recovery_store", ok_response_with(|_| {}));
 
     let transport = transport_pointing_at(&mock);
-    let result = transport.recovery_store(
-        "deadbeef".repeat(8).as_str(),
-        "cHJvb2Y=",
-        &"aa".repeat(32),
-        1_700_000_000,
-        &"bb".repeat(64),
-    );
+    let result = transport.recovery_store("deadbeef".repeat(8).as_str(), "cHJvb2Y=");
     assert!(result.is_ok());
 }
 
@@ -237,15 +231,7 @@ fn recovery_store_propagates_relay_error_message() {
     mock.queue("recovery_store", err_response_with("invalid hash"));
 
     let transport = transport_pointing_at(&mock);
-    let err = transport
-        .recovery_store(
-            "abc",
-            "xyz",
-            &"aa".repeat(32),
-            1_700_000_000,
-            &"bb".repeat(64),
-        )
-        .unwrap_err();
+    let err = transport.recovery_store("abc", "xyz").unwrap_err();
     match err {
         NetworkError::InvalidMessage(msg) => {
             assert!(msg.contains("recovery_store failed") && msg.contains("invalid hash"))

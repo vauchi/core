@@ -58,13 +58,7 @@ fn purge_constructs_request_and_fails_at_network() {
 #[test]
 fn recovery_store_constructs_request_and_fails_at_network() {
     let t = unreachable_transport();
-    let r = t.recovery_store(
-        "deadbeef".repeat(8).as_str(),
-        "cHJvb2YK",
-        &"aa".repeat(32),
-        1_700_000_000,
-        &"bb".repeat(64),
-    );
+    let r = t.recovery_store("deadbeef".repeat(8).as_str(), "cHJvb2YK");
     assert_is_network_error(r, "recovery_store");
 }
 

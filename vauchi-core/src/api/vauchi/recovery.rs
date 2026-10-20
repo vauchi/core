@@ -195,6 +195,10 @@ impl Vauchi {
     /// The canonical proof binds the old and new keys to the collected
     /// vouchers. It is stored under hash(old_pk) for contacts to verify.
     pub fn upload_recovery_proof(&self) -> VauchiResult<()> {
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
         let progress = self
             .storage
             .recovery()
@@ -239,7 +243,9 @@ impl Vauchi {
 
         // Upload to relay
         let transport = self.create_guardian_transport();
-        transport.recovery_store(&key_hash, &proof_b64)?;
+        let (owner_pk, ts, sig) =
+            sign_recovery_store(identity, &key_hash, &proof_bytes, self.clock.unix_seconds());
+        transport.recovery_store(&key_hash, &proof_b64, &owner_pk, ts, &sig)?;
 
         // Clear local progress — proof is now on the relay
         self.storage.recovery().clear_recovery_progress()?;
@@ -405,6 +411,30 @@ fn sign_guardian_request(
     message.extend_from_slice(&now.to_be_bytes());
     let signature = identity.sign(&message);
     (hex::encode(pk), now, hex::encode(signature.as_bytes()))
+}
+
+/// Signs a recovery proof upload so the relay can record its owner and
+/// erase the proof on that owner's purge (#711 D3). Signed message:
+/// `"recovery-store" || key_hash || SHA-256(proof) || timestamp_be`.
+/// Returns `(owner_pk_hex, timestamp, signature_hex)`.
+fn sign_recovery_store(
+    identity: &crate::identity::Identity,
+    key_hash_hex: &str,
+    proof: &[u8],
+    now: u64,
+) -> (String, u64, String) {
+    let hash_bytes = hex::decode(key_hash_hex).expect("key_hash is self-computed hex");
+    let mut message = Vec::with_capacity(14 + 32 + 32 + 8);
+    message.extend_from_slice(b"recovery-store");
+    message.extend_from_slice(&hash_bytes);
+    message.extend_from_slice(&Sha256::digest(proof));
+    message.extend_from_slice(&now.to_be_bytes());
+    let signature = identity.sign(&message);
+    (
+        hex::encode(identity.signing_public_key()),
+        now,
+        hex::encode(signature.as_bytes()),
+    )
 }
 
 /// Converts an Ed25519 public key to an X25519 (Curve25519) public key.

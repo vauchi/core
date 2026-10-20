@@ -638,14 +638,22 @@ impl HttpTransport {
     /// Stores a recovery proof on the relay.
     ///
     /// The proof is opaque to the relay (encrypted). Keyed by a hash of
-    /// the old identity's public key.
-    pub fn recovery_store(&self, key_hash: &str, proof_data_b64: &str) -> Result<(), NetworkError> {
+    /// the old identity's public key; `owner_pk` signs the upload so the
+    /// owner's purge can erase it.
+    pub fn recovery_store(
+        &self,
+        key_hash: &str,
+        proof_data_b64: &str,
+        owner_pk: &str,
+        timestamp: u64,
+        signature: &str,
+    ) -> Result<(), NetworkError> {
         let req = V2RecoveryStoreRequest {
             key_hash: key_hash.to_string(),
             proof_data: proof_data_b64.to_string(),
-            owner_pk: None,
-            timestamp: None,
-            signature: None,
+            owner_pk: Some(owner_pk.to_string()),
+            timestamp: Some(timestamp),
+            signature: Some(signature.to_string()),
         };
         let resp = self.post_action("recovery_store", &req)?;
         if resp.status == "ok" {

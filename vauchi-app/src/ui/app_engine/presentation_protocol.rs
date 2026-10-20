@@ -31,6 +31,8 @@ pub enum AppPresentationError {
     ContextualAction(#[from] crate::ui::ContextualActionCoordinatorError),
     #[error("authentication transition failed: {0}")]
     Authentication(String),
+    #[error("background budget out of range")]
+    InvalidBackgroundBudget,
 }
 
 impl AppPresentationError {
@@ -44,6 +46,7 @@ impl AppPresentationError {
             Self::Prepared(_) => "prepared",
             Self::ContextualAction(_) => "contextual_action",
             Self::Authentication(_) => "authentication",
+            Self::InvalidBackgroundBudget => "invalid_background_budget",
         }
     }
 }
@@ -129,6 +132,7 @@ impl AppEngine {
 
     /// Return the complete initial renderer state as one ordered command batch.
     pub fn initial_commands(&mut self) -> Result<Vec<Command>, AppPresentationError> {
+        self.in_foreground = true;
         let screen = self.current_screen();
         let mut commands = self.surface_commands(&screen)?;
         commands.extend(self.reopened_overlay(&commands));
@@ -183,7 +187,12 @@ impl AppEngine {
             return self.reduce_user_action(UserAction::LinkOpened { uri: uri.clone() }, None);
         }
 
+        if let Event::BackgroundBudgetObserved { window_secs, runs } = event {
+            return self.observe_background_budget(window_secs, runs);
+        }
+
         if matches!(event, Event::AppBackgrounded) {
+            self.in_foreground = false;
             if self.handle_app_backgrounded().is_none() {
                 return Ok(Vec::new());
             }
@@ -225,6 +234,8 @@ impl AppEngine {
         ) {
             return self.reduce_hardware_event(event);
         }
+        // Someone is interacting with a rendered surface.
+        self.in_foreground = true;
 
         let event_surface_id = presentation_event_surface_id(&event)
             .expect("interactive presentation events always carry a surface");

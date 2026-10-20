@@ -42,6 +42,20 @@ pub(crate) fn self_heal_post_auth(engine: &mut AppEngine) {
 }
 
 impl PlatformAppEngine {
+    /// One scheduler tick, returning the `on_wakeup` envelope with the
+    /// scheduler's next run (#603).
+    pub(crate) fn scheduler_tick(&self) -> Result<String, MobileError> {
+        let mut engine_slot = self.lock_engine()?;
+        let engine = open_engine(&mut engine_slot)?;
+        let (_outcome, next_run) =
+            engine
+                .scheduler_sync_tick()
+                .map_err(|e| MobileError::Other {
+                    detail: e.to_string(),
+                })?;
+        crate::json_helpers::wakeup_envelope_to_json(&[], &[next_run])
+    }
+
     /// Build a `SecureStorage` bridge from the keychain set via
     /// `set_platform_keychain`. Errs if none is set (B7 shred path).
     pub(crate) fn shred_keychain_bridge(&self) -> Result<crate::KeychainBridge, MobileError> {

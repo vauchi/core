@@ -638,15 +638,38 @@ impl HttpTransport {
     /// Stores a recovery proof on the relay.
     ///
     /// The proof is opaque to the relay (encrypted). Keyed by a hash of
-    /// the old identity's public key.
+    /// the old identity's public key. Without an owner the relay keeps it
+    /// until it expires; see [`Self::recovery_store_owned`].
     pub fn recovery_store(&self, key_hash: &str, proof_data_b64: &str) -> Result<(), NetworkError> {
-        let req = V2RecoveryStoreRequest {
+        self.post_recovery_store(V2RecoveryStoreRequest {
             key_hash: key_hash.to_string(),
             proof_data: proof_data_b64.to_string(),
             owner_pk: None,
             timestamp: None,
             signature: None,
-        };
+        })
+    }
+
+    /// Stores a recovery proof signed by `owner_pk`, so the relay erases it
+    /// on that identity's purge (#711).
+    pub fn recovery_store_owned(
+        &self,
+        key_hash: &str,
+        proof_data_b64: &str,
+        owner_pk: &str,
+        timestamp: u64,
+        signature: &str,
+    ) -> Result<(), NetworkError> {
+        self.post_recovery_store(V2RecoveryStoreRequest {
+            key_hash: key_hash.to_string(),
+            proof_data: proof_data_b64.to_string(),
+            owner_pk: Some(owner_pk.to_string()),
+            timestamp: Some(timestamp),
+            signature: Some(signature.to_string()),
+        })
+    }
+
+    fn post_recovery_store(&self, req: V2RecoveryStoreRequest) -> Result<(), NetworkError> {
         let resp = self.post_action("recovery_store", &req)?;
         if resp.status == "ok" {
             Ok(())

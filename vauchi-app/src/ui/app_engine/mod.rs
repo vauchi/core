@@ -17,6 +17,7 @@ mod glance;
 mod handover;
 #[cfg(any(test, feature = "testing"))]
 mod test_hooks;
+mod wakeup;
 // INLINE_TEST_REQUIRED: injects a completed DeviceReplacementEngine into the
 // private `engine`/`screen` fields to drive the decommission-at-Complete hook.
 #[cfg(test)]
@@ -78,8 +79,6 @@ use vauchi_core::api::{HandlerId, Vauchi, VauchiEvent};
 use vauchi_core::exchange::capability::TransportReadiness;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::version::{APP_COMPAT_VERSION, AppUpdateStatus, VersionPolicy};
-
-use crate::notification_types::PendingNotification;
 
 use super::action::{ActionResult, UserAction};
 use super::engine::WorkflowEngine;
@@ -269,6 +268,14 @@ pub struct AppEngine {
     retained_detail_screen: Option<AppScreen>,
     /// Monotonic generation of the atomic generic surface command.
     surface_revision: u64,
+    /// A window has rendered Core's presentation and not been backgrounded
+    /// since. Until then this is a background run (Android's WorkManager
+    /// starts the engine cold), which wakes at the drawn background gap
+    /// (#603 option 2).
+    in_foreground: bool,
+    /// The OS's allowance of background runs, as the shell last reported it
+    /// (`Event::BackgroundBudgetObserved`, #603 option 1).
+    background_budget: Option<vauchi_core::api::BackgroundBudget>,
     /// Contextual roles and causal Undo state retained per visible surface.
     contextual_actions: HashMap<vauchi_core::SurfaceId, crate::ui::ContextualActionCoordinator>,
     /// The overlay Core currently believes is presented, if any.
@@ -569,6 +576,8 @@ impl AppEngine {
             presentation_coordinator,
             retained_detail_screen: None,
             surface_revision: 1,
+            in_foreground: false,
+            background_budget: None,
             contextual_actions: HashMap::new(),
             open_overlay: None,
             entry_flow: None,
@@ -850,108 +859,6 @@ impl AppEngine {
         if !tick_cmds.is_empty() {
             self.extend_pending_commands(tick_cmds);
         }
-    }
-
-    /// The shell's platform wakeup fired — a desktop in-process interval, an
-    /// iOS `BGAppRefreshTask`, or an Android `WorkManager` task, scheduled
-    /// from a prior [`vauchi_core::Command::ScheduleWakeup`]. Run all work now
-    /// due (the same relay/exchange advance + activity-log poll as
-    /// [`Self::poll_notifications`]) and emit the *next* `ScheduleWakeup` so
-    /// the shell re-arms. Core owns *when* the heartbeat is due (ADR-044 Am2a
-    /// Option C); the shell owns only the native wakeup mechanism.
-    ///
-    /// Returns the OS notifications to post; the next schedule rides
-    /// `pending_commands` — the caller drains it via
-    /// [`Self::drain_pending_commands`] after this returns. Elapsed-based and
-    /// idempotent: a delayed, coalesced, or skipped wake is safe (the
-    /// underlying advances/poll are no-ops when nothing is due). Public so
-    /// `PlatformAppEngine` can expose it via UniFFI. The frontend bootstraps
-    /// the loop by calling this once at launch.
-    pub fn on_wakeup(&mut self) -> Vec<PendingNotification> {
-        let before = self.current_screen();
-        self.sync_if_due();
-        let notifications = self.poll_notifications();
-        if self.current_screen() != before {
-            self.re_present_after_heartbeat();
-        }
-        self.pending_commands.push_back(self.compute_next_wakeup());
-        notifications
-    }
-
-    /// Tell the shell the heartbeat cadence changed now, not at the end of
-    /// its current sleep. `on_wakeup` is the only other place a
-    /// `ScheduleWakeup` is emitted, and a shell sleeps until the previous one
-    /// comes due: 30 s when idle. A session that goes live in between waited
-    /// that sleep out before its first tick, with its QR frozen on the first
-    /// frame (`2026-10-02-exchange-first-tick-waits-for-idle-heartbeat`).
-    fn reschedule_wakeup_for_new_session(&mut self) {
-        self.pending_commands.push_back(self.compute_next_wakeup());
-    }
-
-    /// Compute the next app-heartbeat wakeup window (ADR-044 Am2a Option C).
-    /// Core is the single authority on *when*; the shell only executes the
-    /// resulting `ScheduleWakeup`. First cut: a fixed ~30 s foreground cadence
-    /// (matching the historical notification poll). The elapsed-based due-math
-    /// (wall `Clock` for calendar-relative token rotation, `MonotonicClock`
-    /// for runtime-elapsed) refines the *values* without changing the command
-    /// shape or the shell contract.
-    fn compute_next_wakeup(&self) -> vauchi_core::Command {
-        // A live multi-stage exchange is driven entirely by this heartbeat:
-        // `advance_multi_stage_session` runs inside `poll_notifications`, which
-        // runs only on wakeup. At the idle cadence the QR advanced once every
-        // 30 s while the protocol is built for a ~300 ms frame — device-observed
-        // as one displayed frame against 110 camera decodes, 40 peer INITs
-        // dropped before our own QR existed, and 43 s from "Exchange started" to
-        // any state change
-        // (`2026-08-18-hover-transfer-stalls-on-the-last-chunk`).
-        //
-        // One second is this command's floor, not the right cadence: the frame
-        // dwell core already computes cannot be expressed in whole seconds.
-        if self.multi_stage_session_active() {
-            // The frame currently on screen names its own dwell, so the
-            // display runs at the protocol's cadence rather than the
-            // coarsest interval a whole-second field can express.
-            let frame_dwell_ms = self.multi_stage_frame_ms().unwrap_or(300);
-            return vauchi_core::Command::schedule_wakeup(1, 1, 1, Some(frame_dwell_ms));
-        }
-        // A Link rendezvous is several dependent relay round trips (presence
-        // deposit, peer epk, card deposit, peer card), each waiting on one
-        // side's heartbeat. At the idle cadence two terminals converged in
-        // ~90 s; the escrow phase is meant to poll about once a second.
-        if self.link_session_active() {
-            return vauchi_core::Command::schedule_wakeup(1, 1, 1, None);
-        }
-        // Wake when the drawn sync gap ends, not on the next 30 s beat: on
-        // the beat, every gap the relay saw was a multiple of 30 s (KU-9,
-        // #603), which undoes the exponential schedule.
-        #[cfg(feature = "network-http")]
-        if let Some(until) = self.vauchi.time_until_sync_due()
-            && until < std::time::Duration::from_secs(30)
-            && self.has_someone_to_sync_with()
-        {
-            let millis = u32::try_from(until.as_millis()).unwrap_or(u32::MAX).max(1);
-            return vauchi_core::Command::schedule_wakeup(
-                millis.div_ceil(1000),
-                90,
-                1,
-                Some(millis),
-            );
-        }
-        vauchi_core::Command::schedule_wakeup(30, 90, 30, None)
-    }
-
-    /// A Link-mode rendezvous (initiator on the share screen or responder on
-    /// the deep-link screen) is still waiting on the relay. Terminal machines
-    /// are dropped by their advance, so "held" means "live".
-    pub fn link_session_active(&self) -> bool {
-        #[cfg(all(feature = "network-http", feature = "storage"))]
-        {
-            [&self.link_initiator, &self.link_responder]
-                .iter()
-                .any(|exchange| exchange.as_ref().is_some_and(|e| e.is_live()))
-        }
-        #[cfg(not(all(feature = "network-http", feature = "storage")))]
-        false
     }
 
     /// Convert `ValidationError` into `UpdateScreen` with the error injected

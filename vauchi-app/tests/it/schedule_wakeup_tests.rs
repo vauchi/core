@@ -593,3 +593,134 @@ fn with_no_one_to_sync_with_the_heartbeat_stays_idle() {
 
     assert_eq!(scheduled_wakeup_ms(&mut engine), 30_000);
 }
+
+#[cfg(feature = "testing")]
+fn wire_delay_ms(engine: &mut AppEngine) -> u64 {
+    let _ = engine.on_wakeup();
+    engine
+        .drain_pending_commands()
+        .iter()
+        .rev()
+        .find_map(delay_millis_on_the_wire)
+        .expect("a ScheduleWakeup")
+}
+
+#[cfg(feature = "testing")]
+const TEN_MINUTES_MS: std::ops::RangeInclusive<u64> = 598_000..=600_500;
+
+// #603 option 2: in the background the scheduler wakes once, at the drawn
+// gap (15-min mean), so the wakeup names the whole gap rather than the 30 s
+// beat an open app polls at. An engine no window has rendered is a
+// background run (Android's WorkManager starts it cold).
+// @internal
+#[test]
+#[cfg(feature = "testing")]
+fn in_the_background_the_wakeup_names_the_whole_drawn_gap() {
+    let mut engine = engine_with_a_contact_and_sync_due_in(600);
+
+    let ms = wire_delay_ms(&mut engine);
+
+    assert!(TEN_MINUTES_MS.contains(&ms), "{ms} ms");
+}
+
+// @internal
+#[test]
+#[cfg(feature = "testing")]
+fn an_open_app_keeps_the_30_s_beat() {
+    let mut engine = engine_with_a_contact_and_sync_due_in(600);
+    engine.initial_commands().expect("presentation");
+
+    assert_eq!(wire_delay_ms(&mut engine), 30_000);
+}
+
+// @internal
+#[test]
+#[cfg(feature = "testing")]
+fn a_backgrounded_app_wakes_at_the_whole_gap_again() {
+    let mut engine = engine_with_a_contact_and_sync_due_in(600);
+    engine.initial_commands().expect("presentation");
+    engine
+        .dispatch(vauchi_core::Event::AppBackgrounded)
+        .expect("backgrounded");
+
+    let ms = wire_delay_ms(&mut engine);
+
+    assert!(TEN_MINUTES_MS.contains(&ms), "{ms} ms");
+}
+
+// The background worker re-arms from its own tick, not from the heartbeat's
+// wakeup: with the app open the heartbeat beats every 30 s, and following it
+// made WorkManager run the worker every 30 s beside the app (#603, rig
+// 2026-10-18). The tick names a gap from the background schedule either way.
+#[cfg(all(feature = "testing", feature = "network-http"))]
+fn next_tick_delay_ms(engine: &mut AppEngine) -> u64 {
+    let (_, next) = engine.scheduler_sync_tick().expect("tick");
+    delay_millis_on_the_wire(&next).expect("a ScheduleWakeup")
+}
+
+#[cfg(all(feature = "testing", feature = "network-http"))]
+fn budget_event(window_secs: u32, runs: u32) -> vauchi_core::Event {
+    vauchi_core::Event::BackgroundBudgetObserved { window_secs, runs }
+}
+
+// @internal
+#[test]
+#[cfg(all(feature = "testing", feature = "network-http"))]
+fn the_scheduler_tick_names_a_background_gap_for_its_next_run() {
+    let mut engine = engine_with_a_contact_and_sync_due_in(0);
+
+    let ms = next_tick_delay_ms(&mut engine);
+
+    assert!((60_000..=3_600_000).contains(&ms), "{ms} ms");
+}
+
+// @internal
+#[test]
+#[cfg(all(feature = "testing", feature = "network-http"))]
+fn an_open_app_s_tick_names_a_background_gap_and_keeps_its_deadline() {
+    let mut engine = engine_with_a_contact_and_sync_due_in(20);
+    engine.initial_commands().expect("presentation");
+
+    let ms = next_tick_delay_ms(&mut engine);
+
+    assert!((60_000..=3_600_000).contains(&ms), "{ms} ms");
+    let until = engine.vauchi().time_until_sync_due().expect("identity");
+    assert!(until <= std::time::Duration::from_secs(20), "{until:?}");
+}
+
+// #603 option 1: Android allows a rationed app a few runs a day; the shell
+// reports that allowance and the next run is drawn so it lasts the day.
+// @internal
+#[test]
+#[cfg(all(feature = "testing", feature = "network-http"))]
+fn a_one_run_a_day_budget_draws_gaps_beyond_the_hour() {
+    let mut engine = engine_with_a_contact_and_sync_due_in(0);
+    engine.dispatch(budget_event(86_400, 1)).expect("budget");
+
+    let delays: Vec<u64> = (0..20).map(|_| next_tick_delay_ms(&mut engine)).collect();
+
+    assert!(
+        delays.iter().all(|ms| (60_000..=86_400_000).contains(ms)),
+        "{delays:?}"
+    );
+    // All 20 within the hour happens with p = (1 - e^(-1/24))^20, about 1e-28.
+    assert!(delays.iter().any(|ms| *ms > 3_600_000), "{delays:?}");
+}
+
+// CC-14: the budget comes from the shell; out-of-range values are refused
+// and leave the schedule as it was.
+// @internal
+#[test]
+#[cfg(all(feature = "testing", feature = "network-http"))]
+fn an_out_of_range_budget_is_refused() {
+    let mut engine = engine_with_a_contact_and_sync_due_in(0);
+    for (window_secs, runs) in [(0, 6), (604_801, 6), (u32::MAX, 6), (86_400, 100_001)] {
+        assert!(
+            engine.dispatch(budget_event(window_secs, runs)).is_err(),
+            "({window_secs}, {runs}) accepted"
+        );
+    }
+
+    let delays: Vec<u64> = (0..20).map(|_| next_tick_delay_ms(&mut engine)).collect();
+    assert!(delays.iter().all(|ms| *ms <= 3_600_000), "{delays:?}");
+}

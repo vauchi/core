@@ -490,23 +490,13 @@ impl PlatformAppEngine {
     /// honour the throttle window, delegate to `Vauchi::sync()`.
     /// Frontends do not duplicate the "sync if due" logic.
     ///
-    /// Returns the [`vauchi_core::VauchiSyncOutcome`] serialised as
-    /// JSON so the platform shell can log/observe without binding
-    /// the full sync types over UniFFI.
+    /// Returns the `on_wakeup` envelope holding the `ScheduleWakeup` for the
+    /// scheduler's next run, drawn from the background schedule (#603); a
+    /// scheduler re-arms from it, never from the heartbeat's.
     ///
     /// Audit `2026-04-28-lifecycle-session-residue-umbrella` P2-C.
     pub fn periodic_sync_tick(&self) -> Result<String, MobileError> {
-        let mut engine_slot = self.lock_engine()?;
-        let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
-        let outcome = engine
-            .vauchi_mut()
-            .periodic_sync_tick()
-            .map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
-        serde_json::to_string(&format!("{outcome:?}")).map_err(|e| MobileError::Other {
-            detail: format!("serialize sync outcome: {e}"),
-        })
+        self.scheduler_tick()
     }
 
     /// Push render-context preferences (locale + theme_id) from

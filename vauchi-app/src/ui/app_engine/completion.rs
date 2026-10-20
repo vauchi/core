@@ -402,6 +402,10 @@ impl AppEngine {
         use crate::ui::GdprChoice;
         let choice = match self.engine.engine_output() {
             Some(crate::ui::EngineOutput::Gdpr(choice)) => Some(choice),
+            Some(crate::ui::EngineOutput::GdprExportEncrypted { password }) => {
+                let result = self.export_encrypted(password);
+                return self.finish_export(result);
+            }
             None => None,
             other => {
                 tracing::warn!(?other, "privacy completion without Gdpr output");
@@ -409,38 +413,12 @@ impl AppEngine {
             }
         };
         match choice {
-            Some(GdprChoice::Export) => match self.vauchi.export_personal_data() {
-                Ok(export) => match serde_json::to_string_pretty(&export) {
-                    Ok(json) => ActionResult::GdprExportComplete { json },
-                    Err(_) => ActionResult::ShowToast {
-                        message: self.t("privacy.export_failed_serialize"),
-                        undo_action_id: None,
-                        undo_label: None,
-                    },
-                },
-                Err(_) => ActionResult::ShowToast {
-                    message: self.t("privacy.export_failed_read"),
-                    undo_action_id: None,
-                    undo_label: None,
-                },
-            },
-            Some(GdprChoice::Heirloom) => match self.vauchi.heirloom_book() {
-                Ok(book) => {
-                    let text = vauchi_core::api::HeirloomText {
-                        document_title: self.t("heirloom.document_title"),
-                        exchanged_on: self.t("heirloom.exchanged_on"),
-                        met_at: self.t("heirloom.met_at"),
-                    };
-                    ActionResult::HeirloomExportComplete {
-                        html: vauchi_core::api::render_heirloom_html(&book, &text),
-                    }
-                }
-                Err(_) => ActionResult::ShowToast {
-                    message: self.t("privacy.heirloom.failed"),
-                    undo_action_id: None,
-                    undo_label: None,
-                },
-            },
+            Some(
+                choice @ (GdprChoice::Export | GdprChoice::ExportVcard | GdprChoice::Heirloom),
+            ) => {
+                let result = self.export_as(choice);
+                self.finish_export(result)
+            }
             Some(GdprChoice::Delete) => {
                 match vauchi_core::api::DeletionManager::new(self.vauchi.storage())
                     .schedule_deletion()

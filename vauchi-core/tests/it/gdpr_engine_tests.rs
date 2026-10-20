@@ -96,7 +96,17 @@ fn gdpr_export_engine_output_waits_on_the_verified_pin() {
     );
 
     assert!(engine.apply_update(EngineUpdate::GdprExport(GdprExportUpdate::Verified)));
+    assert_eq!(engine.current_screen().screen_id, "export_choose_format");
+    assert_eq!(engine.engine_output(), None);
 
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "export_json".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "confirm_readable_export".into(),
+    });
+
+    assert_eq!(result, ActionResult::Complete);
     assert_eq!(
         engine.engine_output(),
         Some(EngineOutput::Gdpr(GdprChoice::Export))

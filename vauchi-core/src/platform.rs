@@ -475,7 +475,7 @@ pub enum Command {
 /// A secret a shell sealed behind the platform's user-presence check:
 /// transparent on the wire, never printed, wiped when dropped (#712).
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, zeroize::Zeroize, zeroize::ZeroizeOnDrop)]
 #[serde(transparent)]
 pub struct SealedSecret(Vec<u8>);
 
@@ -494,12 +494,6 @@ impl From<Vec<u8>> for SealedSecret {
 impl std::fmt::Debug for SealedSecret {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("<redacted>")
-    }
-}
-
-impl Drop for SealedSecret {
-    fn drop(&mut self) {
-        zeroize::Zeroize::zeroize(&mut self.0);
     }
 }
 

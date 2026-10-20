@@ -155,6 +155,8 @@ fn the_vcard_export_warns_then_writes_every_contact() {
     assert_eq!(vcf.matches("BEGIN:VCARD").count(), 1, "{vcf}");
     assert!(vcf.contains("VERSION:4.0"), "{vcf}");
     assert!(vcf.contains("FN:Bob"), "{vcf}");
+    assert!(vcf.contains("X-VAUCHI-KIND:exchanged"), "{vcf}");
+    assert!(vcf.contains("X-VAUCHI-ID:"), "{vcf}");
 }
 
 // @internal

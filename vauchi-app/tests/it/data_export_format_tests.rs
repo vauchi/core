@@ -9,7 +9,7 @@
 
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, Component, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
-use vauchi_core::api::gdpr::import_encrypted;
+use vauchi_core::api::import_encrypted;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::{AuthMode, SymmetricKey};

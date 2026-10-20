@@ -21,13 +21,17 @@
 //! Every export first asks for the session password (#712): without an app
 //! password `export_needs_app_password` (`set_app_password`, handled by the
 //! AppEngine, / `cancel`); with one `export_confirm_pin` (`confirm_pin`,
-//! checked by the AppEngine, / `cancel`).
+//! checked by the AppEngine, / `cancel`). Once the AppEngine confirms it,
+//! `export_choose_format` offers `export_encrypted` -> `export_password`
+//! (`confirm_export_password` / `cancel`) and `export_vcard` /
+//! `export_json` -> `export_readable_warning` (`confirm_readable_export` /
+//! `cancel`).
 //!
 //! The `consent_actions` `ActionList` rows (`view_data` / `manage_consent`)
 //! are `ListItemSelected` pass-throughs and are not walked here.
 
 use vauchi_app::ui::testing::assert_reachability_across_screens;
-use vauchi_app::ui::{GdprEngine, WorkflowEngine};
+use vauchi_app::ui::{EngineUpdate, GdprEngine, GdprExportUpdate, UserAction, WorkflowEngine};
 
 const HANDLED_DEFAULT: &[&str] = &[
     "export",
@@ -72,6 +76,31 @@ fn app_password_factory() -> GdprEngine {
     factory().with_app_password_set(true)
 }
 
+const HANDLED_FORMAT_CHOICE: &[&str] = &[
+    "export_encrypted",
+    "export_vcard",
+    "export_json",
+    "confirm_export_password",
+    "confirm_readable_export",
+    "export",
+    "heirloom",
+    "confirm_heirloom",
+    "confirm_pin",
+    "delete",
+    "confirm_delete",
+    "cancel",
+];
+
+/// Past the password step, which only the AppEngine can confirm.
+fn format_choice_factory() -> GdprEngine {
+    let mut engine = app_password_factory();
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "export".into(),
+    });
+    assert!(engine.apply_update(EngineUpdate::GdprExport(GdprExportUpdate::Verified)));
+    engine
+}
+
 fn scheduled_factory() -> GdprEngine {
     GdprEngine::new(
         Some("Scheduled".into()),
@@ -100,4 +129,14 @@ fn gdpr_scheduled_screens_are_reachable() {
 #[test]
 fn gdpr_export_pin_screen_is_reachable() {
     assert_reachability_across_screens(app_password_factory, HANDLED_WITH_APP_PASSWORD);
+}
+
+// @internal
+#[test]
+fn gdpr_export_format_screens_are_reachable() {
+    assert_eq!(
+        format_choice_factory().current_screen().screen_id,
+        "export_choose_format"
+    );
+    assert_reachability_across_screens(format_choice_factory, HANDLED_FORMAT_CHOICE);
 }

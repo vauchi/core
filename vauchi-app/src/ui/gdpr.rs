@@ -73,6 +73,12 @@ pub struct GdprEngine {
     pending_export: Option<&'static str>,
     entered_pin: EnteredPin,
     pin_error: Option<String>,
+    /// The encrypted export's own password, typed twice (#712).
+    export_password: EnteredPin,
+    export_password_confirm: EnteredPin,
+    export_password_error: Option<String>,
+    /// The readable format waiting behind its warning: vCard or JSON.
+    readable_export: Option<GdprChoice>,
     locale: Locale,
 }
 
@@ -92,6 +98,12 @@ enum GdprStep {
     ConfirmExportPin,
     /// No app password is set: set one before exporting (#712).
     ExportNeedsAppPassword,
+    /// Verified: encrypted, vCard or JSON (#712).
+    ChooseExportFormat,
+    /// The encrypted export's own password, typed twice.
+    ExportPassword,
+    /// The readable formats leave the app unprotected: say so first.
+    ReadableExportWarning,
 }
 
 impl GdprEngine {
@@ -109,6 +121,10 @@ impl GdprEngine {
             pending_export: None,
             entered_pin: EnteredPin::default(),
             pin_error: None,
+            export_password: EnteredPin::default(),
+            export_password_confirm: EnteredPin::default(),
+            export_password_error: None,
+            readable_export: None,
             locale,
         }
     }
@@ -435,6 +451,9 @@ impl GdprEngine {
             GdprStep::ConfirmHeirloom => self.build_confirm_heirloom(),
             GdprStep::ConfirmExportPin => self.build_confirm_export_pin(),
             GdprStep::ExportNeedsAppPassword => self.build_export_needs_app_password(),
+            GdprStep::ChooseExportFormat => self.build_choose_export_format(),
+            GdprStep::ExportPassword => self.build_export_password(),
+            GdprStep::ReadableExportWarning => self.build_readable_export_warning(),
         }
     }
 }
@@ -445,6 +464,9 @@ impl WorkflowEngine for GdprEngine {
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
+        if let Some(result) = self.handle_export_step(&action) {
+            return result;
+        }
         match (&self.step, action) {
             // Overview: export first asks for the session PIN (#712)
             (GdprStep::Overview, UserAction::ActionPressed { action_id })
@@ -516,7 +538,10 @@ impl WorkflowEngine for GdprEngine {
                 | GdprStep::ConfirmExecute
                 | GdprStep::ConfirmHeirloom
                 | GdprStep::ConfirmExportPin
-                | GdprStep::ExportNeedsAppPassword,
+                | GdprStep::ExportNeedsAppPassword
+                | GdprStep::ChooseExportFormat
+                | GdprStep::ExportPassword
+                | GdprStep::ReadableExportWarning,
                 UserAction::ActionPressed { action_id },
             ) if action_id == "cancel" => {
                 self.abandon_export();
@@ -576,12 +601,18 @@ impl WorkflowEngine for GdprEngine {
             GdprStep::ConfirmExportPin | GdprStep::ExportNeedsAppPassword => return None,
             _ => {}
         }
+        if self.last_action.as_deref() == Some("export_encrypted") {
+            return Some(crate::ui::EngineOutput::GdprExportEncrypted {
+                password: self.export_password.as_str().to_owned(),
+            });
+        }
         let choice = match self.last_action.as_deref() {
             Some("export") => GdprChoice::Export,
             Some("delete") => GdprChoice::Delete,
             Some("cancel_deletion") => GdprChoice::CancelDeletion,
             Some("execute") => GdprChoice::Execute,
             Some("heirloom") => GdprChoice::Heirloom,
+            Some("export_vcard") => GdprChoice::ExportVcard,
             _ => return None,
         };
         Some(crate::ui::EngineOutput::Gdpr(choice))

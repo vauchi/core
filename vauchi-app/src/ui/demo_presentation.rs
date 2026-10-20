@@ -247,6 +247,20 @@ fn result_effects(result: ActionResult) -> Result<Vec<Command>, String> {
                 data: html.into_bytes(),
             },
         }],
+        ActionResult::VcardExportComplete { vcf } => vec![Command::ExportFile {
+            file: ExportFileSpec {
+                suggested_name: "vauchi-contacts.vcf".into(),
+                mime_type: "text/vcard".into(),
+                data: vcf.into_bytes(),
+            },
+        }],
+        ActionResult::EncryptedExportComplete { data } => vec![Command::ExportFile {
+            file: ExportFileSpec {
+                suggested_name: "vauchi-data-export.enc".into(),
+                mime_type: "application/octet-stream".into(),
+                data,
+            },
+        }],
         ActionResult::WipeComplete => vec![Command::ResetApplication],
         ActionResult::Commands { commands } => commands,
         unresolved => {

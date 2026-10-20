@@ -51,6 +51,20 @@ pub(super) fn append_result_commands(
                 data: html.into_bytes(),
             },
         }),
+        ActionResult::VcardExportComplete { vcf } => commands.push(Command::ExportFile {
+            file: ExportFileSpec {
+                suggested_name: "vauchi-contacts.vcf".into(),
+                mime_type: "text/vcard".into(),
+                data: vcf.into_bytes(),
+            },
+        }),
+        ActionResult::EncryptedExportComplete { data } => commands.push(Command::ExportFile {
+            file: ExportFileSpec {
+                suggested_name: "vauchi-data-export.enc".into(),
+                mime_type: "application/octet-stream".into(),
+                data,
+            },
+        }),
         ActionResult::WipeComplete => commands.push(Command::ResetApplication),
         ActionResult::Commands {
             commands: result_commands,

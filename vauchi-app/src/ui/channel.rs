@@ -56,6 +56,9 @@ pub enum EngineOutput {
     /// PIN typed to confirm a data export (redacted in `Debug`). Absent
     /// while the entry is empty or the screen is past the PIN step.
     ExportPin { pin: String },
+    /// The export password the encrypted data export is sealed with
+    /// (redacted in `Debug`) (#712).
+    GdprExportEncrypted { password: String },
     /// A verified Glance peer code the user typed instead of scanning;
     /// the AppEngine pins the peer from it as from a camera scan. Absent
     /// until a code is accepted. `Debug` prints the length only: a code
@@ -195,6 +198,9 @@ pub enum GdprExportUpdate {
     /// The PIN that opened the session: run the pending export once.
     Verified,
     PinRejected,
+    /// The export ran (or failed): forget its passwords and return to the
+    /// overview, so nothing of it outlives the one export.
+    Finished,
 }
 
 /// Cycle-thread bridge updates for the device-linking engine.
@@ -424,6 +430,7 @@ impl EngineUpdate {
             Self::GdprExport(u) => match u {
                 GdprExportUpdate::Verified => "GdprExport::Verified",
                 GdprExportUpdate::PinRejected => "GdprExport::PinRejected",
+                GdprExportUpdate::Finished => "GdprExport::Finished",
             },
             Self::MyInfoEntryDetail(u) => match u {
                 MyInfoEntryDetailUpdate::GroupVisibility { .. } => {
@@ -496,6 +503,8 @@ pub enum GdprChoice {
     Shred,
     /// The paper heirloom: a printable, plaintext contact book (private#363).
     Heirloom,
+    /// Every contact as vCard 4.0, behind the unprotected-file warning (#712).
+    ExportVcard,
 }
 
 /// Typed form-dialog submission, one variant per [`FormDialogType`].
@@ -578,6 +587,10 @@ impl std::fmt::Debug for EngineOutput {
             Self::ExportPin { .. } => f
                 .debug_struct("ExportPin")
                 .field("pin", &"<redacted>")
+                .finish(),
+            Self::GdprExportEncrypted { .. } => f
+                .debug_struct("GdprExportEncrypted")
+                .field("password", &"<redacted>")
                 .finish(),
             Self::GlancePeerCode { data } => f
                 .debug_struct("GlancePeerCode")

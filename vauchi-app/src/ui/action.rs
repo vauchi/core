@@ -276,6 +276,16 @@ pub enum ActionResult {
     HeirloomExportComplete {
         html: String,
     },
+    /// Every contact as one vCard 4.0 file, after the user confirmed it
+    /// leaves the app unprotected (#712).
+    VcardExportComplete {
+        vcf: String,
+    },
+    /// The full data export encrypted under the user's export password
+    /// (#712).
+    EncryptedExportComplete {
+        data: Vec<u8>,
+    },
     /// All data has been wiped — frontend should reset to initial state.
     WipeComplete,
     /// App layer should start the device-link join (responder) machine with

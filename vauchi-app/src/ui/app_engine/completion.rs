@@ -480,8 +480,17 @@ impl AppEngine {
                         // signed before the keys were shredded. Network builds
                         // only — without a relay transport there is nowhere to
                         // send (the `recovery` module is `network-http`-gated).
+                        // Then purge what the relay holds for the identity,
+                        // signed while its key still exists. The guardian set
+                        // is kept (it expires after 365 days) until the user
+                        // can choose otherwise (#711 step 5).
                         #[cfg(feature = "network-http")]
-                        let _ = self.vauchi.broadcast_identity_revocations(&deliveries);
+                        {
+                            let _ = self.vauchi.broadcast_identity_revocations(&deliveries);
+                            if self.vauchi.purge_relay_data(false).is_err() {
+                                tracing::warn!("relay purge failed; local deletion continues");
+                            }
+                        }
                         #[cfg(not(feature = "network-http"))]
                         let _ = &deliveries;
                         self.engine_cache.clear();

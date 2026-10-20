@@ -34,7 +34,9 @@ impl AppEngine {
         });
         #[cfg(feature = "network-http")]
         {
-            let gap = self.vauchi.draw_background_sync_gap(self.background_budget);
+            let gap = self
+                .vauchi
+                .draw_background_sync_gap_due_within(self.background_budget);
             Ok(vec![background_wakeup(gap)])
         }
         #[cfg(not(feature = "network-http"))]

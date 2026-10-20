@@ -42,6 +42,8 @@ mod recovery;
 mod recovery_offline;
 mod registry_push;
 mod registry_sibling_apply;
+#[cfg(feature = "network-http")]
+mod relay_purge;
 mod search;
 mod security;
 mod setup;

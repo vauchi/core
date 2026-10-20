@@ -150,11 +150,7 @@ impl PreSignedShredMessages {
         purge_token: [u8; 32],
         timestamp: u64,
     ) -> PreSignedPurgeRequest {
-        let mut message = Vec::with_capacity(32 + 32 + 8);
-        message.extend_from_slice(&public_key);
-        message.extend_from_slice(&purge_token);
-        message.extend_from_slice(&timestamp.to_be_bytes());
-
+        let message = purge_signing_message(&public_key, &purge_token, timestamp, false);
         let signature = identity.sign(&message);
 
         PreSignedPurgeRequest {
@@ -164,6 +160,28 @@ impl PreSignedShredMessages {
             timestamp,
         }
     }
+}
+
+/// Appended to a purge's signed message when it also erases the guardian
+/// set (#711 D2); a purge without it signs what relays verified before.
+const ERASE_GUARDIAN_SET_DOMAIN: &[u8] = b"erase-guardian-set";
+
+/// The bytes a purge request signs:
+/// `public_key || purge_token || timestamp_be [|| "erase-guardian-set"]`.
+pub(crate) fn purge_signing_message(
+    public_key: &[u8; 32],
+    purge_token: &[u8; 32],
+    timestamp: u64,
+    erase_guardian_set: bool,
+) -> Vec<u8> {
+    let mut message = Vec::with_capacity(32 + 32 + 8 + ERASE_GUARDIAN_SET_DOMAIN.len());
+    message.extend_from_slice(public_key);
+    message.extend_from_slice(purge_token);
+    message.extend_from_slice(&timestamp.to_be_bytes());
+    if erase_guardian_set {
+        message.extend_from_slice(ERASE_GUARDIAN_SET_DOMAIN);
+    }
+    message
 }
 
 /// Errors from pre-signed message operations.

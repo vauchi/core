@@ -195,6 +195,7 @@ fn about_shows_the_versions_and_what_vauchi_is() {
     assert!(body.contains("privacy-focused contact card app"), "{body}");
 }
 
+// @scenario: privacy_compliance :: View privacy policy in app
 // @scenario: help_faq :: View a specific FAQ
 #[test]
 fn privacy_policy_and_known_issues_open_their_pages() {

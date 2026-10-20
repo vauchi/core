@@ -484,6 +484,7 @@ fn test_revocation_blob_decode_then_process_shreds_contact() {
 // End-to-end: Alice deletes her identity (GDPR), and Bob — her contact —
 // receives the resulting delivery blob and crypto-shreds Alice. Proves the
 // sender→blob→recipient→shred chain the broadcast wiring delivers.
+// @scenario: privacy_compliance :: Deletion notifies contacts
 // @scenario: privacy_compliance :: Identity deletion notifies contacts end-to-end
 // @internal
 #[test]

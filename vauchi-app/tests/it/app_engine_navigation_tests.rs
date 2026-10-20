@@ -236,6 +236,7 @@ fn gdpr_export_returns_serialized_data() {
 
 // Deletion schedule + cancel performed in core via the engine path:
 // confirm_delete schedules; cancel_deletion (shown when scheduled) clears.
+// @scenario: privacy_compliance :: Delete my account
 // @internal
 #[test]
 fn deletion_schedule_and_cancel_round_trip() {
@@ -277,6 +278,7 @@ fn deletion_schedule_and_cancel_round_trip() {
 
 // Execute-after-grace via the engine path: schedule with an elapsed grace,
 // then execute → WipeComplete.
+// @scenario: privacy_compliance :: Delete my account
 // @internal
 #[test]
 fn execute_deletion_after_grace_returns_wipe_complete() {

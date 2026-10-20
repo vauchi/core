@@ -864,6 +864,7 @@ mod tests {
 
     // ── Magic mode audio integration tests ───────────────────────
 
+    // @scenario: ble_exchange_modes :: Magic mode verifies proximity with an audio response
     // @internal
     #[test]
     fn magic_audio_response_verifies_proximity_without_self_completing() {
@@ -904,6 +905,7 @@ mod tests {
         assert!((prox.confidence - 0.85).abs() < f32::EPSILON);
     }
 
+    // @scenario: ble_exchange_modes :: Magic mode is not blocked by an audio timeout
     // @internal
     #[test]
     fn magic_audio_timeout_does_not_block_exchange() {
@@ -967,6 +969,7 @@ mod tests {
         assert_eq!(envelope[0], 0x01); // ENVELOPE_VERSION
     }
 
+    // @scenario: ble_exchange_modes :: Shake mode verifies proximity by correlating the peer's envelope
     // @internal
     #[test]
     fn shake_peer_envelope_verifies_proximity_without_self_completing() {
@@ -1136,6 +1139,7 @@ mod tests {
 
     // ── Bump mode edge cases ────────────────────────────────────
 
+    // @scenario: ble_exchange_modes :: Bump mode leaves proximity unverified on a weak impact
     // @internal
     #[test]
     fn bump_weak_impact_advances_to_verifying_with_unverified_proximity() {
@@ -1164,6 +1168,7 @@ mod tests {
         assert!(prox.confidence < 0.6);
     }
 
+    // @scenario: ble_exchange_modes :: Bump mode verifies proximity with a strong impact
     // @internal
     #[test]
     fn bump_strong_impact_has_capped_confidence() {

@@ -21,6 +21,7 @@ fn discover(engine: &mut BleExchangeEngine) -> Option<ActionResult> {
     })
 }
 
+// @scenario: ble_exchange_modes :: Magic mode discovery emits BLE commands
 // @internal
 #[test]
 fn new_engine_renders_discovering_and_not_cancelled() {
@@ -118,6 +119,7 @@ fn glance_without_camera_shows_qr_but_no_scan() {
 // `BLE_DISCOVERY_TIMEOUT_SECS` (see the `nothing_found_*` tests below) — so
 // this test discovers a peer first to land in a step the 15 s bound
 // doesn't gate.
+// @scenario: ble_exchange_modes :: A stalled BLE exchange fails after its step budget
 #[test]
 fn stalled_step_past_timeout_ticks_to_failed() {
     let mut engine = BleExchangeEngine::new(
@@ -144,6 +146,7 @@ fn stalled_step_past_timeout_ticks_to_failed() {
     );
 }
 
+// @scenario: ble_exchange_modes :: BLE discovery that finds no one offers Retry and QR
 // @internal
 #[test]
 fn nothing_found_after_discovery_budget_with_no_peer() {
@@ -308,6 +311,7 @@ fn tick_on_terminal_screen_is_inert() {
     );
 }
 
+// @scenario: ble_exchange_modes :: Magic mode discovery emits BLE commands
 // @internal
 #[test]
 fn screen_entered_emits_advertise_then_scan_once() {

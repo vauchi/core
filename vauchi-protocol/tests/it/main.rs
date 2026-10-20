@@ -8,3 +8,4 @@ mod contract_relay_consumer_tests;
 mod escrow_tests;
 mod ohttp_anchor_rollover_tests;
 mod ohttp_key_tests;
+mod purge_scope_and_proof_owner_tests;

@@ -454,6 +454,24 @@ where
     deserialize_optional_bounded_string(deserializer, MAX_ID_HEX_LEN)
 }
 
+fn deserialize_optional_public_key<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserialize_optional_bounded_string(deserializer, MAX_ID_HEX_LEN)
+}
+
+fn deserialize_optional_signature<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserialize_optional_bounded_string(deserializer, MAX_SIGNATURE_HEX_LEN)
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 fn deserialize_optional_origin_hint<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
 where
     D: Deserializer<'de>,
@@ -544,6 +562,11 @@ pub struct V2PurgeRequest {
     pub signature: String,
     /// Unix timestamp (must be within 60s of server time).
     pub timestamp: u64,
+    /// Also erase the guardian set at `SHA-256(public_key || "guardians")`.
+    /// Covered by the signature; absent means keep it, which is all an old
+    /// client could ask for.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub erase_guardian_set: bool,
 }
 
 /// V2 exchange offer request body.
@@ -614,6 +637,24 @@ pub struct V2RecoveryStoreRequest {
     /// Base64-encoded recovery proof data (opaque to relay, max 4 KiB).
     #[serde(deserialize_with = "deserialize_proof_data")]
     pub proof_data: String,
+    /// Hex-encoded Ed25519 public key of the identity uploading the proof,
+    /// so its purge can erase the proof. Proofs without an owner expire.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_optional_public_key"
+    )]
+    pub owner_pk: Option<String>,
+    /// Unix seconds, signed with the owner key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<u64>,
+    /// Hex-encoded Ed25519 signature by `owner_pk` over the upload.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_optional_signature"
+    )]
+    pub signature: Option<String>,
 }
 
 /// V2 recovery proof query request body.

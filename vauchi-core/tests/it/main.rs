@@ -521,6 +521,7 @@ mod unicode_adversarial_tests;
 mod uri_builder_tests;
 mod usb_device_link_tests;
 mod usb_exchange_session_tests;
+mod user_presence_secret_tests;
 mod validation_error_resolution_tests;
 mod vauchi_ohttp_anchor_rollover_tests;
 mod vauchi_signed_ohttp_key_tests;

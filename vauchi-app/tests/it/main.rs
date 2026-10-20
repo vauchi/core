@@ -71,6 +71,7 @@ mod contextual_surface_tests;
 mod contextual_undo_tests;
 mod data_export_duress_tests;
 mod data_export_format_tests;
+mod data_export_presence_tests;
 mod data_export_verification_tests;
 mod deep_link_consent_engine_tests;
 mod delivery_screen_tests;

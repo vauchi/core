@@ -66,6 +66,9 @@ pub struct ImportedVCard {
     pub uid: Option<String>,
     /// The vCard NICKNAME, saved as the contact's own local nickname.
     pub nickname: Option<String>,
+    /// The `X-VAUCHI-ID` a Vauchi export wrote, kept only when id-shaped;
+    /// a re-import matches the existing contact by it (#712).
+    pub vauchi_id: Option<String>,
 }
 
 /// Import contacts from a vCard file (supports 2.1, 3.0, 4.0).
@@ -140,6 +143,7 @@ struct VCardFields {
     display_name: Option<String>,
     n_fallback: Option<String>,
     uid: Option<String>,
+    vauchi_id: Option<String>,
     nickname: Option<String>,
     avatar_data: Option<Vec<u8>>,
     fields: Vec<(FieldType, String, String)>,
@@ -267,6 +271,8 @@ impl VCardFields {
             if let Some(value) = extract_clean(stripped) {
                 self.uid = Some(truncate_chars(&value, MAX_VALUE_LENGTH));
             }
+        } else if upper.starts_with("X-VAUCHI-ID") {
+            self.vauchi_id = extract_clean(stripped).filter(|value| is_vauchi_id(value));
         } else if upper.starts_with("NICKNAME") {
             if let Some(value) = extract_clean(stripped) {
                 self.nickname = Some(truncate_chars(&value, MAX_DISPLAY_NAME_LENGTH));
@@ -376,7 +382,17 @@ fn parse_single_vcard(block: &str, now: u64) -> Option<ImportedVCard> {
         card,
         uid: acc.uid,
         nickname: acc.nickname,
+        vauchi_id: acc.vauchi_id,
     })
+}
+
+/// Contact ids are UUIDs or hex: anything else in the marker is not one,
+/// and is dropped at the parse boundary rather than looked up.
+fn is_vauchi_id(value: &str) -> bool {
+    (1..=128).contains(&value.len())
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
 /// Detect vCard version from content. Defaults to 3.0.

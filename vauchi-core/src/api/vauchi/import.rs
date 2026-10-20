@@ -102,6 +102,17 @@ impl Vauchi {
         let mut remaining_budget = max_contacts.saturating_sub(current_count);
 
         for entry in entries {
+            // A Vauchi export names the contact it came from; that contact
+            // is already here, whether exchanged or imported (#712).
+            if let Some(ref vauchi_id) = entry.vauchi_id
+                && self.storage.contacts().load_contact(vauchi_id)?.is_some()
+            {
+                skipped += 1;
+                warnings.push(ImportWarning::DuplicateUid {
+                    uid: vauchi_id.clone(),
+                });
+                continue;
+            }
             let (card, uid) = (entry.card, entry.uid);
             // W7: Skip if a contact with this original_uid already exists.
             if let Some(ref uid_val) = uid

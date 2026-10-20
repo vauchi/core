@@ -84,7 +84,7 @@ impl AppEngine {
                     vcf: contacts
                         .iter()
                         .map(|contact| {
-                            vauchi_core::contact_card::vcard::export_vcard(contact.card()) + "\r\n"
+                            vauchi_core::contact_card::vcard::export_contact_vcard(contact) + "\r\n"
                         })
                         .collect(),
                 },

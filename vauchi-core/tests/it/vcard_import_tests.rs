@@ -123,6 +123,7 @@ fn test_import_vcard_21_outlook() {
 
 // ── QUOTED-PRINTABLE ────────────────────────────────────────────────
 
+// @scenario: contact_import :: Import vCard 2.1 with QUOTED-PRINTABLE encoding
 // @internal
 #[test]
 fn test_vcard_21_quoted_printable_utf8() {
@@ -523,6 +524,7 @@ mod proptests {
 
 // ── Non-UTF-8 encoding support ──────────────────────────────────────
 
+// @scenario: contact_import :: Import non-UTF-8 vCard file
 // @internal
 #[test]
 fn import_latin1_contact() {

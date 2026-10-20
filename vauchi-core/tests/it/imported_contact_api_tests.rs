@@ -65,6 +65,7 @@ fn trust_for_recovery_fails_for_imported_contact() {
 
 // ── Trust guard: imported contacts cannot have fingerprint verified ─────────
 
+// @scenario: contact_import :: Imported contacts cannot have fingerprint verified
 // @internal
 #[test]
 fn verify_fingerprint_fails_for_imported_contact() {
@@ -80,6 +81,7 @@ fn verify_fingerprint_fails_for_imported_contact() {
 
 // ── Editing: update a field on an imported contact succeeds ────────────────
 
+// @scenario: contact_import :: Edit imported contact fields
 // @internal
 #[test]
 fn update_imported_contact_field_succeeds() {
@@ -119,6 +121,7 @@ fn update_imported_contact_field_succeeds() {
 
 // ── Editing: update a field on an exchanged contact is rejected ────────────
 
+// @scenario: contact_import :: Cannot edit exchanged contact fields
 // @internal
 #[test]
 fn update_imported_contact_field_rejects_exchanged() {
@@ -144,6 +147,7 @@ fn update_imported_contact_field_rejects_exchanged() {
 
 // ── Editing: add a field to an imported contact succeeds ───────────────────
 
+// @scenario: contact_import :: Add field to imported contact
 // @internal
 #[test]
 fn add_imported_contact_field_succeeds() {
@@ -165,6 +169,7 @@ fn add_imported_contact_field_succeeds() {
 
 // ── Editing: add a field to an exchanged contact is rejected ───────────────
 
+// @scenario: contact_import :: Cannot edit exchanged contact fields
 // @internal
 #[test]
 fn add_imported_contact_field_rejects_exchanged() {
@@ -431,6 +436,7 @@ fn import_vcf_respects_contact_limit() {
 
 // ── W5: Cross-kind merge returns error ─────────────────────────────────────
 
+// @scenario: contact_import :: Direct cross-kind merge is rejected
 // @internal
 #[test]
 fn test_merge_cross_kind_returns_error() {
@@ -461,6 +467,7 @@ fn test_merge_cross_kind_returns_error() {
 
 // ── W7: Re-import same VCF produces no duplicates ──────────────────────────
 
+// @scenario: contact_import :: Re-import same vCard file does not create duplicates
 // @internal
 #[test]
 fn test_reimport_same_vcf_no_duplicates() {

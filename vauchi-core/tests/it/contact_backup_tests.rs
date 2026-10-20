@@ -64,6 +64,7 @@ fn contact_backup_roundtrip() {
 }
 
 /// Wrong password must return an error (authentication tag mismatch).
+// @scenario: contact_import :: Contact backup with wrong password fails
 // @internal
 #[test]
 fn contact_backup_wrong_password_fails() {

@@ -17,6 +17,7 @@ use crate::ui::*;
 use crate::ui::contact_detail_rules::{
     ContactPlace, ContactTag, footer_action_id, place_components, tag_components,
 };
+use crate::ui::contact_field_links::FieldLink;
 use vauchi_core::contact::trust::TrustLevel;
 
 /// Which perspective the user is viewing.
@@ -120,6 +121,8 @@ pub struct ContactDetailEngine {
     /// Transient name suggestions for `place_input`, from the named-place
     /// vocabulary, computed by the AppEngine intercept.
     place_suggestions: Vec<String>,
+    /// How each of their fields opens outside the app, keyed by field id.
+    field_links: HashMap<String, Vec<FieldLink>>,
     locale: Locale,
 }
 
@@ -392,12 +395,24 @@ impl ContactDetailEngine {
         // Each field is followed by an inline-editable private note.
         let contact_fields_a11y = self.t("fields.a11y_contact_fields");
         for field in &self.fields {
+            let row_actions = self
+                .field_links
+                .get(&field.id)
+                .into_iter()
+                .flatten()
+                .map(|link| FieldRowAction {
+                    field_id: field.id.clone(),
+                    action_id: link.action_id.clone(),
+                    label: link.label.clone(),
+                })
+                .collect();
             components.push(Component::FieldList {
                 id: format!("field_{}", field.id),
                 title: contact_fields_a11y.clone(),
                 fields: vec![field.clone()],
                 visibility_mode: VisibilityMode::ReadOnly,
                 available_scopes: vec![],
+                row_actions,
                 a11y: Some(A11y {
                     label: Some(contact_fields_a11y.clone()),
                     hint: None,
@@ -501,6 +516,7 @@ impl ContactDetailEngine {
                 fields: shared.my_fields.clone(),
                 visibility_mode: VisibilityMode::PerGroup,
                 available_scopes: shared.visible_groups.clone(),
+                row_actions: Vec::new(),
                 a11y: Some(A11y {
                     label: Some(self.t("fields.a11y_contact_fields")),
                     hint: Some(self.t("contact_detail.manage_group_visibility_hint")),
@@ -666,6 +682,23 @@ impl WorkflowEngine for ContactDetailEngine {
             } if component_id == "recovery_permissions" && item_id == "recovery_trusted" => {
                 self.is_recovery_trusted = !self.is_recovery_trusted;
                 ActionResult::UpdateScreen(self.build_screen())
+            }
+            UserAction::ListItemAction {
+                component_id,
+                item_id,
+                action_id,
+            } if component_id == format!("field_{item_id}") => {
+                let url = self
+                    .field_links
+                    .get(&item_id)
+                    .into_iter()
+                    .flatten()
+                    .find(|link| link.action_id == action_id)
+                    .map(|link| link.url.clone());
+                match url {
+                    Some(url) => ActionResult::OpenUrl { url },
+                    None => ActionResult::UpdateScreen(self.build_screen()),
+                }
             }
             UserAction::ActionPressed { action_id } if action_id == "edit" => {
                 ActionResult::EditContact {

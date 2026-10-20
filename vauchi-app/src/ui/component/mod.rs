@@ -10,7 +10,7 @@ mod preview;
 pub use list::{Item, ListItemAction, ListItemActionKind};
 pub(crate) use preview::initials;
 pub use preview::{
-    Field, PreviewVariant, UiFieldVisibility, icon_for_field_type, visibility_label,
+    Field, FieldRowAction, PreviewVariant, UiFieldVisibility, icon_for_field_type, visibility_label,
 };
 
 /// Serde skip-helper: windowing fields are omitted from the wire when
@@ -78,6 +78,8 @@ pub enum Component {
         fields: Vec<Field>,
         visibility_mode: VisibilityMode,
         available_scopes: Vec<String>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        row_actions: Vec<FieldRowAction>,
         #[serde(default)]
         a11y: Option<A11y>,
     },

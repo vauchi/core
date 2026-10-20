@@ -339,6 +339,7 @@ fn test_component_field_list_roundtrip() {
         }],
         visibility_mode: VisibilityMode::PerGroup,
         available_scopes: vec!["friends".into(), "family".into()],
+        row_actions: Vec::new(),
         a11y: None,
     };
 

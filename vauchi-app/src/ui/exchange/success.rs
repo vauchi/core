@@ -152,6 +152,7 @@ pub fn build_exchange_success_screen(
             fields,
             visibility_mode: VisibilityMode::ReadOnly,
             available_scopes: Vec::new(),
+            row_actions: Vec::new(),
             a11y: None,
         });
     }

@@ -50,6 +50,17 @@ pub struct Field {
     pub a11y: Option<A11y>,
 }
 
+/// One way to open a field outside the app. In a field list's
+/// `row_actions`, a field's first action is its row's tap; the rest are
+/// offered beside it.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FieldRowAction {
+    pub field_id: String,
+    pub action_id: String,
+    pub label: String,
+}
+
 /// Map a `field_type` string to the platform-neutral icon name carried
 /// on `Field.icon`.
 ///

@@ -317,6 +317,7 @@ fn all_components() -> Vec<Component> {
             fields: vec![sample_field(), sample_scoped_field()],
             visibility_mode: VisibilityMode::ReadOnly,
             available_scopes: vec!["work".to_string()],
+            row_actions: Vec::new(),
             a11y: None,
         },
         Component::ToggleList {

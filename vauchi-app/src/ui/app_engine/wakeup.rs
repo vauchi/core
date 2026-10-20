@@ -28,16 +28,22 @@ impl AppEngine {
                 super::presentation_protocol::AppPresentationError::InvalidBackgroundBudget,
             );
         }
-        self.background_budget = (runs > 0).then(|| vauchi_core::api::BackgroundBudget {
+        let budget = (runs > 0).then(|| vauchi_core::api::BackgroundBudget {
             window: std::time::Duration::from_secs(u64::from(window_secs)),
             runs,
         });
         #[cfg(feature = "network-http")]
+        let changed = budget != self.background_budget;
+        self.background_budget = budget;
+        #[cfg(feature = "network-http")]
         {
-            let gap = self
-                .vauchi
-                .draw_background_sync_gap_due_within(self.background_budget);
-            Ok(vec![background_wakeup(gap)])
+            // Only a changed budget redraws: the worker reports it before
+            // every run, and a draw per report would shorten the gaps (#603
+            // run A3 C3).
+            if changed {
+                self.vauchi.pull_sync_deadline_within(budget);
+            }
+            Ok(vec![background_wakeup(self.next_background_gap())])
         }
         #[cfg(not(feature = "network-http"))]
         Ok(Vec::new())
@@ -59,14 +65,19 @@ impl AppEngine {
             (outcome, self.vauchi.draw_background_sync_gap(budget))
         } else {
             let outcome = self.vauchi.background_sync_tick(budget)?;
-            let gap = self
-                .vauchi
-                .time_until_sync_due()
-                .filter(|until| !until.is_zero())
-                .unwrap_or_else(|| self.vauchi.draw_background_sync_gap(budget));
-            (outcome, gap)
+            (outcome, self.next_background_gap())
         };
         Ok((outcome, background_wakeup(gap)))
+    }
+
+    /// When the scheduler's next run comes: at the sync deadline, or at a
+    /// fresh draw once that is due.
+    #[cfg(feature = "network-http")]
+    fn next_background_gap(&self) -> std::time::Duration {
+        self.vauchi
+            .time_until_sync_due()
+            .filter(|until| !until.is_zero())
+            .unwrap_or_else(|| self.vauchi.draw_background_sync_gap(self.background_budget))
     }
 
     /// The shell's platform wakeup fired — a desktop in-process interval, an
@@ -186,7 +197,11 @@ impl AppEngine {
 
 #[cfg(feature = "network-http")]
 fn background_wakeup(gap: std::time::Duration) -> vauchi_core::Command {
-    let millis = u32::try_from(gap.as_millis()).unwrap_or(u32::MAX).max(1);
+    // Rounded up: a run woken a fraction of a millisecond before the deadline
+    // finds the sync not due and skips it.
+    let millis = u32::try_from(gap.as_micros().div_ceil(1000))
+        .unwrap_or(u32::MAX)
+        .max(1);
     let secs = millis.div_ceil(1000);
     vauchi_core::Command::schedule_wakeup(secs, secs, 1, Some(millis))
 }

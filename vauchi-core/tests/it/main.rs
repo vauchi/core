@@ -257,6 +257,7 @@ mod exchangeddata_seal_guard;
 mod expanded_crypto_property_tests;
 mod field_catalog_tests;
 mod field_centric_visibility_tests;
+mod field_link_tests;
 mod field_validation_contact_info_tests;
 mod field_validation_custom_and_crossfield_tests;
 mod field_validation_social_tests;

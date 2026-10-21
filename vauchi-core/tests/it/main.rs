@@ -473,6 +473,7 @@ mod six_device_convergence_tests;
 mod sleeper_tests;
 mod smk_boot_tests;
 mod snapshot_tests;
+mod social_network_data_tests;
 mod social_registry_tests;
 mod sp22_contact_enrichment_tests;
 mod sp33_mailbox_send_path_tests;

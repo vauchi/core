@@ -39,6 +39,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- TLS rejects certificate paths through the distrusted emSign
+  intermediates: rustls-webpki 0.103.16 and webpki-roots 1.0.10
+  (RUSTSEC-2026-0382, RUSTSEC-2026-0381).
 - A second scanner's offer can no longer replace the first scanner's
   BLE commitment (vauchi/private#705), and a Glance displayer latches
   the link whose offer it accepts, not the last one to connect

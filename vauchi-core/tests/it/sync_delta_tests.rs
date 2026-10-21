@@ -6,6 +6,7 @@
 //! Extracted from delta.rs
 
 use vauchi_core::contact_card::FieldType;
+use vauchi_core::sync::delta::{CekWrappedPayload, DeltaError, VersionedPayload};
 use vauchi_core::sync::*;
 use vauchi_core::*;
 
@@ -919,4 +920,39 @@ fn a_changed_network_id_produces_a_delta_carrying_it() {
     let mut received = old.clone();
     delta.apply(&mut received).unwrap();
     assert_eq!(received.fields()[0].network_id(), Some("twitter"));
+}
+
+fn zero_cek_payload() -> CekWrappedPayload {
+    CekWrappedPayload {
+        cek: [0u8; 32],
+        cek_ciphertext: vec![0u8; 41],
+        signature: [0u8; 64],
+        nonce: [0xC3u8; 32],
+    }
+}
+
+/// Card updates carry social network ids, which a peer from before them
+/// drops when it re-encodes the delta to verify it. The payload version
+/// changes with them, so such a peer reports an unknown version instead of
+/// a failed signature that reads like tampering (vauchi/private#734 D8).
+// @scenario: sync_updates :: Only changed fields transmitted
+#[test]
+fn card_updates_are_tagged_with_the_network_id_payload_version() {
+    let wire = VersionedPayload::encode_cek(&zero_cek_payload());
+    assert_eq!(wire[0], 0x08);
+    assert!(matches!(
+        VersionedPayload::decode(&wire),
+        Ok(VersionedPayload::CekWrapped(_))
+    ));
+}
+
+// @scenario: sync_updates :: Only changed fields transmitted
+#[test]
+fn a_card_update_from_before_network_ids_is_an_unknown_version() {
+    let mut wire = VersionedPayload::encode_cek(&zero_cek_payload());
+    wire[0] = 0x02;
+    assert!(matches!(
+        VersionedPayload::decode(&wire),
+        Err(DeltaError::UnknownPayloadVersion(0x02))
+    ));
 }

@@ -414,6 +414,15 @@ impl UxStore<'_> {
         Ok(())
     }
 
+    /// Removes the digest of this device's user-presence secret.
+    pub fn clear_user_presence_digest(&self) -> Result<(), StorageError> {
+        self.conn.execute(
+            "UPDATE ux_state SET user_presence_digest_encrypted = NULL, updated_at = ?1 WHERE id = 1",
+            params![self.now_secs() as i64],
+        )?;
+        Ok(())
+    }
+
     /// Loads the digest of this device's user-presence secret, if enrolled.
     pub fn load_user_presence_digest(&self) -> Result<Option<[u8; 32]>, StorageError> {
         let result = self.conn.query_row(

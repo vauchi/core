@@ -88,3 +88,52 @@ fn the_display_label_is_the_named_networks_current_name() {
     assert_eq!(field(Some("nope")).display_label(&registry), "Twitter");
     assert_eq!(field(None).display_label(&registry), "Twitter");
 }
+
+// Cards stored before network ids existed get one from their label when
+// they load (vauchi/private#734 D6).
+
+// @internal
+#[test]
+fn a_stored_own_card_loads_with_network_ids_from_its_labels() {
+    let mut vauchi = vauchi_core::Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    vauchi
+        .add_own_field(ContactField::new(FieldType::Social, "Twitter", "alice", 0))
+        .unwrap();
+    vauchi
+        .add_own_field(ContactField::new(FieldType::Social, "My blog", "me", 0))
+        .unwrap();
+
+    let card = vauchi.own_card().unwrap().unwrap();
+    let id_of = |label: &str| {
+        card.fields()
+            .iter()
+            .find(|f| f.label() == label)
+            .map(|f| f.network_id().map(str::to_string))
+            .expect("field present")
+    };
+    assert_eq!(id_of("Twitter").as_deref(), Some("twitter"));
+    assert_eq!(id_of("My blog"), None);
+}
+
+// @internal
+#[test]
+fn a_stored_contact_card_loads_with_network_ids_from_its_labels() {
+    use vauchi_core::{Contact, ContactCard, Identity, SymmetricKey};
+    let mut vauchi = vauchi_core::Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Ada").unwrap();
+    let mut card = ContactCard::new("Bob");
+    card.add_field(ContactField::new(FieldType::Social, "GitHub", "bob", 0))
+        .unwrap();
+    let contact = Contact::from_exchange(
+        *Identity::create("Bob", 0).signing_public_key(),
+        card,
+        SymmetricKey::generate(),
+        0,
+    );
+    let contact_id = contact.id().to_string();
+    vauchi.add_contact(contact).unwrap();
+
+    let loaded = vauchi.get_contact(&contact_id).unwrap().unwrap();
+    assert_eq!(loaded.card().fields()[0].network_id(), Some("github"));
+}

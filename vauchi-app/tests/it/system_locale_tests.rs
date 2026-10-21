@@ -156,3 +156,40 @@ fn follow_system_renders_the_system_language_and_keeps_follow_system_selected() 
         Some("follow_system")
     );
 }
+
+// @internal
+#[test]
+fn follow_system_renders_settings_in_the_system_language() {
+    load_german();
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let english = [AppScreen::Settings, AppScreen::SettingsAppearance]
+        .map(|screen| engine.navigate_to(screen).title);
+
+    engine.set_render_context(context(None, Some("de-LI")));
+
+    for (screen, english) in [AppScreen::Settings, AppScreen::SettingsAppearance]
+        .into_iter()
+        .zip(english)
+    {
+        let system = engine.navigate_to(screen.clone()).title;
+        assert_translated(&format!("{screen:?} title"), &system, &english);
+    }
+}
+
+// @internal
+#[test]
+fn a_screen_built_before_the_system_language_arrives_renders_in_it() {
+    load_german();
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let english = engine.navigate_to(AppScreen::Contacts).title;
+    engine.navigate_to(AppScreen::Help);
+
+    engine.set_render_context(context(None, Some("de")));
+
+    let system = engine.navigate_to(AppScreen::Contacts).title;
+    assert_translated("Contacts title", &system, &english);
+}

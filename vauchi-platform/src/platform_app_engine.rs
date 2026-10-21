@@ -354,6 +354,10 @@ impl PlatformAppEngine {
         platform_keychain: Option<Arc<dyn crate::MobilePlatformKeychain>>,
     ) -> Arc<Self> {
         crate::cached_content::load_at_start(storage_path.parent().unwrap_or(&storage_path));
+        let mut engine = engine;
+        if let Some(engine) = engine.as_mut() {
+            engine.reload_social_networks();
+        }
         Arc::new(Self {
             engine: Mutex::new(engine),
             reopening: AtomicBool::new(false),

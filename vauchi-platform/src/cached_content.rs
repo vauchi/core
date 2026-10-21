@@ -21,6 +21,16 @@ pub(crate) fn load_at_start(data_dir: &Path) {
     if let Some(manager) = manager_over(data_dir) {
         manager.load_cached_locales_into_i18n();
         manager.load_cached_themes_into_theme_store();
+        manager.load_cached_networks_into_registry();
+    }
+}
+
+/// After a content update applied, the networks it downloaded take
+/// effect without a restart (vauchi/private#734).
+pub(crate) fn reload_cached_networks() {
+    let root = CONTENT_ROOT.read().ok().and_then(|root| root.clone());
+    if let Some(manager) = root.as_deref().and_then(manager_over) {
+        manager.load_cached_networks_into_registry();
     }
 }
 

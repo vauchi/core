@@ -436,6 +436,14 @@ impl AppEngine {
         if let Some(data) = tokens_json {
             crate::theme::load_design_tokens_from_bytes(data)?;
         }
+        self.rebuild_screens();
+        Ok(())
+    }
+
+    /// Drops every cached screen and rebuilds the active one in place, so
+    /// the next `current_screen()` reflects reloaded content without a
+    /// navigation.
+    fn rebuild_screens(&mut self) {
         self.engine_cache.clear();
         let screen = self.screen.clone();
         self.engine = Self::create_engine(
@@ -448,7 +456,15 @@ impl AppEngine {
             &self.pending_exchange_groups,
             self.glance_display_qr.as_deref(),
         );
-        Ok(())
+    }
+
+    /// Rebuilds what is derived from the active social-network registry
+    /// after new network data loaded: the Add Field catalog and every cached
+    /// screen, whose field names follow the registry (vauchi/private#734).
+    pub fn reload_social_networks(&mut self) {
+        self.field_catalog =
+            vauchi_core::contact_card::FieldTypeCatalog::new(&crate::social::active_registry());
+        self.rebuild_screens();
     }
 
     pub fn new(vauchi: Vauchi) -> Self {

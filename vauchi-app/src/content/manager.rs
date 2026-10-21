@@ -219,6 +219,19 @@ impl ContentManager {
             let _ = crate::theme::load_themes_from_bytes(&data);
         }
     }
+
+    /// Loads the cached networks file into the active social-network
+    /// registry. A file that fails validation leaves the registry as it was
+    /// (vauchi/private#734 D3).
+    pub fn load_cached_networks_into_registry(&self) {
+        if let Some(data) = self
+            .cache
+            .get_content(ContentType::Networks, "networks.json")
+        {
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = crate::social::load_networks_from_bytes(&data);
+        }
+    }
 }
 
 // Async methods (require content-updates feature)

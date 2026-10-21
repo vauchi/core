@@ -1,0 +1,71 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! A social field stores the id of its network, so renaming the network
+//! in the data renames every card (vauchi/private#734 D4).
+
+use vauchi_core::contact_card::{ContactField, FieldType, ValidationError};
+
+fn github_field() -> ContactField {
+    ContactField::new(FieldType::Social, "GitHub", "octocat", 0).with_network_id("github")
+}
+
+// @internal
+#[test]
+fn a_social_field_keeps_its_network_id_through_json() {
+    let field = github_field();
+    assert_eq!(field.network_id(), Some("github"));
+
+    let json = serde_json::to_value(&field).unwrap();
+    assert_eq!(json["network_id"], "github");
+    let back: ContactField = serde_json::from_value(json).unwrap();
+    assert_eq!(back.network_id(), Some("github"));
+    assert_eq!(back.validate(), Ok(()));
+}
+
+// @internal
+#[test]
+fn a_field_without_a_network_id_keeps_its_json_shape() {
+    let field = ContactField::new(FieldType::Social, "My blog", "me", 0);
+    assert_eq!(field.network_id(), None);
+    let json = serde_json::to_value(&field).unwrap();
+    assert!(json.get("network_id").is_none(), "{json}");
+}
+
+// @internal
+#[test]
+fn a_non_social_field_never_has_a_network_id() {
+    let phone =
+        ContactField::new(FieldType::Phone, "Mobile", "+41790000000", 0).with_network_id("github");
+    assert_eq!(phone.network_id(), None);
+}
+
+/// A peer's card is untrusted input: an id on a non-social field, or one
+/// outside the registry's id charset, is rejected (DC-01).
+// @internal
+#[test]
+fn a_received_field_with_an_invalid_network_id_is_rejected() {
+    let received = |field_type: &str, network_id: &str| -> ContactField {
+        serde_json::from_value(serde_json::json!({
+            "id": "f1",
+            "field_type": field_type,
+            "label": "L",
+            "value": "v",
+            "network_id": network_id,
+        }))
+        .unwrap()
+    };
+    assert_eq!(
+        received("Phone", "github").validate(),
+        Err(ValidationError::InvalidNetworkId)
+    );
+    for bad in ["", "GitHub", "git hub", "a\0b", &"a".repeat(33), "ü"] {
+        assert_eq!(
+            received("Social", bad).validate(),
+            Err(ValidationError::InvalidNetworkId),
+            "{bad:?}"
+        );
+    }
+    assert_eq!(received("Social", &"a".repeat(32)).validate(), Ok(()));
+}

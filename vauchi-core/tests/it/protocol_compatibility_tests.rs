@@ -53,6 +53,23 @@ const CONTACT_CARD_V1: &str = r#"{
     ]
 }"#;
 
+/// ContactCard with a social field that names its network
+/// (vauchi/private#734 D4). V1 cards above stay valid: the id is optional.
+const CONTACT_CARD_WITH_NETWORK_ID_V1: &str = r#"{
+    "schema_version": 1,
+    "id": "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7",
+    "display_name": "Bob Jones",
+    "fields": [
+        {
+            "id": "s1t2u3v4w5x6",
+            "field_type": "Social",
+            "label": "GitHub",
+            "value": "bobjones",
+            "network_id": "github"
+        }
+    ]
+}"#;
+
 /// ContactField with each FieldType variant.
 const FIELD_TYPE_PHONE_V1: &str =
     r#"{"id":"f001","field_type":"Phone","label":"Mobile","value":"+1234567890"}"#;
@@ -252,6 +269,21 @@ fn test_contact_card_compatibility_v1() {
     assert_eq!(card.id(), reparsed.id());
     assert_eq!(card.display_name(), reparsed.display_name());
     assert_eq!(card.fields().len(), reparsed.fields().len());
+}
+
+// @internal
+#[test]
+fn test_contact_card_with_network_id_compatibility_v1() {
+    use vauchi_core::ContactCard;
+
+    let card: ContactCard = serde_json::from_str(CONTACT_CARD_WITH_NETWORK_ID_V1)
+        .expect("Failed to deserialize ContactCard with network_id golden fixture");
+    let field = &card.fields()[0];
+    assert_eq!(field.network_id(), Some("github"));
+    assert_eq!(field.validate(), Ok(()));
+
+    let reserialized = serde_json::to_value(&card).unwrap();
+    assert_eq!(reserialized["fields"][0]["network_id"], "github");
 }
 
 // @internal

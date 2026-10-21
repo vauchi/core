@@ -342,26 +342,23 @@ impl ContactField {
     /// Delegates to the `SocialNetworkRegistry` for URL templates, supporting
     /// all registered networks (38+) rather than a hardcoded subset.
     fn social_to_uri(&self, registry: &SocialNetworkRegistry, value: &str) -> Option<String> {
-        let label_lower = match self.label().to_lowercase().as_str() {
-            "x" => "twitter".to_string(),
-            other => other.to_string(),
-        };
+        let network = registry.resolve(self.label())?;
         let username = normalize_social_username(value);
 
-        if label_lower == "mastodon"
+        if network.id() == "mastodon"
             && let Some(profile_url) = parse_mastodon_federated(username)
         {
             return Some(profile_url);
         }
 
         // Strip LinkedIn "in/" prefix if user included it (template already has it)
-        let username = if label_lower == "linkedin" {
+        let username = if network.id() == "linkedin" {
             username.strip_prefix("in/").unwrap_or(username)
         } else {
             username
         };
 
-        registry.profile_url(&label_lower, username)
+        Some(network.profile_url(username))
     }
 
     /// Get the primary action for this field.

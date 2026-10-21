@@ -98,7 +98,8 @@ impl SocialNetwork {
     /// Generates a profile URL from a username.
     ///
     /// Handles common username formats:
-    /// - Removes leading @ for Twitter-style handles
+    /// - Removes a leading @, which is how people write handles, not part
+    ///   of the name on any network
     /// - Preserves full URLs if already provided
     ///
     /// # Examples
@@ -111,33 +112,15 @@ impl SocialNetwork {
     /// assert_eq!(twitter.profile_url("@alice"), "https://twitter.com/alice");
     /// ```
     pub fn profile_url(&self, username: &str) -> String {
-        let clean_username = Self::normalize_username(username, &self.id);
+        let username = username.trim();
+        let clean_username = username.strip_prefix('@').unwrap_or(username);
 
         if clean_username.starts_with("http://") || clean_username.starts_with("https://") {
-            return clean_username;
+            return clean_username.to_string();
         }
 
         self.profile_url_template
-            .replace("{username}", &clean_username)
-    }
-
-    /// Normalizes a username for URL generation.
-    fn normalize_username(username: &str, network_id: &str) -> String {
-        let username = username.trim();
-
-        let username = if username.starts_with('@')
-            && matches!(network_id, "twitter" | "instagram" | "threads" | "mastodon")
-        {
-            &username[1..]
-        } else {
-            username
-        };
-
-        if network_id == "mastodon" && username.contains('@') {
-            return username.to_string();
-        }
-
-        username.to_string()
+            .replace("{username}", clean_username)
     }
 }
 
@@ -225,9 +208,7 @@ impl SocialNetworkRegistry {
     /// Looks up by ID first, then falls back to display name match.
     /// Returns None if the network is not found.
     pub fn profile_url(&self, network_id: &str, username: &str) -> Option<String> {
-        self.get(network_id)
-            .or_else(|| self.find_by_display_name(network_id))
-            .map(|n| n.profile_url(username))
+        self.resolve(network_id).map(|n| n.profile_url(username))
     }
 
     /// Finds the network a user-facing name refers to: its id, an alias or

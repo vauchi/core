@@ -380,6 +380,14 @@ pub enum MobileEvent {
     FilePickCancelledByUser,
     // Biometric auth (ADR-031)
     BiometricUnlockSucceeded,
+    // User presence (#712): answers to Create/RevealUserPresenceSecret
+    UserPresenceSecretCreated {
+        secret: Vec<u8>,
+    },
+    UserPresenceSecretRevealed {
+        secret: Vec<u8>,
+    },
+    UserPresenceCheckCancelled,
     // Errors
     HardwareError {
         transport: String,
@@ -516,6 +524,15 @@ impl From<MobileEvent> for Event {
             }
             MobileEvent::FilePickCancelledByUser => Self::FilePickCancelledByUser,
             MobileEvent::BiometricUnlockSucceeded => Self::BiometricUnlockSucceeded,
+            MobileEvent::UserPresenceSecretCreated { secret } => Self::UserPresenceSecretCreated {
+                secret: secret.into(),
+            },
+            MobileEvent::UserPresenceSecretRevealed { secret } => {
+                Self::UserPresenceSecretRevealed {
+                    secret: secret.into(),
+                }
+            }
+            MobileEvent::UserPresenceCheckCancelled => Self::UserPresenceCheckCancelled,
         }
     }
 }

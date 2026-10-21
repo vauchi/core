@@ -326,6 +326,20 @@ char *vauchi_app_initial_commands(struct VauchiApp *handle);
 char *vauchi_app_dispatch(struct VauchiApp *handle, const char *event_json);
 
 /**
+ * Push the shell's render context: the JSON shape of
+ * `PlatformAppEngine::set_render_context_json` (`locale`, `system_locale`,
+ * `theme_id`). A push while storage is locked is applied when it opens.
+ *
+ * Returns 0 on success, -1 on a null argument or JSON Core rejects, which
+ * leaves the current context unchanged.
+ *
+ * # Safety
+ * `handle` must be a valid app handle or null. `json` must be a valid
+ * null-terminated C string or null.
+ */
+int32_t vauchi_app_set_render_context_json(struct VauchiApp *handle, const char *json);
+
+/**
  * Return the design tokens as JSON.
  *
  * The shape matches `vauchi_app::theme::DesignTokens`, which is the same

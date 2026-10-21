@@ -20,7 +20,9 @@ use vauchi_core::storage::SecureStorage;
 
 use crate::VauchiApp;
 use crate::app::open_app;
-use crate::app_presentation::{vauchi_app_dispatch, vauchi_app_initial_commands};
+use crate::app_presentation::{
+    vauchi_app_dispatch, vauchi_app_initial_commands, vauchi_app_set_render_context_json,
+};
 
 /// A keyring that can stop answering, as the Secret Service does when D-Bus
 /// is not up yet.
@@ -320,4 +322,34 @@ fn after_a_wipe_the_next_identity_survives_a_restart() {
         "the identity created after the wipe did not survive a restart"
     );
     destroy(restarted);
+}
+
+// @internal
+#[test]
+fn a_render_context_pushed_while_locked_reaches_the_opened_app() {
+    let dir = tempfile::tempdir().unwrap();
+    let keyring = SwitchableKeyring::new();
+    destroy(open(&dir, keyring.clone()));
+    keyring.reachable.store(false, Ordering::SeqCst);
+    let app = open(&dir, keyring.clone());
+    let locked = initial(app);
+    let json = CString::new(r#"{"system_locale":"fr-CH"}"#).unwrap();
+
+    // SAFETY: `app` is live and `json` is NUL-terminated.
+    assert_eq!(
+        unsafe { vauchi_app_set_render_context_json(app, json.as_ptr()) },
+        0
+    );
+    keyring.reachable.store(true, Ordering::SeqCst);
+    press_primary(app, &locked);
+
+    // SAFETY: `app` is live and owned by this test.
+    let opened = unsafe { &*app };
+    let engine = opened.lock_engine().unwrap();
+    assert_eq!(
+        engine.as_ref().unwrap().render_context().resolved_locale(),
+        vauchi_app::i18n::Locale::French
+    );
+    drop(engine);
+    destroy(app);
 }

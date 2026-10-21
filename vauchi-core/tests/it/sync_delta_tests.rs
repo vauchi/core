@@ -896,3 +896,27 @@ fn test_card_delta_validation_summary_multiple_fields() {
     assert_eq!(restored_summary["field-address"].count, 0);
     assert_eq!(restored_summary["field-address"].trust_level, "none");
 }
+
+/// A field whose network id changes reaches contacts, so a network they
+/// see follows the sender's (vauchi/private#734 T2.2).
+// @scenario: sync_updates :: Only changed fields transmitted
+#[test]
+fn a_changed_network_id_produces_a_delta_carrying_it() {
+    let field = ContactField::new(FieldType::Social, "Twitter", "alice", 0);
+    let mut old = ContactCard::new("Alice");
+    old.add_field(field.clone()).unwrap();
+    let mut new = ContactCard::new("Alice");
+    new.add_field(field.with_network_id("twitter")).unwrap();
+
+    let delta = CardDelta::compute(&old, &new, 0);
+
+    assert_eq!(delta.changes.len(), 1);
+    let FieldChange::Added { field } = &delta.changes[0] else {
+        panic!("expected an Added change, got {:?}", delta.changes[0]);
+    };
+    assert_eq!(field.network_id(), Some("twitter"));
+
+    let mut received = old.clone();
+    delta.apply(&mut received).unwrap();
+    assert_eq!(received.fields()[0].network_id(), Some("twitter"));
+}

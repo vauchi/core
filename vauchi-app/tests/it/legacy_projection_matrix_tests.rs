@@ -64,6 +64,7 @@ fn sample_settings_config() -> SettingsConfig {
         available_themes: vec![],
         language_id: String::new(),
         available_languages: vec![],
+        system_locale: None,
         reduce_motion: false,
         large_touch: false,
         show_help_icons: true,

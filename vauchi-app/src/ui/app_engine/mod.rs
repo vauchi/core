@@ -386,14 +386,25 @@ impl AppEngine {
     /// rebuilds the active engine so the next `current_screen()`
     /// call reflects the new dropdown `selected` value without
     /// requiring a navigate-away-and-back round trip.
+    ///
+    /// A change of rendered language invalidates every cached screen,
+    /// because the shell's first push can arrive after the start screen
+    /// was built in English (vauchi/private#721).
     pub fn set_render_context(&mut self, ctx: crate::ui::RenderContext) {
+        let language_changed = ctx.resolved_locale() != self.render_context.resolved_locale();
         self.render_context = ctx;
-        self.engine_cache.remove(&AppScreen::Settings);
-        self.engine_cache.remove(&AppScreen::SettingsAppearance);
-        if matches!(
-            self.screen,
-            AppScreen::Settings | AppScreen::SettingsAppearance
-        ) {
+        if language_changed {
+            self.engine_cache.clear();
+        } else {
+            self.engine_cache.remove(&AppScreen::Settings);
+            self.engine_cache.remove(&AppScreen::SettingsAppearance);
+        }
+        if language_changed
+            || matches!(
+                self.screen,
+                AppScreen::Settings | AppScreen::SettingsAppearance
+            )
+        {
             let screen = self.screen.clone();
             self.engine = Self::create_engine(
                 &self.vauchi,

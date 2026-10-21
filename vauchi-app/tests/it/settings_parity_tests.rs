@@ -57,6 +57,7 @@ fn sample_settings_config() -> SettingsConfig {
             id: "en".into(),
             label: "English".into(),
         }],
+        system_locale: None,
         reduce_motion: false,
         large_touch: false,
         show_help_icons: true,

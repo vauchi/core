@@ -39,6 +39,10 @@ pub struct SettingsConfig {
     pub language_id: String,
     #[serde(default)]
     pub available_languages: Vec<DropdownOption>,
+    /// The OS language tag, which "Follow system" renders in
+    /// (`RenderContext::system_locale`, vauchi/private#721).
+    #[serde(default)]
+    pub system_locale: Option<String>,
     #[serde(default)]
     pub reduce_motion: bool,
     #[serde(default)]
@@ -110,7 +114,14 @@ impl SettingsEngine {
     }
 
     fn locale(&self) -> Locale {
-        Locale::from_code(&self.config.language_id).unwrap_or_default()
+        [
+            Some(self.config.language_id.as_str()),
+            self.config.system_locale.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        .find_map(Locale::from_code)
+        .unwrap_or_default()
     }
 
     fn t(&self, key: &str) -> String {

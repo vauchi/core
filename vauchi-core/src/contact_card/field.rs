@@ -169,6 +169,15 @@ impl ContactField {
         self.network_id.as_deref()
     }
 
+    /// The label to show: the named network's current name in `registry`,
+    /// else the stored label (#734 D5).
+    pub fn display_label<'a>(&'a self, registry: &'a SocialNetworkRegistry) -> &'a str {
+        self.network_id
+            .as_deref()
+            .and_then(|id| registry.get(id))
+            .map_or(&self.label, |network| network.display_name())
+    }
+
     /// Returns the field's unique ID.
     pub fn id(&self) -> &str {
         &self.id

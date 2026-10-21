@@ -74,6 +74,7 @@ impl AppEngine {
                         })
                         .filter(|(_, links)| !links.is_empty())
                         .collect();
+                    let registry = crate::social::active_registry();
                     let fields: Vec<Field> = contact
                         .card()
                         .fields()
@@ -85,7 +86,7 @@ impl AppEngine {
                                 icon: crate::ui::component::icon_for_field_type(&field_type_str)
                                     .into(),
                                 field_type: field_type_str,
-                                label: f.label().to_string(),
+                                label: f.display_label(&registry).to_string(),
                                 value: f.value().to_string(),
                                 visibility_label: crate::ui::component::visibility_label(
                                     &UiFieldVisibility::Shown,

@@ -63,6 +63,7 @@ pub(super) fn build_field_preview_screen(
     locale: crate::i18n::Locale,
 ) -> ScreenModel {
     let t = |key: &str| crate::i18n::get_string(locale, key);
+    let registry = crate::social::active_registry();
     let fields: Vec<Field> = config
         .card
         .fields()
@@ -77,12 +78,12 @@ pub(super) fn build_field_preview_screen(
             let field_type_str = format!("{:?}", f.field_type());
             Field {
                 id: f.id().to_string(),
-                label: f.label().to_string(),
+                label: f.display_label(&registry).to_string(),
                 value: f.value().to_string(),
                 icon: crate::ui::component::icon_for_field_type(&field_type_str).into(),
                 field_type: field_type_str,
                 a11y: Some(A11y {
-                    label: Some(format!("{}: {}", f.label(), f.value())),
+                    label: Some(format!("{}: {}", f.display_label(&registry), f.value())),
                     hint: match visibility {
                         UiFieldVisibility::Shown => None,
                         UiFieldVisibility::Hidden => {

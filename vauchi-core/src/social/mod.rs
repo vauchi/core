@@ -11,4 +11,7 @@ pub mod registry;
 #[cfg(not(feature = "testing"))]
 mod registry;
 
+mod network_data;
+
+pub use network_data::{NetworkDataError, UsernameCharset, UsernameRule};
 pub use registry::{SocialNetwork, SocialNetworkRegistry};

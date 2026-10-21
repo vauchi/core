@@ -183,8 +183,8 @@ impl AppEngine {
                 let display_name = card
                     .map(|c| c.display_name().to_string())
                     .unwrap_or_default();
-                let bundled = crate::theme::bundled_themes();
-                let available_themes: Vec<crate::ui::component::DropdownOption> = bundled
+                let themes = crate::theme::active_themes();
+                let available_themes: Vec<crate::ui::component::DropdownOption> = themes
                     .iter()
                     .map(|t| crate::ui::component::DropdownOption {
                         id: t.id.clone(),

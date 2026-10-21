@@ -146,14 +146,16 @@ impl ContactStore<'_> {
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 let json = String::from_utf8(decrypted)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                let card = serde_json::from_str(&json)
+                let mut card: ContactCard = serde_json::from_str(&json)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                card.resolve_stored_network_ids();
                 Ok(Some(card))
             }
             Ok((_, plaintext)) if !plaintext.is_empty() => {
                 // Fallback: read from plaintext column (pre-v13 data)
-                let card = serde_json::from_str(&plaintext)
+                let mut card: ContactCard = serde_json::from_str(&plaintext)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                card.resolve_stored_network_ids();
                 Ok(Some(card))
             }
             Ok(_) => Ok(None),

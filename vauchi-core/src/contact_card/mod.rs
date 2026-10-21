@@ -277,6 +277,20 @@ impl ContactCard {
         card
     }
 
+    /// Gives social fields stored before network ids existed the id their
+    /// label names, against the bundled networks (#734 D6). Called where a
+    /// stored card is read; the next save keeps the ids.
+    #[cfg(feature = "storage")]
+    pub(crate) fn resolve_stored_network_ids(&mut self) {
+        if !self.fields.iter().any(ContactField::lacks_network_id) {
+            return;
+        }
+        let registry = crate::social::SocialNetworkRegistry::with_defaults();
+        for field in &mut self.fields {
+            field.resolve_network_id(&registry);
+        }
+    }
+
     /// Adds a field to the card.
     pub fn add_field(&mut self, field: ContactField) -> Result<(), ContactCardError> {
         field.validate()?;

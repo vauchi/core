@@ -169,6 +169,20 @@ impl ContactField {
         self.network_id.as_deref()
     }
 
+    /// A social field stored before network ids existed takes the id of
+    /// the network its label names, if any (#734 D6).
+    #[cfg(feature = "storage")]
+    pub(crate) fn resolve_network_id(&mut self, registry: &SocialNetworkRegistry) {
+        if self.field_type == FieldType::Social && self.network_id.is_none() {
+            self.network_id = registry.resolve(&self.label).map(|n| n.id().to_string());
+        }
+    }
+
+    #[cfg(feature = "storage")]
+    pub(crate) fn lacks_network_id(&self) -> bool {
+        self.field_type == FieldType::Social && self.network_id.is_none()
+    }
+
     /// The label to show: the named network's current name in `registry`,
     /// else the stored label (#734 D5).
     pub fn display_label<'a>(&'a self, registry: &'a SocialNetworkRegistry) -> &'a str {

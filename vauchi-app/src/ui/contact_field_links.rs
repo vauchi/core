@@ -73,7 +73,11 @@ pub fn field_links(field: &ContactField, platform: &Platform, locale: Locale) ->
         Some(FieldType::Social) => "open_profile",
         _ => return Vec::new(),
     };
-    link("open", label_key, field.to_uri())
-        .into_iter()
-        .collect()
+    link(
+        "open",
+        label_key,
+        field.to_uri(&crate::social::active_registry()),
+    )
+    .into_iter()
+    .collect()
 }

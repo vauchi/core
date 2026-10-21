@@ -152,6 +152,60 @@ fn a_shell_without_the_hardware_falls_back_to_setting_an_app_password() {
     assert_eq!(screen_id(&engine), "export_needs_app_password");
 }
 
+const APP_PIN: &str = "app-password-123";
+
+fn with_app_password(engine: &mut AppEngine) {
+    engine.vauchi_mut().setup_app_password(APP_PIN).unwrap();
+    engine.vauchi_mut().authenticate(APP_PIN).unwrap();
+    engine.navigate_to(AppScreen::Privacy);
+}
+
+fn export_with_pin(engine: &mut AppEngine, pin: &str) {
+    let _ = press(engine, "export");
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "pin".into(),
+        value: pin.into(),
+    });
+    let _ = press(engine, "confirm_pin");
+}
+
+// A device whose sealed secret is gone (lock screen removed, app data
+// cleared, restored phone) answers unavailable on every reveal. Once the
+// app password proves the user, the stale enrolment goes, so the OS check
+// works again if the password is later removed (#739, owner decision
+// 2026-10-21).
+// @internal
+#[test]
+fn the_app_password_clears_an_enrolment_whose_secret_was_lost() {
+    let mut engine = privacy_screen(true);
+    enrolled(&mut engine);
+    let _ = press(&mut engine, "export");
+    let _ = presence_request(&mut engine);
+    let _ = engine.handle_hardware_event(Event::HardwareUnavailable {
+        transport: "user_presence".into(),
+    });
+    assert_eq!(screen_id(&engine), "export_needs_app_password");
+    with_app_password(&mut engine);
+
+    export_with_pin(&mut engine, APP_PIN);
+
+    assert_eq!(screen_id(&engine), "export_choose_format");
+    assert!(!engine.vauchi().has_user_presence_secret().unwrap());
+}
+
+// @internal
+#[test]
+fn a_wrong_app_password_keeps_the_enrolment() {
+    let mut engine = privacy_screen(true);
+    enrolled(&mut engine);
+    with_app_password(&mut engine);
+
+    export_with_pin(&mut engine, "not-the-password");
+
+    assert_ne!(screen_id(&engine), "export_choose_format");
+    assert!(engine.vauchi().has_user_presence_secret().unwrap());
+}
+
 // @scenario: privacy_compliance :: Export asks me to set an app password when nothing else can check it is me
 #[test]
 fn without_the_capability_export_still_asks_for_an_app_password() {

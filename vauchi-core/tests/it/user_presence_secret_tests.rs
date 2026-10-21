@@ -25,6 +25,22 @@ fn an_enrolled_secret_confirms_and_no_other_does() {
     assert!(!vauchi.confirm_user_presence_secret(&other).unwrap());
 }
 
+// Forgetting is what the app does once the app password proved the user
+// (#739), so the next export can seal a fresh secret.
+// @internal
+#[test]
+fn a_forgotten_secret_confirms_nothing_and_a_new_one_can_enrol() {
+    let vauchi = Vauchi::in_memory().unwrap();
+    assert!(vauchi.enroll_user_presence_secret(&SECRET).unwrap());
+
+    vauchi.forget_user_presence_secret().unwrap();
+
+    assert!(!vauchi.has_user_presence_secret().unwrap());
+    assert!(!vauchi.confirm_user_presence_secret(&SECRET).unwrap());
+    assert!(vauchi.enroll_user_presence_secret(&[9; 32]).unwrap());
+    assert!(vauchi.confirm_user_presence_secret(&[9; 32]).unwrap());
+}
+
 // A second enrolment would let whoever can send events replace the secret
 // the keystore guards; only the first one counts.
 // @internal

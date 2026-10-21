@@ -854,6 +854,63 @@ mod tests {
         );
     }
 
+    // A download that matches its checksum but does not load is not cached:
+    // cached, it would fail again at every start while the manifest says the
+    // content is current, so nothing would ever download it again (#747).
+    // @internal
+    #[test]
+    fn test_manager_does_not_cache_themes_that_do_not_load() {
+        let temp = TempDir::new().unwrap();
+        let keypair = SigningKeyPair::generate();
+        let catalog = b"not a theme catalog".to_vec();
+        let mut remote = ContentManifest {
+            schema_version: 1,
+            generated_at: "2026-10-21T00:00:00Z".to_string(),
+            base_url: "https://cdn.vauchi.app/v1/".to_string(),
+            content: super::super::types::ContentIndex {
+                themes: Some(super::super::types::ContentEntry {
+                    version: "1.0.0".to_string(),
+                    path: "themes.json".to_string(),
+                    checksum: super::super::integrity::compute_checksum(&catalog),
+                    size_bytes: catalog.len() as u64,
+                    min_app_version: "0.1.0".to_string(),
+                    max_app_version: None,
+                }),
+                ..super::super::types::ContentIndex::default()
+            },
+            signature: None,
+        };
+        let canonical = serde_json::to_vec(&serde_json::to_value(&remote).unwrap()).unwrap();
+        remote.signature = Some(hex::encode(keypair.sign(&canonical).as_bytes()));
+        let config = ContentConfig {
+            storage_path: temp.path().to_path_buf(),
+            content_url: serve_http(vec![serde_json::to_vec(&remote).unwrap(), catalog]),
+            publisher_public_key: keypair.public_key(),
+            ..Default::default()
+        };
+        let manager =
+            ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
+
+        let result = block_on(manager.apply_updates()).unwrap();
+
+        assert!(matches!(
+            result,
+            ApplyResult::Applied { ref applied, ref failed }
+                if applied.is_empty() && failed.len() == 1 && failed[0].0 == ContentType::Themes
+        ));
+        assert!(
+            manager
+                .cache()
+                .get_content(ContentType::Themes, "themes.json")
+                .is_none(),
+            "a catalog that does not load is not cached"
+        );
+        assert!(
+            manager.cache().get_manifest().is_none(),
+            "the themes update stays retryable"
+        );
+    }
+
     // @internal
     #[test]
     fn test_content_versions_require_exact_numeric_triplets() {

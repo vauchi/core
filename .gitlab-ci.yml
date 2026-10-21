@@ -131,7 +131,10 @@ variables:
   #   RUSTSEC-2026-0192  ttf-parser unmaintained, reached through
   #                      ab_glyph -> owned_ttf_parser. Clears when
   #                      ab_glyph moves off it or we drop the dep.
-  AUDIT_IGNORES: "--ignore RUSTSEC-2026-0192"
+  #   RUSTSEC-2026-0374  basic-toml unmaintained, build-time only via
+  #                      uniffi -> askama; mirrors deny.toml. Clears
+  #                      with private#718.
+  AUDIT_IGNORES: "--ignore RUSTSEC-2026-0192 --ignore RUSTSEC-2026-0374"
 
 # Ceiling for jobs that compile the full dependency tree. On a fresh or
 # reinstalled shell runner ALL warm state is gone at once — per-slot

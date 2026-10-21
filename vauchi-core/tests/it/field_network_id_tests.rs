@@ -51,7 +51,7 @@ fn a_received_field_with_an_invalid_network_id_is_rejected() {
             "id": "f1",
             "field_type": field_type,
             "label": "L",
-            "value": "v",
+            "value": if field_type == "Phone" { "+41790000000" } else { "v" },
             "network_id": network_id,
         }))
         .unwrap()

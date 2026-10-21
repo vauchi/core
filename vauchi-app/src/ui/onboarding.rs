@@ -62,6 +62,17 @@ fn choices_as_list<'a>(id: &str, choices: impl Iterator<Item = &'a ScreenAction>
     }
 }
 
+/// The name a group is shown and created under. A suggestion's
+/// canonical English name stays its id; the user reads, and keeps, the
+/// translation (vauchi/private#721).
+pub fn group_display_name(locale: Locale, name: &str) -> String {
+    if SUGGESTED_LABELS.contains(&name) {
+        get_string(locale, &format!("labels.{}", name.to_lowercase()))
+    } else {
+        name.to_string()
+    }
+}
+
 // ── Public data types ───────────────────────────────────────────────
 
 /// Data collected during onboarding.
@@ -281,15 +292,15 @@ impl OnboardingEngine {
             .data
             .selected_groups
             .iter()
-            .map(|g| ToggleItem {
+            .map(|g| (g, group_display_name(self.locale, &g.name)))
+            .map(|(g, label)| ToggleItem {
                 id: g.name.clone(),
-                label: g.name.clone(),
                 selected: g.selected,
                 subtitle: g.name_override.clone(),
                 a11y: Some(A11y {
                     label: Some(format!(
                         "{}, {}",
-                        g.name,
+                        label,
                         if g.selected {
                             self.t("onboarding.a11y_selected")
                         } else {
@@ -300,6 +311,7 @@ impl OnboardingEngine {
                     role: Some(AccessibilityRole::Toggle),
                 }),
                 info_key: groups_info_key.clone(),
+                label,
             })
             .collect();
 
@@ -640,11 +652,11 @@ impl OnboardingEngine {
     fn commit_pending_custom_group(&mut self) {
         let name = self.custom_group_input.trim().to_string();
         if !name.is_empty()
-            && !self
-                .data
-                .selected_groups
-                .iter()
-                .any(|g| g.name.eq_ignore_ascii_case(&name))
+            && !self.data.selected_groups.iter().any(|g| {
+                g.name.eq_ignore_ascii_case(&name)
+                    || group_display_name(self.locale, &g.name).to_lowercase()
+                        == name.to_lowercase()
+            })
         {
             self.data.selected_groups.push(GroupSetup {
                 name,

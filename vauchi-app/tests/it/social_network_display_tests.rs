@@ -129,3 +129,24 @@ fn exchange_preview_shows_the_networks_current_name() {
 
     assert_eq!(label_beside_handle(&engine), "X");
 }
+
+/// Networks loaded after the engine started reach Add Field once the
+/// engine reloads them (vauchi/private#734 T3.1).
+// @scenario: contact_card_management :: Update social network config on app launch
+#[test]
+fn add_field_offers_networks_loaded_after_the_engine_started() {
+    let mut engine = engine_with_own_field(twitter_field("twitter"));
+    rename_twitter_to_x();
+    engine.reload_social_networks();
+
+    let _ = engine.navigate_to(AppScreen::MyInfo);
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "add_field".into(),
+    });
+    let screen = serde_json::to_value(engine.current_screen()).unwrap();
+    let text = screen.to_string();
+    assert!(
+        text.contains(r#""id":"social:twitter""#) && text.contains(r#""label":"X""#),
+        "Add Field lists twitter as X: {screen}"
+    );
+}

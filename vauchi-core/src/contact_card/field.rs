@@ -83,12 +83,15 @@ impl FieldType {
 
     /// Resolves a human-friendly alias to a `FieldType` and optional label.
     ///
-    /// Social network aliases (e.g. "twitter", "instagram") return the label
-    /// to use for the field. Generic aliases (e.g. "phone", "email") return
-    /// `None` for the label.
+    /// A network's id, alias or name in `registry` (e.g. "twitter", "ig")
+    /// returns the network's name as the field label. Generic aliases
+    /// (e.g. "phone", "email") return `None` for the label.
     ///
     /// Returns `None` if the alias is not recognized.
-    pub fn from_alias(s: &str) -> Option<(FieldType, Option<String>)> {
+    pub fn from_alias(
+        s: &str,
+        registry: &SocialNetworkRegistry,
+    ) -> Option<(FieldType, Option<String>)> {
         match s.to_lowercase().as_str() {
             "phone" | "tel" | "telephone" => Some((FieldType::Phone, None)),
             "email" | "mail" => Some((FieldType::Email, None)),
@@ -96,12 +99,10 @@ impl FieldType {
             "website" | "web" | "url" => Some((FieldType::Website, None)),
             "birthday" | "bday" | "dob" => Some((FieldType::Birthday, None)),
             "social" => Some((FieldType::Social, None)),
-            "twitter" | "x" => Some((FieldType::Social, Some("Twitter".to_string()))),
-            "instagram" | "ig" => Some((FieldType::Social, Some("Instagram".to_string()))),
-            "linkedin" => Some((FieldType::Social, Some("LinkedIn".to_string()))),
-            "github" | "gh" => Some((FieldType::Social, Some("GitHub".to_string()))),
             "custom" | "other" | "note" => Some((FieldType::Custom, None)),
-            _ => None,
+            _ => registry
+                .resolve(s)
+                .map(|n| (FieldType::Social, Some(n.display_name().to_string()))),
         }
     }
 }

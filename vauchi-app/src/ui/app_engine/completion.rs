@@ -98,8 +98,9 @@ impl AppEngine {
                 let now = self.vauchi.clock().unix_seconds();
                 let mut unsaved_fields = 0_usize;
                 for setup in &onboarding_fields {
-                    let (field_type, alias_label) = FieldType::from_alias(&setup.field_type)
-                        .unwrap_or((FieldType::Custom, None));
+                    let (field_type, alias_label) =
+                        FieldType::from_alias(&setup.field_type, &crate::social::active_registry())
+                            .unwrap_or((FieldType::Custom, None));
                     let label = alias_label.unwrap_or_else(|| setup.label.clone());
                     let field = vauchi_core::contact_card::ContactField::new(
                         field_type,

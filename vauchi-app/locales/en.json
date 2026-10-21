@@ -1411,6 +1411,8 @@
   "info.visibility_meaning.body": "Visibility controls which contacts can see each of your fields. By default, a new field is hidden until you choose who sees it. Use groups to show it to some contacts and not to others.",
   "info.visibility_meaning.title": "Visibility",
   "labels.acquaintances": "Acquaintances",
+  "labels.business": "Business",
+  "labels.coworkers": "Coworkers",
   "labels.create": "Create Label",
   "labels.custom": "Custom Labels",
   "labels.delete": "Delete Label",

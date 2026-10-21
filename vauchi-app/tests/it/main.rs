@@ -218,6 +218,7 @@ mod stale_binding_event_tests;
 mod status_indicator_label_tests;
 mod storage_lock_presentation_tests;
 mod sync_chrome_overlay_tests;
+mod system_locale_tests;
 mod update_overlay_tests;
 mod wakeup_sync_tests;
 mod wire_humble_keys_tests;

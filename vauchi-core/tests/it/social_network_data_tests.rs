@@ -260,3 +260,23 @@ proptest! {
         }
     }
 }
+
+// @internal
+#[test]
+fn a_network_resolves_from_its_id_alias_or_name_in_any_case() {
+    let mut twitter = entry("twitter");
+    twitter["name"] = "Twitter / X".into();
+    twitter["aliases"] = serde_json::json!(["x"]);
+    let registry = parse(vec![twitter, entry("github")]).expect("valid file");
+
+    for name in ["X", "x", "twitter", "TWITTER", "Twitter / X", " twitter "] {
+        assert_eq!(
+            registry.resolve(name).map(|n| n.id()),
+            Some("twitter"),
+            "{name:?}"
+        );
+    }
+    for name in ["nope", "", "twit", "Twitter /"] {
+        assert_eq!(registry.resolve(name).map(|n| n.id()), None, "{name:?}");
+    }
+}

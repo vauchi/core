@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Self-heal branch coverage for `storage/rekey.rs::rekey_or_heal`.
+//! Self-heal branch coverage for `storage/rekey/mod.rs::rekey_or_heal`.
 //!
 //! V4 / V32 migrations added `_encrypted` columns but a known
 //! pre-encryption gap meant some callers wrote plaintext to those

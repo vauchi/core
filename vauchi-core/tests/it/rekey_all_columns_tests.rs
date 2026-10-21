@@ -6,7 +6,7 @@
 //!
 //! The existing `rekey_coverage_tests.rs` file has one test per
 //! column. Each test populates exactly one column and leaves the rest
-//! empty, so the per-row `if !enc.is_empty()` guards in `rekey.rs` only
+//! empty, so the per-row `if !enc.is_empty()` guards in `storage/rekey/` only
 //! fire for that one branch — leaving most of the file unexercised.
 //!
 //! This test populates **every** column listed in `ENCRYPTED_COLUMNS`,

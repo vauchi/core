@@ -477,6 +477,12 @@ impl ContentManager {
                         .await
                         .map_err(|e| ContentError::Fetch(e.to_string()))?;
 
+                    // Loaded before it is cached: a file that does not load
+                    // would fail again at every start, and a cached manifest
+                    // would never download it again (#747).
+                    crate::i18n::load_locale_from_bytes(lang_code, &data)
+                        .map_err(|e| ContentError::Load(format!("locale {lang_code}: {e}")))?;
+
                     let filename = format!("{}.json", lang_code);
                     self.cache.save_content(
                         ContentType::Locales,
@@ -484,12 +490,6 @@ impl ContentManager {
                         &data,
                         &file_entry.checksum,
                     )?;
-
-                    // Hot-reload into the i18n system — best-effort:
-                    // failure here means the cached file is on disk but not
-                    // active until next start; recoverable on relaunch
-                    #[allow(clippy::let_underscore_must_use)]
-                    let _ = crate::i18n::load_locale_from_bytes(lang_code, &data);
                 }
             }
             ContentType::Themes => {
@@ -504,19 +504,18 @@ impl ContentManager {
                     .await
                     .map_err(|e| ContentError::Fetch(e.to_string()))?;
 
+                // Loaded before it is cached, as in the Locales branch.
+                // Tokens are global (tokens.json) and reload via the
+                // explicit reload API, not per-theme.
+                crate::theme::load_themes_from_bytes(&data)
+                    .map_err(|e| ContentError::Load(format!("themes: {e}")))?;
+
                 self.cache.save_content(
                     ContentType::Themes,
                     "themes.json",
                     &data,
                     &entry.checksum,
                 )?;
-
-                // Hot-reload the theme catalog — best-effort (mirrors the
-                // Locales branch). Cached on disk regardless; active on the
-                // next start if this fails. Tokens are global (tokens.json)
-                // and reload via the explicit reload API, not per-theme.
-                #[allow(clippy::let_underscore_must_use)]
-                let _ = crate::theme::load_themes_from_bytes(&data);
             }
             ContentType::Help => {
                 // Download ALL help files (privacy: bundle everything so CDN
@@ -661,6 +660,10 @@ pub enum ContentError {
     /// Fetch error (network/remote)
     #[error("Fetch error: {0}")]
     Fetch(String),
+
+    /// Downloaded content that matches its checksum but does not load
+    #[error("Content does not load: {0}")]
+    Load(String),
 }
 
 // INLINE_TEST_REQUIRED: tests private internals

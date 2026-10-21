@@ -244,6 +244,17 @@ impl SocialNetworkRegistry {
             .map(|n| n.profile_url(username))
     }
 
+    /// Finds the network a user-facing name refers to: its id, an alias or
+    /// its display name, ignoring case and surrounding spaces.
+    pub fn resolve(&self, name: &str) -> Option<&SocialNetwork> {
+        let name = name.trim().to_lowercase();
+        self.networks.get(&name).or_else(|| {
+            self.networks
+                .values()
+                .find(|n| n.aliases.contains(&name) || n.display_name.to_lowercase() == name)
+        })
+    }
+
     /// Finds a network by its display name (case-insensitive exact match).
     pub fn find_by_display_name(&self, name: &str) -> Option<&SocialNetwork> {
         let name_lower = name.to_lowercase();

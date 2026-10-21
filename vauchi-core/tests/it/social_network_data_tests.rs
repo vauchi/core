@@ -280,3 +280,63 @@ fn a_network_resolves_from_its_id_alias_or_name_in_any_case() {
         assert_eq!(registry.resolve(name).map(|n| n.id()), None, "{name:?}");
     }
 }
+
+// Profile links come from the data (vauchi/private#734 T1.5, D7).
+
+fn social_field(label: &str, value: &str) -> vauchi_core::contact_card::ContactField {
+    vauchi_core::contact_card::ContactField::new(
+        vauchi_core::contact_card::FieldType::Social,
+        label,
+        value,
+        0,
+    )
+}
+
+// @internal
+#[test]
+fn every_bundled_network_links_a_username_through_its_template() {
+    let registry = SocialNetworkRegistry::with_defaults();
+    for network in registry.all() {
+        let expected = network
+            .profile_url_template()
+            .replace("{username}", "alice");
+        for label in [network.id(), network.display_name()] {
+            assert_eq!(
+                social_field(label, "alice").to_uri(&registry).as_deref(),
+                Some(expected.as_str()),
+                "{label}"
+            );
+        }
+    }
+}
+
+// @internal
+#[test]
+fn a_field_labelled_with_any_alias_opens_the_registry_url() {
+    let mut twitter = entry("twitter");
+    twitter["url"] = "https://x.com/{username}".into();
+    twitter["aliases"] = serde_json::json!(["x", "tw"]);
+    let registry = parse(vec![twitter]).expect("valid file");
+
+    for label in ["X", "Tw", "twitter"] {
+        assert_eq!(
+            social_field(label, "@alice").to_uri(&registry).as_deref(),
+            Some("https://x.com/alice"),
+            "{label}"
+        );
+    }
+}
+
+// @internal
+#[test]
+fn a_leading_at_is_dropped_for_every_network() {
+    let registry = SocialNetworkRegistry::with_defaults();
+    assert_eq!(
+        registry.profile_url("github", "@octocat").as_deref(),
+        Some("https://github.com/octocat")
+    );
+    assert_eq!(
+        registry.profile_url("x", "@alice").as_deref(),
+        Some("https://twitter.com/alice")
+    );
+}

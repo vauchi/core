@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 use vauchi_core::clock::Clock;
+use vauchi_core::social::SocialNetworkRegistry;
 
 use super::cache::{CacheError, ContentCache};
 use super::config::ContentConfig;
@@ -22,17 +23,6 @@ use super::fetcher::ContentFetcher;
 #[cfg(feature = "content-updates")]
 use super::types::ContentManifest;
 use super::types::{ContentType, UpdateStatus};
-
-/// Network entry for content system (matches networks.json format)
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct NetworkEntry {
-    /// Unique identifier
-    pub id: String,
-    /// Display name
-    pub name: String,
-    /// URL template with {username} placeholder
-    pub url: String,
-}
 
 /// Simplified locale strings
 pub type LocaleStrings = HashMap<String, String>;
@@ -72,19 +62,13 @@ impl ContentManager {
         })
     }
 
-    /// Get social networks (cached → bundled)
-    pub fn networks(&self) -> Vec<NetworkEntry> {
-        // Try cached first
-        if let Some(data) = self
-            .cache
+    /// Social networks: the cached file when it passes validation,
+    /// else the bundled `networks.json` (vauchi/private#734 D3).
+    pub fn networks(&self) -> SocialNetworkRegistry {
+        self.cache
             .get_content(ContentType::Networks, "networks.json")
-            && let Ok(networks) = serde_json::from_slice(&data)
-        {
-            return networks;
-        }
-
-        // Fall back to bundled
-        bundled_networks()
+            .and_then(|data| SocialNetworkRegistry::from_data_bytes(&data).ok())
+            .unwrap_or_else(SocialNetworkRegistry::with_defaults)
     }
 
     /// Get themes (cached → single bundled default).
@@ -619,47 +603,6 @@ fn version_compare(a: &str, b: &str) -> Option<std::cmp::Ordering> {
     Some(parse_exact_version(a)?.cmp(&parse_exact_version(b)?))
 }
 
-/// Bundled networks - compiled into the binary (matches networks.json format)
-fn bundled_networks() -> Vec<NetworkEntry> {
-    vec![
-        NetworkEntry {
-            id: "twitter".to_string(),
-            name: "Twitter / X".to_string(),
-            url: "https://twitter.com/{username}".to_string(),
-        },
-        NetworkEntry {
-            id: "instagram".to_string(),
-            name: "Instagram".to_string(),
-            url: "https://instagram.com/{username}".to_string(),
-        },
-        NetworkEntry {
-            id: "github".to_string(),
-            name: "GitHub".to_string(),
-            url: "https://github.com/{username}".to_string(),
-        },
-        NetworkEntry {
-            id: "linkedin".to_string(),
-            name: "LinkedIn".to_string(),
-            url: "https://linkedin.com/in/{username}".to_string(),
-        },
-        NetworkEntry {
-            id: "mastodon".to_string(),
-            name: "Mastodon".to_string(),
-            url: "https://mastodon.social/@{username}".to_string(),
-        },
-        NetworkEntry {
-            id: "bluesky".to_string(),
-            name: "Bluesky".to_string(),
-            url: "https://bsky.app/profile/{username}".to_string(),
-        },
-        NetworkEntry {
-            id: "threads".to_string(),
-            name: "Threads".to_string(),
-            url: "https://threads.net/@{username}".to_string(),
-        },
-    ]
-}
-
 /// Bundled locale - currently only English
 fn bundled_locale(lang: &str) -> Option<LocaleStrings> {
     match lang {
@@ -768,13 +711,6 @@ mod tests {
             .build()
             .unwrap()
             .block_on(future)
-    }
-
-    #[test]
-    fn test_bundled_networks_not_empty() {
-        let networks = bundled_networks();
-        assert!(!networks.is_empty());
-        assert!(networks.iter().any(|n| n.id == "twitter"));
     }
 
     #[test]

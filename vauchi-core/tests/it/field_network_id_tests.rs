@@ -69,3 +69,22 @@ fn a_received_field_with_an_invalid_network_id_is_rejected() {
     }
     assert_eq!(received("Social", &"a".repeat(32)).validate(), Ok(()));
 }
+
+// @internal
+#[test]
+fn the_display_label_is_the_named_networks_current_name() {
+    let registry = vauchi_core::social::SocialNetworkRegistry::from_data_bytes(
+        br#"[{"id": "twitter", "name": "X", "url": "https://x.com/{username}"}]"#,
+    )
+    .unwrap();
+    let field = |network_id: Option<&str>| {
+        let f = ContactField::new(FieldType::Social, "Twitter", "alice", 0);
+        match network_id {
+            Some(id) => f.with_network_id(id),
+            None => f,
+        }
+    };
+    assert_eq!(field(Some("twitter")).display_label(&registry), "X");
+    assert_eq!(field(Some("nope")).display_label(&registry), "Twitter");
+    assert_eq!(field(None).display_label(&registry), "Twitter");
+}

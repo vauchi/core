@@ -489,8 +489,8 @@ impl AppEngine {
             &[],
             None,
         );
-        let registry = vauchi_core::social::SocialNetworkRegistry::with_defaults();
-        let field_catalog = vauchi_core::contact_card::FieldTypeCatalog::new(&registry);
+        let field_catalog =
+            vauchi_core::contact_card::FieldTypeCatalog::new(&crate::social::active_registry());
 
         let now = vauchi.clock().unix_seconds();
 

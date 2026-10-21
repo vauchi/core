@@ -993,7 +993,9 @@ validate:wasm-compat:
           - "vauchi-core/src/lib.rs"
 
 # Content contract validation — detect drift between core parsers and
-# sibling content repos (themes/, locales/). Runs when parser code changes.
+# sibling content repos (themes/, locales/) and the CDN's networks file
+# (website/app-files-src/networks.json, private#734). Runs when parser
+# code changes.
 validate:content-contracts:
   # .timeout-cold-rebuild: see the template comment.
   extends: [.linux-runner, .timeout-cold-rebuild]
@@ -1005,6 +1007,11 @@ validate:content-contracts:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
+    - |
+      mkdir -p ../website/app-files-src
+      NETWORKS_URL=https://gitlab.com/vauchi/website/-/raw/main/app-files-src/networks.json
+      HTTP_STATUS=$(curl -s -o ../website/app-files-src/networks.json -w '%{http_code}' "$NETWORKS_URL") || HTTP_STATUS="000"
+      [ "$HTTP_STATUS" = "200" ] || { echo "ERROR: $NETWORKS_URL → HTTP $HTTP_STATUS"; exit 1; }
   script:
     - bash scripts/validate-content-contracts.sh
   rules:
@@ -1012,10 +1019,10 @@ validate:content-contracts:
       changes:
         compare_to: refs/heads/$CI_DEFAULT_BRANCH
         paths:
-          - "vauchi-core/src/theme.rs"
-          - "vauchi-core/src/i18n.rs"
-          - "vauchi-core/src/social/**/*.rs"
-          - "vauchi-core/src/content/**/*.rs"
+          - "vauchi-app/src/theme.rs"
+          - "vauchi-app/src/i18n.rs"
+          - "vauchi-core/src/social/**"
+          - "vauchi-app/src/content/**/*.rs"
           - "scripts/validate-content-contracts.sh"
     # C4: Run when triggered by content repos (themes/, locales/)
     - if: $CI_PIPELINE_SOURCE == "pipeline" && $CONTENT_TRIGGER_REPO

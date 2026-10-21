@@ -94,29 +94,19 @@ fi
 echo ""
 
 # --- Networks ---
-NETWORKS_JSON="${CORE_DIR}/vauchi-core/src/social/networks.json"
+# The file the CDN publishes, through Core's own validation (#734 D3).
+NETWORKS_JSON="${CORE_DIR}/../website/app-files-src/networks.json"
 if [ -f "$NETWORKS_JSON" ]; then
     echo "Checking networks contract..."
-    if python3 -c "
-import json, sys
-with open('$NETWORKS_JSON') as f:
-    networks = json.load(f)
-errors = 0
-for i, n in enumerate(networks):
-    for field in ['id', 'name', 'url']:
-        if field not in n:
-            print(f'  FAIL: Network at index {i} missing required field: {field}')
-            errors += 1
-sys.exit(1 if errors else 0)
-" 2>/dev/null; then
+    if VAUCHI_NETWORKS_PATH="$NETWORKS_JSON" run_contract_test vauchi-core "--features testing --test it" social_network_data_tests::the_cdn_networks_file_passes_core_validation; then
         NET_COUNT=$(python3 -c "import json; print(len(json.load(open('$NETWORKS_JSON'))))" 2>/dev/null || echo "?")
-        echo "  PASS: All $NET_COUNT networks have required fields"
+        echo "  PASS: Core validated all $NET_COUNT networks from website/app-files-src/networks.json"
     else
-        echo "  FAIL: networks.json has contract violations"
+        echo "  FAIL: networks contract test failed"
         ERRORS=$((ERRORS + 1))
     fi
 else
-    echo "  SKIP: networks.json not found"
+    echo "  SKIP: website/app-files-src/networks.json not found"
 fi
 
 echo ""

@@ -42,8 +42,38 @@ fn test_manager_returns_bundled_networks_when_cache_empty() {
     let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     let networks = manager.networks();
-    // Should return bundled networks (not empty)
-    assert!(!networks.is_empty());
+    // The bundled networks.json, the same 38 the registry ships
+    // (vauchi/private#734 T1.7).
+    let bundled = vauchi_core::social::SocialNetworkRegistry::with_defaults();
+    assert_eq!(networks.len(), bundled.len());
+    assert!(networks.get("tumblr").is_some());
+}
+
+/// A cached file that fails validation is not used (#734 D3).
+// @internal
+#[test]
+fn test_manager_returns_bundled_networks_when_cache_is_invalid() {
+    let temp = TempDir::new().unwrap();
+    let config = test_config(&temp);
+    let cache = ContentCache::new(temp.path()).unwrap();
+    let insecure = br#"[{"id": "evil", "name": "Evil", "url": "http://evil.test/{username}"}]"#;
+    cache
+        .save_content(
+            ContentType::Networks,
+            "networks.json",
+            insecure,
+            &compute_checksum(insecure),
+        )
+        .unwrap();
+
+    let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
+    let networks = manager.networks();
+
+    assert!(networks.get("evil").is_none());
+    assert_eq!(
+        networks.len(),
+        vauchi_core::social::SocialNetworkRegistry::with_defaults().len()
+    );
 }
 
 // @internal
@@ -72,7 +102,10 @@ fn test_manager_returns_cached_networks_over_bundled() {
 
     // Should return cached networks (1 custom network)
     assert_eq!(networks.len(), 1);
-    assert_eq!(networks[0].id, "custom");
+    assert_eq!(
+        networks.get("custom").map(|n| n.display_name()),
+        Some("Custom Network")
+    );
 }
 
 // @internal

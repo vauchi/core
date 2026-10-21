@@ -12,16 +12,10 @@ use tempfile::TempDir;
 use vauchi_app::content::{
     ContentCache, ContentConfig, ContentManager, ContentType, compute_checksum,
 };
-use vauchi_core::social::{SocialNetwork, SocialNetworkRegistry};
+use vauchi_core::social::SocialNetworkRegistry;
 
-/// Build a registry from ContentManager (replaces the method that moved to vauchi-app).
 fn registry_from_content_manager(content: &ContentManager) -> SocialNetworkRegistry {
-    let mut registry = SocialNetworkRegistry::new();
-    let networks = content.networks();
-    for n in networks {
-        registry.add(SocialNetwork::new(&n.id, &n.name, &n.url).with_icon(&n.id));
-    }
-    registry
+    content.networks()
 }
 
 fn test_config(temp: &TempDir) -> ContentConfig {

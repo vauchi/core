@@ -195,11 +195,11 @@ impl ContentManager {
             if path.extension().and_then(|e| e.to_str()) == Some("json")
                 && let Some(code) = path.file_stem().and_then(|s| s.to_str())
                 && let Ok(data) = std::fs::read(&path)
+                && crate::i18n::load_locale_from_bytes(code, &data).is_err()
             {
-                // best-effort: a corrupt locale file should not block the
-                // load of other locales; bundled locales are the fallback
-                #[allow(clippy::let_underscore_must_use)]
-                let _ = crate::i18n::load_locale_from_bytes(code, &data);
+                // The bundled locale stays in effect; the other locales
+                // still load.
+                self.drop_unloadable(ContentType::Locales, &format!("{code}.json"));
             }
         }
     }
@@ -213,10 +213,24 @@ impl ContentManager {
             .cache
             .content_dir(ContentType::Themes)
             .join("themes.json");
-        if let Ok(data) = std::fs::read(&path) {
-            // best-effort: a corrupt cached catalog falls back to bundled.
-            #[allow(clippy::let_underscore_must_use)]
-            let _ = crate::theme::load_themes_from_bytes(&data);
+        if let Ok(data) = std::fs::read(&path)
+            && crate::theme::load_themes_from_bytes(&data).is_err()
+        {
+            // The bundled catalog stays in effect.
+            self.drop_unloadable(ContentType::Themes, "themes.json");
+        }
+    }
+
+    /// A cached file that does not load would fail again at every start
+    /// while the cached manifest calls it current, so it goes with the
+    /// manifest and the next update cycle downloads it again (#747).
+    fn drop_unloadable(&self, content_type: ContentType, filename: &str) {
+        let dropped = self
+            .cache
+            .remove_content(content_type, filename)
+            .and_then(|()| self.cache.clear_manifest());
+        if let Err(e) = dropped {
+            tracing::warn!("[Content] Failed to drop an unloadable cache entry: {e}");
         }
     }
 

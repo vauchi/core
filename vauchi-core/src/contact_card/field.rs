@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::social::SocialNetworkRegistry;
+use crate::social::{SocialNetworkRegistry, is_valid_network_key};
 use crate::text::normalize_text;
 
 /// Validation error types for contact field values.
@@ -28,6 +28,8 @@ pub enum ValidationError {
     EmptyValue,
     #[error("Invalid social network username format")]
     InvalidSocialUsername,
+    #[error("Invalid social network id")]
+    InvalidNetworkId,
 }
 
 /// Maximum length for field values.
@@ -124,6 +126,10 @@ pub struct ContactField {
     /// Private per-field annotation (never sent to other contacts).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     note: Option<String>,
+    /// The registry id of a social field's network, so the network's
+    /// current name is shown however the field was labelled (#734 D4).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    network_id: Option<String>,
 }
 
 impl ContactField {
@@ -146,7 +152,21 @@ impl ContactField {
             value: normalize_text(value),
             updated_at: now,
             note: None,
+            network_id: None,
         }
+    }
+
+    /// Builder: name the network of a social field. Other field types
+    /// have no network, so the id is ignored for them.
+    pub fn with_network_id(mut self, network_id: &str) -> Self {
+        if self.field_type == FieldType::Social {
+            self.network_id = Some(network_id.to_string());
+        }
+        self
+    }
+
+    pub fn network_id(&self) -> Option<&str> {
+        self.network_id.as_deref()
     }
 
     /// Returns the field's unique ID.
@@ -224,7 +244,13 @@ impl ContactField {
 
     /// Validates the field value based on its type.
     pub fn validate(&self) -> Result<(), ValidationError> {
-        validate_parts(&self.field_type, &self.value)
+        validate_parts(&self.field_type, &self.value)?;
+        match &self.network_id {
+            Some(id) if self.field_type != FieldType::Social || !is_valid_network_key(id) => {
+                Err(ValidationError::InvalidNetworkId)
+            }
+            _ => Ok(()),
+        }
     }
 }
 

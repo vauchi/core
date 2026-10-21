@@ -150,10 +150,10 @@ pub(super) fn parse_networks(bytes: &[u8]) -> Result<Vec<SocialNetwork>, Network
 }
 
 fn validate_entry(entry: &NetworkEntry) -> Result<(), NetworkDataError> {
-    if !is_valid_key(&entry.id) {
+    if !is_valid_network_key(&entry.id) {
         return Err(NetworkDataError::InvalidId);
     }
-    if entry.aliases.len() > MAX_ALIASES || !entry.aliases.iter().all(|a| is_valid_key(a)) {
+    if entry.aliases.len() > MAX_ALIASES || !entry.aliases.iter().all(|a| is_valid_network_key(a)) {
         return Err(NetworkDataError::InvalidAlias);
     }
     let name_chars = entry.name.chars().count();
@@ -172,7 +172,7 @@ fn validate_entry(entry: &NetworkEntry) -> Result<(), NetworkDataError> {
     Ok(())
 }
 
-fn is_valid_key(key: &str) -> bool {
+pub(crate) fn is_valid_network_key(key: &str) -> bool {
     (1..=MAX_KEY_CHARS).contains(&key.len())
         && key
             .bytes()

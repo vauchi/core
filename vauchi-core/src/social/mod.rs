@@ -13,5 +13,6 @@ mod registry;
 
 mod network_data;
 
+pub(crate) use network_data::is_valid_network_key;
 pub use network_data::{NetworkDataError, UsernameCharset, UsernameRule};
 pub use registry::{SocialNetwork, SocialNetworkRegistry};

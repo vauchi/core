@@ -288,6 +288,9 @@ impl AppEngine {
         if !note.is_empty() {
             field = field.with_note(note.to_string());
         }
+        if let Some(network_id) = entry_type.strip_prefix("social:") {
+            field = field.with_network_id(network_id);
+        }
         let field_id = field.id().to_string();
         let group_list: Vec<String> = groups
             .into_iter()

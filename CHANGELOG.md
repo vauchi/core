@@ -6,6 +6,49 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.85.0] — 2026-10-21
+
+### Added
+
+- Deleting the identity asks whether recovery stays possible: keep the
+  relay's list of trusted contacts, or erase everything. Someone with no
+  trusted contacts is not asked and erases everything. The choice waits
+  out the seven-day grace period with the schedule, and linked devices
+  keep it (vauchi/private#711).
+- The deletion run purges the relay after the revocations and before the
+  local wipe, with a fresh signed purge that carries the recovery choice
+  in its signed bytes (`Vauchi::purge_relay_data`). A failed purge is
+  logged and the local deletion continues (vauchi/private#711).
+- Protocol: the purge request gains an optional `erase_guardian_set`,
+  and recovery proof uploads carry the uploader's key, a timestamp and
+  a signature (`recovery_store_owned`). Both are omitted when unset, so
+  older relays read them as before (vauchi/private#711).
+- Every data export asks the user to verify first: the session password,
+  or without an app password the phone's own check through a
+  keystore-sealed secret. The user then picks an encrypted file, vCard
+  or JSON. The vCard export names each contact's Vauchi id and kind, and
+  a re-import matches by it (vauchi/private#712).
+- Tapping a contact's phone, email, website, profile or address opens
+  it; Core builds the map link for the chosen provider and dialable
+  phone links (vauchi/private#709).
+- Background sync draws its gaps from an exponential schedule around
+  15 min (1–60 min), and the shell reports the OS's background budget
+  as `Event::BackgroundBudgetObserved { window_secs, runs }`. The
+  scheduler tick names the next background run within that budget
+  (vauchi/private#603).
+
+### Fixed
+
+- A second scanner's offer can no longer replace the first scanner's
+  BLE commitment (vauchi/private#705), and a Glance displayer latches
+  the link whose offer it accepts, not the last one to connect
+  (vauchi/private#706).
+- Delayed mailbox fetches keep their request's routing context: response
+  tokens are accepted only from that request, and the context is bounded
+  to the requested chunk and released afterwards.
+- `bump:consumer-pins` retries a consumer push that was declined once
+  (vauchi/private#704).
+
 ## [0.84.1] — 2026-10-18
 
 ### Fixed

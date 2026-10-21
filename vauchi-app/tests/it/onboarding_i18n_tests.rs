@@ -10,7 +10,10 @@
 
 use super::i18n_support::{action_label, assert_translated, load_german, row_label};
 use vauchi_app::i18n::Locale;
-use vauchi_app::ui::{ActionResult, Component, OnboardingEngine, UserAction, WorkflowEngine};
+use vauchi_app::ui::{
+    ActionResult, AppEngine, Component, OnboardingEngine, RenderContext, UserAction, WorkflowEngine,
+};
+use vauchi_core::api::Vauchi;
 
 /// Copy a shell would show across welcome, name, and the empty-name error.
 struct OnboardingCopy {
@@ -117,4 +120,102 @@ fn onboarding_english_copy_unchanged() {
         action_id: "create_new".into(),
     });
     assert_eq!(engine.current_screen().title, "What's your name?");
+}
+
+fn suggested_group_labels(locale: Locale) -> Vec<(String, String)> {
+    let mut engine = OnboardingEngine::new().with_locale(locale);
+    for (action_id, name) in [("create_new", None), ("continue", Some("Alice"))] {
+        if let Some(name) = name {
+            let _ = engine.handle_action(UserAction::TextChanged {
+                component_id: "display_name".into(),
+                value: name.into(),
+            });
+        }
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: action_id.into(),
+        });
+    }
+    engine
+        .current_screen()
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::ToggleList { id, items, .. } if id == "groups" => Some(
+                items
+                    .iter()
+                    .map(|i| (i.id.clone(), i.label.clone()))
+                    .collect(),
+            ),
+            _ => None,
+        })
+        .expect("groups step carries the suggested-groups toggle list")
+}
+
+/// Device run on a fr-CH phone showed "Family/Friends/Coworkers" in
+/// English on an otherwise French groups step (vauchi/private#721).
+// @internal
+#[test]
+fn suggested_groups_render_in_the_active_locale_with_stable_ids() {
+    load_german();
+    let de = suggested_group_labels(Locale::German);
+    let en = suggested_group_labels(Locale::English);
+
+    assert_eq!(
+        de.iter().map(|(id, _)| id).collect::<Vec<_>>(),
+        en.iter().map(|(id, _)| id).collect::<Vec<_>>(),
+        "toggle ids are the canonical names, so a toggle reaches the same group in any language"
+    );
+    for ((id, de_label), (_, en_label)) in de.iter().zip(&en) {
+        assert_translated(&format!("suggested group {id}"), de_label, en_label);
+    }
+}
+
+/// A group is the user's own data once created, so the suggestion they
+/// picked is saved under the name they read.
+// @internal
+#[test]
+fn suggested_groups_picked_during_onboarding_are_created_in_the_active_locale() {
+    load_german();
+    let mut engine = AppEngine::new(Vauchi::in_memory().unwrap());
+    engine.set_render_context(RenderContext {
+        locale: Some("de".into()),
+        ..RenderContext::default()
+    });
+    let shown = suggested_group_labels(Locale::German);
+    let mut act = |action| {
+        let _ = engine.handle_action(action);
+    };
+    act(UserAction::ActionPressed {
+        action_id: "create_new".into(),
+    });
+    act(UserAction::TextChanged {
+        component_id: "display_name".into(),
+        value: "Alice".into(),
+    });
+    act(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    act(UserAction::ItemToggled {
+        component_id: "groups".into(),
+        item_id: "Family".into(),
+    });
+    for action_id in ["continue", "continue", "start_app"] {
+        act(UserAction::ActionPressed {
+            action_id: action_id.into(),
+        });
+    }
+
+    let created: Vec<String> = engine
+        .vauchi()
+        .list_groups()
+        .expect("groups readable after onboarding")
+        .iter()
+        .map(|g| g.name().to_string())
+        .collect();
+    let family_label = &shown
+        .iter()
+        .find(|(id, _)| id == "Family")
+        .expect("Family is suggested")
+        .1;
+    assert_eq!(created, vec![family_label.clone()]);
 }

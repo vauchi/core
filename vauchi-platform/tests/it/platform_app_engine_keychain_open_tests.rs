@@ -11,6 +11,7 @@
 use std::sync::Arc;
 
 use vauchi_core::crypto::SymmetricKey;
+use vauchi_platform::PlatformAppEngineTestHelpers;
 use vauchi_platform::{
     DomainCommand, DomainCommandResult, HandedOverSecret, KeychainError, MobilePlatformKeychain,
     PlatformAppEngine,
@@ -55,7 +56,7 @@ fn a_shell_key_is_adopted_and_moved_to_the_smk_for_an_existing_identity() {
     let dir = tempfile::tempdir().unwrap();
     let shell_key = SymmetricKey::generate();
     {
-        let legacy = PlatformAppEngine::new(
+        let legacy = PlatformAppEngine::open_under_shell_key(
             dir.path().to_string_lossy().to_string(),
             RELAY.into(),
             shell_key.as_bytes().to_vec(),
@@ -167,7 +168,7 @@ fn a_handed_over_key_is_released_once_and_only_after_storage_opened() {
     let dir = tempfile::tempdir().unwrap();
     let shell_key = SymmetricKey::generate();
     drop(
-        PlatformAppEngine::new(
+        PlatformAppEngine::open_under_shell_key(
             dir.path().to_string_lossy().to_string(),
             RELAY.into(),
             shell_key.as_bytes().to_vec(),

@@ -12,6 +12,7 @@
 
 use std::sync::Arc;
 
+use vauchi_platform::PlatformAppEngineTestHelpers;
 use vauchi_platform::{DomainCommand, DomainCommandResult, MobileRecoveryClaim, PlatformAppEngine};
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -21,7 +22,7 @@ use vauchi_platform::{DomainCommand, DomainCommandResult, MobileRecoveryClaim, P
 fn create_engine_with_identity() -> (Arc<PlatformAppEngine>, tempfile::TempDir) {
     let dir = tempfile::tempdir().expect("temp dir");
     let key = vauchi_core::crypto::SymmetricKey::generate();
-    let engine = PlatformAppEngine::new(
+    let engine = PlatformAppEngine::open_under_shell_key(
         dir.path().to_string_lossy().to_string(),
         "https://relay.test".into(),
         key.as_bytes().to_vec(),

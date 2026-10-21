@@ -25,7 +25,7 @@ use vauchi_platform::{
 fn setup() -> (Arc<PlatformAppEngine>, TempDir) {
     let dir = tempfile::tempdir().expect("temp dir");
     let key = SymmetricKey::generate();
-    let engine = PlatformAppEngine::new(
+    let engine = PlatformAppEngine::open_under_shell_key(
         dir.path().to_string_lossy().to_string(),
         "https://relay.test".into(),
         key.as_bytes().to_vec(),

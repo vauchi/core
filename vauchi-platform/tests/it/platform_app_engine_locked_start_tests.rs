@@ -14,6 +14,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde_json::Value;
+use vauchi_platform::PlatformAppEngineTestHelpers;
 use vauchi_platform::{KeychainError, MobilePlatformKeychain, PlatformAppEngine};
 
 use crate::support::{SharedKeychain, drive_onboarding};
@@ -455,7 +456,7 @@ fn a_handed_over_key_is_not_released_while_storage_is_locked() {
     let dir = tempfile::tempdir().unwrap();
     let shell_key = vauchi_core::crypto::SymmetricKey::generate();
     drive_onboarding(
-        &PlatformAppEngine::new(
+        &PlatformAppEngine::open_under_shell_key(
             dir.path().to_string_lossy().to_string(),
             RELAY.into(),
             shell_key.as_bytes().to_vec(),
@@ -666,7 +667,7 @@ fn contact_count(engine: &PlatformAppEngine) -> u32 {
 /// it.
 fn installed_before_with_its_key_as_bootstrap(dir: &tempfile::TempDir) -> ControlledKeychain {
     let old_key = vauchi_core::crypto::SymmetricKey::generate();
-    let before = PlatformAppEngine::new(
+    let before = PlatformAppEngine::open_under_shell_key(
         dir.path().to_string_lossy().to_string(),
         RELAY.into(),
         old_key.as_bytes().to_vec(),

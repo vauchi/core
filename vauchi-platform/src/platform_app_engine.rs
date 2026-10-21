@@ -126,9 +126,9 @@ pub struct PlatformAppEngine {
     /// `VauchiPlatform::storage_path` so content-update internals can
     /// resolve the data directory without a sibling `VauchiPlatform`.
     pub(crate) storage_path: PathBuf,
-    /// Platform keychain for crypto-shred `DomainCommand`s (B7). Set
-    /// post-construction via `set_platform_keychain`, mirroring
-    /// `VauchiPlatform`'s slot. `None` until the frontend wires it.
+    /// Platform keychain for crypto-shred `DomainCommand`s (B7), the one
+    /// `open_with_keychain` was given. `None` only for an install opened
+    /// under a shell-held key (vauchi/private#580).
     pub(crate) platform_keychain: Mutex<Option<Arc<dyn crate::MobilePlatformKeychain>>>,
     /// Relay URL retained for building shred purge/revocation senders
     /// (B7 Phase 1b) — PAE can't reopen a fresh relay `Vauchi` (no stored
@@ -225,38 +225,6 @@ mod poll_invalidation_tests {
 
 #[uniffi::export]
 impl PlatformAppEngine {
-    /// Create a new PlatformAppEngine with platform-provided secure key.
-    ///
-    /// This creates its own `Vauchi` instance backed by the same database
-    /// as `VauchiPlatform`. After external mutations, dispatch
-    /// [`vauchi_core::Event::PresentationInvalidated`] through
-    /// [`Self::dispatch_json`] and apply the returned replacement batch.
-    #[uniffi::constructor]
-    pub fn new(
-        data_dir: String,
-        relay_url: String,
-        storage_key_bytes: Vec<u8>,
-    ) -> Result<Arc<Self>, MobileError> {
-        let data_path = PathBuf::from(&data_dir);
-
-        std::fs::create_dir_all(&data_path).map_err(|e| MobileError::StorageError {
-            detail: e.to_string(),
-        })?;
-
-        let storage_path = data_path.join("vauchi.db");
-        let storage_key = parse_storage_key(storage_key_bytes)?;
-
-        let config = VauchiConfig::with_storage_path(&storage_path)
-            .with_relay_url(&relay_url)
-            .with_storage_key(storage_key);
-
-        let vauchi = Vauchi::new(config).map_err(|e| MobileError::Other {
-            detail: e.to_string(),
-        })?;
-
-        Ok(Self::from_vauchi(vauchi, storage_path, relay_url, None))
-    }
-
     /// Opens the engine with the platform keychain from the first call, so
     /// every key that opens the database lives in the keychain and a shred
     /// deletes them all (ADR-033, vauchi/private#580).
@@ -334,6 +302,35 @@ fn parse_storage_key(bytes: Vec<u8>) -> Result<SymmetricKey, MobileError> {
 }
 
 impl PlatformAppEngine {
+    /// An engine over a database under a storage key the shell kept, with
+    /// no platform keychain: how the shells opened Core before
+    /// vauchi/private#580. Off the binding since T4.3; Core's tests reach
+    /// it through `PlatformAppEngineTestHelpers::open_under_shell_key`.
+    pub(crate) fn open_under_shell_key(
+        data_dir: String,
+        relay_url: String,
+        storage_key_bytes: Vec<u8>,
+    ) -> Result<Arc<Self>, MobileError> {
+        let data_path = PathBuf::from(&data_dir);
+
+        std::fs::create_dir_all(&data_path).map_err(|e| MobileError::StorageError {
+            detail: e.to_string(),
+        })?;
+
+        let storage_path = data_path.join("vauchi.db");
+        let storage_key = parse_storage_key(storage_key_bytes)?;
+
+        let config = VauchiConfig::with_storage_path(&storage_path)
+            .with_relay_url(&relay_url)
+            .with_storage_key(storage_key);
+
+        let vauchi = Vauchi::new(config).map_err(|e| MobileError::Other {
+            detail: e.to_string(),
+        })?;
+
+        Ok(Self::from_vauchi(vauchi, storage_path, relay_url, None))
+    }
+
     fn from_vauchi(
         vauchi: Vauchi,
         storage_path: PathBuf,
@@ -552,16 +549,6 @@ impl PlatformAppEngine {
         let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
         engine.set_network_online(online);
         Ok(())
-    }
-
-    /// Set the platform keychain for crypto-shred `DomainCommand`s (B7).
-    /// Mirrors `VauchiPlatform::set_platform_keychain`; frontends call it
-    /// post-construction like the other PAE setters. Used only by the
-    /// shred dispatch arms.
-    pub fn set_platform_keychain(&self, keychain: Box<dyn crate::MobilePlatformKeychain>) {
-        if let Ok(mut lock) = self.platform_keychain.lock() {
-            *lock = Some(Arc::from(keychain));
-        }
     }
 
     /// Poll core for pending OS notifications to render.

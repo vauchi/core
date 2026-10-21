@@ -53,7 +53,7 @@ const STORAGE_KEY_BYTE_LENGTH: u32 = 32;
 ///
 /// Used by frontends that cache the key in their platform keychain (iOS
 /// Keychain, Android Keystore) so they can validate length before handing
-/// the bytes to `PlatformAppEngine::new`. Replaces the
+/// the bytes to `PlatformAppEngine::open_with_keychain`. Replaces the
 /// `private static let storageKeyLength = 32` literal in
 /// `ios/Vauchi/Services/VauchiRepository.swift:456` (ADR-033 constant
 /// that was being duplicated on every frontend).

@@ -246,9 +246,9 @@ Mixed: high-level entry points migrate, session types stay.
 consumers; `MobileShredVerification` record + `From` impl retired
 alongside).
 
-`set_platform_keychain` is a constructor parameter on
-`PlatformAppEngine::new` (the secure-key seam) — not a runtime
-method on the engine.
+`set_platform_keychain` is retired (vauchi/private#580 T4.3): the
+keychain is a parameter of `PlatformAppEngine::open_with_keychain`,
+the only constructor — not a runtime method on the engine.
 
 ### Content Updates (`mobile_content.rs`)
 
@@ -276,7 +276,7 @@ become `PlatformAppEngine` methods. They become top-level
 | `get_available_themes`, `get_default_theme_id`, `get_theme` | *(free function)* | NOT MIGRATED — STAYS |
 | `get_faqs`, `get_faqs_localized`, `get_faqs_by_category`, `get_faqs_by_category_localized`, `get_faq_by_id`, `get_faq_by_id_localized`, `get_help_categories`, `search_faqs`, `search_faqs_localized` | *(retired)* | **RETIRED 2026-05-23 (Track A)** — zero hand-written consumers in any frontend; 9 `#[uniffi::export]` free fns + `MobileFaqItem` / `MobileHelpCategory` / `MobileHelpCategoryInfo` deleted, core's `vauchi_app::help::*` survives for future `HelpWorkflowEngine` use. |
 | `save_test_contact`, `save_test_delivery_record` | `PlatformAppEngineTestHelpers` trait | **MIGRATED** to `#[doc(hidden)] pub trait PlatformAppEngineTestHelpers` (slice 32g 2026-05-17 + slice 32h.Ph2 2026-05-18); trait impls don't count toward audit |
-| `new`, `new_with_secure_key` | `PlatformAppEngine::new` | **MIGRATED** (covered by engine constructor) |
+| `new`, `new_with_secure_key` | `PlatformAppEngine::open_with_keychain` | **MIGRATED** (covered by engine constructor); `PlatformAppEngine::new` itself retired from the binding in vauchi/private#580 T4.3, Core's tests open a pre-#580 engine through `PlatformAppEngineTestHelpers::open_under_shell_key` |
 
 ## Summary
 

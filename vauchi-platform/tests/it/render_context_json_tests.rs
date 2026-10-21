@@ -16,11 +16,12 @@
 use std::sync::Arc;
 
 use vauchi_platform::PlatformAppEngine;
+use vauchi_platform::PlatformAppEngineTestHelpers;
 
 fn create_engine() -> (Arc<PlatformAppEngine>, tempfile::TempDir) {
     let dir = tempfile::tempdir().expect("temp dir");
     let key = vauchi_core::crypto::SymmetricKey::generate();
-    let engine = PlatformAppEngine::new(
+    let engine = PlatformAppEngine::open_under_shell_key(
         dir.path().to_string_lossy().to_string(),
         "https://relay.test".into(),
         key.as_bytes().to_vec(),

@@ -12,13 +12,14 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use std::sync::Arc;
 use tempfile::TempDir;
+use vauchi_platform::PlatformAppEngineTestHelpers;
 use vauchi_platform::{DomainCommand, PlatformAppEngine};
 
 /// Setup helper to create a fresh engine instance (no identity).
 fn create_test_instance() -> (Arc<PlatformAppEngine>, TempDir) {
     let dir = TempDir::new().unwrap();
     let key = vauchi_core::crypto::SymmetricKey::generate();
-    let instance = PlatformAppEngine::new(
+    let instance = PlatformAppEngine::open_under_shell_key(
         dir.path().to_string_lossy().to_string(),
         "http://localhost:8080".to_string(),
         key.as_bytes().to_vec(),

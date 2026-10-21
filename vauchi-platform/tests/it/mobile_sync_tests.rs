@@ -25,6 +25,7 @@ use vauchi_app::i18n::Locale;
 use vauchi_core::AhaMoment;
 use vauchi_core::AhaMomentType;
 use vauchi_core::api::VauchiSyncOutcome;
+use vauchi_platform::PlatformAppEngineTestHelpers;
 use vauchi_platform::{
     DomainCommand, MobileAnimationToken, MobileHapticPattern, MobileSoundToken, MobileSyncResult,
     PlatformAppEngine,
@@ -33,7 +34,7 @@ use vauchi_platform::{
 fn fresh_engine() -> (Arc<PlatformAppEngine>, TempDir) {
     let dir = TempDir::new().unwrap();
     let key = vauchi_core::crypto::SymmetricKey::generate();
-    let engine = PlatformAppEngine::new(
+    let engine = PlatformAppEngine::open_under_shell_key(
         dir.path().to_string_lossy().to_string(),
         "http://localhost:8080".to_string(),
         key.as_bytes().to_vec(),

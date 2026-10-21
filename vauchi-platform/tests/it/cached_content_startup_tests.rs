@@ -9,6 +9,7 @@
 //! runs each test in its own process.
 
 use vauchi_app::i18n::{Locale, try_get_string};
+use vauchi_platform::PlatformAppEngineTestHelpers;
 
 const CACHED_THEMES: &str = r##"[{
     "id": "cdn-only","name": "From the CDN","version": "1.0.0","mode": "dark",
@@ -28,7 +29,7 @@ fn start_engine_over(cached: &[(&str, &str)]) -> tempfile::TempDir {
         std::fs::write(file, body).unwrap();
     }
     let key = vauchi_core::crypto::SymmetricKey::generate();
-    vauchi_platform::PlatformAppEngine::new(
+    vauchi_platform::PlatformAppEngine::open_under_shell_key(
         dir.path().to_string_lossy().to_string(),
         "https://relay.test".into(),
         key.as_bytes().to_vec(),

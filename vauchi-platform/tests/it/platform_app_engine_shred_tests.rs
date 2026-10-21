@@ -8,8 +8,8 @@
 //! The shred crypto runs through the real `vauchi_core::api::ShredManager`
 //! (ADR-002, no mocking). The keychain is *platform secure storage*
 //! (iOS Keychain / Android KeyStore), so an in-memory fake is the correct
-//! test double — `soft_shred` / `cancel_shred` only touch the deletion
-//! schedule in storage, not the SMK, so the store can be empty.
+//! test double. The engine opens through `open_with_keychain`, as the
+//! shells do, so the keys Core stores there are the ones a shred deletes.
 
 use std::sync::Arc;
 
@@ -18,6 +18,20 @@ use vauchi_platform::{DomainCommand, DomainCommandResult, MobileShredStatus, Pla
 use crate::support::{FakeKeychain, drive_onboarding};
 
 fn engine_with_identity() -> (Arc<PlatformAppEngine>, tempfile::TempDir) {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let engine = PlatformAppEngine::open_with_keychain(
+        dir.path().to_string_lossy().to_string(),
+        "https://relay.test".into(),
+        None,
+        Box::new(FakeKeychain::new()),
+    )
+    .expect("open engine");
+    drive_onboarding(&engine);
+    (engine, dir)
+}
+
+/// An install from before vauchi/private#580: no platform keychain at all.
+fn engine_without_keychain() -> (Arc<PlatformAppEngine>, tempfile::TempDir) {
     let dir = tempfile::tempdir().expect("temp dir");
     let key = vauchi_core::crypto::SymmetricKey::generate();
     let engine = PlatformAppEngine::new(
@@ -33,7 +47,7 @@ fn engine_with_identity() -> (Arc<PlatformAppEngine>, tempfile::TempDir) {
 // @internal
 #[test]
 fn soft_shred_without_keychain_errors() {
-    let (engine, _dir) = engine_with_identity();
+    let (engine, _dir) = engine_without_keychain();
     // No keychain set → the dispatch arm's bridge build must fail.
     let result = engine.dispatch_domain_command(DomainCommand::SoftShred);
     assert!(
@@ -46,7 +60,6 @@ fn soft_shred_without_keychain_errors() {
 #[test]
 fn soft_shred_schedules_then_cancel_clears() {
     let (engine, _dir) = engine_with_identity();
-    engine.set_platform_keychain(Box::new(FakeKeychain::new()));
 
     // SoftShred → ShredScheduled carrying a token.
     let token = match engine
@@ -93,7 +106,6 @@ fn soft_shred_schedules_then_cancel_clears() {
 #[test]
 fn panic_shred_returns_report_and_destroys_storage() {
     let (engine, _dir) = engine_with_identity();
-    engine.set_platform_keychain(Box::new(FakeKeychain::new()));
 
     // PanicShred is immediate + irreversible. The relay purge/revocation
     // can't reach the non-resolving test relay URL, but local destruction
@@ -115,7 +127,6 @@ fn panic_shred_returns_report_and_destroys_storage() {
 #[test]
 fn hard_shred_before_grace_period_errors() {
     let (engine, _dir) = engine_with_identity();
-    engine.set_platform_keychain(Box::new(FakeKeychain::new()));
 
     let token = match engine
         .dispatch_domain_command(DomainCommand::SoftShred)

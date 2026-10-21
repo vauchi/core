@@ -340,3 +340,23 @@ fn a_leading_at_is_dropped_for_every_network() {
         Some("https://twitter.com/alice")
     );
 }
+
+/// The networks file the CDN publishes passes Core's validation. Used by
+/// CI's validate-content-contracts job: `VAUCHI_NETWORKS_PATH`, else the
+/// sibling website checkout; skipped when neither exists.
+// @internal
+#[test]
+fn the_cdn_networks_file_passes_core_validation() {
+    let path = std::env::var("VAUCHI_NETWORKS_PATH")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../website/app-files-src/networks.json")
+        });
+    let Ok(data) = std::fs::read(&path) else {
+        return;
+    };
+    let registry = SocialNetworkRegistry::from_data_bytes(&data)
+        .unwrap_or_else(|e| panic!("{} fails Core's network validation: {e}", path.display()));
+    assert!(registry.get("twitter").is_some());
+}

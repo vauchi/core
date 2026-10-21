@@ -8,6 +8,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- Bindings: `MobileEvent` gains `UserPresenceSecretCreated`,
+  `UserPresenceSecretRevealed` and `UserPresenceCheckCancelled`, so shells
+  answer the user-presence commands through `hardware_event_json` instead
+  of writing the JSON themselves (vauchi/private#740).
+
 ### Removed
 
 - Bindings: `PlatformAppEngine.new` (the constructor taking a storage key

@@ -17,6 +17,22 @@ CORE_DIR="$(dirname "$SCRIPT_DIR")"
 echo "=== Content Contract Validation ==="
 echo ""
 
+# Runs one named test and passes only if exactly that test ran: a filter
+# that matches nothing exits 0 too, which hid a moved test for months.
+run_contract_test() {
+    package="$1"
+    target="$2"
+    test_name="$3"
+    output=$(cargo test -p "$package" $target -- "$test_name" --exact 2>&1) || {
+        echo "$output" | grep -E "error|FAILED|panicked" | head -5
+        return 1
+    }
+    if ! echo "$output" | grep -q "test result: ok. 1 passed"; then
+        echo "  $test_name did not run in $package (moved or renamed?)"
+        return 1
+    fi
+}
+
 # --- Themes ---
 # Core reads the generated flat format, not the hierarchical source.
 # The .clone-themes CI template runs generate.py to produce it.
@@ -29,14 +45,11 @@ if [ ! -f "$THEMES_JSON" ]; then
 fi
 if [ -f "$THEMES_JSON" ]; then
     echo "Checking themes contract..."
-    THEME_OUTPUT=$(VAUCHI_THEMES_PATH="$THEMES_JSON" cargo test -p vauchi-core --lib -- theme::tests::test_load_real_themes_json --exact 2>&1)
-    THEME_EXIT=$?
-    if [ $THEME_EXIT -eq 0 ]; then
+    if VAUCHI_THEMES_PATH="$THEMES_JSON" run_contract_test vauchi-app --lib theme::tests::test_load_real_themes_json; then
         THEME_COUNT=$(python3 -c "import json; print(len(json.load(open('$THEMES_JSON'))))" 2>/dev/null || echo "?")
         echo "  PASS: Core parsed all $THEME_COUNT themes from generated/themes.json"
     else
-        echo "  FAIL: themes contract test failed (exit $THEME_EXIT)"
-        echo "$THEME_OUTPUT" | grep -E "error|FAILED|panicked" | head -5
+        echo "  FAIL: themes contract test failed"
         ERRORS=$((ERRORS + 1))
     fi
 else
@@ -114,14 +127,10 @@ echo ""
 # Pass VAUCHI_MANIFEST_PATH to test against a real manifest file.
 echo "Checking CDN manifest contract..."
 MANIFEST_TEST="content::integrity::tests::test_deserialize_build_manifest_output"
-MANIFEST_OUTPUT=$(cargo test -p vauchi-core --lib -- "$MANIFEST_TEST" --exact 2>&1)
-MANIFEST_EXIT=$?
-if [ $MANIFEST_EXIT -eq 0 ]; then
+if run_contract_test vauchi-app --lib "$MANIFEST_TEST"; then
     echo "  PASS: Core can deserialize build-manifest.py output format"
 else
-    # Show the actual error (not hidden behind 2>/dev/null)
-    echo "  FAIL: CDN manifest contract test failed (exit $MANIFEST_EXIT)"
-    echo "$MANIFEST_OUTPUT" | grep -E "error|FAILED|panicked" | head -5
+    echo "  FAIL: CDN manifest contract test failed"
     echo "  Fix: check content/types.rs vs website/scripts/build-manifest.py"
     ERRORS=$((ERRORS + 1))
 fi

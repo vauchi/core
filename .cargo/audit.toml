@@ -18,4 +18,9 @@ ignore = [
     "RUSTSEC-2024-0436",
     # instant is unmaintained — transitive via arti-client.
     "RUSTSEC-2024-0384",
+    # basic-toml is unmaintained — transitive via uniffi -> uniffi_bindgen ->
+    # askama -> askama_derive. Build-time proc-macro only, no runtime risk;
+    # askama_derive 0.16.1 (latest) still uses it. Remove once uniffi's
+    # askama moves to `toml` (private#718).
+    "RUSTSEC-2026-0374",
 ]

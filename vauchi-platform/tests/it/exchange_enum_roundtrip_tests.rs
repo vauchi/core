@@ -261,6 +261,13 @@ fn every_mobile_event() -> Vec<MobileEvent> {
         },
         MobileEvent::FilePickCancelledByUser,
         MobileEvent::BiometricUnlockSucceeded,
+        MobileEvent::UserPresenceSecretCreated {
+            secret: vec![7; 32],
+        },
+        MobileEvent::UserPresenceSecretRevealed {
+            secret: vec![9; 32],
+        },
+        MobileEvent::UserPresenceCheckCancelled,
         MobileEvent::HardwareError {
             transport: "ble".into(),
             error: "radio off".into(),
@@ -311,6 +318,9 @@ fn variant_name(event: &MobileEvent) -> &'static str {
         MobileEvent::FilePickedFromUser { .. } => "FilePickedFromUser",
         MobileEvent::FilePickCancelledByUser => "FilePickCancelledByUser",
         MobileEvent::BiometricUnlockSucceeded => "BiometricUnlockSucceeded",
+        MobileEvent::UserPresenceSecretCreated { .. } => "UserPresenceSecretCreated",
+        MobileEvent::UserPresenceSecretRevealed { .. } => "UserPresenceSecretRevealed",
+        MobileEvent::UserPresenceCheckCancelled => "UserPresenceCheckCancelled",
         MobileEvent::HardwareError { .. } => "HardwareError",
         MobileEvent::HardwareUnavailable { .. } => "HardwareUnavailable",
         MobileEvent::PermissionDenied { .. } => "PermissionDenied",
@@ -328,7 +338,7 @@ fn hardware_event_json_carries_every_mobile_event_through_the_canonical_reader()
     let covered: std::collections::BTreeSet<_> = events.iter().map(variant_name).collect();
     assert_eq!(
         covered.len(),
-        29,
+        32,
         "a sample for each MobileEvent variant: {covered:?}"
     );
 
@@ -345,5 +355,33 @@ fn hardware_event_json_carries_every_mobile_event_through_the_canonical_reader()
             serde_json::to_value(&expected).expect("serialize expected"),
             "{name}: codec output differs from the typed conversion",
         );
+    }
+}
+
+// android!735, ios!752 and macos!476 wrote these three by hand before the
+// variants existed (vauchi/private#740); the codec must produce the same
+// bytes so moving them onto it changes nothing Core sees.
+// @internal
+#[test]
+fn hardware_event_json_writes_the_user_presence_events_the_shells_wrote_by_hand() {
+    let cases = [
+        (
+            MobileEvent::UserPresenceSecretCreated {
+                secret: vec![1, 2, 255],
+            },
+            r#"{"UserPresenceSecretCreated":{"secret":[1,2,255]}}"#,
+        ),
+        (
+            MobileEvent::UserPresenceSecretRevealed { secret: vec![0, 9] },
+            r#"{"UserPresenceSecretRevealed":{"secret":[0,9]}}"#,
+        ),
+        (
+            MobileEvent::UserPresenceCheckCancelled,
+            r#""UserPresenceCheckCancelled""#,
+        ),
+    ];
+
+    for (event, expected) in cases {
+        assert_eq!(vauchi_platform::hardware_event_json(event), expected);
     }
 }

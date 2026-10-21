@@ -10,6 +10,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use super::network_data::{NetworkDataError, UsernameRule, parse_networks};
+
 /// A social network definition with profile URL template.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SocialNetwork {
@@ -22,6 +24,11 @@ pub struct SocialNetwork {
     profile_url_template: String,
     /// Optional icon identifier for UI rendering.
     icon: Option<String>,
+    /// Other names the network is known by (`"x"` for Twitter).
+    #[serde(default)]
+    aliases: Vec<String>,
+    #[serde(default)]
+    username_rule: Option<UsernameRule>,
 }
 
 impl SocialNetwork {
@@ -32,6 +39,25 @@ impl SocialNetwork {
             display_name: display_name.to_string(),
             profile_url_template: profile_url_template.to_string(),
             icon: None,
+            aliases: Vec::new(),
+            username_rule: None,
+        }
+    }
+
+    pub(super) fn from_data(
+        id: String,
+        display_name: String,
+        profile_url_template: String,
+        aliases: Vec<String>,
+        username_rule: Option<UsernameRule>,
+    ) -> Self {
+        Self {
+            icon: Some(id.clone()),
+            id,
+            display_name,
+            profile_url_template,
+            aliases,
+            username_rule,
         }
     }
 
@@ -54,6 +80,14 @@ impl SocialNetwork {
     /// Returns the profile URL template.
     pub fn profile_url_template(&self) -> &str {
         &self.profile_url_template
+    }
+
+    pub fn aliases(&self) -> &[String] {
+        &self.aliases
+    }
+
+    pub fn username_rule(&self) -> Option<UsernameRule> {
+        self.username_rule
     }
 
     /// Returns the icon identifier if set.
@@ -149,6 +183,16 @@ impl SocialNetworkRegistry {
             registry.add(SocialNetwork::new(&n.id, &n.name, &n.url).with_icon(&n.id));
         }
         registry
+    }
+
+    /// Builds a registry from network data as cdn.vauchi.app publishes
+    /// it. Any invalid entry rejects the whole file (#734 D3).
+    pub fn from_data_bytes(bytes: &[u8]) -> Result<Self, NetworkDataError> {
+        let mut registry = Self::new();
+        for network in parse_networks(bytes)? {
+            registry.add(network);
+        }
+        Ok(registry)
     }
 
     // from_content_manager() moved to vauchi-app (content module is there now).

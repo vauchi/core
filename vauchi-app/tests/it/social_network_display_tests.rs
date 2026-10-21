@@ -30,10 +30,14 @@ fn label_beside_handle(engine: &AppEngine) -> String {
     fn find(value: &serde_json::Value) -> Option<String> {
         match value {
             serde_json::Value::Object(map) => {
-                if map.get("value").and_then(|v| v.as_str()) == Some(HANDLE)
-                    && let Some(label) = map.get("label").and_then(|l| l.as_str())
-                {
-                    return Some(label.to_string());
+                // Field lists pair value with label; My Card's entry list
+                // shows the value as the row's name and the label beneath.
+                for (value_key, label_key) in [("value", "label"), ("name", "subtitle")] {
+                    if map.get(value_key).and_then(|v| v.as_str()) == Some(HANDLE)
+                        && let Some(label) = map.get(label_key).and_then(|l| l.as_str())
+                    {
+                        return Some(label.to_string());
+                    }
                 }
                 map.values().find_map(find)
             }

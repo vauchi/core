@@ -256,7 +256,7 @@ impl Vauchi {
     /// repropagation (`features.rs`) produced the 2026-07-19
     /// delta-version-floor bug.
     ///
-    /// Always emits CEK format (version 0x02): receivers reject legacy raw
+    /// Always emits CEK format (`PAYLOAD_VERSION_CEK`): receivers reject legacy raw
     /// deltas, and a freshly-exchanged contact has no CEK yet, so one is
     /// generated per delta (2026-06-29-card-update-duplicate-message-paths).
     pub(crate) fn seal_and_persist_card_delta(

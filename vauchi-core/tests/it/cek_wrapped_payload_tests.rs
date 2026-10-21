@@ -175,5 +175,5 @@ fn test_cek_rotation_in_wrapped_payload() {
 // @internal
 #[test]
 fn test_version_constants() {
-    assert_eq!(PAYLOAD_VERSION_CEK, 0x02);
+    assert_eq!(PAYLOAD_VERSION_CEK, 0x08);
 }

@@ -6,6 +6,11 @@
 //! Extracted from field.rs
 
 use vauchi_core::contact_card::*;
+use vauchi_core::social::SocialNetworkRegistry;
+
+fn registry() -> SocialNetworkRegistry {
+    SocialNetworkRegistry::with_defaults()
+}
 
 // @scenario: contact_card_management :: Add field to contact card
 // @internal
@@ -140,7 +145,7 @@ fn test_field_note_truncated_multibyte_utf8() {
 #[test]
 fn test_field_type_from_alias_phone() {
     for alias in &["phone", "Phone", "tel", "TEL", "telephone"] {
-        let (ft, label) = FieldType::from_alias(alias).unwrap();
+        let (ft, label) = FieldType::from_alias(alias, &registry()).unwrap();
         assert_eq!(ft, FieldType::Phone);
         assert!(label.is_none());
     }
@@ -151,7 +156,7 @@ fn test_field_type_from_alias_phone() {
 #[test]
 fn test_field_type_from_alias_email() {
     for alias in &["email", "mail", "EMAIL"] {
-        let (ft, label) = FieldType::from_alias(alias).unwrap();
+        let (ft, label) = FieldType::from_alias(alias, &registry()).unwrap();
         assert_eq!(ft, FieldType::Email);
         assert!(label.is_none());
     }
@@ -161,28 +166,44 @@ fn test_field_type_from_alias_email() {
 // @internal
 #[test]
 fn test_field_type_from_alias_social_with_label() {
-    let (ft, label) = FieldType::from_alias("twitter").unwrap();
-    assert_eq!(ft, FieldType::Social);
-    assert_eq!(label.as_deref(), Some("Twitter"));
+    let registry = registry();
+    for (alias, name) in [
+        ("twitter", "Twitter / X"),
+        ("x", "Twitter / X"),
+        ("Instagram", "Instagram"),
+        ("ig", "Instagram"),
+        ("linkedin", "LinkedIn"),
+        ("github", "GitHub"),
+        ("gh", "GitHub"),
+        ("mastodon", "Mastodon"),
+        ("Bluesky", "Bluesky"),
+    ] {
+        let (ft, label) = FieldType::from_alias(alias, &registry).unwrap();
+        assert_eq!(ft, FieldType::Social, "{alias}");
+        assert_eq!(label.as_deref(), Some(name), "{alias}");
+    }
+}
 
-    let (ft, label) = FieldType::from_alias("Instagram").unwrap();
+/// The networks an alias reaches come from the data (vauchi/private#734).
+// @scenario: contact_card_management :: Field type alias resolution
+// @internal
+#[test]
+fn test_field_type_from_alias_reaches_a_network_from_the_data() {
+    let registry = SocialNetworkRegistry::from_data_bytes(
+        br#"[{"id": "twitter", "name": "X", "url": "https://x.com/{username}", "aliases": ["tw"]}]"#,
+    )
+    .unwrap();
+    let (ft, label) = FieldType::from_alias("tw", &registry).unwrap();
     assert_eq!(ft, FieldType::Social);
-    assert_eq!(label.as_deref(), Some("Instagram"));
-
-    let (ft, label) = FieldType::from_alias("linkedin").unwrap();
-    assert_eq!(ft, FieldType::Social);
-    assert_eq!(label.as_deref(), Some("LinkedIn"));
-
-    let (ft, label) = FieldType::from_alias("github").unwrap();
-    assert_eq!(ft, FieldType::Social);
-    assert_eq!(label.as_deref(), Some("GitHub"));
+    assert_eq!(label.as_deref(), Some("X"));
+    assert!(FieldType::from_alias("github", &registry).is_none());
 }
 
 // @scenario: contact_card_management :: Field type alias resolution
 // @internal
 #[test]
 fn test_field_type_from_alias_generic_social() {
-    let (ft, label) = FieldType::from_alias("social").unwrap();
+    let (ft, label) = FieldType::from_alias("social", &registry()).unwrap();
     assert_eq!(ft, FieldType::Social);
     assert!(label.is_none());
 }
@@ -191,9 +212,9 @@ fn test_field_type_from_alias_generic_social() {
 // @internal
 #[test]
 fn test_field_type_from_alias_unknown_returns_none() {
-    assert!(FieldType::from_alias("fax").is_none());
-    assert!(FieldType::from_alias("").is_none());
-    assert!(FieldType::from_alias("unknown").is_none());
+    assert!(FieldType::from_alias("fax", &registry()).is_none());
+    assert!(FieldType::from_alias("", &registry()).is_none());
+    assert!(FieldType::from_alias("unknown", &registry()).is_none());
 }
 
 // @scenario: contact_card_management :: Field type categorization
@@ -365,7 +386,7 @@ fn test_field_type_from_alias_table(
     #[case] expected_type: FieldType,
     #[case] expected_label: Option<&'static str>,
 ) {
-    let (ft, label) = FieldType::from_alias(alias).expect("alias must resolve");
+    let (ft, label) = FieldType::from_alias(alias, &registry()).expect("alias must resolve");
     assert_eq!(ft, expected_type);
     assert_eq!(label.as_deref(), expected_label);
 }

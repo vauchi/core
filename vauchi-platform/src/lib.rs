@@ -20,6 +20,7 @@ use vauchi_core::SymmetricKey;
 
 // === Modules ===
 
+mod cached_content;
 mod content;
 mod diagnostic;
 mod domain_command;
@@ -306,9 +307,13 @@ pub fn get_default_theme_id(prefer_dark: bool) -> String {
 /// (e.g., en.json, de.json, fr.json, es.json).
 #[uniffi::export]
 pub fn init_locales(resource_dir: String) -> Result<(), MobileError> {
-    vauchi_app::i18n::init(std::path::Path::new(&resource_dir)).map_err(|e| MobileError::Other {
-        detail: e.to_string(),
-    })
+    vauchi_app::i18n::init(std::path::Path::new(&resource_dir)).map_err(|e| {
+        MobileError::Other {
+            detail: e.to_string(),
+        }
+    })?;
+    cached_content::reapply_cached_locales();
+    Ok(())
 }
 
 /// Get all available locales.

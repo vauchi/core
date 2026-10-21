@@ -356,6 +356,7 @@ impl PlatformAppEngine {
         relay_url: String,
         platform_keychain: Option<Arc<dyn crate::MobilePlatformKeychain>>,
     ) -> Arc<Self> {
+        crate::cached_content::load_at_start(storage_path.parent().unwrap_or(&storage_path));
         Arc::new(Self {
             engine: Mutex::new(engine),
             reopening: AtomicBool::new(false),

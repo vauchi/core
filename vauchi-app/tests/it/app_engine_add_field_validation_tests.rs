@@ -160,3 +160,16 @@ fn editing_a_field_to_an_invalid_value_reports_localized_message_inline() {
     let message = inline_validation_error(result, "field_value");
     assert_eq!(message, "Please enter a valid phone number");
 }
+
+/// Username rules come from the active network data (vauchi/private#734).
+// @scenario: field_validation :: Validate a contact's social profile
+#[test]
+fn a_social_username_breaking_the_network_rule_reports_inline() {
+    let mut engine = engine_on_my_info();
+    fill_add_field_form(&mut engine, "social:twitter", &"a".repeat(16));
+
+    let result = submit(&mut engine);
+
+    let message = inline_validation_error(result, "field_value");
+    assert_eq!(message, "Invalid format");
+}

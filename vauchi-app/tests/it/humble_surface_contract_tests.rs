@@ -55,22 +55,16 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
     "dispatch_json",
     "has_identity",
     "initial_commands_json",
-    "new",
     "on_wakeup",
     // Keychain-at-construction (ADR-043 Amendment 7, vauchi/private#580):
     // every key that opens the database lives in the platform keychain
-    // from the first call. Once Android, iOS and macOS construct through
-    // it, `new` and `set_platform_keychain` retire — one method fewer.
+    // from the first call. It is the only constructor.
     "open_with_keychain",
     "periodic_sync_tick",
     "poll_notifications",
     "set_device_capabilities_json",
     "set_event_listener",
     "set_network_online",
-    // Platform-capability injection setter (B7) — same sanctioned class
-    // as the other set_* setters: the frontend injects native keychain
-    // access post-construction for the crypto-shred DomainCommands.
-    "set_platform_keychain",
     "set_render_context_json",
 ];
 
@@ -328,9 +322,14 @@ fn humble_allowlist_size_matches_plan() {
     //
     // `open_with_keychain` addition (ADR-043 Amendment 7, 13 -> 14): the
     // engine opens with the platform keychain so crypto-shredding destroys
-    // every key that opens the database (vauchi/private#580). `new` and
-    // `set_platform_keychain` retire once the shells move (14 -> 12).
-    assert_eq!(HUMBLE_ALLOWLIST.len(), 14);
+    // every key that opens the database (vauchi/private#580).
+    //
+    // `new` and `set_platform_keychain` retirement (#580 T4.3, 14 -> 12):
+    // Android, iOS and macOS construct through `open_with_keychain`, and
+    // their upgrade tests start from a checked-in database instead of
+    // writing one through `new`. Core's tests reach the pre-#580 engine
+    // through `PlatformAppEngineTestHelpers::open_under_shell_key`.
+    assert_eq!(HUMBLE_ALLOWLIST.len(), 12);
 }
 
 // @internal

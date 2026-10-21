@@ -103,7 +103,7 @@ pub enum DomainCommand {
     /// `VauchiPlatform::shred_status` — does NOT require keychain.
     ShredStatus,
     /// Schedule crypto-shredding with a grace period (Soft Shred).
-    /// Requires a platform keychain set via `set_platform_keychain`.
+    /// Requires the platform keychain the engine was opened with.
     /// Returns the `MobileShredToken` authorising a later `HardShred`.
     SoftShred,
     /// Cancel a scheduled soft-shred during the grace period.

@@ -53,6 +53,12 @@ impl AppEngine {
         pin.zeroize();
         if confirmed {
             self.confirm_pin_failures = 0;
+            // The password proved the user, so an enrolment whose sealed
+            // secret may be gone (#739) can go; the OS check, once the
+            // password is removed, seals a fresh one.
+            if self.vauchi.forget_user_presence_secret().is_err() {
+                tracing::warn!("user-presence enrolment not cleared");
+            }
             let _ = self
                 .engine
                 .apply_update(EngineUpdate::GdprExport(GdprExportUpdate::Verified));

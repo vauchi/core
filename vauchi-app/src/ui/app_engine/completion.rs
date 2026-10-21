@@ -47,7 +47,12 @@ impl AppEngine {
                 ob.selected_groups
                     .iter()
                     .filter(|g| g.selected)
-                    .map(|g| g.name.clone())
+                    .map(|g| {
+                        crate::ui::onboarding::group_display_name(
+                            self.render_context.resolved_locale(),
+                            &g.name,
+                        )
+                    })
                     .collect()
             })
             .unwrap_or_default();

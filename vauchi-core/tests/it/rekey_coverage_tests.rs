@@ -22,7 +22,7 @@ fn open_storage() -> (tempfile::TempDir, Storage) {
 // === Self-Healing Exhaustiveness Test ===
 
 /// Discovers all encrypted columns from the live schema via PRAGMA table_info
-/// and asserts they match the ENCRYPTED_COLUMNS registry in rekey.rs.
+/// and asserts they match the ENCRYPTED_COLUMNS registry in storage/rekey/mod.rs.
 ///
 /// If a migration adds a new `_encrypted`/`_hmac`/`encrypted_blob` column
 /// without updating the registry, this test fails with a clear message.
@@ -84,7 +84,7 @@ fn test_rekey_covers_all_encrypted_columns() {
 
     assert!(
         missing.is_empty(),
-        "Encrypted columns not handled by rekey (add to ENCRYPTED_COLUMNS or REKEY_SKIP_COLUMNS in rekey.rs):\n  {}",
+        "Encrypted columns not handled by rekey (add to ENCRYPTED_COLUMNS or REKEY_SKIP_COLUMNS in storage/rekey/mod.rs):\n  {}",
         missing.join("\n  ")
     );
 

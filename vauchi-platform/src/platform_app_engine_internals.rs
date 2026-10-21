@@ -56,8 +56,8 @@ impl PlatformAppEngine {
         crate::json_helpers::wakeup_envelope_to_json(&[], &[next_run])
     }
 
-    /// Build a `SecureStorage` bridge from the keychain set via
-    /// `set_platform_keychain`. Errs if none is set (B7 shred path).
+    /// Build a `SecureStorage` bridge from the keychain the engine was
+    /// opened with. Errs if it has none (B7 shred path).
     pub(crate) fn shred_keychain_bridge(&self) -> Result<crate::KeychainBridge, MobileError> {
         let lock = self
             .platform_keychain
@@ -68,7 +68,8 @@ impl PlatformAppEngine {
         let callback = lock
             .as_ref()
             .ok_or_else(|| MobileError::Other {
-                detail: "Platform keychain not set. Call set_platform_keychain() first.".into(),
+                detail: "Platform keychain not set. Open the engine with open_with_keychain()."
+                    .into(),
             })?
             .clone();
         Ok(crate::KeychainBridge { callback })

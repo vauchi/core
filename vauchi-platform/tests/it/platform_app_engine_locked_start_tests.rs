@@ -14,6 +14,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde_json::Value;
+use vauchi_platform::PlatformAppEngineTestHelpers;
 use vauchi_platform::{KeychainError, MobilePlatformKeychain, PlatformAppEngine};
 
 use crate::support::{SharedKeychain, drive_onboarding};
@@ -418,6 +419,27 @@ fn a_render_context_set_while_locked_reaches_the_opened_engine() {
     assert!(opened.contains(&more), "expected {more:?} in {opened}");
 }
 
+// @internal
+#[test]
+fn the_system_language_set_while_locked_reaches_the_lock_screen_and_the_opened_engine() {
+    let title = german("storage_lock.locked_title");
+    let more = german("nav.more");
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = onboarded(&dir);
+    keychain.locked.store(true, Ordering::SeqCst);
+    let engine = open(&dir, &keychain);
+    engine
+        .set_render_context_json(r#"{"system_locale":"de-LI"}"#.into())
+        .unwrap();
+    let locked = engine.initial_commands_json().unwrap();
+
+    keychain.locked.store(false, Ordering::SeqCst);
+    let opened = prompt_succeeded(&engine).to_string();
+
+    assert!(locked.contains(&title), "expected {title:?} in {locked}");
+    assert!(opened.contains(&more), "expected {more:?} in {opened}");
+}
+
 fn released(batch: &Value) -> Vec<String> {
     batch["commands"]
         .as_array()
@@ -434,7 +456,7 @@ fn a_handed_over_key_is_not_released_while_storage_is_locked() {
     let dir = tempfile::tempdir().unwrap();
     let shell_key = vauchi_core::crypto::SymmetricKey::generate();
     drive_onboarding(
-        &PlatformAppEngine::new(
+        &PlatformAppEngine::open_under_shell_key(
             dir.path().to_string_lossy().to_string(),
             RELAY.into(),
             shell_key.as_bytes().to_vec(),
@@ -645,7 +667,7 @@ fn contact_count(engine: &PlatformAppEngine) -> u32 {
 /// it.
 fn installed_before_with_its_key_as_bootstrap(dir: &tempfile::TempDir) -> ControlledKeychain {
     let old_key = vauchi_core::crypto::SymmetricKey::generate();
-    let before = PlatformAppEngine::new(
+    let before = PlatformAppEngine::open_under_shell_key(
         dir.path().to_string_lossy().to_string(),
         RELAY.into(),
         old_key.as_bytes().to_vec(),

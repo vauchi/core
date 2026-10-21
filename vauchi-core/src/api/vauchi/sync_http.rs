@@ -267,6 +267,18 @@ impl Vauchi {
             .next_background_sync_interval_within(budget, self.rng.as_ref())
     }
 
+    /// Bring the sync deadline forward to a gap drawn within `budget`, when
+    /// that comes sooner: a deadline drawn under a tighter budget would
+    /// otherwise outlast it, up to 24 h (#603 run A3 C2). One already sooner
+    /// stands, so a due sync is never pushed back.
+    pub fn pull_sync_deadline_within(&mut self, budget: Option<crate::api::BackgroundBudget>) {
+        let due_by = self.monotonic.now() + self.draw_background_sync_gap(budget);
+        self.next_sync_allowed = Some(
+            self.next_sync_allowed
+                .map_or(due_by, |deadline| deadline.min(due_by)),
+        );
+    }
+
     /// [`Self::periodic_sync_tick`] for a scheduler running while the app is
     /// in the background: the next deadline is drawn from the background
     /// schedule whatever the sync answered, because the scheduler wakes at

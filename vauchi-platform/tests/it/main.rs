@@ -4,6 +4,7 @@
 
 //! Consolidated integration test binary for vauchi-platform.
 
+mod cached_content_startup_tests;
 mod concurrency_regression_tests;
 mod contact_crud_wrapper_contract_tests;
 mod contact_lifecycle_tests;

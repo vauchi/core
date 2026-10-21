@@ -35,6 +35,7 @@ fn set_render_context_round_trips_both_fields() {
     let mut engine = engine_no_identity();
     engine.set_render_context(RenderContext {
         locale: Some("de".to_string()),
+        system_locale: None,
         theme_id: Some("cyber".to_string()),
     });
     let ctx = engine.render_context();
@@ -48,10 +49,12 @@ fn set_render_context_overwrites_previous() {
     let mut engine = engine_no_identity();
     engine.set_render_context(RenderContext {
         locale: Some("de".to_string()),
+        system_locale: None,
         theme_id: Some("cyber".to_string()),
     });
     engine.set_render_context(RenderContext {
         locale: Some("fr".to_string()),
+        system_locale: None,
         theme_id: Some("classic".to_string()),
     });
     let ctx = engine.render_context();
@@ -66,6 +69,7 @@ fn set_render_context_fields_independent() {
     let mut engine = engine_no_identity();
     engine.set_render_context(RenderContext {
         locale: Some("de".to_string()),
+        system_locale: None,
         theme_id: None,
     });
     let ctx = engine.render_context();
@@ -85,6 +89,7 @@ fn render_context_is_storage_independent() {
     assert!(!engine.vauchi().has_identity());
     engine.set_render_context(RenderContext {
         locale: Some("de".to_string()),
+        system_locale: None,
         theme_id: Some("cyber".to_string()),
     });
     let ctx = engine.render_context();

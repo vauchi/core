@@ -35,6 +35,14 @@ impl Vauchi {
         Ok(true)
     }
 
+    /// Drops this device's enrolment so the next check seals a fresh
+    /// secret. Only for after the app password proved the user (#739): a
+    /// shell must never be able to trigger it.
+    pub fn forget_user_presence_secret(&self) -> VauchiResult<()> {
+        self.storage.ux().clear_user_presence_digest()?;
+        Ok(())
+    }
+
     /// Whether `secret` is the one this device enrolled.
     pub fn confirm_user_presence_secret(&self, secret: &[u8]) -> VauchiResult<bool> {
         if !SECRET_LEN.contains(&secret.len()) {

@@ -36,6 +36,17 @@ use crate::types::{MobileLocale, MobileTabInfo, MobileTabLayout};
 /// surface frontends route through.
 #[doc(hidden)]
 pub trait PlatformAppEngineTestHelpers {
+    /// Test-only: an engine over a database under a storage key the shell
+    /// kept, with no platform keychain — an install from before
+    /// vauchi/private#580, which the binding can no longer open.
+    fn open_under_shell_key(
+        data_dir: String,
+        relay_url: String,
+        storage_key_bytes: Vec<u8>,
+    ) -> Result<std::sync::Arc<PlatformAppEngine>, MobileError>
+    where
+        Self: Sized;
+
     /// Test-only: wait until every pending engine event has reached the
     /// registered listener, which runs on its own thread (#677).
     fn flush_events_for_test(&self);
@@ -151,6 +162,14 @@ pub trait PlatformAppEngineTestHelpers {
 }
 
 impl PlatformAppEngineTestHelpers for PlatformAppEngine {
+    fn open_under_shell_key(
+        data_dir: String,
+        relay_url: String,
+        storage_key_bytes: Vec<u8>,
+    ) -> Result<std::sync::Arc<PlatformAppEngine>, MobileError> {
+        PlatformAppEngine::open_under_shell_key(data_dir, relay_url, storage_key_bytes)
+    }
+
     fn flush_events_for_test(&self) {
         let notifier = self
             .event_notifier

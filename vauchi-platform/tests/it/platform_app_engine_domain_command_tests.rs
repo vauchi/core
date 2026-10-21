@@ -11,6 +11,7 @@
 
 use std::sync::Arc;
 
+use vauchi_platform::PlatformAppEngineTestHelpers;
 use vauchi_platform::{
     DomainCommand, DomainCommandResult, MobileAhaMomentType, MobileConsentType, MobileError,
     PlatformAppEngine,
@@ -19,7 +20,7 @@ use vauchi_platform::{
 fn create_engine_with_identity() -> (Arc<PlatformAppEngine>, tempfile::TempDir) {
     let dir = tempfile::tempdir().expect("temp dir");
     let key = vauchi_core::crypto::SymmetricKey::generate();
-    let engine = PlatformAppEngine::new(
+    let engine = PlatformAppEngine::open_under_shell_key(
         dir.path().to_string_lossy().to_string(),
         "https://relay.test".into(),
         key.as_bytes().to_vec(),
@@ -3106,7 +3107,7 @@ fn certificate_pinning_persists_across_engine_recreation() {
     let dir = tempfile::tempdir().expect("temp dir");
     let key = vauchi_core::crypto::SymmetricKey::generate();
 
-    let engine_a = PlatformAppEngine::new(
+    let engine_a = PlatformAppEngine::open_under_shell_key(
         dir.path().to_string_lossy().to_string(),
         "https://relay.test".into(),
         key.as_bytes().to_vec(),
@@ -3121,7 +3122,7 @@ fn certificate_pinning_persists_across_engine_recreation() {
         .expect("set");
     drop(engine_a);
 
-    let engine_b = PlatformAppEngine::new(
+    let engine_b = PlatformAppEngine::open_under_shell_key(
         dir.path().to_string_lossy().to_string(),
         "https://relay.test".into(),
         key.as_bytes().to_vec(),

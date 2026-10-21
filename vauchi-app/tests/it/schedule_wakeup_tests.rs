@@ -736,6 +736,67 @@ fn reporting_the_budget_names_the_next_background_run_within_it() {
     assert!(delays.iter().any(|ms| *ms > 3_600_000), "{delays:?}");
 }
 
+// The worker woken at that answer found its sync not due: the deadline drawn
+// in the quieter bucket still stood, and it re-armed for it (#603 run A3 C2).
+// @internal
+#[test]
+#[cfg(all(feature = "testing", feature = "network-http"))]
+fn the_sync_falls_due_by_the_run_the_budget_answer_names() {
+    let mut engine = engine_with_a_contact_and_sync_due_in(86_400);
+
+    let commands = engine.dispatch(budget_event(600, 75)).expect("budget");
+
+    let answered = commands
+        .iter()
+        .find_map(delay_millis_on_the_wire)
+        .expect("a ScheduleWakeup");
+    let until = engine.vauchi().time_until_sync_due().expect("identity");
+    assert!(
+        until <= std::time::Duration::from_millis(answered),
+        "due in {until:?}, worker wakes in {answered} ms"
+    );
+}
+
+// The worker reports the budget before every tick, so the report must not
+// push back a sync already due, or the worker would never sync.
+// @internal
+#[test]
+#[cfg(all(feature = "testing", feature = "network-http"))]
+fn reporting_the_budget_keeps_a_due_sync_due() {
+    let mut engine = engine_with_a_contact_and_sync_due_in(0);
+
+    engine.dispatch(budget_event(600, 75)).expect("budget");
+
+    assert_eq!(
+        engine.vauchi().time_until_sync_due(),
+        Some(std::time::Duration::ZERO)
+    );
+}
+
+// The worker reports the budget before every run. Were each report to pull the
+// deadline in with a fresh draw, a run that is not yet due would shorten the
+// gap, and the gaps would come out shorter than drawn (#603 run A3 C3).
+// @internal
+#[test]
+#[cfg(all(feature = "testing", feature = "network-http"))]
+fn reporting_an_unchanged_budget_leaves_the_deadline_where_it_was() {
+    let mut engine = engine_with_a_contact_and_sync_due_in(86_400);
+    engine.dispatch(budget_event(86_400, 1)).expect("budget");
+    let drawn = engine.vauchi().time_until_sync_due().expect("identity");
+
+    // Were each report to draw again, all 200 draws would land after the
+    // first with p = 1/201, about 0.5%.
+    for _ in 0..200 {
+        engine.dispatch(budget_event(86_400, 1)).expect("budget");
+    }
+
+    let until = engine.vauchi().time_until_sync_due().expect("identity");
+    assert!(
+        drawn - until < std::time::Duration::from_secs(1),
+        "drawn {drawn:?}, now due in {until:?}"
+    );
+}
+
 // CC-14: the budget comes from the shell; out-of-range values are refused
 // and leave the schedule as it was.
 // @internal

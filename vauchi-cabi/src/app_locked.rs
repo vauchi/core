@@ -14,7 +14,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use vauchi_app::i18n::Locale;
-use vauchi_app::ui::{AppEngine, StorageLockPresentation, StorageLockReason, StorageLockStep};
+use vauchi_app::ui::{
+    AppEngine, RenderContext, StorageLockPresentation, StorageLockReason, StorageLockStep,
+};
 use vauchi_core::api::storage_reset::delete_unreadable_data;
 use vauchi_core::api::{Vauchi, VauchiConfig};
 use vauchi_core::storage::SecureStorage;
@@ -98,11 +100,18 @@ pub(crate) struct LockedStart {
     params: KeyringOpen,
     /// A `vauchi_app_set_event_callback` made while locked, applied on open.
     pending_callback: Option<Option<EventCallbackHandler>>,
+    /// A render context pushed while locked, applied on open.
+    pending_render_context: Option<RenderContext>,
 }
 
 impl LockedStart {
     pub(crate) fn keep_event_callback(&mut self, handler: Option<EventCallbackHandler>) {
         self.pending_callback = Some(handler);
+    }
+
+    pub(crate) fn keep_render_context(&mut self, context: RenderContext) {
+        self.presentation.set_locale(context.resolved_locale());
+        self.pending_render_context = Some(context);
     }
 }
 
@@ -125,6 +134,7 @@ pub(crate) fn open_app(
             presentation: StorageLockPresentation::new(reason, Locale::English),
             params,
             pending_callback: None,
+            pending_render_context: None,
         }),
     };
     app.reopen = Some(reopen);
@@ -196,6 +206,7 @@ impl VauchiApp {
                     ),
                     params,
                     pending_callback: callback.map(Some),
+                    pending_render_context: Some(render_context),
                 };
                 if let Ok(mut locked) = self.locked.lock() {
                     *locked = Some(start);
@@ -220,6 +231,18 @@ impl VauchiApp {
             }
             None => Some(handler),
         }
+    }
+
+    /// Applies `context` to the open engine, or keeps it for the locked
+    /// start until storage opens.
+    pub(crate) fn set_render_context(&self, context: RenderContext) -> Result<(), ()> {
+        if let Some(start) = self.locked.lock().map_err(|_| ())?.as_mut() {
+            start.keep_render_context(context);
+            return Ok(());
+        }
+        let mut slot = self.lock_engine()?;
+        slot.as_mut().ok_or(())?.set_render_context(context);
+        Ok(())
     }
 
     /// The locked start's first batch, or `None` once storage is open.
@@ -270,6 +293,9 @@ impl VauchiApp {
             Opened::Locked(reason) => start.presentation.show(reason),
             Opened::Engine(vauchi) => {
                 let mut engine = AppEngine::new(*vauchi);
+                if let Some(context) = start.pending_render_context.take() {
+                    engine.set_render_context(context);
+                }
                 let commands = engine
                     .initial_commands()
                     .unwrap_or_else(|_| start.presentation.failure());

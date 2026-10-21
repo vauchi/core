@@ -142,6 +142,7 @@ impl<'a> Recorder<'a> {
         engine.set_device_capabilities(phone_capabilities());
         engine.set_render_context(RenderContext {
             locale: Some(locale.to_owned()),
+            system_locale: None,
             theme_id: None,
         });
         // `AppEngine::new` built the boot screen under the default locale;

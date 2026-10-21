@@ -11,11 +11,12 @@ use std::sync::Arc;
 use tempfile::TempDir;
 use vauchi_core::MAX_EVENT_INPUT_VALUE_BYTES;
 use vauchi_platform::PlatformAppEngine;
+use vauchi_platform::PlatformAppEngineTestHelpers;
 
 fn engine() -> (Arc<PlatformAppEngine>, TempDir) {
     let dir = TempDir::new().unwrap();
     let key = vauchi_core::crypto::SymmetricKey::generate();
-    let engine = PlatformAppEngine::new(
+    let engine = PlatformAppEngine::open_under_shell_key(
         dir.path().to_string_lossy().to_string(),
         "http://localhost:8080".to_string(),
         key.as_bytes().to_vec(),

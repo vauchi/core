@@ -183,8 +183,8 @@ impl AppEngine {
                 let display_name = card
                     .map(|c| c.display_name().to_string())
                     .unwrap_or_default();
-                let bundled = crate::theme::bundled_themes();
-                let available_themes: Vec<crate::ui::component::DropdownOption> = bundled
+                let themes = crate::theme::active_themes();
+                let available_themes: Vec<crate::ui::component::DropdownOption> = themes
                     .iter()
                     .map(|t| crate::ui::component::DropdownOption {
                         id: t.id.clone(),
@@ -228,6 +228,7 @@ impl AppEngine {
                     available_themes,
                     language_id,
                     available_languages,
+                    system_locale: render_context.system_locale.clone(),
                     // Category-2 accessibility flags, self-seeded from
                     // SettingsFlags so they follow the user (ADR-047 Addendum
                     // 2026-07-05). high_contrast deferred to M4 S1b (theme

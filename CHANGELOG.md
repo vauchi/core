@@ -6,6 +6,22 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+
+- Bindings: `MobileEvent` gains `UserPresenceSecretCreated`,
+  `UserPresenceSecretRevealed` and `UserPresenceCheckCancelled`, so shells
+  answer the user-presence commands through `hardware_event_json` instead
+  of writing the JSON themselves (vauchi/private#740).
+
+### Removed
+
+- Bindings: `PlatformAppEngine.new` (the constructor taking a storage key
+  the shell kept) and `setPlatformKeychain` are gone. Every shell opens
+  Core with `openWithKeychain`, so every key that opens the data lives in
+  the keychain and a shred deletes them all (vauchi/private#580).
+
 ## [0.85.0] — 2026-10-21
 
 ### Added

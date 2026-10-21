@@ -95,10 +95,6 @@ fn test_no_unchecked_key_construction_outside_crypto() {
         if path_str.contains("/crypto/") {
             continue;
         }
-        // Allow in storage/rekey.rs (per-contact derived keys from HKDF)
-        if path_str.ends_with("rekey.rs") {
-            continue;
-        }
         // Allow in contact_row.rs and device_sync.rs (post-decryption — AEAD-verified bytes)
         if path_str.ends_with("contact_row.rs") || path_str.ends_with("device_sync.rs") {
             continue;

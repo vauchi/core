@@ -95,13 +95,28 @@ impl AppEngine {
     /// users (verification 2026-08-07, TUI-12/QT-5). Core owns the
     /// error-to-copy translation (ADR-045 Amendment 1) — a shell must
     /// never receive the chain and never classify it.
+    ///
+    /// `network` names a social field's network (its id or label); the
+    /// username rule comes from the active network data (#734).
     fn field_value_validation_error(
         &self,
         field_type: &FieldType,
+        network: &str,
         value: &str,
     ) -> Option<ActionResult> {
         use vauchi_core::contact_card::ValidationError as Ve;
-        let message = match vauchi_core::contact_card::validate_value(field_type, value) {
+        let checked = vauchi_core::contact_card::validate_value(field_type, value).and_then(|()| {
+            if *field_type == FieldType::Social {
+                vauchi_core::contact_card::validate_social_username(
+                    &crate::social::active_registry(),
+                    network,
+                    value,
+                )
+            } else {
+                Ok(())
+            }
+        });
+        let message = match checked {
             Ok(()) => return None,
             Err(Ve::InvalidPhone) => self.t("validation.invalid_phone"),
             Err(Ve::InvalidEmail) => self.t("validation.invalid_email"),
@@ -174,12 +189,12 @@ impl AppEngine {
         let now = self.vauchi.clock().unix_seconds();
         let result = match self.vauchi.own_card() {
             Ok(Some(mut card)) => {
-                if let Some(field_type) = card
-                    .fields()
-                    .iter()
-                    .find(|f| f.id() == field_id)
-                    .map(|f| f.field_type())
-                    && let Some(invalid) = self.field_value_validation_error(&field_type, &value)
+                if let Some(field) = card.fields().iter().find(|f| f.id() == field_id)
+                    && let Some(invalid) = self.field_value_validation_error(
+                        &field.field_type(),
+                        field.label(),
+                        &value,
+                    )
                 {
                     return invalid;
                 }
@@ -248,7 +263,8 @@ impl AppEngine {
             "birthday" => FieldType::Birthday,
             _ => FieldType::Custom,
         };
-        if let Some(invalid) = self.field_value_validation_error(&field_type, value) {
+        let network = entry_type.strip_prefix("social:").unwrap_or(label_input);
+        if let Some(invalid) = self.field_value_validation_error(&field_type, network, value) {
             return invalid;
         }
         // Use label_input if provided, otherwise derive from catalog

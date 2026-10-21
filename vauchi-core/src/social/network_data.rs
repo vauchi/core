@@ -54,6 +54,34 @@ impl UsernameRule {
     pub fn strip_at(&self) -> bool {
         self.strip_at
     }
+
+    pub fn accepts(&self, username: &str) -> bool {
+        let username = match username.strip_prefix('@') {
+            Some(rest) if self.strip_at => rest,
+            _ => username,
+        };
+        let len = username.chars().count();
+        len > 0 && len <= usize::from(self.max_len) && self.charset.accepts(username)
+    }
+}
+
+impl UsernameCharset {
+    fn accepts(self, username: &str) -> bool {
+        match self {
+            Self::Any => true,
+            Self::AlnumUnderscore => username
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_'),
+            Self::AlnumHyphenInner => {
+                username
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-')
+                    && !username.starts_with('-')
+                    && !username.ends_with('-')
+                    && !username.contains("--")
+            }
+        }
+    }
 }
 
 /// Why network data was rejected. Carries no input, so it is safe to log

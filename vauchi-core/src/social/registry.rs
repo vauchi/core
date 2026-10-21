@@ -141,14 +141,6 @@ impl SocialNetwork {
     }
 }
 
-/// Compact format for loading networks from JSON.
-#[derive(Deserialize)]
-struct NetworkData {
-    id: String,
-    name: String,
-    url: String,
-}
-
 /// Registry of known social networks.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SocialNetworkRegistry {
@@ -176,13 +168,7 @@ impl SocialNetworkRegistry {
 
     /// Creates a registry with default social networks.
     pub fn with_defaults() -> Self {
-        let mut registry = Self::new();
-        let networks: Vec<NetworkData> =
-            serde_json::from_str(NETWORKS_JSON).expect("Invalid embedded networks.json");
-        for n in networks {
-            registry.add(SocialNetwork::new(&n.id, &n.name, &n.url).with_icon(&n.id));
-        }
-        registry
+        Self::from_data_bytes(NETWORKS_JSON.as_bytes()).expect("Invalid embedded networks.json")
     }
 
     /// Builds a registry from network data as cdn.vauchi.app publishes

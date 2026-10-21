@@ -145,7 +145,9 @@ impl CardDelta {
         for (id, old_field) in &old_fields {
             match new_fields.get(id) {
                 Some(new_field) => {
-                    if old_field.value() != new_field.value() {
+                    if old_field.value() != new_field.value()
+                        || old_field.network_id() != new_field.network_id()
+                    {
                         changes.push(FieldChange::Added {
                             field: new_field.strip_private(),
                         });

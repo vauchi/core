@@ -50,8 +50,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - Background sync draws its gaps from an exponential schedule around
   15 min (1–60 min), and the shell reports the OS's background budget
   as `Event::BackgroundBudgetObserved { window_secs, runs }`. The
-  scheduler tick names the next background run within that budget
-  (vauchi/private#603).
+  scheduler tick names the next background run within that budget. The
+  report answers with the next background run, so closing the app
+  re-arms it, and a changed budget brings the sync deadline forward to
+  that run (vauchi/private#603).
 
 ### Fixed
 

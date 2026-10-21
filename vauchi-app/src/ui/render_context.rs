@@ -26,24 +26,29 @@
 /// Active render context pushed from the frontend.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct RenderContext {
-    /// Active locale code (e.g. `"de"`, `"fr"`). `None` means
-    /// "frontend has not pushed a value yet" — fall back to the
-    /// platform default during the migration window (S3); after S6
-    /// this becomes a hard error (the frontend must push at boot).
+    /// The language the user picked (e.g. `"de"`, `"fr"`). `None` is
+    /// "Follow system" (ADR-047 absence-is-follow-system): the Settings
+    /// dropdown selects `follow_system` from it.
     pub locale: Option<String>,
+    /// The OS language tag as the shell reads it (`"fr-CH"`,
+    /// `"de_DE.UTF-8"`), unparsed; Core decides what it maps to
+    /// (vauchi/private#721).
+    #[serde(default)]
+    pub system_locale: Option<String>,
     /// Active theme id (e.g. `"cyber"`, `"classic"`). Same `None`
     /// semantics as `locale`.
     pub theme_id: Option<String>,
 }
 
 impl RenderContext {
-    /// The pushed locale as a [`crate::i18n::Locale`], English when the
-    /// frontend has not pushed one (or pushed an unknown code) — the
-    /// resolution every locale-threaded engine factory arm uses.
+    /// The picked language if it parses, else the system language if it
+    /// parses, else English — the resolution every locale-threaded engine
+    /// factory arm uses.
     pub fn resolved_locale(&self) -> crate::i18n::Locale {
-        self.locale
-            .as_deref()
-            .and_then(crate::i18n::Locale::from_code)
+        [self.locale.as_deref(), self.system_locale.as_deref()]
+            .into_iter()
+            .flatten()
+            .find_map(crate::i18n::Locale::from_code)
             .unwrap_or_default()
     }
 }

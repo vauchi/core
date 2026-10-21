@@ -52,6 +52,7 @@ fn theme_dropdown_selected_reflects_pushed_render_context() {
     // Frontend pushes an explicit theme.
     engine.set_render_context(RenderContext {
         locale: None,
+        system_locale: None,
         theme_id: Some("cyber".to_string()),
     });
 
@@ -75,6 +76,7 @@ fn language_dropdown_selected_reflects_pushed_render_context() {
 
     engine.set_render_context(RenderContext {
         locale: Some("de".to_string()),
+        system_locale: None,
         theme_id: None,
     });
 
@@ -90,6 +92,7 @@ fn render_context_fields_are_independent_at_render_time() {
     let mut engine = engine_with_identity();
     engine.set_render_context(RenderContext {
         locale: Some("fr".to_string()),
+        system_locale: None,
         theme_id: None,
     });
 
@@ -152,6 +155,7 @@ fn follow_system_selection_clears_render_context_field() {
     let mut engine = engine_with_identity();
     engine.set_render_context(RenderContext {
         locale: Some("de".to_string()),
+        system_locale: None,
         theme_id: Some("cyber".to_string()),
     });
     engine.navigate_to(AppScreen::SettingsAppearance);

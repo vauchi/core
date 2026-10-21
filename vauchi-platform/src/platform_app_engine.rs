@@ -510,10 +510,13 @@ impl PlatformAppEngine {
     /// dropdown change. Core uses them to prepare selected values and
     /// localized presentation commands.
     ///
-    /// JSON shape: `{ "locale": "de", "theme_id": "cyber" }`.
-    /// Both fields optional — `null` / absent means "frontend has
-    /// no value yet". Field names are UI-shaped to preserve the
-    /// humble-allowlist invariant (no domain words).
+    /// JSON shape: `{ "locale": "de", "system_locale": "fr-CH",
+    /// "theme_id": "cyber" }`. All fields optional. A missing `locale`
+    /// or `theme_id` is "Follow system"; `system_locale` is the OS
+    /// language tag, sent on every push, which Core renders when no
+    /// language was picked (vauchi/private#721). Field names are
+    /// UI-shaped to preserve the humble-allowlist invariant (no domain
+    /// words).
     pub fn set_render_context_json(&self, json: String) -> Result<(), MobileError> {
         let ctx: vauchi_app::ui::RenderContext =
             serde_json::from_str(&json).map_err(|e| MobileError::Other {

@@ -418,6 +418,27 @@ fn a_render_context_set_while_locked_reaches_the_opened_engine() {
     assert!(opened.contains(&more), "expected {more:?} in {opened}");
 }
 
+// @internal
+#[test]
+fn the_system_language_set_while_locked_reaches_the_lock_screen_and_the_opened_engine() {
+    let title = german("storage_lock.locked_title");
+    let more = german("nav.more");
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = onboarded(&dir);
+    keychain.locked.store(true, Ordering::SeqCst);
+    let engine = open(&dir, &keychain);
+    engine
+        .set_render_context_json(r#"{"system_locale":"de-LI"}"#.into())
+        .unwrap();
+    let locked = engine.initial_commands_json().unwrap();
+
+    keychain.locked.store(false, Ordering::SeqCst);
+    let opened = prompt_succeeded(&engine).to_string();
+
+    assert!(locked.contains(&title), "expected {title:?} in {locked}");
+    assert!(opened.contains(&more), "expected {more:?} in {opened}");
+}
+
 fn released(batch: &Value) -> Vec<String> {
     batch["commands"]
         .as_array()

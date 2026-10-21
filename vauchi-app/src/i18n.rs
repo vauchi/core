@@ -47,14 +47,17 @@ impl Locale {
         }
     }
 
-    /// Parse a locale from its code
+    /// Parse a locale from a language tag by its language subtag, so a
+    /// regional tag Core has no copy for (`fr-CH`, POSIX `de_LI.UTF-8`)
+    /// renders its language.
     pub fn from_code(code: &str) -> Option<Self> {
-        match code.to_lowercase().as_str() {
-            "en" | "en-us" | "en-gb" => Some(Locale::English),
-            "de" | "de-de" | "de-at" | "de-ch" => Some(Locale::German),
-            "fr" | "fr-fr" | "fr-ca" => Some(Locale::French),
-            "es" | "es-es" | "es-mx" => Some(Locale::Spanish),
-            "it" | "it-it" | "it-ch" => Some(Locale::Italian),
+        let language = code.split(['-', '_', '.']).next().unwrap_or_default();
+        match language.to_ascii_lowercase().as_str() {
+            "en" => Some(Locale::English),
+            "de" => Some(Locale::German),
+            "fr" => Some(Locale::French),
+            "es" => Some(Locale::Spanish),
+            "it" => Some(Locale::Italian),
             _ => None,
         }
     }

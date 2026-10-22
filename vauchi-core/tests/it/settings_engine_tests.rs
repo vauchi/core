@@ -72,7 +72,7 @@ fn settings_shows_all_groups() {
     assert_eq!(
         advanced_groups,
         vec![
-            "security", "backup", "network", "delivery", "about", "danger"
+            "security", "backup", "network", "content", "delivery", "about", "danger"
         ]
     );
 }

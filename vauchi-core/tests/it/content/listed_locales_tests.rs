@@ -13,19 +13,34 @@ use vauchi_app::content::{
     ContentCache, ContentConfig, ContentIndex, ContentManager, ContentManifest, FileEntry,
     LocalesEntry,
 };
-use vauchi_app::i18n::get_available_locales;
+use vauchi_app::i18n::{Locale, get_available_locales, get_locale_info};
 use vauchi_core::crypto::signing::SigningKeyPair;
 
+fn unnamed(code: &str) -> (&str, Option<(&str, &str, bool)>) {
+    (code, None)
+}
+
 fn signed_locales_manifest(signer: &SigningKeyPair, codes: &[&str]) -> ContentManifest {
-    let files: HashMap<String, FileEntry> = codes
+    let entries: Vec<_> = codes.iter().map(|code| unnamed(code)).collect();
+    signed_named_locales_manifest(signer, &entries)
+}
+
+fn signed_named_locales_manifest(
+    signer: &SigningKeyPair,
+    entries: &[(&str, Option<(&str, &str, bool)>)],
+) -> ContentManifest {
+    let files: HashMap<String, FileEntry> = entries
         .iter()
-        .map(|code| {
+        .map(|(code, names)| {
             (
                 code.to_string(),
                 FileEntry {
                     path: format!("{code}.json"),
                     checksum: vauchi_app::content::compute_checksum(code.as_bytes()),
                     size_bytes: 2,
+                    name: names.map(|(name, _, _)| name.to_string()),
+                    english_name: names.map(|(_, english, _)| english.to_string()),
+                    is_rtl: names.map(|(_, _, rtl)| rtl),
                 },
             )
         })
@@ -119,4 +134,73 @@ fn loading_cached_locales_offers_the_listed_languages_without_their_files() {
     manager.load_cached_locales_into_i18n();
 
     assert_eq!(offered_codes(), ["en", "pt"]);
+}
+
+/// Settings names a listed language before its file arrives, from the
+/// signed manifest (vauchi/private#733 D7).
+// @internal
+#[test]
+fn a_listed_language_is_named_by_the_manifest_before_its_file_arrives() {
+    let publisher = SigningKeyPair::generate();
+    let manifest = signed_named_locales_manifest(
+        &publisher,
+        &[("pt", Some(("Português", "Portuguese", false)))],
+    );
+    let (_temp, manager) = manager_with_cached(&manifest, &publisher);
+
+    manager.load_cached_locales_into_i18n();
+
+    let info = get_locale_info(Locale::from_code("pt").unwrap());
+    assert_eq!(
+        (info.name.as_str(), info.english_name.as_str()),
+        ("Português", "Portuguese")
+    );
+}
+
+// @internal
+#[test]
+fn an_unusable_listed_name_names_the_language_by_its_code() {
+    let publisher = SigningKeyPair::generate();
+    let long = "n".repeat(65);
+    let manifest = signed_named_locales_manifest(
+        &publisher,
+        &[
+            ("sv", Some((long.as_str(), "Swedish", false))),
+            ("pl", Some(("Pol\u{7}ski", "Polish", false))),
+        ],
+    );
+    let (_temp, manager) = manager_with_cached(&manifest, &publisher);
+
+    manager.load_cached_locales_into_i18n();
+
+    assert_eq!(get_locale_info(Locale::from_code("sv").unwrap()).name, "sv");
+    assert_eq!(get_locale_info(Locale::from_code("pl").unwrap()).name, "pl");
+}
+
+// @internal
+#[test]
+fn a_listed_right_to_left_language_is_not_offered() {
+    let publisher = SigningKeyPair::generate();
+    let manifest =
+        signed_named_locales_manifest(&publisher, &[("fa", Some(("فارسی", "Persian", true)))]);
+    let (_temp, manager) = manager_with_cached(&manifest, &publisher);
+
+    manager.load_cached_locales_into_i18n();
+
+    assert_eq!(offered_codes(), ["en"]);
+}
+
+// @internal
+#[test]
+fn a_name_changed_after_signing_fails_the_signature() {
+    let publisher = SigningKeyPair::generate();
+    let mut manifest = signed_named_locales_manifest(
+        &publisher,
+        &[("pt", Some(("Português", "Portuguese", false)))],
+    );
+    let files = &mut manifest.content.locales.as_mut().unwrap().files;
+    files.get_mut("pt").unwrap().name = Some("Fake".to_string());
+    let (_temp, manager) = manager_with_cached(&manifest, &publisher);
+
+    assert_eq!(manager.listed_locale_codes(), Vec::<String>::new());
 }

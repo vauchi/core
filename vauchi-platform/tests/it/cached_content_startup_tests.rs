@@ -22,11 +22,28 @@ const CACHED_THEMES: &str = r##"[{
 }]"##;
 
 fn start_engine_over(cached: &[(&str, &str)]) -> tempfile::TempDir {
+    use vauchi_app::content::{ContentCache, ContentType, compute_checksum};
     let dir = tempfile::tempdir().expect("temp dir");
+    let cache = ContentCache::new(dir.path()).unwrap();
     for (path, body) in cached {
-        let file = dir.path().join("content").join(path);
-        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
-        std::fs::write(file, body).unwrap();
+        let (dir_name, filename) = path.split_once('/').unwrap();
+        let content_type = [
+            ContentType::Networks,
+            ContentType::Locales,
+            ContentType::Help,
+            ContentType::Themes,
+        ]
+        .into_iter()
+        .find(|t| t.dir_name() == dir_name)
+        .unwrap();
+        cache
+            .save_content(
+                content_type,
+                filename,
+                body.as_bytes(),
+                &compute_checksum(body.as_bytes()),
+            )
+            .unwrap();
     }
     let key = vauchi_core::crypto::SymmetricKey::generate();
     vauchi_platform::PlatformAppEngine::open_under_shell_key(

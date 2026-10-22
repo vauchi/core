@@ -36,11 +36,14 @@ schemars = { version = "0.8", optional = true }
 # the async content-updates surface uses spawn_blocking.
 ureq = { version = "3", default-features = false, features = ["json", "rustls-no-provider", "rustls-webpki-roots", "gzip"], optional = true }
 tokio = { version = "1.0", features = ["rt"], optional = true }
+# Cached content is stored gzipped (vauchi/private#733 D9); already a
+# vauchi-core dependency.
+flate2 = { version = "1.0", optional = true }
 
 [features]
 default = ["storage", "network-rustls", "content-updates"]
 storage = ["vauchi-core/storage"]
-content-updates = ["ureq", "tokio"]
+content-updates = ["ureq", "tokio", "flate2"]
 network-rustls = ["vauchi-core/network-rustls", "storage"]
 network-http = ["vauchi-core/network-http"]
 network = ["network-rustls", "network-http", "storage"]

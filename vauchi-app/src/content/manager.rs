@@ -54,7 +54,8 @@ pub struct ContentManager {
 impl ContentManager {
     /// Create a new ContentManager
     pub fn new(config: ContentConfig, clock: Arc<dyn Clock>) -> Result<Self, ContentError> {
-        let cache = ContentCache::new(&config.storage_path)?;
+        let cache =
+            ContentCache::new(&config.storage_path)?.with_max_content_size(config.max_content_size);
         Ok(Self {
             config,
             cache,
@@ -181,26 +182,14 @@ impl ContentManager {
     /// Called at startup AFTER `i18n::init()` to overlay CDN-cached versions.
     pub fn load_cached_locales_into_i18n(&self) {
         self.publish_listed_locales();
-        let locales_dir = self.cache.content_dir(ContentType::Locales);
-        if !locales_dir.exists() {
-            return;
-        }
-
-        let entries = match std::fs::read_dir(&locales_dir) {
-            Ok(e) => e,
-            Err(_) => return,
-        };
-
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("json")
-                && let Some(code) = path.file_stem().and_then(|s| s.to_str())
-                && let Ok(data) = std::fs::read(&path)
+        for filename in self.cache.content_files(ContentType::Locales) {
+            if let Some(code) = filename.strip_suffix(".json")
+                && let Some(data) = self.cache.get_content(ContentType::Locales, &filename)
                 && crate::i18n::load_locale_from_bytes(code, &data).is_err()
             {
                 // The bundled locale stays in effect; the other locales
                 // still load.
-                self.drop_unloadable(ContentType::Locales, &format!("{code}.json"));
+                self.drop_unloadable(ContentType::Locales, &filename);
             }
         }
     }
@@ -210,11 +199,7 @@ impl ContentManager {
     /// cache is readable but BEFORE the first render so screens use the
     /// cached catalog rather than the bundled one.
     pub fn load_cached_themes_into_theme_store(&self) {
-        let path = self
-            .cache
-            .content_dir(ContentType::Themes)
-            .join("themes.json");
-        if let Ok(data) = std::fs::read(&path)
+        if let Some(data) = self.cache.get_content(ContentType::Themes, "themes.json")
             && crate::theme::load_themes_from_bytes(&data).is_err()
         {
             // The bundled catalog stays in effect.

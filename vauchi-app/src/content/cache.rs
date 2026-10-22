@@ -6,9 +6,10 @@
 //!
 //! The cache stores content files and manifests in a local directory,
 //! using atomic writes to prevent partial files on crash/interruption.
+//! Content files are stored gzipped (vauchi/private#733 D9).
 
 use std::fs;
-use std::io;
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use thiserror::Error;
@@ -19,7 +20,10 @@ use super::types::{ContentManifest, ContentType};
 /// Local cache for remote content
 pub struct ContentCache {
     cache_dir: PathBuf,
+    max_content_size: u64,
 }
+
+const STORED_SUFFIX: &str = ".gz";
 
 impl ContentCache {
     /// Create a new content cache at the given storage path
@@ -28,7 +32,17 @@ impl ContentCache {
     pub fn new(storage_path: &Path) -> Result<Self, CacheError> {
         let cache_dir = storage_path.join("content");
         fs::create_dir_all(&cache_dir)?;
-        Ok(Self { cache_dir })
+        Ok(Self {
+            cache_dir,
+            max_content_size: super::ContentConfig::default().max_content_size,
+        })
+    }
+
+    /// Cap on the inflated size of a stored file, so a stored file cannot
+    /// expand into more memory than a download may take (DC-03).
+    pub fn with_max_content_size(mut self, max_content_size: u64) -> Self {
+        self.max_content_size = max_content_size;
+        self
     }
 
     /// Get cached manifest if it exists
@@ -45,10 +59,45 @@ impl ContentCache {
         atomic_write(&path, data.as_bytes())
     }
 
-    /// Get cached content file if it exists
+    /// Get cached content file if it exists. A stored file that does not
+    /// inflate, or inflates past the size cap, is dropped with the manifest
+    /// so the next update cycle downloads it again.
     pub fn get_content(&self, content_type: ContentType, filename: &str) -> Option<Vec<u8>> {
         let path = self.content_path(content_type, filename);
-        fs::read(&path).ok()
+        let stored = fs::File::open(&path).ok()?;
+        let mut data = Vec::new();
+        let inflated = flate2::read::GzDecoder::new(stored)
+            .take(self.max_content_size.saturating_add(1))
+            .read_to_end(&mut data);
+        if inflated.is_err() || data.len() as u64 > self.max_content_size || data.is_empty() {
+            self.drop_stored(&path);
+            return None;
+        }
+        Some(data)
+    }
+
+    /// The names of the cached files of one content type.
+    pub fn content_files(&self, content_type: ContentType) -> Vec<String> {
+        let Ok(entries) = fs::read_dir(self.content_dir(content_type)) else {
+            return Vec::new();
+        };
+        entries
+            .flatten()
+            .filter_map(|entry| {
+                entry
+                    .file_name()
+                    .to_str()?
+                    .strip_suffix(STORED_SUFFIX)
+                    .map(str::to_string)
+            })
+            .collect()
+    }
+
+    fn drop_stored(&self, path: &Path) {
+        let dropped = remove_if_present(path).and_then(|()| self.clear_manifest());
+        if let Err(e) = dropped {
+            tracing::warn!("[Content] Failed to drop an unreadable cache entry: {e}");
+        }
     }
 
     /// Save content file to cache with checksum verification
@@ -68,8 +117,12 @@ impl ContentCache {
         let dir = self.cache_dir.join(content_type.dir_name());
         fs::create_dir_all(&dir)?;
 
-        let path = dir.join(filename);
-        atomic_write(&path, data)
+        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::best());
+        encoder.write_all(data)?;
+        atomic_write(
+            &self.content_path(content_type, filename),
+            &encoder.finish()?,
+        )
     }
 
     /// Remove one cached content file. A file that is already gone is not
@@ -121,7 +174,8 @@ impl ContentCache {
     }
 
     fn content_path(&self, content_type: ContentType, filename: &str) -> PathBuf {
-        self.content_dir(content_type).join(filename)
+        self.content_dir(content_type)
+            .join(format!("{filename}{STORED_SUFFIX}"))
     }
 }
 

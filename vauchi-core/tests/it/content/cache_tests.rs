@@ -102,7 +102,8 @@ fn test_cache_content_creates_subdirectory() {
         .save_content(ContentType::Themes, "dark.json", data, &checksum)
         .unwrap();
 
-    assert!(temp.path().join("content/themes/dark.json").exists());
+    assert!(temp.path().join("content/themes").is_dir());
+    assert_eq!(cache.content_files(ContentType::Themes), ["dark.json"]);
 }
 
 // @internal
@@ -307,6 +308,7 @@ fn test_cache_help_content_roundtrip() {
         help_de
     );
 
-    assert!(temp.path().join("content/help/en.json").exists());
-    assert!(temp.path().join("content/help/de.json").exists());
+    let mut stored = cache.content_files(ContentType::Help);
+    stored.sort();
+    assert_eq!(stored, ["de.json", "en.json"]);
 }

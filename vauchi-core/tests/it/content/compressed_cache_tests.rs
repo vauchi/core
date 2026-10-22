@@ -14,7 +14,7 @@ use vauchi_app::content::{
     ContentCache, ContentIndex, ContentManifest, ContentType, compute_checksum,
 };
 
-const CAP: u64 = 64 * 1024;
+const CAP: u64 = 256 * 1024;
 
 fn locale_bytes() -> Vec<u8> {
     let entries: Vec<String> = (0..2000)

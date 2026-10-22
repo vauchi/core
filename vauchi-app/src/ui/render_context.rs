@@ -41,14 +41,14 @@ pub struct RenderContext {
 }
 
 impl RenderContext {
-    /// The picked language if it parses, else the system language if it
-    /// parses, else English — the resolution every locale-threaded engine
+    /// The picked language if Core has its strings, else the system
+    /// language if Core has its strings, else English — the resolution every locale-threaded engine
     /// factory arm uses.
     pub fn resolved_locale(&self) -> crate::i18n::Locale {
         [self.locale.as_deref(), self.system_locale.as_deref()]
             .into_iter()
             .flatten()
-            .find_map(crate::i18n::Locale::from_code)
+            .find_map(crate::i18n::translated_locale)
             .unwrap_or_default()
     }
 }

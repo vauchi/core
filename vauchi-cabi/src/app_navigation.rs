@@ -44,7 +44,7 @@ pub(super) unsafe fn resolve_locale(locale_code: *const c_char) -> Locale {
     // which handles null and non-UTF-8 gracefully.
     let code = from_c_str(locale_code);
     code.as_deref()
-        .and_then(Locale::from_code)
+        .and_then(vauchi_app::i18n::translated_locale)
         .unwrap_or_default()
 }
 

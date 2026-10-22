@@ -63,11 +63,7 @@ pub unsafe extern "C" fn vauchi_i18n_get_string(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_i18n_available_locales() -> *mut c_char {
     match std::panic::catch_unwind(|| {
-        let codes: Vec<&str> = vauchi_app::i18n::get_available_locales()
-            .iter()
-            .map(|l| l.code())
-            .collect();
-        let json = serde_json::json!(codes).to_string();
+        let json = serde_json::json!(vauchi_app::i18n::get_available_locales()).to_string();
         to_c_string(&json)
     }) {
         Ok(result) => result,

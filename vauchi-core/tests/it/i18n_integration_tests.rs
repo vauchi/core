@@ -80,7 +80,7 @@ fn test_locale_from_code() {
     assert_eq!(Locale::from_code("de"), Some(Locale::GERMAN));
     assert_eq!(Locale::from_code("fr"), Some(Locale::FRENCH));
     assert_eq!(Locale::from_code("es"), Some(Locale::SPANISH));
-    assert_eq!(Locale::from_code("xx"), None);
+    assert_eq!(Locale::from_code("x"), None);
 }
 
 /// Test: Locale info is available

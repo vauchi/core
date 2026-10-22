@@ -9,7 +9,7 @@
 //! language.
 
 use proptest::prelude::*;
-use vauchi_app::i18n::Locale;
+use vauchi_app::i18n::{Locale, load_locale_from_bytes};
 use vauchi_app::ui::{AppEngine, AppScreen, Component, RenderContext, ScreenModel};
 use vauchi_core::api::Vauchi;
 
@@ -83,6 +83,20 @@ fn an_untranslated_system_language_resolves_to_english() {
         Locale::ENGLISH
     );
     assert_eq!(context(None, None).resolved_locale(), Locale::ENGLISH);
+}
+
+// @internal
+#[test]
+fn a_system_language_core_does_not_ship_is_used_once_its_file_loads() {
+    let romanian = Locale::from_code("ro").unwrap();
+    assert_eq!(
+        context(None, Some("ro-RO")).resolved_locale(),
+        Locale::ENGLISH
+    );
+
+    load_locale_from_bytes("ro", br#"{"_meta":{"locale":"ro"}}"#).unwrap();
+
+    assert_eq!(context(None, Some("ro-RO")).resolved_locale(), romanian);
 }
 
 proptest! {

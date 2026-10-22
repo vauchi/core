@@ -18,54 +18,85 @@ use std::path::Path;
 use std::sync::RwLock;
 use thiserror::Error;
 
-/// Supported locales
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-#[non_exhaustive]
-pub enum Locale {
-    #[serde(rename = "en")]
-    #[default]
-    English,
-    #[serde(rename = "de")]
-    German,
-    #[serde(rename = "fr")]
-    French,
-    #[serde(rename = "es")]
-    Spanish,
-    #[serde(rename = "it")]
-    Italian,
+/// A language, by its lower-case ISO 639 language subtag. Any
+/// well-formed subtag is a `Locale`, so a language published on the CDN
+/// needs no Core release (vauchi/private#733 D1); the constants name the
+/// languages Core ships with.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Locale {
+    subtag: [u8; 3],
+    len: u8,
 }
 
-impl Locale {
-    pub const ENGLISH: Locale = Locale::English;
-    pub const GERMAN: Locale = Locale::German;
-    pub const FRENCH: Locale = Locale::French;
-    pub const SPANISH: Locale = Locale::Spanish;
-    pub const ITALIAN: Locale = Locale::Italian;
+/// The longest tag `from_code` looks at; shells pass OS tags such as
+/// `de_LI.UTF-8`, never anything near this (DC-01).
+const MAX_TAG_BYTES: usize = 64;
 
-    /// Get the ISO 639-1 language code
-    pub fn code(&self) -> &'static str {
-        match self {
-            Locale::English => "en",
-            Locale::German => "de",
-            Locale::French => "fr",
-            Locale::Spanish => "es",
-            Locale::Italian => "it",
+impl Locale {
+    pub const ENGLISH: Locale = Locale::two_letter(*b"en");
+    pub const GERMAN: Locale = Locale::two_letter(*b"de");
+    pub const FRENCH: Locale = Locale::two_letter(*b"fr");
+    pub const SPANISH: Locale = Locale::two_letter(*b"es");
+    pub const ITALIAN: Locale = Locale::two_letter(*b"it");
+
+    const fn two_letter(code: [u8; 2]) -> Self {
+        Locale {
+            subtag: [code[0], code[1], 0],
+            len: 2,
         }
+    }
+
+    /// The ISO 639 language subtag, such as `en` or `fil`.
+    pub fn code(&self) -> &str {
+        std::str::from_utf8(&self.subtag[..usize::from(self.len)]).unwrap_or("en")
     }
 
     /// Parse a locale from a language tag by its language subtag, so a
     /// regional tag Core has no copy for (`fr-CH`, POSIX `de_LI.UTF-8`)
-    /// renders its language.
-    pub fn from_code(code: &str) -> Option<Self> {
-        let language = code.split(['-', '_', '.']).next().unwrap_or_default();
-        match language.to_ascii_lowercase().as_str() {
-            "en" => Some(Locale::English),
-            "de" => Some(Locale::German),
-            "fr" => Some(Locale::French),
-            "es" => Some(Locale::Spanish),
-            "it" => Some(Locale::Italian),
-            _ => None,
+    /// renders its language. The subtag must be 2–3 ASCII letters.
+    pub fn from_code(tag: &str) -> Option<Self> {
+        if tag.len() > MAX_TAG_BYTES {
+            return None;
         }
+        let language = tag.split(['-', '_', '.']).next().unwrap_or_default();
+        if !(2..=3).contains(&language.len()) || !language.bytes().all(|b| b.is_ascii_alphabetic())
+        {
+            return None;
+        }
+        let mut subtag = [0; 3];
+        for (slot, byte) in subtag.iter_mut().zip(language.bytes()) {
+            *slot = byte.to_ascii_lowercase();
+        }
+        Some(Locale {
+            subtag,
+            len: language.len() as u8,
+        })
+    }
+}
+
+impl Default for Locale {
+    fn default() -> Self {
+        Locale::ENGLISH
+    }
+}
+
+impl std::fmt::Debug for Locale {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Locale").field(&self.code()).finish()
+    }
+}
+
+impl Serialize for Locale {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.code())
+    }
+}
+
+impl<'de> Deserialize<'de> for Locale {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let tag = String::deserialize(deserializer)?;
+        Locale::from_code(&tag)
+            .ok_or_else(|| serde::de::Error::custom("not an ISO 639 language subtag"))
     }
 }
 
@@ -80,49 +111,55 @@ pub struct LocaleInfo {
 
 /// Get information about a locale
 pub fn get_locale_info(locale: Locale) -> LocaleInfo {
-    match locale {
-        Locale::English => LocaleInfo {
-            code: "en",
-            name: "English",
-            english_name: "English",
-            is_rtl: false,
-        },
-        Locale::German => LocaleInfo {
-            code: "de",
-            name: "Deutsch",
-            english_name: "German",
-            is_rtl: false,
-        },
-        Locale::French => LocaleInfo {
-            code: "fr",
-            name: "Français",
-            english_name: "French",
-            is_rtl: false,
-        },
-        Locale::Spanish => LocaleInfo {
-            code: "es",
-            name: "Español",
-            english_name: "Spanish",
-            is_rtl: false,
-        },
-        Locale::Italian => LocaleInfo {
-            code: "it",
-            name: "Italiano",
-            english_name: "Italian",
-            is_rtl: false,
-        },
+    let (code, name, english_name) = match locale.code() {
+        "en" => ("en", "English", "English"),
+        "de" => ("de", "Deutsch", "German"),
+        "fr" => ("fr", "Français", "French"),
+        "es" => ("es", "Español", "Spanish"),
+        "it" => ("it", "Italiano", "Italian"),
+        _ => ("en", "English", "English"),
+    };
+    LocaleInfo {
+        code,
+        name,
+        english_name,
+        is_rtl: false,
     }
+}
+
+/// The languages every shell bundles a file for. They resolve before the
+/// shell has loaded its files, so a screen built at start renders in them.
+const SHELL_BUNDLED_LOCALES: [Locale; 5] = [
+    Locale::ENGLISH,
+    Locale::GERMAN,
+    Locale::FRENCH,
+    Locale::SPANISH,
+    Locale::ITALIAN,
+];
+
+/// The locale `tag` names, if Core can render it: a shell-bundled
+/// language, or one whose file has loaded. Another well-formed tag yields
+/// `None` until its file arrives, so a resolution chain falls through to
+/// its next tag instead of rendering English over a language the person
+/// reads (vauchi/private#733 D4).
+pub fn translated_locale(tag: &str) -> Option<Locale> {
+    Locale::from_code(tag)
+        .filter(|locale| SHELL_BUNDLED_LOCALES.contains(locale) || has_loaded_strings(*locale))
+}
+
+fn has_loaded_strings(locale: Locale) -> bool {
+    LOCALE_STORE
+        .read()
+        .map(|lock| {
+            lock.as_ref()
+                .is_some_and(|store| store.contains_key(locale.code()))
+        })
+        .unwrap_or(false)
 }
 
 /// Get all available locales
 pub fn get_available_locales() -> Vec<Locale> {
-    vec![
-        Locale::English,
-        Locale::German,
-        Locale::French,
-        Locale::Spanish,
-        Locale::Italian,
-    ]
+    SHELL_BUNDLED_LOCALES.to_vec()
 }
 
 /// Get a localized string by key
@@ -132,8 +169,8 @@ pub fn get_string(locale: Locale, key: &str) -> String {
     }
 
     // Fallback to English
-    if locale != Locale::English
-        && let Some(value) = lookup_one(Locale::English, key)
+    if locale != Locale::ENGLISH
+        && let Some(value) = lookup_one(Locale::ENGLISH, key)
     {
         return value;
     }
@@ -146,8 +183,8 @@ pub fn get_string(locale: Locale, key: &str) -> String {
 /// bar's information text, where "Missing: …" must never reach a person.
 pub fn try_get_string(locale: Locale, key: &str) -> Option<String> {
     lookup_one(locale, key).or_else(|| {
-        (locale != Locale::English)
-            .then(|| lookup_one(Locale::English, key))
+        (locale != Locale::ENGLISH)
+            .then(|| lookup_one(Locale::ENGLISH, key))
             .flatten()
     })
 }
@@ -166,7 +203,7 @@ fn lookup_one(locale: Locale, key: &str) -> Option<String> {
     {
         return strings.get(key).cloned();
     }
-    if locale == Locale::English {
+    if locale == Locale::ENGLISH {
         return bundled_english_cached().get(key).cloned();
     }
     None
@@ -310,7 +347,7 @@ fn get_strings_for_locale(locale: Locale) -> HashMap<String, String> {
     }
 
     // Fallback: if requesting English and nothing loaded, use bundled minimal set
-    if locale == Locale::English {
+    if locale == Locale::ENGLISH {
         return bundled_english();
     }
 
@@ -434,21 +471,21 @@ mod tests {
 
     #[test]
     fn test_locale_default() {
-        assert_eq!(Locale::default(), Locale::English);
+        assert_eq!(Locale::default(), Locale::ENGLISH);
     }
 
     #[test]
     fn test_locale_codes() {
-        assert_eq!(Locale::English.code(), "en");
-        assert_eq!(Locale::German.code(), "de");
+        assert_eq!(Locale::ENGLISH.code(), "en");
+        assert_eq!(Locale::GERMAN.code(), "de");
     }
 
     #[test]
     fn test_locale_from_code() {
-        assert_eq!(Locale::from_code("en"), Some(Locale::English));
-        assert_eq!(Locale::from_code("EN"), Some(Locale::English));
-        assert_eq!(Locale::from_code("en-US"), Some(Locale::English));
-        assert_eq!(Locale::from_code("xx"), None);
+        assert_eq!(Locale::from_code("en"), Some(Locale::ENGLISH));
+        assert_eq!(Locale::from_code("EN"), Some(Locale::ENGLISH));
+        assert_eq!(Locale::from_code("en-US"), Some(Locale::ENGLISH));
+        assert_eq!(Locale::from_code("x"), None);
     }
 
     #[test]
@@ -459,7 +496,7 @@ mod tests {
         init(dir.path()).unwrap();
 
         assert!(is_initialized());
-        let s = get_string(Locale::English, "welcome.title");
+        let s = get_string(Locale::ENGLISH, "welcome.title");
         assert_eq!(s, "Welcome to Vauchi");
     }
 
@@ -470,7 +507,7 @@ mod tests {
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
 
-        let s = get_string(Locale::German, "welcome.title");
+        let s = get_string(Locale::GERMAN, "welcome.title");
         assert_eq!(s, "Willkommen bei Vauchi");
     }
 
@@ -482,8 +519,8 @@ mod tests {
         init(dir.path()).unwrap();
 
         // "update.sent" only exists in en, not de
-        let de = get_string(Locale::German, "update.sent");
-        let en = get_string(Locale::English, "update.sent");
+        let de = get_string(Locale::GERMAN, "update.sent");
+        let en = get_string(Locale::ENGLISH, "update.sent");
         assert_eq!(de, en);
     }
 
@@ -494,7 +531,7 @@ mod tests {
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
 
-        let s = get_string(Locale::English, "nonexistent");
+        let s = get_string(Locale::ENGLISH, "nonexistent");
         assert!(s.contains("Missing"));
     }
 
@@ -505,7 +542,7 @@ mod tests {
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
 
-        let s = get_string_with_args(Locale::English, "contacts.count", &[("count", "5")]);
+        let s = get_string_with_args(Locale::ENGLISH, "contacts.count", &[("count", "5")]);
         assert_eq!(s, "5 contacts");
     }
 
@@ -522,7 +559,7 @@ mod tests {
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
 
-        let strings = get_strings_for_locale(Locale::English);
+        let strings = get_strings_for_locale(Locale::ENGLISH);
         assert!(!strings.contains_key("_meta"));
     }
 
@@ -534,7 +571,7 @@ mod tests {
         init(dir.path()).unwrap();
 
         assert_eq!(
-            get_string(Locale::English, "welcome.title"),
+            get_string(Locale::ENGLISH, "welcome.title"),
             "Welcome to Vauchi"
         );
 
@@ -545,7 +582,7 @@ mod tests {
         load_locale_from_bytes("en", updated.to_string().as_bytes()).unwrap();
 
         assert_eq!(
-            get_string(Locale::English, "welcome.title"),
+            get_string(Locale::ENGLISH, "welcome.title"),
             "Welcome Back to Vauchi"
         );
     }
@@ -555,7 +592,7 @@ mod tests {
         let _guard = store_guard();
         reset_store();
         // Without init(), should fall back to bundled_english
-        let s = get_string(Locale::English, "app.name");
+        let s = get_string(Locale::ENGLISH, "app.name");
         assert_eq!(s, "Vauchi");
     }
 
@@ -596,7 +633,7 @@ mod tests {
             .map(|_| {
                 std::thread::spawn(|| {
                     for _ in 0..100 {
-                        let _ = get_string(Locale::English, "welcome.title");
+                        let _ = get_string(Locale::ENGLISH, "welcome.title");
                     }
                 })
             })
@@ -620,7 +657,7 @@ mod tests {
 
         init(&nonexistent).expect("nonexistent resource directory");
 
-        assert_eq!(get_string(Locale::English, "app.name"), "Vauchi");
+        assert_eq!(get_string(Locale::ENGLISH, "app.name"), "Vauchi");
     }
 
     #[test]
@@ -639,7 +676,7 @@ mod tests {
         let data = serde_json::json!({ "app.name": "Test" });
         load_locale_from_bytes("en", data.to_string().as_bytes()).unwrap();
         assert!(is_initialized());
-        assert_eq!(get_string(Locale::English, "app.name"), "Test");
+        assert_eq!(get_string(Locale::ENGLISH, "app.name"), "Test");
         // Restore for other tests
         reset_store();
     }
@@ -651,7 +688,7 @@ mod tests {
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
 
-        let all = get_all_strings(Locale::English);
+        let all = get_all_strings(Locale::ENGLISH);
         assert!(all.contains_key("welcome.title"));
         assert!(all.contains_key("contacts.count"));
         assert!(!all.contains_key("_meta"));

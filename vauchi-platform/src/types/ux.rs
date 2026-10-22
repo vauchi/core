@@ -585,11 +585,11 @@ pub enum MobileLocale {
 impl From<vauchi_app::i18n::Locale> for MobileLocale {
     fn from(locale: vauchi_app::i18n::Locale) -> Self {
         match locale {
-            vauchi_app::i18n::Locale::English => MobileLocale::English,
-            vauchi_app::i18n::Locale::German => MobileLocale::German,
-            vauchi_app::i18n::Locale::French => MobileLocale::French,
-            vauchi_app::i18n::Locale::Spanish => MobileLocale::Spanish,
-            vauchi_app::i18n::Locale::Italian => MobileLocale::Italian,
+            vauchi_app::i18n::Locale::ENGLISH => MobileLocale::English,
+            vauchi_app::i18n::Locale::GERMAN => MobileLocale::German,
+            vauchi_app::i18n::Locale::FRENCH => MobileLocale::French,
+            vauchi_app::i18n::Locale::SPANISH => MobileLocale::Spanish,
+            vauchi_app::i18n::Locale::ITALIAN => MobileLocale::Italian,
             _ => MobileLocale::English,
         }
     }

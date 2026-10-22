@@ -41,19 +41,9 @@ fn a_regional_tag_falls_back_to_its_language() {
 
 // @internal
 #[test]
-fn a_tag_whose_language_core_does_not_translate_resolves_to_none() {
+fn a_tag_without_a_language_subtag_resolves_to_none() {
     let long = "a".repeat(1024);
-    for tag in [
-        "pt-BR",
-        "",
-        "-",
-        "_",
-        ".",
-        "C",
-        "POSIX",
-        "en\0de",
-        long.as_str(),
-    ] {
+    for tag in ["", "-", "_", ".", "C", "POSIX", "en\0de", long.as_str()] {
         assert_eq!(Locale::from_code(tag), None, "tag {tag:?}");
     }
 }

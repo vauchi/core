@@ -173,6 +173,7 @@ mod contact_list_reach_tests;
 mod context_bar_info_tests;
 mod context_bar_overlay_toggle_tests;
 mod inactive_surface_event_tests;
+mod locale_tag_tests;
 mod lock_screen_navigation_tests;
 #[cfg(feature = "testing")]
 mod multi_stage_layout_memory_tests;

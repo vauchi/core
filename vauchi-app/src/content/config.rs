@@ -5,6 +5,7 @@
 //! Configuration for remote content updates
 
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 use vauchi_core::crypto::signing::PublicKey;
 
@@ -12,6 +13,25 @@ const PRODUCTION_PUBLISHER_PUBLIC_KEY: [u8; 32] = [
     149, 18, 255, 58, 48, 37, 240, 241, 30, 161, 195, 217, 252, 234, 187, 13, 89, 153, 62, 43, 189,
     135, 252, 19, 184, 228, 36, 89, 216, 200, 184, 45,
 ];
+
+/// Where content files come from instead of straight from the CDN: the
+/// relay's OHTTP `content` action, so the server that learns which language
+/// was asked for cannot tie it to an IP address (vauchi/private#733 D8).
+/// The manager still checks the signed manifest, checksums and sizes.
+pub trait ContentSource: Send + Sync {
+    /// The bytes of the content file at `path`, such as `locales/pt.json`.
+    fn fetch(&self, path: &str) -> Result<Vec<u8>, String>;
+}
+
+/// A shared [`ContentSource`] in a [`ContentConfig`].
+#[derive(Clone)]
+pub struct ContentSourceHandle(pub Arc<dyn ContentSource>);
+
+impl std::fmt::Debug for ContentSourceHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ContentSource")
+    }
+}
 
 /// Configuration for the content update system
 #[derive(Debug, Clone)]
@@ -46,6 +66,10 @@ pub struct ContentConfig {
     /// system language (vauchi/private#733 D7). `None` fetches every listed
     /// locale file.
     pub wanted_locales: Option<Vec<String>>,
+
+    /// Fetch through this source instead of `content_url`; `None` fetches
+    /// from the CDN directly (tools and tests).
+    pub source: Option<ContentSourceHandle>,
 }
 
 impl Default for ContentConfig {
@@ -60,6 +84,7 @@ impl Default for ContentConfig {
             proxy_url: None,
             publisher_public_key: PublicKey::from_bytes(PRODUCTION_PUBLISHER_PUBLIC_KEY),
             wanted_locales: None,
+            source: None,
         }
     }
 }

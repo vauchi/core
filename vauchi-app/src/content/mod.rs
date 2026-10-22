@@ -20,11 +20,13 @@ mod config;
 mod fetcher;
 mod integrity;
 mod manager;
+#[cfg(feature = "network-http")]
+mod relay_source;
 mod scheduler;
 mod types;
 
 pub use cache::{CacheError, ContentCache};
-pub use config::ContentConfig;
+pub use config::{ContentConfig, ContentSource, ContentSourceHandle};
 pub use fetcher::{ContentFetcher, FetchError};
 pub use integrity::{IntegrityError, compute_checksum, verify_checksum, verify_manifest_signature};
 pub use manager::{ApplyResult, ContentError, ContentManager, LocaleStrings};

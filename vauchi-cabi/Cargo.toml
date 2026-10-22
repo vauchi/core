@@ -22,7 +22,7 @@ dev-logging = ["dep:tracing-subscriber"]
 
 [dependencies]
 vauchi-core = { workspace = true, default-features = false, features = ["storage", "network-rustls", "network-http"] }
-vauchi-app = { workspace = true, default-features = false, features = ["network-rustls", "network-http"] }
+vauchi-app = { workspace = true, default-features = false, features = ["network-rustls", "network-http", "content-updates"] }
 serde_json = "1.0"
 zeroize = "1.8"
 # Dev-only stderr sink for the canonical `tracing` facade (ADR-067).

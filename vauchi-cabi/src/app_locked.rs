@@ -128,6 +128,7 @@ pub(crate) fn open_app(
         keyring,
     };
     let reopen = params.clone();
+    crate::content_updates::load_cached_content(data_path);
     let mut app = match params.open() {
         Opened::Engine(vauchi) => VauchiApp::opened(AppEngine::new(*vauchi)),
         Opened::Locked(reason) => VauchiApp::locked(LockedStart {
@@ -138,17 +139,20 @@ pub(crate) fn open_app(
         }),
     };
     app.reopen = Some(reopen);
+    let app = app.with_content_dir(data_path);
     Box::into_raw(Box::new(app))
 }
 
 impl VauchiApp {
     pub(crate) fn locked(start: LockedStart) -> Self {
         Self {
-            engine: std::sync::Mutex::new(None),
+            engine: Arc::new(std::sync::Mutex::new(None)),
             locked: std::sync::Mutex::new(Some(start)),
             event_handler_id: std::sync::Mutex::new(None),
-            event_callback: std::sync::Mutex::new(None),
+            event_callback: Arc::new(std::sync::Mutex::new(None)),
             reopen: None,
+            content_dir: None,
+            content_scheduler: std::sync::Mutex::new(None),
         }
     }
 

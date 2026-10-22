@@ -120,7 +120,10 @@ pub unsafe extern "C" fn vauchi_app_create_with_config(
             None => return std::ptr::null_mut(),
         };
 
-        Box::into_raw(Box::new(VauchiApp::opened(AppEngine::new(vauchi))))
+        crate::content_updates::load_cached_content(&data_path);
+        Box::into_raw(Box::new(
+            VauchiApp::opened(AppEngine::new(vauchi)).with_content_dir(&data_path),
+        ))
     })) {
         Ok(result) => result,
         Err(_) => std::ptr::null_mut(),
@@ -185,7 +188,10 @@ pub unsafe extern "C" fn vauchi_app_create_with_key(
                 Err(_) => return std::ptr::null_mut(),
             };
 
-            Box::into_raw(Box::new(VauchiApp::opened(AppEngine::new(vauchi))))
+            crate::content_updates::load_cached_content(&data_path);
+            Box::into_raw(Box::new(
+                VauchiApp::opened(AppEngine::new(vauchi)).with_content_dir(&data_path),
+            ))
         })) {
             Ok(result) => result,
             Err(_) => std::ptr::null_mut(),
@@ -715,6 +721,7 @@ pub(crate) fn register_event_callback(app: &VauchiApp, handler: Option<EventCall
                     notifier.notify(vauchi_app::ui::affected_screens(&event));
                 }));
             *handler_id_slot = Some(new_id);
+            app.start_content_scheduler();
         }
     }));
 }
@@ -737,7 +744,7 @@ unsafe impl Send for EventCallbackHandler {}
 unsafe impl Sync for EventCallbackHandler {}
 
 impl EventCallbackHandler {
-    fn dispatch(&self, screens: &[String]) {
+    pub(crate) fn dispatch(&self, screens: &[String]) {
         // Defensive: validate callback pointer before dereferencing (C14).
         // The C API contract says the caller guarantees validity, but
         // a null check is cheap and prevents UB on misbehaving callers.

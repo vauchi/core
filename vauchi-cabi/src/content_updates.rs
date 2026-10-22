@@ -1,0 +1,116 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! CDN content for C ABI shells, which schedule nothing themselves
+//! (vauchi/private#733 D10): content cached by an earlier run loads when an
+//! app opens on a data directory, and once a shell registers its callback
+//! Core runs the update cycle within the person's setting. An in-memory app
+//! has no data directory and gets neither.
+
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+
+use vauchi_app::content::{ApplyResult, ContentConfig, ContentManager, ContentScheduler};
+use vauchi_app::ui::AppEngine;
+
+use crate::VauchiApp;
+use crate::app::EventCallbackHandler;
+
+/// The first cycle waits for the app to settle.
+const SETTLE: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Loads content cached by an earlier run; call before the engine is built,
+/// which reads the active social networks.
+pub(crate) fn load_cached_content(data_dir: &Path) {
+    if let Some(manager) = manager_over(data_dir) {
+        manager.load_cached_locales_into_i18n();
+        manager.load_cached_themes_into_theme_store();
+        manager.load_cached_networks_into_registry();
+    }
+}
+
+fn manager_over(data_dir: &Path) -> Option<ContentManager> {
+    let config = ContentConfig {
+        storage_path: data_dir.to_path_buf(),
+        ..Default::default()
+    };
+    ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).ok()
+}
+
+/// One cycle as the scheduler runs it, holding only what it shares with
+/// the app, so a cycle in progress never reaches into a destroyed handle.
+pub(crate) struct ScheduledCycle {
+    engine: Arc<Mutex<Option<AppEngine>>>,
+    callback: Arc<Mutex<Option<EventCallbackHandler>>>,
+    data_dir: PathBuf,
+}
+
+impl ScheduledCycle {
+    /// Whether the cycle applied content, or `None` when the setting kept
+    /// it from running. Applied content rebuilds the screens and calls the
+    /// shell's callback, outside the engine lock.
+    pub(crate) fn run(&self) -> Option<bool> {
+        let allowed = self.engine.lock().ok().is_some_and(|slot| {
+            slot.as_ref()
+                .is_some_and(AppEngine::content_updates_allowed)
+        });
+        if !allowed {
+            return None;
+        }
+        let manager = manager_over(&self.data_dir)?;
+        let (_, apply) = manager.run_update_cycle_blocking();
+        let applied = matches!(
+            &apply,
+            Some(Ok(ApplyResult::Applied { applied, .. })) if !applied.is_empty()
+        );
+        if applied {
+            manager.load_cached_networks_into_registry();
+            if let Ok(mut slot) = self.engine.lock()
+                && let Some(engine) = slot.as_mut()
+            {
+                engine.reload_social_networks();
+                engine.reload_locales();
+            }
+            let callback = self.callback.lock().ok().and_then(|c| *c);
+            if let Some(callback) = callback {
+                callback.dispatch(&[]);
+            }
+        }
+        Some(applied)
+    }
+}
+
+impl VauchiApp {
+    pub(crate) fn with_content_dir(mut self, data_dir: &Path) -> Self {
+        self.content_dir = Some(data_dir.to_path_buf());
+        self
+    }
+
+    /// The cycle Core runs for this app, if it has a data directory.
+    pub(crate) fn scheduled_content_cycle(&self) -> Option<ScheduledCycle> {
+        Some(ScheduledCycle {
+            engine: Arc::clone(&self.engine),
+            callback: Arc::clone(&self.event_callback),
+            data_dir: self.content_dir.clone()?,
+        })
+    }
+
+    /// Starts Core's own content cycle, once.
+    pub(crate) fn start_content_scheduler(&self) {
+        let Ok(mut slot) = self.content_scheduler.lock() else {
+            return;
+        };
+        if slot.is_some() {
+            return;
+        }
+        let Some(cycle) = self.scheduled_content_cycle() else {
+            return;
+        };
+        *slot =
+            ContentScheduler::spawn(SETTLE, ContentConfig::default().check_interval, move || {
+                let _ = cycle.run();
+            })
+            .ok();
+    }
+}

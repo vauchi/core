@@ -201,6 +201,59 @@ impl PlatformAppEngine {
         }
     }
 
+    /// Starts Core's own content cycle once a shell listens, so a
+    /// background update can re-render (vauchi/private#733 D10). The first
+    /// cycle waits for the app to settle.
+    #[cfg(feature = "content-updates")]
+    pub(crate) fn start_content_scheduler(&self) {
+        const SETTLE: std::time::Duration = std::time::Duration::from_secs(30);
+        let Ok(mut slot) = self.content_scheduler.lock() else {
+            return;
+        };
+        if slot.is_some() {
+            return;
+        }
+        let engine = self.self_ref.clone();
+        *slot = vauchi_app::content::ContentScheduler::spawn(
+            SETTLE,
+            vauchi_app::content::ContentConfig::default().check_interval,
+            move || {
+                if let Some(engine) = engine.upgrade() {
+                    engine.run_scheduled_content_cycle();
+                }
+            },
+        )
+        .ok();
+    }
+
+    /// One scheduled cycle: within the person's setting, and on applied
+    /// content the screens rebuild and the shell is told to re-render.
+    /// `None` when the setting kept it from running.
+    pub(crate) fn run_scheduled_content_cycle(
+        &self,
+    ) -> Option<crate::content::MobileContentCycleOutcome> {
+        let allowed = self.lock_engine().ok().is_some_and(|mut slot| {
+            open_engine(&mut slot).is_ok_and(|engine| engine.content_updates_allowed())
+        });
+        if !allowed {
+            return None;
+        }
+        let outcome = self.run_content_update_cycle_dispatch();
+        if outcome.applied {
+            if let Ok(mut slot) = self.lock_engine()
+                && let Ok(engine) = open_engine(&mut slot)
+            {
+                crate::pae_dispatch::engagement::invalidate_content_screens(engine);
+            }
+            if let Ok(notifier) = self.event_notifier.lock()
+                && let Some(notifier) = notifier.as_ref()
+            {
+                notifier.notify(Vec::<String>::new());
+            }
+        }
+        Some(outcome)
+    }
+
     /// Whole content-update cycle: check, then apply only when updates
     /// are available. Owns the sequencing frontends used to duplicate
     /// (ADR-021/ADR-043 — F-3, pure-functional-core program record).

@@ -10,7 +10,7 @@
 mod contacts;
 mod delivery;
 mod devices;
-mod engagement;
+pub(crate) mod engagement;
 mod groups_visibility;
 mod own_card_identity;
 mod recovery_backup;

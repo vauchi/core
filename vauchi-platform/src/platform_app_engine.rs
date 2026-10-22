@@ -122,6 +122,13 @@ pub struct PlatformAppEngine {
     /// Delivers to the registered listener from its own thread, so the
     /// listener never runs under the engine lock (vauchi/private#677).
     pub(crate) event_notifier: Mutex<Option<Arc<vauchi_app::event_notifier::EventNotifier>>>,
+    /// This engine, for the content scheduler's thread to reach without
+    /// keeping it alive.
+    pub(crate) self_ref: std::sync::Weak<PlatformAppEngine>,
+    /// Core's own content update cycle, started once a shell listens
+    /// (vauchi/private#733 D10).
+    #[cfg(feature = "content-updates")]
+    pub(crate) content_scheduler: Mutex<Option<vauchi_app::content::ContentScheduler>>,
     /// Storage path retained for in-place session creation. Mirrors
     /// `VauchiPlatform::storage_path` so content-update internals can
     /// resolve the data directory without a sibling `VauchiPlatform`.
@@ -358,7 +365,7 @@ impl PlatformAppEngine {
         if let Some(engine) = engine.as_mut() {
             engine.reload_social_networks();
         }
-        Arc::new(Self {
+        Arc::new_cyclic(|self_ref| Self {
             engine: Mutex::new(engine),
             reopening: AtomicBool::new(false),
             reopened: Condvar::new(),
@@ -367,6 +374,9 @@ impl PlatformAppEngine {
             event_handler_id: Mutex::new(None),
             direct_listener: Arc::new(Mutex::new(None)),
             event_notifier: Mutex::new(None),
+            self_ref: self_ref.clone(),
+            #[cfg(feature = "content-updates")]
+            content_scheduler: Mutex::new(None),
             storage_path,
             platform_keychain: Mutex::new(platform_keychain),
             relay_url,
@@ -810,6 +820,8 @@ impl PlatformAppEngine {
                 detail: format!("Lock failed: {e}"),
             })?;
         *direct = Some(listener);
+        #[cfg(feature = "content-updates")]
+        self.start_content_scheduler();
         Ok(())
     }
 }

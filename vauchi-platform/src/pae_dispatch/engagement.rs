@@ -281,7 +281,7 @@ impl PlatformAppEngine {
 /// cache; every screen reading social-network labels re-renders. Named
 /// helper so the invalidation set stays in one place when a new content
 /// type needs a wider one.
-fn invalidate_content_screens(engine: &mut AppEngine) {
+pub(crate) fn invalidate_content_screens(engine: &mut AppEngine) {
     crate::cached_content::reload_cached_networks();
     engine.reload_social_networks();
     engine.reload_locales();

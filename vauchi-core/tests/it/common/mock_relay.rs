@@ -147,6 +147,9 @@ struct MockGateway {
     delay_window_header: Option<String>,
     /// Answer `404` on `/v2/ohttp-async`, as a relay without the path does.
     async_refused: bool,
+    /// Files the `content` action serves, by content path
+    /// (vauchi/private#733 D11).
+    content: std::collections::HashMap<String, Vec<u8>>,
 }
 
 pub struct MockRelay {
@@ -234,6 +237,7 @@ impl MockRelay {
             held_polls: 0,
             delay_window_header: None,
             async_refused: false,
+            content: std::collections::HashMap::new(),
         });
     }
 
@@ -262,6 +266,15 @@ impl MockRelay {
             .map(|blob| serde_json::to_value(blob).expect("FetchedBlob serializes"))
             .collect();
         self.with_gateway(|gateway| gateway.blobs = blobs);
+    }
+
+    /// Files the gateway's `content` action serves, by content path.
+    pub fn set_gateway_content(&self, files: Vec<(&str, Vec<u8>)>) {
+        let files = files
+            .into_iter()
+            .map(|(path, body)| (path.to_string(), body))
+            .collect();
+        self.with_gateway(|gateway| gateway.content = files);
     }
 
     /// The next `polls` collects of any ticket answer `202` (still delayed).
@@ -451,7 +464,20 @@ fn serve_ohttp(gateway: &mut MockGateway, body: &[u8]) -> CannedResponse {
         .and_then(|value| value.as_str())
         .unwrap_or_default()
         .to_string();
-    let reply = if let Some(mailboxes) = &mut gateway.mailboxes {
+    let reply = if action == "content" {
+        use base64::Engine as _;
+        let path = request
+            .get("path")
+            .and_then(|p| p.as_str())
+            .unwrap_or_default();
+        match gateway.content.get(path) {
+            Some(body) => serde_json::json!({
+                "status": "ok",
+                "content_b64": base64::engine::general_purpose::STANDARD.encode(body),
+            }),
+            None => serde_json::json!({ "status": "error", "error": "content unavailable" }),
+        }
+    } else if let Some(mailboxes) = &mut gateway.mailboxes {
         mailboxes.reply(&action, request)
     } else {
         match action.as_str() {

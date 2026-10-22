@@ -99,6 +99,22 @@ fn a_system_language_core_does_not_ship_is_used_once_its_file_loads() {
     assert_eq!(context(None, Some("ro-RO")).resolved_locale(), romanian);
 }
 
+/// A content cycle fetches only these (vauchi/private#733 D7).
+// @internal
+#[test]
+fn the_wanted_languages_are_english_the_pick_and_the_system_language() {
+    assert_eq!(
+        context(Some("pt"), Some("fr-CH")).wanted_locale_codes(),
+        ["en", "pt", "fr"]
+    );
+    assert_eq!(
+        context(Some("en"), Some("en-GB")).wanted_locale_codes(),
+        ["en"]
+    );
+    assert_eq!(context(Some("x"), None).wanted_locale_codes(), ["en"]);
+    assert_eq!(context(None, None).wanted_locale_codes(), ["en"]);
+}
+
 proptest! {
     // @internal
     #[test]

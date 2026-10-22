@@ -276,6 +276,7 @@ impl PlatformAppEngine {
 fn invalidate_content_screens(engine: &mut AppEngine) {
     crate::cached_content::reload_cached_networks();
     engine.reload_social_networks();
+    engine.reload_locales();
     engine.invalidate_screen(&AppScreen::Settings);
     engine.invalidate_screen(&AppScreen::MyInfo);
 }

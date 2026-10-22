@@ -461,6 +461,13 @@ impl AppEngine {
     /// Rebuilds what is derived from the active social-network registry
     /// after new network data loaded: the Add Field catalog and every cached
     /// screen, whose field names follow the registry (vauchi/private#734).
+    /// Rebuild every screen after locale files loaded, so a picked
+    /// language whose file arrived after the screens were built renders in
+    /// it (vauchi/private#733 D4).
+    pub fn reload_locales(&mut self) {
+        self.rebuild_screens();
+    }
+
     pub fn reload_social_networks(&mut self) {
         self.field_catalog =
             vauchi_core::contact_card::FieldTypeCatalog::new(&crate::social::active_registry());

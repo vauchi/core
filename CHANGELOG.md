@@ -15,6 +15,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   answer the user-presence commands through `hardware_event_json` instead
   of writing the JSON themselves (vauchi/private#740).
 
+### Security
+
+- Leaving a verified data export ends it: reopening Privacy, or Back
+  from an export step, returns to the Privacy overview, and the next
+  export asks for the app password or the OS check again. Before, a
+  cached Privacy screen reopened on the format choice with no new check
+  (vauchi/private#750).
+
 ### Removed
 
 - Bindings: `PlatformAppEngine.new` (the constructor taking a storage key

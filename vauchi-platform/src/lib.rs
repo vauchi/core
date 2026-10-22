@@ -262,13 +262,11 @@ pub fn is_blocked_scheme(scheme: String) -> bool {
 // Theme Functions
 // ============================================================
 
-const THEMES_JSON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/themes.json"));
-
-/// Get all available themes from themes.json.
+/// The themes in effect: the CDN catalog once one loads, else the bundled
+/// one — the same list Settings offers.
 #[uniffi::export]
 pub fn get_available_themes() -> Vec<MobileTheme> {
-    vauchi_app::theme::load_themes_from_json(THEMES_JSON)
-        .unwrap_or_else(|_| vec![vauchi_app::theme::default_theme()])
+    vauchi_app::theme::active_themes()
         .iter()
         .map(MobileTheme::from)
         .collect()
@@ -279,8 +277,7 @@ pub fn get_available_themes() -> Vec<MobileTheme> {
 /// Returns None if the theme is not found.
 #[uniffi::export]
 pub fn get_theme(theme_id: String) -> Option<MobileTheme> {
-    vauchi_app::theme::load_themes_from_json(THEMES_JSON)
-        .unwrap_or_default()
+    vauchi_app::theme::active_themes()
         .iter()
         .find(|t| t.id == theme_id)
         .map(MobileTheme::from)

@@ -51,6 +51,10 @@ pub trait PlatformAppEngineTestHelpers {
     /// registered listener, which runs on its own thread (#677).
     fn flush_events_for_test(&self);
 
+    /// Test-only: choose when content updates run, as the Settings
+    /// dropdown does (vauchi/private#733 D6).
+    fn set_content_updates_for_test(&self, choice: vauchi_core::settings::ContentUpdates);
+
     /// Query the retired form-factor-specific navigation list in tests.
     fn nav_items(
         &self,
@@ -253,6 +257,14 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
             && let Some(e) = slot.as_mut()
         {
             e.cancel_device_link_session();
+        }
+    }
+
+    fn set_content_updates_for_test(&self, choice: vauchi_core::settings::ContentUpdates) {
+        if let Ok(mut engine_slot) = self.lock_engine()
+            && let Ok(engine) = crate::platform_app_engine_internals::open_engine(&mut engine_slot)
+        {
+            engine.vauchi_mut().config_mut().content_updates = choice;
         }
     }
 

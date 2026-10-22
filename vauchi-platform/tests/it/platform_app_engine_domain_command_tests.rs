@@ -311,6 +311,35 @@ fn grant_consent_invalidates_settings_and_privacy_screens() {
 
 // ── Content Updates (B7 batch 2) ────────────────────────────────────
 
+/// With content updates Off a cycle makes no request: online, a check
+/// would record its time; offline, it would report a retryable failure
+/// (vauchi/private#733 D6).
+// @internal
+#[test]
+fn a_cycle_with_content_updates_off_makes_no_request() {
+    let (engine, dir) = create_engine_with_identity();
+    engine.set_content_updates_for_test(vauchi_core::settings::ContentUpdates::Off);
+
+    let outcome = match engine
+        .dispatch_domain_command(DomainCommand::RunContentUpdateCycle)
+        .expect("dispatch")
+    {
+        DomainCommandResult::ContentUpdateCycle { outcome } => outcome,
+        other => panic!("unexpected result: {other:?}"),
+    };
+
+    assert!(
+        !outcome.applied && !outcome.retryable_failure,
+        "{outcome:?}"
+    );
+    let checked = std::fs::read_dir(dir.path())
+        .unwrap()
+        .flatten()
+        .any(|e| e.path().join("content").join("last_check").exists())
+        || dir.path().join("content").join("last_check").exists();
+    assert!(!checked, "a check ran");
+}
+
 // @internal
 #[test]
 fn run_content_update_cycle_is_benign_noop_when_feature_off() {

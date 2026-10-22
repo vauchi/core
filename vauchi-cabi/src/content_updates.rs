@@ -31,13 +31,18 @@ pub(crate) fn load_cached_content(data_dir: &Path) {
 }
 
 fn manager_over(data_dir: &Path) -> Option<ContentManager> {
-    manager_wanting(data_dir, None)
+    manager_wanting(data_dir, None, None)
 }
 
-fn manager_wanting(data_dir: &Path, wanted_locales: Option<Vec<String>>) -> Option<ContentManager> {
+fn manager_wanting(
+    data_dir: &Path,
+    wanted_locales: Option<Vec<String>>,
+    source: Option<vauchi_app::content::ContentSourceHandle>,
+) -> Option<ContentManager> {
     let config = ContentConfig {
         storage_path: data_dir.to_path_buf(),
         wanted_locales,
+        source,
         ..Default::default()
     };
     ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).ok()
@@ -56,14 +61,17 @@ impl ScheduledCycle {
     /// it from running. Applied content rebuilds the screens and calls the
     /// shell's callback, outside the engine lock.
     pub(crate) fn run(&self) -> Option<bool> {
-        let wanted = self.engine.lock().ok().and_then(|slot| {
+        let (wanted, source) = self.engine.lock().ok().and_then(|slot| {
             slot.as_ref().and_then(|engine| {
-                engine
-                    .content_updates_allowed()
-                    .then(|| engine.render_context().wanted_locale_codes())
+                engine.content_updates_allowed().then(|| {
+                    (
+                        engine.render_context().wanted_locale_codes(),
+                        vauchi_app::content::relay_content_source(engine.vauchi()),
+                    )
+                })
             })
         })?;
-        let manager = manager_wanting(&self.data_dir, Some(wanted))?;
+        let manager = manager_wanting(&self.data_dir, Some(wanted), Some(source))?;
         let (_, apply) = manager.run_update_cycle_blocking();
         let applied = matches!(
             &apply,

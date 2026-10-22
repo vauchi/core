@@ -228,14 +228,17 @@ impl PlatformAppEngine {
     pub(crate) fn run_scheduled_content_cycle(
         &self,
     ) -> Option<crate::content::MobileContentCycleOutcome> {
-        let wanted = self.lock_engine().ok().and_then(|mut slot| {
+        let (wanted, source) = self.lock_engine().ok().and_then(|mut slot| {
             open_engine(&mut slot).ok().and_then(|engine| {
-                engine
-                    .content_updates_allowed()
-                    .then(|| engine.render_context().wanted_locale_codes())
+                engine.content_updates_allowed().then(|| {
+                    (
+                        engine.render_context().wanted_locale_codes(),
+                        content_source_for(engine),
+                    )
+                })
             })
         })?;
-        let outcome = self.run_content_update_cycle_dispatch(wanted);
+        let outcome = self.run_content_update_cycle_dispatch(wanted, source);
         if outcome.applied {
             if let Ok(mut slot) = self.lock_engine()
                 && let Ok(engine) = open_engine(&mut slot)
@@ -259,14 +262,15 @@ impl PlatformAppEngine {
     pub(crate) fn run_content_update_cycle_dispatch(
         &self,
         wanted_locales: Vec<String>,
+        source: ContentSourceArg,
     ) -> crate::content::MobileContentCycleOutcome {
         #[cfg(feature = "content-updates")]
         {
-            self.run_content_update_cycle_engine(wanted_locales)
+            self.run_content_update_cycle_engine(wanted_locales, source)
         }
         #[cfg(not(feature = "content-updates"))]
         {
-            let _ = wanted_locales;
+            let _ = (wanted_locales, source);
             crate::content::content_cycle_outcome(
                 &crate::content::MobileUpdateStatus::Disabled,
                 None,
@@ -292,11 +296,27 @@ impl PlatformAppEngine {
 
 // ── Content updates internals (B7 batch 2 — feature-gated) ─────────
 
+/// Where a content cycle fetches from: the relay over OHTTP
+/// (vauchi/private#733 D8).
+#[cfg(feature = "content-updates")]
+pub(crate) type ContentSourceArg = Option<vauchi_app::content::ContentSourceHandle>;
+#[cfg(not(feature = "content-updates"))]
+pub(crate) type ContentSourceArg = ();
+
+#[cfg(feature = "content-updates")]
+pub(crate) fn content_source_for(engine: &AppEngine) -> ContentSourceArg {
+    Some(vauchi_app::content::relay_content_source(engine.vauchi()))
+}
+
+#[cfg(not(feature = "content-updates"))]
+pub(crate) fn content_source_for(_engine: &AppEngine) -> ContentSourceArg {}
+
 #[cfg(feature = "content-updates")]
 impl PlatformAppEngine {
     fn run_content_update_cycle_engine(
         &self,
         wanted_locales: Vec<String>,
+        source: ContentSourceArg,
     ) -> crate::content::MobileContentCycleOutcome {
         use crate::content::{MobileApplyResult, MobileUpdateStatus, content_cycle_outcome};
         use vauchi_app::content::{ContentConfig, ContentManager};
@@ -309,6 +329,7 @@ impl PlatformAppEngine {
                 .to_path_buf(),
             remote_updates_enabled: true,
             wanted_locales: Some(wanted_locales),
+            source,
             ..Default::default()
         };
         let Ok(manager) = ContentManager::new(config, vauchi_core::clock::SystemClock::shared())

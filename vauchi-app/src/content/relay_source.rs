@@ -12,3 +12,12 @@ impl super::ContentSource for HttpTransport {
         self.fetch_content(path).map_err(|e| e.to_string())
     }
 }
+
+/// The relay of `vauchi`'s configuration, over OHTTP, as a content source.
+/// May fetch the gateway's signed key first when none is held.
+pub fn relay_content_source(vauchi: &vauchi_core::api::Vauchi) -> super::ContentSourceHandle {
+    let relay = &vauchi.config().relay;
+    let transport =
+        vauchi.build_action_relay_transport(&relay.server_url, relay.connect_timeout_ms);
+    super::ContentSourceHandle(std::sync::Arc::new(transport))
+}

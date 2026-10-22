@@ -30,6 +30,8 @@ pub use config::{ContentConfig, ContentSource, ContentSourceHandle};
 pub use fetcher::{ContentFetcher, FetchError};
 pub use integrity::{IntegrityError, compute_checksum, verify_checksum, verify_manifest_signature};
 pub use manager::{ApplyResult, ContentError, ContentManager, LocaleStrings};
+#[cfg(feature = "network-http")]
+pub use relay_source::relay_content_source;
 pub use scheduler::ContentScheduler;
 pub use types::{
     ContentEntry, ContentIndex, ContentManifest, ContentType, FileEntry, LocalesEntry, UpdateStatus,

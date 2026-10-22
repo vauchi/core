@@ -101,30 +101,43 @@ impl<'de> Deserialize<'de> for Locale {
 }
 
 /// Information about a locale
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocaleInfo {
-    pub code: &'static str,
-    pub name: &'static str,
-    pub english_name: &'static str,
+    pub code: String,
+    pub name: String,
+    pub english_name: String,
     pub is_rtl: bool,
 }
 
-/// Get information about a locale
+/// Get information about a locale: from its loaded file's `_meta` when
+/// that is usable, else by its code (vauchi/private#733 D2).
 pub fn get_locale_info(locale: Locale) -> LocaleInfo {
-    let (code, name, english_name) = match locale.code() {
-        "en" => ("en", "English", "English"),
-        "de" => ("de", "Deutsch", "German"),
-        "fr" => ("fr", "Français", "French"),
-        "es" => ("es", "Español", "Spanish"),
-        "it" => ("it", "Italiano", "Italian"),
-        _ => ("en", "English", "English"),
+    if let Some(info) = loaded_locale_info(locale) {
+        return info;
+    }
+    let (name, english_name) = match locale.code() {
+        "en" => ("English", "English"),
+        "de" => ("Deutsch", "German"),
+        "fr" => ("Français", "French"),
+        "es" => ("Español", "Spanish"),
+        "it" => ("Italiano", "Italian"),
+        code => (code, code),
     };
     LocaleInfo {
-        code,
-        name,
-        english_name,
+        code: locale.code().to_string(),
+        name: name.to_string(),
+        english_name: english_name.to_string(),
         is_rtl: false,
     }
+}
+
+fn loaded_locale_info(locale: Locale) -> Option<LocaleInfo> {
+    LOCALE_META
+        .read()
+        .ok()?
+        .as_ref()?
+        .get(locale.code())
+        .cloned()
 }
 
 /// The languages every shell bundles a file for. They resolve before the
@@ -234,6 +247,14 @@ pub fn get_string_with_args(locale: Locale, key: &str, args: &[(&str, &str)]) ->
 /// Global locale store: maps locale code → string map
 static LOCALE_STORE: RwLock<Option<HashMap<String, HashMap<String, String>>>> = RwLock::new(None);
 
+/// Each loaded file's usable `_meta`, by locale code. A file whose `_meta`
+/// is unusable has strings in `LOCALE_STORE` and no entry here.
+static LOCALE_META: RwLock<Option<HashMap<String, LocaleInfo>>> = RwLock::new(None);
+
+/// Longest language name a `_meta` may carry; names are shown in a
+/// dropdown, and a CDN file is untrusted input (DC-01).
+const MAX_LANGUAGE_NAME_CHARS: usize = 64;
+
 /// Errors from i18n operations
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -258,6 +279,7 @@ pub enum I18nError {
 /// the locale code (e.g., `en.json` → `"en"`).
 pub fn init(resource_dir: &Path) -> Result<(), I18nError> {
     let mut store = HashMap::new();
+    let mut meta = HashMap::new();
 
     if resource_dir.exists() {
         for entry in std::fs::read_dir(resource_dir)? {
@@ -272,14 +294,17 @@ pub fn init(resource_dir: &Path) -> Result<(), I18nError> {
                     .to_string();
 
                 let data = std::fs::read(&path)?;
-                let strings = parse_locale_bytes(&data)?;
+                let (strings, info) = parse_locale_file(&code, &data)?;
+                if let Some(info) = info {
+                    meta.insert(code.clone(), info);
+                }
                 store.insert(code, strings);
             }
         }
     }
 
-    let mut lock = LOCALE_STORE.write().map_err(|_| I18nError::LockPoisoned)?;
-    *lock = Some(store);
+    *LOCALE_STORE.write().map_err(|_| I18nError::LockPoisoned)? = Some(store);
+    *LOCALE_META.write().map_err(|_| I18nError::LockPoisoned)? = Some(meta);
     Ok(())
 }
 
@@ -293,7 +318,15 @@ pub fn init(resource_dir: &Path) -> Result<(), I18nError> {
 /// outright. This prevents a partial CDN locale file from wiping keys the
 /// running app still needs, which would surface as "Missing: ..." placeholders.
 pub fn load_locale_from_bytes(code: &str, data: &[u8]) -> Result<(), I18nError> {
-    let mut strings = parse_locale_bytes(data)?;
+    let (mut strings, info) = parse_locale_file(code, data)?;
+    {
+        let mut meta = LOCALE_META.write().map_err(|_| I18nError::LockPoisoned)?;
+        let meta = meta.get_or_insert_with(HashMap::new);
+        match info {
+            Some(info) => meta.insert(code.to_string(), info),
+            None => meta.remove(code),
+        };
+    }
 
     let mut lock = LOCALE_STORE.write().map_err(|_| I18nError::LockPoisoned)?;
 
@@ -324,14 +357,48 @@ pub fn is_initialized() -> bool {
         .unwrap_or(false)
 }
 
-/// Parse a locale JSON byte slice into a string map, filtering out the `_meta` key.
-fn parse_locale_bytes(data: &[u8]) -> Result<HashMap<String, String>, I18nError> {
-    let raw: HashMap<String, serde_json::Value> = serde_json::from_slice(data)?;
-    Ok(raw
+/// Parse a locale file into its string map and, when usable, its `_meta`.
+fn parse_locale_file(
+    code: &str,
+    data: &[u8],
+) -> Result<(HashMap<String, String>, Option<LocaleInfo>), I18nError> {
+    let mut raw: HashMap<String, serde_json::Value> = serde_json::from_slice(data)?;
+    let info = raw
+        .remove("_meta")
+        .and_then(|meta| serde_json::from_value::<RawLocaleMeta>(meta).ok())
+        .and_then(|meta| meta.into_info(code));
+    let strings = raw
         .into_iter()
-        .filter(|(k, _)| k != "_meta")
         .filter_map(|(k, v)| v.as_str().map(|s| (k, s.to_owned())))
-        .collect())
+        .collect();
+    Ok((strings, info))
+}
+
+#[derive(Deserialize)]
+struct RawLocaleMeta {
+    locale: String,
+    name: String,
+    english_name: String,
+    #[serde(default)]
+    is_rtl: bool,
+}
+
+impl RawLocaleMeta {
+    /// The file counts only under its own name, so a file cannot claim to
+    /// be another language, and only with names a dropdown can show.
+    fn into_info(self, file_code: &str) -> Option<LocaleInfo> {
+        let usable = |name: &str| {
+            (1..=MAX_LANGUAGE_NAME_CHARS).contains(&name.chars().count())
+                && !name.chars().any(char::is_control)
+        };
+        let counts = self.locale == file_code && usable(&self.name) && usable(&self.english_name);
+        counts.then_some(LocaleInfo {
+            code: self.locale,
+            name: self.name,
+            english_name: self.english_name,
+            is_rtl: self.is_rtl,
+        })
+    }
 }
 
 /// Get strings for a specific locale. Reads from the RwLock store, falling

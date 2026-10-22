@@ -79,7 +79,7 @@ fn an_unknown_picked_language_falls_through_to_the_system_language() {
 #[test]
 fn an_untranslated_system_language_resolves_to_english() {
     assert_eq!(
-        context(None, Some("pt-BR")).resolved_locale(),
+        context(None, Some("km-KH")).resolved_locale(),
         Locale::ENGLISH
     );
     assert_eq!(context(None, None).resolved_locale(), Locale::ENGLISH);

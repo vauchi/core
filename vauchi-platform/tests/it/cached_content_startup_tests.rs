@@ -84,6 +84,28 @@ fn a_theme_cached_by_an_earlier_run_is_loaded_when_the_engine_starts() {
     );
 }
 
+/// Shells apply a theme natively by asking for it, so a CDN theme picked
+/// in Settings must be one they can find (vauchi/private#733).
+// @internal
+#[test]
+fn shells_find_a_theme_cached_by_an_earlier_run() {
+    let _dir = start_engine_over(&[("themes/themes.json", CACHED_THEMES)]);
+
+    let listed: Vec<String> = vauchi_platform::get_available_themes()
+        .into_iter()
+        .map(|t| t.id)
+        .collect();
+    assert_eq!(listed, vec!["cdn-only".to_string()]);
+    assert_eq!(
+        vauchi_platform::get_theme("cdn-only".into()).map(|t| t.name),
+        Some("From the CDN".to_string())
+    );
+    assert_eq!(
+        vauchi_platform::get_theme("not-a-theme".into()).map(|t| t.id),
+        None
+    );
+}
+
 // @internal
 #[test]
 fn the_shells_bundled_locales_loaded_after_start_keep_the_cached_overlay() {

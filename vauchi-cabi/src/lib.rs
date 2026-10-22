@@ -24,6 +24,8 @@ mod app_locked;
 mod app_navigation;
 mod app_presentation;
 mod config;
+#[cfg(test)]
+mod content_updates_tests;
 mod design_tokens;
 mod exchange;
 mod i18n;

@@ -298,6 +298,28 @@ impl SettingsEngine {
         )
     }
 
+    pub(super) fn content_updates_dropdown(&self) -> Component {
+        use vauchi_core::settings::ContentUpdates;
+        let options = ContentUpdates::ALL
+            .into_iter()
+            .map(|choice| DropdownOption {
+                id: choice.id().into(),
+                label: self.t(&format!("settings.content_updates_{}", choice.id())),
+            })
+            .collect();
+        Component::Dropdown {
+            id: "content_updates".into(),
+            label: self.t("settings.content_updates"),
+            selected: Some(self.config.content_updates.id().into()),
+            options,
+            a11y: Some(A11y {
+                label: Some(self.t("settings.content_updates")),
+                hint: Some(self.t("settings.content_updates_hint")),
+                role: None,
+            }),
+        }
+    }
+
     pub(super) fn accessibility_group(&self) -> Component {
         Component::SettingsGroup {
             id: "accessibility".into(),

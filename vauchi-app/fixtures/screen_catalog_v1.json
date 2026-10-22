@@ -6278,6 +6278,32 @@
                   }
                 },
                 {
+                  "Choice": {
+                    "binding_id": "surface.1.binding.0",
+                    "label": "Content updates",
+                    "selected": "on",
+                    "options": [
+                      {
+                        "id": "on",
+                        "label": "On"
+                      },
+                      {
+                        "id": "wifi_only",
+                        "label": "Wi-Fi only"
+                      },
+                      {
+                        "id": "off",
+                        "label": "Off"
+                      }
+                    ],
+                    "enabled": true,
+                    "accessibility": {
+                      "label": "Content updates",
+                      "description": "Download new languages, themes and social networks"
+                    }
+                  }
+                },
+                {
                   "List": {
                     "id": "delivery",
                     "label": "Message Delivery",
@@ -6419,7 +6445,7 @@
                       {
                         "title": "Version",
                         "subtitle": null,
-                        "detail": "0.81.0",
+                        "detail": "0.85.0",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": null,
@@ -6454,7 +6480,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.0",
+                              "binding_id": "surface.1.binding.1",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -7267,18 +7293,6 @@
                       {
                         "id": "de",
                         "label": "Deutsch"
-                      },
-                      {
-                        "id": "fr",
-                        "label": "Français"
-                      },
-                      {
-                        "id": "es",
-                        "label": "Español"
-                      },
-                      {
-                        "id": "it",
-                        "label": "Italiano"
                       }
                     ],
                     "enabled": true,

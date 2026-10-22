@@ -99,6 +99,7 @@ use super::ohttp_client::OhttpClient;
 use super::pinning::PinnedCertificate;
 use super::transport::ProxyConfig;
 
+mod content;
 mod delayed;
 pub(crate) use delayed::PendingFetch;
 pub use delayed::{

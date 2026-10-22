@@ -24,6 +24,9 @@ mod app_locked;
 mod app_navigation;
 mod app_presentation;
 mod config;
+mod content_updates;
+#[cfg(test)]
+mod content_updates_tests;
 mod design_tokens;
 mod exchange;
 mod i18n;
@@ -43,26 +46,33 @@ use config::CabiConfig;
 /// Opaque handle to an AppEngine instance.
 pub struct VauchiApp {
     /// `None` while the locked start below holds storage closed.
-    pub(crate) engine: Mutex<Option<AppEngine>>,
+    pub(crate) engine: Arc<Mutex<Option<AppEngine>>>,
     /// Core's storage-lock screens until storage opens (vauchi/private#581).
     pub(crate) locked: Mutex<Option<app_locked::LockedStart>>,
     /// Active event handler ID for cleanup on replacement or destroy.
     pub(crate) event_handler_id: Mutex<Option<vauchi_core::api::HandlerId>>,
     /// The registered event callback, registered again on a reopened engine.
-    pub(crate) event_callback: Mutex<Option<app::EventCallbackHandler>>,
+    pub(crate) event_callback: Arc<Mutex<Option<app::EventCallbackHandler>>>,
     /// How this handle opened storage, to reopen a fresh install after a
     /// shred (vauchi/private#599); `None` for handles that cannot reopen.
     pub(crate) reopen: Option<app_locked::KeyringOpen>,
+    /// The data directory content is cached under; `None` for an
+    /// in-memory app (vauchi/private#733 D10).
+    pub(crate) content_dir: Option<std::path::PathBuf>,
+    /// Core's own content update cycle, started once a callback is set.
+    pub(crate) content_scheduler: Mutex<Option<vauchi_app::content::ContentScheduler>>,
 }
 
 impl VauchiApp {
     pub(crate) fn opened(engine: AppEngine) -> Self {
         Self {
-            engine: Mutex::new(Some(engine)),
+            engine: Arc::new(Mutex::new(Some(engine))),
             locked: Mutex::new(None),
             event_handler_id: Mutex::new(None),
-            event_callback: Mutex::new(None),
+            event_callback: Arc::new(Mutex::new(None)),
             reopen: None,
+            content_dir: None,
+            content_scheduler: Mutex::new(None),
         }
     }
 }
@@ -183,7 +193,10 @@ pub unsafe extern "C" fn vauchi_app_create_from_config(config: *mut CabiConfig) 
                 return std::ptr::null_mut();
             };
 
-            Box::into_raw(Box::new(VauchiApp::opened(AppEngine::new(vauchi))))
+            content_updates::load_cached_content(&data_dir);
+            Box::into_raw(Box::new(
+                VauchiApp::opened(AppEngine::new(vauchi)).with_content_dir(&data_dir),
+            ))
         })) {
             Ok(result) => result,
             Err(_) => std::ptr::null_mut(),

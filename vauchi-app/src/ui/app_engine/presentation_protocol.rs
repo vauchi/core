@@ -132,6 +132,7 @@ impl AppEngine {
 
     /// Return the complete initial renderer state as one ordered command batch.
     pub fn initial_commands(&mut self) -> Result<Vec<Command>, AppPresentationError> {
+        self.absorb_applied_content();
         self.in_foreground = true;
         let screen = self.current_screen();
         let mut commands = self.surface_commands(&screen)?;
@@ -176,6 +177,7 @@ impl AppEngine {
 
     /// Reduce one raw shell event into the next ordered command batch.
     pub fn dispatch(&mut self, event: Event) -> Result<Vec<Command>, AppPresentationError> {
+        self.absorb_applied_content();
         self.clear_open_overlay(&event);
 
         if matches!(event, Event::PresentationInvalidated) {

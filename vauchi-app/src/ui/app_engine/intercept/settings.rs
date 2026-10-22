@@ -126,6 +126,23 @@ impl AppEngine {
             let _ = self.vauchi.save_backup_reminder_state(&state);
         }
 
+        if let UserAction::ListItemSelected {
+            component_id,
+            item_id,
+        } = action
+            && component_id == "content_updates"
+            && let Some(choice) = vauchi_core::settings::ContentUpdates::from_id(item_id)
+        {
+            self.vauchi.config_mut().content_updates = choice;
+            self.refresh_content_snapshot();
+            let mut flags = self.vauchi.load_settings_flags().unwrap_or_default();
+            flags.merge_config_toggles(self.vauchi.config());
+            // best-effort, like the toggles above: a failed save keeps the
+            // choice for this session only
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = self.vauchi.save_settings_flags(&flags);
+        }
+
         // Handle theme + language Dropdown selections.
         // Component::Dropdown emits UserAction::ListItemSelected with
         // component_id = the dropdown id ("theme" / "language") and

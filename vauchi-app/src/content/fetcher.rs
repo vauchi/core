@@ -34,10 +34,33 @@ pub struct ContentFetcher {
     max_content_size: u64,
     /// Publisher key for manifest signature verification.
     publisher_public_key: vauchi_core::crypto::signing::PublicKey,
+    source: Option<std::sync::Arc<dyn super::config::ContentSource>>,
 }
 
 #[cfg(feature = "content-updates")]
 impl ContentFetcher {
+    /// The file at `path` from the configured source, refused past
+    /// `max_content_size`.
+    async fn fetch_from_source(
+        &self,
+        source: &std::sync::Arc<dyn super::config::ContentSource>,
+        path: &str,
+    ) -> Result<Vec<u8>, FetchError> {
+        let source = std::sync::Arc::clone(source);
+        let path = path.to_owned();
+        let data = tokio::task::spawn_blocking(move || source.fetch(&path))
+            .await
+            .map_err(|e| FetchError::NetworkError(e.to_string()))?
+            .map_err(FetchError::NetworkError)?;
+        if data.len() as u64 > self.max_content_size {
+            return Err(FetchError::TooLarge {
+                size: data.len() as u64,
+                max: self.max_content_size,
+            });
+        }
+        Ok(data)
+    }
+
     /// Create a new content fetcher from config
     pub fn new(config: &ContentConfig) -> Result<Self, FetchError> {
         let timeout = config.timeout;
@@ -64,11 +87,21 @@ impl ContentFetcher {
             base_url: config.content_url.clone(),
             max_content_size: config.max_content_size,
             publisher_public_key: config.publisher_public_key.clone(),
+            source: config
+                .source
+                .as_ref()
+                .map(|handle| std::sync::Arc::clone(&handle.0)),
         })
     }
 
     /// Fetch manifest from remote
     pub async fn fetch_manifest(&self) -> Result<ContentManifest, FetchError> {
+        if let Some(source) = &self.source {
+            let data = self.fetch_from_source(source, "manifest.json").await?;
+            let manifest: ContentManifest = serde_json::from_slice(&data)?;
+            super::integrity::verify_manifest_signature(&manifest, &self.publisher_public_key)?;
+            return Ok(manifest);
+        }
         let url = format!("{}/manifest.json", self.base_url);
         let agent = self.agent.clone();
 
@@ -108,6 +141,11 @@ impl ContentFetcher {
         path: &str,
         expected_checksum: &str,
     ) -> Result<Vec<u8>, FetchError> {
+        if let Some(source) = &self.source {
+            let data = self.fetch_from_source(source, path).await?;
+            super::integrity::verify_checksum(&data, expected_checksum)?;
+            return Ok(data);
+        }
         let url = format!("{}/{}", self.base_url, path);
         let max_content_size = self.max_content_size;
         let agent = self.agent.clone();

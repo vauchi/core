@@ -51,6 +51,17 @@ pub trait PlatformAppEngineTestHelpers {
     /// registered listener, which runs on its own thread (#677).
     fn flush_events_for_test(&self);
 
+    /// Test-only: choose when content updates run, as the Settings
+    /// dropdown does (vauchi/private#733 D6).
+    fn set_content_updates_for_test(&self, choice: vauchi_core::settings::ContentUpdates);
+
+    /// Test-only: run one cycle the way Core's content scheduler does
+    /// (vauchi/private#733 D10), on the calling thread; `None` when the
+    /// setting kept it from running.
+    fn run_scheduled_content_cycle_for_test(
+        &self,
+    ) -> Option<crate::content::MobileContentCycleOutcome>;
+
     /// Query the retired form-factor-specific navigation list in tests.
     fn nav_items(
         &self,
@@ -254,6 +265,20 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
         {
             e.cancel_device_link_session();
         }
+    }
+
+    fn set_content_updates_for_test(&self, choice: vauchi_core::settings::ContentUpdates) {
+        if let Ok(mut engine_slot) = self.lock_engine()
+            && let Ok(engine) = crate::platform_app_engine_internals::open_engine(&mut engine_slot)
+        {
+            engine.vauchi_mut().config_mut().content_updates = choice;
+        }
+    }
+
+    fn run_scheduled_content_cycle_for_test(
+        &self,
+    ) -> Option<crate::content::MobileContentCycleOutcome> {
+        self.run_scheduled_content_cycle()
     }
 
     fn navigate_to_json_for_test(&self, screen_json: String) -> Result<(), MobileError> {

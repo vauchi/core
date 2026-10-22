@@ -10,6 +10,10 @@
 mod app_screen;
 mod ble_handshake;
 mod completion;
+#[cfg(feature = "content-updates")]
+mod content_runner;
+#[cfg(feature = "content-updates")]
+pub use content_runner::ContentRunOptions;
 mod completion_contact;
 mod completion_forms;
 mod contact_visibility_view;
@@ -117,6 +121,15 @@ pub struct AppEngine {
     /// Transient transport-permission ledger (T2.1b): updated from
     /// `Event::PermissionDenied`, joined with `device_capabilities` by T2.2.
     pub(super) transport_readiness: TransportReadiness,
+    /// What the current network costs, as the shell last reported it
+    /// (vauchi/private#733 D6); unknown until it reports.
+    pub(super) network_cost: vauchi_core::settings::NetworkCost,
+    /// The wanted languages changed since the binding layer last asked, so
+    /// it should request a content cycle (vauchi/private#733 D7).
+    wanted_locales_changed: bool,
+    /// Core's content cycle for a shell driving the engine directly.
+    #[cfg(feature = "content-updates")]
+    content_runner: Option<content_runner::ContentRunner>,
     /// Frontend-pushed render context — Category-1 settings per ADR-047
     /// (locale + theme_id). Owned by the frontend's OS-native sandbox;
     /// pushed via `set_render_context_json` at boot and on Settings
@@ -338,6 +351,27 @@ impl AppEngine {
         self.local_network_address = address;
     }
 
+    #[cfg(not(feature = "content-updates"))]
+    pub(super) fn refresh_content_snapshot(&mut self) {}
+
+    #[cfg(not(feature = "content-updates"))]
+    pub(super) fn absorb_applied_content(&mut self) {}
+
+    /// Whether the wanted languages changed since the last call, so a
+    /// content cycle should fetch a newly wanted file now.
+    pub fn take_wanted_locales_changed(&mut self) -> bool {
+        std::mem::take(&mut self.wanted_locales_changed)
+    }
+
+    /// Whether a content update may run now: the person's setting applied
+    /// to the network the shell last reported (vauchi/private#733 D6).
+    pub fn content_updates_allowed(&self) -> bool {
+        self.vauchi
+            .config()
+            .content_updates
+            .allows(self.network_cost)
+    }
+
     pub fn device_capabilities(&self) -> &DeviceCapabilities {
         &self.device_capabilities
     }
@@ -392,7 +426,10 @@ impl AppEngine {
     /// was built in English (vauchi/private#721).
     pub fn set_render_context(&mut self, ctx: crate::ui::RenderContext) {
         let language_changed = ctx.resolved_locale() != self.render_context.resolved_locale();
+        self.wanted_locales_changed |=
+            ctx.wanted_locale_codes() != self.render_context.wanted_locale_codes();
         self.render_context = ctx;
+        self.refresh_content_snapshot();
         if language_changed {
             self.engine_cache.clear();
         } else {
@@ -569,6 +606,10 @@ impl AppEngine {
             field_catalog,
             preview_as_contact: None,
             device_capabilities: DeviceCapabilities::default(),
+            network_cost: vauchi_core::settings::NetworkCost::Unknown,
+            wanted_locales_changed: false,
+            #[cfg(feature = "content-updates")]
+            content_runner: None,
             transport_readiness: TransportReadiness::default(),
             render_context: crate::ui::RenderContext::default(),
             update_status: AppUpdateStatus::UpToDate,

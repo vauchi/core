@@ -246,6 +246,10 @@ pub enum VauchiEvent {
         /// The contact ID.
         contact_id: String,
     },
+
+    /// CDN content (languages, themes, social networks) was applied, so
+    /// any screen may show new copy (vauchi/private#733 D10).
+    ContentUpdated,
 }
 
 impl VauchiEvent {

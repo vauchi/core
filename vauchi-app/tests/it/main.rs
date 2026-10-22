@@ -22,10 +22,13 @@ mod app_reducer_protocol_tests;
 mod app_undo_protocol_tests;
 mod ble_handshake_app_engine_tests;
 mod ble_link_release_tests;
+mod content_scheduler_tests;
+mod engine_content_updates_tests;
 mod event_notifier_tests;
 mod glance_displayed_code_tests;
 mod glance_failed_screen_tests;
 mod glance_manual_code_entry_tests;
+mod network_cost_tests;
 mod schedule_wakeup_tests;
 // The multi-stage half needs FakeClock (gated inside the file); the
 // BLE half runs featureless.
@@ -162,6 +165,7 @@ mod places_screen_tests;
 mod places_tests;
 #[path = "../prepared_surface_tests.rs"]
 mod prepared_surface_tests;
+mod settings_content_updates_tests;
 mod tag_promotion_tests;
 mod tags_engine_tests;
 mod tags_intercepts_tests;

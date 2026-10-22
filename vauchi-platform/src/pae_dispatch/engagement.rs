@@ -85,7 +85,18 @@ impl PlatformAppEngine {
 
             // ── Content Updates (B7 batch 2) ──
             DomainCommand::RunContentUpdateCycle => {
-                let outcome = self.run_content_update_cycle_dispatch();
+                if !engine.content_updates_allowed() {
+                    return Ok(DomainCommandResult::ContentUpdateCycle {
+                        outcome: crate::content::content_cycle_outcome(
+                            &crate::content::MobileUpdateStatus::Disabled,
+                            None,
+                        ),
+                    });
+                }
+                let outcome = self.run_content_update_cycle_dispatch(
+                    engine.render_context().wanted_locale_codes(),
+                    crate::platform_app_engine_internals::content_source_for(engine),
+                );
                 if outcome.applied {
                     invalidate_content_screens(engine);
                 }
@@ -273,7 +284,7 @@ impl PlatformAppEngine {
 /// cache; every screen reading social-network labels re-renders. Named
 /// helper so the invalidation set stays in one place when a new content
 /// type needs a wider one.
-fn invalidate_content_screens(engine: &mut AppEngine) {
+pub(crate) fn invalidate_content_screens(engine: &mut AppEngine) {
     crate::cached_content::reload_cached_networks();
     engine.reload_social_networks();
     engine.reload_locales();

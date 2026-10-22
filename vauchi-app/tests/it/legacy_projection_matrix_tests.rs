@@ -52,6 +52,7 @@ fn sample_contacts() -> Vec<IndexedItem> {
 
 fn sample_settings_config() -> SettingsConfig {
     SettingsConfig {
+        content_updates: Default::default(),
         display_name: "Alice".into(),
         delivery_receipts_enabled: true,
         new_field_default_visible: false,

@@ -727,6 +727,12 @@ pub enum Event {
     /// that cannot reach it.
     LocalNetworkAddressChanged { address: Option<String> },
 
+    /// What the current network costs: unmetered (Wi-Fi, Ethernet),
+    /// metered, or unknown. Shells report it on every network change; core
+    /// decides what to run on it, such as "Wi-Fi only" content updates
+    /// (vauchi/private#733 D6).
+    NetworkCostChanged { cost: crate::settings::NetworkCost },
+
     /// A BLE peripheral was discovered during scanning.
     BleDeviceDiscovered {
         id: String,

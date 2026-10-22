@@ -63,6 +63,9 @@ pub struct SettingsConfig {
     pub backup_reminder_frequency: String,
     #[serde(default)]
     pub last_backup_display: Option<String>,
+    /// When content updates run (vauchi/private#733 D6).
+    #[serde(default)]
+    pub content_updates: vauchi_core::settings::ContentUpdates,
 }
 
 fn default_true() -> bool {
@@ -181,6 +184,7 @@ impl SettingsEngine {
             self.security_group(),
             self.backup_group(),
             self.network_group(),
+            self.content_updates_dropdown(),
             self.delivery_group(),
             self.about_group(),
             self.danger_group(),
@@ -265,6 +269,15 @@ impl WorkflowEngine for SettingsEngine {
                 ref item_id,
             } if component_id == "language" => {
                 self.config.language_id = item_id.clone();
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::ListItemSelected {
+                ref component_id,
+                ref item_id,
+            } if component_id == "content_updates" => {
+                if let Some(choice) = vauchi_core::settings::ContentUpdates::from_id(item_id) {
+                    self.config.content_updates = choice;
+                }
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ListItemSelected {

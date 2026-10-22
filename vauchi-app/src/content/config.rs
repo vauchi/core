@@ -41,6 +41,11 @@ pub struct ContentConfig {
     ///
     /// Custom content origins must explicitly replace the production key.
     pub publisher_public_key: PublicKey,
+
+    /// The language codes to fetch and keep: English, the picked and the
+    /// system language (vauchi/private#733 D7). `None` fetches every listed
+    /// locale file.
+    pub wanted_locales: Option<Vec<String>>,
 }
 
 impl Default for ContentConfig {
@@ -54,6 +59,7 @@ impl Default for ContentConfig {
             max_content_size: 5 * 1024 * 1024, // 5 MB
             proxy_url: None,
             publisher_public_key: PublicKey::from_bytes(PRODUCTION_PUBLISHER_PUBLIC_KEY),
+            wanted_locales: None,
         }
     }
 }

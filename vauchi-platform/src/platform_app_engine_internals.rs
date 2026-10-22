@@ -187,20 +187,6 @@ impl PlatformAppEngine {
             .join(".cert_pin")
     }
 
-    /// Feature-gated content-update check (B7 batch 2). Returns
-    /// `MobileUpdateStatus::Disabled` when the `content-updates` Cargo
-    /// feature is off — matches legacy `VauchiPlatform::check_content_updates`.
-    pub(crate) fn check_content_updates_dispatch(&self) -> crate::content::MobileUpdateStatus {
-        #[cfg(feature = "content-updates")]
-        {
-            self.check_content_updates_impl_engine()
-        }
-        #[cfg(not(feature = "content-updates"))]
-        {
-            crate::content::MobileUpdateStatus::Disabled
-        }
-    }
-
     /// Starts Core's own content cycle once a shell listens, so a
     /// background update can re-render (vauchi/private#733 D10). The first
     /// cycle waits for the app to settle.
@@ -232,13 +218,14 @@ impl PlatformAppEngine {
     pub(crate) fn run_scheduled_content_cycle(
         &self,
     ) -> Option<crate::content::MobileContentCycleOutcome> {
-        let allowed = self.lock_engine().ok().is_some_and(|mut slot| {
-            open_engine(&mut slot).is_ok_and(|engine| engine.content_updates_allowed())
-        });
-        if !allowed {
-            return None;
-        }
-        let outcome = self.run_content_update_cycle_dispatch();
+        let wanted = self.lock_engine().ok().and_then(|mut slot| {
+            open_engine(&mut slot).ok().and_then(|engine| {
+                engine
+                    .content_updates_allowed()
+                    .then(|| engine.render_context().wanted_locale_codes())
+            })
+        })?;
+        let outcome = self.run_content_update_cycle_dispatch(wanted);
         if outcome.applied {
             if let Ok(mut slot) = self.lock_engine()
                 && let Ok(engine) = open_engine(&mut slot)
@@ -255,28 +242,25 @@ impl PlatformAppEngine {
     }
 
     /// Whole content-update cycle: check, then apply only when updates
-    /// are available. Owns the sequencing frontends used to duplicate
-    /// (ADR-021/ADR-043 — F-3, pure-functional-core program record).
+    /// are available, fetching only `wanted_locales` (vauchi/private#733
+    /// D7). Owns the sequencing frontends used to duplicate (ADR-021/ADR-043
+    /// — F-3, pure-functional-core program record). Disabled when the
+    /// `content-updates` feature is off.
     pub(crate) fn run_content_update_cycle_dispatch(
         &self,
+        wanted_locales: Vec<String>,
     ) -> crate::content::MobileContentCycleOutcome {
-        let status = self.check_content_updates_dispatch();
-        let apply = matches!(status, crate::content::MobileUpdateStatus::UpdatesAvailable)
-            .then(|| self.apply_content_updates_dispatch());
-        crate::content::content_cycle_outcome(&status, apply.as_ref())
-    }
-
-    /// Feature-gated content-update apply (B7 batch 2). Mirrors the
-    /// legacy `VauchiPlatform::apply_content_updates` semantics —
-    /// returns `Disabled` when the feature is off.
-    pub(crate) fn apply_content_updates_dispatch(&self) -> crate::content::MobileApplyResult {
         #[cfg(feature = "content-updates")]
         {
-            self.apply_content_updates_impl_engine()
+            self.run_content_update_cycle_engine(wanted_locales)
         }
         #[cfg(not(feature = "content-updates"))]
         {
-            crate::content::MobileApplyResult::Disabled
+            let _ = wanted_locales;
+            crate::content::content_cycle_outcome(
+                &crate::content::MobileUpdateStatus::Disabled,
+                None,
+            )
         }
     }
 
@@ -297,14 +281,14 @@ impl PlatformAppEngine {
 }
 
 // ── Content updates internals (B7 batch 2 — feature-gated) ─────────
-//
-// These mirror the `VauchiPlatform::*_content_updates_impl` methods
-// in `mobile_content.rs` line-for-line. Once D3 deletes the legacy
-// `VauchiPlatform` surface, these become the only copies.
 
 #[cfg(feature = "content-updates")]
 impl PlatformAppEngine {
-    fn check_content_updates_impl_engine(&self) -> crate::content::MobileUpdateStatus {
+    fn run_content_update_cycle_engine(
+        &self,
+        wanted_locales: Vec<String>,
+    ) -> crate::content::MobileContentCycleOutcome {
+        use crate::content::{MobileApplyResult, MobileUpdateStatus, content_cycle_outcome};
         use vauchi_app::content::{ContentConfig, ContentManager};
 
         let config = ContentConfig {
@@ -314,59 +298,17 @@ impl PlatformAppEngine {
                 .unwrap_or(&self.storage_path)
                 .to_path_buf(),
             remote_updates_enabled: true,
+            wanted_locales: Some(wanted_locales),
             ..Default::default()
         };
-
-        let manager = match ContentManager::new(config, vauchi_core::clock::SystemClock::shared()) {
-            Ok(m) => m,
-            Err(_) => {
-                return crate::content::MobileUpdateStatus::CheckFailed;
-            }
+        let Ok(manager) = ContentManager::new(config, vauchi_core::clock::SystemClock::shared())
+        else {
+            return content_cycle_outcome(&MobileUpdateStatus::CheckFailed, None);
         };
-
-        let rt: tokio::runtime::Runtime = match tokio::runtime::Runtime::new() {
-            Ok(rt) => rt,
-            Err(_) => {
-                return crate::content::MobileUpdateStatus::CheckFailed;
-            }
-        };
-
-        rt.block_on(async { manager.check_for_updates().await.into() })
-    }
-
-    fn apply_content_updates_impl_engine(&self) -> crate::content::MobileApplyResult {
-        use vauchi_app::content::{ContentConfig, ContentManager};
-
-        let config = ContentConfig {
-            storage_path: self
-                .storage_path
-                .parent()
-                .unwrap_or(&self.storage_path)
-                .to_path_buf(),
-            remote_updates_enabled: true,
-            ..Default::default()
-        };
-
-        let manager = match ContentManager::new(config, vauchi_core::clock::SystemClock::shared()) {
-            Ok(m) => m,
-            Err(_) => {
-                return crate::content::MobileApplyResult::Error;
-            }
-        };
-
-        let rt: tokio::runtime::Runtime = match tokio::runtime::Runtime::new() {
-            Ok(rt) => rt,
-            Err(_) => {
-                return crate::content::MobileApplyResult::Error;
-            }
-        };
-
-        rt.block_on(async {
-            match manager.apply_updates().await {
-                Ok(result) => result.into(),
-                Err(_) => crate::content::MobileApplyResult::Error,
-            }
-        })
+        let (status, apply) = manager.run_update_cycle_blocking();
+        let status: MobileUpdateStatus = status.into();
+        let apply = apply.map(|result| result.map_or(MobileApplyResult::Error, Into::into));
+        content_cycle_outcome(&status, apply.as_ref())
     }
 }
 

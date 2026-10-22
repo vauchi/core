@@ -15,6 +15,7 @@
 //! Bundled content serves as fallback when remote content is unavailable.
 
 mod cache;
+mod chosen_locales;
 mod config;
 mod fetcher;
 mod integrity;

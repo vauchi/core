@@ -93,7 +93,9 @@ impl PlatformAppEngine {
                         ),
                     });
                 }
-                let outcome = self.run_content_update_cycle_dispatch();
+                let outcome = self.run_content_update_cycle_dispatch(
+                    engine.render_context().wanted_locale_codes(),
+                );
                 if outcome.applied {
                     invalidate_content_screens(engine);
                 }

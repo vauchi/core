@@ -148,7 +148,7 @@ impl ContentManager {
             return UpdateStatus::Disabled;
         }
 
-        if !self.should_check_now() {
+        if !self.should_check_now() && !self.cache_misses_a_wanted_locale() {
             return UpdateStatus::UpToDate;
         }
 
@@ -245,7 +245,7 @@ impl ContentManager {
             return UpdateStatus::Disabled;
         }
 
-        if !self.should_check_now() {
+        if !self.should_check_now() && !self.cache_misses_a_wanted_locale() {
             return UpdateStatus::UpToDate;
         }
 
@@ -361,7 +361,12 @@ impl ContentManager {
         // Check locales
         if let Some(remote_entry) = &remote.content.locales {
             let needs_update =
-                needs_update(cached.as_ref(), ContentType::Locales, &remote_entry.version);
+                needs_update(cached.as_ref(), ContentType::Locales, &remote_entry.version)
+                    || super::chosen_locales::misses_a_wanted_file(
+                        &self.cache,
+                        self.config.wanted_locales.as_deref(),
+                        remote_entry,
+                    );
 
             if needs_update && self.is_compatible(&remote_entry.min_app_version) {
                 updates.push(ContentType::Locales);
@@ -485,6 +490,18 @@ impl ContentManager {
         })
     }
 
+    fn cache_misses_a_wanted_locale(&self) -> bool {
+        self.trusted_cached_manifest()
+            .and_then(|manifest| manifest.content.locales)
+            .is_some_and(|entry| {
+                super::chosen_locales::misses_a_wanted_file(
+                    &self.cache,
+                    self.config.wanted_locales.as_deref(),
+                    &entry,
+                )
+            })
+    }
+
     /// Apply a single content update
     async fn apply_single_update(
         &self,
@@ -512,14 +529,25 @@ impl ContentManager {
                 )?;
             }
             ContentType::Locales => {
-                // Download ALL locale files (privacy: bundle everything so CDN
-                // cannot learn the user's language from request patterns)
+                // Only the wanted languages (vauchi/private#733 D7); fetching
+                // through OHTTP keeps the choice from being tied to an IP (D8).
                 let entry =
                     manifest.content.locales.as_ref().ok_or_else(|| {
                         ContentError::Fetch("No locales entry in manifest".into())
                     })?;
+                let wanted = self.config.wanted_locales.as_deref();
+                let version_changed = needs_update(
+                    self.trusted_cached_manifest().as_ref(),
+                    ContentType::Locales,
+                    &entry.version,
+                );
 
-                for (lang_code, file_entry) in &entry.files {
+                for (lang_code, file_entry) in super::chosen_locales::files_to_fetch(
+                    &self.cache,
+                    wanted,
+                    entry,
+                    version_changed,
+                ) {
                     let path = format!("{}{}", entry.path, file_entry.path);
                     let data = fetcher
                         .fetch_content(&path, &file_entry.checksum)
@@ -540,6 +568,7 @@ impl ContentManager {
                         &file_entry.checksum,
                     )?;
                 }
+                super::chosen_locales::prune_unwanted(&self.cache, wanted);
             }
             ContentType::Themes => {
                 let entry = manifest

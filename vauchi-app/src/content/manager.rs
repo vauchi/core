@@ -463,6 +463,28 @@ impl ContentManager {
         })
     }
 
+    /// One whole cycle on the calling thread: check, then apply only when
+    /// updates are available. The binding layers and Core's content
+    /// scheduler run it (vauchi/private#733 D10). The apply result is
+    /// `None` when the check found nothing to apply.
+    pub fn run_update_cycle_blocking(
+        &self,
+    ) -> (UpdateStatus, Option<Result<ApplyResult, ContentError>>) {
+        let runtime = match tokio::runtime::Builder::new_current_thread().build() {
+            Ok(runtime) => runtime,
+            Err(e) => return (UpdateStatus::CheckFailed(e.to_string()), None),
+        };
+        runtime.block_on(async {
+            let status = self.check_for_updates().await;
+            let apply = if matches!(status, UpdateStatus::UpdatesAvailable(_)) {
+                Some(self.apply_updates().await)
+            } else {
+                None
+            };
+            (status, apply)
+        })
+    }
+
     /// Apply a single content update
     async fn apply_single_update(
         &self,

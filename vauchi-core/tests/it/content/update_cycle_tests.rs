@@ -91,9 +91,9 @@ fn a_cycle_applies_what_the_signed_manifest_offers() {
 
     let (status, apply) = manager(&temp, url, &publisher).run_update_cycle_blocking();
 
-    assert_eq!(
-        status,
-        UpdateStatus::UpdatesAvailable(vec![ContentType::Locales])
+    assert!(
+        matches!(&status, UpdateStatus::UpdatesAvailable(types) if types == &vec![ContentType::Locales]),
+        "{status:?}"
     );
     assert!(
         matches!(&apply, Some(Ok(ApplyResult::Applied { applied, failed }))

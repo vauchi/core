@@ -212,6 +212,16 @@ impl PlatformAppEngine {
         .ok();
     }
 
+    /// Asks Core's content scheduler for a cycle now, when it runs.
+    pub(crate) fn request_content_cycle(&self) {
+        #[cfg(feature = "content-updates")]
+        if let Ok(scheduler) = self.content_scheduler.lock()
+            && let Some(scheduler) = scheduler.as_ref()
+        {
+            scheduler.request_cycle();
+        }
+    }
+
     /// One scheduled cycle: within the person's setting, and on applied
     /// content the screens rebuild and the shell is told to re-render.
     /// `None` when the setting kept it from running.

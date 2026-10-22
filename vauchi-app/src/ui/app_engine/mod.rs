@@ -120,6 +120,9 @@ pub struct AppEngine {
     /// What the current network costs, as the shell last reported it
     /// (vauchi/private#733 D6); unknown until it reports.
     pub(super) network_cost: vauchi_core::settings::NetworkCost,
+    /// The wanted languages changed since the binding layer last asked, so
+    /// it should request a content cycle (vauchi/private#733 D7).
+    wanted_locales_changed: bool,
     /// Frontend-pushed render context — Category-1 settings per ADR-047
     /// (locale + theme_id). Owned by the frontend's OS-native sandbox;
     /// pushed via `set_render_context_json` at boot and on Settings
@@ -341,6 +344,12 @@ impl AppEngine {
         self.local_network_address = address;
     }
 
+    /// Whether the wanted languages changed since the last call, so a
+    /// content cycle should fetch a newly wanted file now.
+    pub fn take_wanted_locales_changed(&mut self) -> bool {
+        std::mem::take(&mut self.wanted_locales_changed)
+    }
+
     /// Whether a content update may run now: the person's setting applied
     /// to the network the shell last reported (vauchi/private#733 D6).
     pub fn content_updates_allowed(&self) -> bool {
@@ -404,6 +413,8 @@ impl AppEngine {
     /// was built in English (vauchi/private#721).
     pub fn set_render_context(&mut self, ctx: crate::ui::RenderContext) {
         let language_changed = ctx.resolved_locale() != self.render_context.resolved_locale();
+        self.wanted_locales_changed |=
+            ctx.wanted_locale_codes() != self.render_context.wanted_locale_codes();
         self.render_context = ctx;
         if language_changed {
             self.engine_cache.clear();
@@ -582,6 +593,7 @@ impl AppEngine {
             preview_as_contact: None,
             device_capabilities: DeviceCapabilities::default(),
             network_cost: vauchi_core::settings::NetworkCost::Unknown,
+            wanted_locales_changed: false,
             transport_readiness: TransportReadiness::default(),
             render_context: crate::ui::RenderContext::default(),
             update_status: AppUpdateStatus::UpToDate,

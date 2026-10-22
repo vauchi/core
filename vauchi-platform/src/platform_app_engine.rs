@@ -426,17 +426,24 @@ impl PlatformAppEngine {
         if let Some(commands) = self.locked_dispatch(event.clone())? {
             return commands_envelope_to_json(&commands);
         }
-        let (commands, fire_invalidation) = {
+        let (commands, fire_invalidation, wanted_changed) = {
             let mut engine_slot = self.lock_engine()?;
             let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
             self_heal_post_auth(engine);
             let commands = engine
                 .dispatch(event)
                 .unwrap_or_else(|rejection| engine.reject_dispatch(&rejection));
-            (commands, engine.take_pending_presentation_invalidation())
+            (
+                commands,
+                engine.take_pending_presentation_invalidation(),
+                engine.take_wanted_locales_changed(),
+            )
         };
         if fire_invalidation {
             self.fire_presentation_invalidated();
+        }
+        if wanted_changed {
+            self.request_content_cycle();
         }
         commands_envelope_to_json(&commands)
     }
@@ -543,6 +550,11 @@ impl PlatformAppEngine {
         let mut engine_slot = self.lock_engine()?;
         let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
         engine.set_render_context(ctx);
+        let wanted_changed = engine.take_wanted_locales_changed();
+        drop(engine_slot);
+        if wanted_changed {
+            self.request_content_cycle();
+        }
         Ok(())
     }
 

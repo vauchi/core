@@ -31,8 +31,13 @@ pub(crate) fn load_cached_content(data_dir: &Path) {
 }
 
 fn manager_over(data_dir: &Path) -> Option<ContentManager> {
+    manager_wanting(data_dir, None)
+}
+
+fn manager_wanting(data_dir: &Path, wanted_locales: Option<Vec<String>>) -> Option<ContentManager> {
     let config = ContentConfig {
         storage_path: data_dir.to_path_buf(),
+        wanted_locales,
         ..Default::default()
     };
     ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).ok()
@@ -51,14 +56,14 @@ impl ScheduledCycle {
     /// it from running. Applied content rebuilds the screens and calls the
     /// shell's callback, outside the engine lock.
     pub(crate) fn run(&self) -> Option<bool> {
-        let allowed = self.engine.lock().ok().is_some_and(|slot| {
-            slot.as_ref()
-                .is_some_and(AppEngine::content_updates_allowed)
-        });
-        if !allowed {
-            return None;
-        }
-        let manager = manager_over(&self.data_dir)?;
+        let wanted = self.engine.lock().ok().and_then(|slot| {
+            slot.as_ref().and_then(|engine| {
+                engine
+                    .content_updates_allowed()
+                    .then(|| engine.render_context().wanted_locale_codes())
+            })
+        })?;
+        let manager = manager_wanting(&self.data_dir, Some(wanted))?;
         let (_, apply) = manager.run_update_cycle_blocking();
         let applied = matches!(
             &apply,
@@ -94,6 +99,15 @@ impl VauchiApp {
             callback: Arc::clone(&self.event_callback),
             data_dir: self.content_dir.clone()?,
         })
+    }
+
+    /// Asks Core's content scheduler for a cycle now, when it runs.
+    pub(crate) fn request_content_cycle(&self) {
+        if let Ok(scheduler) = self.content_scheduler.lock()
+            && let Some(scheduler) = scheduler.as_ref()
+        {
+            scheduler.request_cycle();
+        }
     }
 
     /// Starts Core's own content cycle, once.

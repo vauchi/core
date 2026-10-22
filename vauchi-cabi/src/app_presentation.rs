@@ -102,6 +102,11 @@ pub unsafe extern "C" fn vauchi_app_dispatch(
                     .unwrap_or_else(|rejection| engine.reject_dispatch(&rejection)),
                 Err(error) => engine.reject_event_json(&error),
             };
+            let wanted_changed = engine.take_wanted_locales_changed();
+            drop(engine_slot);
+            if wanted_changed {
+                app.request_content_cycle();
+            }
             to_c_string(&serde_json::json!({ "commands": commands }).to_string())
         }))
         .unwrap_or(std::ptr::null_mut())

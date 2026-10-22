@@ -245,7 +245,13 @@ impl VauchiApp {
             return Ok(());
         }
         let mut slot = self.lock_engine()?;
-        slot.as_mut().ok_or(())?.set_render_context(context);
+        let engine = slot.as_mut().ok_or(())?;
+        engine.set_render_context(context);
+        let wanted_changed = engine.take_wanted_locales_changed();
+        drop(slot);
+        if wanted_changed {
+            self.request_content_cycle();
+        }
         Ok(())
     }
 

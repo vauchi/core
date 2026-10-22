@@ -8,12 +8,54 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.86.0] — 2026-10-22
+
 ### Added
 
+- C ABI: `vauchi_app_set_render_context_json` lets linux-qt and windows
+  push the system language, so Follow system renders it there too. A
+  push made while storage is locked applies to the engine that opens
+  (vauchi/private#721).
+- Social networks come from data: the CDN's networks file, validated
+  whole or not at all, else the bundled 38. A network resolves from its
+  id, an alias or its name in any case; username rules and profile
+  links come from that data, and a profile link names the host it opens
+  (vauchi/private#734).
+- A social field stores its network id, and shows the network's
+  current name on the own card, contact detail and exchange preview
+  (vauchi/private#734).
+- A language published on the CDN needs no Core release: `Locale` holds
+  any 2-3 letter ISO 639 language subtag, a locale file's `_meta` names
+  its language, and Settings offers English first, then every loaded
+  language and every language the verified manifest lists. A listed
+  right-to-left language is not offered while no frontend mirrors its
+  layout. Screens re-render once a picked language's file arrives
+  (`AppEngine::reload_locales`, vauchi/private#733).
+- Cached CDN content is stored gzipped, about a quarter of its size; a
+  stored file that does not inflate, or inflates past the download
+  limit, downloads again (vauchi/private#733).
+- The app password clears a user-presence enrolment whose sealed secret
+  was lost, so the device seals a fresh one the next time the OS check
+  is used (`Vauchi::forget_user_presence_secret`, vauchi/private#739).
 - Bindings: `MobileEvent` gains `UserPresenceSecretCreated`,
   `UserPresenceSecretRevealed` and `UserPresenceCheckCancelled`, so shells
   answer the user-presence commands through `hardware_event_json` instead
   of writing the JSON themselves (vauchi/private#740).
+
+### Changed
+
+- Protocol: card updates carry the network id, with payload version
+  0x08 and the delta signature domain `vauchi-delta-v3`. Core 0.86.0
+  and older Cores report each other's card updates as an unknown
+  payload version; there is no backward compatibility
+  (vauchi/private#734).
+- Content: a manifest's locale entries may name their language
+  (`name`, `english_name`, `is_rtl`). Older Cores fail to verify a
+  manifest that carries them (vauchi/private#733).
+- Bindings: `get_string`, `get_string_with_args`, `get_locale_info` and
+  `get_aha_moment_localized` take a language code, and
+  `parse_locale_code` returns one. A malformed code reads English
+  (vauchi/private#733).
 
 ### Removed
 
@@ -21,6 +63,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   the shell kept) and `setPlatformKeychain` are gone. Every shell opens
   Core with `openWithKeychain`, so every key that opens the data lives in
   the keychain and a shred deletes them all (vauchi/private#580).
+- Bindings: `MobileLocale` is gone; locales cross the binding as
+  language codes (vauchi/private#733).
+- Core's table of five language names is gone; names come from the
+  locale files (vauchi/private#733).
+
+### Fixed
+
+- Settings, and screens built before the shell first reports the system
+  language, render in that language under Follow system; suggested
+  groups render, and are created, in the onboarding language
+  (vauchi/private#721).
+- CDN locales and themes cached by an earlier run are in effect after a
+  restart (vauchi/private#736).
+- A downloaded locale or theme catalog that does not load is not cached
+  and is retried; a cached one that does not load at start is dropped
+  and downloads again (vauchi/private#747).
 
 ## [0.85.0] — 2026-10-21
 

@@ -33,6 +33,7 @@ fn generic_shell_effects_round_trip_without_domain_results() {
         },
         Command::PerformNativeBack,
         Command::ResetApplication,
+        Command::ReloadTheme,
         Command::RequestBiometricUnlock,
         Command::ForgetStoredSecret {
             handle: "legacy-storage-key".into(),

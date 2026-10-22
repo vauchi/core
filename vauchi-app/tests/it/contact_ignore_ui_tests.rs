@@ -83,7 +83,7 @@ fn detail_offers_ignore_with_core_resolved_label_for_an_active_contact() {
         .expect("active contact must offer ignore_contact");
     assert_eq!(
         ignore.label,
-        get_string(Locale::English, "contact_detail.ignore_contact_button")
+        get_string(Locale::ENGLISH, "contact_detail.ignore_contact_button")
     );
     assert_eq!(ignore.style, ActionStyle::Secondary);
     assert!(
@@ -104,7 +104,7 @@ fn detail_offers_unignore_for_an_ignored_contact() {
         .expect("ignored contact must offer unignore_contact");
     assert_eq!(
         unignore.label,
-        get_string(Locale::English, "contact_detail.unignore_contact_button")
+        get_string(Locale::ENGLISH, "contact_detail.unignore_contact_button")
     );
     assert!(
         !action_ids(&screen).contains(&"ignore_contact".to_string()),

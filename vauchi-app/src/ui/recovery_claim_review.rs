@@ -86,7 +86,7 @@ impl RecoveryClaimReviewEngine {
             context,
             step: ReviewStep::Review,
             cancelled: false,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

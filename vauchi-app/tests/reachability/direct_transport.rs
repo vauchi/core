@@ -50,7 +50,7 @@ fn waiting_factory() -> DirectTransportEngine {
         Some(card),
         UsbRole::Initiator,
         SystemClock::shared(),
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     )
 }
 

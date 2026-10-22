@@ -30,7 +30,7 @@ const ALL_STATUSES: [Status; 5] = [
 fn status_label_key_resolves_for_every_variant() {
     load_german();
     for status in ALL_STATUSES {
-        for locale in [Locale::English, Locale::German] {
+        for locale in [Locale::ENGLISH, Locale::GERMAN] {
             let label = get_string(locale, status.label_key());
             assert!(
                 !label.is_empty() && !label.starts_with("Missing:"),
@@ -48,8 +48,8 @@ fn status_label_key_is_translated_for_every_variant() {
     for status in ALL_STATUSES {
         assert_translated(
             &format!("{status:?} badge label"),
-            &get_string(Locale::German, status.label_key()),
-            &get_string(Locale::English, status.label_key()),
+            &get_string(Locale::GERMAN, status.label_key()),
+            &get_string(Locale::ENGLISH, status.label_key()),
         );
     }
 }
@@ -119,7 +119,7 @@ fn link_responder_waiting_badge_is_catalog_resolved() {
 
     assert_translated(
         "waiting badge label",
-        &waiting_badge(Locale::German),
-        &waiting_badge(Locale::English),
+        &waiting_badge(Locale::GERMAN),
+        &waiting_badge(Locale::ENGLISH),
     );
 }

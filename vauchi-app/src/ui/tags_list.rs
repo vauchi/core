@@ -42,7 +42,7 @@ impl TagsEngine {
         Self {
             tags,
             pending_delete: None,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

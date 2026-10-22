@@ -298,7 +298,7 @@ mod tests {
 
         assert_eq!(set_render_context(app, r#"{"system_locale":"fr-CH"}"#), 0);
 
-        assert_eq!(resolved_locale(app), vauchi_app::i18n::Locale::French);
+        assert_eq!(resolved_locale(app), vauchi_app::i18n::Locale::FRENCH);
         // SAFETY: The handle is owned by this test and destroyed exactly once.
         unsafe { crate::vauchi_app_destroy(app) };
     }
@@ -320,7 +320,7 @@ mod tests {
             -1
         );
 
-        assert_eq!(resolved_locale(app), vauchi_app::i18n::Locale::German);
+        assert_eq!(resolved_locale(app), vauchi_app::i18n::Locale::GERMAN);
         // SAFETY: The handle is owned by this test and destroyed exactly once.
         unsafe { crate::vauchi_app_destroy(app) };
     }

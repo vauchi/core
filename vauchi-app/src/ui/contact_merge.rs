@@ -27,7 +27,7 @@ impl ContactMergeEngine {
     pub fn new(preview: MergePreview) -> Self {
         Self {
             preview,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

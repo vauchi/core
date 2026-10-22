@@ -237,7 +237,7 @@ impl MultiStageExchangeEngine {
             stalled: false,
             link_feedback: LinkFeedback::default(),
             peer_confirmed: false,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 
@@ -282,7 +282,7 @@ impl MultiStageExchangeEngine {
             stalled: false,
             link_feedback: LinkFeedback::default(),
             peer_confirmed: false,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 
@@ -311,7 +311,7 @@ impl MultiStageExchangeEngine {
             stalled: false,
             link_feedback: LinkFeedback::default(),
             peer_confirmed: false,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

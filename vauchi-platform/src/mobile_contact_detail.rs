@@ -125,7 +125,7 @@ pub(crate) fn compute_added_time_display(
 /// All decisions delegate to the `vauchi_app::ui` predicates; this
 /// function only orders the lists and resolves banner labels from the
 /// locale table (was inline in the `ContactDetailViewState` dispatch
-/// arm with hardcoded English labels, `Locale::English`, and a
+/// arm with hardcoded English labels, `Locale::ENGLISH`, and a
 /// `reciprocity(0)` call that disabled the 7-day unreciprocated
 /// timeout — `now` is used for both timestamps here).
 pub(crate) fn build_view_state(

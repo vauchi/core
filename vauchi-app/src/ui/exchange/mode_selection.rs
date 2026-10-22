@@ -407,7 +407,7 @@ mod tests {
             full_caps(),
             TransportReadiness::default(),
             None,
-            Locale::English,
+            Locale::ENGLISH,
         );
         engine.expanded = true;
         let screen = engine.screen();
@@ -452,7 +452,7 @@ mod tests {
             ..Default::default()
         };
         let engine =
-            ModeSelectionEngine::new(caps, TransportReadiness::default(), None, Locale::English);
+            ModeSelectionEngine::new(caps, TransportReadiness::default(), None, Locale::ENGLISH);
         let screen = engine.screen();
         let hero_first = screen
             .components
@@ -473,7 +473,7 @@ mod tests {
             full_caps(),
             TransportReadiness::default(),
             Some(ExchangeMode::Magic),
-            Locale::English,
+            Locale::ENGLISH,
         );
         let screen = engine.screen();
         let hero_first = screen
@@ -495,7 +495,7 @@ mod tests {
             full_caps(),
             TransportReadiness::default(),
             None,
-            Locale::English,
+            Locale::ENGLISH,
         );
         let list_ids = |screen: &ScreenModel| -> Vec<String> {
             screen
@@ -520,7 +520,7 @@ mod tests {
             full_caps(),
             TransportReadiness::default(),
             None,
-            Locale::English,
+            Locale::ENGLISH,
         );
         let screen = engine.screen();
         // First-run hero (no last-used) is Glance — implemented +
@@ -547,7 +547,7 @@ mod tests {
             full_caps(),
             TransportReadiness::default(),
             Some(ExchangeMode::Hover),
-            Locale::English,
+            Locale::ENGLISH,
         );
         let screen = engine.screen();
         let hero_first = screen
@@ -568,7 +568,7 @@ mod tests {
             full_caps(),
             TransportReadiness::default(),
             None,
-            Locale::English,
+            Locale::ENGLISH,
         );
         let screen = engine.screen();
 
@@ -586,7 +586,7 @@ mod tests {
         // instruction wording is the locales repo's contract, not this
         // test's. The key-exists guard keeps the assertion non-tautological
         // (a missing key would echo through both sides identically).
-        let glance_instruction = get_string(Locale::English, "exchange.mode_instruction.glance");
+        let glance_instruction = get_string(Locale::ENGLISH, "exchange.mode_instruction.glance");
         assert_ne!(glance_instruction, "exchange.mode_instruction.glance");
         assert!(
             detail.contains(&glance_instruction),
@@ -606,7 +606,7 @@ mod tests {
             full_caps(),
             TransportReadiness::default(),
             None,
-            Locale::English,
+            Locale::ENGLISH,
         );
         engine.expanded = true;
         let screen = engine.screen();
@@ -627,7 +627,7 @@ mod tests {
             minimal_caps(),
             TransportReadiness::default(),
             None,
-            Locale::English,
+            Locale::ENGLISH,
         );
         engine.expanded = true;
         let screen = engine.screen();
@@ -651,7 +651,7 @@ mod tests {
             full_caps(),
             TransportReadiness::default(),
             None,
-            Locale::English,
+            Locale::ENGLISH,
         );
         engine.expanded = true;
         let screen = engine.screen();
@@ -659,7 +659,7 @@ mod tests {
         // Hover is available with full caps and is not the hero (Glance is),
         // so its detail is the plain instruction (no "Recommended" marker).
         let hover = find_mode_item(&screen, "hover").expect("Hover should be listed");
-        let hover_instruction = get_string(Locale::English, "exchange.mode_instruction.hover");
+        let hover_instruction = get_string(Locale::ENGLISH, "exchange.mode_instruction.hover");
         assert_ne!(hover_instruction, "exchange.mode_instruction.hover");
         assert_eq!(
             hover.detail.as_deref(),
@@ -674,7 +674,7 @@ mod tests {
             full_caps(),
             TransportReadiness::default(),
             None,
-            Locale::English,
+            Locale::ENGLISH,
         );
         let result = engine.handle_action(&UserAction::ListItemSelected {
             component_id: "category:standard".into(),
@@ -693,7 +693,7 @@ mod tests {
             minimal_caps(),
             TransportReadiness::default(),
             None,
-            Locale::English,
+            Locale::ENGLISH,
         );
         let result = engine.handle_action(&UserAction::ListItemSelected {
             component_id: "category:fun".into(),
@@ -715,7 +715,7 @@ mod tests {
             full_caps(),
             TransportReadiness::default(),
             None,
-            Locale::English,
+            Locale::ENGLISH,
         );
         for unoffered in ["mode:bump", "mode:shake", "mode:magic"] {
             let result = engine.handle_action(&UserAction::ListItemSelected {
@@ -743,7 +743,7 @@ mod tests {
             full_caps(),
             TransportReadiness::default(),
             None,
-            Locale::English,
+            Locale::ENGLISH,
         );
         let result = engine.handle_action(&UserAction::ActionPressed {
             action_id: "something".into(),
@@ -760,7 +760,7 @@ mod tests {
             full_caps(),
             TransportReadiness::default(),
             None,
-            Locale::English,
+            Locale::ENGLISH,
         );
         let screen = engine.screen();
         let ids: Vec<&str> = screen
@@ -801,7 +801,7 @@ mod tests {
         // (`grant:glance:camera`), not a selectable `mode:glance`.
         let mut led = TransportReadiness::default();
         led.note_denied(DeviceRequirement::Camera);
-        let mut engine = ModeSelectionEngine::new(full_caps(), led, None, Locale::English);
+        let mut engine = ModeSelectionEngine::new(full_caps(), led, None, Locale::ENGLISH);
         engine.expanded = true;
         let screen = engine.screen();
 
@@ -835,7 +835,7 @@ mod tests {
         let mut led = TransportReadiness::default();
         led.note_denied(DeviceRequirement::Camera);
         led.note_granted(DeviceRequirement::Camera);
-        let engine = ModeSelectionEngine::new(full_caps(), led, None, Locale::English);
+        let engine = ModeSelectionEngine::new(full_caps(), led, None, Locale::ENGLISH);
         let screen = engine.screen();
 
         assert!(
@@ -859,7 +859,7 @@ mod tests {
         let mut led = TransportReadiness::default();
         led.note_denied(DeviceRequirement::Camera);
         led.note_denied(DeviceRequirement::Ble);
-        let mut engine = ModeSelectionEngine::new(full_caps(), led, None, Locale::English);
+        let mut engine = ModeSelectionEngine::new(full_caps(), led, None, Locale::ENGLISH);
         engine.expanded = true;
         let screen = engine.screen();
 

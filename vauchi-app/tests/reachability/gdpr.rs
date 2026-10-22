@@ -72,7 +72,7 @@ fn factory() -> GdprEngine {
     GdprEngine::new(
         None,
         "Consent summary".into(),
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     )
 }
 
@@ -109,7 +109,7 @@ fn scheduled_factory() -> GdprEngine {
     GdprEngine::new(
         Some("Scheduled".into()),
         "Consent summary".into(),
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     )
     .with_deletion_scheduled(true)
     .with_deletion_executable(true)

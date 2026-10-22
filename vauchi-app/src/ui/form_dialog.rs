@@ -135,7 +135,7 @@ impl FormDialogEngine {
             selected_groups: Vec::new(),
             cancelled: false,
             pending_discard: false,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

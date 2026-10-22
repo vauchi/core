@@ -27,8 +27,8 @@ fn avatar_editor_source_picker_renders_the_active_locale() {
     load_german();
     assert_translated(
         "source-picker title",
-        &picker_title(Locale::German),
-        &picker_title(Locale::English),
+        &picker_title(Locale::GERMAN),
+        &picker_title(Locale::ENGLISH),
     );
 }
 

@@ -43,8 +43,8 @@ fn tags_list_renders_the_active_locale() {
     load_german();
     assert_translated(
         "promote-to-group action",
-        &promote_label(Locale::German),
-        &promote_label(Locale::English),
+        &promote_label(Locale::GERMAN),
+        &promote_label(Locale::ENGLISH),
     );
 }
 

@@ -108,7 +108,7 @@ proptest! {
             .collect();
 
         let notifications = NotificationEmitter::evaluate(
-            &entries, &prefs, vauchi_app::i18n::Locale::English, |_| "Test".into()
+            &entries, &prefs, vauchi_app::i18n::Locale::ENGLISH, |_| "Test".into()
         );
         prop_assert!(notifications.len() <= entries.len());
     }

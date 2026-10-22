@@ -73,7 +73,7 @@ impl DeviceLinkJoinEngine {
             step: JoinStep::EnterName,
             device_name: String::new(),
             default_device_name,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

@@ -172,7 +172,7 @@ impl OnboardingEngine {
             show_help_icons: false,
             pending_backup_bytes: None,
             pending_backup_password: String::new(),
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

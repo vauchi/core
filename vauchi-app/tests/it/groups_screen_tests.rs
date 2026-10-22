@@ -91,7 +91,7 @@ fn each_row_counts_contacts_and_the_entries_they_see() {
 fn rows_are_localized() {
     load_german();
     let screen = GroupsEngine::new(vec![group("g1", "Familie", 3, 1)])
-        .with_locale(Locale::German)
+        .with_locale(Locale::GERMAN)
         .current_screen();
     assert_eq!(
         rows(&screen),

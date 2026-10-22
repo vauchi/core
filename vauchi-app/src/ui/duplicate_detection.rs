@@ -70,7 +70,7 @@ impl DuplicateDetectionEngine {
         Self {
             pairs,
             selected_pair_index: None,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

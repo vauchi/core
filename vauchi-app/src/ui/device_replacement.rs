@@ -103,7 +103,7 @@ impl DeviceReplacementEngine {
             total_contacts: 0,
             outcome: CompletionOutcome::Cancelled,
             cancelled: false,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

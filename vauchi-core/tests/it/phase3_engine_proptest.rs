@@ -160,7 +160,7 @@ fn make_exchange() -> ExchangeEngine {
             last_used_mode: None,
             card_snapshot: None,
             available_group_data: Vec::new(),
-            locale: vauchi_app::i18n::Locale::English,
+            locale: vauchi_app::i18n::Locale::ENGLISH,
         },
         vauchi_core::clock::SystemClock::shared(),
     )
@@ -171,18 +171,18 @@ fn make_device_linking() -> DeviceLinkingEngine {
 }
 
 fn make_backup(mode: Option<BackupMode>) -> BackupRecoveryEngine {
-    BackupRecoveryEngine::new(mode, false, vauchi_app::i18n::Locale::English)
+    BackupRecoveryEngine::new(mode, false, vauchi_app::i18n::Locale::ENGLISH)
 }
 
 fn make_duress() -> DuressPinEngine {
     DuressPinEngine::new(
         DuressConfig { enabled: false },
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     )
 }
 
 fn make_shred() -> EmergencyShredEngine {
-    EmergencyShredEngine::new(vauchi_app::i18n::Locale::English)
+    EmergencyShredEngine::new(vauchi_app::i18n::Locale::ENGLISH)
 }
 
 // ── Property 1: Random actions never panic ──────────────────────────

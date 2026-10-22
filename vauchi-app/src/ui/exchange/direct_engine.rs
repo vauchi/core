@@ -577,7 +577,7 @@ mod tests {
             Some(c),
             UsbRole::Initiator,
             SystemClock::shared(),
-            Locale::English,
+            Locale::ENGLISH,
         )
     }
 
@@ -621,7 +621,7 @@ mod tests {
             None,
             UsbRole::Initiator,
             SystemClock::shared(),
-            Locale::English,
+            Locale::ENGLISH,
         );
         assert_eq!(e.current_screen().screen_id, "exchange_failed");
         assert!(!e.was_cancelled());
@@ -674,7 +674,7 @@ mod tests {
             None,
             UsbRole::Initiator,
             SystemClock::shared(),
-            Locale::English,
+            Locale::ENGLISH,
         );
         assert_eq!(e.current_screen().screen_id, "exchange_failed");
         let before = e.current_screen().components;

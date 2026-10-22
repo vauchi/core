@@ -167,8 +167,8 @@ fn screen_titles(locale: Locale) -> Vec<(&'static str, String)> {
 #[test]
 fn batch3_screens_render_the_active_locale() {
     load_german();
-    let de = screen_titles(Locale::German);
-    let en = screen_titles(Locale::English);
+    let de = screen_titles(Locale::GERMAN);
+    let en = screen_titles(Locale::ENGLISH);
     assert_eq!(de.len(), en.len(), "both locales list the same screens");
 
     for ((field, de_title), (_, en_title)) in de.iter().zip(en.iter()) {
@@ -183,8 +183,8 @@ fn groups_list_renders_the_active_locale() {
     load_german();
     assert_translated(
         "add group button",
-        &groups_add_group_label(Locale::German),
-        &groups_add_group_label(Locale::English),
+        &groups_add_group_label(Locale::GERMAN),
+        &groups_add_group_label(Locale::ENGLISH),
     );
 }
 
@@ -194,7 +194,7 @@ fn groups_list_renders_the_active_locale() {
 fn contact_visibility_title_interpolates_the_contact_name() {
     load_german();
     // Interpolation IS core's to hold, whatever the surrounding wording.
-    for locale in [Locale::English, Locale::German] {
+    for locale in [Locale::ENGLISH, Locale::GERMAN] {
         let title = ContactVisibilityEngine::new("Alice".into(), vec![])
             .with_locale(locale)
             .current_screen()

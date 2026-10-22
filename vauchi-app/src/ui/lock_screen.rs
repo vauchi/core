@@ -37,7 +37,7 @@ impl LockScreenEngine {
             entered_pin: String::new(),
             max_attempts,
             attempts: 0,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
             has_biometrics: false,
             biometric_type: None,
             biometric_passed: false,

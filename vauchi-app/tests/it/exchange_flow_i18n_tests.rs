@@ -103,8 +103,8 @@ fn failed_copy(locale: Locale) -> (String, String, String) {
 #[test]
 fn group_gate_and_preview_render_the_active_locale() {
     load_german();
-    let de = walk_gate(Locale::German);
-    let en = walk_gate(Locale::English);
+    let de = walk_gate(Locale::GERMAN);
+    let en = walk_gate(Locale::ENGLISH);
 
     // Screen ids are identifiers, not copy — they must NOT translate.
     assert_eq!(de.gate_screen_id, "exchange_group_selection");
@@ -131,8 +131,8 @@ fn group_gate_and_preview_render_the_active_locale() {
 #[test]
 fn failed_terminal_renders_the_active_locale() {
     load_german();
-    let (de_title, de_retry, de_cancel) = failed_copy(Locale::German);
-    let (en_title, en_retry, en_cancel) = failed_copy(Locale::English);
+    let (de_title, de_retry, de_cancel) = failed_copy(Locale::GERMAN);
+    let (en_title, en_retry, en_cancel) = failed_copy(Locale::ENGLISH);
 
     assert_translated("failed title", &de_title, &en_title);
     assert_translated("retry action", &de_retry, &en_retry);
@@ -144,7 +144,7 @@ fn failed_terminal_renders_the_active_locale() {
 // @internal
 #[test]
 fn exchange_flow_english_copy_unchanged() {
-    let mut engine = engine_for(Locale::English);
+    let mut engine = engine_for(Locale::ENGLISH);
     let gate = engine.current_screen();
     assert_eq!(action_label(&gate, "continue"), "Skip");
 

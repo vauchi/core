@@ -220,7 +220,7 @@ mod tests {
             name_options,
             selected_name_id,
         };
-        let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
+        let screen = build_field_preview_screen(&config, crate::i18n::Locale::ENGLISH);
         assert_eq!(screen.screen_id, "exchange_field_preview");
 
         let fields = extract_fields(&screen);
@@ -245,7 +245,7 @@ mod tests {
             name_options,
             selected_name_id,
         };
-        let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
+        let screen = build_field_preview_screen(&config, crate::i18n::Locale::ENGLISH);
 
         let fields = extract_fields(&screen);
         let email = fields.iter().find(|f| f.id == email_id).unwrap();
@@ -274,7 +274,7 @@ mod tests {
             name_options,
             selected_name_id,
         };
-        let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
+        let screen = build_field_preview_screen(&config, crate::i18n::Locale::ENGLISH);
 
         let name = screen.components.iter().find_map(|c| match c {
             Component::Text { content, .. } => Some(content.as_str()),
@@ -318,7 +318,7 @@ mod tests {
             name_options,
             selected_name_id,
         };
-        let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
+        let screen = build_field_preview_screen(&config, crate::i18n::Locale::ENGLISH);
         assert_eq!(screen.contextual_actions.len(), 2);
         assert_eq!(screen.contextual_actions[0].id, "start_exchange");
         assert_eq!(screen.contextual_actions[1].id, "change_groups");
@@ -336,7 +336,7 @@ mod tests {
             name_options,
             selected_name_id,
         };
-        let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
+        let screen = build_field_preview_screen(&config, crate::i18n::Locale::ENGLISH);
         let fields = extract_fields(&screen);
         assert_eq!(fields.len(), 2, "Card with 2 fields should show 2 entries");
         assert_eq!(
@@ -361,7 +361,7 @@ mod tests {
             }],
             selected_name_id: DEFAULT_NAME_OPTION_ID.into(),
         };
-        let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
+        let screen = build_field_preview_screen(&config, crate::i18n::Locale::ENGLISH);
         assert!(
             !screen
                 .components
@@ -397,7 +397,7 @@ mod tests {
             name_options: name_options.clone(),
             selected_name_id: DEFAULT_NAME_OPTION_ID.into(),
         };
-        let screen = build_field_preview_screen(&config, crate::i18n::Locale::English);
+        let screen = build_field_preview_screen(&config, crate::i18n::Locale::ENGLISH);
         let dropdown = screen
             .components
             .iter()

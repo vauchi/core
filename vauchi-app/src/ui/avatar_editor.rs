@@ -76,7 +76,7 @@ impl AvatarEditorEngine {
             result: None,
             cancelled: false,
             removed: false,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

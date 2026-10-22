@@ -24,8 +24,8 @@ fn share_copy(locale: Locale) -> (String, String) {
 #[test]
 fn link_exchange_share_url_screen_renders_the_active_locale() {
     load_german();
-    let (de_title, de_share) = share_copy(Locale::German);
-    let (en_title, en_share) = share_copy(Locale::English);
+    let (de_title, de_share) = share_copy(Locale::GERMAN);
+    let (en_title, en_share) = share_copy(Locale::ENGLISH);
 
     assert_translated("share-url title", &de_title, &en_title);
     assert_translated("share action", &de_share, &en_share);

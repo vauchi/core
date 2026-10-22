@@ -97,7 +97,7 @@ pub(crate) struct LockedStart {
 impl LockedStart {
     pub(crate) fn new(reason: StorageLockReason, params: OpenParams) -> Self {
         Self {
-            presentation: StorageLockPresentation::new(reason, Locale::English),
+            presentation: StorageLockPresentation::new(reason, Locale::ENGLISH),
             params,
             pending: PendingSetup::default(),
         }

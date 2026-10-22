@@ -458,7 +458,7 @@ fn action_ids(screen: &ScreenModel) -> Vec<String> {
 // @internal
 #[test]
 fn idle_screen_has_cancel_affordance() {
-    let s = build_nfc_screen(&NfcStep::Idle, crate::i18n::Locale::English);
+    let s = build_nfc_screen(&NfcStep::Idle, crate::i18n::Locale::ENGLISH);
     assert_eq!(s.screen_id, "exchange_nfc_idle");
     assert_eq!(action_ids(&s), vec!["cancel".to_string()]);
     assert!(
@@ -471,7 +471,7 @@ fn idle_screen_has_cancel_affordance() {
 // @internal
 #[test]
 fn awaiting_tap_screen_has_cancel_affordance() {
-    let s = build_nfc_screen(&NfcStep::AwaitingTap, crate::i18n::Locale::English);
+    let s = build_nfc_screen(&NfcStep::AwaitingTap, crate::i18n::Locale::ENGLISH);
     assert_eq!(s.screen_id, "exchange_nfc_awaiting_tap");
     assert_eq!(action_ids(&s), vec!["cancel".to_string()]);
     assert!(
@@ -484,8 +484,8 @@ fn awaiting_tap_screen_has_cancel_affordance() {
 // @internal
 #[test]
 fn in_progress_screens_share_screen_id_and_keep_cancel_enabled() {
-    let sent = build_nfc_screen(&NfcStep::PayloadSent, crate::i18n::Locale::English);
-    let ack = build_nfc_screen(&NfcStep::AckSent, crate::i18n::Locale::English);
+    let sent = build_nfc_screen(&NfcStep::PayloadSent, crate::i18n::Locale::ENGLISH);
+    let ack = build_nfc_screen(&NfcStep::AckSent, crate::i18n::Locale::ENGLISH);
     assert_eq!(sent.screen_id, "exchange_nfc_in_progress");
     assert_eq!(ack.screen_id, "exchange_nfc_in_progress");
     assert_eq!(action_ids(&sent), vec!["cancel".to_string()]);
@@ -495,7 +495,7 @@ fn in_progress_screens_share_screen_id_and_keep_cancel_enabled() {
 // @internal
 #[test]
 fn complete_screen_disables_cancel() {
-    let s = build_nfc_screen(&NfcStep::Complete, crate::i18n::Locale::English);
+    let s = build_nfc_screen(&NfcStep::Complete, crate::i18n::Locale::ENGLISH);
     assert_eq!(s.screen_id, "exchange_nfc_complete");
     // Cancel is still listed (so the action surface is stable across
     // states) but disabled — the exchange has already completed.

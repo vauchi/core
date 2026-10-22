@@ -87,7 +87,7 @@ fn config_no_groups() -> ExchangeConfig {
         last_used_mode: None,
         card_snapshot: None,
         available_group_data: Vec::new(),
-        locale: crate::i18n::Locale::English,
+        locale: crate::i18n::Locale::ENGLISH,
     }
 }
 

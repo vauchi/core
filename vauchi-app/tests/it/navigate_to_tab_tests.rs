@@ -93,7 +93,7 @@ fn navigate_to_tab_unknown_token_does_not_navigate() {
 // @internal
 #[test]
 fn tab_info_action_id_round_trips_through_navigate_to_tab() {
-    let tabs = engine_with_identity().tab_info(vauchi_app::Locale::English);
+    let tabs = engine_with_identity().tab_info(vauchi_app::Locale::ENGLISH);
     assert!(
         !tabs.is_empty(),
         "expected top-level tabs after identity creation"
@@ -184,7 +184,7 @@ fn navigate_back_after_navigate_to_tab_returns_to_prior_screen() {
 // @internal
 #[test]
 fn navigate_to_tab_routes_every_sidebar_item_to_canonical_screen() {
-    let items = engine_with_identity().sidebar_items(vauchi_app::i18n::Locale::English);
+    let items = engine_with_identity().sidebar_items(vauchi_app::i18n::Locale::ENGLISH);
     assert!(
         !items.is_empty(),
         "the overlay must offer destinations, or this test proves nothing"

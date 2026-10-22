@@ -16,7 +16,7 @@ fn enabled_config() -> DuressConfig {
 // @internal
 #[test]
 fn duress_starts_at_overview() {
-    let engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::English);
+    let engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::ENGLISH);
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "duress_overview");
     assert!(
@@ -31,7 +31,7 @@ fn duress_starts_at_overview() {
 // @internal
 #[test]
 fn duress_overview_shows_read_only_status_not_dead_toggle() {
-    let engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::English);
+    let engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::ENGLISH);
     let screen = engine.current_screen();
 
     assert!(
@@ -61,7 +61,7 @@ fn duress_overview_shows_read_only_status_not_dead_toggle() {
     assert_eq!(body_buttons(&screen), ["Set Up PIN"]);
 
     // Set up: rows carry the state, and Turn off sits beside the help.
-    let engine = DuressPinEngine::new(enabled_config(), vauchi_app::i18n::Locale::English);
+    let engine = DuressPinEngine::new(enabled_config(), vauchi_app::i18n::Locale::ENGLISH);
     let screen = engine.current_screen();
     assert!(
         !screen
@@ -92,7 +92,7 @@ fn body_buttons(screen: &ScreenModel) -> Vec<String> {
 // @internal
 #[test]
 fn duress_configure_goes_to_pin() {
-    let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::English);
+    let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::ENGLISH);
     let result = engine.handle_action(UserAction::ListItemSelected {
         component_id: "duress_actions".into(),
         item_id: "set_up".into(),
@@ -109,7 +109,7 @@ fn duress_configure_goes_to_pin() {
 // @internal
 #[test]
 fn duress_enter_pin_validation() {
-    let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::English);
+    let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::ENGLISH);
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "duress_actions".into(),
         item_id: "set_up".into(),
@@ -153,7 +153,7 @@ fn duress_enter_pin_validation() {
 // @internal
 #[test]
 fn duress_pin_mismatch_error() {
-    let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::English);
+    let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::ENGLISH);
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "duress_actions".into(),
         item_id: "set_up".into(),
@@ -189,7 +189,7 @@ fn duress_pin_mismatch_error() {
 // @internal
 #[test]
 fn duress_pin_match_completes_the_setup() {
-    let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::English);
+    let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::ENGLISH);
     // Navigate through EnterPin → ConfirmPin with matching PINs
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "duress_actions".into(),
@@ -216,7 +216,7 @@ fn duress_pin_match_completes_the_setup() {
 // @internal
 #[test]
 fn duress_disable_shows_inline_confirm() {
-    let mut engine = DuressPinEngine::new(enabled_config(), vauchi_app::i18n::Locale::English);
+    let mut engine = DuressPinEngine::new(enabled_config(), vauchi_app::i18n::Locale::ENGLISH);
     assert!(engine.config().enabled, "should start enabled");
 
     let result = engine.handle_action(UserAction::ListItemSelected {
@@ -245,7 +245,7 @@ fn duress_disable_shows_inline_confirm() {
 // @internal
 #[test]
 fn duress_confirm_disable_completes() {
-    let mut engine = DuressPinEngine::new(enabled_config(), vauchi_app::i18n::Locale::English);
+    let mut engine = DuressPinEngine::new(enabled_config(), vauchi_app::i18n::Locale::ENGLISH);
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "duress_actions".into(),
         item_id: "turn_off".into(),
@@ -267,7 +267,7 @@ fn duress_confirm_disable_completes() {
 // @internal
 #[test]
 fn duress_cancel_disable_keeps_enabled() {
-    let mut engine = DuressPinEngine::new(enabled_config(), vauchi_app::i18n::Locale::English);
+    let mut engine = DuressPinEngine::new(enabled_config(), vauchi_app::i18n::Locale::ENGLISH);
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "duress_actions".into(),
         item_id: "turn_off".into(),
@@ -293,7 +293,7 @@ fn duress_cancel_disable_keeps_enabled() {
 // @internal
 #[test]
 fn duress_back_navigation() {
-    let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::English);
+    let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::ENGLISH);
 
     // Overview → EnterPin
     let _ = engine.handle_action(UserAction::ListItemSelected {
@@ -341,7 +341,7 @@ fn duress_back_navigation() {
 // @internal
 #[test]
 fn duress_pin_takes_the_whole_field_on_each_keystroke() {
-    let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::English);
+    let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::ENGLISH);
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "duress_actions".into(),
         item_id: "set_up".into(),
@@ -389,7 +389,7 @@ fn duress_pin_takes_the_whole_field_on_each_keystroke() {
 // @internal
 #[test]
 fn duress_pin_backspace_removes_last_char() {
-    let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::English);
+    let mut engine = DuressPinEngine::new(default_config(), vauchi_app::i18n::Locale::ENGLISH);
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "duress_actions".into(),
         item_id: "set_up".into(),

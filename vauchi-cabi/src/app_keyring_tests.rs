@@ -348,7 +348,7 @@ fn a_render_context_pushed_while_locked_reaches_the_opened_app() {
     let engine = opened.lock_engine().unwrap();
     assert_eq!(
         engine.as_ref().unwrap().render_context().resolved_locale(),
-        vauchi_app::i18n::Locale::French
+        vauchi_app::i18n::Locale::FRENCH
     );
     drop(engine);
     destroy(app);

@@ -392,7 +392,7 @@ fn throttled_sync_outcome_puts_the_remaining_wait_on_the_chip() {
             retry_after_secs: 42
         }
     );
-    let (label, kind) = status.chip(vauchi_app::i18n::Locale::English);
+    let (label, kind) = status.chip(vauchi_app::i18n::Locale::ENGLISH);
     assert_eq!(
         (label.as_str(), kind),
         ("Sync in 42 s", IndicatorKind::Neutral)

@@ -39,8 +39,8 @@ fn review_copy(locale: Locale) -> (String, String) {
 #[test]
 fn claim_review_screen_renders_the_active_locale() {
     load_german();
-    let (de_title, de_vouch) = review_copy(Locale::German);
-    let (en_title, en_vouch) = review_copy(Locale::English);
+    let (de_title, de_vouch) = review_copy(Locale::GERMAN);
+    let (en_title, en_vouch) = review_copy(Locale::ENGLISH);
 
     assert_translated("claim-review title", &de_title, &en_title);
     assert_translated("vouch action", &de_vouch, &en_vouch);

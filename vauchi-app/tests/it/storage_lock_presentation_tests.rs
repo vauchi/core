@@ -77,7 +77,7 @@ fn choose_start_over(lock: &mut StorageLockPresentation, batch: &[Command]) -> V
 // @internal
 #[test]
 fn a_locked_start_asks_for_the_prompt_and_offers_one_unlock_action() {
-    let mut lock = StorageLockPresentation::new(StorageLockReason::Locked, Locale::English);
+    let mut lock = StorageLockPresentation::new(StorageLockReason::Locked, Locale::ENGLISH);
 
     let batch = lock.initial_commands();
 
@@ -90,7 +90,7 @@ fn a_locked_start_asks_for_the_prompt_and_offers_one_unlock_action() {
 // @internal
 #[test]
 fn unlocking_retries_opening_storage() {
-    let mut lock = StorageLockPresentation::new(StorageLockReason::Locked, Locale::English);
+    let mut lock = StorageLockPresentation::new(StorageLockReason::Locked, Locale::ENGLISH);
     let batch = lock.initial_commands();
 
     assert_eq!(press_primary(&mut lock, &batch), StorageLockStep::RetryOpen);
@@ -103,7 +103,7 @@ fn unlocking_retries_opening_storage() {
 // @internal
 #[test]
 fn the_prompt_is_requested_automatically_only_once() {
-    let mut lock = StorageLockPresentation::new(StorageLockReason::Locked, Locale::English);
+    let mut lock = StorageLockPresentation::new(StorageLockReason::Locked, Locale::ENGLISH);
 
     let first = lock.initial_commands();
     let second = lock.initial_commands();
@@ -115,7 +115,7 @@ fn the_prompt_is_requested_automatically_only_once() {
 // @internal
 #[test]
 fn a_tap_whose_retry_finds_storage_still_locked_asks_for_the_prompt() {
-    let mut lock = StorageLockPresentation::new(StorageLockReason::Locked, Locale::English);
+    let mut lock = StorageLockPresentation::new(StorageLockReason::Locked, Locale::ENGLISH);
     let batch = lock.initial_commands();
     assert_eq!(press_primary(&mut lock, &batch), StorageLockStep::RetryOpen);
 
@@ -127,7 +127,7 @@ fn a_tap_whose_retry_finds_storage_still_locked_asks_for_the_prompt() {
 // @internal
 #[test]
 fn a_prompt_whose_retry_finds_storage_still_locked_does_not_prompt_again() {
-    let mut lock = StorageLockPresentation::new(StorageLockReason::Locked, Locale::English);
+    let mut lock = StorageLockPresentation::new(StorageLockReason::Locked, Locale::ENGLISH);
     lock.initial_commands();
     assert_eq!(
         lock.dispatch(Event::BiometricUnlockSucceeded),
@@ -145,7 +145,7 @@ fn a_prompt_whose_retry_finds_storage_still_locked_does_not_prompt_again() {
 // @internal
 #[test]
 fn unreadable_data_offers_try_again_first() {
-    let mut lock = StorageLockPresentation::new(StorageLockReason::Unreadable, Locale::English);
+    let mut lock = StorageLockPresentation::new(StorageLockReason::Unreadable, Locale::ENGLISH);
     let unreadable = lock.initial_commands();
 
     assert_eq!(
@@ -157,7 +157,7 @@ fn unreadable_data_offers_try_again_first() {
 // @internal
 #[test]
 fn unreadable_data_deletes_nothing_until_the_person_confirms() {
-    let mut lock = StorageLockPresentation::new(StorageLockReason::Unreadable, Locale::English);
+    let mut lock = StorageLockPresentation::new(StorageLockReason::Unreadable, Locale::ENGLISH);
     let unreadable = lock.initial_commands();
     assert!(!asks_for_prompt(&unreadable));
 
@@ -172,7 +172,7 @@ fn unreadable_data_deletes_nothing_until_the_person_confirms() {
 // @internal
 #[test]
 fn cancelling_the_confirmation_goes_back_without_starting_over() {
-    let mut lock = StorageLockPresentation::new(StorageLockReason::Unreadable, Locale::English);
+    let mut lock = StorageLockPresentation::new(StorageLockReason::Unreadable, Locale::ENGLISH);
     let unreadable = lock.initial_commands();
     let confirm = choose_start_over(&mut lock, &unreadable);
 
@@ -185,7 +185,7 @@ fn cancelling_the_confirmation_goes_back_without_starting_over() {
 // @internal
 #[test]
 fn unreadable_data_is_not_reopened_by_a_prompt_or_a_stale_action() {
-    let mut lock = StorageLockPresentation::new(StorageLockReason::Unreadable, Locale::English);
+    let mut lock = StorageLockPresentation::new(StorageLockReason::Unreadable, Locale::ENGLISH);
     let unreadable = lock.initial_commands();
     let (surface, _) = context_bar(&unreadable);
     let forged = [
@@ -213,7 +213,7 @@ fn unreadable_data_is_not_reopened_by_a_prompt_or_a_stale_action() {
 // @internal
 #[test]
 fn a_locked_start_that_turns_out_unreadable_stops_asking_for_the_prompt() {
-    let mut lock = StorageLockPresentation::new(StorageLockReason::Locked, Locale::English);
+    let mut lock = StorageLockPresentation::new(StorageLockReason::Locked, Locale::ENGLISH);
     lock.initial_commands();
 
     let batch = lock.show(StorageLockReason::Unreadable);
@@ -228,7 +228,7 @@ fn a_locked_start_that_turns_out_unreadable_stops_asking_for_the_prompt() {
 // @internal
 #[test]
 fn every_storage_lock_screen_has_its_strings() {
-    let mut lock = StorageLockPresentation::new(StorageLockReason::Locked, Locale::English);
+    let mut lock = StorageLockPresentation::new(StorageLockReason::Locked, Locale::ENGLISH);
     let locked = lock.initial_commands();
     let unreadable = lock.show(StorageLockReason::Unreadable);
     let confirm = choose_start_over(&mut lock, &unreadable);
@@ -251,7 +251,7 @@ fn every_storage_lock_screen_has_its_strings() {
 // @internal
 #[test]
 fn an_unavailable_keychain_offers_only_try_again() {
-    let mut lock = StorageLockPresentation::new(StorageLockReason::Unavailable, Locale::English);
+    let mut lock = StorageLockPresentation::new(StorageLockReason::Unavailable, Locale::ENGLISH);
 
     let batch = lock.initial_commands();
 

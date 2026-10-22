@@ -24,8 +24,8 @@ fn empty_state_copy(locale: Locale) -> (String, String) {
 #[test]
 fn contact_list_empty_state_renders_the_active_locale() {
     load_german();
-    let (de_title, de_add) = empty_state_copy(Locale::German);
-    let (en_title, en_add) = empty_state_copy(Locale::English);
+    let (de_title, de_add) = empty_state_copy(Locale::GERMAN);
+    let (en_title, en_add) = empty_state_copy(Locale::ENGLISH);
 
     assert_translated("contact-list title", &de_title, &en_title);
     assert_translated("add-contact action", &de_add, &en_add);

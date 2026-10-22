@@ -7,7 +7,7 @@ use vauchi_app::ui::*;
 // @internal
 #[test]
 fn backup_starts_at_choose() {
-    let engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::English);
+    let engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::ENGLISH);
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "backup_choose");
     assert!(screen.progress.is_none());
@@ -31,7 +31,7 @@ fn backup_starts_at_choose() {
 // @internal
 #[test]
 fn backup_create_flow_to_password() {
-    let mut engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::English);
+    let mut engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::ENGLISH);
     let result = engine.handle_action(UserAction::ListItemSelected {
         component_id: "backup_rows".into(),
         item_id: "create".into(),
@@ -51,7 +51,7 @@ fn backup_create_flow_to_password() {
 // @internal
 #[test]
 fn backup_restore_flow_to_password() {
-    let mut engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::English);
+    let mut engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::ENGLISH);
     let result = engine.handle_action(UserAction::ListItemSelected {
         component_id: "backup_rows".into(),
         item_id: "restore".into(),
@@ -74,7 +74,7 @@ fn backup_password_validation() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Create),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
 
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -108,7 +108,7 @@ fn backup_confirm_password_mismatch() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Create),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
 
     let _ = engine.handle_action(UserAction::TextChanged {
@@ -149,7 +149,7 @@ fn backup_confirm_match_to_processing() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Create),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
 
     let _ = engine.handle_action(UserAction::TextChanged {
@@ -193,7 +193,7 @@ fn backup_restore_skips_confirm() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Restore),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
 
     let _ = engine.handle_action(UserAction::TextChanged {
@@ -224,7 +224,7 @@ fn backup_processing_complete() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Create),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
 
     let _ = engine.handle_action(UserAction::TextChanged {
@@ -261,7 +261,7 @@ fn backup_processing_complete() {
     let mut engine_done = BackupRecoveryEngine::new(
         Some(BackupMode::Create),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     let _ = engine_done.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
@@ -290,7 +290,7 @@ fn backup_processing_failed() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Restore),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
 
     let _ = engine.handle_action(UserAction::TextChanged {
@@ -332,7 +332,7 @@ fn backup_processing_failed() {
 // @internal
 #[test]
 fn backup_back_navigation() {
-    let mut engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::English);
+    let mut engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::ENGLISH);
 
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "backup_rows".into(),
@@ -382,7 +382,7 @@ fn backup_back_navigation() {
 // @internal
 #[test]
 fn backup_processing_complete_guard_ignores_wrong_step() {
-    let mut engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::English);
+    let mut engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::ENGLISH);
 
     engine.processing_complete();
     assert_eq!(engine.current_screen().screen_id, "backup_choose");
@@ -397,7 +397,7 @@ fn processing_screen_shows_kdf_explanation_for_create() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Create),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
@@ -436,7 +436,7 @@ fn processing_screen_shows_kdf_explanation_for_restore() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Restore),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
@@ -466,7 +466,7 @@ fn processing_screen_shows_kdf_explanation_for_restore() {
 // @internal
 #[test]
 fn backup_defaults_to_full_level() {
-    let engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::English);
+    let engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::ENGLISH);
     assert_eq!(*engine.level(), BackupLevel::Full);
 }
 
@@ -474,7 +474,7 @@ fn backup_defaults_to_full_level() {
 // @internal
 #[test]
 fn backup_level_toggle_switches_to_identity_only_and_back() {
-    let mut engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::English);
+    let mut engine = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::ENGLISH);
     assert_eq!(*engine.level(), BackupLevel::Full);
     // The level is an export question, asked on the export password step.
     let _ = engine.handle_action(UserAction::ListItemSelected {
@@ -508,7 +508,7 @@ fn backup_password_getter_returns_entered_password() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Create),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     assert!(engine.password().is_empty());
 
@@ -526,11 +526,11 @@ fn backup_mode_getter() {
     let engine = BackupRecoveryEngine::new(
         Some(BackupMode::Restore),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     assert_eq!(*engine.mode(), BackupMode::Restore);
 
-    let engine2 = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::English);
+    let engine2 = BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::ENGLISH);
     assert_eq!(*engine2.mode(), BackupMode::Create);
 }
 
@@ -544,7 +544,7 @@ fn backup_restore_password_screen_offers_paste_field() {
     let engine = BackupRecoveryEngine::new(
         Some(BackupMode::Restore),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "backup_password");
@@ -563,7 +563,7 @@ fn backup_create_password_screen_has_no_paste_field() {
     let engine = BackupRecoveryEngine::new(
         Some(BackupMode::Create),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     let screen = engine.current_screen();
     assert!(
@@ -581,7 +581,7 @@ fn backup_restore_captures_pasted_data_and_requires_it() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Restore),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
 
     // Password set but no pasted data → continue must fail on backup_data.
@@ -620,7 +620,7 @@ fn backup_password_value_is_reflected_for_keyboard_frontends() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Create),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
@@ -656,7 +656,7 @@ fn backup_processing_rejects_a_second_submit() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Restore),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
 
     let _ = engine.handle_action(UserAction::TextChanged {
@@ -722,7 +722,7 @@ fn restore_password_screen_offers_a_file_pick_action() {
     let engine = BackupRecoveryEngine::new(
         Some(BackupMode::Restore),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     let screen = engine.current_screen();
     assert!(
@@ -748,7 +748,7 @@ fn create_password_screen_has_no_file_pick_action() {
     let engine = BackupRecoveryEngine::new(
         Some(BackupMode::Create),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     assert!(
         !engine
@@ -769,7 +769,7 @@ fn choose_file_requests_an_import_backup_pick() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Restore),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "choose_file".into(),
@@ -795,7 +795,7 @@ fn picked_backup_bytes_populate_the_restore_payload() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Restore),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
 
     // Far past MAX_EVENT_INPUT_VALUE_BYTES: the point is that this path

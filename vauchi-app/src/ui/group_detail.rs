@@ -60,7 +60,7 @@ impl GroupDetailEngine {
             fields: Vec::new(),
             pending_delete: false,
             pending_grant: None,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
             help_icons: false,
         }
     }

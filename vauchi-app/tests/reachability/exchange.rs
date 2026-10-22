@@ -41,7 +41,7 @@ fn factory() -> ExchangeEngine {
             last_used_mode: None,
             card_snapshot: None,
             available_group_data: Vec::new(),
-            locale: vauchi_app::i18n::Locale::English,
+            locale: vauchi_app::i18n::Locale::ENGLISH,
         },
         vauchi_core::clock::SystemClock::shared(),
     )

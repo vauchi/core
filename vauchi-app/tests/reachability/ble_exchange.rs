@@ -79,7 +79,7 @@ fn glance_factory(has_camera: bool) -> BleExchangeEngine {
         vec![],
         vauchi_core::clock::SystemClock::shared(),
         Some("OWN-QR".to_string()),
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     )
 }
 
@@ -91,7 +91,7 @@ fn discovering_factory() -> BleExchangeEngine {
         vec![],
         vauchi_core::clock::SystemClock::shared(),
         None,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     )
 }
 
@@ -104,7 +104,7 @@ fn exchanging_factory() -> BleExchangeEngine {
         vec![],
         vauchi_core::clock::SystemClock::shared(),
         None,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     e.handle_hardware_event(Event::BleDeviceDiscovered {
         id: "peer-1".into(),
@@ -124,7 +124,7 @@ fn verifying_factory() -> BleExchangeEngine {
         vec![],
         vauchi_core::clock::SystemClock::shared(),
         None,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     e.handle_hardware_event(Event::BleDeviceDiscovered {
         id: "peer-1".into(),
@@ -153,7 +153,7 @@ fn success_factory() -> BleExchangeEngine {
         vec![],
         vauchi_core::clock::SystemClock::shared(),
         None,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     e.handle_hardware_event(Event::BleDeviceDiscovered {
         id: "peer-1".into(),
@@ -182,7 +182,7 @@ fn failed_factory() -> BleExchangeEngine {
         vec![],
         vauchi_core::clock::SystemClock::shared(),
         None,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     e.handle_hardware_event(Event::BleDisconnected {
         device_id: "peer-1".into(),

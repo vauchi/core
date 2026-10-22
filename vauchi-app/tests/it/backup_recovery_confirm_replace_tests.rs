@@ -27,7 +27,7 @@ fn restore_with_identity_shows_confirm_replace() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Restore),
         true,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     enter_password(&mut engine);
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -51,7 +51,7 @@ fn restore_without_identity_skips_confirm_replace() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Restore),
         false,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     enter_password(&mut engine);
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -70,7 +70,7 @@ fn confirm_replace_proceeds_to_processing() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Restore),
         true,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     enter_password(&mut engine);
     let _ = engine.handle_action(UserAction::ActionPressed {
@@ -92,7 +92,7 @@ fn cancel_replace_returns_to_password() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Restore),
         true,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     enter_password(&mut engine);
     let _ = engine.handle_action(UserAction::ActionPressed {
@@ -115,7 +115,7 @@ fn create_backup_flow_unaffected_by_has_identity() {
     let mut engine = BackupRecoveryEngine::new(
         Some(BackupMode::Create),
         true,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     enter_password(&mut engine);
     let result = engine.handle_action(UserAction::ActionPressed {

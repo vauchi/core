@@ -47,7 +47,7 @@ mod tests {
     // @internal
     #[test]
     fn verifying_screen_is_flow_agnostic() {
-        let screen = build_verifying_screen(crate::i18n::Locale::English);
+        let screen = build_verifying_screen(crate::i18n::Locale::ENGLISH);
         assert_eq!(screen.screen_id, "exchange_verifying");
         assert!(screen.progress.is_none(), "no numeric progress (M2 S2)");
         // No QR component — the screen is shared across exchange flows.

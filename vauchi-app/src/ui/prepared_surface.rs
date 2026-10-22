@@ -45,7 +45,7 @@ impl PreparedSurface {
         revision: u64,
         screen: &ScreenModel,
     ) -> Result<Self, PreparedSurfaceError> {
-        Self::from_screen_in(surface_id, revision, screen, crate::i18n::Locale::English)
+        Self::from_screen_in(surface_id, revision, screen, crate::i18n::Locale::ENGLISH)
     }
 
     pub fn from_screen_in(

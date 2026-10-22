@@ -36,7 +36,7 @@ impl DeviceManagementEngine {
             devices,
             pending_revoke_index: None,
             confirmed_revoke_index: None,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

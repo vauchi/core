@@ -58,7 +58,7 @@ impl ChangePasswordEngine {
             current: String::new(),
             new_pw: String::new(),
             confirm: String::new(),
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

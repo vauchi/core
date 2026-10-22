@@ -356,7 +356,7 @@ impl vauchi_platform::PlatformEventListener for SilentListener {
 fn german(key: &str) -> String {
     vauchi_platform::init_locales(crate::support::locales_dir().to_string_lossy().into_owned())
         .expect("locales");
-    vauchi_app::i18n::get_string(vauchi_app::i18n::Locale::German, key)
+    vauchi_app::i18n::get_string(vauchi_app::i18n::Locale::GERMAN, key)
 }
 
 const GERMAN_CONTEXT: &str = r#"{"locale":"de","theme_id":null}"#;

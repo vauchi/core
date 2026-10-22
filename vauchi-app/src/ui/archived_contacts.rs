@@ -19,7 +19,7 @@ impl ArchivedContactsEngine {
     pub fn new(contacts: Vec<(String, String)>) -> Self {
         Self {
             contacts,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

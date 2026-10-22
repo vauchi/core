@@ -33,7 +33,7 @@ impl DecoyContactsEngine {
             decoys,
             new_decoy_name: String::new(),
             pending_delete_id: None,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

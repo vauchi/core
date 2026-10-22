@@ -45,7 +45,7 @@ fn emergency_always_produces_notification() {
     let results = NotificationEmitter::evaluate(
         &entries,
         &prefs_all_off(),
-        Locale::English,
+        Locale::ENGLISH,
         test_name_resolver,
     );
 
@@ -71,7 +71,7 @@ fn emergency_uses_name_resolver_for_body() {
     let results = NotificationEmitter::evaluate(
         &entries,
         &prefs_all_on(),
-        Locale::English,
+        Locale::ENGLISH,
         test_name_resolver,
     );
 
@@ -93,7 +93,7 @@ fn contact_added_synced_with_pref_on_produces_notification() {
     let results = NotificationEmitter::evaluate(
         &entries,
         &prefs_all_on(),
-        Locale::English,
+        Locale::ENGLISH,
         test_name_resolver,
     );
 
@@ -121,7 +121,7 @@ fn contact_added_local_never_notifies() {
     let results = NotificationEmitter::evaluate(
         &entries,
         &prefs_all_on(),
-        Locale::English,
+        Locale::ENGLISH,
         test_name_resolver,
     );
 
@@ -145,7 +145,7 @@ fn contact_added_pref_off_no_notification() {
     let results = NotificationEmitter::evaluate(
         &entries,
         &prefs_all_off(),
-        Locale::English,
+        Locale::ENGLISH,
         test_name_resolver,
     );
 
@@ -197,7 +197,7 @@ fn multiple_entries_evaluated_independently() {
     let results = NotificationEmitter::evaluate(
         &entries,
         &prefs_all_on(),
-        Locale::English,
+        Locale::ENGLISH,
         test_name_resolver,
     );
 
@@ -229,7 +229,7 @@ fn card_update_produces_notification_when_enabled() {
     let results = NotificationEmitter::evaluate(
         &entries,
         &prefs_all_on(),
-        Locale::English,
+        Locale::ENGLISH,
         test_name_resolver,
     );
 
@@ -258,7 +258,7 @@ fn card_update_suppressed_when_disabled() {
     let results = NotificationEmitter::evaluate(
         &entries,
         &prefs_all_off(),
-        Locale::English,
+        Locale::ENGLISH,
         test_name_resolver,
     );
     assert!(results.is_empty());
@@ -279,7 +279,7 @@ fn card_update_default_prefs_are_on() {
     let results = NotificationEmitter::evaluate(
         &entries,
         &NotificationPreferences::default(),
-        Locale::English,
+        Locale::ENGLISH,
         test_name_resolver,
     );
     assert_eq!(results.len(), 1);
@@ -304,7 +304,7 @@ fn card_update_body_localizes_to_german() {
     let results = NotificationEmitter::evaluate(
         &entries,
         &prefs_all_on(),
-        Locale::German,
+        Locale::GERMAN,
         test_name_resolver,
     );
     assert_eq!(results.len(), 1);
@@ -318,7 +318,7 @@ fn empty_entries_produces_no_notifications() {
     let results = NotificationEmitter::evaluate(
         &entries,
         &prefs_all_on(),
-        Locale::English,
+        Locale::ENGLISH,
         test_name_resolver,
     );
     assert!(results.is_empty());
@@ -352,7 +352,7 @@ fn contact_bearing_notifications_include_core_owned_deep_link() {
     let results = NotificationEmitter::evaluate(
         &entries,
         &prefs_all_on(),
-        Locale::English,
+        Locale::ENGLISH,
         test_name_resolver,
     );
     assert_eq!(results.len(), 3);
@@ -388,7 +388,7 @@ fn contact_bearing_notifications_include_core_owned_os_hints() {
     let results = NotificationEmitter::evaluate(
         &entries,
         &prefs_all_on(),
-        Locale::English,
+        Locale::ENGLISH,
         test_name_resolver,
     );
 

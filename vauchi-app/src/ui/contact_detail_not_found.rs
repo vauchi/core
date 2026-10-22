@@ -17,7 +17,7 @@ impl ContactNotFoundEngine {
     pub fn new(contact_id: String) -> Self {
         Self {
             contact_id,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

@@ -96,7 +96,7 @@ impl ContactListEngine {
             facet_place: false,
             faceted_ids: None,
             window_offset: 0,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 
@@ -117,7 +117,7 @@ impl ContactListEngine {
             facet_place: false,
             faceted_ids: None,
             window_offset: 0,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

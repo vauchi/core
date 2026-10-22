@@ -60,7 +60,7 @@ fn open(engine: &mut BackupRecoveryEngine, row: &str) {
 }
 
 fn choose() -> BackupRecoveryEngine {
-    BackupRecoveryEngine::new(None, true, Locale::English)
+    BackupRecoveryEngine::new(None, true, Locale::ENGLISH)
 }
 
 // @internal

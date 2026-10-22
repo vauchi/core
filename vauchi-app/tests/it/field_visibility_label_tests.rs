@@ -21,11 +21,11 @@ fn load_locale(code: &str, file: &str) {
 fn shown_and_hidden_resolve_to_localized_labels() {
     load_locale("en", "en.json");
     assert_eq!(
-        visibility_label(&UiFieldVisibility::Shown, Locale::English),
+        visibility_label(&UiFieldVisibility::Shown, Locale::ENGLISH),
         "Visible"
     );
     assert_eq!(
-        visibility_label(&UiFieldVisibility::Hidden, Locale::English),
+        visibility_label(&UiFieldVisibility::Hidden, Locale::ENGLISH),
         "Hidden"
     );
 }
@@ -35,7 +35,7 @@ fn shown_and_hidden_resolve_to_localized_labels() {
 fn empty_scopes_resolve_to_no_groups_label() {
     load_locale("en", "en.json");
     assert_eq!(
-        visibility_label(&UiFieldVisibility::Scopes(vec![]), Locale::English),
+        visibility_label(&UiFieldVisibility::Scopes(vec![]), Locale::ENGLISH),
         "No groups"
     );
 }
@@ -45,7 +45,7 @@ fn empty_scopes_resolve_to_no_groups_label() {
 fn named_scopes_resolve_to_joined_names() {
     let scopes = vec!["Family".to_string(), "Work".to_string()];
     assert_eq!(
-        visibility_label(&UiFieldVisibility::Scopes(scopes), Locale::English),
+        visibility_label(&UiFieldVisibility::Scopes(scopes), Locale::ENGLISH),
         "Family, Work"
     );
 }
@@ -55,11 +55,11 @@ fn named_scopes_resolve_to_joined_names() {
 fn german_labels_resolve_from_the_active_locale() {
     load_locale("de", "de.json");
     assert_eq!(
-        visibility_label(&UiFieldVisibility::Hidden, Locale::German),
+        visibility_label(&UiFieldVisibility::Hidden, Locale::GERMAN),
         "Verborgen"
     );
     assert_eq!(
-        visibility_label(&UiFieldVisibility::Scopes(vec![]), Locale::German),
+        visibility_label(&UiFieldVisibility::Scopes(vec![]), Locale::GERMAN),
         "Keine Gruppen"
     );
 }

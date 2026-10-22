@@ -34,8 +34,8 @@ fn management_copy(locale: Locale) -> (String, String) {
 #[test]
 fn device_management_renders_the_active_locale() {
     load_german();
-    let (de_title, de_revoke) = management_copy(Locale::German);
-    let (en_title, en_revoke) = management_copy(Locale::English);
+    let (de_title, de_revoke) = management_copy(Locale::GERMAN);
+    let (en_title, en_revoke) = management_copy(Locale::ENGLISH);
 
     assert_translated("device-management title", &de_title, &en_title);
     assert_translated("revoke-device action", &de_revoke, &en_revoke);

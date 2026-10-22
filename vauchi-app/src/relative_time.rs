@@ -183,11 +183,11 @@ mod tests {
     #[test]
     fn just_now_for_under_one_minute() {
         assert_eq!(
-            format_relative_time(NOW, at(0), Locale::English),
+            format_relative_time(NOW, at(0), Locale::ENGLISH),
             "Just now",
         );
         assert_eq!(
-            format_relative_time(NOW, at(59), Locale::English),
+            format_relative_time(NOW, at(59), Locale::ENGLISH),
             "Just now",
         );
     }
@@ -198,7 +198,7 @@ mod tests {
         // Clock skew on the calling device must not produce "in 5 minutes" —
         // saturating subtraction keeps delta == 0.
         assert_eq!(
-            format_relative_time(NOW, NOW + 300, Locale::English),
+            format_relative_time(NOW, NOW + 300, Locale::ENGLISH),
             "Just now",
         );
     }
@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn singular_minute_at_boundary() {
         assert_eq!(
-            format_relative_time(NOW, at(60), Locale::English),
+            format_relative_time(NOW, at(60), Locale::ENGLISH),
             "1 minute ago",
         );
     }
@@ -216,11 +216,11 @@ mod tests {
     #[test]
     fn plural_minutes() {
         assert_eq!(
-            format_relative_time(NOW, at(120), Locale::English),
+            format_relative_time(NOW, at(120), Locale::ENGLISH),
             "2 minutes ago",
         );
         assert_eq!(
-            format_relative_time(NOW, at(59 * 60), Locale::English),
+            format_relative_time(NOW, at(59 * 60), Locale::ENGLISH),
             "59 minutes ago",
         );
     }
@@ -229,7 +229,7 @@ mod tests {
     #[test]
     fn singular_hour_at_boundary() {
         assert_eq!(
-            format_relative_time(NOW, at(3600), Locale::English),
+            format_relative_time(NOW, at(3600), Locale::ENGLISH),
             "1 hour ago",
         );
     }
@@ -238,11 +238,11 @@ mod tests {
     #[test]
     fn plural_hours() {
         assert_eq!(
-            format_relative_time(NOW, at(2 * 3600), Locale::English),
+            format_relative_time(NOW, at(2 * 3600), Locale::ENGLISH),
             "2 hours ago",
         );
         assert_eq!(
-            format_relative_time(NOW, at(23 * 3600), Locale::English),
+            format_relative_time(NOW, at(23 * 3600), Locale::ENGLISH),
             "23 hours ago",
         );
     }
@@ -251,12 +251,12 @@ mod tests {
     #[test]
     fn yesterday_for_one_day() {
         assert_eq!(
-            format_relative_time(NOW, at(SECONDS_PER_DAY), Locale::English),
+            format_relative_time(NOW, at(SECONDS_PER_DAY), Locale::ENGLISH),
             "Yesterday",
         );
         // 1 day + 1 hour still renders as Yesterday.
         assert_eq!(
-            format_relative_time(NOW, at(SECONDS_PER_DAY + 3600), Locale::English),
+            format_relative_time(NOW, at(SECONDS_PER_DAY + 3600), Locale::ENGLISH),
             "Yesterday",
         );
     }
@@ -265,11 +265,11 @@ mod tests {
     #[test]
     fn plural_days_after_yesterday() {
         assert_eq!(
-            format_relative_time(NOW, at(2 * SECONDS_PER_DAY), Locale::English),
+            format_relative_time(NOW, at(2 * SECONDS_PER_DAY), Locale::ENGLISH),
             "2 days ago",
         );
         assert_eq!(
-            format_relative_time(NOW, at(6 * SECONDS_PER_DAY), Locale::English),
+            format_relative_time(NOW, at(6 * SECONDS_PER_DAY), Locale::ENGLISH),
             "6 days ago",
         );
     }
@@ -278,11 +278,11 @@ mod tests {
     #[test]
     fn weeks_with_singular_and_plural() {
         assert_eq!(
-            format_relative_time(NOW, at(SECONDS_PER_WEEK), Locale::English),
+            format_relative_time(NOW, at(SECONDS_PER_WEEK), Locale::ENGLISH),
             "1 week ago",
         );
         assert_eq!(
-            format_relative_time(NOW, at(3 * SECONDS_PER_WEEK), Locale::English),
+            format_relative_time(NOW, at(3 * SECONDS_PER_WEEK), Locale::ENGLISH),
             "3 weeks ago",
         );
     }
@@ -291,11 +291,11 @@ mod tests {
     #[test]
     fn months_with_singular_and_plural() {
         assert_eq!(
-            format_relative_time(NOW, at(SECONDS_PER_MONTH), Locale::English),
+            format_relative_time(NOW, at(SECONDS_PER_MONTH), Locale::ENGLISH),
             "1 month ago",
         );
         assert_eq!(
-            format_relative_time(NOW, at(6 * SECONDS_PER_MONTH), Locale::English),
+            format_relative_time(NOW, at(6 * SECONDS_PER_MONTH), Locale::ENGLISH),
             "6 months ago",
         );
     }
@@ -304,11 +304,11 @@ mod tests {
     #[test]
     fn years_with_singular_and_plural() {
         assert_eq!(
-            format_relative_time(NOW, at(SECONDS_PER_YEAR), Locale::English),
+            format_relative_time(NOW, at(SECONDS_PER_YEAR), Locale::ENGLISH),
             "1 year ago",
         );
         assert_eq!(
-            format_relative_time(NOW, at(5 * SECONDS_PER_YEAR), Locale::English),
+            format_relative_time(NOW, at(5 * SECONDS_PER_YEAR), Locale::ENGLISH),
             "5 years ago",
         );
     }
@@ -320,7 +320,7 @@ mod tests {
         // every `get_string` call hits the hardcoded English fallback.
         // Ask for German — the formatter must still produce the English
         // bucket string rather than the "Missing: ..." sentinel.
-        let out = format_relative_time(NOW, at(120), Locale::German);
+        let out = format_relative_time(NOW, at(120), Locale::GERMAN);
         assert!(
             !out.starts_with("Missing:"),
             "German fallback must not surface the Missing sentinel, got {out:?}",

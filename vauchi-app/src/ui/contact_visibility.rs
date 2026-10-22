@@ -23,7 +23,7 @@ impl ContactVisibilityEngine {
             contact_name,
             fields,
             groups: Vec::new(),
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

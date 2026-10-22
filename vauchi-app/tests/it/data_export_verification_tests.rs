@@ -105,7 +105,7 @@ fn a_wrong_pin_exports_nothing_and_never_changes_the_session() {
         );
         assert_eq!(screen_id(&engine), "export_confirm_pin");
     }
-    let wrong = get_string(Locale::English, "lock_screen.wrong_password");
+    let wrong = get_string(Locale::ENGLISH, "lock_screen.wrong_password");
     assert!(
         format!("{:?}", engine.current_screen()).contains(&wrong),
         "the screen says the PIN was wrong"

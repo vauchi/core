@@ -70,8 +70,8 @@ fn walk_onboarding(locale: Locale) -> OnboardingCopy {
 #[test]
 fn onboarding_welcome_and_name_render_the_active_locale() {
     load_german();
-    let de = walk_onboarding(Locale::German);
-    let en = walk_onboarding(Locale::English);
+    let de = walk_onboarding(Locale::GERMAN);
+    let en = walk_onboarding(Locale::ENGLISH);
 
     assert_translated("welcome title", &de.welcome_title, &en.welcome_title);
     assert_translated(
@@ -157,8 +157,8 @@ fn suggested_group_labels(locale: Locale) -> Vec<(String, String)> {
 #[test]
 fn suggested_groups_render_in_the_active_locale_with_stable_ids() {
     load_german();
-    let de = suggested_group_labels(Locale::German);
-    let en = suggested_group_labels(Locale::English);
+    let de = suggested_group_labels(Locale::GERMAN);
+    let en = suggested_group_labels(Locale::ENGLISH);
 
     assert_eq!(
         de.iter().map(|(id, _)| id).collect::<Vec<_>>(),
@@ -181,7 +181,7 @@ fn suggested_groups_picked_during_onboarding_are_created_in_the_active_locale() 
         locale: Some("de".into()),
         ..RenderContext::default()
     });
-    let shown = suggested_group_labels(Locale::German);
+    let shown = suggested_group_labels(Locale::GERMAN);
     let mut act = |action| {
         let _ = engine.handle_action(action);
     };

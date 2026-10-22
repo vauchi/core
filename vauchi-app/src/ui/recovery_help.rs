@@ -76,7 +76,7 @@ impl RecoveryHelpEngine {
             claim_error: None,
             parsed_claim: None,
             voucher_data: None,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

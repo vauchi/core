@@ -34,13 +34,13 @@ fn test_deterministic_fallback_to_english() {
         r#"{"test.fallback_only": "English Fallback Value", "test.partial_key": "Partial Key"}"#;
     load_locale_from_bytes("en", en_with_key.as_bytes()).expect("Should load EN locale");
 
-    let de_result = get_string(Locale::German, "test.fallback_only");
+    let de_result = get_string(Locale::GERMAN, "test.fallback_only");
     assert_eq!(
         de_result, "English Fallback Value",
         "German should fall back to English for missing key"
     );
 
-    let de_present = get_string(Locale::German, "test.partial_key");
+    let de_present = get_string(Locale::GERMAN, "test.partial_key");
     assert_eq!(
         de_present, "Teilweise",
         "German should return own value when key exists"
@@ -56,13 +56,13 @@ fn test_locale_cache_reload() {
     let fr_v1 = r#"{"test.reload_key": "Version Un"}"#;
     load_locale_from_bytes("fr", fr_v1.as_bytes()).expect("Should load FR v1");
 
-    let v1_result = get_string(Locale::French, "test.reload_key");
+    let v1_result = get_string(Locale::FRENCH, "test.reload_key");
     assert_eq!(v1_result, "Version Un");
 
     let fr_v2 = r#"{"test.reload_key": "Version Deux"}"#;
     load_locale_from_bytes("fr", fr_v2.as_bytes()).expect("Should load FR v2");
 
-    let v2_result = get_string(Locale::French, "test.reload_key");
+    let v2_result = get_string(Locale::FRENCH, "test.reload_key");
     assert_eq!(
         v2_result, "Version Deux",
         "Cache should reflect reloaded locale data"
@@ -75,7 +75,7 @@ fn test_locale_cache_reload() {
 fn test_missing_key_after_cache_operations() {
     ensure_init();
 
-    let result = get_string(Locale::English, "test.absolutely_nonexistent_key_12345");
+    let result = get_string(Locale::ENGLISH, "test.absolutely_nonexistent_key_12345");
     assert!(
         result.starts_with("Missing:"),
         "Nonexistent key should return Missing prefix, got: {}",

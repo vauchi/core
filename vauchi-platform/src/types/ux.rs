@@ -598,11 +598,11 @@ impl From<vauchi_app::i18n::Locale> for MobileLocale {
 impl From<MobileLocale> for vauchi_app::i18n::Locale {
     fn from(locale: MobileLocale) -> Self {
         match locale {
-            MobileLocale::English => vauchi_app::i18n::Locale::English,
-            MobileLocale::German => vauchi_app::i18n::Locale::German,
-            MobileLocale::French => vauchi_app::i18n::Locale::French,
-            MobileLocale::Spanish => vauchi_app::i18n::Locale::Spanish,
-            MobileLocale::Italian => vauchi_app::i18n::Locale::Italian,
+            MobileLocale::English => vauchi_app::i18n::Locale::ENGLISH,
+            MobileLocale::German => vauchi_app::i18n::Locale::GERMAN,
+            MobileLocale::French => vauchi_app::i18n::Locale::FRENCH,
+            MobileLocale::Spanish => vauchi_app::i18n::Locale::SPANISH,
+            MobileLocale::Italian => vauchi_app::i18n::Locale::ITALIAN,
         }
     }
 }

@@ -47,7 +47,7 @@ impl HelpEngine {
         Self {
             items,
             search_query: String::new(),
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

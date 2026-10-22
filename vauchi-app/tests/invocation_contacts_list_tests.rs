@@ -82,7 +82,7 @@ fn document_reproduces_the_contacts_v1_shape() {
         &vauchi,
         &list(0, 0),
         InvocationOutput::Document,
-        Locale::English,
+        Locale::ENGLISH,
     ));
 
     let entries = doc.as_array().expect("array");
@@ -123,7 +123,7 @@ fn document_for_no_contacts_is_an_empty_array() {
         &vauchi,
         &list(0, 0),
         InvocationOutput::Document,
-        Locale::English,
+        Locale::ENGLISH,
     ));
 
     assert_eq!(doc, json!([]));
@@ -139,7 +139,7 @@ fn document_honours_offset_and_limit() {
         &vauchi,
         &list(1, 1),
         InvocationOutput::Document,
-        Locale::English,
+        Locale::ENGLISH,
     ));
 
     let entries = doc.as_array().expect("array");
@@ -159,7 +159,7 @@ fn text_surface_lists_contacts_with_prepared_status_copy() {
         &vauchi,
         &list(0, 0),
         InvocationOutput::Text,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let surface = surface(&commands);
 
@@ -191,7 +191,7 @@ fn text_surface_for_a_page_names_its_range() {
         &vauchi,
         &list(1, 1),
         InvocationOutput::Text,
-        Locale::English,
+        Locale::ENGLISH,
     );
 
     assert_eq!(surface(&commands).title, "Contacts (showing 2-2 of 3):");
@@ -206,7 +206,7 @@ fn text_surface_without_contacts_points_at_exchange() {
         &vauchi,
         &list(0, 0),
         InvocationOutput::Text,
-        Locale::English,
+        Locale::ENGLISH,
     );
     assert_eq!(
         surface(&commands).title,
@@ -252,7 +252,7 @@ fn duress_unlock_lists_only_decoys_in_both_outputs() {
         &vauchi,
         &list(0, 0),
         InvocationOutput::Document,
-        Locale::English,
+        Locale::ENGLISH,
     ));
     let names: Vec<&str> = doc
         .as_array()
@@ -266,7 +266,7 @@ fn duress_unlock_lists_only_decoys_in_both_outputs() {
         &vauchi,
         &list(0, 0),
         InvocationOutput::Text,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let text = surface(&commands);
     assert_eq!(text.title, "Contacts (1):");
@@ -296,7 +296,7 @@ fn archived_document_lists_only_archived_contacts_in_the_v1_shape() {
         &vauchi,
         &Invocation::ArchivedContactsList,
         InvocationOutput::Document,
-        Locale::English,
+        Locale::ENGLISH,
     ));
 
     let entries = doc.as_array().expect("array");
@@ -316,7 +316,7 @@ fn archived_text_surface_uses_the_archived_header() {
         &vauchi,
         &Invocation::ArchivedContactsList,
         InvocationOutput::Text,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let surface = surface(&commands);
 
@@ -342,7 +342,7 @@ fn archived_text_surface_without_archive_says_so() {
         &vauchi,
         &Invocation::ArchivedContactsList,
         InvocationOutput::Text,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let surface = surface(&commands);
 
@@ -374,7 +374,7 @@ fn duress_unlock_shows_no_real_archive() {
         &vauchi,
         &Invocation::ArchivedContactsList,
         InvocationOutput::Document,
-        Locale::English,
+        Locale::ENGLISH,
     ));
     assert_eq!(doc, json!([]));
 
@@ -382,7 +382,7 @@ fn duress_unlock_shows_no_real_archive() {
         &vauchi,
         &Invocation::ArchivedContactsList,
         InvocationOutput::Text,
-        Locale::English,
+        Locale::ENGLISH,
     );
     assert_eq!(surface(&commands).title, "Archived contacts (0):");
 }

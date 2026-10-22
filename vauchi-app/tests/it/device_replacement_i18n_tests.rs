@@ -27,8 +27,8 @@ fn select_mode_copy(locale: Locale) -> (String, String) {
 #[test]
 fn device_replacement_select_mode_renders_the_active_locale() {
     load_german();
-    let (de_title, de_action) = select_mode_copy(Locale::German);
-    let (en_title, en_action) = select_mode_copy(Locale::English);
+    let (de_title, de_action) = select_mode_copy(Locale::GERMAN);
+    let (en_title, en_action) = select_mode_copy(Locale::ENGLISH);
 
     assert_translated("select-mode title", &de_title, &en_title);
     assert_translated("has-old-device action", &de_action, &en_action);

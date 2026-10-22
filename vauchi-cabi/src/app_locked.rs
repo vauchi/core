@@ -131,7 +131,7 @@ pub(crate) fn open_app(
     let mut app = match params.open() {
         Opened::Engine(vauchi) => VauchiApp::opened(AppEngine::new(*vauchi)),
         Opened::Locked(reason) => VauchiApp::locked(LockedStart {
-            presentation: StorageLockPresentation::new(reason, Locale::English),
+            presentation: StorageLockPresentation::new(reason, Locale::ENGLISH),
             params,
             pending_callback: None,
             pending_render_context: None,

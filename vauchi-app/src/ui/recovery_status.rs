@@ -88,7 +88,7 @@ impl RecoveryEngine {
             old_key_input: String::new(),
             old_key_error: None,
             generated_claim_b64: None,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

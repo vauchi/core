@@ -46,10 +46,10 @@ fn ensure_init() {
 fn test_all_target_locales_available() {
     let locales = get_available_locales();
 
-    assert!(locales.contains(&Locale::English), "Should have English");
-    assert!(locales.contains(&Locale::German), "Should have German");
-    assert!(locales.contains(&Locale::French), "Should have French");
-    assert!(locales.contains(&Locale::Spanish), "Should have Spanish");
+    assert!(locales.contains(&Locale::ENGLISH), "Should have English");
+    assert!(locales.contains(&Locale::GERMAN), "Should have German");
+    assert!(locales.contains(&Locale::FRENCH), "Should have French");
+    assert!(locales.contains(&Locale::SPANISH), "Should have Spanish");
 }
 
 /// Test: English is the default/source locale
@@ -58,17 +58,17 @@ fn test_all_target_locales_available() {
 #[test]
 fn test_english_is_default() {
     let default = Locale::default();
-    assert_eq!(default, Locale::English);
+    assert_eq!(default, Locale::ENGLISH);
 }
 
 /// Test: Locale codes are correct
 // @scenario: internationalization :: Core languages are supported
 #[test]
 fn test_locale_codes() {
-    assert_eq!(Locale::English.code(), "en");
-    assert_eq!(Locale::German.code(), "de");
-    assert_eq!(Locale::French.code(), "fr");
-    assert_eq!(Locale::Spanish.code(), "es");
+    assert_eq!(Locale::ENGLISH.code(), "en");
+    assert_eq!(Locale::GERMAN.code(), "de");
+    assert_eq!(Locale::FRENCH.code(), "fr");
+    assert_eq!(Locale::SPANISH.code(), "es");
 }
 
 /// Test: Locale can be parsed from code
@@ -76,10 +76,10 @@ fn test_locale_codes() {
 // @scenario: internationalization :: Core languages are supported
 #[test]
 fn test_locale_from_code() {
-    assert_eq!(Locale::from_code("en"), Some(Locale::English));
-    assert_eq!(Locale::from_code("de"), Some(Locale::German));
-    assert_eq!(Locale::from_code("fr"), Some(Locale::French));
-    assert_eq!(Locale::from_code("es"), Some(Locale::Spanish));
+    assert_eq!(Locale::from_code("en"), Some(Locale::ENGLISH));
+    assert_eq!(Locale::from_code("de"), Some(Locale::GERMAN));
+    assert_eq!(Locale::from_code("fr"), Some(Locale::FRENCH));
+    assert_eq!(Locale::from_code("es"), Some(Locale::SPANISH));
     assert_eq!(Locale::from_code("xx"), None);
 }
 
@@ -87,7 +87,7 @@ fn test_locale_from_code() {
 // @scenario: internationalization :: Available languages are listed
 #[test]
 fn test_locale_info() {
-    let info = get_locale_info(Locale::German);
+    let info = get_locale_info(Locale::GERMAN);
     assert_eq!(info.code, "de");
     assert_eq!(info.name, "Deutsch");
     assert_eq!(info.english_name, "German");
@@ -103,16 +103,16 @@ fn test_locale_info() {
 fn test_basic_string_localization() {
     ensure_init();
 
-    let en = get_string(Locale::English, "welcome.title");
+    let en = get_string(Locale::ENGLISH, "welcome.title");
     assert_eq!(en, "Welcome to Vauchi");
 
-    let de = get_string(Locale::German, "welcome.title");
+    let de = get_string(Locale::GERMAN, "welcome.title");
     assert_eq!(de, "Willkommen bei Vauchi");
 
-    let fr = get_string(Locale::French, "welcome.title");
+    let fr = get_string(Locale::FRENCH, "welcome.title");
     assert_eq!(fr, "Bienvenue sur Vauchi");
 
-    let es = get_string(Locale::Spanish, "welcome.title");
+    let es = get_string(Locale::SPANISH, "welcome.title");
     assert_eq!(es, "Bienvenido a Vauchi");
 }
 
@@ -126,7 +126,7 @@ fn test_key_sections_exist() {
 
     for section in sections {
         let key = format!("{}.title", section);
-        let en = get_string(Locale::English, &key);
+        let en = get_string(Locale::ENGLISH, &key);
         assert!(
             !en.is_empty() && !en.starts_with("Missing:"),
             "Section {} should have title",
@@ -142,8 +142,8 @@ fn test_fallback_to_english() {
     ensure_init();
 
     // Use a key that might only exist in English
-    let en = get_string(Locale::English, "app.name");
-    let de = get_string(Locale::German, "app.name");
+    let en = get_string(Locale::ENGLISH, "app.name");
+    let de = get_string(Locale::GERMAN, "app.name");
 
     // If German translation exists, use it; otherwise fallback to English
     assert!(!de.is_empty());
@@ -157,7 +157,7 @@ fn test_fallback_to_english() {
 fn test_missing_key_handling() {
     ensure_init();
 
-    let result = get_string(Locale::English, "nonexistent.key");
+    let result = get_string(Locale::ENGLISH, "nonexistent.key");
     assert!(result.contains("Missing:") || result.contains("nonexistent"));
 }
 
@@ -170,7 +170,7 @@ fn test_missing_key_handling() {
 fn test_string_interpolation() {
     ensure_init();
 
-    let result = get_string_with_args(Locale::English, "contacts.count", &[("count", "5")]);
+    let result = get_string_with_args(Locale::ENGLISH, "contacts.count", &[("count", "5")]);
     assert!(result.contains("5"), "Should interpolate count");
 }
 
@@ -181,7 +181,7 @@ fn test_multiple_args_interpolation() {
     ensure_init();
 
     let result = get_string_with_args(
-        Locale::English,
+        Locale::ENGLISH,
         "update.sent",
         &[("count", "3"), ("name", "Alice")],
     );
@@ -195,8 +195,8 @@ fn test_multiple_args_interpolation() {
 fn test_interpolation_across_locales() {
     ensure_init();
 
-    let en = get_string_with_args(Locale::English, "contacts.count", &[("count", "10")]);
-    let de = get_string_with_args(Locale::German, "contacts.count", &[("count", "10")]);
+    let en = get_string_with_args(Locale::ENGLISH, "contacts.count", &[("count", "10")]);
+    let de = get_string_with_args(Locale::GERMAN, "contacts.count", &[("count", "10")]);
 
     assert!(en.contains("10"));
     assert!(de.contains("10"));
@@ -215,7 +215,7 @@ fn test_navigation_strings() {
     let keys = ["nav.home", "nav.contacts", "nav.exchange", "nav.settings"];
 
     for key in keys {
-        let en = get_string(Locale::English, key);
+        let en = get_string(Locale::ENGLISH, key);
         assert!(
             !en.is_empty() && !en.contains("Missing"),
             "Key {} should exist",
@@ -239,7 +239,7 @@ fn test_action_strings() {
     ];
 
     for key in keys {
-        let en = get_string(Locale::English, key);
+        let en = get_string(Locale::ENGLISH, key);
         assert!(
             !en.is_empty() && !en.contains("Missing"),
             "Action {} should exist",
@@ -257,7 +257,7 @@ fn test_error_strings() {
     let keys = ["error.generic", "error.network", "error.validation"];
 
     for key in keys {
-        let en = get_string(Locale::English, key);
+        let en = get_string(Locale::ENGLISH, key);
         assert!(
             !en.is_empty() && !en.contains("Missing"),
             "Error {} should exist",
@@ -275,10 +275,10 @@ fn test_error_strings() {
 #[test]
 fn test_rtl_detection() {
     // Current locales are all LTR
-    assert!(!get_locale_info(Locale::English).is_rtl);
-    assert!(!get_locale_info(Locale::German).is_rtl);
-    assert!(!get_locale_info(Locale::French).is_rtl);
-    assert!(!get_locale_info(Locale::Spanish).is_rtl);
+    assert!(!get_locale_info(Locale::ENGLISH).is_rtl);
+    assert!(!get_locale_info(Locale::GERMAN).is_rtl);
+    assert!(!get_locale_info(Locale::FRENCH).is_rtl);
+    assert!(!get_locale_info(Locale::SPANISH).is_rtl);
 }
 
 /// Canary test: blocks RTL locale addition until layout mirroring is implemented.
@@ -317,7 +317,7 @@ fn test_rtl_canary_no_rtl_locales_without_layout_support() {
 // @scenario: internationalization :: Core languages are supported
 #[test]
 fn test_locale_serialization() {
-    let locale = Locale::German;
+    let locale = Locale::GERMAN;
     let json = serde_json::to_string(&locale).expect("Should serialize");
     assert!(json.contains("de") || json.contains("German"));
 
@@ -344,8 +344,8 @@ fn test_german_coverage() {
     ];
 
     for key in keys {
-        let _en = get_string(Locale::English, key);
-        let de = get_string(Locale::German, key);
+        let _en = get_string(Locale::ENGLISH, key);
+        let de = get_string(Locale::GERMAN, key);
 
         assert!(
             !de.contains("Missing"),
@@ -364,7 +364,7 @@ fn test_french_coverage() {
     ensure_init();
 
     let key = "welcome.title";
-    let fr = get_string(Locale::French, key);
+    let fr = get_string(Locale::FRENCH, key);
     assert!(!fr.contains("Missing"), "French translation should exist");
 }
 
@@ -375,7 +375,7 @@ fn test_spanish_coverage() {
     ensure_init();
 
     let key = "welcome.title";
-    let es = get_string(Locale::Spanish, key);
+    let es = get_string(Locale::SPANISH, key);
     assert!(!es.contains("Missing"), "Spanish translation should exist");
 }
 

@@ -43,8 +43,8 @@ fn intro_copy(locale: Locale) -> (String, String, String) {
 #[test]
 fn recovery_intro_screen_renders_the_active_locale() {
     load_german();
-    let (de_title, de_intro, de_start) = intro_copy(Locale::German);
-    let (en_title, en_intro, en_start) = intro_copy(Locale::English);
+    let (de_title, de_intro, de_start) = intro_copy(Locale::GERMAN);
+    let (en_title, en_intro, en_start) = intro_copy(Locale::ENGLISH);
 
     assert_translated("recovery intro title", &de_title, &en_title);
     assert_translated("recovery intro text", &de_intro, &en_intro);
@@ -56,7 +56,7 @@ fn recovery_intro_screen_renders_the_active_locale() {
 // @internal
 #[test]
 fn recovery_intro_screen_english_copy_unchanged() {
-    let (title, _, start) = intro_copy(Locale::English);
+    let (title, _, start) = intro_copy(Locale::ENGLISH);
     assert_eq!(title, "Social Recovery");
     assert_eq!(start, "Start recovery");
 }

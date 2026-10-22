@@ -18,14 +18,14 @@ fn onboarding_demo() -> DemoPresentationEngine {
 fn alert_with(message: String) -> Vec<Command> {
     vec![Command::PresentAlert {
         alert: AlertSpec {
-            title: get_string(Locale::English, "error.title"),
+            title: get_string(Locale::ENGLISH, "error.title"),
             message,
         },
     }]
 }
 
 fn generic_alert() -> Vec<Command> {
-    alert_with(get_string(Locale::English, "error.generic"))
+    alert_with(get_string(Locale::ENGLISH, "error.generic"))
 }
 
 /// Feature: generic_presentation_protocol.feature
@@ -75,7 +75,7 @@ fn an_over_bound_input_value_is_refused_naming_the_bound() {
     assert_eq!(
         onboarding_demo().dispatch_json(&event),
         alert_with(get_string_with_args(
-            Locale::English,
+            Locale::ENGLISH,
             "validation.too_long",
             &[("max", &MAX_EVENT_INPUT_VALUE_BYTES.to_string())],
         ))

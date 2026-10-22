@@ -22,7 +22,7 @@ const SHRED_NOTE: &str = "If someone forces you to use Emergency Shred while Vau
 duress mode, it erases your real data, not only the decoys.";
 
 fn engine(enabled: bool, decoys: usize) -> DuressPinEngine {
-    DuressPinEngine::new(DuressConfig { enabled }, Locale::English).with_decoy_count(decoys)
+    DuressPinEngine::new(DuressConfig { enabled }, Locale::ENGLISH).with_decoy_count(decoys)
 }
 
 fn rows(screen: &ScreenModel) -> Vec<(String, Option<String>)> {

@@ -229,7 +229,7 @@ mod both_shells_agree {
     // @scenario: duress_mode.feature :: Enable duress PIN in settings
     #[test]
     fn text_from_another_field_leaves_the_pin_alone() {
-        let mut engine = DuressPinEngine::new(DuressConfig::default(), Locale::English);
+        let mut engine = DuressPinEngine::new(DuressConfig::default(), Locale::ENGLISH);
         let _ = engine.handle_action(UserAction::ListItemSelected {
             component_id: "duress_actions".into(),
             item_id: "set_up".into(),
@@ -254,7 +254,7 @@ mod both_shells_agree {
         fn keystrokes_give_the_same_pin_either_way(
             keys in prop::collection::vec(prop::option::weighted(0.8, 0u8..10), 6..20),
         ) {
-            let mut engine = DuressPinEngine::new(DuressConfig::default(), Locale::English);
+            let mut engine = DuressPinEngine::new(DuressConfig::default(), Locale::ENGLISH);
             let _ = engine.handle_action(UserAction::ListItemSelected {
                 component_id: "duress_actions".into(),
                 item_id: "set_up".into(),

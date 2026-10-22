@@ -69,7 +69,7 @@ impl MyInfoEntryDetailEngine {
             visible_contacts,
             shown: false,
             pending_delete: false,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

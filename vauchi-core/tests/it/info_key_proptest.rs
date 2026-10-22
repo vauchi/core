@@ -18,7 +18,7 @@ fn all_info_keys_resolve_to_content() {
     ];
     for key in &known_keys {
         let result =
-            vauchi_app::ui::info_content::resolve_info_key(key, vauchi_app::i18n::Locale::English);
+            vauchi_app::ui::info_content::resolve_info_key(key, vauchi_app::i18n::Locale::ENGLISH);
         assert!(result.is_some(), "info_key '{key}' has no locale content");
         let (title, body) = result.unwrap();
         assert!(!title.is_empty(), "info_key '{key}' has empty title");

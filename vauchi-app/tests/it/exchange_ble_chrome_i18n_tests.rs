@@ -44,8 +44,8 @@ fn text_of(screen: &ScreenModel) -> String {
 #[test]
 fn ble_discovering_renders_the_active_locale() {
     load_german();
-    let de = bump_engine(Locale::German).current_screen();
-    let en = bump_engine(Locale::English).current_screen();
+    let de = bump_engine(Locale::GERMAN).current_screen();
+    let en = bump_engine(Locale::ENGLISH).current_screen();
 
     // Screen ids are identifiers, not copy — they must NOT translate.
     assert_eq!(de.screen_id, "exchange_ble_discovering");
@@ -67,7 +67,7 @@ fn ble_discovering_renders_the_active_locale() {
 // @internal
 #[test]
 fn ble_discovering_english_copy_unchanged() {
-    let engine = bump_engine(Locale::English);
+    let engine = bump_engine(Locale::ENGLISH);
     let screen = engine.current_screen();
     assert_eq!(screen.title, "Ready to bump");
     assert_eq!(

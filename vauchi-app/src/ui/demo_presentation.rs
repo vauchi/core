@@ -48,10 +48,10 @@ impl DemoPresentationEngine {
     pub fn dispatch_json(&mut self, event_json: &str) -> Vec<Command> {
         let event = match vauchi_core::event_from_json(event_json) {
             Ok(event) => event,
-            Err(error) => return rejection::event_json_rejection(Locale::English, &error),
+            Err(error) => return rejection::event_json_rejection(Locale::ENGLISH, &error),
         };
         self.dispatch(event)
-            .unwrap_or_else(|_| rejection::dispatch_rejection(Locale::English))
+            .unwrap_or_else(|_| rejection::dispatch_rejection(Locale::ENGLISH))
     }
 
     pub fn dispatch(&mut self, event: Event) -> Result<Vec<Command>, String> {
@@ -162,7 +162,7 @@ impl DemoPresentationEngine {
 fn engine_for(workflow_type: &str) -> Result<Box<dyn WorkflowEngine + Send>, String> {
     match workflow_type {
         "onboarding" => Ok(Box::new(OnboardingEngine::new())),
-        "emergency_shred" => Ok(Box::new(EmergencyShredEngine::new(Locale::English))),
+        "emergency_shred" => Ok(Box::new(EmergencyShredEngine::new(Locale::ENGLISH))),
         "lock_screen" => Ok(Box::new(LockScreenEngine::new(3))),
         _ => Err("unknown workflow".to_owned()),
     }

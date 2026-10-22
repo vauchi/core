@@ -47,7 +47,7 @@ fn a_locale_cached_by_an_earlier_run_is_loaded_when_the_engine_starts() {
     )]);
 
     assert_eq!(
-        try_get_string(Locale::German, "cdn.probe").as_deref(),
+        try_get_string(Locale::GERMAN, "cdn.probe").as_deref(),
         Some("vom CDN")
     );
 }
@@ -84,11 +84,11 @@ fn the_shells_bundled_locales_loaded_after_start_keep_the_cached_overlay() {
     vauchi_platform::init_locales(bundled.path().to_string_lossy().to_string()).unwrap();
 
     assert_eq!(
-        try_get_string(Locale::German, "cdn.probe").as_deref(),
+        try_get_string(Locale::GERMAN, "cdn.probe").as_deref(),
         Some("vom CDN")
     );
     assert_eq!(
-        try_get_string(Locale::German, "bundled.probe").as_deref(),
+        try_get_string(Locale::GERMAN, "bundled.probe").as_deref(),
         Some("gebündelt")
     );
 }

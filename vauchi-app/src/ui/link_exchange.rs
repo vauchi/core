@@ -103,7 +103,7 @@ impl LinkExchangeEngine {
             peer_link: String::new(),
             cancelled: false,
             success_summary: None,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

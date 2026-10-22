@@ -29,7 +29,7 @@ fn config_with_mode_selection() -> ExchangeConfig {
         card_snapshot: None,
         transport_readiness: Default::default(),
         available_group_data: Vec::new(),
-        locale: vauchi_app::i18n::Locale::English,
+        locale: vauchi_app::i18n::Locale::ENGLISH,
     }
 }
 

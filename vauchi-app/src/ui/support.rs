@@ -22,7 +22,7 @@ impl Default for SupportEngine {
 impl SupportEngine {
     pub fn new() -> Self {
         Self {
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

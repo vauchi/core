@@ -1318,7 +1318,7 @@ mod tests {
             card_snapshot: None,
             transport_readiness: Default::default(),
             available_group_data: Vec::new(),
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 
@@ -1340,7 +1340,7 @@ mod tests {
             card_snapshot: None,
             transport_readiness: Default::default(),
             available_group_data: Vec::new(),
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 
@@ -1479,7 +1479,7 @@ mod tests {
             card_snapshot: None,
             transport_readiness: Default::default(),
             available_group_data: Vec::new(),
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 
@@ -2132,7 +2132,7 @@ mod tests {
             last_used_mode: None,
             card_snapshot: None,
             available_group_data: Vec::new(),
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

@@ -105,7 +105,7 @@ impl DeviceLinkingEngine {
             step: DeviceLinkStep::ShowQr,
             invitation_url,
             verification_code: None,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
             entered_pin: EnteredPin::default(),
         }
     }
@@ -118,7 +118,7 @@ impl DeviceLinkingEngine {
             step: DeviceLinkStep::TransportSelection,
             invitation_url,
             verification_code: None,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
             entered_pin: EnteredPin::default(),
         }
     }
@@ -137,7 +137,7 @@ impl DeviceLinkingEngine {
             step: DeviceLinkStep::QrPending,
             invitation_url: String::new(),
             verification_code: None,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
             entered_pin: EnteredPin::default(),
         }
     }

@@ -69,7 +69,7 @@ fn a_wrong_pin_keeps_asking_and_never_changes_the_session() {
     engine.navigate_to(AppScreen::DeviceLinking);
     assert_eq!(enter_pin(&mut engine, "wrong"), "link_confirm_pin");
     assert_eq!(enter_pin(&mut engine, DURESS_PIN), "link_confirm_pin");
-    let wrong = get_string(Locale::English, "lock_screen.wrong_password");
+    let wrong = get_string(Locale::ENGLISH, "lock_screen.wrong_password");
     assert!(
         format!("{:?}", engine.current_screen()).contains(&wrong),
         "the screen says the PIN was wrong"

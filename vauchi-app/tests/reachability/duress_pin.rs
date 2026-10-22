@@ -40,7 +40,7 @@ fn factory() -> DuressPinEngine {
     // `enabled = true` so the overview renders its management rows.
     DuressPinEngine::new(
         DuressConfig { enabled: true },
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     )
 }
 

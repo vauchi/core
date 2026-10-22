@@ -31,8 +31,8 @@ fn camera_denied_copy(locale: Locale) -> (String, String) {
 #[test]
 fn multi_stage_camera_denied_screen_renders_the_active_locale() {
     load_german();
-    let (de_title, de_grant) = camera_denied_copy(Locale::German);
-    let (en_title, en_grant) = camera_denied_copy(Locale::English);
+    let (de_title, de_grant) = camera_denied_copy(Locale::GERMAN);
+    let (en_title, en_grant) = camera_denied_copy(Locale::ENGLISH);
 
     assert_translated("exchange title", &de_title, &en_title);
     assert_translated("grant-permission action", &de_grant, &en_grant);

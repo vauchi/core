@@ -10,7 +10,7 @@ fn gdpr_screen_id() {
     let engine = GdprEngine::new(
         None,
         "All consents granted".into(),
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "privacy_settings");
@@ -22,7 +22,7 @@ fn gdpr_title() {
     let engine = GdprEngine::new(
         None,
         "All consents granted".into(),
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     let screen = engine.current_screen();
     assert_eq!(screen.title, "Privacy & Data");
@@ -34,7 +34,7 @@ fn gdpr_shows_deletion_status() {
     let engine = GdprEngine::new(
         Some("Pending".into()),
         "All consents granted".into(),
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     let screen = engine.current_screen();
 
@@ -48,7 +48,7 @@ fn gdpr_shows_no_deletion_requested_when_none() {
     let engine = GdprEngine::new(
         None,
         "All consents granted".into(),
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     let screen = engine.current_screen();
 
@@ -62,7 +62,7 @@ fn gdpr_export_without_an_app_password_asks_to_set_one() {
     let mut engine = GdprEngine::new(
         None,
         "All consents granted".into(),
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "export".into(),
@@ -80,7 +80,7 @@ fn gdpr_export_engine_output_waits_on_the_verified_pin() {
     let mut engine = GdprEngine::new(
         None,
         "All consents granted".into(),
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     )
     .with_app_password_set(true);
     let _ = engine.handle_action(UserAction::ActionPressed {
@@ -119,7 +119,7 @@ fn gdpr_delete_navigates_to_confirmation() {
     let mut engine = GdprEngine::new(
         None,
         "All consents granted".into(),
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "delete".into(),
@@ -141,7 +141,7 @@ fn gdpr_confirm_delete_without_trusted_contacts_erases_everything() {
     let mut engine = GdprEngine::new(
         None,
         "All consents granted".into(),
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "delete".into(),
@@ -162,7 +162,7 @@ fn gdpr_engine_output_initially_none() {
     let engine = GdprEngine::new(
         None,
         "All consents granted".into(),
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     assert_eq!(engine.engine_output(), None);
 }
@@ -173,7 +173,7 @@ fn gdpr_unknown_action_returns_update_screen() {
     let mut engine = GdprEngine::new(
         None,
         "All consents granted".into(),
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "unknown".into(),

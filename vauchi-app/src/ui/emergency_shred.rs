@@ -27,7 +27,7 @@ pub struct EmergencyShredEngine {
 
 impl Default for EmergencyShredEngine {
     fn default() -> Self {
-        Self::new(Locale::English)
+        Self::new(Locale::ENGLISH)
     }
 }
 

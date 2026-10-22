@@ -191,12 +191,12 @@ fn primary_destinations_are_the_five_option_a_screens() {
 fn both_shell_shapes_render_the_primary_destinations() {
     let engine = engine_with_identity();
     let tabs: Vec<String> = engine
-        .tab_info(Locale::English)
+        .tab_info(Locale::ENGLISH)
         .into_iter()
         .map(|t| t.id)
         .collect();
     let sidebar: Vec<String> = engine
-        .sidebar_items(Locale::English)
+        .sidebar_items(Locale::ENGLISH)
         .into_iter()
         .map(|t| t.id)
         .collect();

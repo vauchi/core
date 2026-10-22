@@ -65,7 +65,7 @@ impl ContactEditEngine {
             name_error: None,
             confirming_discard: false,
             leaving: None,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

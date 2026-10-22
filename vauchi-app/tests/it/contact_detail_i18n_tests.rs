@@ -71,8 +71,8 @@ fn contact_detail_renders_the_active_locale() {
     load_german();
     assert_translated(
         "edit action",
-        &edit_label(Locale::German),
-        &edit_label(Locale::English),
+        &edit_label(Locale::GERMAN),
+        &edit_label(Locale::ENGLISH),
     );
 }
 
@@ -81,8 +81,8 @@ fn contact_detail_renders_the_active_locale() {
 #[test]
 fn contact_detail_archive_toast_undo_label_is_translated() {
     load_german();
-    let (de_id, de_label) = archive_toast(Locale::German);
-    let (en_id, en_label) = archive_toast(Locale::English);
+    let (de_id, de_label) = archive_toast(Locale::GERMAN);
+    let (en_id, en_label) = archive_toast(Locale::ENGLISH);
 
     // The undo action id is an identifier, not copy — it must NOT
     // translate, and it must carry the contact it undoes.
@@ -97,7 +97,7 @@ fn contact_detail_archive_toast_undo_label_is_translated() {
 // @internal
 #[test]
 fn contact_detail_english_copy_unchanged() {
-    assert_eq!(edit_label(Locale::English), "Edit");
+    assert_eq!(edit_label(Locale::ENGLISH), "Edit");
 }
 
 // @scenario: contact-detail :: not-found screen renders in the active locale
@@ -105,8 +105,8 @@ fn contact_detail_english_copy_unchanged() {
 #[test]
 fn contact_not_found_renders_the_active_locale() {
     load_german();
-    let (de_title, de_back) = not_found_copy(Locale::German);
-    let (en_title, en_back) = not_found_copy(Locale::English);
+    let (de_title, de_back) = not_found_copy(Locale::GERMAN);
+    let (en_title, en_back) = not_found_copy(Locale::ENGLISH);
 
     assert_translated("not-found title", &de_title, &en_title);
     assert_translated("back action", &de_back, &en_back);
@@ -115,7 +115,7 @@ fn contact_not_found_renders_the_active_locale() {
 // @internal
 #[test]
 fn contact_not_found_english_copy_unchanged() {
-    let (title, back) = not_found_copy(Locale::English);
+    let (title, back) = not_found_copy(Locale::ENGLISH);
     assert_eq!(title, "Contact Not Found");
     assert_eq!(back, "Back");
 }

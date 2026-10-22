@@ -76,8 +76,8 @@ fn walk_shred(locale: Locale) -> ShredCopy {
 #[test]
 fn shred_wizard_renders_the_active_locale() {
     load_german();
-    let de = walk_shred(Locale::German);
-    let en = walk_shred(Locale::English);
+    let de = walk_shred(Locale::GERMAN);
+    let en = walk_shred(Locale::ENGLISH);
 
     // Screen ids are identifiers, not copy — they must NOT translate.
     assert_eq!(de.screen_id, "shred_warning");
@@ -116,7 +116,7 @@ fn shred_wizard_renders_the_active_locale() {
 #[test]
 fn the_confirmation_word_is_not_translated() {
     load_german();
-    let mut engine = EmergencyShredEngine::new(Locale::German);
+    let mut engine = EmergencyShredEngine::new(Locale::GERMAN);
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "confirmation".into(),
         value: "WIPE".into(),

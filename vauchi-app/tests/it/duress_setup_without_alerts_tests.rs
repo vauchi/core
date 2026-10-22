@@ -35,7 +35,7 @@ fn press(engine: &mut DuressPinEngine, action_id: &str) -> ActionResult {
 // @scenario: duress_mode :: A duress unlock sends nothing
 #[test]
 fn confirming_the_pin_completes_the_setup() {
-    let mut engine = DuressPinEngine::new(DuressConfig::default(), Locale::English);
+    let mut engine = DuressPinEngine::new(DuressConfig::default(), Locale::ENGLISH);
     let _ = select(&mut engine, "duress_actions", "set_up");
     type_into(&mut engine, "pin", "246813");
     let _ = press(&mut engine, "continue");
@@ -59,7 +59,7 @@ fn confirming_the_pin_completes_the_setup() {
 // @scenario: duress_mode :: A duress unlock sends nothing
 #[test]
 fn setup_counts_two_steps() {
-    let mut engine = DuressPinEngine::new(DuressConfig::default(), Locale::English);
+    let mut engine = DuressPinEngine::new(DuressConfig::default(), Locale::ENGLISH);
     let _ = select(&mut engine, "duress_actions", "set_up");
 
     let progress = engine.current_screen().progress.expect("a step bar");
@@ -70,7 +70,7 @@ fn setup_counts_two_steps() {
 // @scenario: duress_mode :: A duress unlock sends nothing
 #[test]
 fn an_enabled_duress_pin_lists_no_alerts_row() {
-    let engine = DuressPinEngine::new(DuressConfig { enabled: true }, Locale::English);
+    let engine = DuressPinEngine::new(DuressConfig { enabled: true }, Locale::ENGLISH);
 
     let rows: Vec<String> = engine
         .current_screen()
@@ -111,7 +111,7 @@ fn screen_copy(engine: &DuressPinEngine) -> String {
 fn all_duress_copy() -> Vec<String> {
     let mut copy = Vec::new();
 
-    let mut setup = DuressPinEngine::new(DuressConfig::default(), Locale::English);
+    let mut setup = DuressPinEngine::new(DuressConfig::default(), Locale::ENGLISH);
     copy.push(screen_copy(&setup));
     let _ = select(&mut setup, "duress_actions", "set_up");
     copy.push(screen_copy(&setup));
@@ -119,7 +119,7 @@ fn all_duress_copy() -> Vec<String> {
     let _ = press(&mut setup, "continue");
     copy.push(screen_copy(&setup));
 
-    let mut enabled = DuressPinEngine::new(DuressConfig { enabled: true }, Locale::English);
+    let mut enabled = DuressPinEngine::new(DuressConfig { enabled: true }, Locale::ENGLISH);
     copy.push(screen_copy(&enabled));
     if let ActionResult::ShowInfoOverlay { title, body } =
         select(&mut enabled, "duress_actions", "how_it_looks")
@@ -131,7 +131,7 @@ fn all_duress_copy() -> Vec<String> {
     let _ = select(&mut enabled, "duress_actions", "turn_off");
     copy.push(screen_copy(&enabled));
 
-    let (title, body) = resolve_info_key("duress_pin", Locale::English).expect("the info sheet");
+    let (title, body) = resolve_info_key("duress_pin", Locale::ENGLISH).expect("the info sheet");
     copy.push(format!("{title} {body}"));
     copy
 }

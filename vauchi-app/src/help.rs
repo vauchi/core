@@ -204,7 +204,7 @@ pub fn get_faqs_localized(locale: Locale) -> Vec<FaqItem> {
 
 /// Get all bundled FAQ items (English).
 pub fn get_faqs() -> Vec<FaqItem> {
-    get_faqs_localized(Locale::English)
+    get_faqs_localized(Locale::ENGLISH)
 }
 
 /// Get FAQs for a specific category
@@ -394,7 +394,7 @@ mod tests {
     #[test]
     fn test_localized_faqs_german() {
         let _lock = lock_and_init();
-        let faqs = get_faqs_localized(Locale::German);
+        let faqs = get_faqs_localized(Locale::GERMAN);
         assert_eq!(faqs.len(), get_faqs().len());
         let phone_lost = faqs.iter().find(|f| f.id == "faq-phone-lost").unwrap();
         assert!(phone_lost.question.contains("Telefon"));
@@ -403,7 +403,7 @@ mod tests {
     #[test]
     fn test_localized_faqs_french() {
         let _lock = lock_and_init();
-        let faqs = get_faqs_localized(Locale::French);
+        let faqs = get_faqs_localized(Locale::FRENCH);
         let phone_lost = faqs.iter().find(|f| f.id == "faq-phone-lost").unwrap();
         assert!(phone_lost.question.contains("téléphone"));
     }
@@ -411,7 +411,7 @@ mod tests {
     #[test]
     fn test_localized_faqs_spanish() {
         let _lock = lock_and_init();
-        let faqs = get_faqs_localized(Locale::Spanish);
+        let faqs = get_faqs_localized(Locale::SPANISH);
         let phone_lost = faqs.iter().find(|f| f.id == "faq-phone-lost").unwrap();
         assert!(phone_lost.question.contains("teléfono"));
     }
@@ -420,14 +420,14 @@ mod tests {
     fn test_localized_search() {
         let _lock = lock_and_init();
         // Search in German
-        let results = search_faqs_localized("Verschlüsselung", Locale::German);
+        let results = search_faqs_localized("Verschlüsselung", Locale::GERMAN);
         assert!(!results.is_empty());
     }
 
     #[test]
     fn test_localized_faq_by_id() {
         let _lock = lock_and_init();
-        let faq = get_faq_by_id_localized("faq-phone-lost", Locale::German);
+        let faq = get_faq_by_id_localized("faq-phone-lost", Locale::GERMAN);
         assert!(faq.is_some(), "expected Some value");
         assert!(faq.unwrap().question.contains("Telefon"));
     }

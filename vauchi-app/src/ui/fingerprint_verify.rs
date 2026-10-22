@@ -47,7 +47,7 @@ impl FingerprintVerifyEngine {
             our_fingerprint: our_fingerprint.to_string(),
             is_verified,
             action: VerifyAction::None,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

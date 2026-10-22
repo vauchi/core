@@ -27,13 +27,13 @@ fn context(locale: Option<&str>, system_locale: Option<&str>) -> RenderContext {
 #[test]
 fn a_regional_tag_falls_back_to_its_language() {
     for (tag, expected) in [
-        ("fr-CH", Locale::French),
-        ("FR-ch", Locale::French),
-        ("fr-BE", Locale::French),
-        ("de_LI.UTF-8", Locale::German),
-        ("it-CH", Locale::Italian),
-        ("es-AR", Locale::Spanish),
-        ("en-AU", Locale::English),
+        ("fr-CH", Locale::FRENCH),
+        ("FR-ch", Locale::FRENCH),
+        ("fr-BE", Locale::FRENCH),
+        ("de_LI.UTF-8", Locale::GERMAN),
+        ("it-CH", Locale::ITALIAN),
+        ("es-AR", Locale::SPANISH),
+        ("en-AU", Locale::ENGLISH),
     ] {
         assert_eq!(Locale::from_code(tag), Some(expected), "tag {tag:?}");
     }
@@ -63,7 +63,7 @@ fn a_tag_whose_language_core_does_not_translate_resolves_to_none() {
 fn the_system_language_is_used_when_no_language_was_picked() {
     assert_eq!(
         context(None, Some("fr-CH")).resolved_locale(),
-        Locale::French
+        Locale::FRENCH
     );
 }
 
@@ -72,7 +72,7 @@ fn the_system_language_is_used_when_no_language_was_picked() {
 fn a_picked_language_wins_over_the_system_language() {
     assert_eq!(
         context(Some("de"), Some("fr")).resolved_locale(),
-        Locale::German
+        Locale::GERMAN
     );
 }
 
@@ -81,7 +81,7 @@ fn a_picked_language_wins_over_the_system_language() {
 fn an_unknown_picked_language_falls_through_to_the_system_language() {
     assert_eq!(
         context(Some("xx"), Some("fr")).resolved_locale(),
-        Locale::French
+        Locale::FRENCH
     );
 }
 
@@ -90,9 +90,9 @@ fn an_unknown_picked_language_falls_through_to_the_system_language() {
 fn an_untranslated_system_language_resolves_to_english() {
     assert_eq!(
         context(None, Some("pt-BR")).resolved_locale(),
-        Locale::English
+        Locale::ENGLISH
     );
-    assert_eq!(context(None, None).resolved_locale(), Locale::English);
+    assert_eq!(context(None, None).resolved_locale(), Locale::ENGLISH);
 }
 
 proptest! {

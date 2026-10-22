@@ -246,7 +246,7 @@ mod tests {
             "Done",
             "done",
             &summary,
-            Locale::English,
+            Locale::ENGLISH,
         );
         let ids = component_ids(&screen);
         assert!(ids.contains(&"status".to_string()), "status present");
@@ -274,7 +274,7 @@ mod tests {
             "Done",
             "done",
             &ExchangeSuccessSummary::default(),
-            Locale::English,
+            Locale::ENGLISH,
         );
         let ids = component_ids(&screen);
         assert!(ids.contains(&"status".to_string()), "status always present");

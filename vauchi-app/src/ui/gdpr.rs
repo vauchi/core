@@ -589,7 +589,7 @@ mod tests {
     use super::*;
 
     fn engine() -> GdprEngine {
-        GdprEngine::new(None, "Active".into(), Locale::English).with_deletion_summary(
+        GdprEngine::new(None, "Active".into(), Locale::ENGLISH).with_deletion_summary(
             DeletionSummary {
                 contact_count: 5,
                 has_backup: true,
@@ -663,7 +663,7 @@ mod tests {
 
     #[test]
     fn summary_hides_devices_when_single() {
-        let mut e = GdprEngine::new(None, "Active".into(), Locale::English).with_deletion_summary(
+        let mut e = GdprEngine::new(None, "Active".into(), Locale::ENGLISH).with_deletion_summary(
             DeletionSummary {
                 contact_count: 0,
                 has_backup: false,
@@ -761,7 +761,7 @@ mod tests {
     #[test]
     fn consent_screen_reflects_grant_state() {
         let mut e =
-            GdprEngine::new(None, "Active".into(), Locale::English).with_consent(ConsentStatus {
+            GdprEngine::new(None, "Active".into(), Locale::ENGLISH).with_consent(ConsentStatus {
                 data_processing: true,
                 contact_sharing: false,
                 recovery_vouching: true,
@@ -804,7 +804,7 @@ mod tests {
     // @internal
     #[test]
     fn overview_shows_cancel_when_deletion_scheduled() {
-        let e = GdprEngine::new(Some("Scheduled".into()), "Active".into(), Locale::English)
+        let e = GdprEngine::new(Some("Scheduled".into()), "Active".into(), Locale::ENGLISH)
             .with_deletion_scheduled(true);
         let ids: Vec<String> = e
             .current_screen()
@@ -840,7 +840,7 @@ mod tests {
     #[test]
     fn overview_shows_execute_when_grace_elapsed() {
         let ids: Vec<String> =
-            GdprEngine::new(Some("Scheduled".into()), "Active".into(), Locale::English)
+            GdprEngine::new(Some("Scheduled".into()), "Active".into(), Locale::ENGLISH)
                 .with_deletion_scheduled(true)
                 .with_deletion_executable(true)
                 .current_screen()

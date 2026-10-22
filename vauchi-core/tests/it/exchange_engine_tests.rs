@@ -17,7 +17,7 @@ fn make_engine() -> ExchangeEngine {
             last_used_mode: None,
             card_snapshot: None,
             available_group_data: Vec::new(),
-            locale: vauchi_app::i18n::Locale::English,
+            locale: vauchi_app::i18n::Locale::ENGLISH,
         },
         vauchi_core::clock::SystemClock::shared(),
     )
@@ -227,7 +227,7 @@ fn with_session_auto_enables_debug_log() {
         last_used_mode: None,
         card_snapshot: None,
         available_group_data: Vec::new(),
-        locale: vauchi_app::i18n::Locale::English,
+        locale: vauchi_app::i18n::Locale::ENGLISH,
     };
 
     let engine =
@@ -270,7 +270,7 @@ fn exchange_failed_fallback_actions_have_a11y_hints() {
         vec![],
         vauchi_core::clock::SystemClock::shared(),
         None,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     let _ = engine.handle_hardware_event(vauchi_core::Event::BleDisconnected {
         device_id: "peer-1".to_string(),

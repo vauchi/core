@@ -61,7 +61,7 @@ impl LinkResponderEngine {
             cancelled: false,
             terminal: None,
             success_summary: None,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 
@@ -314,7 +314,7 @@ mod success_summary_tests {
         let screen = engine.build_screen();
         assert_eq!(
             screen.title,
-            get_string(Locale::English, "link_exchange.contact_updated_title"),
+            get_string(Locale::ENGLISH, "link_exchange.contact_updated_title"),
             "re-exchanging with a known contact updates it; claiming it was \
              added tells the user something that did not happen",
         );
@@ -333,7 +333,7 @@ mod success_summary_tests {
         let screen = engine.build_screen();
         assert_eq!(
             screen.title,
-            get_string(Locale::English, "link_exchange.contact_added_title"),
+            get_string(Locale::ENGLISH, "link_exchange.contact_added_title"),
         );
     }
 

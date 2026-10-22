@@ -152,7 +152,7 @@ fn every_mode_screen_opens_with_its_pictogram_and_name() {
             }),
         };
         let screen = engine.current_screen();
-        let name = get_string(Locale::English, &format!("exchange.mode_name.{mode}"));
+        let name = get_string(Locale::ENGLISH, &format!("exchange.mode_name.{mode}"));
         let badge = all_objects(&screen).into_iter().find(|o| {
             o.get("icon").and_then(Value::as_str) == Some(pictogram(mode).as_str())
                 && o.get("title").and_then(Value::as_str) == Some(name.as_str())

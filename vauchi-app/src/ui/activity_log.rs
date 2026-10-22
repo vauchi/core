@@ -29,7 +29,7 @@ impl ActivityLogEngine {
     pub fn new(items: Vec<ActivityLogItem>) -> Self {
         Self {
             items,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

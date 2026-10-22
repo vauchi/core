@@ -713,7 +713,7 @@ mod tests {
         let unresolved: Vec<&str> = SCREENS_WITH_NAV_LABELS
             .iter()
             .map(|screen| AppEngine::tab_metadata(screen).0)
-            .filter(|key| get_string(Locale::English, key).starts_with("Missing:"))
+            .filter(|key| get_string(Locale::ENGLISH, key).starts_with("Missing:"))
             .collect();
 
         assert!(

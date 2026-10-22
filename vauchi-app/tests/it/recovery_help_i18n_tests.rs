@@ -24,8 +24,8 @@ fn help_copy(locale: Locale) -> (String, String) {
 #[test]
 fn recovery_help_info_screen_renders_the_active_locale() {
     load_german();
-    let (de_title, de_vouch) = help_copy(Locale::German);
-    let (en_title, en_vouch) = help_copy(Locale::English);
+    let (de_title, de_vouch) = help_copy(Locale::GERMAN);
+    let (en_title, en_vouch) = help_copy(Locale::ENGLISH);
 
     assert_translated("recovery-help title", &de_title, &en_title);
     assert_translated("vouch action", &de_vouch, &en_vouch);

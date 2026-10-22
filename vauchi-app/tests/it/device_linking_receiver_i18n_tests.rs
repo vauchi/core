@@ -54,8 +54,8 @@ fn failure_detail_for(locale: Locale, reason: &str) -> String {
 #[test]
 fn device_linking_qr_expired_and_link_failed_render_the_active_locale() {
     load_german();
-    let (de_expired, de_expired_retry, de_failed, de_failed_retry) = terminal_copy(Locale::German);
-    let (en_expired, en_expired_retry, en_failed, en_failed_retry) = terminal_copy(Locale::English);
+    let (de_expired, de_expired_retry, de_failed, de_failed_retry) = terminal_copy(Locale::GERMAN);
+    let (en_expired, en_expired_retry, en_failed, en_failed_retry) = terminal_copy(Locale::ENGLISH);
 
     assert_translated("qr-expired title", &de_expired, &en_expired);
     assert_translated(
@@ -76,7 +76,7 @@ fn device_linking_qr_expired_and_link_failed_render_the_active_locale() {
 // @internal
 #[test]
 fn device_linking_qr_expired_and_link_failed_english_copy_unchanged() {
-    let (expired, expired_retry, failed, failed_retry) = terminal_copy(Locale::English);
+    let (expired, expired_retry, failed, failed_retry) = terminal_copy(Locale::ENGLISH);
     assert_eq!(expired, "QR Code Expired");
     assert_eq!(expired_retry, "Generate New QR");
     assert_eq!(failed, "Linking Failed");
@@ -92,14 +92,14 @@ fn device_linking_qr_expired_and_link_failed_english_copy_unchanged() {
 fn device_link_failure_id_maps_to_localized_copy() {
     load_german();
 
-    let en = failure_detail_for(Locale::English, "user_denied");
-    let de = failure_detail_for(Locale::German, "user_denied");
+    let en = failure_detail_for(Locale::ENGLISH, "user_denied");
+    let de = failure_detail_for(Locale::GERMAN, "user_denied");
     assert_eq!(en, "The other device declined the link.");
     assert_translated("user-denied failure detail", &de, &en);
 
     // An unknown / relay reason falls back to the generic sentence, never
     // raw — in every locale.
-    for locale in [Locale::English, Locale::German] {
+    for locale in [Locale::ENGLISH, Locale::GERMAN] {
         let generic = failure_detail_for(locale, "relay timeout");
         assert!(
             !generic.contains("relay timeout"),
@@ -111,7 +111,7 @@ fn device_link_failure_id_maps_to_localized_copy() {
         );
     }
     assert_eq!(
-        failure_detail_for(Locale::English, "relay timeout"),
+        failure_detail_for(Locale::ENGLISH, "relay timeout"),
         "Device linking failed. Please try again."
     );
 }

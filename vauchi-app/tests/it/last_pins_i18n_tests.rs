@@ -62,8 +62,8 @@ fn about_overlay_title(language_id: &str) -> String {
 #[test]
 fn my_info_sync_captions_render_the_active_locale() {
     load_german();
-    let de = sync_captions(Locale::German);
-    let en = sync_captions(Locale::English);
+    let de = sync_captions(Locale::GERMAN);
+    let en = sync_captions(Locale::ENGLISH);
 
     assert_translated("MyInfo caption block", &de.join(" | "), &en.join(" | "));
 

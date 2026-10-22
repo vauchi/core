@@ -80,8 +80,8 @@ fn walk_gdpr(locale: Locale) -> GdprCopy {
 #[test]
 fn gdpr_overview_and_delete_review_render_the_active_locale() {
     load_german();
-    let de = walk_gdpr(Locale::German);
-    let en = walk_gdpr(Locale::English);
+    let de = walk_gdpr(Locale::GERMAN);
+    let en = walk_gdpr(Locale::ENGLISH);
 
     // Screen ids are identifiers, not copy — they must NOT translate.
     assert_eq!(de.overview_screen_id, "privacy_settings");
@@ -128,7 +128,7 @@ fn gdpr_overview_and_delete_review_render_the_active_locale() {
 // @internal
 #[test]
 fn gdpr_english_copy_matches_canonical_keys() {
-    let mut engine = GdprEngine::new(None, "Active".into(), Locale::English);
+    let mut engine = GdprEngine::new(None, "Active".into(), Locale::ENGLISH);
 
     let overview = engine.current_screen();
     assert_eq!(overview.title, "Privacy & Data");

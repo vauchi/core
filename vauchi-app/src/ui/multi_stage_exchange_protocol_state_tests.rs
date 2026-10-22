@@ -30,7 +30,7 @@ fn idle_emits_show_this_label_with_peer_scanner() {
     // The active screen no longer emits a StatusIndicator — the own-QR
     // label carries the status. In Idle that caption is "Show this".
     assert_eq!(
-        own_qr_label(&ProtocolState::Idle, Locale::English),
+        own_qr_label(&ProtocolState::Idle, Locale::ENGLISH),
         "Show this"
     );
     // Back in the title row ends the exchange, so no Cancel button (#534).
@@ -76,7 +76,7 @@ fn active_own_qr_ships_current_frame_in_frames_carrier() {
 #[test]
 fn discovered_state_narrates_starting_exchange() {
     assert_eq!(
-        own_qr_label(&ProtocolState::Discovered, Locale::English),
+        own_qr_label(&ProtocolState::Discovered, Locale::ENGLISH),
         "Connecting…"
     );
 }
@@ -92,7 +92,7 @@ fn transferring_state_names_both_directions() {
                 chunks_received: 5,
                 peer_chunks_total: 9,
             },
-            Locale::English
+            Locale::ENGLISH
         ),
         "Sending 3/7 · Receiving 5/9",
     );
@@ -112,7 +112,7 @@ fn transferring_names_one_direction_until_the_peer_size_is_known() {
                 chunks_received: 0,
                 peer_chunks_total: 0,
             },
-            Locale::English
+            Locale::ENGLISH
         ),
         "Transferring 1/4",
     );
@@ -129,7 +129,7 @@ fn transferring_with_zero_totals_omits_progress_detail() {
                 chunks_received: 0,
                 peer_chunks_total: 0,
             },
-            Locale::English
+            Locale::ENGLISH
         ),
         "Transferring…",
         "all-zero totals must omit the progress fraction",
@@ -140,7 +140,7 @@ fn transferring_with_zero_totals_omits_progress_detail() {
 #[test]
 fn verifying_state_narrates_verifying() {
     assert_eq!(
-        own_qr_label(&ProtocolState::Verifying, Locale::English),
+        own_qr_label(&ProtocolState::Verifying, Locale::ENGLISH),
         "Verifying…"
     );
 }
@@ -149,7 +149,7 @@ fn verifying_state_narrates_verifying() {
 #[test]
 fn confirming_state_narrates_confirming() {
     assert_eq!(
-        own_qr_label(&ProtocolState::Confirming, Locale::English),
+        own_qr_label(&ProtocolState::Confirming, Locale::ENGLISH),
         "Confirming…"
     );
 }
@@ -161,7 +161,7 @@ fn complete_before_session_ended_keeps_active_chrome() {
     // The active own-QR caption reads "Almost done" while Complete
     // before the session ends.
     assert_eq!(
-        own_qr_label(&ProtocolState::Complete, Locale::English),
+        own_qr_label(&ProtocolState::Complete, Locale::ENGLISH),
         "Almost done"
     );
     // Still active — switch_camera only; Back ends the exchange.
@@ -387,15 +387,15 @@ fn failed_state_renders_retry_and_cancel() {
 #[test]
 fn own_qr_label_maps_every_protocol_state() {
     assert_eq!(
-        own_qr_label(&ProtocolState::Idle, Locale::English),
+        own_qr_label(&ProtocolState::Idle, Locale::ENGLISH),
         "Show this"
     );
     assert_eq!(
-        own_qr_label(&ProtocolState::Advertising, Locale::English),
+        own_qr_label(&ProtocolState::Advertising, Locale::ENGLISH),
         "Show this"
     );
     assert_eq!(
-        own_qr_label(&ProtocolState::Discovered, Locale::English),
+        own_qr_label(&ProtocolState::Discovered, Locale::ENGLISH),
         "Connecting…"
     );
     assert_eq!(
@@ -406,7 +406,7 @@ fn own_qr_label_maps_every_protocol_state() {
                 chunks_received: 1,
                 peer_chunks_total: 5,
             },
-            Locale::English
+            Locale::ENGLISH
         ),
         "Sending 2/5 · Receiving 1/5",
     );
@@ -418,32 +418,32 @@ fn own_qr_label_maps_every_protocol_state() {
                 chunks_received: 0,
                 peer_chunks_total: 0,
             },
-            Locale::English
+            Locale::ENGLISH
         ),
         "Transferring…",
     );
     assert_eq!(
-        own_qr_label(&ProtocolState::Verifying, Locale::English),
+        own_qr_label(&ProtocolState::Verifying, Locale::ENGLISH),
         "Verifying…"
     );
     assert_eq!(
-        own_qr_label(&ProtocolState::Confirming, Locale::English),
+        own_qr_label(&ProtocolState::Confirming, Locale::ENGLISH),
         "Confirming…"
     );
     assert_eq!(
-        own_qr_label(&ProtocolState::Complete, Locale::English),
+        own_qr_label(&ProtocolState::Complete, Locale::ENGLISH),
         "Almost done"
     );
     assert_eq!(
-        own_qr_label(&ProtocolState::RetryReady, Locale::English),
+        own_qr_label(&ProtocolState::RetryReady, Locale::ENGLISH),
         "Almost done"
     );
     assert_eq!(
-        own_qr_label(&ProtocolState::Finalized, Locale::English),
+        own_qr_label(&ProtocolState::Finalized, Locale::ENGLISH),
         "Almost done"
     );
     assert_eq!(
-        own_qr_label(&ProtocolState::Failed("boom".into()), Locale::English),
+        own_qr_label(&ProtocolState::Failed("boom".into()), Locale::ENGLISH),
         "Exchange failed",
     );
 }

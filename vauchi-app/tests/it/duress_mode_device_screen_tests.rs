@@ -74,7 +74,7 @@ fn duress_mode_device_link_fails_like_any_failed_link() {
     });
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "link_failed");
-    let generic = get_string(Locale::English, "device_link.failure_generic");
+    let generic = get_string(Locale::ENGLISH, "device_link.failure_generic");
     assert!(
         format!("{:?}", screen.components).contains(&generic),
         "the ordinary failure copy, not a duress-specific one: {:?}",

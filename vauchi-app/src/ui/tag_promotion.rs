@@ -53,7 +53,7 @@ impl TagPromotionEngine {
             name,
             member_count,
             fields,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

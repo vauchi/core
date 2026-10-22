@@ -268,17 +268,17 @@ fn engine_screen_matrix() -> Vec<(&'static str, ScreenModel)> {
         ),
         (
             "backup_choose",
-            BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::English)
+            BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::ENGLISH)
                 .current_screen(),
         ),
         (
             "duress_overview",
-            DuressPinEngine::new(sample_duress_config(), vauchi_app::i18n::Locale::English)
+            DuressPinEngine::new(sample_duress_config(), vauchi_app::i18n::Locale::ENGLISH)
                 .current_screen(),
         ),
         (
             "emergency_shred",
-            EmergencyShredEngine::new(vauchi_app::i18n::Locale::English).current_screen(),
+            EmergencyShredEngine::new(vauchi_app::i18n::Locale::ENGLISH).current_screen(),
         ),
         ("support", SupportEngine::new().current_screen()),
         ("recovery_help", RecoveryHelpEngine::new().current_screen()),
@@ -303,7 +303,7 @@ fn engine_screen_matrix() -> Vec<(&'static str, ScreenModel)> {
             GdprEngine::new(
                 None,
                 "2 contacts, 1 group".into(),
-                vauchi_app::i18n::Locale::English,
+                vauchi_app::i18n::Locale::ENGLISH,
             )
             .current_screen(),
         ),

@@ -67,7 +67,7 @@ impl DeepLinkConsentEngine {
             payload,
             decision: ConsentDecision::Pending,
             cancelled: false,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

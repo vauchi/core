@@ -100,8 +100,8 @@ fn walk_picker(locale: Locale) -> PickerCopy {
 #[test]
 fn mode_picker_renders_the_active_locale() {
     load_german();
-    let de = walk_picker(Locale::German);
-    let en = walk_picker(Locale::English);
+    let de = walk_picker(Locale::GERMAN);
+    let en = walk_picker(Locale::ENGLISH);
 
     // Screen ids are identifiers, not copy — they must NOT translate.
     assert_eq!(de.screen_id, "exchange_mode_selection");
@@ -118,11 +118,11 @@ fn mode_picker_renders_the_active_locale() {
     // that name is.
     assert_eq!(
         de.hero_label,
-        vauchi_app::i18n::get_string(Locale::German, "exchange.mode_name.glance")
+        vauchi_app::i18n::get_string(Locale::GERMAN, "exchange.mode_name.glance")
     );
     assert_eq!(
         en.hero_label,
-        vauchi_app::i18n::get_string(Locale::English, "exchange.mode_name.glance")
+        vauchi_app::i18n::get_string(Locale::ENGLISH, "exchange.mode_name.glance")
     );
 }
 
@@ -133,7 +133,7 @@ fn mode_picker_renders_the_active_locale() {
 #[test]
 fn mode_picker_english_copy_unchanged() {
     let engine = ExchangeEngine::new(
-        config_for(Locale::English),
+        config_for(Locale::ENGLISH),
         vauchi_core::clock::SystemClock::shared(),
     );
     let picker = engine.current_screen();

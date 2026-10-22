@@ -14,7 +14,7 @@ use vauchi_app::ui::{
 };
 
 fn engine() -> EmergencyShredEngine {
-    EmergencyShredEngine::new(vauchi_app::i18n::Locale::English)
+    EmergencyShredEngine::new(vauchi_app::i18n::Locale::ENGLISH)
 }
 
 fn type_word(engine: &mut EmergencyShredEngine, word: &str) {

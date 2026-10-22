@@ -88,8 +88,8 @@ fn contact_merge_renders_the_active_locale() {
     load_german();
     assert_translated(
         "contact-merge title",
-        &merge_title(Locale::German),
-        &merge_title(Locale::English),
+        &merge_title(Locale::GERMAN),
+        &merge_title(Locale::ENGLISH),
     );
 }
 
@@ -100,8 +100,8 @@ fn delivery_status_renders_the_active_locale() {
     load_german();
     assert_translated(
         "delivery-status title",
-        &delivery_title(Locale::German),
-        &delivery_title(Locale::English),
+        &delivery_title(Locale::GERMAN),
+        &delivery_title(Locale::ENGLISH),
     );
 }
 
@@ -112,8 +112,8 @@ fn group_detail_renders_the_active_locale() {
     load_german();
     assert_translated(
         "group-info panel title",
-        &group_info_panel_title(Locale::German),
-        &group_info_panel_title(Locale::English),
+        &group_info_panel_title(Locale::GERMAN),
+        &group_info_panel_title(Locale::ENGLISH),
     );
 }
 
@@ -122,8 +122,8 @@ fn group_detail_renders_the_active_locale() {
 #[test]
 fn contact_edit_renders_the_active_locale() {
     load_german();
-    let (de_title, de_fields) = contact_edit_copy(Locale::German);
-    let (en_title, en_fields) = contact_edit_copy(Locale::English);
+    let (de_title, de_fields) = contact_edit_copy(Locale::GERMAN);
+    let (en_title, en_fields) = contact_edit_copy(Locale::ENGLISH);
 
     assert_translated("contact-edit title", &de_title, &en_title);
     assert_translated("personal note label", &de_fields, &en_fields);
@@ -135,7 +135,7 @@ fn contact_edit_renders_the_active_locale() {
 // @internal
 #[test]
 fn batch2_english_copy_unchanged() {
-    assert_eq!(merge_title(Locale::English), "Merge Contacts");
-    assert_eq!(delivery_title(Locale::English), "Update Delivery");
-    assert_eq!(contact_edit_copy(Locale::English).0, "Edit Contact");
+    assert_eq!(merge_title(Locale::ENGLISH), "Merge Contacts");
+    assert_eq!(delivery_title(Locale::ENGLISH), "Update Delivery");
+    assert_eq!(contact_edit_copy(Locale::ENGLISH).0, "Edit Contact");
 }

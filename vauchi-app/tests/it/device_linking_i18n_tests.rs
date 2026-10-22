@@ -33,8 +33,8 @@ fn linking_copy(locale: Locale) -> (String, String, String) {
 #[test]
 fn device_linking_transport_and_qr_render_the_active_locale() {
     load_german();
-    let (de_title, de_subtitle, de_qr) = linking_copy(Locale::German);
-    let (en_title, en_subtitle, en_qr) = linking_copy(Locale::English);
+    let (de_title, de_subtitle, de_qr) = linking_copy(Locale::GERMAN);
+    let (en_title, en_subtitle, en_qr) = linking_copy(Locale::ENGLISH);
 
     assert_translated("transport-selection title", &de_title, &en_title);
     assert_translated("transport-selection subtitle", &de_subtitle, &en_subtitle);

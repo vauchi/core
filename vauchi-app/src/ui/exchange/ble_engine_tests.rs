@@ -31,7 +31,7 @@ fn new_engine_renders_discovering_and_not_cancelled() {
         vec![],
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     assert_eq!(
         engine.current_screen().screen_id,
@@ -49,7 +49,7 @@ fn glance_active_screen_shows_injected_qr_and_scan() {
         vec![1, 2, 3],
         SystemClock::shared(),
         Some("QR-PAYLOAD".to_string()),
-        Locale::English,
+        Locale::ENGLISH,
     );
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_ble_glance");
@@ -87,7 +87,7 @@ fn glance_without_camera_shows_qr_but_no_scan() {
         vec![9],
         SystemClock::shared(),
         Some("Q".to_string()),
-        Locale::English,
+        Locale::ENGLISH,
     );
     let screen = engine.current_screen();
     assert!(
@@ -128,7 +128,7 @@ fn stalled_step_past_timeout_ticks_to_failed() {
         vec![],
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let _ = discover(&mut engine);
     assert_eq!(engine.current_screen().screen_id, "exchange_ble_exchanging");
@@ -156,7 +156,7 @@ fn nothing_found_after_discovery_budget_with_no_peer() {
         vec![],
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let entered = SystemClock::shared().unix_seconds();
 
@@ -191,7 +191,7 @@ fn not_nothing_found_before_the_discovery_budget() {
         vec![],
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let entered = SystemClock::shared().unix_seconds();
 
@@ -213,7 +213,7 @@ fn discovering_a_peer_before_the_budget_prevents_nothing_found() {
         vec![],
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let entered = SystemClock::shared().unix_seconds();
     let _ = discover(&mut engine);
@@ -236,7 +236,7 @@ fn nothing_found_retry_restarts_scanning() {
         vec![],
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let entered = SystemClock::shared().unix_seconds();
     engine.tick(entered + BLE_DISCOVERY_TIMEOUT_SECS + 1);
@@ -272,7 +272,7 @@ fn step_within_timeout_stays_active() {
         vec![],
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let entered = SystemClock::shared().unix_seconds();
 
@@ -296,7 +296,7 @@ fn tick_on_terminal_screen_is_inert() {
         vec![],
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     engine.force_failure(Some("crypto failure".into()));
     let before = engine.current_screen();
@@ -321,7 +321,7 @@ fn screen_entered_emits_advertise_then_scan_once() {
         vec![],
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let cmds = engine.screen_entered();
     assert_eq!(cmds.len(), 2);
@@ -340,7 +340,7 @@ fn glance_screen_entered_selects_rear_camera_before_ble_bootstrap() {
         vec![],
         SystemClock::shared(),
         Some("QR-PAYLOAD".to_string()),
-        Locale::English,
+        Locale::ENGLISH,
     );
 
     let commands = engine.screen_entered();
@@ -367,7 +367,7 @@ fn glance_screen_entered_sets_the_exchange_brightness_first() {
         vec![],
         SystemClock::shared(),
         Some("QR-PAYLOAD".to_string()),
-        Locale::English,
+        Locale::ENGLISH,
     );
 
     let commands = engine.screen_entered();
@@ -387,7 +387,7 @@ fn glance_screen_exited_restores_the_platform_brightness() {
         vec![],
         SystemClock::shared(),
         Some("QR-PAYLOAD".to_string()),
-        Locale::English,
+        Locale::ENGLISH,
     );
     engine.screen_entered();
 
@@ -406,7 +406,7 @@ fn qr_less_ble_modes_leave_brightness_alone_on_exit() {
         vec![],
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     engine.screen_entered();
 
@@ -422,7 +422,7 @@ fn discovery_event_emits_connect_command_and_advances() {
         vec![],
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let result = discover(&mut engine).expect("an active engine handles BLE events");
     match result {
@@ -448,7 +448,7 @@ fn responder_backoff_dials_out_after_fallback_window() {
         vec![0xFF], // large own token → we are the responder vs peer 0x01
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let entered = SystemClock::shared().unix_seconds();
     // Discover a peer: as the responder we advance but emit no connect.
@@ -492,7 +492,7 @@ fn disconnect_transitions_to_failed_with_all_fallbacks() {
         vec![],
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let _ = engine.handle_hardware_event(Event::BleDisconnected {
         device_id: "peer-1".into(),
@@ -521,7 +521,7 @@ fn failed_screen_states_nothing_was_saved() {
         vec![],
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let _ = engine.handle_hardware_event(Event::BleDisconnected {
         device_id: "peer-1".into(),
@@ -529,7 +529,7 @@ fn failed_screen_states_nothing_was_saved() {
         reason: "lost".into(),
     });
     let screen = engine.current_screen();
-    let nothing_saved = get_string(Locale::English, "exchange.terminal.failed_nothing_saved");
+    let nothing_saved = get_string(Locale::ENGLISH, "exchange.terminal.failed_nothing_saved");
     assert!(
         screen
             .components
@@ -549,7 +549,7 @@ fn no_qr_fallback_offered_without_camera() {
         vec![],
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let _ = engine.handle_hardware_event(Event::BleDisconnected {
         device_id: "peer-1".into(),
@@ -577,7 +577,7 @@ fn force_success_flips_chrome_to_success_screen() {
         vec![],
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     assert_eq!(
         engine.current_screen().screen_id,
@@ -596,7 +596,7 @@ fn cancel_completes_and_marks_cancelled() {
         vec![],
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel".into(),
@@ -614,7 +614,7 @@ fn retry_from_failed_resets_to_active_and_re_emits_start() {
         vec![],
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let _ = engine.handle_hardware_event(Event::BleDisconnected {
         device_id: "peer-1".into(),
@@ -640,7 +640,7 @@ fn failed_engine(has_camera: bool) -> BleExchangeEngine {
         vec![],
         SystemClock::shared(),
         None,
-        Locale::English,
+        Locale::ENGLISH,
     );
     let _ = engine.handle_hardware_event(Event::BleDisconnected {
         device_id: "peer-1".into(),
@@ -712,7 +712,7 @@ fn glance_engine(has_camera: bool) -> BleExchangeEngine {
         vec![],
         SystemClock::shared(),
         Some("OWN-QR".to_string()),
-        Locale::English,
+        Locale::ENGLISH,
     )
 }
 

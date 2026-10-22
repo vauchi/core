@@ -53,7 +53,7 @@ impl PlacesEngine {
             places,
             unnamed: Vec::new(),
             pending_delete: None,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

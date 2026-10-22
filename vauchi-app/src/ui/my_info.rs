@@ -102,7 +102,7 @@ impl MyInfoEngine {
             pending_updates: 0,
             last_sync_seconds: None,
             now_seconds: 0,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

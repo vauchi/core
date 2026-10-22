@@ -45,7 +45,7 @@ fn backup_output_redacts_password_in_debug() {
     let engine = BackupRecoveryEngine::new(
         Some(BackupMode::Restore),
         true,
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
 
     let output = engine.engine_output().expect("backup engine output");
@@ -219,7 +219,7 @@ fn duress_pin_output_redacts_pin_in_debug() {
     use vauchi_app::ui::{DuressConfig, DuressPinEngine};
     let engine = DuressPinEngine::new(
         DuressConfig { enabled: true },
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
 
     let output = engine.engine_output().expect("duress output");

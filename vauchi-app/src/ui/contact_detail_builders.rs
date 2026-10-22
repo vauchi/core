@@ -40,7 +40,7 @@ impl ContactDetailEngine {
             place_input: String::new(),
             place_suggestions: Vec::new(),
             field_links: HashMap::new(),
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 
@@ -80,7 +80,7 @@ impl ContactDetailEngine {
             place_input: String::new(),
             place_suggestions: Vec::new(),
             field_links: HashMap::new(),
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

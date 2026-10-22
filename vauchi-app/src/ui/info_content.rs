@@ -55,7 +55,7 @@ mod tests {
     #[test]
     fn resolve_known_key_returns_content() {
         let _g = setup_i18n();
-        let result = resolve_info_key("auto_lock", Locale::English);
+        let result = resolve_info_key("auto_lock", Locale::ENGLISH);
         assert!(result.is_some(), "expected Some for known key 'auto_lock'");
         let (title, body) = result.unwrap();
         assert!(!title.is_empty(), "title must not be empty");
@@ -66,7 +66,7 @@ mod tests {
     #[test]
     fn resolve_unknown_key_returns_none() {
         let _g = setup_i18n();
-        let result = resolve_info_key("nonexistent_key_xyz", Locale::English);
+        let result = resolve_info_key("nonexistent_key_xyz", Locale::ENGLISH);
         assert!(result.is_none(), "expected None for unknown key");
     }
 
@@ -74,7 +74,7 @@ mod tests {
     #[test]
     fn resolve_known_key_has_non_missing_content() {
         let _g = setup_i18n();
-        let (title, body) = resolve_info_key("auto_lock", Locale::English).unwrap();
+        let (title, body) = resolve_info_key("auto_lock", Locale::ENGLISH).unwrap();
         assert!(
             !title.starts_with("Missing:"),
             "title should not be a missing-key placeholder"

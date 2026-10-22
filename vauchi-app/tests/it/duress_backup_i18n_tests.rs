@@ -173,8 +173,8 @@ fn walk_backup(locale: Locale) -> BackupCopy {
 #[test]
 fn duress_wizard_renders_the_active_locale() {
     load_german();
-    let de = walk_duress(Locale::German);
-    let en = walk_duress(Locale::English);
+    let de = walk_duress(Locale::GERMAN);
+    let en = walk_duress(Locale::ENGLISH);
 
     assert_translated("overview title", &de.overview_title, &en.overview_title);
     assert_translated(
@@ -203,8 +203,8 @@ fn duress_wizard_renders_the_active_locale() {
 #[test]
 fn backup_wizard_renders_the_active_locale() {
     load_german();
-    let de = walk_backup(Locale::German);
-    let en = walk_backup(Locale::English);
+    let de = walk_backup(Locale::GERMAN);
+    let en = walk_backup(Locale::ENGLISH);
 
     // Screen ids are identifiers, not copy — they must NOT be translated.
     assert_eq!(de.choose_screen_id, "backup_choose");
@@ -228,7 +228,7 @@ fn backup_wizard_renders_the_active_locale() {
 // @internal
 #[test]
 fn duress_and_backup_english_copy_unchanged() {
-    let engine = DuressPinEngine::new(DuressConfig::default(), Locale::English);
+    let engine = DuressPinEngine::new(DuressConfig::default(), Locale::ENGLISH);
     let overview = engine.current_screen();
     assert_eq!(overview.title, "Duress PIN");
     assert_eq!(
@@ -236,7 +236,7 @@ fn duress_and_backup_english_copy_unchanged() {
         "Set Up PIN"
     );
 
-    let backup = BackupRecoveryEngine::new(None, true, Locale::English);
+    let backup = BackupRecoveryEngine::new(None, true, Locale::ENGLISH);
     let choose = backup.current_screen();
     assert_eq!(choose.title, "Backup & Recovery");
     assert_eq!(row_label(&choose, "create"), "Export backup");

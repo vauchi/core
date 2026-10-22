@@ -101,7 +101,7 @@ impl DeliveryStatusEngine {
         Self {
             items,
             retries: Vec::new(),
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
             chosen: None,
         }
     }

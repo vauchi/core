@@ -77,7 +77,7 @@ impl GroupsEngine {
         Self {
             groups,
             education_banner: false,
-            locale: Locale::English,
+            locale: Locale::ENGLISH,
         }
     }
 

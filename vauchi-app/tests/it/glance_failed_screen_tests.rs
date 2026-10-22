@@ -17,7 +17,7 @@ fn failed_by(mode: ExchangeMode, event: Event) -> Vec<String> {
         vec![],
         vauchi_core::clock::SystemClock::shared(),
         Some("OWN-QR".to_string()),
-        vauchi_app::i18n::Locale::English,
+        vauchi_app::i18n::Locale::ENGLISH,
     );
     engine.handle_hardware_event(event);
     let screen = engine.current_screen();

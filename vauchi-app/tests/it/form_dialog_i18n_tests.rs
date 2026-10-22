@@ -24,8 +24,8 @@ fn create_group_copy(locale: Locale) -> (String, String) {
 #[test]
 fn form_dialog_create_group_renders_the_active_locale() {
     load_german();
-    let (de_title, de_submit) = create_group_copy(Locale::German);
-    let (en_title, en_submit) = create_group_copy(Locale::English);
+    let (de_title, de_submit) = create_group_copy(Locale::GERMAN);
+    let (en_title, en_submit) = create_group_copy(Locale::ENGLISH);
 
     assert_translated("create-group title", &de_title, &en_title);
     assert_translated("submit action", &de_submit, &en_submit);

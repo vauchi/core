@@ -508,7 +508,7 @@ mod tests {
             "Alice".into(),
             true,
             SystemClock::shared(),
-            Locale::English,
+            Locale::ENGLISH,
         )
     }
 
@@ -571,7 +571,7 @@ mod tests {
             "A".into(),
             true,
             SystemClock::shared(),
-            Locale::English,
+            Locale::ENGLISH,
         );
         let _ = e.handle_action(select(ROLE_SEND));
         assert_eq!(e.current_screen().screen_id, "exchange_failed");
@@ -662,7 +662,7 @@ mod tests {
             "Alice".into(),
             true,
             SystemClock::shared(),
-            Locale::English,
+            Locale::ENGLISH,
         );
         let _ = e.handle_action(select(ROLE_SEND));
         assert_eq!(e.current_screen().screen_id, "exchange_failed");
@@ -695,7 +695,7 @@ mod tests {
             "Alice".into(),
             true,
             SystemClock::shared(),
-            Locale::English,
+            Locale::ENGLISH,
         );
         let _ = e.handle_action(select(ROLE_SEND)); // -> Failed (no identity)
         assert_eq!(e.current_screen().screen_id, "exchange_failed");
@@ -714,7 +714,7 @@ mod tests {
             "A".into(),
             true,
             SystemClock::shared(),
-            Locale::English,
+            Locale::ENGLISH,
         );
         let _ = with.handle_action(select(ROLE_SEND));
         let with_ids: Vec<String> = with
@@ -730,7 +730,7 @@ mod tests {
             "A".into(),
             false,
             SystemClock::shared(),
-            Locale::English,
+            Locale::ENGLISH,
         );
         let _ = without.handle_action(select(ROLE_SEND));
         let without_ids: Vec<String> = without

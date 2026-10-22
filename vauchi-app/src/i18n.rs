@@ -36,6 +36,12 @@ pub enum Locale {
 }
 
 impl Locale {
+    pub const ENGLISH: Locale = Locale::English;
+    pub const GERMAN: Locale = Locale::German;
+    pub const FRENCH: Locale = Locale::French;
+    pub const SPANISH: Locale = Locale::Spanish;
+    pub const ITALIAN: Locale = Locale::Italian;
+
     /// Get the ISO 639-1 language code
     pub fn code(&self) -> &'static str {
         match self {

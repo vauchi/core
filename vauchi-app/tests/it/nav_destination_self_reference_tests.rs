@@ -21,7 +21,7 @@ fn engine_with_identity() -> AppEngine {
 /// The screen ids every shell is offered in the navigation overlay.
 fn destination_ids(engine: &AppEngine) -> Vec<String> {
     engine
-        .sidebar_items(vauchi_app::i18n::Locale::English)
+        .sidebar_items(vauchi_app::i18n::Locale::ENGLISH)
         .into_iter()
         .map(|tab| tab.id)
         .collect()

@@ -13,6 +13,7 @@ mod error_tests;
 mod exchange_enum_roundtrip_tests;
 mod ffi_boundary_tests;
 mod keychain_unexpected_error_tests;
+mod locale_code_binding_tests;
 mod mobile_contact_detail_tests;
 mod mobile_contact_display_tests;
 mod mobile_delivery_tests;

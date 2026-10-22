@@ -8,7 +8,7 @@
 use std::sync::{Arc, Mutex};
 
 use vauchi_platform::{
-    MobileBleLinkDirection, MobileEvent, MobileLocale, MobileTabLayout, PlatformAppEngine,
+    MobileBleLinkDirection, MobileEvent, MobileTabLayout, PlatformAppEngine,
     PlatformAppEngineTestHelpers, PlatformEventListener, hardware_event_json,
 };
 
@@ -353,7 +353,7 @@ fn initial_screen_id_is_identity_check() {
 fn nav_items_mobile_pre_identity_returns_only_onboarding() {
     let (engine, _dir) = create_engine();
     let tabs = engine
-        .nav_items(MobileTabLayout::Mobile, MobileLocale::English)
+        .nav_items(MobileTabLayout::Mobile, "en".to_string())
         .expect("nav items");
     assert_eq!(tabs.len(), 1, "pre-identity should expose just onboarding");
     let tab = &tabs[0];
@@ -377,7 +377,7 @@ fn nav_items_post_identity_returns_the_primary_destinations() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
     let tabs = engine
-        .nav_items(MobileTabLayout::Mobile, MobileLocale::English)
+        .nav_items(MobileTabLayout::Mobile, "en".to_string())
         .expect("nav items");
     let ids: Vec<&str> = tabs.iter().map(|t| t.id.as_str()).collect();
     assert_eq!(
@@ -411,7 +411,7 @@ fn nav_items_english_labels_come_from_locale() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
     let tabs = engine
-        .nav_items(MobileTabLayout::Mobile, MobileLocale::English)
+        .nav_items(MobileTabLayout::Mobile, "en".to_string())
         .expect("nav items");
     let by_id: std::collections::HashMap<_, _> = tabs
         .iter()
@@ -437,10 +437,10 @@ fn nav_items_mobile_german_labels_differ_from_english_once_locales_loaded() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
     let en = engine
-        .nav_items(MobileTabLayout::Mobile, MobileLocale::English)
+        .nav_items(MobileTabLayout::Mobile, "en".to_string())
         .expect("en");
     let de = engine
-        .nav_items(MobileTabLayout::Mobile, MobileLocale::German)
+        .nav_items(MobileTabLayout::Mobile, "de".to_string())
         .expect("de");
     // Same screen IDs in the same order
     let en_ids: Vec<&str> = en.iter().map(|t| t.id.as_str()).collect();
@@ -464,13 +464,13 @@ fn nav_items_agree_across_layouts() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
     let mobile: Vec<String> = engine
-        .nav_items(MobileTabLayout::Mobile, MobileLocale::English)
+        .nav_items(MobileTabLayout::Mobile, "en".to_string())
         .expect("mobile nav")
         .iter()
         .map(|t| t.id.clone())
         .collect();
     let desktop: Vec<String> = engine
-        .nav_items(MobileTabLayout::Desktop, MobileLocale::English)
+        .nav_items(MobileTabLayout::Desktop, "en".to_string())
         .expect("desktop nav")
         .iter()
         .map(|t| t.id.clone())
@@ -487,7 +487,7 @@ fn nav_items_agree_across_layouts() {
 fn nav_items_desktop_pre_identity_returns_only_onboarding() {
     let (engine, _dir) = create_engine();
     let items = engine
-        .nav_items(MobileTabLayout::Desktop, MobileLocale::English)
+        .nav_items(MobileTabLayout::Desktop, "en".to_string())
         .expect("desktop nav");
     assert_eq!(items.len(), 1);
     assert_eq!(items[0].id, "onboarding");

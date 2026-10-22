@@ -14,8 +14,8 @@
 use std::sync::Once;
 
 use vauchi_platform::{
-    MobileAhaMomentType, MobileLocale, generate_storage_key, get_aha_moment_localized,
-    is_allowed_scheme, is_blocked_scheme, is_safe_url, is_valid_relay_url,
+    MobileAhaMomentType, generate_storage_key, get_aha_moment_localized, is_allowed_scheme,
+    is_blocked_scheme, is_safe_url, is_valid_relay_url,
 };
 
 static INIT: Once = Once::new();
@@ -294,10 +294,8 @@ fn test_relay_url_other_schemes_rejected() {
 #[test]
 fn test_aha_moment_localized_german() {
     ensure_init();
-    let moment = get_aha_moment_localized(
-        MobileAhaMomentType::CardCreationComplete,
-        MobileLocale::German,
-    );
+    let moment =
+        get_aha_moment_localized(MobileAhaMomentType::CardCreationComplete, "de".to_string());
     assert!(
         moment.title.contains("Karte"),
         "German title should contain 'Karte', got: {}",
@@ -313,10 +311,8 @@ fn test_aha_moment_localized_german() {
 #[test]
 fn test_aha_moment_localized_english() {
     ensure_init();
-    let moment = get_aha_moment_localized(
-        MobileAhaMomentType::CardCreationComplete,
-        MobileLocale::English,
-    );
+    let moment =
+        get_aha_moment_localized(MobileAhaMomentType::CardCreationComplete, "en".to_string());
     assert!(!moment.title.is_empty());
     assert!(!moment.message.is_empty());
 }
@@ -335,7 +331,7 @@ fn test_all_aha_moments_localized() {
         MobileAhaMomentType::FirstOutboundDelivered,
     ];
     for moment_type in types {
-        let moment = get_aha_moment_localized(moment_type, MobileLocale::German);
+        let moment = get_aha_moment_localized(moment_type, "de".to_string());
         assert!(
             !moment.title.is_empty(),
             "Localized title should not be empty for {:?}",
@@ -355,7 +351,7 @@ fn test_all_aha_moments_localized() {
 #[test]
 fn test_aha_moment_localized_french() {
     ensure_init();
-    let moment = get_aha_moment_localized(MobileAhaMomentType::FirstEdit, MobileLocale::French);
+    let moment = get_aha_moment_localized(MobileAhaMomentType::FirstEdit, "fr".to_string());
     assert!(!moment.title.is_empty());
     assert!(!moment.message.contains("Missing"));
 }

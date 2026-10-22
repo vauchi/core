@@ -80,6 +80,8 @@ pub use action::{
     ActionResult, ContactActionKind, DeviceLinkRole, PostOnboardingDestination, UserAction,
 };
 pub use activity_log::{ActivityLogEngine, ActivityLogItem};
+#[cfg(feature = "content-updates")]
+pub use app_engine::ContentRunOptions;
 #[cfg(feature = "network-rustls")]
 pub use app_engine::{AppEngine, AppPresentationError, AppScreen, SyncChromeStatus, TabLayout};
 pub use archived_contacts::ArchivedContactsEngine;
@@ -265,6 +267,16 @@ pub fn affected_screens(event: &vauchi_core::api::VauchiEvent) -> Vec<&'static s
         }
         VauchiEvent::EmergencyAlertReceived { .. } | VauchiEvent::EmergencyBroadcastSent { .. } => {
             vec!["contacts"]
+        }
+        VauchiEvent::ContentUpdated => {
+            vec![
+                "my_info",
+                "contacts",
+                "contact_detail",
+                "exchange",
+                "settings",
+                "help",
+            ]
         }
         VauchiEvent::DowngradeDetected { .. } | VauchiEvent::Error { .. } => vec![],
         // #[non_exhaustive] — unknown future variants don't invalidate screens.

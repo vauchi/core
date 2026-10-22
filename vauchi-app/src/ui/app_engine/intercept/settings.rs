@@ -134,6 +134,7 @@ impl AppEngine {
             && let Some(choice) = vauchi_core::settings::ContentUpdates::from_id(item_id)
         {
             self.vauchi.config_mut().content_updates = choice;
+            self.refresh_content_snapshot();
             let mut flags = self.vauchi.load_settings_flags().unwrap_or_default();
             flags.merge_config_toggles(self.vauchi.config());
             // best-effort, like the toggles above: a failed save keeps the

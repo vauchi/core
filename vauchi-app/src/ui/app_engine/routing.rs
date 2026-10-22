@@ -171,6 +171,7 @@ impl AppEngine {
 
         if let Event::NetworkCostChanged { cost } = &event {
             self.network_cost = *cost;
+            self.refresh_content_snapshot();
             return None;
         }
 

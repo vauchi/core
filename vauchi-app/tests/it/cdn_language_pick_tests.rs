@@ -54,3 +54,20 @@ fn a_picked_language_renders_once_its_file_arrives_without_a_restart() {
 
     assert_eq!(engine.navigate_to(AppScreen::Contacts).title, "Pessoas");
 }
+
+/// A change to the wanted languages asks for a content cycle, so a picked
+/// language's file is fetched without waiting for the interval
+/// (vauchi/private#733 D7, D10).
+// @internal
+#[test]
+fn picking_a_new_language_asks_for_a_content_cycle_once() {
+    let mut engine = engine();
+    assert!(!engine.take_wanted_locales_changed());
+
+    engine.set_render_context(picked("pt", None));
+    assert!(engine.take_wanted_locales_changed());
+    assert!(!engine.take_wanted_locales_changed(), "asked twice");
+
+    engine.set_render_context(picked("pt", Some("pt-BR")));
+    assert!(!engine.take_wanted_locales_changed(), "same languages");
+}

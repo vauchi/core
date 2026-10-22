@@ -162,6 +162,7 @@ mod places_screen_tests;
 mod places_tests;
 #[path = "../prepared_surface_tests.rs"]
 mod prepared_surface_tests;
+mod settings_content_updates_tests;
 mod tag_promotion_tests;
 mod tags_engine_tests;
 mod tags_intercepts_tests;

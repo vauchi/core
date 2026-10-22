@@ -17,6 +17,7 @@ fn _flame_install() {
 #[allow(dead_code)]
 mod common;
 mod content;
+mod content_update_setting_tests;
 mod e2e;
 mod emergency_wipe_shred_tests;
 mod integration;

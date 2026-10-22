@@ -50,7 +50,7 @@ pub(super) unsafe fn resolve_locale(locale_code: *const c_char) -> Locale {
 
 /// Return the mobile tab-bar metadata as a JSON array.
 ///
-/// Mirrors `PlatformAppEngine::tab_info(MobileLocale)` (UniFFI) — each
+/// Mirrors `PlatformAppEngine::tab_info(locale_code)` (UniFFI) — each
 /// element is `{id, label, icon, badge_count}`. Pre-identity the
 /// result is a single-element `[{onboarding ...}]` array; post-identity
 /// it is the 5-element bottom-tab set (MyInfo / Contacts / Exchange /
@@ -97,7 +97,7 @@ pub unsafe extern "C" fn vauchi_app_tab_info(
 
 /// Return the desktop sidebar metadata as a JSON array.
 ///
-/// Mirrors `PlatformAppEngine::sidebar_items(MobileLocale)` (UniFFI) —
+/// Mirrors `PlatformAppEngine::sidebar_items(locale_code)` (UniFFI) —
 /// the broader 14-entry top-level set used by desktop frames
 /// (MyInfo, Contacts, Exchange, Groups, Settings, Recovery,
 /// DeviceManagement, Backup, Privacy, Support, Help, ActivityLog,

@@ -41,9 +41,10 @@ pub use social::{
     MobileLabelContactBadge, MobileLabelContactRow, MobileLabelContactStatus, MobileSocialNetwork,
     MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
+pub(crate) use ux::locale_from_code;
 pub use ux::{
     MobileAhaMoment, MobileAhaMomentType, MobileAvatarTokens, MobileBorderRadiusTokens,
-    MobileDemoContact, MobileDemoContactState, MobileDesignTokens, MobileLocale, MobileLocaleInfo,
+    MobileDemoContact, MobileDemoContactState, MobileDesignTokens, MobileLocaleInfo,
     MobileMotionTokens, MobileOnboardingProgress, MobileOnboardingStep,
     MobileSpacingDirectionTokens, MobileSpacingTokens, MobileTabInfo, MobileTabLayout, MobileTheme,
     MobileThemeColors, MobileThemeMode, MobileTouchTargetTokens, MobileTypographyTokens,

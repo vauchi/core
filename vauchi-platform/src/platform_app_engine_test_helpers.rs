@@ -22,7 +22,7 @@
 
 use crate::error::MobileError;
 use crate::platform_app_engine::PlatformAppEngine;
-use crate::types::{MobileLocale, MobileTabInfo, MobileTabLayout};
+use crate::types::{MobileTabInfo, MobileTabLayout};
 
 /// Test-only helpers on `PlatformAppEngine`.
 ///
@@ -55,7 +55,7 @@ pub trait PlatformAppEngineTestHelpers {
     fn nav_items(
         &self,
         layout: MobileTabLayout,
-        locale: MobileLocale,
+        locale: String,
     ) -> Result<Vec<MobileTabInfo>, MobileError>;
 
     /// Pop the history stack in tests. Emits no presentation — read the
@@ -184,7 +184,7 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
     fn nav_items(
         &self,
         layout: MobileTabLayout,
-        locale: MobileLocale,
+        locale: String,
     ) -> Result<Vec<MobileTabInfo>, MobileError> {
         self.nav_items_for_test(layout, locale)
     }

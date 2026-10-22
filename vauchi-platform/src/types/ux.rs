@@ -572,39 +572,10 @@ impl From<MobileTabLayout> for vauchi_app::ui::TabLayout {
     }
 }
 
-/// Supported locales for the app.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum MobileLocale {
-    English,
-    German,
-    French,
-    Spanish,
-    Italian,
-}
-
-impl From<vauchi_app::i18n::Locale> for MobileLocale {
-    fn from(locale: vauchi_app::i18n::Locale) -> Self {
-        match locale {
-            vauchi_app::i18n::Locale::ENGLISH => MobileLocale::English,
-            vauchi_app::i18n::Locale::GERMAN => MobileLocale::German,
-            vauchi_app::i18n::Locale::FRENCH => MobileLocale::French,
-            vauchi_app::i18n::Locale::SPANISH => MobileLocale::Spanish,
-            vauchi_app::i18n::Locale::ITALIAN => MobileLocale::Italian,
-            _ => MobileLocale::English,
-        }
-    }
-}
-
-impl From<MobileLocale> for vauchi_app::i18n::Locale {
-    fn from(locale: MobileLocale) -> Self {
-        match locale {
-            MobileLocale::English => vauchi_app::i18n::Locale::ENGLISH,
-            MobileLocale::German => vauchi_app::i18n::Locale::GERMAN,
-            MobileLocale::French => vauchi_app::i18n::Locale::FRENCH,
-            MobileLocale::Spanish => vauchi_app::i18n::Locale::SPANISH,
-            MobileLocale::Italian => vauchi_app::i18n::Locale::ITALIAN,
-        }
-    }
+/// The locale a shell's code names; a malformed code reads English, which
+/// every string falls back to anyway.
+pub(crate) fn locale_from_code(code: &str) -> vauchi_app::i18n::Locale {
+    vauchi_app::i18n::Locale::from_code(code).unwrap_or_default()
 }
 
 /// Information about a locale.
@@ -636,16 +607,16 @@ impl From<vauchi_app::i18n::LocaleInfo> for MobileLocaleInfo {
 // ============================================================
 
 /// Get a localized string by key.
-pub fn mobile_get_string(locale: MobileLocale, key: String) -> String {
-    vauchi_app::i18n::get_string(locale.into(), &key)
+pub fn mobile_get_string(locale: String, key: String) -> String {
+    vauchi_app::i18n::get_string(locale_from_code(&locale), &key)
 }
 
 /// Get a localized string with argument interpolation.
 pub fn mobile_get_string_with_args(
-    locale: MobileLocale,
+    locale: String,
     key: String,
     args: HashMap<String, String>,
 ) -> String {
     let args_vec: Vec<(&str, &str)> = args.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
-    vauchi_app::i18n::get_string_with_args(locale.into(), &key, &args_vec)
+    vauchi_app::i18n::get_string_with_args(locale_from_code(&locale), &key, &args_vec)
 }

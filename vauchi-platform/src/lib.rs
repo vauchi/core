@@ -100,8 +100,8 @@ pub use types::{
     MobileDeviceLinkConfirmation, MobileDeviceLinkData, MobileDeviceLinkInfo,
     MobileDeviceLinkRequest, MobileDeviceLinkResult, MobileEmergencyConfig, MobileExchangeResult,
     MobileFieldNote, MobileFieldType, MobileGdprExport, MobileLabelContactBadge,
-    MobileLabelContactRow, MobileLabelContactStatus, MobileLocale, MobileLocaleInfo,
-    MobileMotionTokens, MobileNotificationCategory, MobileOnboardingProgress, MobileOnboardingStep,
+    MobileLabelContactRow, MobileLabelContactStatus, MobileLocaleInfo, MobileMotionTokens,
+    MobileNotificationCategory, MobileOnboardingProgress, MobileOnboardingStep,
     MobilePendingNotification, MobileRecoveryClaim, MobileRecoveryProgress,
     MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileShredReport,
     MobileShredStatus, MobileShredToken, MobileSocialNetwork, MobileSpacingDirectionTokens,
@@ -327,15 +327,17 @@ pub fn get_available_locales() -> Vec<MobileLocaleInfo> {
 
 /// Get information about a specific locale.
 #[uniffi::export]
-pub fn get_locale_info(locale: MobileLocale) -> MobileLocaleInfo {
-    MobileLocaleInfo::from(vauchi_app::i18n::get_locale_info(locale.into()))
+pub fn get_locale_info(locale: String) -> MobileLocaleInfo {
+    MobileLocaleInfo::from(vauchi_app::i18n::get_locale_info(types::locale_from_code(
+        &locale,
+    )))
 }
 
 /// Get a localized string by key.
 ///
 /// Falls back to English if the key is not found in the requested locale.
 #[uniffi::export]
-pub fn get_string(locale: MobileLocale, key: String) -> String {
+pub fn get_string(locale: String, key: String) -> String {
     types::mobile_get_string(locale, key)
 }
 
@@ -345,20 +347,18 @@ pub fn get_string(locale: MobileLocale, key: String) -> String {
 /// Falls back to English if the key is not found in the requested locale.
 #[uniffi::export]
 pub fn get_string_with_args(
-    locale: MobileLocale,
+    locale: String,
     key: String,
     args: std::collections::HashMap<String, String>,
 ) -> String {
     types::mobile_get_string_with_args(locale, key, args)
 }
 
-/// Parse a locale code to MobileLocale.
-///
-/// Supports codes like "en", "en-US", "de-DE", etc.
-/// Returns None if the code is not recognized.
+/// The language code of a tag such as "en-US" or "de_DE.UTF-8", or None
+/// when the tag has no 2-3 letter language subtag.
 #[uniffi::export]
-pub fn parse_locale_code(code: String) -> Option<MobileLocale> {
-    vauchi_app::i18n::Locale::from_code(&code).map(MobileLocale::from)
+pub fn parse_locale_code(code: String) -> Option<String> {
+    vauchi_app::i18n::Locale::from_code(&code).map(|locale| locale.code().to_string())
 }
 
 /// Get localized aha moment content for a given moment type.
@@ -370,10 +370,10 @@ pub fn parse_locale_code(code: String) -> Option<MobileLocale> {
 #[uniffi::export]
 pub fn get_aha_moment_localized(
     moment_type: MobileAhaMomentType,
-    locale: MobileLocale,
+    locale: String,
 ) -> MobileAhaMoment {
     let core_type: vauchi_core::AhaMomentType = moment_type.into();
-    let core_locale: vauchi_app::i18n::Locale = locale.into();
+    let core_locale = types::locale_from_code(&locale);
     MobileAhaMoment {
         moment_type,
         title: vauchi_app::aha_moment_title_localized(core_type, core_locale),

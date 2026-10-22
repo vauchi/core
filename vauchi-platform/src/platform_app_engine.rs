@@ -22,8 +22,8 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Condvar, Mutex};
 
 use crate::types::{
-    MobileLocale, MobileNotificationCategory, MobileNotificationPriority,
-    MobilePendingNotification, MobileTabInfo, MobileTabLayout,
+    MobileNotificationCategory, MobileNotificationPriority, MobilePendingNotification,
+    MobileTabInfo, MobileTabLayout,
 };
 use vauchi_app::notification_types::{
     NotificationCategory as CoreNotificationCategory,
@@ -446,14 +446,16 @@ impl PlatformAppEngine {
     pub(crate) fn nav_items_for_test(
         &self,
         layout: MobileTabLayout,
-        locale: MobileLocale,
+        locale: String,
     ) -> Result<Vec<MobileTabInfo>, MobileError> {
         let mut engine_slot = self.lock_engine()?;
         let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
         self_heal_post_auth(engine);
         let items = match layout {
-            MobileTabLayout::Mobile => engine.tab_info(locale.into()),
-            MobileTabLayout::Desktop => engine.sidebar_items(locale.into()),
+            MobileTabLayout::Mobile => engine.tab_info(crate::types::locale_from_code(&locale)),
+            MobileTabLayout::Desktop => {
+                engine.sidebar_items(crate::types::locale_from_code(&locale))
+            }
         };
         Ok(items.into_iter().map(MobileTabInfo::from).collect())
     }

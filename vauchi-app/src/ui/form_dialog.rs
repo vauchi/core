@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
 use vauchi_core::contact_card::{CatalogEntry, FieldTypeCatalog};
-use vauchi_core::social::SocialNetworkRegistry;
 
 /// The type of form dialog, determining which fields are shown.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -123,8 +122,7 @@ impl FormDialogEngine {
             FormDialogType::NamePlace { .. } => vec![("place_name".into(), String::new())],
         };
         let catalog_entries = if matches!(dialog_type, FormDialogType::AddField { .. }) {
-            let registry = SocialNetworkRegistry::with_defaults();
-            let catalog = FieldTypeCatalog::new(&registry);
+            let catalog = FieldTypeCatalog::new(&crate::social::active_registry());
             catalog.all().to_vec()
         } else {
             Vec::new()

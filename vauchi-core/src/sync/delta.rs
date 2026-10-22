@@ -11,7 +11,7 @@
 //! ## Version-Tagged Payloads
 //!
 //! The inner payload (before Double Ratchet encryption) uses a version byte prefix:
-//! - `0x02`: CEK-wrapped payload (`CekWrappedPayload`)
+//! - `0x08`: CEK-wrapped payload (`CekWrappedPayload`)
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -33,7 +33,14 @@ pub struct ValidationSummary {
 }
 
 /// Version byte for CEK-wrapped payloads (crypto-shredding enabled).
-pub const PAYLOAD_VERSION_CEK: u8 = 0x02;
+///
+/// 0x08 since card updates carry social network ids (vauchi/private#734
+/// D8). The 0x02 format before them is refused: a peer from before
+/// network ids drops the unknown field when it re-encodes a delta to
+/// verify it, so the two formats cannot verify each other. A version
+/// byte makes that an unknown version on both sides, not a signature
+/// failure that reads like tampering.
+pub const PAYLOAD_VERSION_CEK: u8 = 0x08;
 /// Version byte for a reciprocity confirmation from a sender still waiting
 /// for ours.
 pub const PAYLOAD_VERSION_RECIPROCITY: u8 = 0x03;
@@ -145,7 +152,9 @@ impl CardDelta {
         for (id, old_field) in &old_fields {
             match new_fields.get(id) {
                 Some(new_field) => {
-                    if old_field.value() != new_field.value() {
+                    if old_field.value() != new_field.value()
+                        || old_field.network_id() != new_field.network_id()
+                    {
                         changes.push(FieldChange::Added {
                             field: new_field.strip_private(),
                         });
@@ -383,7 +392,7 @@ impl CardDelta {
     /// to a specific sender-recipient pair.
     fn signable_bytes(&self, sender_pk: &[u8; 32], recipient_pk: &[u8; 32]) -> Vec<u8> {
         let signable = SignableDelta {
-            domain: "vauchi-delta-v2",
+            domain: "vauchi-delta-v3",
             version: self.version,
             timestamp: self.timestamp,
             changes: &self.changes,
@@ -489,11 +498,11 @@ impl CekWrappedPayload {
 /// Version-tagged payload decoded from the inner Double Ratchet plaintext.
 ///
 /// The first byte determines the format:
-/// - `0x02`: CEK-wrapped payload (remaining bytes are `CekWrappedPayload`)
+/// - `0x08`: CEK-wrapped payload (remaining bytes are `CekWrappedPayload`)
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum VersionedPayload {
-    /// CEK-wrapped format: contains rotated CEK + CEK-encrypted delta (version 0x02).
+    /// CEK-wrapped format: contains rotated CEK + CEK-encrypted delta (version 0x08).
     CekWrapped(CekWrappedPayload),
     /// Reciprocity confirmation (version 0x03): token + Ed25519 signature.
     ReciprocityConfirm(ReciprocityConfirmPayload),

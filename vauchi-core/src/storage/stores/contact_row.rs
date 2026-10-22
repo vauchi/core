@@ -287,14 +287,16 @@ impl ContactStore<'_> {
             let card_json = cek
                 .decrypt(&row.card_encrypted)
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
-            let card: ContactCard = serde_json::from_slice(&card_json)
+            let mut card: ContactCard = serde_json::from_slice(&card_json)
                 .map_err(|e| StorageError::Serialization(e.to_string()))?;
+            card.resolve_stored_network_ids();
             (card, Some(cek))
         } else {
             let card_json = crate::crypto::decrypt(self.key, &row.card_encrypted)
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
-            let card: ContactCard = serde_json::from_slice(&card_json)
+            let mut card: ContactCard = serde_json::from_slice(&card_json)
                 .map_err(|e| StorageError::Serialization(e.to_string()))?;
+            card.resolve_stored_network_ids();
             (card, None)
         };
 

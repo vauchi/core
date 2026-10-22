@@ -215,6 +215,8 @@ mod settings_render_context_tests;
 mod settings_row_control_label_tests;
 mod settings_security_i18n_tests;
 mod shred_i18n_tests;
+mod social_active_registry_tests;
+mod social_network_display_tests;
 mod stale_binding_event_tests;
 mod status_indicator_label_tests;
 mod storage_lock_presentation_tests;

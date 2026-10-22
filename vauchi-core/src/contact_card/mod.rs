@@ -21,7 +21,9 @@ pub mod vcard;
 pub mod vcard_import;
 
 pub use catalog::{CatalogEntry, FieldCategory, FieldTypeCatalog};
-pub use field::{ContactField, FieldType, ValidationError, validate_value};
+pub use field::{
+    ContactField, FieldType, ValidationError, validate_social_username, validate_value,
+};
 pub use uri::{
     ContactAction, MapProvider, is_allowed_scheme, is_blocked_scheme, is_safe_url, is_valid_email,
     is_valid_phone, is_valid_relay_url, map_uri,
@@ -273,6 +275,20 @@ impl ContactCard {
             .rules
             .retain(|field_id, _| allowed_field_ids.contains(field_id));
         card
+    }
+
+    /// Gives social fields stored before network ids existed the id their
+    /// label names, against the bundled networks (#734 D6). Called where a
+    /// stored card is read; the next save keeps the ids.
+    #[cfg(feature = "storage")]
+    pub(crate) fn resolve_stored_network_ids(&mut self) {
+        if !self.fields.iter().any(ContactField::lacks_network_id) {
+            return;
+        }
+        let registry = crate::social::SocialNetworkRegistry::with_defaults();
+        for field in &mut self.fields {
+            field.resolve_network_id(&registry);
+        }
     }
 
     /// Adds a field to the card.

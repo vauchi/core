@@ -10,7 +10,7 @@ use vauchi_core::contact_card::{ContactField, FieldType, MapProvider, is_safe_ur
 use vauchi_core::exchange::capability::Platform;
 
 #[cfg(feature = "network-rustls")]
-use crate::i18n::{Locale, get_string};
+use crate::i18n::{Locale, get_string, get_string_with_args};
 
 /// One way to open a field; a field's first link opens on a tap of its row.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -70,10 +70,41 @@ pub fn field_links(field: &ContactField, platform: &Platform, locale: Locale) ->
         Some(FieldType::Phone) => "call",
         Some(FieldType::Email) => "send_email",
         Some(FieldType::Website) => "open_website",
-        Some(FieldType::Social) => "open_profile",
+        Some(FieldType::Social) => {
+            return profile_link(field, locale).into_iter().collect();
+        }
         _ => return Vec::new(),
     };
-    link("open", label_key, field.to_uri())
-        .into_iter()
-        .collect()
+    link(
+        "open",
+        label_key,
+        field.to_uri(&crate::social::active_registry()),
+    )
+    .into_iter()
+    .collect()
+}
+
+/// A profile link names the host it opens: network data from the CDN can
+/// rewrite profile URLs, so a changed host shows before the browser opens
+/// it (vauchi/private#734 D9).
+#[cfg(feature = "network-rustls")]
+fn profile_link(field: &ContactField, locale: Locale) -> Option<FieldLink> {
+    let url = field
+        .to_uri(&crate::social::active_registry())
+        .filter(|url| is_safe_url(url))?;
+    let host = url
+        .strip_prefix("https://")?
+        .split(['/', '?', '#'])
+        .next()
+        .filter(|host| !host.is_empty())?
+        .to_string();
+    Some(FieldLink {
+        action_id: "open".into(),
+        label: get_string_with_args(
+            locale,
+            "contact_detail.field_action.open_profile_on",
+            &[("host", &host)],
+        ),
+        url,
+    })
 }

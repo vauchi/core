@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 use vauchi_core::clock::Clock;
+use vauchi_core::social::SocialNetworkRegistry;
 
 use super::cache::{CacheError, ContentCache};
 use super::config::ContentConfig;
@@ -22,17 +23,6 @@ use super::fetcher::ContentFetcher;
 #[cfg(feature = "content-updates")]
 use super::types::ContentManifest;
 use super::types::{ContentType, UpdateStatus};
-
-/// Network entry for content system (matches networks.json format)
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct NetworkEntry {
-    /// Unique identifier
-    pub id: String,
-    /// Display name
-    pub name: String,
-    /// URL template with {username} placeholder
-    pub url: String,
-}
 
 /// Simplified locale strings
 pub type LocaleStrings = HashMap<String, String>;
@@ -72,19 +62,13 @@ impl ContentManager {
         })
     }
 
-    /// Get social networks (cached → bundled)
-    pub fn networks(&self) -> Vec<NetworkEntry> {
-        // Try cached first
-        if let Some(data) = self
-            .cache
+    /// Social networks: the cached file when it passes validation,
+    /// else the bundled `networks.json` (vauchi/private#734 D3).
+    pub fn networks(&self) -> SocialNetworkRegistry {
+        self.cache
             .get_content(ContentType::Networks, "networks.json")
-            && let Ok(networks) = serde_json::from_slice(&data)
-        {
-            return networks;
-        }
-
-        // Fall back to bundled
-        bundled_networks()
+            .and_then(|data| SocialNetworkRegistry::from_data_bytes(&data).ok())
+            .unwrap_or_else(SocialNetworkRegistry::with_defaults)
     }
 
     /// Get themes (cached → single bundled default).
@@ -211,11 +195,11 @@ impl ContentManager {
             if path.extension().and_then(|e| e.to_str()) == Some("json")
                 && let Some(code) = path.file_stem().and_then(|s| s.to_str())
                 && let Ok(data) = std::fs::read(&path)
+                && crate::i18n::load_locale_from_bytes(code, &data).is_err()
             {
-                // best-effort: a corrupt locale file should not block the
-                // load of other locales; bundled locales are the fallback
-                #[allow(clippy::let_underscore_must_use)]
-                let _ = crate::i18n::load_locale_from_bytes(code, &data);
+                // The bundled locale stays in effect; the other locales
+                // still load.
+                self.drop_unloadable(ContentType::Locales, &format!("{code}.json"));
             }
         }
     }
@@ -229,10 +213,37 @@ impl ContentManager {
             .cache
             .content_dir(ContentType::Themes)
             .join("themes.json");
-        if let Ok(data) = std::fs::read(&path) {
-            // best-effort: a corrupt cached catalog falls back to bundled.
+        if let Ok(data) = std::fs::read(&path)
+            && crate::theme::load_themes_from_bytes(&data).is_err()
+        {
+            // The bundled catalog stays in effect.
+            self.drop_unloadable(ContentType::Themes, "themes.json");
+        }
+    }
+
+    /// A cached file that does not load would fail again at every start
+    /// while the cached manifest calls it current, so it goes with the
+    /// manifest and the next update cycle downloads it again (#747).
+    fn drop_unloadable(&self, content_type: ContentType, filename: &str) {
+        let dropped = self
+            .cache
+            .remove_content(content_type, filename)
+            .and_then(|()| self.cache.clear_manifest());
+        if let Err(e) = dropped {
+            tracing::warn!("[Content] Failed to drop an unloadable cache entry: {e}");
+        }
+    }
+
+    /// Loads the cached networks file into the active social-network
+    /// registry. A file that fails validation leaves the registry as it was
+    /// (vauchi/private#734 D3).
+    pub fn load_cached_networks_into_registry(&self) {
+        if let Some(data) = self
+            .cache
+            .get_content(ContentType::Networks, "networks.json")
+        {
             #[allow(clippy::let_underscore_must_use)]
-            let _ = crate::theme::load_themes_from_bytes(&data);
+            let _ = crate::social::load_networks_from_bytes(&data);
         }
     }
 }
@@ -480,6 +491,12 @@ impl ContentManager {
                         .await
                         .map_err(|e| ContentError::Fetch(e.to_string()))?;
 
+                    // Loaded before it is cached: a file that does not load
+                    // would fail again at every start, and a cached manifest
+                    // would never download it again (#747).
+                    crate::i18n::load_locale_from_bytes(lang_code, &data)
+                        .map_err(|e| ContentError::Load(format!("locale {lang_code}: {e}")))?;
+
                     let filename = format!("{}.json", lang_code);
                     self.cache.save_content(
                         ContentType::Locales,
@@ -487,12 +504,6 @@ impl ContentManager {
                         &data,
                         &file_entry.checksum,
                     )?;
-
-                    // Hot-reload into the i18n system — best-effort:
-                    // failure here means the cached file is on disk but not
-                    // active until next start; recoverable on relaunch
-                    #[allow(clippy::let_underscore_must_use)]
-                    let _ = crate::i18n::load_locale_from_bytes(lang_code, &data);
                 }
             }
             ContentType::Themes => {
@@ -507,19 +518,18 @@ impl ContentManager {
                     .await
                     .map_err(|e| ContentError::Fetch(e.to_string()))?;
 
+                // Loaded before it is cached, as in the Locales branch.
+                // Tokens are global (tokens.json) and reload via the
+                // explicit reload API, not per-theme.
+                crate::theme::load_themes_from_bytes(&data)
+                    .map_err(|e| ContentError::Load(format!("themes: {e}")))?;
+
                 self.cache.save_content(
                     ContentType::Themes,
                     "themes.json",
                     &data,
                     &entry.checksum,
                 )?;
-
-                // Hot-reload the theme catalog — best-effort (mirrors the
-                // Locales branch). Cached on disk regardless; active on the
-                // next start if this fails. Tokens are global (tokens.json)
-                // and reload via the explicit reload API, not per-theme.
-                #[allow(clippy::let_underscore_must_use)]
-                let _ = crate::theme::load_themes_from_bytes(&data);
             }
             ContentType::Help => {
                 // Download ALL help files (privacy: bundle everything so CDN
@@ -619,47 +629,6 @@ fn version_compare(a: &str, b: &str) -> Option<std::cmp::Ordering> {
     Some(parse_exact_version(a)?.cmp(&parse_exact_version(b)?))
 }
 
-/// Bundled networks - compiled into the binary (matches networks.json format)
-fn bundled_networks() -> Vec<NetworkEntry> {
-    vec![
-        NetworkEntry {
-            id: "twitter".to_string(),
-            name: "Twitter / X".to_string(),
-            url: "https://twitter.com/{username}".to_string(),
-        },
-        NetworkEntry {
-            id: "instagram".to_string(),
-            name: "Instagram".to_string(),
-            url: "https://instagram.com/{username}".to_string(),
-        },
-        NetworkEntry {
-            id: "github".to_string(),
-            name: "GitHub".to_string(),
-            url: "https://github.com/{username}".to_string(),
-        },
-        NetworkEntry {
-            id: "linkedin".to_string(),
-            name: "LinkedIn".to_string(),
-            url: "https://linkedin.com/in/{username}".to_string(),
-        },
-        NetworkEntry {
-            id: "mastodon".to_string(),
-            name: "Mastodon".to_string(),
-            url: "https://mastodon.social/@{username}".to_string(),
-        },
-        NetworkEntry {
-            id: "bluesky".to_string(),
-            name: "Bluesky".to_string(),
-            url: "https://bsky.app/profile/{username}".to_string(),
-        },
-        NetworkEntry {
-            id: "threads".to_string(),
-            name: "Threads".to_string(),
-            url: "https://threads.net/@{username}".to_string(),
-        },
-    ]
-}
-
 /// Bundled locale - currently only English
 fn bundled_locale(lang: &str) -> Option<LocaleStrings> {
     match lang {
@@ -705,6 +674,10 @@ pub enum ContentError {
     /// Fetch error (network/remote)
     #[error("Fetch error: {0}")]
     Fetch(String),
+
+    /// Downloaded content that matches its checksum but does not load
+    #[error("Content does not load: {0}")]
+    Load(String),
 }
 
 // INLINE_TEST_REQUIRED: tests private internals
@@ -768,13 +741,6 @@ mod tests {
             .build()
             .unwrap()
             .block_on(future)
-    }
-
-    #[test]
-    fn test_bundled_networks_not_empty() {
-        let networks = bundled_networks();
-        assert!(!networks.is_empty());
-        assert!(networks.iter().any(|n| n.id == "twitter"));
     }
 
     #[test]
@@ -902,6 +868,63 @@ mod tests {
         assert!(
             manager.cache().get_manifest().is_none(),
             "a failed content download must remain retryable"
+        );
+    }
+
+    // A download that matches its checksum but does not load is not cached:
+    // cached, it would fail again at every start while the manifest says the
+    // content is current, so nothing would ever download it again (#747).
+    // @internal
+    #[test]
+    fn test_manager_does_not_cache_themes_that_do_not_load() {
+        let temp = TempDir::new().unwrap();
+        let keypair = SigningKeyPair::generate();
+        let catalog = b"not a theme catalog".to_vec();
+        let mut remote = ContentManifest {
+            schema_version: 1,
+            generated_at: "2026-10-21T00:00:00Z".to_string(),
+            base_url: "https://cdn.vauchi.app/v1/".to_string(),
+            content: super::super::types::ContentIndex {
+                themes: Some(super::super::types::ContentEntry {
+                    version: "1.0.0".to_string(),
+                    path: "themes.json".to_string(),
+                    checksum: super::super::integrity::compute_checksum(&catalog),
+                    size_bytes: catalog.len() as u64,
+                    min_app_version: "0.1.0".to_string(),
+                    max_app_version: None,
+                }),
+                ..super::super::types::ContentIndex::default()
+            },
+            signature: None,
+        };
+        let canonical = serde_json::to_vec(&serde_json::to_value(&remote).unwrap()).unwrap();
+        remote.signature = Some(hex::encode(keypair.sign(&canonical).as_bytes()));
+        let config = ContentConfig {
+            storage_path: temp.path().to_path_buf(),
+            content_url: serve_http(vec![serde_json::to_vec(&remote).unwrap(), catalog]),
+            publisher_public_key: keypair.public_key(),
+            ..Default::default()
+        };
+        let manager =
+            ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
+
+        let result = block_on(manager.apply_updates()).unwrap();
+
+        assert!(matches!(
+            result,
+            ApplyResult::Applied { ref applied, ref failed }
+                if applied.is_empty() && failed.len() == 1 && failed[0].0 == ContentType::Themes
+        ));
+        assert!(
+            manager
+                .cache()
+                .get_content(ContentType::Themes, "themes.json")
+                .is_none(),
+            "a catalog that does not load is not cached"
+        );
+        assert!(
+            manager.cache().get_manifest().is_none(),
+            "the themes update stays retryable"
         );
     }
 

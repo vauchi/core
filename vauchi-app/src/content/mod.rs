@@ -25,7 +25,7 @@ pub use cache::{CacheError, ContentCache};
 pub use config::ContentConfig;
 pub use fetcher::{ContentFetcher, FetchError};
 pub use integrity::{IntegrityError, compute_checksum, verify_checksum, verify_manifest_signature};
-pub use manager::{ApplyResult, ContentError, ContentManager, LocaleStrings, NetworkEntry};
+pub use manager::{ApplyResult, ContentError, ContentManager, LocaleStrings};
 pub use types::{
     ContentEntry, ContentIndex, ContentManifest, ContentType, FileEntry, LocalesEntry, UpdateStatus,
 };

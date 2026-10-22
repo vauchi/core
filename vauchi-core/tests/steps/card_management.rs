@@ -320,8 +320,24 @@ fn validation_should(world: &mut VauchiWorld, expected: String) {
             FieldType::Custom
         }
     };
+    let is_social = field_type == FieldType::Social;
     let field = ContactField::new(field_type, &label, &value, 0);
-    world.last_result = field.validate().map_err(|e| e.to_string());
+    // Username rules are an input check, not part of validate(), so a
+    // received card is never judged by them (vauchi/private#734 T1.4).
+    world.last_result = field
+        .validate()
+        .and_then(|()| {
+            if is_social {
+                vauchi_core::contact_card::validate_social_username(
+                    &vauchi_core::social::SocialNetworkRegistry::with_defaults(),
+                    &label,
+                    &value,
+                )
+            } else {
+                Ok(())
+            }
+        })
+        .map_err(|e| e.to_string());
     match expected.as_str() {
         "pass" => assert!(
             world.last_result.is_ok(),

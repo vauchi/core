@@ -13,7 +13,8 @@
 use std::time::Duration;
 use tempfile::TempDir;
 use vauchi_app::content::{
-    ContentCache, ContentConfig, ContentManager, ContentType, UpdateStatus, compute_checksum,
+    ContentCache, ContentConfig, ContentIndex, ContentManager, ContentManifest, ContentType,
+    UpdateStatus, compute_checksum,
 };
 
 fn test_config(temp: &TempDir) -> ContentConfig {
@@ -42,8 +43,38 @@ fn test_manager_returns_bundled_networks_when_cache_empty() {
     let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     let networks = manager.networks();
-    // Should return bundled networks (not empty)
-    assert!(!networks.is_empty());
+    // The bundled networks.json, the same 38 the registry ships
+    // (vauchi/private#734 T1.7).
+    let bundled = vauchi_core::social::SocialNetworkRegistry::with_defaults();
+    assert_eq!(networks.len(), bundled.len());
+    assert!(networks.get("tumblr").is_some());
+}
+
+/// A cached file that fails validation is not used (#734 D3).
+// @internal
+#[test]
+fn test_manager_returns_bundled_networks_when_cache_is_invalid() {
+    let temp = TempDir::new().unwrap();
+    let config = test_config(&temp);
+    let cache = ContentCache::new(temp.path()).unwrap();
+    let insecure = br#"[{"id": "evil", "name": "Evil", "url": "http://evil.test/{username}"}]"#;
+    cache
+        .save_content(
+            ContentType::Networks,
+            "networks.json",
+            insecure,
+            &compute_checksum(insecure),
+        )
+        .unwrap();
+
+    let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
+    let networks = manager.networks();
+
+    assert!(networks.get("evil").is_none());
+    assert_eq!(
+        networks.len(),
+        vauchi_core::social::SocialNetworkRegistry::with_defaults().len()
+    );
 }
 
 // @internal
@@ -72,7 +103,10 @@ fn test_manager_returns_cached_networks_over_bundled() {
 
     // Should return cached networks (1 custom network)
     assert_eq!(networks.len(), 1);
-    assert_eq!(networks[0].id, "custom");
+    assert_eq!(
+        networks.get("custom").map(|n| n.display_name()),
+        Some("Custom Network")
+    );
 }
 
 // @internal
@@ -268,4 +302,70 @@ fn test_manager_record_check_time() {
     manager.record_check_time().unwrap();
 
     assert!(!manager.should_check_now());
+}
+
+/// A cache holding `content_type/filename` that does not load, under a
+/// cached manifest that says the content is current.
+fn stage_unloadable_cache(temp: &TempDir, content_type: ContentType, filename: &str) {
+    let cache = ContentCache::new(temp.path()).unwrap();
+    let data = b"does not load";
+    cache
+        .save_content(content_type, filename, data, &compute_checksum(data))
+        .unwrap();
+    cache
+        .save_manifest(&ContentManifest {
+            schema_version: 1,
+            generated_at: "2026-10-21T00:00:00Z".to_string(),
+            base_url: "https://cdn.vauchi.app/v1/".to_string(),
+            content: ContentIndex::default(),
+            signature: None,
+        })
+        .unwrap();
+}
+
+// A cached file that does not load at start is dropped with the cached
+// manifest, so the next update cycle downloads the content again instead
+// of every start falling back to the bundled copy (#747).
+// @internal
+#[test]
+fn a_cached_theme_catalog_that_does_not_load_is_dropped_to_download_again() {
+    let temp = TempDir::new().unwrap();
+    stage_unloadable_cache(&temp, ContentType::Themes, "themes.json");
+    let manager = ContentManager::new(
+        test_config(&temp),
+        vauchi_core::clock::SystemClock::shared(),
+    )
+    .unwrap();
+
+    manager.load_cached_themes_into_theme_store();
+
+    assert!(
+        manager
+            .cache()
+            .get_content(ContentType::Themes, "themes.json")
+            .is_none()
+    );
+    assert!(manager.cache().get_manifest().is_none());
+}
+
+// @internal
+#[test]
+fn a_cached_locale_that_does_not_load_is_dropped_to_download_again() {
+    let temp = TempDir::new().unwrap();
+    stage_unloadable_cache(&temp, ContentType::Locales, "de.json");
+    let manager = ContentManager::new(
+        test_config(&temp),
+        vauchi_core::clock::SystemClock::shared(),
+    )
+    .unwrap();
+
+    manager.load_cached_locales_into_i18n();
+
+    assert!(
+        manager
+            .cache()
+            .get_content(ContentType::Locales, "de.json")
+            .is_none()
+    );
+    assert!(manager.cache().get_manifest().is_none());
 }

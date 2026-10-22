@@ -100,6 +100,7 @@ impl AppEngine {
                                     .map(|g| g.name().to_string())
                                     .collect();
                                 // Count contacts across visible groups (deduplicated)
+                                let registry = crate::social::active_registry();
                                 let mut visible_contact_ids =
                                     std::collections::HashSet::<String>::new();
                                 for g in &all_groups {
@@ -112,7 +113,7 @@ impl AppEngine {
                                 OwnFieldInfo {
                                     field_id: f.id().to_string(),
                                     field_type: format!("{:?}", f.field_type()),
-                                    label: f.label().to_string(),
+                                    label: f.display_label(&registry).to_string(),
                                     value: f.value().to_string(),
                                     visible_groups,
                                     contact_count: visible_contact_ids.len(),
@@ -802,7 +803,9 @@ impl AppEngine {
             MyInfoEntryDetailEngine::new(
                 field_id.to_string(),
                 format!("{:?}", field.field_type()),
-                field.label().to_string(),
+                field
+                    .display_label(&crate::social::active_registry())
+                    .to_string(),
                 field.value().to_string(),
                 field.note().map(|s| s.to_string()),
                 groups,

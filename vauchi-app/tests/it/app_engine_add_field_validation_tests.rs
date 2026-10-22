@@ -160,3 +160,35 @@ fn editing_a_field_to_an_invalid_value_reports_localized_message_inline() {
     let message = inline_validation_error(result, "field_value");
     assert_eq!(message, "Please enter a valid phone number");
 }
+
+/// A social field added from the catalog stores its network's id
+/// (vauchi/private#734 D4).
+// @scenario: contact_card_management.feature :: Add social media fields
+#[test]
+fn a_social_field_added_from_the_catalog_stores_its_network_id() {
+    let mut engine = engine_on_my_info();
+    fill_add_field_form(&mut engine, "social:github", "octocat");
+
+    let _ = submit(&mut engine);
+
+    let card = engine.vauchi().own_card().unwrap().expect("own card");
+    let field = card
+        .fields()
+        .iter()
+        .find(|f| f.value() == "octocat")
+        .expect("the field was saved");
+    assert_eq!(field.network_id(), Some("github"));
+}
+
+/// Username rules come from the active network data (vauchi/private#734).
+// @scenario: field_validation :: Validate a contact's social profile
+#[test]
+fn a_social_username_breaking_the_network_rule_reports_inline() {
+    let mut engine = engine_on_my_info();
+    fill_add_field_form(&mut engine, "social:twitter", &"a".repeat(16));
+
+    let result = submit(&mut engine);
+
+    let message = inline_validation_error(result, "field_value");
+    assert_eq!(message, "Invalid format");
+}

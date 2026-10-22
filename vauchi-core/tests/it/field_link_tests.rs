@@ -7,6 +7,11 @@
 
 use proptest::prelude::*;
 use vauchi_core::contact_card::{ContactField, FieldType, MapProvider, is_safe_url, map_uri};
+use vauchi_core::social::SocialNetworkRegistry;
+
+fn registry() -> SocialNetworkRegistry {
+    SocialNetworkRegistry::with_defaults()
+}
 
 const ADDRESS: &str = "Bahnhofstrasse 1, 8001 Zürich";
 const ENCODED: &str = "Bahnhofstrasse+1%2C+8001+Z%C3%BCrich";
@@ -15,14 +20,20 @@ const ENCODED: &str = "Bahnhofstrasse+1%2C+8001+Z%C3%BCrich";
 #[test]
 fn a_phone_link_carries_no_whitespace() {
     let field = ContactField::new(FieldType::Phone, "International", "+44 20 7946 0958", 0);
-    assert_eq!(field.to_uri().as_deref(), Some("tel:+442079460958"));
+    assert_eq!(
+        field.to_uri(&registry()).as_deref(),
+        Some("tel:+442079460958")
+    );
 }
 
 // @scenario: contact_actions :: Various phone number formats are normalized for dialer
 #[test]
 fn a_phone_link_keeps_the_punctuation_dialers_accept() {
     let field = ContactField::new(FieldType::Phone, "Home", "(555) 123-4567", 0);
-    assert_eq!(field.to_uri().as_deref(), Some("tel:(555)123-4567"));
+    assert_eq!(
+        field.to_uri(&registry()).as_deref(),
+        Some("tel:(555)123-4567")
+    );
 }
 
 // @internal

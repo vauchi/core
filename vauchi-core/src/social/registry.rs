@@ -98,7 +98,8 @@ impl SocialNetwork {
     /// Generates a profile URL from a username.
     ///
     /// Handles common username formats:
-    /// - Removes leading @ for Twitter-style handles
+    /// - Removes a leading @, which is how people write handles, not part
+    ///   of the name on any network
     /// - Preserves full URLs if already provided
     ///
     /// # Examples
@@ -111,42 +112,16 @@ impl SocialNetwork {
     /// assert_eq!(twitter.profile_url("@alice"), "https://twitter.com/alice");
     /// ```
     pub fn profile_url(&self, username: &str) -> String {
-        let clean_username = Self::normalize_username(username, &self.id);
+        let username = username.trim();
+        let clean_username = username.strip_prefix('@').unwrap_or(username);
 
         if clean_username.starts_with("http://") || clean_username.starts_with("https://") {
-            return clean_username;
+            return clean_username.to_string();
         }
 
         self.profile_url_template
-            .replace("{username}", &clean_username)
+            .replace("{username}", clean_username)
     }
-
-    /// Normalizes a username for URL generation.
-    fn normalize_username(username: &str, network_id: &str) -> String {
-        let username = username.trim();
-
-        let username = if username.starts_with('@')
-            && matches!(network_id, "twitter" | "instagram" | "threads" | "mastodon")
-        {
-            &username[1..]
-        } else {
-            username
-        };
-
-        if network_id == "mastodon" && username.contains('@') {
-            return username.to_string();
-        }
-
-        username.to_string()
-    }
-}
-
-/// Compact format for loading networks from JSON.
-#[derive(Deserialize)]
-struct NetworkData {
-    id: String,
-    name: String,
-    url: String,
 }
 
 /// Registry of known social networks.
@@ -176,13 +151,7 @@ impl SocialNetworkRegistry {
 
     /// Creates a registry with default social networks.
     pub fn with_defaults() -> Self {
-        let mut registry = Self::new();
-        let networks: Vec<NetworkData> =
-            serde_json::from_str(NETWORKS_JSON).expect("Invalid embedded networks.json");
-        for n in networks {
-            registry.add(SocialNetwork::new(&n.id, &n.name, &n.url).with_icon(&n.id));
-        }
-        registry
+        Self::from_data_bytes(NETWORKS_JSON.as_bytes()).expect("Invalid embedded networks.json")
     }
 
     /// Builds a registry from network data as cdn.vauchi.app publishes
@@ -239,9 +208,18 @@ impl SocialNetworkRegistry {
     /// Looks up by ID first, then falls back to display name match.
     /// Returns None if the network is not found.
     pub fn profile_url(&self, network_id: &str, username: &str) -> Option<String> {
-        self.get(network_id)
-            .or_else(|| self.find_by_display_name(network_id))
-            .map(|n| n.profile_url(username))
+        self.resolve(network_id).map(|n| n.profile_url(username))
+    }
+
+    /// Finds the network a user-facing name refers to: its id, an alias or
+    /// its display name, ignoring case and surrounding spaces.
+    pub fn resolve(&self, name: &str) -> Option<&SocialNetwork> {
+        let name = name.trim().to_lowercase();
+        self.networks.get(&name).or_else(|| {
+            self.networks
+                .values()
+                .find(|n| n.aliases.contains(&name) || n.display_name.to_lowercase() == name)
+        })
     }
 
     /// Finds a network by its display name (case-insensitive exact match).

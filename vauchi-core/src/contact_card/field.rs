@@ -9,10 +9,11 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::social::{SocialNetworkRegistry, is_valid_network_key};
 use crate::text::normalize_text;
 
 /// Validation error types for contact field values.
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ValidationError {
     #[error("Invalid phone number format")]
@@ -27,6 +28,8 @@ pub enum ValidationError {
     EmptyValue,
     #[error("Invalid social network username format")]
     InvalidSocialUsername,
+    #[error("Invalid social network id")]
+    InvalidNetworkId,
 }
 
 /// Maximum length for field values.
@@ -82,12 +85,15 @@ impl FieldType {
 
     /// Resolves a human-friendly alias to a `FieldType` and optional label.
     ///
-    /// Social network aliases (e.g. "twitter", "instagram") return the label
-    /// to use for the field. Generic aliases (e.g. "phone", "email") return
-    /// `None` for the label.
+    /// A network's id, alias or name in `registry` (e.g. "twitter", "ig")
+    /// returns the network's name as the field label. Generic aliases
+    /// (e.g. "phone", "email") return `None` for the label.
     ///
     /// Returns `None` if the alias is not recognized.
-    pub fn from_alias(s: &str) -> Option<(FieldType, Option<String>)> {
+    pub fn from_alias(
+        s: &str,
+        registry: &SocialNetworkRegistry,
+    ) -> Option<(FieldType, Option<String>)> {
         match s.to_lowercase().as_str() {
             "phone" | "tel" | "telephone" => Some((FieldType::Phone, None)),
             "email" | "mail" => Some((FieldType::Email, None)),
@@ -95,12 +101,10 @@ impl FieldType {
             "website" | "web" | "url" => Some((FieldType::Website, None)),
             "birthday" | "bday" | "dob" => Some((FieldType::Birthday, None)),
             "social" => Some((FieldType::Social, None)),
-            "twitter" | "x" => Some((FieldType::Social, Some("Twitter".to_string()))),
-            "instagram" | "ig" => Some((FieldType::Social, Some("Instagram".to_string()))),
-            "linkedin" => Some((FieldType::Social, Some("LinkedIn".to_string()))),
-            "github" | "gh" => Some((FieldType::Social, Some("GitHub".to_string()))),
             "custom" | "other" | "note" => Some((FieldType::Custom, None)),
-            _ => None,
+            _ => registry
+                .resolve(s)
+                .map(|n| (FieldType::Social, Some(n.display_name().to_string()))),
         }
     }
 }
@@ -122,6 +126,10 @@ pub struct ContactField {
     /// Private per-field annotation (never sent to other contacts).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     note: Option<String>,
+    /// The registry id of a social field's network, so the network's
+    /// current name is shown however the field was labelled (#734 D4).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    network_id: Option<String>,
 }
 
 impl ContactField {
@@ -144,7 +152,44 @@ impl ContactField {
             value: normalize_text(value),
             updated_at: now,
             note: None,
+            network_id: None,
         }
+    }
+
+    /// Builder: name the network of a social field. Other field types
+    /// have no network, so the id is ignored for them.
+    pub fn with_network_id(mut self, network_id: &str) -> Self {
+        if self.field_type == FieldType::Social {
+            self.network_id = Some(network_id.to_string());
+        }
+        self
+    }
+
+    pub fn network_id(&self) -> Option<&str> {
+        self.network_id.as_deref()
+    }
+
+    /// A social field stored before network ids existed takes the id of
+    /// the network its label names, if any (#734 D6).
+    #[cfg(feature = "storage")]
+    pub(crate) fn resolve_network_id(&mut self, registry: &SocialNetworkRegistry) {
+        if self.field_type == FieldType::Social && self.network_id.is_none() {
+            self.network_id = registry.resolve(&self.label).map(|n| n.id().to_string());
+        }
+    }
+
+    #[cfg(feature = "storage")]
+    pub(crate) fn lacks_network_id(&self) -> bool {
+        self.field_type == FieldType::Social && self.network_id.is_none()
+    }
+
+    /// The label to show: the named network's current name in `registry`,
+    /// else the stored label (#734 D5).
+    pub fn display_label<'a>(&'a self, registry: &'a SocialNetworkRegistry) -> &'a str {
+        self.network_id
+            .as_deref()
+            .and_then(|id| registry.get(id))
+            .map_or(&self.label, |network| network.display_name())
     }
 
     /// Returns the field's unique ID.
@@ -222,7 +267,13 @@ impl ContactField {
 
     /// Validates the field value based on its type.
     pub fn validate(&self) -> Result<(), ValidationError> {
-        validate_parts(&self.field_type, &self.label, &self.value)
+        validate_parts(&self.field_type, &self.value)?;
+        match &self.network_id {
+            Some(id) if self.field_type != FieldType::Social || !is_valid_network_key(id) => {
+                Err(ValidationError::InvalidNetworkId)
+            }
+            _ => Ok(()),
+        }
     }
 }
 
@@ -233,13 +284,13 @@ impl ContactField {
 /// before any field exists; constructing a throwaway field just to
 /// validate would burn RNG on the unused id. The value is normalized the
 /// same way `ContactField::new` normalizes, so both entry points judge the
-/// same string. Label-keyed rules (social-network username formats) are
-/// not applied here — they need the field's label.
+/// same string. Social usernames have their own input check,
+/// [`validate_social_username`].
 pub fn validate_value(field_type: &FieldType, value: &str) -> Result<(), ValidationError> {
-    validate_parts(field_type, "", &normalize_text(value))
+    validate_parts(field_type, &normalize_text(value))
 }
 
-fn validate_parts(field_type: &FieldType, label: &str, value: &str) -> Result<(), ValidationError> {
+fn validate_parts(field_type: &FieldType, value: &str) -> Result<(), ValidationError> {
     if value.len() > MAX_VALUE_LENGTH {
         return Err(ValidationError::ValueTooLong {
             max: MAX_VALUE_LENGTH,
@@ -251,7 +302,6 @@ fn validate_parts(field_type: &FieldType, label: &str, value: &str) -> Result<()
         FieldType::Email => validate_email_value(value),
         FieldType::Website => validate_website_value(value),
         FieldType::Birthday => validate_birthday_value(value),
-        FieldType::Social => validate_social_value(label, value),
         _ => Ok(()), // Address, Custom accept any value
     }
 }
@@ -364,40 +414,26 @@ fn validate_birthday_value(value: &str) -> Result<(), ValidationError> {
 
 /// Validates social network usernames when the label identifies a known network.
 /// URL-formatted values (http/https) are accepted as-is; unknown networks accept any non-empty value.
-fn validate_social_value(label: &str, value: &str) -> Result<(), ValidationError> {
+/// Checks a social username the user typed against its network's rule
+/// in `registry`. A full URL, a network the registry does not know, and a
+/// network with no rule are accepted.
+///
+/// Only input paths call this. A received card is judged by type and
+/// length, so network data from the CDN can never make a phone reject a
+/// peer's card (vauchi/private#734).
+pub fn validate_social_username(
+    registry: &SocialNetworkRegistry,
+    network: &str,
+    value: &str,
+) -> Result<(), ValidationError> {
+    let value = value.trim();
     if value.starts_with("http://") || value.starts_with("https://") {
         return Ok(());
     }
-    let username = value.trim_start_matches('@');
-    match label.to_lowercase().as_str() {
-        "twitter" | "x" => {
-            // Twitter: max 15 chars, alphanumeric + underscore only (ADR-spec: social-registry)
-            if username.len() > 15
-                || !username
-                    .chars()
-                    .all(|c| c.is_ascii_alphanumeric() || c == '_')
-                || username.is_empty()
-            {
-                return Err(ValidationError::InvalidSocialUsername);
-            }
-        }
-        "github" | "gh" => {
-            // GitHub: max 39 chars, alphanumeric + hyphens, no leading/trailing/consecutive hyphens
-            if username.is_empty()
-                || username.len() > 39
-                || username.starts_with('-')
-                || username.ends_with('-')
-                || username.contains("--")
-                || !username
-                    .chars()
-                    .all(|c| c.is_ascii_alphanumeric() || c == '-')
-            {
-                return Err(ValidationError::InvalidSocialUsername);
-            }
-        }
-        _ => {}
+    match registry.resolve(network).and_then(|n| n.username_rule()) {
+        Some(rule) if !rule.accepts(value) => Err(ValidationError::InvalidSocialUsername),
+        _ => Ok(()),
     }
-    Ok(())
 }
 
 // INLINE_TEST_REQUIRED: FieldType::icon is the single source of truth for the

@@ -72,6 +72,22 @@ impl ContentCache {
         atomic_write(&path, data)
     }
 
+    /// Remove one cached content file. A file that is already gone is not
+    /// an error.
+    pub fn remove_content(
+        &self,
+        content_type: ContentType,
+        filename: &str,
+    ) -> Result<(), CacheError> {
+        remove_if_present(&self.content_path(content_type, filename))
+    }
+
+    /// Forget the cached manifest, so the next update cycle treats every
+    /// content type as not downloaded.
+    pub fn clear_manifest(&self) -> Result<(), CacheError> {
+        remove_if_present(&self.cache_dir.join("manifest.json"))
+    }
+
     /// Clear all content of a specific type
     pub fn clear_content_type(&self, content_type: ContentType) -> Result<(), CacheError> {
         let dir = self.cache_dir.join(content_type.dir_name());
@@ -106,6 +122,14 @@ impl ContentCache {
 
     fn content_path(&self, content_type: ContentType, filename: &str) -> PathBuf {
         self.content_dir(content_type).join(filename)
+    }
+}
+
+fn remove_if_present(path: &Path) -> Result<(), CacheError> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e.into()),
     }
 }
 

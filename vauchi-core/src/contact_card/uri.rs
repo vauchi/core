@@ -282,7 +282,7 @@ impl ContactField {
     /// - The value is empty or whitespace-only
     /// - The URI scheme would be blocked
     /// - No URI can be generated (e.g., unknown social network)
-    pub fn to_uri(&self) -> Option<String> {
+    pub fn to_uri(&self, registry: &SocialNetworkRegistry) -> Option<String> {
         let value = self.value().trim();
         if value.is_empty() {
             return None;
@@ -305,7 +305,7 @@ impl ContactField {
             }
             FieldType::Email => Some(format!("mailto:{}", value)),
             FieldType::Website => self.website_to_uri(value),
-            FieldType::Social => self.social_to_uri(value),
+            FieldType::Social => self.social_to_uri(registry, value),
             FieldType::Address => map_uri(value, MapProvider::System),
             FieldType::Birthday => None, // Birthday dates don't have a direct URI action
             FieldType::Custom => None,   // No heuristic match, no URI
@@ -341,35 +341,28 @@ impl ContactField {
     ///
     /// Delegates to the `SocialNetworkRegistry` for URL templates, supporting
     /// all registered networks (38+) rather than a hardcoded subset.
-    fn social_to_uri(&self, value: &str) -> Option<String> {
-        let label_lower = match self.label().to_lowercase().as_str() {
-            "x" => "twitter".to_string(),
-            other => other.to_string(),
-        };
+    fn social_to_uri(&self, registry: &SocialNetworkRegistry, value: &str) -> Option<String> {
+        let network = registry.resolve(self.label())?;
         let username = normalize_social_username(value);
 
-        if label_lower == "mastodon"
+        if network.id() == "mastodon"
             && let Some(profile_url) = parse_mastodon_federated(username)
         {
             return Some(profile_url);
         }
 
         // Strip LinkedIn "in/" prefix if user included it (template already has it)
-        let username = if label_lower == "linkedin" {
+        let username = if network.id() == "linkedin" {
             username.strip_prefix("in/").unwrap_or(username)
         } else {
             username
         };
 
-        // Use a locally-constructed registry instead of a global singleton (C12).
-        // SocialNetworkRegistry::with_defaults() is cheap (~38 entries, constructed once
-        // per social field URI resolution).
-        let registry = SocialNetworkRegistry::with_defaults();
-        registry.profile_url(&label_lower, username)
+        Some(network.profile_url(username))
     }
 
     /// Get the primary action for this field.
-    pub fn to_action(&self) -> ContactAction {
+    pub fn to_action(&self, registry: &SocialNetworkRegistry) -> ContactAction {
         let value = self.value().trim();
         if value.is_empty() {
             return ContactAction::CopyToClipboard;
@@ -391,14 +384,14 @@ impl ContactField {
             }
             FieldType::Email => ContactAction::SendEmail(value.to_string()),
             FieldType::Website => {
-                if let Some(uri) = self.to_uri() {
+                if let Some(uri) = self.to_uri(registry) {
                     ContactAction::OpenUrl(uri)
                 } else {
                     ContactAction::CopyToClipboard
                 }
             }
             FieldType::Social => {
-                if let Some(uri) = self.to_uri() {
+                if let Some(uri) = self.to_uri(registry) {
                     ContactAction::OpenUrl(uri)
                 } else {
                     ContactAction::CopyToClipboard
@@ -426,7 +419,7 @@ impl ContactField {
     /// assert!(actions.contains(&ContactAction::SendSms("+1-555-123-4567".to_string())));
     /// assert!(actions.contains(&ContactAction::CopyToClipboard));
     /// ```
-    pub fn to_secondary_actions(&self) -> Vec<ContactAction> {
+    pub fn to_secondary_actions(&self, registry: &SocialNetworkRegistry) -> Vec<ContactAction> {
         let value = self.value().trim();
         let mut actions: Vec<ContactAction> = Vec::new();
 
@@ -453,12 +446,12 @@ impl ContactField {
                 actions.push(ContactAction::SendEmail(value.to_string()));
             }
             FieldType::Website => {
-                if let Some(uri) = self.to_uri() {
+                if let Some(uri) = self.to_uri(registry) {
                     actions.push(ContactAction::OpenUrl(uri));
                 }
             }
             FieldType::Social => {
-                if let Some(uri) = self.to_uri() {
+                if let Some(uri) = self.to_uri(registry) {
                     actions.push(ContactAction::OpenUrl(uri));
                 }
             }
@@ -675,12 +668,15 @@ mod tests {
     fn test_website_to_action_uses_normalized_uri() {
         let plain = ContactField::new(FieldType::Website, "Site", "example.com", 0);
         assert_eq!(
-            plain.to_action(),
+            plain.to_action(&SocialNetworkRegistry::with_defaults()),
             ContactAction::OpenUrl("https://example.com".to_string())
         );
 
         let blocked = ContactField::new(FieldType::Website, "Bad", "javascript:alert(1)", 0);
-        assert_eq!(blocked.to_action(), ContactAction::CopyToClipboard);
+        assert_eq!(
+            blocked.to_action(&SocialNetworkRegistry::with_defaults()),
+            ContactAction::CopyToClipboard
+        );
     }
 
     // @scenario: security:Relay URL validation

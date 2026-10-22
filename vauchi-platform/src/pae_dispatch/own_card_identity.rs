@@ -96,7 +96,7 @@ impl PlatformAppEngine {
                 let field_id = card
                     .fields()
                     .iter()
-                    .find(|f| f.label() == label)
+                    .find(|f| names_field(f, &label))
                     .ok_or_else(|| MobileError::InvalidInput {
                         field: String::new(),
                         detail: format!("Field '{label}' not found"),
@@ -140,7 +140,7 @@ impl PlatformAppEngine {
                         detail: "Identity not found".into(),
                     })?;
                 let mut card = old_card.clone();
-                let field_id = match card.fields().iter().find(|f| f.label() == label) {
+                let field_id = match card.fields().iter().find(|f| names_field(f, &label)) {
                     Some(f) => f.id().to_string(),
                     None => return Ok(DomainCommandResult::Bool { value: false }),
                 };
@@ -405,4 +405,10 @@ impl PlatformAppEngine {
             ),
         }
     }
+}
+
+/// Whether `label` names `field`: its stored label, or the name it shows
+/// once its network is renamed (vauchi/private#734).
+fn names_field(field: &vauchi_core::ContactField, label: &str) -> bool {
+    field.label() == label || field.display_label(&vauchi_app::social::active_registry()) == label
 }

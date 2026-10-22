@@ -92,3 +92,22 @@ fn the_shells_bundled_locales_loaded_after_start_keep_the_cached_overlay() {
         Some("gebündelt")
     );
 }
+
+/// A network renamed on the CDN in an earlier run keeps its new name
+/// after a restart (vauchi/private#734 T3.1).
+// @internal
+#[test]
+fn networks_cached_by_an_earlier_run_are_loaded_when_the_engine_starts() {
+    let _dir = start_engine_over(&[(
+        "networks/networks.json",
+        r#"[{"id": "twitter", "name": "X", "url": "https://x.com/{username}"}]"#,
+    )]);
+
+    assert_eq!(
+        vauchi_app::social::active_registry()
+            .get("twitter")
+            .map(|n| n.display_name().to_string())
+            .as_deref(),
+        Some("X")
+    );
+}

@@ -163,8 +163,24 @@ fn tapping_a_social_handle_opens_the_profile() {
     assert_eq!(
         tap(Platform::Android, social),
         (
-            "Open profile".to_string(),
+            "Open on twitter.com".to_string(),
             "https://twitter.com/bobsmith".to_string()
+        )
+    );
+}
+
+/// CDN data can now rewrite where a profile link goes, so the action names
+/// the host it opens, the user's own subdomain included
+/// (vauchi/private#734 D9).
+// @scenario: navigation :: Tap social handle to open in app
+#[test]
+fn a_profile_link_names_the_host_it_opens() {
+    let substack = ContactField::new(FieldType::Social, "Substack", "bob", 0);
+    assert_eq!(
+        tap(Platform::Android, substack),
+        (
+            "Open on bob.substack.com".to_string(),
+            "https://bob.substack.com".to_string()
         )
     );
 }

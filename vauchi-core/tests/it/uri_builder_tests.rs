@@ -8,6 +8,11 @@
 //! Reference: features/contact_actions.feature
 
 use vauchi_core::contact_card::{ContactAction, ContactField, FieldType};
+use vauchi_core::social::SocialNetworkRegistry;
+
+fn registry() -> SocialNetworkRegistry {
+    SocialNetworkRegistry::with_defaults()
+}
 
 // ============================================================
 // Phone Number → tel: URI
@@ -18,7 +23,7 @@ use vauchi_core::contact_card::{ContactAction, ContactField, FieldType};
 #[test]
 fn test_phone_field_generates_tel_uri() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert_eq!(uri, Some("tel:+1-555-123-4567".to_string()));
 }
 
@@ -27,7 +32,7 @@ fn test_phone_field_generates_tel_uri() {
 #[test]
 fn test_phone_with_spaces_generates_tel_uri() {
     let field = ContactField::new(FieldType::Phone, "International", "+44 20 7946 0958", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     // Spaces should be preserved or removed depending on RFC 3966
     assert!(uri.is_some(), "expected Some value");
     assert!(uri.unwrap().starts_with("tel:"));
@@ -38,7 +43,7 @@ fn test_phone_with_spaces_generates_tel_uri() {
 #[test]
 fn test_phone_with_parentheses() {
     let field = ContactField::new(FieldType::Phone, "Home", "(555) 123-4567", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert!(uri.is_some(), "expected Some value");
     assert!(uri.unwrap().starts_with("tel:"));
 }
@@ -48,7 +53,10 @@ fn test_phone_with_parentheses() {
 #[test]
 fn test_phone_to_action_returns_call() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567", 0);
-    assert!(matches!(field.to_action(), ContactAction::Call(_)));
+    assert!(matches!(
+        field.to_action(&registry()),
+        ContactAction::Call(_)
+    ));
 }
 
 // ============================================================
@@ -60,7 +68,7 @@ fn test_phone_to_action_returns_call() {
 #[test]
 fn test_email_field_generates_mailto_uri() {
     let field = ContactField::new(FieldType::Email, "Work", "bob@company.com", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert_eq!(uri, Some("mailto:bob@company.com".to_string()));
 }
 
@@ -69,7 +77,7 @@ fn test_email_field_generates_mailto_uri() {
 #[test]
 fn test_email_with_plus_sign() {
     let field = ContactField::new(FieldType::Email, "Personal", "bob+work@company.com", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert_eq!(uri, Some("mailto:bob+work@company.com".to_string()));
 }
 
@@ -78,7 +86,7 @@ fn test_email_with_plus_sign() {
 #[test]
 fn test_email_to_action_returns_send_email() {
     let field = ContactField::new(FieldType::Email, "Work", "bob@test.com", 0);
-    let action = field.to_action();
+    let action = field.to_action(&registry());
     assert!(matches!(action, ContactAction::SendEmail(_)));
 }
 
@@ -91,7 +99,7 @@ fn test_email_to_action_returns_send_email() {
 #[test]
 fn test_website_with_https_preserved() {
     let field = ContactField::new(FieldType::Website, "Blog", "https://bobsmith.com", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert_eq!(uri, Some("https://bobsmith.com".to_string()));
 }
 
@@ -100,7 +108,7 @@ fn test_website_with_https_preserved() {
 #[test]
 fn test_website_with_http_preserved() {
     let field = ContactField::new(FieldType::Website, "Legacy", "http://old-site.com", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert_eq!(uri, Some("http://old-site.com".to_string()));
 }
 
@@ -109,7 +117,7 @@ fn test_website_with_http_preserved() {
 #[test]
 fn test_website_without_protocol_adds_https() {
     let field = ContactField::new(FieldType::Website, "Site", "bobsmith.com", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert_eq!(uri, Some("https://bobsmith.com".to_string()));
 }
 
@@ -118,7 +126,7 @@ fn test_website_without_protocol_adds_https() {
 #[test]
 fn test_website_to_action_returns_open_url() {
     let field = ContactField::new(FieldType::Website, "Site", "https://example.com", 0);
-    let action = field.to_action();
+    let action = field.to_action(&registry());
     assert!(matches!(action, ContactAction::OpenUrl(_)));
 }
 
@@ -149,7 +157,7 @@ fn test_social_network_generates_profile_url(
     #[case] expected: &str,
 ) {
     let field = ContactField::new(FieldType::Social, label, username, 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert_eq!(
         uri,
         Some(expected.to_string()),
@@ -164,7 +172,7 @@ fn test_social_network_generates_profile_url(
 #[test]
 fn test_social_unknown_network_returns_none() {
     let field = ContactField::new(FieldType::Social, "UnknownNetwork", "bobsmith", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     // Unknown networks should return None (can't generate URL)
     assert!(uri.is_none());
 }
@@ -174,7 +182,7 @@ fn test_social_unknown_network_returns_none() {
 #[test]
 fn test_social_to_action_returns_open_url() {
     let field = ContactField::new(FieldType::Social, "GitHub", "octocat", 0);
-    let action = field.to_action();
+    let action = field.to_action(&registry());
     assert!(matches!(action, ContactAction::OpenUrl(_)));
 }
 
@@ -187,7 +195,7 @@ fn test_social_to_action_returns_open_url() {
 #[test]
 fn test_address_generates_map_query() {
     let field = ContactField::new(FieldType::Address, "Home", "123 Main St, City, ST 12345", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert!(uri.is_some(), "expected Some value");
     let uri_str = uri.unwrap();
     assert!(uri_str.starts_with("geo:") || uri_str.contains("maps"));
@@ -203,7 +211,7 @@ fn test_address_is_url_encoded() {
         "123 Main St, San Francisco, CA",
         0,
     );
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert!(uri.is_some(), "expected Some value");
     let uri_str = uri.unwrap();
     assert!(!uri_str.contains(' ') || uri_str.contains("%20") || uri_str.contains('+'));
@@ -214,7 +222,7 @@ fn test_address_is_url_encoded() {
 #[test]
 fn test_address_to_action_returns_open_map() {
     let field = ContactField::new(FieldType::Address, "Home", "123 Main St", 0);
-    let action = field.to_action();
+    let action = field.to_action(&registry());
     assert!(matches!(action, ContactAction::OpenMap(_)));
 }
 
@@ -246,7 +254,7 @@ fn test_custom_field_value_type_detection(
 #[test]
 fn test_custom_field_uses_heuristic_for_uri() {
     let field = ContactField::new(FieldType::Custom, "Signal", "+1-555-987-6543", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert!(uri.is_some(), "expected Some value");
     assert!(uri.unwrap().starts_with("tel:"));
 }
@@ -256,7 +264,7 @@ fn test_custom_field_uses_heuristic_for_uri() {
 #[test]
 fn test_custom_field_plain_text_returns_none() {
     let field = ContactField::new(FieldType::Custom, "Notes", "Met at conference", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert!(uri.is_none());
 }
 
@@ -265,7 +273,7 @@ fn test_custom_field_plain_text_returns_none() {
 #[test]
 fn test_custom_to_action_copy_for_plain_text() {
     let field = ContactField::new(FieldType::Custom, "Notes", "Met at conference", 0);
-    let action = field.to_action();
+    let action = field.to_action(&registry());
     assert!(matches!(action, ContactAction::CopyToClipboard));
 }
 
@@ -281,7 +289,7 @@ fn test_custom_to_action_copy_for_plain_text() {
 #[case("data:text/html,<script>alert(1)</script>")]
 fn test_blocked_uri_scheme_returns_none(#[case] value: &str) {
     let field = ContactField::new(FieldType::Website, "Test", value, 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert!(uri.is_none(), "{value} should be blocked");
 }
 
@@ -320,7 +328,7 @@ fn test_blocked_scheme(#[case] scheme: &str) {
 #[test]
 fn test_empty_value_returns_none() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert!(uri.is_none());
 }
 
@@ -328,7 +336,7 @@ fn test_empty_value_returns_none() {
 #[test]
 fn test_whitespace_only_value_returns_none() {
     let field = ContactField::new(FieldType::Email, "Work", "   ", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert!(uri.is_none());
 }
 
@@ -337,7 +345,7 @@ fn test_whitespace_only_value_returns_none() {
 #[test]
 fn test_special_characters_in_email_encoded() {
     let field = ContactField::new(FieldType::Email, "Test", "test&user@example.com", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert!(uri.is_some(), "expected Some value");
     assert!(uri.unwrap().contains("test"));
 }
@@ -346,7 +354,7 @@ fn test_special_characters_in_email_encoded() {
 #[test]
 fn test_unicode_in_address_encoded() {
     let field = ContactField::new(FieldType::Address, "Office", "東京都渋谷区", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert!(uri.is_some(), "expected Some value");
     // Unicode should be percent-encoded
     let uri_str = uri.unwrap();
@@ -364,7 +372,7 @@ fn test_unicode_in_address_encoded() {
 #[test]
 fn test_phone_secondary_actions_call_and_sms() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567", 0);
-    let actions = field.to_secondary_actions();
+    let actions = field.to_secondary_actions(&registry());
     assert_eq!(actions.len(), 3); // Call, SendSms, CopyToClipboard
     assert!(actions.contains(&ContactAction::Call("+1-555-123-4567".to_string())));
     assert!(actions.contains(&ContactAction::SendSms("+1-555-123-4567".to_string())));
@@ -377,7 +385,7 @@ fn test_phone_secondary_actions_call_and_sms() {
 #[test]
 fn test_email_secondary_actions() {
     let field = ContactField::new(FieldType::Email, "Work", "bob@company.com", 0);
-    let actions = field.to_secondary_actions();
+    let actions = field.to_secondary_actions(&registry());
     assert_eq!(actions.len(), 2); // SendEmail, CopyToClipboard
     assert!(actions.contains(&ContactAction::SendEmail("bob@company.com".to_string())));
     assert!(actions.contains(&ContactAction::CopyToClipboard));
@@ -389,7 +397,7 @@ fn test_email_secondary_actions() {
 #[test]
 fn test_website_secondary_actions() {
     let field = ContactField::new(FieldType::Website, "Blog", "https://example.com", 0);
-    let actions = field.to_secondary_actions();
+    let actions = field.to_secondary_actions(&registry());
     assert_eq!(actions.len(), 2); // OpenUrl, CopyToClipboard
     assert!(actions.contains(&ContactAction::OpenUrl("https://example.com".to_string())));
     assert!(actions.contains(&ContactAction::CopyToClipboard));
@@ -401,7 +409,7 @@ fn test_website_secondary_actions() {
 #[test]
 fn test_address_secondary_actions() {
     let field = ContactField::new(FieldType::Address, "Home", "123 Main St, City", 0);
-    let actions = field.to_secondary_actions();
+    let actions = field.to_secondary_actions(&registry());
     assert_eq!(actions.len(), 3); // OpenMap, GetDirections, CopyToClipboard
     assert!(
         actions
@@ -422,7 +430,7 @@ fn test_address_secondary_actions() {
 #[test]
 fn test_social_secondary_actions() {
     let field = ContactField::new(FieldType::Social, "Twitter", "@bobsmith", 0);
-    let actions = field.to_secondary_actions();
+    let actions = field.to_secondary_actions(&registry());
     assert!(actions.len() >= 2); // At least OpenUrl and CopyToClipboard
     assert!(actions.contains(&ContactAction::CopyToClipboard));
 }
@@ -433,7 +441,7 @@ fn test_social_secondary_actions() {
 #[test]
 fn test_custom_field_secondary_actions() {
     let field = ContactField::new(FieldType::Custom, "Notes", "+1-555-987-6543", 0);
-    let actions = field.to_secondary_actions();
+    let actions = field.to_secondary_actions(&registry());
     assert_eq!(actions.len(), 3);
     assert!(actions.contains(&ContactAction::Call("+1-555-987-6543".to_string())));
     assert!(actions.contains(&ContactAction::SendSms("+1-555-987-6543".to_string())));
@@ -445,7 +453,7 @@ fn test_custom_field_secondary_actions() {
 #[test]
 fn test_empty_field_secondary_actions() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "", 0);
-    let actions = field.to_secondary_actions();
+    let actions = field.to_secondary_actions(&registry());
     assert_eq!(actions.len(), 1); // Only CopyToClipboard (copy empty)
     assert!(actions.contains(&ContactAction::CopyToClipboard));
 }
@@ -570,7 +578,7 @@ fn test_contact_with_multiple_actionable_fields() {
     .unwrap();
 
     for field in card.fields() {
-        let uri = field.to_uri();
+        let uri = field.to_uri(&registry());
         assert!(uri.is_some(), "Field {} should have a URI", field.label());
     }
 }
@@ -591,7 +599,7 @@ fn test_all_field_types_have_actions() {
 
     for (field_type, label, value, expected_action) in test_cases {
         let field = ContactField::new(field_type.clone(), label, value, 0);
-        let action = field.to_action();
+        let action = field.to_action(&registry());
         let action_str = format!("{:?}", action);
         assert!(
             action_str.contains(expected_action),
@@ -611,7 +619,7 @@ fn test_all_field_types_have_actions() {
 #[test]
 fn test_social_mastodon_handle_on_default_instance() {
     let field = ContactField::new(FieldType::Social, "Mastodon", "@bob", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert_eq!(uri, Some("https://mastodon.social/@bob".to_string()));
 }
 
@@ -621,7 +629,7 @@ fn test_social_mastodon_handle_on_default_instance() {
 fn test_social_mastodon_federated_handle_at_prefix() {
     // @bob@mas.to → https://mas.to/@bob
     let field = ContactField::new(FieldType::Social, "Mastodon", "@bob@mas.to", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert_eq!(uri, Some("https://mas.to/@bob".to_string()));
 }
 
@@ -631,7 +639,7 @@ fn test_social_mastodon_federated_handle_at_prefix() {
 fn test_social_mastodon_federated_handle_no_prefix() {
     // bob@fosstodon.org → https://fosstodon.org/@bob
     let field = ContactField::new(FieldType::Social, "Mastodon", "bob@fosstodon.org", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert_eq!(uri, Some("https://fosstodon.org/@bob".to_string()));
 }
 
@@ -641,7 +649,7 @@ fn test_social_mastodon_federated_handle_no_prefix() {
 fn test_social_mastodon_default_instance_handle() {
     // @alice@mastodon.social → https://mastodon.social/@alice
     let field = ContactField::new(FieldType::Social, "Mastodon", "@alice@mastodon.social", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert_eq!(uri, Some("https://mastodon.social/@alice".to_string()));
 }
 
@@ -650,7 +658,7 @@ fn test_social_mastodon_default_instance_handle() {
 #[test]
 fn test_social_mastodon_bare_username() {
     let field = ContactField::new(FieldType::Social, "Mastodon", "bob", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert_eq!(uri, Some("https://mastodon.social/@bob".to_string()));
 }
 
@@ -673,7 +681,7 @@ fn test_phone_sms_uri() {
 #[test]
 fn test_website_with_subdomain() {
     let field = ContactField::new(FieldType::Website, "Blog", "blog.example.com", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert_eq!(uri, Some("https://blog.example.com".to_string()));
 }
 
@@ -688,7 +696,7 @@ fn test_website_with_path_and_query() {
         "https://example.com/user?id=123",
         0,
     );
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert_eq!(uri, Some("https://example.com/user?id=123".to_string()));
 }
 
@@ -705,7 +713,7 @@ fn test_custom_field_http_url_detected() {
     );
     let detected = field.detect_value_type();
     assert_eq!(detected, Some(FieldType::Website));
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert_eq!(uri, Some("http://oldsite.example.com".to_string()));
 }
 
@@ -725,7 +733,7 @@ fn test_international_phone_formats() {
 
     for (number, country) in phones {
         let field = ContactField::new(FieldType::Phone, country, number, 0);
-        let uri = field.to_uri();
+        let uri = field.to_uri(&registry());
         assert!(uri.is_some(), "{} phone should generate URI", country);
         assert!(
             uri.unwrap().starts_with("tel:"),
@@ -741,16 +749,28 @@ fn test_international_phone_formats() {
 #[test]
 fn test_action_type_categorization() {
     let phone = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567", 0);
-    assert!(matches!(phone.to_action(), ContactAction::Call(_)));
+    assert!(matches!(
+        phone.to_action(&registry()),
+        ContactAction::Call(_)
+    ));
 
     let email = ContactField::new(FieldType::Email, "Work", "test@example.com", 0);
-    assert!(matches!(email.to_action(), ContactAction::SendEmail(_)));
+    assert!(matches!(
+        email.to_action(&registry()),
+        ContactAction::SendEmail(_)
+    ));
 
     let website = ContactField::new(FieldType::Website, "Blog", "https://example.com", 0);
-    assert!(matches!(website.to_action(), ContactAction::OpenUrl(_)));
+    assert!(matches!(
+        website.to_action(&registry()),
+        ContactAction::OpenUrl(_)
+    ));
 
     let address = ContactField::new(FieldType::Address, "Home", "123 Main St", 0);
-    assert!(matches!(address.to_action(), ContactAction::OpenMap(_)));
+    assert!(matches!(
+        address.to_action(&registry()),
+        ContactAction::OpenMap(_)
+    ));
 }
 
 // ============================================================
@@ -771,7 +791,7 @@ fn test_xss_in_website_blocked() {
 
     for value in malicious_values {
         let field = ContactField::new(FieldType::Website, "Malicious", value, 0);
-        let uri = field.to_uri();
+        let uri = field.to_uri(&registry());
         assert!(uri.is_none(), "XSS attempt '{}' should be blocked", value);
     }
 }
@@ -790,7 +810,7 @@ fn test_data_uri_blocked() {
 
     for value in data_uris {
         let field = ContactField::new(FieldType::Website, "Data", value, 0);
-        let uri = field.to_uri();
+        let uri = field.to_uri(&registry());
         assert!(uri.is_none(), "Data URI '{}' should be blocked", value);
     }
 }
@@ -802,7 +822,7 @@ fn test_data_uri_blocked() {
 #[test]
 fn test_ftp_scheme_blocked() {
     let field = ContactField::new(FieldType::Website, "FTP", "ftp://files.example.com", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert!(uri.is_none(), "FTP scheme should be blocked");
 }
 
@@ -813,7 +833,7 @@ fn test_ftp_scheme_blocked() {
 #[test]
 fn test_custom_field_malicious_url_blocked() {
     let field = ContactField::new(FieldType::Custom, "Link", "javascript:void(0)", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert!(uri.is_none(), "Malicious custom field should be blocked");
 }
 
@@ -827,7 +847,7 @@ fn test_very_long_url() {
     let long_path = "a".repeat(500);
     let url = format!("https://example.com/{}", long_path);
     let field = ContactField::new(FieldType::Website, "Long", &url, 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert!(uri.is_some(), "Long URLs should still work");
 }
 
@@ -836,7 +856,7 @@ fn test_very_long_url() {
 #[test]
 fn test_unicode_domain_url() {
     let field = ContactField::new(FieldType::Website, "IDN", "https://例え.jp", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert!(uri.is_some(), "expected Some value");
 }
 
@@ -846,7 +866,7 @@ fn test_unicode_domain_url() {
 #[test]
 fn test_email_with_dots() {
     let field = ContactField::new(FieldType::Email, "Gmail", "first.last@gmail.com", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert_eq!(uri, Some("mailto:first.last@gmail.com".to_string()));
 }
 
@@ -861,7 +881,7 @@ fn test_address_special_characters() {
         "123 O'Brien's Way, Suite #5",
         0,
     );
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert!(uri.is_some(), "expected Some value");
     let uri_str = uri.unwrap();
     assert!(uri_str.contains("geo:") || uri_str.contains("maps"));
@@ -888,7 +908,7 @@ fn test_all_registry_networks_produce_uri() {
         }
 
         let field = ContactField::new(FieldType::Social, network.display_name(), "testuser123", 0);
-        let uri = field.to_uri();
+        let uri = field.to_uri(&registry);
         assert!(
             uri.is_some(),
             "Network '{}' (id='{}') should produce a URI for 'testuser123', got None",
@@ -921,7 +941,7 @@ proptest! {
         username in "[a-zA-Z0-9_]{1,30}"
     ) {
         let field = ContactField::new(FieldType::Social, "GitHub", &username, 0);
-        let uri = field.to_uri();
+        let uri = field.to_uri(&registry());
         prop_assert!(uri.is_some(), "GitHub should produce URI for '{}'", username);
         let uri_str = uri.unwrap();
         prop_assert!(
@@ -968,7 +988,7 @@ fn test_validate_phone_accepts_valid_formats() {
 fn test_malformed_phone_to_uri_returns_none() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "not-a-number", 0);
     assert!(
-        field.to_uri().is_none(),
+        field.to_uri(&registry()).is_none(),
         "Malformed phone should not produce a tel: URI"
     );
 }
@@ -981,7 +1001,7 @@ fn test_malformed_phone_to_uri_returns_none() {
 fn test_short_phone_to_uri_returns_none() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "12", 0);
     assert!(
-        field.to_uri().is_none(),
+        field.to_uri(&registry()).is_none(),
         "Phone with < 7 digits should not produce a tel: URI"
     );
 }
@@ -993,7 +1013,7 @@ fn test_short_phone_to_uri_returns_none() {
 #[test]
 fn test_malformed_phone_to_action_returns_copy() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "not-a-number", 0);
-    let action = field.to_action();
+    let action = field.to_action(&registry());
     assert!(
         matches!(action, ContactAction::CopyToClipboard),
         "Malformed phone should fall back to CopyToClipboard, got {:?}",
@@ -1008,7 +1028,7 @@ fn test_malformed_phone_to_action_returns_copy() {
 #[test]
 fn test_valid_phone_to_uri_still_works() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567", 0);
-    let uri = field.to_uri();
+    let uri = field.to_uri(&registry());
     assert_eq!(uri, Some("tel:+1-555-123-4567".to_string()));
 }
 
@@ -1019,7 +1039,7 @@ fn test_valid_phone_to_uri_still_works() {
 fn test_whitespace_phone_to_uri_returns_none() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "   ", 0);
     assert!(
-        field.to_uri().is_none(),
+        field.to_uri(&registry()).is_none(),
         "Whitespace-only phone should not produce a tel: URI"
     );
 }
@@ -1031,7 +1051,7 @@ fn test_whitespace_phone_to_uri_returns_none() {
 fn test_phone_with_letters_to_uri_returns_none() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "555-CALL-ME", 0);
     assert!(
-        field.to_uri().is_none(),
+        field.to_uri(&registry()).is_none(),
         "Phone with letters should not produce a tel: URI"
     );
 }

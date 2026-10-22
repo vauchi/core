@@ -17,6 +17,22 @@ CORE_DIR="$(dirname "$SCRIPT_DIR")"
 echo "=== Content Contract Validation ==="
 echo ""
 
+# Runs one named test and passes only if exactly that test ran: a filter
+# that matches nothing exits 0 too, which hid a moved test for months.
+run_contract_test() {
+    package="$1"
+    target="$2"
+    test_name="$3"
+    output=$(cargo test -p "$package" $target -- "$test_name" --exact 2>&1) || {
+        echo "$output" | grep -E "error|FAILED|panicked" | head -5
+        return 1
+    }
+    if ! echo "$output" | grep -q "test result: ok. 1 passed"; then
+        echo "  $test_name did not run in $package (moved or renamed?)"
+        return 1
+    fi
+}
+
 # --- Themes ---
 # Core reads the generated flat format, not the hierarchical source.
 # The .clone-themes CI template runs generate.py to produce it.
@@ -29,14 +45,11 @@ if [ ! -f "$THEMES_JSON" ]; then
 fi
 if [ -f "$THEMES_JSON" ]; then
     echo "Checking themes contract..."
-    THEME_OUTPUT=$(VAUCHI_THEMES_PATH="$THEMES_JSON" cargo test -p vauchi-core --lib -- theme::tests::test_load_real_themes_json --exact 2>&1)
-    THEME_EXIT=$?
-    if [ $THEME_EXIT -eq 0 ]; then
+    if VAUCHI_THEMES_PATH="$THEMES_JSON" run_contract_test vauchi-app --lib theme::tests::test_load_real_themes_json; then
         THEME_COUNT=$(python3 -c "import json; print(len(json.load(open('$THEMES_JSON'))))" 2>/dev/null || echo "?")
         echo "  PASS: Core parsed all $THEME_COUNT themes from generated/themes.json"
     else
-        echo "  FAIL: themes contract test failed (exit $THEME_EXIT)"
-        echo "$THEME_OUTPUT" | grep -E "error|FAILED|panicked" | head -5
+        echo "  FAIL: themes contract test failed"
         ERRORS=$((ERRORS + 1))
     fi
 else
@@ -81,29 +94,19 @@ fi
 echo ""
 
 # --- Networks ---
-NETWORKS_JSON="${CORE_DIR}/vauchi-core/src/social/networks.json"
+# The file the CDN publishes, through Core's own validation (#734 D3).
+NETWORKS_JSON="${CORE_DIR}/../website/app-files-src/networks.json"
 if [ -f "$NETWORKS_JSON" ]; then
     echo "Checking networks contract..."
-    if python3 -c "
-import json, sys
-with open('$NETWORKS_JSON') as f:
-    networks = json.load(f)
-errors = 0
-for i, n in enumerate(networks):
-    for field in ['id', 'name', 'url']:
-        if field not in n:
-            print(f'  FAIL: Network at index {i} missing required field: {field}')
-            errors += 1
-sys.exit(1 if errors else 0)
-" 2>/dev/null; then
+    if VAUCHI_NETWORKS_PATH="$NETWORKS_JSON" run_contract_test vauchi-core "--features testing --test it" social_network_data_tests::the_cdn_networks_file_passes_core_validation; then
         NET_COUNT=$(python3 -c "import json; print(len(json.load(open('$NETWORKS_JSON'))))" 2>/dev/null || echo "?")
-        echo "  PASS: All $NET_COUNT networks have required fields"
+        echo "  PASS: Core validated all $NET_COUNT networks from website/app-files-src/networks.json"
     else
-        echo "  FAIL: networks.json has contract violations"
+        echo "  FAIL: networks contract test failed"
         ERRORS=$((ERRORS + 1))
     fi
 else
-    echo "  SKIP: networks.json not found"
+    echo "  SKIP: website/app-files-src/networks.json not found"
 fi
 
 echo ""
@@ -114,14 +117,10 @@ echo ""
 # Pass VAUCHI_MANIFEST_PATH to test against a real manifest file.
 echo "Checking CDN manifest contract..."
 MANIFEST_TEST="content::integrity::tests::test_deserialize_build_manifest_output"
-MANIFEST_OUTPUT=$(cargo test -p vauchi-core --lib -- "$MANIFEST_TEST" --exact 2>&1)
-MANIFEST_EXIT=$?
-if [ $MANIFEST_EXIT -eq 0 ]; then
+if run_contract_test vauchi-app --lib "$MANIFEST_TEST"; then
     echo "  PASS: Core can deserialize build-manifest.py output format"
 else
-    # Show the actual error (not hidden behind 2>/dev/null)
-    echo "  FAIL: CDN manifest contract test failed (exit $MANIFEST_EXIT)"
-    echo "$MANIFEST_OUTPUT" | grep -E "error|FAILED|panicked" | head -5
+    echo "  FAIL: CDN manifest contract test failed"
     echo "  Fix: check content/types.rs vs website/scripts/build-manifest.py"
     ERRORS=$((ERRORS + 1))
 fi

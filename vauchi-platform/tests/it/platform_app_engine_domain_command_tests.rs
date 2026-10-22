@@ -3174,3 +3174,52 @@ fn save_recovery_response_refuses_an_unknown_decision() {
         );
     }
 }
+
+/// A social field is found by the name it shows as well as the label it
+/// was stored under, so a renamed network does not lose its fields
+/// (vauchi/private#734 T2.5).
+// @internal
+#[test]
+fn update_and_remove_find_a_social_field_by_its_networks_current_name() {
+    use vauchi_platform::MobileFieldType;
+    let (engine, _dir) = create_engine_with_identity();
+    engine
+        .dispatch_domain_command(DomainCommand::AddField {
+            field_type: MobileFieldType::Social,
+            label: "Twitter".into(),
+            value: "alice".into(),
+        })
+        .expect("add_field");
+    vauchi_app::social::load_networks_from_bytes(
+        br#"[{"id": "twitter", "name": "X", "url": "https://x.com/{username}"}]"#,
+    )
+    .expect("valid network data");
+
+    engine
+        .dispatch_domain_command(DomainCommand::UpdateField {
+            label: "X".into(),
+            new_value: "bob".into(),
+        })
+        .expect("the field is found by its shown name");
+    match engine
+        .dispatch_domain_command(DomainCommand::GetOwnCard)
+        .expect("get")
+    {
+        DomainCommandResult::ContactCardPayload { card } => assert!(
+            card.fields.iter().any(|f| f.value == "bob"),
+            "the update reached the field: {:?}",
+            card.fields
+        ),
+        other => panic!("unexpected result: {other:?}"),
+    }
+
+    match engine
+        .dispatch_domain_command(DomainCommand::RemoveField { label: "X".into() })
+        .expect("remove")
+    {
+        DomainCommandResult::Bool { value } => {
+            assert!(value, "the field is found by its shown name")
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}

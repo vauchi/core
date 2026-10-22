@@ -449,7 +449,7 @@ impl PlatformAppEngine {
                 Ok(DomainCommandResult::AvatarOpt { data })
             }
             DomainCommand::SearchSocialNetworks { query } => {
-                let registry = vauchi_core::SocialNetworkRegistry::with_defaults();
+                let registry = vauchi_app::social::active_registry();
                 let networks = registry
                     .search(&query)
                     .iter()
@@ -465,7 +465,7 @@ impl PlatformAppEngine {
                 network_id,
                 username,
             } => {
-                let registry = vauchi_core::SocialNetworkRegistry::with_defaults();
+                let registry = vauchi_app::social::active_registry();
                 Ok(DomainCommandResult::StringOpt {
                     value: registry.profile_url(&network_id, &username),
                 })
@@ -666,7 +666,7 @@ impl PlatformAppEngine {
                 })
             }
             DomainCommand::ListSocialNetworks => {
-                let registry = vauchi_core::SocialNetworkRegistry::with_defaults();
+                let registry = vauchi_app::social::active_registry();
                 let networks = registry
                     .all()
                     .iter()

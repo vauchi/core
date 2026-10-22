@@ -260,3 +260,103 @@ proptest! {
         }
     }
 }
+
+// @internal
+#[test]
+fn a_network_resolves_from_its_id_alias_or_name_in_any_case() {
+    let mut twitter = entry("twitter");
+    twitter["name"] = "Twitter / X".into();
+    twitter["aliases"] = serde_json::json!(["x"]);
+    let registry = parse(vec![twitter, entry("github")]).expect("valid file");
+
+    for name in ["X", "x", "twitter", "TWITTER", "Twitter / X", " twitter "] {
+        assert_eq!(
+            registry.resolve(name).map(|n| n.id()),
+            Some("twitter"),
+            "{name:?}"
+        );
+    }
+    for name in ["nope", "", "twit", "Twitter /"] {
+        assert_eq!(registry.resolve(name).map(|n| n.id()), None, "{name:?}");
+    }
+}
+
+// Profile links come from the data (vauchi/private#734 T1.5, D7).
+
+fn social_field(label: &str, value: &str) -> vauchi_core::contact_card::ContactField {
+    vauchi_core::contact_card::ContactField::new(
+        vauchi_core::contact_card::FieldType::Social,
+        label,
+        value,
+        0,
+    )
+}
+
+// @internal
+#[test]
+fn every_bundled_network_links_a_username_through_its_template() {
+    let registry = SocialNetworkRegistry::with_defaults();
+    for network in registry.all() {
+        let expected = network
+            .profile_url_template()
+            .replace("{username}", "alice");
+        for label in [network.id(), network.display_name()] {
+            assert_eq!(
+                social_field(label, "alice").to_uri(&registry).as_deref(),
+                Some(expected.as_str()),
+                "{label}"
+            );
+        }
+    }
+}
+
+// @internal
+#[test]
+fn a_field_labelled_with_any_alias_opens_the_registry_url() {
+    let mut twitter = entry("twitter");
+    twitter["url"] = "https://x.com/{username}".into();
+    twitter["aliases"] = serde_json::json!(["x", "tw"]);
+    let registry = parse(vec![twitter]).expect("valid file");
+
+    for label in ["X", "Tw", "twitter"] {
+        assert_eq!(
+            social_field(label, "@alice").to_uri(&registry).as_deref(),
+            Some("https://x.com/alice"),
+            "{label}"
+        );
+    }
+}
+
+// @internal
+#[test]
+fn a_leading_at_is_dropped_for_every_network() {
+    let registry = SocialNetworkRegistry::with_defaults();
+    assert_eq!(
+        registry.profile_url("github", "@octocat").as_deref(),
+        Some("https://github.com/octocat")
+    );
+    assert_eq!(
+        registry.profile_url("x", "@alice").as_deref(),
+        Some("https://twitter.com/alice")
+    );
+}
+
+/// The networks file the CDN publishes passes Core's validation. Used by
+/// CI's validate-content-contracts job: `VAUCHI_NETWORKS_PATH`, else the
+/// sibling website checkout; skipped when neither exists.
+// @internal
+#[test]
+fn the_cdn_networks_file_passes_core_validation() {
+    let path = std::env::var("VAUCHI_NETWORKS_PATH")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../website/app-files-src/networks.json")
+        });
+    let Ok(data) = std::fs::read(&path) else {
+        return;
+    };
+    let registry = SocialNetworkRegistry::from_data_bytes(&data)
+        .unwrap_or_else(|e| panic!("{} fails Core's network validation: {e}", path.display()));
+    assert!(registry.get("twitter").is_some());
+}

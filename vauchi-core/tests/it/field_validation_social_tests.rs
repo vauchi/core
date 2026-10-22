@@ -142,3 +142,98 @@ fn test_social_handle_preserves_full_urls() {
     let result = twitter.profile_url(full_url);
     assert_eq!(result, full_url, "Full URLs should be returned as-is");
 }
+
+// Username rules are data in networks.json, checked where the user types
+// (vauchi/private#734 T1.4); received cards are judged by type and length.
+
+fn username_check(
+    network: &str,
+    value: &str,
+) -> Result<(), vauchi_core::contact_card::ValidationError> {
+    vauchi_core::contact_card::validate_social_username(
+        &vauchi_core::social::SocialNetworkRegistry::with_defaults(),
+        network,
+        value,
+    )
+}
+
+// @scenario: field_validation :: Validate a contact's social profile
+#[test]
+fn twitter_usernames_follow_the_bundled_rule() {
+    use vauchi_core::contact_card::ValidationError::InvalidSocialUsername;
+    for ok in ["alice", "bob_smith", "@alice", &"a".repeat(15)] {
+        assert_eq!(username_check("Twitter", ok), Ok(()), "{ok}");
+    }
+    for bad in [&"a".repeat(16), "bad-name", "", "@"] {
+        assert_eq!(
+            username_check("Twitter", bad),
+            Err(InvalidSocialUsername),
+            "{bad:?}"
+        );
+    }
+    assert_eq!(
+        username_check("X", &"a".repeat(16)),
+        Err(InvalidSocialUsername),
+        "an alias reaches the same rule"
+    );
+}
+
+// @scenario: field_validation :: Validate a contact's social profile
+#[test]
+fn github_usernames_follow_the_bundled_rule() {
+    use vauchi_core::contact_card::ValidationError::InvalidSocialUsername;
+    for ok in ["octocat", "test-user", "@octocat", &"a".repeat(39)] {
+        assert_eq!(username_check("GitHub", ok), Ok(()), "{ok}");
+    }
+    for bad in ["-a", "a-", "a--b", "a_b", &"a".repeat(40)] {
+        assert_eq!(
+            username_check("github", bad),
+            Err(InvalidSocialUsername),
+            "{bad}"
+        );
+    }
+}
+
+// @scenario: field_validation :: Validate a contact's social profile
+#[test]
+fn a_network_without_a_rule_or_a_full_url_accepts_any_value() {
+    assert_eq!(username_check("LinkedIn", "anything goes, really"), Ok(()));
+    assert_eq!(username_check("My blog", "!!"), Ok(()));
+    assert_eq!(
+        username_check(
+            "Twitter",
+            "https://twitter.com/a_name_far_too_long_for_a_handle"
+        ),
+        Ok(())
+    );
+}
+
+// @scenario: field_validation :: Validate a contact's social profile
+#[test]
+fn the_rules_live_in_the_data_not_the_code() {
+    let without_rules = vauchi_core::social::SocialNetworkRegistry::from_data_bytes(
+        br#"[{"id": "twitter", "name": "Twitter", "url": "https://twitter.com/{username}"}]"#,
+    )
+    .expect("valid data");
+    assert_eq!(
+        vauchi_core::contact_card::validate_social_username(
+            &without_rules,
+            "Twitter",
+            &"a".repeat(16)
+        ),
+        Ok(())
+    );
+}
+
+// A peer's card is judged by type and length only, so network data can
+// never make a phone reject a card it receives.
+// @scenario: field_validation :: Validate a contact's social profile
+#[test]
+fn a_received_social_field_is_not_judged_by_username_rules() {
+    use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
+    let field = ContactField::new(FieldType::Social, "Twitter", &"a".repeat(16), 0);
+    assert_eq!(field.validate(), Ok(()));
+    let mut card = ContactCard::new("Bob");
+    assert!(card.add_field(field).is_ok());
+    assert_eq!(card.fields().len(), 1);
+}

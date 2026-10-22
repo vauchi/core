@@ -7,6 +7,7 @@
 //! Feature: remote-content.feature
 
 mod cache_tests;
+mod chosen_locales_tests;
 mod compressed_cache_tests;
 mod config_tests;
 mod integrity_tests;

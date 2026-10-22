@@ -243,7 +243,7 @@ impl PlatformAppEngine {
             if let Ok(mut slot) = self.lock_engine()
                 && let Ok(engine) = open_engine(&mut slot)
             {
-                crate::pae_dispatch::engagement::invalidate_content_screens(engine);
+                crate::pae_dispatch::engagement::invalidate_content_screens(engine, &outcome);
             }
             if let Ok(notifier) = self.event_notifier.lock()
                 && let Some(notifier) = notifier.as_ref()

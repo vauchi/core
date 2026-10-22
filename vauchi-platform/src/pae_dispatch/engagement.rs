@@ -98,7 +98,7 @@ impl PlatformAppEngine {
                     crate::platform_app_engine_internals::content_source_for(engine),
                 );
                 if outcome.applied {
-                    invalidate_content_screens(engine);
+                    invalidate_content_screens(engine, &outcome);
                 }
                 Ok(DomainCommandResult::ContentUpdateCycle { outcome })
             }
@@ -281,13 +281,20 @@ impl PlatformAppEngine {
 }
 
 /// A completed `RunContentUpdateCycle` refreshes the on-disk content
-/// cache; every screen reading social-network labels re-renders. Named
-/// helper so the invalidation set stays in one place when a new content
-/// type needs a wider one.
-pub(crate) fn invalidate_content_screens(engine: &mut AppEngine) {
+/// cache; every screen reading social-network labels re-renders, and new
+/// themes ask the shell to apply its theme again. Named helper so the
+/// invalidation set stays in one place when a new content type needs a
+/// wider one.
+pub(crate) fn invalidate_content_screens(
+    engine: &mut AppEngine,
+    outcome: &crate::content::MobileContentCycleOutcome,
+) {
     crate::cached_content::reload_cached_networks();
     engine.reload_social_networks();
     engine.reload_locales();
     engine.invalidate_screen(&AppScreen::Settings);
     engine.invalidate_screen(&AppScreen::MyInfo);
+    if outcome.refresh_appearance {
+        engine.themes_updated();
+    }
 }

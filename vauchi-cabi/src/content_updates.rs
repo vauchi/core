@@ -11,7 +11,9 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use vauchi_app::content::{ApplyResult, ContentConfig, ContentManager, ContentScheduler};
+use vauchi_app::content::{
+    ApplyResult, ContentConfig, ContentManager, ContentScheduler, ContentType,
+};
 use vauchi_app::ui::AppEngine;
 
 use crate::VauchiApp;
@@ -73,10 +75,12 @@ impl ScheduledCycle {
         })?;
         let manager = manager_wanting(&self.data_dir, Some(wanted), Some(source))?;
         let (_, apply) = manager.run_update_cycle_blocking();
-        let applied = matches!(
-            &apply,
-            Some(Ok(ApplyResult::Applied { applied, .. })) if !applied.is_empty()
-        );
+        let (applied, themes_applied) = match &apply {
+            Some(Ok(ApplyResult::Applied { applied, .. })) => {
+                (!applied.is_empty(), applied.contains(&ContentType::Themes))
+            }
+            _ => (false, false),
+        };
         if applied {
             manager.load_cached_networks_into_registry();
             if let Ok(mut slot) = self.engine.lock()
@@ -84,6 +88,9 @@ impl ScheduledCycle {
             {
                 engine.reload_social_networks();
                 engine.reload_locales();
+                if themes_applied {
+                    engine.themes_updated();
+                }
             }
             let callback = self.callback.lock().ok().and_then(|c| *c);
             if let Some(callback) = callback {

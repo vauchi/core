@@ -20,7 +20,7 @@ use vauchi_core::crypto::signing::PublicKey;
 
 use super::AppEngine;
 use crate::content::{
-    ApplyResult, ContentConfig, ContentManager, ContentScheduler, ContentSourceHandle,
+    ApplyResult, ContentConfig, ContentManager, ContentScheduler, ContentSourceHandle, ContentType,
 };
 
 /// How a direct-engine shell's content updates run.
@@ -55,6 +55,7 @@ pub(super) struct ContentRunner {
     scheduler: ContentScheduler,
     snapshot: Arc<Mutex<Snapshot>>,
     applied: Arc<AtomicBool>,
+    themes_applied: Arc<AtomicBool>,
 }
 
 fn manager(
@@ -89,12 +90,14 @@ impl AppEngine {
         let source = options.source.or_else(|| self.relay_content_source());
         let snapshot = Arc::new(Mutex::new(self.content_snapshot()));
         let applied = Arc::new(AtomicBool::new(false));
+        let themes_applied = Arc::new(AtomicBool::new(false));
         let cycle = ScheduledCycle {
             data_dir: data_dir.to_path_buf(),
             source,
             publisher_public_key: options.publisher_public_key,
             snapshot: Arc::clone(&snapshot),
             applied: Arc::clone(&applied),
+            themes_applied: Arc::clone(&themes_applied),
             events: Arc::clone(self.vauchi.events()),
         };
         let Ok(scheduler) =
@@ -108,6 +111,7 @@ impl AppEngine {
             scheduler,
             snapshot,
             applied,
+            themes_applied,
         });
     }
 
@@ -149,13 +153,17 @@ impl AppEngine {
 
     /// Takes up content a cycle applied since the last entry point.
     pub(super) fn absorb_applied_content(&mut self) {
-        let applied = self
-            .content_runner
-            .as_ref()
-            .is_some_and(|runner| runner.applied.swap(false, Ordering::SeqCst));
+        let Some(runner) = &self.content_runner else {
+            return;
+        };
+        let applied = runner.applied.swap(false, Ordering::SeqCst);
+        let themes_applied = runner.themes_applied.swap(false, Ordering::SeqCst);
         if applied {
             self.reload_social_networks();
             self.reload_locales();
+        }
+        if themes_applied {
+            self.themes_updated();
         }
     }
 }
@@ -166,6 +174,7 @@ struct ScheduledCycle {
     publisher_public_key: Option<PublicKey>,
     snapshot: Arc<Mutex<Snapshot>>,
     applied: Arc<AtomicBool>,
+    themes_applied: Arc<AtomicBool>,
     events: Arc<vauchi_core::api::EventDispatcher>,
 }
 
@@ -186,8 +195,13 @@ impl ScheduledCycle {
             return;
         };
         let (_, apply) = manager.run_update_cycle_blocking();
-        if matches!(&apply, Some(Ok(ApplyResult::Applied { applied, .. })) if !applied.is_empty()) {
+        if let Some(Ok(ApplyResult::Applied { applied, .. })) = &apply
+            && !applied.is_empty()
+        {
             manager.load_cached_networks_into_registry();
+            if applied.contains(&ContentType::Themes) {
+                self.themes_applied.store(true, Ordering::SeqCst);
+            }
             self.applied.store(true, Ordering::SeqCst);
             self.events.dispatch(VauchiEvent::ContentUpdated);
         }

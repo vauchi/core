@@ -448,6 +448,10 @@ pub enum Command {
     PerformNativeBack,
     /// Reset platform-owned application state after Core wiped its data.
     ResetApplication,
+    /// The theme catalog changed: read the selected theme again and apply
+    /// it. Shells apply themes natively, so new themes otherwise wait for
+    /// a restart (vauchi/private#733).
+    ReloadTheme,
     /// Post a fully prepared operating-system notification.
     PostNotification { notification: NotificationSpec },
     /// Run the platform biometric prompt (LAContext, BiometricPrompt) for
@@ -678,6 +682,7 @@ impl Command {
             Self::FinishInvocation { .. } => "FinishInvocation",
             Self::PerformNativeBack => "PerformNativeBack",
             Self::ResetApplication => "ResetApplication",
+            Self::ReloadTheme => "ReloadTheme",
             Self::PostNotification { .. } => "PostNotification",
             Self::RequestBiometricUnlock => "RequestBiometricUnlock",
             Self::ForgetStoredSecret { .. } => "ForgetStoredSecret",

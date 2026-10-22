@@ -61,10 +61,8 @@ fn each_choice_has_a_stable_id_and_an_unknown_id_is_none() {
 // @internal
 #[test]
 fn the_choice_survives_a_round_trip_through_stored_flags() {
-    let flags = SettingsFlags {
-        content_updates: ContentUpdates::WifiOnly,
-        ..SettingsFlags::default()
-    };
+    let mut flags = SettingsFlags::default();
+    flags.content_updates = ContentUpdates::WifiOnly;
 
     let stored = serde_json::to_string(&flags).unwrap();
 

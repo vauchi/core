@@ -6,7 +6,7 @@
 //! Wi-Fi only or Off (vauchi/private#733 D6). The choice is Core's and
 //! survives a restart.
 
-use vauchi_app::ui::{AppEngine, AppScreen, Component, UserAction};
+use vauchi_app::ui::{AppEngine, AppScreen, Component, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
 use vauchi_core::settings::ContentUpdates;
 

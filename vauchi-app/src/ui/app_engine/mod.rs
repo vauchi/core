@@ -117,6 +117,9 @@ pub struct AppEngine {
     /// Transient transport-permission ledger (T2.1b): updated from
     /// `Event::PermissionDenied`, joined with `device_capabilities` by T2.2.
     pub(super) transport_readiness: TransportReadiness,
+    /// What the current network costs, as the shell last reported it
+    /// (vauchi/private#733 D6); unknown until it reports.
+    pub(super) network_cost: vauchi_core::settings::NetworkCost,
     /// Frontend-pushed render context — Category-1 settings per ADR-047
     /// (locale + theme_id). Owned by the frontend's OS-native sandbox;
     /// pushed via `set_render_context_json` at boot and on Settings
@@ -336,6 +339,15 @@ impl AppEngine {
     /// can be told about is attack surface with no benefit.
     pub fn set_local_network_address(&mut self, address: Option<String>) {
         self.local_network_address = address;
+    }
+
+    /// Whether a content update may run now: the person's setting applied
+    /// to the network the shell last reported (vauchi/private#733 D6).
+    pub fn content_updates_allowed(&self) -> bool {
+        self.vauchi
+            .config()
+            .content_updates
+            .allows(self.network_cost)
     }
 
     pub fn device_capabilities(&self) -> &DeviceCapabilities {
@@ -569,6 +581,7 @@ impl AppEngine {
             field_catalog,
             preview_as_contact: None,
             device_capabilities: DeviceCapabilities::default(),
+            network_cost: vauchi_core::settings::NetworkCost::Unknown,
             transport_readiness: TransportReadiness::default(),
             render_context: crate::ui::RenderContext::default(),
             update_status: AppUpdateStatus::UpToDate,

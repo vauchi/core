@@ -85,6 +85,14 @@ impl PlatformAppEngine {
 
             // ── Content Updates (B7 batch 2) ──
             DomainCommand::RunContentUpdateCycle => {
+                if !engine.content_updates_allowed() {
+                    return Ok(DomainCommandResult::ContentUpdateCycle {
+                        outcome: crate::content::content_cycle_outcome(
+                            &crate::content::MobileUpdateStatus::Disabled,
+                            None,
+                        ),
+                    });
+                }
                 let outcome = self.run_content_update_cycle_dispatch();
                 if outcome.applied {
                     invalidate_content_screens(engine);

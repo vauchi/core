@@ -11,6 +11,55 @@ fn default_true() -> bool {
     true
 }
 
+/// When content updates (languages, themes, social networks) run
+/// (vauchi/private#733 D6).
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContentUpdates {
+    #[default]
+    On,
+    WifiOnly,
+    Off,
+}
+
+/// What the current network costs, as the shell reports it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NetworkCost {
+    Unmetered,
+    Metered,
+    #[default]
+    Unknown,
+}
+
+impl ContentUpdates {
+    pub const ALL: [ContentUpdates; 3] = [Self::On, Self::WifiOnly, Self::Off];
+
+    /// Whether an update may run on `network`. An unknown network counts
+    /// as metered, so Wi-Fi only never spends a paid connection by mistake.
+    pub fn allows(self, network: NetworkCost) -> bool {
+        match self {
+            Self::On => true,
+            Self::WifiOnly => network == NetworkCost::Unmetered,
+            Self::Off => false,
+        }
+    }
+
+    /// The opaque id Settings uses for this choice.
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::On => "on",
+            Self::WifiOnly => "wifi_only",
+            Self::Off => "off",
+        }
+    }
+
+    pub fn from_id(id: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|choice| choice.id() == id)
+    }
+}
+
 /// Persisted user settings toggles, the core source of truth for the
 /// three config-backed flags. Encrypted in the `ux_state` table and
 /// self-seeded into `VauchiConfig` on construction so every `Vauchi`
@@ -63,6 +112,9 @@ pub struct SettingsFlags {
     /// 2026-07-05-ungrouped-contacts-default-open).
     #[serde(default)]
     pub first_group_education_shown: bool,
+    /// When content updates run (vauchi/private#733 D6). Defaults to On.
+    #[serde(default)]
+    pub content_updates: ContentUpdates,
 }
 
 impl Default for SettingsFlags {
@@ -77,6 +129,7 @@ impl Default for SettingsFlags {
             show_help_icons: true,
             new_field_default_visible: false,
             first_group_education_shown: false,
+            content_updates: ContentUpdates::On,
         }
     }
 }

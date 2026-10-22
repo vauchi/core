@@ -39,6 +39,7 @@ const EXPECTED_ADVANCED_GROUP_IDS: &[&str] = &[
 
 fn sample_settings_config() -> SettingsConfig {
     SettingsConfig {
+        content_updates: Default::default(),
         display_name: "Sample User".into(),
         delivery_receipts_enabled: true,
         new_field_default_visible: false,

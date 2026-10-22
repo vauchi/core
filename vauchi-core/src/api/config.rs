@@ -86,6 +86,10 @@ pub struct VauchiConfig {
     /// (2026-07-05-ungrouped-contacts-default-open, Decision 2). Self-seeded
     /// from `SettingsFlags`. Default: false.
     pub new_field_default_visible: bool,
+
+    /// When content updates run (vauchi/private#733 D6). Self-seeded from
+    /// `SettingsFlags`. Default: On.
+    pub content_updates: crate::settings::ContentUpdates,
 }
 
 impl Default for VauchiConfig {
@@ -107,6 +111,7 @@ impl Default for VauchiConfig {
             large_touch: false,
             show_help_icons: true,
             new_field_default_visible: false,
+            content_updates: crate::settings::ContentUpdates::On,
         }
     }
 }
@@ -127,6 +132,7 @@ impl crate::types::SettingsFlags {
         self.large_touch = config.large_touch;
         self.show_help_icons = config.show_help_icons;
         self.new_field_default_visible = config.new_field_default_visible;
+        self.content_updates = config.content_updates;
     }
 }
 

@@ -15,6 +15,7 @@ use vauchi_app::ui::{DropdownOption, SettingsConfig, SettingsEngine, WorkflowEng
 
 fn config() -> SettingsConfig {
     SettingsConfig {
+        content_updates: Default::default(),
         display_name: "Sample User".into(),
         delivery_receipts_enabled: true,
         new_field_default_visible: false,

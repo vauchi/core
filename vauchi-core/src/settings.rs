@@ -24,6 +24,7 @@ pub enum ContentUpdates {
 }
 
 /// What the current network costs, as the shell reports it.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NetworkCost {

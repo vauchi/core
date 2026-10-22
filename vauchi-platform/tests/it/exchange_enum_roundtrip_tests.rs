@@ -357,7 +357,7 @@ fn hardware_event_json_carries_every_mobile_event_through_the_canonical_reader()
     let covered: std::collections::BTreeSet<_> = events.iter().map(variant_name).collect();
     assert_eq!(
         covered.len(),
-        32,
+        33,
         "a sample for each MobileEvent variant: {covered:?}"
     );
 

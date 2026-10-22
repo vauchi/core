@@ -169,6 +169,11 @@ impl AppEngine {
             return None;
         }
 
+        if let Event::NetworkCostChanged { cost } = &event {
+            self.network_cost = *cost;
+            return None;
+        }
+
         match &event {
             Event::FilePickedFromUser { bytes, filename } => {
                 return self.handle_file_picked(bytes.clone(), filename.clone());

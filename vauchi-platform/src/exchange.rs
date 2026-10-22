@@ -248,6 +248,26 @@ impl From<Command> for MobileCommand {
 /// `Outbound` when it is the central (it dialed out) and `Inbound` when it is
 /// the peripheral (a peer connected to it). Core derives the handshake role
 /// from this, not from the token tiebreak.
+/// What the current network costs: Wi-Fi or Ethernet is `Unmetered`, a
+/// cellular or hotspot connection `Metered`; `Unknown` when the OS does
+/// not say.
+#[derive(uniffi::Enum, Debug, Clone, Copy)]
+pub enum MobileNetworkCost {
+    Unmetered,
+    Metered,
+    Unknown,
+}
+
+impl From<MobileNetworkCost> for vauchi_core::settings::NetworkCost {
+    fn from(cost: MobileNetworkCost) -> Self {
+        match cost {
+            MobileNetworkCost::Unmetered => Self::Unmetered,
+            MobileNetworkCost::Metered => Self::Metered,
+            MobileNetworkCost::Unknown => Self::Unknown,
+        }
+    }
+}
+
 #[derive(uniffi::Enum, Debug, Clone)]
 pub enum MobileBleLinkDirection {
     Outbound,
@@ -287,6 +307,10 @@ pub enum MobileEvent {
     // interfaces (ADR-030/031).
     LocalNetworkAddressChanged {
         address: Option<String>,
+    },
+    /// What the current network costs (vauchi/private#733 D6).
+    NetworkCostChanged {
+        cost: MobileNetworkCost,
     },
     // BLE
     BleDeviceDiscovered {
@@ -417,6 +441,9 @@ impl From<MobileEvent> for Event {
             MobileEvent::QrScanned { data } => Self::QrScanned { data },
             MobileEvent::LocalNetworkAddressChanged { address } => {
                 Self::LocalNetworkAddressChanged { address }
+            }
+            MobileEvent::NetworkCostChanged { cost } => {
+                Self::NetworkCostChanged { cost: cost.into() }
             }
             MobileEvent::BleDeviceDiscovered { id, rssi, adv_data } => {
                 Self::BleDeviceDiscovered { id, rssi, adv_data }

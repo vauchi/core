@@ -10,6 +10,7 @@ mod cache_tests;
 mod chosen_locales_tests;
 mod compressed_cache_tests;
 mod config_tests;
+mod content_source_tests;
 mod integrity_tests;
 mod listed_locales_tests;
 mod manager_tests;

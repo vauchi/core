@@ -22,6 +22,7 @@ fn language_options() -> Vec<(String, String)> {
             Component::Dropdown { id, options, .. } if id == "language" => Some(
                 options
                     .iter()
+                    .filter(|o| o.id != "follow_system")
                     .map(|o| (o.id.clone(), o.label.clone()))
                     .collect(),
             ),

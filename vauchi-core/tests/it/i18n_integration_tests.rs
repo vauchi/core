@@ -44,6 +44,7 @@ fn ensure_init() {
 // @scenario: internationalization :: Core languages are supported
 #[test]
 fn test_all_target_locales_available() {
+    ensure_init();
     let locales = get_available_locales();
 
     assert!(locales.contains(&Locale::ENGLISH), "Should have English");

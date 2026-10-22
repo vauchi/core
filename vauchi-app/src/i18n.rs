@@ -170,9 +170,51 @@ fn has_loaded_strings(locale: Locale) -> bool {
         .unwrap_or(false)
 }
 
-/// Get all available locales
+/// The languages Settings offers: English, every language whose loaded
+/// file has a usable `_meta`, and every language the trusted manifest
+/// lists, before its file arrives (vauchi/private#733 D3). English leads,
+/// the rest follow by code. A right-to-left language is left out while no
+/// frontend mirrors its layout (the RTL canary in i18n_integration_tests).
 pub fn get_available_locales() -> Vec<Locale> {
-    SHELL_BUNDLED_LOCALES.to_vec()
+    let loaded: Vec<Locale> = LOCALE_META
+        .read()
+        .ok()
+        .and_then(|lock| {
+            lock.as_ref()
+                .map(|meta| meta.keys().filter_map(|code| exact_locale(code)).collect())
+        })
+        .unwrap_or_default();
+    let listed = LISTED_LOCALES
+        .read()
+        .map(|lock| lock.clone())
+        .unwrap_or_default();
+    let mut others: Vec<Locale> = loaded
+        .into_iter()
+        .chain(listed)
+        .filter(|&locale| locale != Locale::ENGLISH && !get_locale_info(locale).is_rtl)
+        .collect();
+    others.sort_by(|a, b| a.code().cmp(b.code()));
+    others.dedup();
+    std::iter::once(Locale::ENGLISH).chain(others).collect()
+}
+
+/// Codes the trusted cached manifest lists in its locales entry.
+static LISTED_LOCALES: RwLock<Vec<Locale>> = RwLock::new(Vec::new());
+
+/// Record the codes the trusted cached manifest lists, so Settings offers
+/// them before their files arrive. An entry that is not exactly a language
+/// code is ignored (DC-01).
+pub fn set_listed_locales<'a>(codes: impl IntoIterator<Item = &'a str>) {
+    let listed = codes.into_iter().filter_map(exact_locale).collect();
+    if let Ok(mut lock) = LISTED_LOCALES.write() {
+        *lock = listed;
+    }
+}
+
+/// The locale whose code is exactly `code`; a file or manifest entry named
+/// `pt-BR` names no locale, since a locale holds only the language subtag.
+fn exact_locale(code: &str) -> Option<Locale> {
+    Locale::from_code(code).filter(|locale| locale.code() == code)
 }
 
 /// Get a localized string by key
@@ -614,9 +656,16 @@ mod tests {
     }
 
     #[test]
-    fn test_available_locales() {
-        let locales = get_available_locales();
-        assert_eq!(locales.len(), 5);
+    fn the_bundled_locale_files_are_offered_with_english_first() {
+        let _guard = store_guard();
+        reset_store();
+
+        let codes: Vec<String> = get_available_locales()
+            .iter()
+            .map(|l| l.code().to_string())
+            .collect();
+
+        assert_eq!(codes, ["en", "de", "es", "fr", "it"]);
     }
 
     #[test]

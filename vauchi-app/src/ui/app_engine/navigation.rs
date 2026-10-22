@@ -392,10 +392,14 @@ impl AppEngine {
     /// `ContactEdit` is a form like `FormDialog`: a cached engine would
     /// reopen on the last visit's draft and its Save/Discard exit instead
     /// of what is stored (#451).
+    /// `Privacy` holds a verified export: a cached engine reopened on the
+    /// format choice without asking again, for whoever picked the phone up
+    /// later (#750).
     fn is_cacheable(screen: &AppScreen) -> bool {
         !matches!(
             screen,
             AppScreen::Lock
+                | AppScreen::Privacy
                 | AppScreen::FormDialog { .. }
                 | AppScreen::ContactEdit { .. }
                 | AppScreen::DeepLinkConsent { .. }

@@ -80,6 +80,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   and is retried; a cached one that does not load at start is dropped
   and downloads again (vauchi/private#747).
 
+### Security
+
+- Leaving a verified data export ends it: reopening Privacy, or Back
+  from an export step, returns to the Privacy overview, and the next
+  export asks for the app password or the OS check again. Before, a
+  cached Privacy screen reopened on the format choice with no new check
+  (vauchi/private#750).
+
 ## [0.85.0] — 2026-10-21
 
 ### Added

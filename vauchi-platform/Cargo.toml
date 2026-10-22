@@ -14,13 +14,11 @@ crate-type = ["cdylib", "staticlib", "lib"]
 name = "vauchi_platform"
 
 [features]
-default = ["async-sync", "content-updates"]
-# Async sync — runs sync in background thread via tokio::spawn_blocking
-async-sync = ["tokio"]
+default = ["content-updates"]
 # Enable remote content updates (networks, locales, themes).
 # Default-on so mobile bindings expose check_content_updates() / apply_content_updates()
 # instead of silently returning Disabled. Gate 2 of frontend architecture audit (2026-03-18).
-content-updates = ["vauchi-app/content-updates", "tokio"]
+content-updates = ["vauchi-app/content-updates"]
 # Diagnostic QR preprocessing pipeline (imageproc, fast_image_resize, CLAHE,
 # adaptive threshold, unsharp mask). Gates the `diagnostic_scan_qr_with_config`
 # UniFFI export. NOT in defaults — production mobile scanner uses rxing/rqrr
@@ -49,9 +47,6 @@ dev-logging = ["dep:tracing-subscriber", "dep:tracing-oslog", "dep:ndk-sys"]
 # Note: version required for `cargo package` (path used for local dev, version for published crate)
 vauchi-core = { workspace = true, default-features = false, features = ["network-rustls", "network-http"] }
 vauchi-app = { workspace = true, default-features = false, features = ["network-rustls", "network-http"] }
-
-# Async runtime for content updates and async sync (optional)
-tokio = { version = "1.0", features = ["rt-multi-thread", "net", "time"], optional = true }
 
 # UniFFI for cross-language bindings (tokio feature enables async export support)
 uniffi = { version = "0.31", features = ["cli", "tokio"] }

@@ -403,6 +403,20 @@ impl WorkflowEngine for GdprEngine {
         self.build_screen()
     }
 
+    fn can_navigate_back_within(&self) -> bool {
+        self.in_export()
+    }
+
+    /// Back from any export step ends the export on the overview (#750).
+    fn navigate_back_within(&mut self) -> bool {
+        if !self.in_export() {
+            return false;
+        }
+        self.abandon_export();
+        self.step = GdprStep::Overview;
+        true
+    }
+
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         if let Some(result) = self.handle_export_step(&action) {
             return result;

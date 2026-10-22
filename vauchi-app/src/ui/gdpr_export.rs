@@ -30,6 +30,18 @@ impl GdprEngine {
         ActionResult::NavigateTo(self.build_screen())
     }
 
+    pub(super) fn in_export(&self) -> bool {
+        matches!(
+            self.step,
+            GdprStep::ConfirmExportPin
+                | GdprStep::ExportNeedsAppPassword
+                | GdprStep::ExportAwaitPresence
+                | GdprStep::ChooseExportFormat
+                | GdprStep::ExportPassword
+                | GdprStep::ReadableExportWarning
+        )
+    }
+
     pub(super) fn abandon_export(&mut self) {
         self.pending_export = None;
         self.entered_pin.clear();

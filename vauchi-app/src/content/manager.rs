@@ -180,6 +180,7 @@ impl ContentManager {
     /// loads each into the i18n store via `i18n::load_locale_from_bytes()`.
     /// Called at startup AFTER `i18n::init()` to overlay CDN-cached versions.
     pub fn load_cached_locales_into_i18n(&self) {
+        self.publish_listed_locales();
         let locales_dir = self.cache.content_dir(ContentType::Locales);
         if !locales_dir.exists() {
             return;
@@ -335,6 +336,7 @@ impl ContentManager {
 
         if self.can_cache_manifest(&remote, &applied) {
             self.cache.save_manifest(&remote)?;
+            self.publish_listed_locales();
         }
         // best-effort: see check_for_updates rationale
         #[allow(clippy::let_underscore_must_use)]
@@ -411,6 +413,21 @@ impl ContentManager {
             version_compare(app_version, min_version),
             Some(std::cmp::Ordering::Equal | std::cmp::Ordering::Greater)
         )
+    }
+
+    /// The language codes the trusted cached manifest lists in its locales
+    /// entry; Settings offers them before their files arrive
+    /// (vauchi/private#733 D3).
+    pub fn listed_locale_codes(&self) -> Vec<String> {
+        self.trusted_cached_manifest()
+            .and_then(|manifest| manifest.content.locales)
+            .map(|locales| locales.files.into_keys().collect())
+            .unwrap_or_default()
+    }
+
+    fn publish_listed_locales(&self) {
+        let codes = self.listed_locale_codes();
+        crate::i18n::set_listed_locales(codes.iter().map(String::as_str));
     }
 
     fn trusted_cached_manifest(&self) -> Option<ContentManifest> {

@@ -51,6 +51,7 @@ mod ble_handshake_machine_tests;
 mod ble_pair_fault_gate_tests;
 mod canonical_screen_id_tests;
 mod cdn_language_options_tests;
+mod cdn_language_pick_tests;
 mod cdn_theme_options_tests;
 mod component_serialization_tests;
 mod contact_detail_engine_tests;

@@ -14,3 +14,4 @@ mod listed_locales_tests;
 mod manager_tests;
 mod registry_integration_tests;
 mod types_tests;
+mod update_cycle_tests;

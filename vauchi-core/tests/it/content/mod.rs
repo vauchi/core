@@ -9,6 +9,7 @@
 mod cache_tests;
 mod config_tests;
 mod integrity_tests;
+mod listed_locales_tests;
 mod manager_tests;
 mod registry_integration_tests;
 mod types_tests;

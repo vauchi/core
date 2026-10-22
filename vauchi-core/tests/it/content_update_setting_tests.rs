@@ -73,3 +73,18 @@ fn the_choice_survives_a_round_trip_through_stored_flags() {
         ContentUpdates::WifiOnly
     );
 }
+
+/// Updates while the app is in the background are a choice of their own
+/// (owner, 2026-10-22), on unless switched off, also for flags stored
+/// before the choice existed.
+// @internal
+#[test]
+fn background_updates_are_on_unless_switched_off() {
+    assert!(SettingsFlags::default().content_updates_in_background);
+    let stored_before_the_setting_existed: SettingsFlags = serde_json::from_str("{}").unwrap();
+    assert!(stored_before_the_setting_existed.content_updates_in_background);
+
+    let stored_off: SettingsFlags =
+        serde_json::from_str(r#"{"content_updates_in_background":false}"#).unwrap();
+    assert!(!stored_off.content_updates_in_background);
+}

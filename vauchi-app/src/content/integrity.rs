@@ -324,6 +324,9 @@ mod tests {
                 path: "en.json".to_string(),
                 checksum: "sha256:aaa".to_string(),
                 size_bytes: 1000,
+                name: None,
+                english_name: None,
+                is_rtl: None,
             },
         );
         files.insert(
@@ -332,6 +335,9 @@ mod tests {
                 path: "de.json".to_string(),
                 checksum: "sha256:bbb".to_string(),
                 size_bytes: 1100,
+                name: None,
+                english_name: None,
+                is_rtl: None,
             },
         );
         files.insert(
@@ -340,6 +346,9 @@ mod tests {
                 path: "fr.json".to_string(),
                 checksum: "sha256:ccc".to_string(),
                 size_bytes: 1200,
+                name: None,
+                english_name: None,
+                is_rtl: None,
             },
         );
 

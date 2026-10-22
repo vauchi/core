@@ -95,6 +95,16 @@ pub struct FileEntry {
     pub checksum: String,
     /// File size in bytes
     pub size_bytes: u64,
+    /// For a locale file: the language's name in itself, so Settings names
+    /// it before the file is fetched (vauchi/private#733 D7)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// For a locale file: the language's name in English
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub english_name: Option<String>,
+    /// For a locale file: whether the language is written right to left
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_rtl: Option<bool>,
 }
 
 /// Update check result

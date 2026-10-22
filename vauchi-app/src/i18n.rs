@@ -114,6 +114,7 @@ pub struct LocaleInfo {
 /// code (vauchi/private#733 D2, G2).
 pub fn get_locale_info(locale: Locale) -> LocaleInfo {
     loaded_locale_info(locale)
+        .or_else(|| listed_locale_info(locale))
         .or_else(|| {
             (locale == Locale::ENGLISH)
                 .then(bundled_english_info)
@@ -190,9 +191,9 @@ pub fn get_available_locales() -> Vec<Locale> {
                 .map(|meta| meta.keys().filter_map(|code| exact_locale(code)).collect())
         })
         .unwrap_or_default();
-    let listed = LISTED_LOCALES
+    let listed: Vec<Locale> = LISTED_LOCALES
         .read()
-        .map(|lock| lock.clone())
+        .map(|lock| lock.iter().map(|(locale, _)| *locale).collect())
         .unwrap_or_default();
     let mut others: Vec<Locale> = loaded
         .into_iter()
@@ -204,17 +205,63 @@ pub fn get_available_locales() -> Vec<Locale> {
     std::iter::once(Locale::ENGLISH).chain(others).collect()
 }
 
-/// Codes the trusted cached manifest lists in its locales entry.
-static LISTED_LOCALES: RwLock<Vec<Locale>> = RwLock::new(Vec::new());
+/// A language the trusted manifest lists, with the names it gives.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ListedLocale {
+    pub code: String,
+    pub name: Option<String>,
+    pub english_name: Option<String>,
+    pub is_rtl: bool,
+}
 
-/// Record the codes the trusted cached manifest lists, so Settings offers
-/// them before their files arrive. An entry that is not exactly a language
-/// code is ignored (DC-01).
-pub fn set_listed_locales<'a>(codes: impl IntoIterator<Item = &'a str>) {
-    let listed = codes.into_iter().filter_map(exact_locale).collect();
+impl From<&str> for ListedLocale {
+    fn from(code: &str) -> Self {
+        ListedLocale {
+            code: code.to_string(),
+            ..ListedLocale::default()
+        }
+    }
+}
+
+/// The languages the trusted cached manifest lists, each with its names
+/// when they pass the same checks as a file's `_meta`.
+static LISTED_LOCALES: RwLock<Vec<(Locale, Option<LocaleInfo>)>> = RwLock::new(Vec::new());
+
+/// Record the languages the trusted cached manifest lists, so Settings
+/// offers and names them before their files arrive (vauchi/private#733 D3,
+/// D7). An entry that is not exactly a language code is ignored, and
+/// unusable names leave the language named by its code (DC-01).
+pub fn set_listed_locales(entries: impl IntoIterator<Item = impl Into<ListedLocale>>) {
+    let listed = entries
+        .into_iter()
+        .map(Into::into)
+        .filter_map(|entry| {
+            let locale = exact_locale(&entry.code)?;
+            let info = match (entry.name, entry.english_name) {
+                (Some(name), Some(english_name)) => RawLocaleMeta {
+                    locale: entry.code,
+                    name,
+                    english_name,
+                    is_rtl: entry.is_rtl,
+                }
+                .into_info(locale.code()),
+                _ => None,
+            };
+            Some((locale, info))
+        })
+        .collect();
     if let Ok(mut lock) = LISTED_LOCALES.write() {
         *lock = listed;
     }
+}
+
+fn listed_locale_info(locale: Locale) -> Option<LocaleInfo> {
+    LISTED_LOCALES
+        .read()
+        .ok()?
+        .iter()
+        .find(|(listed, _)| *listed == locale)
+        .and_then(|(_, info)| info.clone())
 }
 
 /// The locale whose code is exactly `code`; a file or manifest entry named

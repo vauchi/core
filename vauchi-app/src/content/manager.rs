@@ -426,8 +426,19 @@ impl ContentManager {
     }
 
     fn publish_listed_locales(&self) {
-        let codes = self.listed_locale_codes();
-        crate::i18n::set_listed_locales(codes.iter().map(String::as_str));
+        let listed = self
+            .trusted_cached_manifest()
+            .and_then(|manifest| manifest.content.locales)
+            .map(|locales| locales.files)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(code, file)| crate::i18n::ListedLocale {
+                code,
+                name: file.name,
+                english_name: file.english_name,
+                is_rtl: file.is_rtl.unwrap_or(false),
+            });
+        crate::i18n::set_listed_locales(listed);
     }
 
     fn trusted_cached_manifest(&self) -> Option<ContentManifest> {

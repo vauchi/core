@@ -206,6 +206,69 @@ fn a_wrong_app_password_keeps_the_enrolment() {
     assert!(engine.vauchi().has_user_presence_secret().unwrap());
 }
 
+fn verified_by_presence(engine: &mut AppEngine) {
+    enrolled(engine);
+    let _ = press(engine, "export");
+    let _ = presence_request(engine);
+    let _ = engine.handle_hardware_event(Event::UserPresenceSecretRevealed {
+        secret: SECRET.to_vec().into(),
+    });
+    assert_eq!(screen_id(engine), "export_choose_format");
+}
+
+fn leave_and_return(engine: &mut AppEngine) {
+    engine.navigate_to(AppScreen::Settings);
+    engine.navigate_to(AppScreen::Privacy);
+    let _ = engine.drain_pending_commands();
+}
+
+// Whoever picks the phone up after the user walked away from a verified
+// export is asked again (#750, owner decision 2026-10-22).
+// @internal
+#[test]
+fn leaving_a_verified_export_asks_again_on_return() {
+    let mut engine = privacy_screen(true);
+    verified_by_presence(&mut engine);
+
+    leave_and_return(&mut engine);
+
+    assert_eq!(screen_id(&engine), "privacy_settings");
+    let _ = press(&mut engine, "export");
+    assert!(matches!(
+        presence_request(&mut engine),
+        Some(Command::RevealUserPresenceSecret { .. })
+    ));
+}
+
+// @internal
+#[test]
+fn leaving_after_the_app_password_asks_for_it_again() {
+    let mut engine = privacy_screen(false);
+    with_app_password(&mut engine);
+    export_with_pin(&mut engine, APP_PIN);
+    assert_eq!(screen_id(&engine), "export_choose_format");
+
+    leave_and_return(&mut engine);
+
+    assert_eq!(screen_id(&engine), "privacy_settings");
+    let _ = press(&mut engine, "export");
+    assert_eq!(screen_id(&engine), "export_confirm_pin");
+}
+
+// @internal
+#[test]
+fn back_from_the_format_choice_returns_to_privacy_and_ends_the_export() {
+    let mut engine = privacy_screen(true);
+    verified_by_presence(&mut engine);
+
+    let _ = engine.navigate_back();
+
+    assert!(matches!(engine.current_app_screen(), AppScreen::Privacy));
+    assert_eq!(screen_id(&engine), "privacy_settings");
+    let _ = press(&mut engine, "export");
+    assert_eq!(screen_id(&engine), "export_await_presence");
+}
+
 // @scenario: privacy_compliance :: Export asks me to set an app password when nothing else can check it is me
 #[test]
 fn without_the_capability_export_still_asks_for_an_app_password() {

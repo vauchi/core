@@ -110,25 +110,31 @@ pub struct LocaleInfo {
 }
 
 /// Get information about a locale: from its loaded file's `_meta` when
-/// that is usable, else by its code (vauchi/private#733 D2).
+/// that is usable (for English, also the copy Core embeds), else by its
+/// code (vauchi/private#733 D2, G2).
 pub fn get_locale_info(locale: Locale) -> LocaleInfo {
-    if let Some(info) = loaded_locale_info(locale) {
-        return info;
-    }
-    let (name, english_name) = match locale.code() {
-        "en" => ("English", "English"),
-        "de" => ("Deutsch", "German"),
-        "fr" => ("Français", "French"),
-        "es" => ("Español", "Spanish"),
-        "it" => ("Italiano", "Italian"),
-        code => (code, code),
-    };
-    LocaleInfo {
-        code: locale.code().to_string(),
-        name: name.to_string(),
-        english_name: english_name.to_string(),
-        is_rtl: false,
-    }
+    loaded_locale_info(locale)
+        .or_else(|| {
+            (locale == Locale::ENGLISH)
+                .then(bundled_english_info)
+                .flatten()
+        })
+        .unwrap_or_else(|| LocaleInfo {
+            code: locale.code().to_string(),
+            name: locale.code().to_string(),
+            english_name: locale.code().to_string(),
+            is_rtl: false,
+        })
+}
+
+fn bundled_english_info() -> Option<LocaleInfo> {
+    static INFO: std::sync::OnceLock<Option<LocaleInfo>> = std::sync::OnceLock::new();
+    INFO.get_or_init(|| {
+        parse_locale_file("en", BUNDLED_EN_JSON.as_bytes())
+            .ok()
+            .and_then(|(_, info)| info)
+    })
+    .clone()
 }
 
 fn loaded_locale_info(locale: Locale) -> Option<LocaleInfo> {

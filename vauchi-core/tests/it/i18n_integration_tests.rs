@@ -88,6 +88,7 @@ fn test_locale_from_code() {
 // @scenario: internationalization :: Available languages are listed
 #[test]
 fn test_locale_info() {
+    ensure_init();
     let info = get_locale_info(Locale::GERMAN);
     assert_eq!(info.code, "de");
     assert_eq!(info.name, "Deutsch");

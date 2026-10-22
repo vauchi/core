@@ -62,7 +62,7 @@ impl AppEngine {
         } = action
             && matches!(
                 component_id.as_str(),
-                "privacy" | "accessibility" | "appearance"
+                "privacy" | "accessibility" | "appearance" | "content"
             )
         {
             let config = self.vauchi.config_mut();
@@ -86,6 +86,10 @@ impl AppEngine {
                 }
                 "large_touch" => {
                     config.large_touch = !config.large_touch;
+                }
+                "content_updates_in_background" => {
+                    config.content_updates_in_background = !config.content_updates_in_background;
+                    self.refresh_content_snapshot();
                 }
                 "show_help_icons" => {
                     config.show_help_icons = !config.show_help_icons;

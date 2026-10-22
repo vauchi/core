@@ -296,7 +296,7 @@ fn advanced_screen_keeps_every_row_the_canvas_dropped() {
     assert_eq!(
         sections,
         vec![
-            "security", "backup", "network", "delivery", "about", "danger"
+            "security", "backup", "network", "content", "delivery", "about", "danger"
         ],
         "danger stays last, far from the thumb"
     );

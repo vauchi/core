@@ -116,6 +116,11 @@ pub struct SettingsFlags {
     /// When content updates run (vauchi/private#733 D6). Defaults to On.
     #[serde(default)]
     pub content_updates: ContentUpdates,
+    /// Content updates also run while the app is in the background
+    /// (owner, 2026-10-22). Defaults to true; `default_true` keeps flags
+    /// stored before this field existed updating in the background.
+    #[serde(default = "default_true")]
+    pub content_updates_in_background: bool,
 }
 
 impl Default for SettingsFlags {
@@ -131,6 +136,7 @@ impl Default for SettingsFlags {
             new_field_default_visible: false,
             first_group_education_shown: false,
             content_updates: ContentUpdates::On,
+            content_updates_in_background: true,
         }
     }
 }

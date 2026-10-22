@@ -90,6 +90,10 @@ pub struct VauchiConfig {
     /// When content updates run (vauchi/private#733 D6). Self-seeded from
     /// `SettingsFlags`. Default: On.
     pub content_updates: crate::settings::ContentUpdates,
+
+    /// Content updates also run while the app is in the background.
+    /// Self-seeded from `SettingsFlags`. Default: true.
+    pub content_updates_in_background: bool,
 }
 
 impl Default for VauchiConfig {
@@ -112,6 +116,7 @@ impl Default for VauchiConfig {
             show_help_icons: true,
             new_field_default_visible: false,
             content_updates: crate::settings::ContentUpdates::On,
+            content_updates_in_background: true,
         }
     }
 }
@@ -133,6 +138,7 @@ impl crate::types::SettingsFlags {
         self.show_help_icons = config.show_help_icons;
         self.new_field_default_visible = config.new_field_default_visible;
         self.content_updates = config.content_updates;
+        self.content_updates_in_background = config.content_updates_in_background;
     }
 }
 

@@ -238,6 +238,7 @@ impl AppEngine {
                     large_touch: vauchi.config().large_touch,
                     show_help_icons: vauchi.config().show_help_icons,
                     content_updates: vauchi.config().content_updates,
+                    content_updates_in_background: vauchi.config().content_updates_in_background,
                     // Core/binding semver. Frontends may eventually pass their
                     // own app version + build hash through SettingsConfig —
                     // until then, every frontend renders the binding semver

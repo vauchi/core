@@ -66,6 +66,8 @@ pub struct SettingsConfig {
     /// When content updates run (vauchi/private#733 D6).
     #[serde(default)]
     pub content_updates: vauchi_core::settings::ContentUpdates,
+    #[serde(default = "default_true")]
+    pub content_updates_in_background: bool,
 }
 
 fn default_true() -> bool {
@@ -185,6 +187,7 @@ impl SettingsEngine {
             self.backup_group(),
             self.network_group(),
             self.content_updates_dropdown(),
+            self.content_group(),
             self.delivery_group(),
             self.about_group(),
             self.danger_group(),
@@ -211,6 +214,9 @@ impl SettingsEngine {
             ("accessibility", "reduce_motion") => config.reduce_motion = !config.reduce_motion,
             ("accessibility", "large_touch") => config.large_touch = !config.large_touch,
             ("appearance", "show_help_icons") => config.show_help_icons = !config.show_help_icons,
+            ("content", "content_updates_in_background") => {
+                config.content_updates_in_background = !config.content_updates_in_background;
+            }
             ("about", "debug_mode") => config.debug_mode = !config.debug_mode,
             _ => {}
         }

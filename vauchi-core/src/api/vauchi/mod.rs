@@ -375,6 +375,7 @@ impl Vauchi {
             config.show_help_icons = flags.show_help_icons;
             config.new_field_default_visible = flags.new_field_default_visible;
             config.content_updates = flags.content_updates;
+            config.content_updates_in_background = flags.content_updates_in_background;
         }
         // Seed the persisted relay URL, but only when the caller left the
         // built-in default — an explicit `with_relay_url` (desktop

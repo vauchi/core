@@ -364,12 +364,13 @@ impl AppEngine {
     }
 
     /// Whether a content update may run now: the person's setting applied
-    /// to the network the shell last reported (vauchi/private#733 D6).
+    /// to the network the shell last reported (vauchi/private#733 D6),
+    /// and, while the app is not in the foreground, their background
+    /// choice.
     pub fn content_updates_allowed(&self) -> bool {
-        self.vauchi
-            .config()
-            .content_updates
-            .allows(self.network_cost)
+        let config = self.vauchi.config();
+        config.content_updates.allows(self.network_cost)
+            && (self.in_foreground || config.content_updates_in_background)
     }
 
     pub fn device_capabilities(&self) -> &DeviceCapabilities {

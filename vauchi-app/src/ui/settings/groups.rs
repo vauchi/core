@@ -320,6 +320,20 @@ impl SettingsEngine {
         }
     }
 
+    pub(super) fn content_group(&self) -> Component {
+        Component::SettingsGroup {
+            id: "content".into(),
+            label: self.t("settings.content_updates"),
+            items: vec![self.toggle_row(
+                "content_updates_in_background",
+                "settings.content_updates_in_background",
+                self.config.content_updates_in_background,
+                self.generic_toggle_label("settings.content_updates_in_background"),
+                "settings.content_updates_in_background_hint",
+            )],
+        }
+    }
+
     pub(super) fn accessibility_group(&self) -> Component {
         Component::SettingsGroup {
             id: "accessibility".into(),

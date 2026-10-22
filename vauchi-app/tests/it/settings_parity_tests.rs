@@ -34,12 +34,13 @@ use vauchi_core::api::Vauchi;
 const EXPECTED_SETTINGS_GROUP_IDS: &[&str] = &["identity", "privacy", "app"];
 
 const EXPECTED_ADVANCED_GROUP_IDS: &[&str] = &[
-    "security", "backup", "network", "delivery", "about", "danger",
+    "security", "backup", "network", "content", "delivery", "about", "danger",
 ];
 
 fn sample_settings_config() -> SettingsConfig {
     SettingsConfig {
         content_updates: Default::default(),
+        content_updates_in_background: true,
         display_name: "Sample User".into(),
         delivery_receipts_enabled: true,
         new_field_default_visible: false,

@@ -170,6 +170,21 @@ fn nfc_failed_roundtrips_through_mobile_enum() {
     );
 }
 
+// @internal
+#[test]
+fn network_cost_changed_roundtrips_through_mobile_enum() {
+    use vauchi_core::settings::NetworkCost;
+    use vauchi_platform::MobileNetworkCost;
+    for (mobile, core) in [
+        (MobileNetworkCost::Unmetered, NetworkCost::Unmetered),
+        (MobileNetworkCost::Metered, NetworkCost::Metered),
+        (MobileNetworkCost::Unknown, NetworkCost::Unknown),
+    ] {
+        let event: Event = MobileEvent::NetworkCostChanged { cost: mobile }.into();
+        assert_eq!(event, Event::NetworkCostChanged { cost: core });
+    }
+}
+
 /// One sample of every `MobileEvent` variant. The exhaustive match in
 /// `variant_name` has no wildcard arm, so a new variant does not compile
 /// until it has a sample here.
@@ -183,6 +198,9 @@ fn every_mobile_event() -> Vec<MobileEvent> {
             address: Some("192.0.2.7".into()),
         },
         MobileEvent::LocalNetworkAddressChanged { address: None },
+        MobileEvent::NetworkCostChanged {
+            cost: vauchi_platform::MobileNetworkCost::Unmetered,
+        },
         MobileEvent::BleDeviceDiscovered {
             id: "d1".into(),
             rssi: -61,
@@ -295,6 +313,7 @@ fn variant_name(event: &MobileEvent) -> &'static str {
     match event {
         MobileEvent::QrScanned { .. } => "QrScanned",
         MobileEvent::LocalNetworkAddressChanged { .. } => "LocalNetworkAddressChanged",
+        MobileEvent::NetworkCostChanged { .. } => "NetworkCostChanged",
         MobileEvent::BleDeviceDiscovered { .. } => "BleDeviceDiscovered",
         MobileEvent::BleConnected { .. } => "BleConnected",
         MobileEvent::BleCharacteristicRead { .. } => "BleCharacteristicRead",

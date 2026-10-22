@@ -26,6 +26,7 @@ mod event_notifier_tests;
 mod glance_displayed_code_tests;
 mod glance_failed_screen_tests;
 mod glance_manual_code_entry_tests;
+mod network_cost_tests;
 mod schedule_wakeup_tests;
 // The multi-stage half needs FakeClock (gated inside the file); the
 // BLE half runs featureless.

@@ -29,6 +29,7 @@
 use serde::{Deserialize, Serialize};
 
 mod event_json;
+pub mod executor;
 mod presentation;
 
 pub use event_json::{

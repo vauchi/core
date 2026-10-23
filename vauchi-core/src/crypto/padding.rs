@@ -213,6 +213,21 @@ mod tests {
     }
 
     #[test]
+    fn test_unpad_rejects_length_prefix_near_u32_max_at_every_buffer_size() {
+        for declared_len in [u32::MAX - 3, u32::MAX - 1, u32::MAX] {
+            for buffer_len in [LENGTH_PREFIX_SIZE, 8, BUCKET_SMALL, BUCKET_LARGE] {
+                let mut padded = vec![0u8; buffer_len];
+                padded[..LENGTH_PREFIX_SIZE].copy_from_slice(&declared_len.to_be_bytes());
+                assert_eq!(
+                    unpad(&padded),
+                    None,
+                    "declared_len={declared_len:#x} buffer_len={buffer_len}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn test_all_bucket_sizes_are_consistent() {
         for size in 0..=252 {
             let plaintext = vec![0u8; size];

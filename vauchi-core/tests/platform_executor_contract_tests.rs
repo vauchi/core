@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::num::NonZeroUsize;
-use vauchi_core::platform::executor::{DeliveryError, EventInbox, InboxLimits};
+use vauchi_core::platform::executor::{DeliveryError, EventInbox, InboxLimits, RejectedEvent};
 use vauchi_core::{BleLinkDirection, Event};
 
 fn inbox(operations: usize, events: usize, bytes: usize) -> EventInbox {
@@ -48,7 +48,10 @@ fn test_cancel_discards_buffered_events_and_rejects_late_callbacks() {
     let replacement = inbox.start().unwrap();
     assert_eq!(
         cancelled.publish(found("late")),
-        Err(DeliveryError::Cancelled)
+        Err(RejectedEvent {
+            reason: DeliveryError::Inactive,
+            event: found("late")
+        })
     );
     assert_eq!(replacement.publish(found("replacement")), Ok(()));
     assert_eq!(inbox.pop(), Some(found("current")));
@@ -65,7 +68,10 @@ fn test_cancel_before_first_callback_is_idempotent() {
     operation.cancel();
     assert_eq!(
         operation.publish(found("late")),
-        Err(DeliveryError::Cancelled)
+        Err(RejectedEvent {
+            reason: DeliveryError::Inactive,
+            event: found("late")
+        })
     );
     assert_eq!(inbox.pop(), None);
     let replacement = inbox.start().unwrap();
@@ -80,7 +86,13 @@ fn test_full_inbox_reports_backpressure_without_replacing_accepted_events() {
     let operation = inbox.start().unwrap();
     assert_eq!(inbox.start().err(), Some(DeliveryError::Full));
     assert_eq!(operation.publish(found("first")), Ok(()));
-    assert_eq!(operation.publish(found("second")), Err(DeliveryError::Full));
+    assert_eq!(
+        operation.publish(found("second")),
+        Err(RejectedEvent {
+            reason: DeliveryError::Full,
+            event: found("second")
+        })
+    );
     assert_eq!(inbox.pop(), Some(found("first")));
     assert_eq!(operation.publish(found("second")), Ok(()));
     assert_eq!(inbox.pop(), Some(found("second")));
@@ -97,8 +109,11 @@ fn test_payload_limit_is_inclusive_and_rejection_does_not_consume_capacity() {
     let mut smaller = inbox(1, 1, size - 1);
     let operation = smaller.start().unwrap();
     assert_eq!(
-        operation.publish(event),
-        Err(DeliveryError::PayloadTooLarge)
+        operation.publish(event.clone()),
+        Err(RejectedEvent {
+            reason: DeliveryError::PayloadTooLarge,
+            event
+        })
     );
     let short = Event::HardwareUnavailable {
         transport: "BLE".into(),
@@ -116,7 +131,13 @@ fn test_shutdown_discards_pending_events_and_closes_existing_and_new_producers()
     inbox.close();
     inbox.close();
     assert_eq!(inbox.pop(), None);
-    assert_eq!(operation.publish(found("late")), Err(DeliveryError::Closed));
+    assert_eq!(
+        operation.publish(found("late")),
+        Err(RejectedEvent {
+            reason: DeliveryError::Closed,
+            event: found("late")
+        })
+    );
     assert_eq!(inbox.start().err(), Some(DeliveryError::Closed));
 }
 
@@ -127,7 +148,13 @@ fn test_dropping_inbox_closes_callbacks_without_retaining_queued_payloads() {
         let mut inbox = inbox(1, 1, 1024);
         inbox.start().unwrap()
     };
-    assert_eq!(operation.publish(found("late")), Err(DeliveryError::Closed));
+    assert_eq!(
+        operation.publish(found("late")),
+        Err(RejectedEvent {
+            reason: DeliveryError::Closed,
+            event: found("late")
+        })
+    );
 }
 
 // @scenario: contact_exchange.feature :: Discover nearby Vauchi users via BLE
@@ -171,8 +198,46 @@ fn test_cancelled_callback_on_another_thread_cannot_reach_a_replacement_operatio
     operation.cancel();
     let replacement = inbox.start().unwrap();
     release.send(()).unwrap();
-    assert_eq!(worker.join().unwrap(), Err(DeliveryError::Cancelled));
+    assert_eq!(
+        worker.join().unwrap(),
+        Err(RejectedEvent {
+            reason: DeliveryError::Inactive,
+            event: found("late")
+        })
+    );
     assert_eq!(replacement.publish(found("replacement")), Ok(()));
     assert_eq!(inbox.pop(), Some(found("replacement")));
     assert_eq!(inbox.pop(), None);
+}
+
+// @scenario: contact_exchange.feature :: Discover nearby Vauchi users via BLE
+#[test]
+fn test_finish_preserves_final_observation_and_releases_operation_capacity() {
+    let mut inbox = inbox(1, 2, 1024);
+    let operation = inbox.start().unwrap();
+    assert_eq!(operation.publish(found("final")), Ok(()));
+    assert_eq!(operation.finish(), Ok(()));
+    let next = inbox.start().unwrap();
+    assert_eq!(next.publish(found("next")), Ok(()));
+    assert_eq!(
+        operation.publish(found("late")).unwrap_err().event,
+        found("late")
+    );
+    assert_eq!(inbox.pop(), Some(found("final")));
+    assert_eq!(inbox.pop(), Some(found("next")));
+    assert_eq!(inbox.pop(), None);
+}
+
+// @scenario: contact_exchange.feature :: Discover nearby Vauchi users via BLE
+#[test]
+fn test_backpressure_returns_the_rejected_event_for_retry() {
+    let mut inbox = inbox(1, 1, 1024);
+    let operation = inbox.start().unwrap();
+    assert_eq!(operation.publish(found("first")), Ok(()));
+    let rejected = operation.publish(found("retry")).unwrap_err();
+    assert_eq!(rejected.reason, DeliveryError::Full);
+    assert_eq!(rejected.event, found("retry"));
+    assert_eq!(inbox.pop(), Some(found("first")));
+    assert_eq!(operation.publish(rejected.event), Ok(()));
+    assert_eq!(inbox.pop(), Some(found("retry")));
 }

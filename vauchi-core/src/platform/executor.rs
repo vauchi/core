@@ -28,14 +28,31 @@ pub struct InboxLimits {
 pub enum DeliveryError {
     #[error("platform event inbox is full")]
     Full,
-    #[error("platform operation was cancelled")]
-    Cancelled,
+    #[error("platform operation is no longer active")]
+    Inactive,
     #[error("platform event inbox is closed")]
     Closed,
     #[error("platform event exceeds the payload budget")]
     PayloadTooLarge,
     #[error("platform event cannot be serialized")]
     InvalidEvent,
+}
+
+/// A rejected observation remains owned by its producer for bounded retry.
+#[derive(PartialEq, thiserror::Error)]
+#[error("{reason}")]
+pub struct RejectedEvent {
+    pub reason: DeliveryError,
+    pub event: Event,
+}
+
+impl std::fmt::Debug for RejectedEvent {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RejectedEvent")
+            .field("reason", &self.reason)
+            .finish_non_exhaustive()
+    }
 }
 
 struct State {
@@ -57,7 +74,7 @@ impl State {
         if self.closed {
             Err(DeliveryError::Closed)
         } else if !self.active.contains(&id) {
-            Err(DeliveryError::Cancelled)
+            Err(DeliveryError::Inactive)
         } else {
             Ok(())
         }
@@ -77,6 +94,12 @@ fn lock(state: &Mutex<State>) -> MutexGuard<'_, State> {
 /// native callbacks still retain operation handles.
 pub struct EventInbox {
     state: Arc<Mutex<State>>,
+}
+
+impl Drop for EventInbox {
+    fn drop(&mut self) {
+        self.close();
+    }
 }
 
 impl EventInbox {
@@ -125,8 +148,9 @@ impl EventInbox {
     }
 }
 
-/// Cloneable callback handle. The host explicitly cancels it when the native
-/// operation ends; dropping one callback clone does not end other callbacks.
+/// Cloneable callback handle. Finish normal operations; cancel aborted ones.
+/// Dropping one callback clone does not end other callbacks. The host must
+/// finish or cancel every lifetime to release its active-operation budget.
 #[derive(Clone)]
 pub struct Operation {
     state: Weak<Mutex<State>>,
@@ -137,20 +161,48 @@ impl Operation {
     /// Enqueue an unmodified observation. Full is backpressure, not success:
     /// retain/retry within a bounded producer buffer or terminate native work.
     /// No domain retry or fallback decision belongs in this method.
-    pub fn publish(&self, event: Event) -> Result<(), DeliveryError> {
-        let shared = self.state.upgrade().ok_or(DeliveryError::Closed)?;
+    pub fn publish(&self, event: Event) -> Result<(), RejectedEvent> {
+        let Some(shared) = self.state.upgrade() else {
+            return Err(RejectedEvent {
+                reason: DeliveryError::Closed,
+                event,
+            });
+        };
+        match self.prepare(&shared, &event) {
+            Ok(mut state) => {
+                state.pending.push_back((self.id, event));
+                Ok(())
+            }
+            Err(reason) => Err(RejectedEvent { reason, event }),
+        }
+    }
+
+    fn prepare<'a>(
+        &self,
+        shared: &'a Mutex<State>,
+        event: &Event,
+    ) -> Result<MutexGuard<'a, State>, DeliveryError> {
         let limit = {
-            let state = lock(&shared);
+            let state = lock(shared);
             state.check(self.id)?;
             state.limits.event_bytes.get()
         };
-        validate_size(&event, limit)?;
-        let mut state = lock(&shared);
+        validate_size(event, limit)?;
+        let state = lock(shared);
         state.check(self.id)?;
         if state.pending.len() == state.limits.events.get() {
             return Err(DeliveryError::Full);
         }
-        state.pending.push_back((self.id, event));
+        Ok(state)
+    }
+
+    /// Seal a completed operation without discarding accepted observations.
+    /// Late callbacks are rejected, and another operation can use the slot.
+    pub fn finish(&self) -> Result<(), DeliveryError> {
+        let shared = self.state.upgrade().ok_or(DeliveryError::Closed)?;
+        let mut state = lock(&shared);
+        state.check(self.id)?;
+        state.active.remove(&self.id);
         Ok(())
     }
 

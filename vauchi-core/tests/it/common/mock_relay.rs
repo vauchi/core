@@ -150,6 +150,14 @@ struct MockGateway {
     /// Files the `content` action serves, by content path
     /// (vauchi/private#733 D11).
     content: std::collections::HashMap<String, Vec<u8>>,
+    /// Gzip a file when the client asks, as an upgraded relay does
+    /// (vauchi/private#733 D14); an older relay answers plain.
+    compresses_content: bool,
+    /// Answers handed back as they are, by content path: an encoding and
+    /// the encoded bytes.
+    encoded_content: std::collections::HashMap<String, (String, Vec<u8>)>,
+    /// The OHTTP relay's response cap: a larger `content` answer is a `502`.
+    content_answer_limit: Option<usize>,
 }
 
 pub struct MockRelay {
@@ -238,6 +246,9 @@ impl MockRelay {
             delay_window_header: None,
             async_refused: false,
             content: std::collections::HashMap::new(),
+            compresses_content: false,
+            encoded_content: std::collections::HashMap::new(),
+            content_answer_limit: None,
         });
     }
 
@@ -275,6 +286,26 @@ impl MockRelay {
             .map(|(path, body)| (path.to_string(), body))
             .collect();
         self.with_gateway(|gateway| gateway.content = files);
+    }
+
+    /// Gzip content when the client asks, as an upgraded relay does.
+    pub fn answer_content_compressed(&self) {
+        self.with_gateway(|gateway| gateway.compresses_content = true);
+    }
+
+    /// Answer `path` with `bytes` marked as `encoding`, whatever was asked.
+    pub fn set_gateway_encoded_content(&self, path: &str, encoding: &str, bytes: Vec<u8>) {
+        self.with_gateway(|gateway| {
+            gateway
+                .encoded_content
+                .insert(path.to_string(), (encoding.to_string(), bytes));
+        });
+    }
+
+    /// A `content` answer larger than `bytes` is a `502`, as the OHTTP
+    /// relay's response cap makes it.
+    pub fn limit_content_answers(&self, bytes: usize) {
+        self.with_gateway(|gateway| gateway.content_answer_limit = Some(bytes));
     }
 
     /// The next `polls` collects of any ticket answer `202` (still delayed).
@@ -452,6 +483,13 @@ fn serve_escrow(
 
 /// Decapsulate one OHTTP request, answer its padded JSON action the way the
 /// relay does (`relay/src/http_api.rs`), and encapsulate the padded reply.
+fn gzip(bytes: &[u8]) -> Vec<u8> {
+    use std::io::Write as _;
+    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::best());
+    encoder.write_all(bytes).expect("gzip in memory");
+    encoder.finish().expect("gzip in memory")
+}
+
 fn serve_ohttp(gateway: &mut MockGateway, body: &[u8]) -> CannedResponse {
     let Ok((padded_request, server_response)) = gateway.server.decapsulate(body) else {
         return CannedResponse::status(400);
@@ -470,12 +508,20 @@ fn serve_ohttp(gateway: &mut MockGateway, body: &[u8]) -> CannedResponse {
             .get("path")
             .and_then(|p| p.as_str())
             .unwrap_or_default();
-        match gateway.content.get(path) {
-            Some(body) => serde_json::json!({
-                "status": "ok",
-                "content_b64": base64::engine::general_purpose::STANDARD.encode(body),
-            }),
-            None => serde_json::json!({ "status": "error", "error": "content unavailable" }),
+        let base64 = |bytes: &[u8]| base64::engine::general_purpose::STANDARD.encode(bytes);
+        let asked_gzip = request.get("encoding").and_then(|e| e.as_str()) == Some("gzip");
+        if let Some((encoding, bytes)) = gateway.encoded_content.get(path) {
+            serde_json::json!({ "status": "ok", "encoding": encoding, "content_b64": base64(bytes) })
+        } else {
+            match gateway.content.get(path) {
+                Some(body) if asked_gzip && gateway.compresses_content => serde_json::json!({
+                    "status": "ok",
+                    "encoding": "gzip",
+                    "content_b64": base64(&gzip(body)),
+                }),
+                Some(body) => serde_json::json!({ "status": "ok", "content_b64": base64(body) }),
+                None => serde_json::json!({ "status": "error", "error": "content unavailable" }),
+            }
         }
     } else if let Some(mailboxes) = &mut gateway.mailboxes {
         mailboxes.reply(&action, request)
@@ -488,6 +534,13 @@ fn serve_ohttp(gateway: &mut MockGateway, body: &[u8]) -> CannedResponse {
             }
         }
     };
+    if action == "content"
+        && let Some(limit) = gateway.content_answer_limit
+        && serde_json::to_vec(&reply).map_or(0, |r| r.len()) > limit
+    {
+        gateway.actions.push(action);
+        return CannedResponse::status(502);
+    }
     gateway.actions.push(action);
     let padded_reply =
         vauchi_core::crypto::padding::pad(&serde_json::to_vec(&reply).expect("reply serializes"));

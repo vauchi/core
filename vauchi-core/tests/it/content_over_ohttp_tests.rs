@@ -60,6 +60,66 @@ fn a_content_error_from_the_relay_is_an_error() {
     assert!(result.is_err(), "{result:?}");
 }
 
+/// A locale file is larger than the OHTTP relay passes back; asked for
+/// compressed, it arrives (vauchi/private#733 D14).
+// @internal
+#[test]
+fn a_locale_larger_than_the_ohttp_relay_passes_arrives_compressed() {
+    let locale = br#"{"pt.greeting":"Bom dia, tudo bem?"},"#.repeat(10_000);
+    let outer = MockRelay::start();
+    outer.enable_ohttp_gateway(&SignedGateway::new(0x41), window_of(NOW));
+    outer.set_gateway_content(vec![("locales/pt.json", locale.clone())]);
+    outer.answer_content_compressed();
+    outer.limit_content_answers(128 * 1024);
+    let application = MockRelay::start();
+    let (vauchi, _dir) = client(&outer, &application);
+
+    let body = vauchi
+        .build_action_relay_transport(&application.url(), 5_000)
+        .fetch_content("locales/pt.json")
+        .unwrap();
+
+    assert_eq!(body, locale);
+}
+
+fn gzip(bytes: &[u8]) -> Vec<u8> {
+    use std::io::Write as _;
+    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::best());
+    encoder.write_all(bytes).unwrap();
+    encoder.finish().unwrap()
+}
+
+/// What a relay answers is untrusted: a small answer that inflates without
+/// bound, bytes that are not gzip, or an encoding Core does not know are
+/// errors, never content.
+// @internal
+#[test]
+fn an_encoded_answer_core_cannot_trust_is_an_error() {
+    let six_mebibytes_of_zeros = gzip(&vec![0_u8; 6 * 1024 * 1024]);
+    for (encoding, bytes) in [
+        ("gzip", six_mebibytes_of_zeros),
+        ("gzip", b"not gzip at all".to_vec()),
+        ("gzip", Vec::new()),
+        ("zstd", gzip(b"{\"pt\":1}")),
+    ] {
+        let outer = MockRelay::start();
+        outer.enable_ohttp_gateway(&SignedGateway::new(0x41), window_of(NOW));
+        outer.set_gateway_encoded_content("locales/pt.json", encoding, bytes.clone());
+        let application = MockRelay::start();
+        let (vauchi, _dir) = client(&outer, &application);
+
+        let result = vauchi
+            .build_action_relay_transport(&application.url(), 5_000)
+            .fetch_content("locales/pt.json");
+
+        assert!(
+            result.is_err(),
+            "{encoding}, {} bytes: accepted",
+            bytes.len()
+        );
+    }
+}
+
 // @internal
 #[test]
 fn content_is_never_fetched_without_ohttp() {

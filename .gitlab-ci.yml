@@ -579,6 +579,9 @@ lint:architecture:
   tags: [docker]
   needs: []
   allow_failure: false
+  variables:
+    # The image has no sccache; empty overrides .cargo/config.toml's wrapper.
+    RUSTC_WRAPPER: ""
   before_script:
     - |
       VAUCHI_CI_SCRIPTS_DIR=$(mktemp -d)

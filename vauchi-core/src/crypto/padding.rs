@@ -74,8 +74,9 @@ pub fn unpad(padded: &[u8]) -> Option<Vec<u8>> {
 
     let len = u32::from_be_bytes([padded[0], padded[1], padded[2], padded[3]]) as usize;
 
-    // Validate: plaintext must fit within the padded buffer
-    if LENGTH_PREFIX_SIZE + len > padded.len() {
+    // Subtract rather than add: on 32-bit targets `LENGTH_PREFIX_SIZE + len`
+    // wraps for a prefix near u32::MAX and the check passes (private#756).
+    if len > padded.len() - LENGTH_PREFIX_SIZE {
         return None;
     }
 
@@ -210,6 +211,22 @@ mod tests {
         // Length prefix claims 255 bytes but buffer is only 8 bytes
         let bad = [0x00, 0x00, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00];
         assert!(unpad(&bad).is_none());
+    }
+
+    // @internal
+    #[test]
+    fn test_unpad_rejects_length_prefix_near_u32_max_at_every_buffer_size() {
+        for declared_len in [u32::MAX - 3, u32::MAX - 1, u32::MAX] {
+            for buffer_len in [LENGTH_PREFIX_SIZE, 8, BUCKET_SMALL, BUCKET_LARGE] {
+                let mut padded = vec![0u8; buffer_len];
+                padded[..LENGTH_PREFIX_SIZE].copy_from_slice(&declared_len.to_be_bytes());
+                assert_eq!(
+                    unpad(&padded),
+                    None,
+                    "declared_len={declared_len:#x} buffer_len={buffer_len}"
+                );
+            }
+        }
     }
 
     #[test]

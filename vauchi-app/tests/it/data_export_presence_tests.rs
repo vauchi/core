@@ -11,7 +11,7 @@
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
 use vauchi_core::exchange::capability::DeviceCapabilities;
-use vauchi_core::{Command, Event};
+use vauchi_core::{AuthMode, Command, Event};
 
 const SECRET: [u8; 32] = [42; 32];
 
@@ -319,11 +319,9 @@ fn the_first_app_password_is_set_once_the_os_check_passes() {
         secret: SECRET.to_vec().into(),
     });
     assert!(engine.vauchi().is_password_enabled().unwrap());
-    assert!(
-        engine
-            .vauchi()
-            .confirm_session_password(CHOSEN_PIN)
-            .unwrap()
+    assert_eq!(
+        engine.vauchi_mut().authenticate(CHOSEN_PIN).unwrap(),
+        AuthMode::Normal
     );
 }
 

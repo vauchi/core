@@ -74,8 +74,9 @@ pub fn unpad(padded: &[u8]) -> Option<Vec<u8>> {
 
     let len = u32::from_be_bytes([padded[0], padded[1], padded[2], padded[3]]) as usize;
 
-    // Validate: plaintext must fit within the padded buffer
-    if LENGTH_PREFIX_SIZE + len > padded.len() {
+    // Subtract rather than add: on 32-bit targets `LENGTH_PREFIX_SIZE + len`
+    // wraps for a prefix near u32::MAX and the check passes (private#756).
+    if len > padded.len() - LENGTH_PREFIX_SIZE {
         return None;
     }
 

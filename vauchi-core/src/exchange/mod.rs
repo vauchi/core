@@ -139,9 +139,9 @@ pub use ble_handshake::{
 pub use ble_payload::BleCardPayload;
 pub use device_link::{
     DeviceLinkConfirmation, DeviceLinkInitiator, DeviceLinkInitiatorRestored,
-    DeviceLinkJoinInvitation, DeviceLinkQR, DeviceLinkRequest, DeviceLinkResponder,
-    DeviceLinkResponse, JoinInvitationError, ProximityProof, compute_confirmation_mac,
-    generate_numeric_code,
+    DeviceLinkJoinInvitation, DeviceLinkQR, DeviceLinkRefusalReason, DeviceLinkRequest,
+    DeviceLinkResponder, DeviceLinkResponse, JoinInvitationError, ProximityProof,
+    compute_confirmation_mac, generate_numeric_code,
 };
 pub use direct_transport::{ProximityLevel, UsbRole};
 pub use encrypted_message::{DecryptedExchangePayload, EncryptedExchangeMessage};

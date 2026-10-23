@@ -6,6 +6,7 @@
 
 use super::super::ExchangeError;
 use super::qr::DeviceLinkQR;
+use super::refusal::{DeviceLinkRefusalReason, decrypt_refusal};
 use super::request::DeviceLinkRequest;
 use super::response::DeviceLinkResponse;
 use super::types::derive_confirmation_code;
@@ -67,6 +68,15 @@ impl DeviceLinkResponder {
         encrypted_response: &[u8],
     ) -> Result<DeviceLinkResponse, ExchangeError> {
         DeviceLinkResponse::decrypt(encrypted_response, self.qr.link_key())
+    }
+
+    /// Reads the host's word that it ended the ceremony, instead of a
+    /// response (vauchi/private#780).
+    pub fn process_refusal(
+        &self,
+        encrypted_refusal: &[u8],
+    ) -> Result<DeviceLinkRefusalReason, ExchangeError> {
+        decrypt_refusal(self.qr.link_key(), encrypted_refusal)
     }
 
     /// Returns the identity public key from the QR.

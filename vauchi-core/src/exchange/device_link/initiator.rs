@@ -12,6 +12,7 @@ use crate::identity::{DeviceInfo, DeviceRegistry, Identity};
 
 use super::super::ExchangeError;
 use super::qr::DeviceLinkQR;
+use super::refusal::{DeviceLinkRefusalReason, encrypt_refusal};
 use super::request::DeviceLinkRequest;
 use super::response::DeviceLinkResponse;
 use super::types::{
@@ -60,6 +61,12 @@ impl DeviceLinkInitiator {
     /// Returns the QR code to display.
     pub fn qr(&self) -> &DeviceLinkQR {
         &self.qr
+    }
+
+    /// Tells the joiner, on its return channel, that this host ended the
+    /// ceremony and why (vauchi/private#780).
+    pub fn refuse(&self, reason: DeviceLinkRefusalReason) -> Result<Vec<u8>, ExchangeError> {
+        encrypt_refusal(self.qr.link_key(), reason)
     }
 
     /// Decrypts a link request and returns confirmation details for the user.

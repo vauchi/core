@@ -8,6 +8,40 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.87.0] — 2026-10-23
+
+### Added
+
+- Content updates: Core asks the relay for content gzipped, so locale
+  files fit through the OHTTP relay; a setting chooses whether updates
+  also run in the background; and `Command::ReloadTheme` asks the
+  shell to reload its theme when an update brings new themes
+  (vauchi/private#733).
+- CI runs Core's library tests with a 32-bit `usize` (vauchi/private#767).
+
+### Fixed
+
+- A content update no longer rebuilds a live device-link screen, which
+  dropped the code on screen and refused the host's Confirm
+  (vauchi/private#758).
+- A device name already linked is refused before the confirmation codes
+  are shown, and the screen says to rename the new device
+  (vauchi/private#671).
+- A first app password waits for the OS user-presence check
+  (vauchi/private#766).
+- Unpadding checks the declared length without adding to it
+  (vauchi/private#756).
+- Shells read the themes in effect, so a CDN theme picked in Settings
+  applies (vauchi/private#733).
+- ureq is capped below 3.5, whose unversioned transport API TLS pinning
+  uses (vauchi/private#752).
+
+### Changed
+
+- Relay trust is separated from the network and storage adapters, and
+  core layer violations are removed with the public aliases kept
+  (vauchi/private#760).
+
 ## [0.86.0] — 2026-10-22
 
 ### Added

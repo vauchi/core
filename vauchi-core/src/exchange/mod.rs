@@ -40,6 +40,8 @@ mod error;
 pub mod exchange_payload;
 #[cfg(not(feature = "testing"))]
 mod exchange_payload;
+#[cfg(kani)]
+mod exchange_payload_proofs;
 #[cfg(feature = "testing")]
 pub mod multistage;
 #[cfg(not(feature = "testing"))]

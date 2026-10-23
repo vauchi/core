@@ -616,3 +616,6 @@ impl ExchangeBle {
         Ok(ExchangeBle { inner })
     }
 }
+
+#[cfg(kani)]
+mod proofs;

@@ -689,3 +689,39 @@ fn a_joiner_learns_its_name_is_already_linked() {
         "the joiner must learn its name is taken, so it can pick another; got {told:?}"
     );
 }
+
+/// A refusal travels the same return channel off-relay (ADR-070).
+// @internal
+#[test]
+fn a_joiner_learns_the_host_declined_over_a_local_rendezvous() {
+    use std::sync::Arc;
+    use vauchi_app::orchestrator::local_rendezvous::{
+        LocalDeviceLinkBroker, SingleCeremonyRendezvous,
+    };
+
+    let (initiator, _identity) = initiator_for("Alice", [0x77u8; 32]);
+    let rendezvous = Arc::new(SingleCeremonyRendezvous::new());
+    let host_broker = LocalDeviceLinkBroker::new("100001".to_string(), Arc::clone(&rendezvous));
+    let joiner_broker = LocalDeviceLinkBroker::new("100002".to_string(), Arc::clone(&rendezvous));
+    let mut host = DeviceLinkInitiatorMachine::new(
+        initiator,
+        "alice-identity".to_string(),
+        TIMEOUT_SECS,
+        None,
+    );
+    let _ = host.advance(&host_broker, NOW);
+    let invitation = host.join_invitation().expect("invitation");
+    let mut joiner =
+        DeviceLinkResponderMachine::new(invitation, "New Phone".to_string(), TIMEOUT_SECS)
+            .expect("invitation parses");
+    let _ = joiner.advance(&joiner_broker, NOW);
+    let _ = host.advance(&host_broker, NOW);
+
+    let _ = host.deny(&host_broker);
+
+    let told = joiner.advance(&joiner_broker, NOW + 1);
+    assert!(
+        matches!(&told, ResponderEvent::Failed { reason } if reason == "user_denied"),
+        "the refusal must reach the joiner off-relay too; got {told:?}"
+    );
+}

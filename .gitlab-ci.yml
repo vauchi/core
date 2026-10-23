@@ -580,9 +580,16 @@ lint:architecture:
   needs: []
   allow_failure: false
   variables:
-    # The image has no sccache; empty overrides .cargo/config.toml's wrapper.
-    RUSTC_WRAPPER: ""
+    RUSTC_WRAPPER: "sccache"
+    SCCACHE_DIR: "${CI_PROJECT_DIR}/.cache/sccache/architecture"
+    SCCACHE_CACHE_SIZE: "256M"
+  cache:
+    key: "architecture-sccache-${VAUCHI_SCRIPTS_REF}"
+    paths:
+      - .cache/sccache/architecture/
   before_script:
+    - apt-get update -qq
+    - apt-get install -y --no-install-recommends sccache
     - |
       VAUCHI_CI_SCRIPTS_DIR=$(mktemp -d)
       export VAUCHI_CI_SCRIPTS_DIR
@@ -594,7 +601,10 @@ lint:architecture:
       test -f "$VAUCHI_CI_SCRIPTS_DIR/tools/architecture-check/Cargo.lock"
     - git fetch --depth=1 origin +main:refs/remotes/origin/main
   script:
+    # Keep the standalone tool's linker settings separate; sccache stays enabled.
+    - cd "$VAUCHI_CI_SCRIPTS_DIR"
     - bash "$VAUCHI_CI_SCRIPTS_DIR/scripts/architecture-check.sh" "$CI_PROJECT_DIR" check origin/main
+    - sccache --show-stats
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

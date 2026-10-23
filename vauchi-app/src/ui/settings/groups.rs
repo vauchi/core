@@ -8,7 +8,7 @@
 //! show is built here for the Advanced, Appearance & Language and
 //! Accessibility sub-screens.
 
-use super::SettingsEngine;
+use super::{DelayedFetching, SettingsEngine};
 use crate::i18n::get_string_with_args;
 use crate::ui::*;
 
@@ -446,13 +446,45 @@ impl SettingsEngine {
             // EditRelayUrl dialog) only on Link rows; as a Value row the
             // editor was unreachable on mobile (device regression
             // 2026-06-10, `2026-06-10-mobile-relay-url-editor-noop`).
-            items: vec![self.link_row(
-                "relay_url",
-                self.t("settings.relay_url"),
-                Some(self.t("settings.relay_url_hint")),
-                None,
-                Some(self.config.relay_url.clone()),
-            )],
+            items: vec![
+                self.link_row(
+                    "relay_url",
+                    self.t("settings.relay_url"),
+                    Some(self.t("settings.relay_url_hint")),
+                    None,
+                    Some(self.config.relay_url.clone()),
+                ),
+                SettingsItem {
+                    id: "delayed_fetching".into(),
+                    label: self.t("settings.delayed_fetching"),
+                    subtitle: None,
+                    kind: SettingsItemKind::Value {
+                        value: self.delayed_fetching_value(),
+                    },
+                    a11y: Some(A11y {
+                        label: Some(self.t("settings.delayed_fetching")),
+                        hint: Some(self.t("settings.delayed_fetching_hint")),
+                        role: None,
+                    }),
+                    info_key: None,
+                },
+            ],
+        }
+    }
+
+    fn delayed_fetching_value(&self) -> String {
+        match &self.config.delayed_fetching {
+            DelayedFetching::On { window_minutes } => get_string_with_args(
+                self.locale(),
+                "settings.delayed_fetching_on",
+                &[("minutes", &window_minutes.to_string())],
+            ),
+            DelayedFetching::Off => self.t("settings.delayed_fetching_off"),
+            DelayedFetching::Withdrawn { when } => get_string_with_args(
+                self.locale(),
+                "settings.delayed_fetching_withdrawn",
+                &[("when", when)],
+            ),
         }
     }
 

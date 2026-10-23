@@ -25,6 +25,35 @@ pub enum DelayedFetching {
     Withdrawn { when: String },
 }
 
+#[cfg(feature = "network-rustls")]
+impl DelayedFetching {
+    /// What `vauchi`'s next sync fetches through, for the Network row.
+    pub fn of(vauchi: &vauchi_core::api::Vauchi, locale: Locale) -> Self {
+        #[cfg(feature = "network-http")]
+        {
+            use vauchi_core::api::FetchPath;
+            match vauchi.fetch_path() {
+                FetchPath::Delayed { window } => Self::On {
+                    window_minutes: window.as_secs().div_ceil(60),
+                },
+                FetchPath::Synchronous => Self::Off,
+                FetchPath::SynchronousSinceWithdrawn { since_unix } => Self::Withdrawn {
+                    when: crate::relative_time::format_relative_time(
+                        vauchi.clock().unix_seconds(),
+                        since_unix,
+                        locale,
+                    ),
+                },
+            }
+        }
+        #[cfg(not(feature = "network-http"))]
+        {
+            let _ = (vauchi, locale);
+            Self::Off
+        }
+    }
+}
+
 /// Configuration values displayed and toggled on the settings screen.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]

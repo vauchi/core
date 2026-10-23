@@ -32,7 +32,7 @@ use crate::ui::places_list::{PlaceSummary, PlacesEngine, UnnamedPlace};
 use crate::ui::recovery_claim_review::{
     ClaimContext, Confidence, RecoveryClaimReviewEngine, ReviewMode,
 };
-use crate::ui::settings::{SettingsConfig, SettingsEngine, SettingsMode};
+use crate::ui::settings::{DelayedFetching, SettingsConfig, SettingsEngine, SettingsMode};
 use crate::ui::support::SupportEngine;
 use crate::ui::tag_promotion::{PromotionField, TagPromotionEngine};
 use crate::ui::tags_list::{TagSummary, TagsEngine};
@@ -267,7 +267,7 @@ impl AppEngine {
                             .and_then(|s| s.last_backup_timestamp)
                             .map(|t| crate::relative_time::format_relative_time(now, t, locale))
                     },
-                    delayed_fetching: Default::default(),
+                    delayed_fetching: DelayedFetching::of(vauchi, render_context.resolved_locale()),
                 };
                 let mode = match screen {
                     AppScreen::SettingsAdvanced => SettingsMode::Advanced,

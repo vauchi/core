@@ -189,6 +189,7 @@ fn read_tlv_content(data: &[u8]) -> Option<(&[u8], &[u8])> {
 mod tests {
     use super::*;
 
+    // @internal — constructing a stored fingerprint preserves its bytes.
     #[test]
     fn test_pinned_certificate_new() {
         let fingerprint = [0xAA; 32];
@@ -196,6 +197,7 @@ mod tests {
         assert_eq!(pin.sha256_fingerprint, fingerprint);
     }
 
+    // @internal — retained full-certificate hashing compatibility, not SPKI policy.
     #[test]
     #[allow(deprecated)]
     fn test_from_der_legacy_hash() {
@@ -208,6 +210,7 @@ mod tests {
         assert_eq!(pin, pin2);
     }
 
+    // @scenario: certificate_pinning :: Empty pin list rejects all certificates
     #[test]
     fn test_verify_pin_empty_pins() {
         assert!(!verify_pin(b"anything", &[]));

@@ -6305,6 +6305,50 @@
                 },
                 {
                   "List": {
+                    "id": "content",
+                    "label": "Content updates",
+                    "rows": [
+                      {
+                        "title": "Also in the background",
+                        "subtitle": "Update while the app is not open on screen",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": null,
+                        "secondary_actions": [],
+                        "controls": [
+                          {
+                            "Toggle": {
+                              "binding_id": "surface.1.binding.1",
+                              "label": "",
+                              "value": true,
+                              "enabled": true,
+                              "accessibility": {
+                                "label": "Also in the background toggle",
+                                "description": "Update while the app is not open on screen"
+                              }
+                            }
+                          }
+                        ],
+                        "accessibility": {
+                          "label": "Also in the background toggle",
+                          "description": "Update while the app is not open on screen"
+                        }
+                      }
+                    ],
+                    "searchable": false,
+                    "paging": null,
+                    "accessibility": {
+                      "label": "Content updates",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "List": {
                     "id": "delivery",
                     "label": "Message Delivery",
                     "rows": [
@@ -6445,7 +6489,7 @@
                       {
                         "title": "Version",
                         "subtitle": null,
-                        "detail": "0.85.0",
+                        "detail": "0.86.0",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": null,
@@ -6480,7 +6524,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.1",
+                              "binding_id": "surface.1.binding.2",
                               "label": "",
                               "value": false,
                               "enabled": true,

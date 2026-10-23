@@ -1,0 +1,117 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * In-person QR exchange, as `ExchangeSession` runs it (#757):
+ *
+ *   - each side shows a QR signed with its Ed25519 identity key, carrying
+ *     that key and an X25519 key made for this QR alone (session.rs:311);
+ *   - each side scans the other's QR, checks the signature and that the
+ *     identity is not its own (session.rs:1657-1665);
+ *   - the session key is HKDF(DH(our ephemeral, their ephemeral)), with
+ *     both identity keys and both ephemeral keys, each pair sorted, in the
+ *     HKDF info (session.rs:1491-1503, "vauchi-x3dh-symmetric-v2").
+ *
+ * The attacker controls every channel, the QR included: a QR is only as
+ * authentic as its signature. Sorting a pair is modelled with the
+ * commutative multiset union `+`, which is equal for both orders.
+ *
+ * Out of scope: the audio challenge, the reciprocity tokens, the escrow
+ * keys and the card exchange that follow.
+ *
+ * Run: tamarin-prover --prove qr_exchange.spthy
+ * Prove it can fail: tamarin-prover --prove -DNO_IDENTITY_BINDING
+ *   qr_exchange.spthy  (no_misbinding must then be falsified: without the
+ *   identity keys in the HKDF info an attacker re-signs the peer's
+ *   ephemeral key and the two sides hold one key with different peers)
+ */
+
+theory VauchiQrExchange
+begin
+
+builtins: diffie-hellman, signing, hashing, multiset
+
+restriction Equality:
+  "All x y #i. Eq(x, y) @ i ==> x = y"
+
+restriction Inequality:
+  "All x #i. Neq(x, x) @ i ==> F"
+
+/* A user's long-term identity: the Ed25519 signing key. */
+rule Register_identity:
+  [ Fr(~ltk) ]
+  --[ Identity($P, pk(~ltk)) ]->
+  [ !Ltk($P, ~ltk), !Pk($P, pk(~ltk)), Out(pk(~ltk)) ]
+
+/* The identity key leaks (a lost phone, malware). */
+rule Reveal_identity:
+  [ !Ltk($P, ltk) ]
+  --[ RevealIdentity($P) ]->
+  [ Out(ltk) ]
+
+/* Show a QR: identity key and a fresh ephemeral key, signed. */
+rule Show_qr:
+  let epk = 'g' ^ ~e
+      qr = <'WBEX', pk(ltk), epk, ~token>
+  in
+  [ !Ltk($A, ltk), Fr(~e), Fr(~token) ]
+  --[ ShowQr($A, epk) ]->
+  [ Displayed($A, ~e, pk(ltk)), Out(<qr, sign(qr, ltk)>) ]
+
+/* Scan the peer's QR and derive the session key. */
+#ifdef NO_IDENTITY_BINDING
+rule Scan_and_agree:
+  let epk = 'g' ^ ~e
+      peer_qr = <'WBEX', peer_pk, peer_epk, peer_token>
+      shared = peer_epk ^ ~e
+      info = <'vauchi-x3dh-symmetric-v2', epk + peer_epk>
+      k = h(<shared, info>)
+  in
+  [ Displayed($A, ~e, pk_a), In(<peer_qr, sig>) ]
+  --[ Eq(verify(sig, peer_qr, peer_pk), true)
+    , Neq(peer_pk, pk_a)
+    , Accept($A, pk_a, peer_pk, k)
+    ]->
+  [ ]
+#else
+rule Scan_and_agree:
+  let epk = 'g' ^ ~e
+      peer_qr = <'WBEX', peer_pk, peer_epk, peer_token>
+      shared = peer_epk ^ ~e
+      info = <'vauchi-x3dh-symmetric-v2', pk_a + peer_pk, epk + peer_epk>
+      k = h(<shared, info>)
+  in
+  [ Displayed($A, ~e, pk_a), In(<peer_qr, sig>) ]
+  --[ Eq(verify(sig, peer_qr, peer_pk), true)
+    , Neq(peer_pk, pk_a)
+    , Accept($A, pk_a, peer_pk, k)
+    ]->
+  [ ]
+#endif
+
+/* Sanity: two honest users can complete an exchange with the same key. */
+lemma executable:
+  exists-trace
+  "Ex A B pka pkb k #i #j.
+     Accept(A, pka, pkb, k) @ i & Accept(B, pkb, pka, k) @ j
+     & not (Ex P #r. RevealIdentity(P) @ r)"
+
+/* Secrecy and forward secrecy: the key stays secret unless the peer's
+   identity key leaked before the exchange; leaks afterwards do not
+   matter, and our own key leaking never does. */
+lemma session_key_secrecy:
+  "All A B pka pkb k #i #r.
+     Accept(A, pka, pkb, k) @ i & Identity(B, pkb) @ r
+     ==> not (Ex #j. K(k) @ j)
+         | (Ex #l. RevealIdentity(B) @ l & l < i)"
+
+/* No misbinding: two sessions that hold the same key agree on whose key
+   each holds — an attacker cannot make B believe it shares the key with
+   someone other than A. */
+lemma no_misbinding:
+  "All A B pka pkb pkx k #i #j.
+     Accept(A, pka, pkb, k) @ i & Accept(B, pkb, pkx, k) @ j
+     ==> pkx = pka"
+
+end

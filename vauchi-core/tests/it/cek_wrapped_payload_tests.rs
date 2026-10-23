@@ -9,7 +9,9 @@
 //!   - "Crypto-shredding renders card unreadable without key"
 
 use vauchi_core::crypto::cek::ContentEncryptionKey;
-use vauchi_core::sync::delta::{CekWrappedPayload, PAYLOAD_VERSION_CEK, VersionedPayload};
+use vauchi_core::sync::delta::{
+    CekWrappedPayload, DeltaError, PAYLOAD_VERSION_CEK, VersionedPayload,
+};
 
 // === Serialization Round-trips ===
 
@@ -92,6 +94,26 @@ fn test_versioned_payload_unknown_version_returns_error() {
     let data = vec![0xFF, 0x01, 0x02, 0x03];
     let result = VersionedPayload::decode(&data);
     result.expect_err("expected error");
+}
+
+/// A ciphertext length near `u32::MAX` makes `132 + ct_len` wrap on a
+/// 32-bit `usize`, so the length check passes and the slice panics (#784,
+/// the shape of #756). A contact's sync message reaches this decode.
+// @internal
+#[test]
+fn test_cek_payload_whose_length_wraps_a_32_bit_usize_is_refused() {
+    for declared in [u32::MAX, u32::MAX - 131, u32::MAX - 64, 0x8000_0000] {
+        let mut data = vec![PAYLOAD_VERSION_CEK];
+        data.extend_from_slice(&[0u8; 128]);
+        data.extend_from_slice(&declared.to_be_bytes());
+
+        let result = VersionedPayload::decode(&data);
+
+        assert!(
+            matches!(result, Err(DeltaError::CekDecodeError(_))),
+            "declared ciphertext length {declared:#x}: {result:?}"
+        );
+    }
 }
 
 // @internal

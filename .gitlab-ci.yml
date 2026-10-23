@@ -740,6 +740,37 @@ test:protocol:
       junit: target/nextest/ci/junit.xml
     expire_in: 1 week
 
+# Core ships armeabi-v7a, where usize is 32 bits; arithmetic that wraps only
+# there passes every 64-bit job (private#756: a crafted padding length
+# aborted the app). An i386 userland has the same pointer width natively and
+# needs no runner packages (private#767). The LONG_BIT guard fails the job if
+# the image ever resolves to a 64-bit platform, which would pass silently.
+test:core-32bit:
+  extends: [.validation-rust, .timeout-long]
+  stage: test
+  image:
+    name: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/i386/rust:1.93.1-bookworm
+    docker:
+      platform: linux/386
+  tags: [docker]
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
+  variables:
+    CARGO_HOME: ${CI_PROJECT_DIR}/.cargo-i386
+    CARGO_TARGET_DIR: ${CI_PROJECT_DIR}/target-i386
+    # The image has no sccache; empty overrides .cargo/config.toml's wrapper.
+    RUSTC_WRAPPER: ""
+  cache:
+    key: core-32bit-${CI_COMMIT_REF_SLUG}
+    fallback_keys: [core-32bit-${CI_DEFAULT_BRANCH}]
+    paths: [.cargo-i386/registry/, target-i386/]
+  script:
+    - test "$(getconf LONG_BIT)" = 32 || { echo "ERROR: expected a 32-bit userland, got $(getconf LONG_BIT)-bit"; exit 1; }
+    - cargo test --locked -p vauchi-core --lib --features test-kdf
+
 test:cucumber:
   # .timeout-cold-rebuild: compiles the full workspace before running
   # cucumber — see the template comment.

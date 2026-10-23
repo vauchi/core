@@ -15,7 +15,6 @@ use vauchi_core::identity::DeviceInfo;
 const APP_PIN: &str = "app-password-123";
 const DURESS_PIN: &str = "135790";
 const OTHER_SEED: [u8; 32] = [9u8; 32];
-const GATE_SCREEN_ID: &str = "confirm_session_pin";
 
 fn engine_with_password() -> AppEngine {
     let mut vauchi: Vauchi = Vauchi::in_memory().unwrap();
@@ -49,8 +48,14 @@ fn type_into(engine: &mut AppEngine, component_id: &str, text: &str) {
     }
 }
 
-fn screen_id(engine: &AppEngine) -> String {
-    engine.current_screen().screen_id
+/// The PIN step is told apart by its confirm action: screens such as the
+/// duress PIN stamp their own id on every step they show.
+fn at_session_pin_step(engine: &AppEngine) -> bool {
+    engine
+        .current_screen()
+        .contextual_actions
+        .iter()
+        .any(|action| action.id == "confirm_pin")
 }
 
 fn enter_session_pin(engine: &mut AppEngine, pin: &str) -> ActionResult {
@@ -150,7 +155,7 @@ fn setting_the_duress_pin_waits_for_the_session_pin() {
 
     let _ = finish_duress_setup(&mut engine);
 
-    assert_eq!(screen_id(&engine), GATE_SCREEN_ID);
+    assert!(at_session_pin_step(&engine));
     assert!(!engine.vauchi().is_duress_enabled().unwrap());
     let _ = enter_session_pin(&mut engine, APP_PIN);
     assert!(engine.vauchi().is_duress_enabled().unwrap());
@@ -164,7 +169,7 @@ fn a_wrong_session_pin_sets_no_duress_pin_and_says_so() {
 
     let _ = enter_session_pin(&mut engine, "not-the-pin");
 
-    assert_eq!(screen_id(&engine), GATE_SCREEN_ID);
+    assert!(at_session_pin_step(&engine));
     assert!(pin_error(&engine).is_some_and(|e| !e.is_empty()));
     assert!(!engine.vauchi().is_duress_enabled().unwrap());
 }
@@ -192,7 +197,7 @@ fn cancelling_the_session_pin_returns_to_the_duress_screen_unchanged() {
     let _ = press(&mut engine, "cancel");
 
     assert_eq!(engine.current_app_screen(), &AppScreen::DuressPin);
-    assert_ne!(screen_id(&engine), GATE_SCREEN_ID);
+    assert!(!at_session_pin_step(&engine));
     let _ = enter_session_pin(&mut engine, APP_PIN);
     assert!(!engine.vauchi().is_duress_enabled().unwrap());
 }
@@ -223,7 +228,7 @@ fn turning_off_the_duress_pin_waits_for_the_session_pin() {
 
     let _ = press(&mut engine, "confirm_disable");
 
-    assert_eq!(screen_id(&engine), GATE_SCREEN_ID);
+    assert!(at_session_pin_step(&engine));
     assert!(engine.vauchi().is_duress_enabled().unwrap());
     let _ = enter_session_pin(&mut engine, APP_PIN);
     assert!(!engine.vauchi().is_duress_enabled().unwrap());
@@ -248,7 +253,7 @@ fn a_duress_session_confirms_with_its_own_pin() {
     let _ = enter_session_pin(&mut engine, DURESS_PIN);
 
     assert_eq!(pin_error(&engine), None);
-    assert_ne!(screen_id(&engine), GATE_SCREEN_ID);
+    assert!(!at_session_pin_step(&engine));
 }
 
 // @internal
@@ -259,7 +264,7 @@ fn revoking_a_device_waits_for_the_session_pin() {
 
     let _ = confirm_laptop_revoke(&mut engine);
 
-    assert_eq!(screen_id(&engine), GATE_SCREEN_ID);
+    assert!(at_session_pin_step(&engine));
     assert!(laptop_is_active(&engine));
     let _ = enter_session_pin(&mut engine, APP_PIN);
     assert!(!laptop_is_active(&engine));
@@ -284,9 +289,9 @@ fn vouching_for_a_recovery_waits_for_the_session_pin() {
 
     let _ = confirm_voucher_for_a_claim(&mut engine);
 
-    assert_eq!(screen_id(&engine), GATE_SCREEN_ID);
+    assert!(at_session_pin_step(&engine));
     let _ = enter_session_pin(&mut engine, APP_PIN);
-    assert!(voucher_shown(&engine), "got {}", screen_id(&engine));
+    assert!(voucher_shown(&engine));
 }
 
 // @internal
@@ -298,7 +303,7 @@ fn a_wrong_session_pin_signs_no_voucher() {
     let _ = enter_session_pin(&mut engine, "not-the-pin");
 
     assert!(!voucher_shown(&engine));
-    assert_eq!(screen_id(&engine), GATE_SCREEN_ID);
+    assert!(at_session_pin_step(&engine));
 }
 
 // @internal
@@ -311,6 +316,6 @@ fn without_an_app_password_revoking_asks_for_no_pin() {
 
     let _ = confirm_laptop_revoke(&mut engine);
 
-    assert_ne!(screen_id(&engine), GATE_SCREEN_ID);
+    assert!(!at_session_pin_step(&engine));
     assert!(!laptop_is_active(&engine));
 }

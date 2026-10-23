@@ -248,6 +248,7 @@ fn the_failed_screen_gives_the_reason_the_host_stated() {
             "user_confirm_timeout",
             "The confirmation timed out — both devices must confirm within 60 seconds. Try again.",
         ),
+        ("cancelled", "The link was canceled."),
         (
             "device_name_taken",
             "A device with this name is already linked. On the new device, start again and give it a different name.",

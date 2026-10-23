@@ -29,10 +29,11 @@ fn ceremony(seed: u8) -> (DeviceLinkInitiator, DeviceLinkResponder) {
     (initiator, responder)
 }
 
-const REASONS: [DeviceLinkRefusalReason; 3] = [
+const REASONS: [DeviceLinkRefusalReason; 4] = [
     DeviceLinkRefusalReason::Declined,
     DeviceLinkRefusalReason::ConfirmationTimedOut,
     DeviceLinkRefusalReason::DeviceNameTaken,
+    DeviceLinkRefusalReason::Cancelled,
 ];
 
 // @internal

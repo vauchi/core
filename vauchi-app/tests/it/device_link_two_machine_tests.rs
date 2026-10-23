@@ -725,3 +725,32 @@ fn a_joiner_learns_the_host_declined_over_a_local_rendezvous() {
         "the refusal must reach the joiner off-relay too; got {told:?}"
     );
 }
+
+/// Leaving the linking screen on the host ends the ceremony too.
+// @internal
+#[test]
+fn a_joiner_learns_the_host_left_the_ceremony() {
+    let (initiator, _identity) = initiator_for("Alice", [0x5Au8; 32]);
+    let broker = RelayLikeBroker::new();
+    let mut host = DeviceLinkInitiatorMachine::new(
+        initiator,
+        "alice-identity".to_string(),
+        TIMEOUT_SECS,
+        None,
+    );
+    let _ = host.advance(&broker, NOW);
+    let invitation = host.join_invitation().expect("invitation");
+    let mut joiner =
+        DeviceLinkResponderMachine::new(invitation, "New Phone".to_string(), TIMEOUT_SECS)
+            .expect("invitation parses");
+    let _ = joiner.advance(&broker, NOW + 1);
+    let _ = host.advance(&broker, NOW + 2);
+
+    let _ = host.cancel(&broker);
+
+    let told = joiner.advance(&broker, NOW + 3);
+    assert!(
+        matches!(&told, ResponderEvent::Failed { reason } if reason == "cancelled"),
+        "the joiner must learn the host left; got {told:?}"
+    );
+}

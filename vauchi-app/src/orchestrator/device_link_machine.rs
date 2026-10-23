@@ -313,9 +313,20 @@ impl DeviceLinkInitiatorMachine {
         }
     }
 
-    /// Navigation left the device-linking screen. Absorbing.
-    pub fn cancel(&mut self) -> InitiatorEvent {
-        self.state = State::Cancelled;
+    /// Navigation left the device-linking screen. Absorbing; a joiner
+    /// already waiting for confirmation is told the link was canceled.
+    pub fn cancel(&mut self, broker: &dyn DeviceLinkBroker) -> InitiatorEvent {
+        if let State::AwaitingConfirmation { sender_token, .. } =
+            std::mem::replace(&mut self.state, State::Cancelled)
+        {
+            let _ = self.refuse(
+                broker,
+                &sender_token,
+                DeviceLinkRefusalReason::Cancelled,
+                "cancelled",
+            );
+            self.state = State::Cancelled;
+        }
         InitiatorEvent::None
     }
 
@@ -689,7 +700,7 @@ mod tests {
         let broker = FakeBroker::new("B");
         let mut m = machine(build_initiator("Alice", 0x11));
 
-        assert_eq!(m.cancel(), InitiatorEvent::None);
+        assert_eq!(m.cancel(&broker), InitiatorEvent::None);
         assert_eq!(m.phase(), InitiatorPhase::Cancelled);
         // Even a past-deadline advance must not resurrect the machine.
         let _ = m.advance(&broker, NOW + TIMEOUT + 10_000);

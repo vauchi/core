@@ -168,7 +168,7 @@ impl AppEngine {
     /// so binding crates (cabi, platform) can cancel without a nav-out.
     pub fn cancel_device_link_session(&mut self) {
         if let Some(mut holder) = self.device_link_initiator.take() {
-            let _ = holder.machine.cancel();
+            let _ = holder.machine.cancel(holder.transport.as_ref());
         }
     }
 

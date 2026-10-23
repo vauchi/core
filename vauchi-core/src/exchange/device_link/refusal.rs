@@ -22,6 +22,7 @@ pub enum DeviceLinkRefusalReason {
     Declined,
     ConfirmationTimedOut,
     DeviceNameTaken,
+    Cancelled,
 }
 
 impl DeviceLinkRefusalReason {
@@ -30,6 +31,7 @@ impl DeviceLinkRefusalReason {
             Self::Declined => 1,
             Self::ConfirmationTimedOut => 2,
             Self::DeviceNameTaken => 3,
+            Self::Cancelled => 4,
         }
     }
 
@@ -38,6 +40,7 @@ impl DeviceLinkRefusalReason {
             1 => Some(Self::Declined),
             2 => Some(Self::ConfirmationTimedOut),
             3 => Some(Self::DeviceNameTaken),
+            4 => Some(Self::Cancelled),
             _ => None,
         }
     }

@@ -66,6 +66,7 @@ pub enum ResponderEvent {
     ResponseReady,
     /// Terminal failure (stable reason ids: `qr_expired`, `decrypt_error`,
     /// the host's `user_denied`, `user_confirm_timeout`, `device_name_taken`,
+    /// `cancelled`,
     /// `invalid_qr`, `relay_failed`, `link_failed`).
     Failed { reason: String },
 }
@@ -313,6 +314,7 @@ fn refusal_reason_id(reason: DeviceLinkRefusalReason) -> &'static str {
         DeviceLinkRefusalReason::Declined => "user_denied",
         DeviceLinkRefusalReason::ConfirmationTimedOut => "user_confirm_timeout",
         DeviceLinkRefusalReason::DeviceNameTaken => "device_name_taken",
+        DeviceLinkRefusalReason::Cancelled => "cancelled",
     }
 }
 

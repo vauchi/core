@@ -319,6 +319,7 @@ fn failure_detail(reason: &str, locale: Locale) -> String {
         "user_denied" => "device_link.failure_user_denied",
         "user_confirm_timeout" => "device_link.failure_confirm_timeout",
         "device_name_taken" => "device_link.failure_device_name_taken",
+        "cancelled" => "device_link.failure_cancelled",
         "relay_failed" => "device_link.failure_generic",
         "decrypt_error" => "device_link.failure_generic",
         "invalid_qr" => "device_link.failure_generic",

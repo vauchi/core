@@ -93,6 +93,35 @@ fn activate_next(app: &mut AppEngine, commands: &[Command]) -> Vec<Command> {
     .expect("activate")
 }
 
+/// Types the app password into the session PIN step's password field.
+fn enter_password(app: &mut AppEngine, commands: Vec<Command>) -> Vec<Command> {
+    fn find(nodes: &[PresentationNode]) -> Option<BindingId> {
+        nodes.iter().find_map(|node| match node {
+            PresentationNode::Input {
+                binding_id,
+                input_kind: PresentationInputKind::Password,
+                ..
+            } => Some(binding_id.clone()),
+            PresentationNode::Group { children, .. } => find(children),
+            _ => None,
+        })
+    }
+    let Some((surface_id, binding_id)) = commands.iter().find_map(|command| match command {
+        Command::ReplaceSurface { surface } => {
+            find(&surface.nodes).map(|binding_id| (surface.surface_id.clone(), binding_id))
+        }
+        _ => None,
+    }) else {
+        return commands;
+    };
+    app.dispatch(Event::ValueChanged {
+        surface_id,
+        binding_id,
+        value: InputValue::Text(PASSWORD.to_string()),
+    })
+    .expect("value change")
+}
+
 /// Types `keys` into the PIN field one keystroke at a time; `\u{8}` is a
 /// backspace.
 fn type_pin(
@@ -145,7 +174,8 @@ fn set_up_duress_pin(shell: Shell, keys: &str) -> AppEngine {
     commands = type_pin(&mut app, commands, shell, keys);
     commands = activate_next(&mut app, &commands); // → confirm PIN
     commands = type_pin(&mut app, commands, shell, keys);
-    commands = activate_next(&mut app, &commands); // → alerts
+    commands = activate_next(&mut app, &commands); // → session PIN step (#777)
+    commands = enter_password(&mut app, commands);
     let commands = activate_next(&mut app, &commands); // save
     assert!(
         commands.contains(&Command::PerformNativeBack),

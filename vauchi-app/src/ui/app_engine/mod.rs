@@ -12,6 +12,7 @@ mod ble_handshake;
 mod completion;
 #[cfg(feature = "content-updates")]
 mod content_runner;
+mod credential_gate;
 #[cfg(feature = "content-updates")]
 pub use content_runner::ContentRunOptions;
 mod completion_contact;
@@ -216,6 +217,8 @@ pub struct AppEngine {
     /// a device that can run it, so holding the unlocked phone is not enough
     /// to choose one (#766). Leaving the screen drops it.
     pub(super) pending_first_password: Option<zeroize::Zeroizing<String>>,
+    /// A duress PIN, revoke or voucher waiting on the session PIN (#777).
+    pending_credential_change: Option<credential_gate::PendingCredentialChange>,
     /// Where this device is reachable on the network it is attached to, as
     /// reported by the shell (ADR-070).
     ///
@@ -632,6 +635,7 @@ impl AppEngine {
             device_link_initiator: None,
             confirm_pin_failures: 0,
             pending_first_password: None,
+            pending_credential_change: None,
             local_network_address: None,
             #[cfg(all(feature = "network-http", feature = "storage"))]
             device_link_responder: None,
@@ -798,6 +802,10 @@ impl WorkflowEngine for AppEngine {
         // reminder, update link, tab nav, system back, settings gear,
         // demo-contact dismiss). See `dispatch::intercept_global_chrome`.
         if let Some(result) = self.intercept_global_chrome(&action) {
+            return result;
+        }
+
+        if let Some(result) = self.intercept_session_pin(&action) {
             return result;
         }
 

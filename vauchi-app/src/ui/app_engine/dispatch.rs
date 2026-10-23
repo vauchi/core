@@ -13,6 +13,7 @@
 
 #[cfg(feature = "network-http")]
 use super::SyncChromeStatus;
+use super::credential_gate::CredentialChange;
 use super::{
     ACTION_DISMISS_DEMO_CONTACT, ACTION_GO_BACK, ACTION_OPEN_SETTINGS, ACTION_OPEN_UPDATE_LINK,
     ACTION_SYNC_NOW, AppEngine, AppScreen, UPDATE_LINK_URL,
@@ -427,9 +428,12 @@ impl AppEngine {
         }
         if self.screen == AppScreen::RecoveryHelp
             && matches!(action, UserAction::ActionPressed { action_id } if action_id == "create_voucher")
-            && let Some(result) = self.intercept_create_voucher_action()
+            && matches!(
+                self.engine.engine_output(),
+                Some(crate::ui::EngineOutput::RecoveryHelp { .. })
+            )
         {
-            return Some(result);
+            return Some(self.confirm_session_pin_then(CredentialChange::RecoveryVoucher));
         }
 
         // Recovery screen (EnterOldKey step): hex-decode + sign claim

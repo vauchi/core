@@ -88,6 +88,17 @@ fn duress_pin_screen_renders_with_defaults() {
     assert_eq!(screen.title, "Duress PIN");
 }
 
+/// Every duress PIN change waits on the session PIN step (private#777).
+fn enter_session_pin(engine: &mut AppEngine, pin: &str) -> ActionResult {
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "pin".into(),
+        value: pin.into(),
+    });
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "confirm_pin".into(),
+    })
+}
+
 // @scenario: duress_password :: Duress PIN setup persists through AppEngine
 // @internal
 #[test]
@@ -120,9 +131,10 @@ fn duress_pin_setup_persists_via_handle_completion() {
         component_id: "confirm_pin".into(),
         value: "654321".into(),
     });
-    let result = engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
+    let result = enter_session_pin(&mut engine, "123456");
 
     // Should navigate back (not show error alert)
     assert!(
@@ -156,9 +168,10 @@ fn duress_pin_disable_persists_via_handle_completion() {
         component_id: "duress_actions".into(),
         item_id: "turn_off".into(),
     });
-    let result = engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "confirm_disable".into(),
     });
+    let result = enter_session_pin(&mut engine, "123456");
 
     assert!(
         matches!(result, ActionResult::NavigateTo(_)),

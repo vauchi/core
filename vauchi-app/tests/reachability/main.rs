@@ -51,6 +51,7 @@ mod places;
 mod recovery;
 mod recovery_claim_review;
 mod recovery_help;
+mod session_pin;
 mod settings;
 mod support;
 mod tag_promotion;

@@ -7,6 +7,7 @@
 
 use super::AppEngine;
 use super::AppScreen;
+use super::credential_gate::CredentialChange;
 use crate::ui::ScreenModel;
 use crate::ui::action::{ActionResult, ContactActionKind};
 use crate::ui::form_dialog::FormDialogType;
@@ -522,7 +523,10 @@ impl AppEngine {
             AppScreen::Privacy => self.complete_privacy(),
             AppScreen::FormDialog { dialog_type } => self.complete_form_dialog(dialog_type),
             AppScreen::ChangePassword => self.complete_change_password(),
-            AppScreen::DuressPin => self.complete_duress_pin(),
+            AppScreen::DuressPin => self.confirm_session_pin_then(CredentialChange::DuressPin),
+            AppScreen::DeviceManagement if self.revoke_is_confirmed() => {
+                self.confirm_session_pin_then(CredentialChange::DeviceRevoke)
+            }
             AppScreen::DeviceManagement => self.complete_device_management(),
             AppScreen::ContactDetail { contact_id } => self.complete_contact_detail(contact_id),
             AppScreen::ContactEdit { contact_id } => self.complete_contact_edit(contact_id),

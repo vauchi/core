@@ -69,6 +69,8 @@ mod recovery_status;
 mod rejection;
 pub mod render_context;
 mod screen;
+#[cfg(feature = "network-rustls")]
+mod session_pin;
 mod settings;
 mod storage_lock;
 mod support;
@@ -196,6 +198,8 @@ pub use screen::{
 pub use screen_catalog_fixture::{
     ScreenCatalogEntry, ScreenCatalogFixture, screen_catalog_fixture_json,
 };
+#[cfg(feature = "network-rustls")]
+pub use session_pin::{SESSION_PIN_SCREEN_ID, SessionPinEngine};
 pub use settings::{SettingsConfig, SettingsEngine, SettingsMode};
 pub use support::SupportEngine;
 pub use tag_promotion::{PromotionField, TagPromotionEngine};

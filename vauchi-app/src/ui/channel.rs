@@ -56,6 +56,9 @@ pub enum EngineOutput {
     /// PIN typed to confirm a data export (redacted in `Debug`). Absent
     /// while the entry is empty or the screen is past the PIN step.
     ExportPin { pin: String },
+    /// PIN typed at the step in front of a credential change (redacted in
+    /// `Debug`) (#777). Absent while the entry is empty.
+    SessionPin { pin: String },
     /// The export waits on the OS user-presence check (#712).
     AwaitingUserPresence,
     /// The export password the encrypted data export is sealed with
@@ -169,6 +172,8 @@ pub enum EngineUpdate {
     /// The biometric prompt succeeded but a duress PIN is set, so the lock
     /// screen asks for the password only (ADR-032, #591).
     BiometricUnlockPassed,
+    /// The PIN typed at a session PIN step was not the session's (#777).
+    SessionPinRejected,
     GdprExport(GdprExportUpdate),
 }
 
@@ -431,6 +436,7 @@ impl EngineUpdate {
             Self::ConfirmPendingDelete => "ConfirmPendingDelete",
             Self::DeviceCapabilities(_) => "DeviceCapabilities",
             Self::BiometricUnlockPassed => "BiometricUnlockPassed",
+            Self::SessionPinRejected => "SessionPinRejected",
             Self::GdprExport(u) => match u {
                 GdprExportUpdate::Verified => "GdprExport::Verified",
                 GdprExportUpdate::PinRejected => "GdprExport::PinRejected",
@@ -594,6 +600,10 @@ impl std::fmt::Debug for EngineOutput {
                 .finish(),
             Self::ExportPin { .. } => f
                 .debug_struct("ExportPin")
+                .field("pin", &"<redacted>")
+                .finish(),
+            Self::SessionPin { .. } => f
+                .debug_struct("SessionPin")
                 .field("pin", &"<redacted>")
                 .finish(),
             Self::AwaitingUserPresence => f.write_str("AwaitingUserPresence"),

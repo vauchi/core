@@ -188,6 +188,7 @@ impl AppEngine {
             return self.engine.current_screen();
         }
         self.pending_first_password = None;
+        self.drop_pending_credential_change();
         // Refresh identity from storage if a sibling `Vauchi` instance
         // (e.g. `VauchiPlatform` on iOS/Android) wrote one to disk after
         // this AppEngine was constructed. Without this, screen builders
@@ -302,6 +303,7 @@ impl AppEngine {
         if matches!(screen, AppScreen::Lock) {
             self.session_locked = true;
         }
+        self.drop_pending_credential_change();
         let new_engine = self.engine_cache.remove(&screen).unwrap_or_else(|| {
             Self::create_engine(
                 &self.vauchi,
@@ -337,6 +339,7 @@ impl AppEngine {
             return self.engine.current_screen();
         }
         self.pending_first_password = None;
+        self.drop_pending_credential_change();
         if self.engine.navigate_back_within() {
             // Re-decorate the same engine's screen exactly as
             // `navigate_to_internal` does for its final return, so the

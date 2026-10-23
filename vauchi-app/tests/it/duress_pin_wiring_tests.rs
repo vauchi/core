@@ -21,6 +21,7 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 
 const PIN: &str = "135790";
+const APP_PASSWORD: &str = "app-password-123";
 
 /// Identity + app password (duress setup is gated on an app password,
 /// mirroring the real Settings → Security flow).
@@ -30,8 +31,9 @@ fn engine_ready() -> AppEngine {
     let mut engine = AppEngine::new(vauchi);
     engine
         .vauchi_mut()
-        .setup_app_password("app-password-123")
+        .setup_app_password(APP_PASSWORD)
         .unwrap();
+    engine.vauchi_mut().authenticate(APP_PASSWORD).unwrap();
     engine
 }
 
@@ -88,14 +90,19 @@ fn type_into(engine: &mut AppEngine, component_id: &str, text: &str) {
     }
 }
 
-/// Overview → EnterPin → ConfirmPin with matching PINs; confirming is the
-/// last step.
+/// Overview → EnterPin → ConfirmPin with matching PINs, then the session
+/// PIN step every duress PIN change waits on (#777).
 fn set_up_duress_pin(engine: &mut AppEngine) -> ActionResult {
     let _ = start_setup(engine);
     type_into(engine, "pin", PIN);
     let _ = press(engine, "continue");
     type_into(engine, "confirm_pin", PIN);
-    press(engine, "continue")
+    let _ = press(engine, "continue");
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "pin".into(),
+        value: APP_PASSWORD.into(),
+    });
+    press(engine, "confirm_pin")
 }
 
 // @scenario: duress_mode :: Enable duress password (requires app password)

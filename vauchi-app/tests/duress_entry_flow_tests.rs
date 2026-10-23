@@ -91,10 +91,13 @@ fn fill(app: &mut AppEngine, commands: &[Command], surface: &str, value: &str) -
 ///
 /// `DuressPinEngine` is a four-step sub-flow (overview → enter PIN → confirm
 /// → alerts), so no single dispatch completes it.
+/// Types `duress_pin` into the duress PIN inputs and `app_password` into
+/// the password input the session PIN step shows (#777).
 fn drive_until_native_back(
     app: &mut AppEngine,
     mut commands: Vec<Command>,
-    value: &str,
+    duress_pin: &str,
+    app_password: &str,
     max_steps: usize,
 ) -> Vec<Command> {
     for _ in 0..max_steps {
@@ -106,7 +109,13 @@ fn drive_until_native_back(
             _ => None,
         }) {
             let surface_id = surface.surface_id.clone();
+            let password_input = input_binding(&surface.nodes, "password");
             for binding_id in all_input_bindings(&surface.nodes) {
+                let value = if password_input.as_ref() == Some(&binding_id) {
+                    app_password
+                } else {
+                    duress_pin
+                };
                 commands = app
                     .dispatch(Event::ValueChanged {
                         surface_id: surface_id.clone(),
@@ -285,7 +294,8 @@ fn completing_duress_setup_terminates_the_entry_flow() {
         .initial_commands()
         .expect("initial duress-entry commands");
 
-    let after_submit = drive_until_native_back(&mut app, commands, "987654", 12);
+    let after_submit =
+        drive_until_native_back(&mut app, commands, "987654", "existing-pin-1234", 14);
 
     assert!(
         after_submit.contains(&Command::PerformNativeBack),

@@ -33,6 +33,27 @@ fn a_voucher_with_a_guardian_token_round_trips() {
     );
 }
 
+/// A token length near `u32::MAX` makes `173 + token_len` wrap on a 32-bit
+/// `usize`, so the length check passes and the slice panics (#784, the
+/// shape of #756). Anyone can hand over a voucher.
+// @internal
+#[test]
+fn a_voucher_whose_token_length_wraps_a_32_bit_usize_is_refused() {
+    let bytes = voucher_with_token().to_bytes();
+
+    for declared in [u32::MAX, u32::MAX - 172, u32::MAX - 100, 0x8000_0000] {
+        let mut forged = bytes.clone();
+        forged[169..173].copy_from_slice(&declared.to_le_bytes());
+        assert!(
+            matches!(
+                RecoveryVoucher::from_bytes(&forged),
+                Err(RecoveryError::InvalidFormat)
+            ),
+            "declared token length {declared:#x}"
+        );
+    }
+}
+
 // @internal
 #[test]
 fn a_voucher_whose_token_is_cut_short_is_refused() {

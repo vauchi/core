@@ -803,6 +803,9 @@ test:core-32bit:
     - apt-get install -y --no-install-recommends sccache
     - sh ci/tests/rust-cache.test.sh
     - cargo test --locked -p vauchi-core --lib --features test-kdf
+    # Integration tests that guard a 32-bit usize (#784) carry `32_bit` in
+    # their name; only this job runs them where the bug can happen.
+    - cargo test --locked -p vauchi-core --features "test-kdf testing" --test it -- 32_bit
   after_script:
     - sccache --show-stats
   rules:

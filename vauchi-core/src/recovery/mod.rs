@@ -497,7 +497,9 @@ impl RecoveryVoucher {
                     .try_into()
                     .map_err(|_| RecoveryError::InvalidFormat)?,
             ) as usize;
-            if bytes.len() < 173 + token_len {
+            // Subtract rather than add: on 32-bit targets `173 + token_len`
+            // wraps for a declared length near u32::MAX (#784).
+            if token_len > bytes.len() - 173 {
                 return Err(RecoveryError::InvalidFormat);
             }
             let token = guardian::GuardianToken::from_bytes(&bytes[173..173 + token_len])?;

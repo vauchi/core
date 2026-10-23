@@ -174,7 +174,7 @@ impl AppEngine {
             }
             return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
         }
-        if let Err(e) = self.vauchi.setup_app_password(&password) {
+        if let Err(e) = self.set_first_app_password(&password) {
             return Some(ActionResult::ShowAlert {
                 title: self.t("error.title"),
                 message: format!("Could not set password: {e}"),

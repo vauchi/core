@@ -561,7 +561,7 @@ impl AppEngine {
                         let result = if had_password {
                             self.vauchi.change_app_password(&current, &new)
                         } else {
-                            self.vauchi.setup_app_password(&new)
+                            self.set_first_app_password(&new)
                         };
                         password_was_set = result.is_ok();
                         result.err().map(|e| {
@@ -588,6 +588,18 @@ impl AppEngine {
             }
         }
         self.finish_password_change(password_was_set)
+    }
+
+    /// Sets the first app password and opens this session with it, as an
+    /// unlock would: left unauthenticated, the session PIN step would refuse
+    /// the password it was just set with (private#777). Locking and
+    /// reopening with it grants the same.
+    pub(super) fn set_first_app_password(
+        &mut self,
+        password: &str,
+    ) -> vauchi_core::api::VauchiResult<()> {
+        self.vauchi.setup_app_password(password)?;
+        self.vauchi.authenticate(password).map(|_| ())
     }
 
     /// Leaves the password screen once a change ends: on to the duress PIN

@@ -224,6 +224,29 @@ fn failed_bridge_renders_honest_failure_copy() {
     );
 }
 
+// A joiner named after a linked device failed with the generic sentence, so
+// the user never learned to pick another name (vauchi/private#671).
+// @internal
+#[test]
+fn a_taken_device_name_tells_the_user_to_rename_the_new_device() {
+    let mut engine = engine_on_device_linking();
+    let screen = engine
+        .device_link_failed("device_name_taken".into())
+        .expect("on device linking screen");
+    let detail = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            vauchi_app::ui::Component::StatusIndicator { detail, .. } => detail.clone(),
+            _ => None,
+        })
+        .expect("status detail present");
+    assert_eq!(
+        detail,
+        "A device with this name is already linked. On the new device, start again and give it a different name."
+    );
+}
+
 // @scenario: pair5_device_link_bridge :: cancel from any device-link step navigates away
 #[test]
 fn cancel_from_any_step_navigates_away_from_device_linking() {

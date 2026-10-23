@@ -1,0 +1,1945 @@
+{
+  "apis": [
+    "vauchi_cabi::app::cabi::vauchi_app_create",
+    "vauchi_cabi::app::cabi::vauchi_app_create_identity",
+    "vauchi_cabi::app::cabi::vauchi_app_create_with_config",
+    "vauchi_cabi::app::cabi::vauchi_app_create_with_key",
+    "vauchi_cabi::app::cabi::vauchi_app_create_with_keyring",
+    "vauchi_cabi::app::cabi::vauchi_app_create_with_relay",
+    "vauchi_cabi::app::cabi::vauchi_app_destroy",
+    "vauchi_cabi::app::cabi::vauchi_app_drain_notifications",
+    "vauchi_cabi::app::cabi::vauchi_app_has_identity",
+    "vauchi_cabi::app::cabi::vauchi_app_import_contacts_from_vcf",
+    "vauchi_cabi::app::cabi::vauchi_app_on_wakeup",
+    "vauchi_cabi::app::cabi::vauchi_app_poll_notifications",
+    "vauchi_cabi::app::cabi::vauchi_app_set_event_callback",
+    "vauchi_cabi::app_presentation::cabi::vauchi_app_dispatch",
+    "vauchi_cabi::app_presentation::cabi::vauchi_app_initial_commands",
+    "vauchi_cabi::app_presentation::cabi::vauchi_app_set_render_context_json",
+    "vauchi_cabi::app_presentation::cabi::vauchi_presentation_contract_fixture",
+    "vauchi_cabi::cabi::vauchi_app_create_from_config",
+    "vauchi_cabi::cabi::vauchi_config_free",
+    "vauchi_cabi::cabi::vauchi_config_new",
+    "vauchi_cabi::cabi::vauchi_config_set_storage_key",
+    "vauchi_cabi::cabi::vauchi_string_free",
+    "vauchi_cabi::design_tokens::cabi::vauchi_design_tokens_json",
+    "vauchi_cabi::exchange::cabi::vauchi_exchange_complete",
+    "vauchi_cabi::exchange::cabi::vauchi_exchange_confirm_proximity",
+    "vauchi_cabi::exchange::cabi::vauchi_exchange_create",
+    "vauchi_cabi::exchange::cabi::vauchi_exchange_debug_jsonl",
+    "vauchi_cabi::exchange::cabi::vauchi_exchange_debug_markdown",
+    "vauchi_cabi::exchange::cabi::vauchi_exchange_destroy",
+    "vauchi_cabi::exchange::cabi::vauchi_exchange_enable_debug_log",
+    "vauchi_cabi::exchange::cabi::vauchi_exchange_generate_qr",
+    "vauchi_cabi::exchange::cabi::vauchi_exchange_is_timed_out",
+    "vauchi_cabi::exchange::cabi::vauchi_exchange_peer_display_name",
+    "vauchi_cabi::exchange::cabi::vauchi_exchange_perform_key_agreement",
+    "vauchi_cabi::exchange::cabi::vauchi_exchange_process_qr",
+    "vauchi_cabi::exchange::cabi::vauchi_exchange_state",
+    "vauchi_cabi::exchange::cabi::vauchi_exchange_they_scanned_our_qr",
+    "vauchi_cabi::i18n::cabi::vauchi_i18n_available_locales",
+    "vauchi_cabi::i18n::cabi::vauchi_i18n_get_string",
+    "vauchi_cabi::i18n::cabi::vauchi_i18n_init",
+    "vauchi_cabi::i18n::cabi::vauchi_i18n_is_initialized",
+    "vauchi_cabi::logging::cabi::vauchi_cabi_init_logging",
+    "vauchi_platform::diagnostic::uniffi::diagnostic_generate_extended_qr_test_patterns",
+    "vauchi_platform::diagnostic::uniffi::diagnostic_generate_qr_test_patterns",
+    "vauchi_platform::diagnostic::uniffi::diagnostic_generate_sweep_matrix",
+    "vauchi_platform::diagnostic::uniffi::diagnostic_generate_throughput_sequence",
+    "vauchi_platform::diagnostic::uniffi::diagnostic_load_yolo_model",
+    "vauchi_platform::diagnostic::uniffi::diagnostic_rank_configs",
+    "vauchi_platform::diagnostic::uniffi::diagnostic_scan_qr_with_config",
+    "vauchi_platform::diagnostic::uniffi::diagnostic_scan_qr_yolo",
+    "vauchi_platform::diagnostic::uniffi::diagnostic_score_config",
+    "vauchi_platform::diagnostic::uniffi::generate_qr_bitmap",
+    "vauchi_platform::diagnostic::uniffi::scan_qr",
+    "vauchi_platform::domain_command::DomainCommand::AddContactToGroup",
+    "vauchi_platform::domain_command::DomainCommand::AddDecoyContact",
+    "vauchi_platform::domain_command::DomainCommand::AddField",
+    "vauchi_platform::domain_command::DomainCommand::AddRecoveryVoucher",
+    "vauchi_platform::domain_command::DomainCommand::AdvanceOnboarding",
+    "vauchi_platform::domain_command::DomainCommand::AhaMomentsSeenCount",
+    "vauchi_platform::domain_command::DomainCommand::AhaMomentsTotalCount",
+    "vauchi_platform::domain_command::DomainCommand::ArchiveContact",
+    "vauchi_platform::domain_command::DomainCommand::Authenticate",
+    "vauchi_platform::domain_command::DomainCommand::AutoRemoveDemoContact",
+    "vauchi_platform::domain_command::DomainCommand::CalculateRetryBackoff",
+    "vauchi_platform::domain_command::DomainCommand::CancelIdentityDeletion",
+    "vauchi_platform::domain_command::DomainCommand::CancelShred",
+    "vauchi_platform::domain_command::DomainCommand::CheckConsent",
+    "vauchi_platform::domain_command::DomainCommand::ClearContactCustomAvatar",
+    "vauchi_platform::domain_command::DomainCommand::ClearContactNickname",
+    "vauchi_platform::domain_command::DomainCommand::ClearOwnAvatar",
+    "vauchi_platform::domain_command::DomainCommand::ClearPendingUpdatesForContact",
+    "vauchi_platform::domain_command::DomainCommand::ConfigureEmergencyBroadcast",
+    "vauchi_platform::domain_command::DomainCommand::ContactCount",
+    "vauchi_platform::domain_command::DomainCommand::ContactDetailFooterActionId",
+    "vauchi_platform::domain_command::DomainCommand::ContactDetailViewState",
+    "vauchi_platform::domain_command::DomainCommand::CountFailedDeliveries",
+    "vauchi_platform::domain_command::DomainCommand::CreateIdentity",
+    "vauchi_platform::domain_command::DomainCommand::CreateLabel",
+    "vauchi_platform::domain_command::DomainCommand::CreateRecoveryClaim",
+    "vauchi_platform::domain_command::DomainCommand::CreateRecoveryVoucher",
+    "vauchi_platform::domain_command::DomainCommand::CurrentOnboardingStep",
+    "vauchi_platform::domain_command::DomainCommand::DeleteContactFieldNote",
+    "vauchi_platform::domain_command::DomainCommand::DeleteContactNote",
+    "vauchi_platform::domain_command::DomainCommand::DeleteDecoyContact",
+    "vauchi_platform::domain_command::DomainCommand::DeleteLabel",
+    "vauchi_platform::domain_command::DomainCommand::DeleteRetry",
+    "vauchi_platform::domain_command::DomainCommand::DisableDuress",
+    "vauchi_platform::domain_command::DomainCommand::DisableEmergencyBroadcast",
+    "vauchi_platform::domain_command::DomainCommand::DismissDemoContact",
+    "vauchi_platform::domain_command::DomainCommand::DismissDuplicate",
+    "vauchi_platform::domain_command::DomainCommand::DisplayNameSuggestions",
+    "vauchi_platform::domain_command::DomainCommand::EncodeMultipartQr",
+    "vauchi_platform::domain_command::DomainCommand::ExecuteIdentityDeletion",
+    "vauchi_platform::domain_command::DomainCommand::ExportBackup",
+    "vauchi_platform::domain_command::DomainCommand::ExportFullBackup",
+    "vauchi_platform::domain_command::DomainCommand::ExportGdprData",
+    "vauchi_platform::domain_command::DomainCommand::FindDuplicates",
+    "vauchi_platform::domain_command::DomainCommand::GenerateDeviceLinkQr",
+    "vauchi_platform::domain_command::DomainCommand::GetAllDeliveryRecords",
+    "vauchi_platform::domain_command::DomainCommand::GetConsentRecords",
+    "vauchi_platform::domain_command::DomainCommand::GetConsentStatus",
+    "vauchi_platform::domain_command::DomainCommand::GetContact",
+    "vauchi_platform::domain_command::DomainCommand::GetContactCustomAvatar",
+    "vauchi_platform::domain_command::DomainCommand::GetContactDisplayOptions",
+    "vauchi_platform::domain_command::DomainCommand::GetContactFieldNotes",
+    "vauchi_platform::domain_command::DomainCommand::GetContactNote",
+    "vauchi_platform::domain_command::DomainCommand::GetDeletionState",
+    "vauchi_platform::domain_command::DomainCommand::GetDeliveryCountByStatus",
+    "vauchi_platform::domain_command::DomainCommand::GetDeliveryRecord",
+    "vauchi_platform::domain_command::DomainCommand::GetDeliveryRecordsForContact",
+    "vauchi_platform::domain_command::DomainCommand::GetDeliverySummary",
+    "vauchi_platform::domain_command::DomainCommand::GetDemoContact",
+    "vauchi_platform::domain_command::DomainCommand::GetDemoContactState",
+    "vauchi_platform::domain_command::DomainCommand::GetDeviceCount",
+    "vauchi_platform::domain_command::DomainCommand::GetDeviceDeliveries",
+    "vauchi_platform::domain_command::DomainCommand::GetDevices",
+    "vauchi_platform::domain_command::DomainCommand::GetDisplayName",
+    "vauchi_platform::domain_command::DomainCommand::GetDueRetries",
+    "vauchi_platform::domain_command::DomainCommand::GetEmergencyConfig",
+    "vauchi_platform::domain_command::DomainCommand::GetFailedDeliveryRecords",
+    "vauchi_platform::domain_command::DomainCommand::GetGroupsForContact",
+    "vauchi_platform::domain_command::DomainCommand::GetLabel",
+    "vauchi_platform::domain_command::DomainCommand::GetOfflineQueueCapacity",
+    "vauchi_platform::domain_command::DomainCommand::GetOnboardingProgress",
+    "vauchi_platform::domain_command::DomainCommand::GetOwnCard",
+    "vauchi_platform::domain_command::DomainCommand::GetOwnFingerprint",
+    "vauchi_platform::domain_command::DomainCommand::GetPendingDeliveries",
+    "vauchi_platform::domain_command::DomainCommand::GetPendingDeviceDeliveries",
+    "vauchi_platform::domain_command::DomainCommand::GetProfileUrl",
+    "vauchi_platform::domain_command::DomainCommand::GetPublicId",
+    "vauchi_platform::domain_command::DomainCommand::GetRecoveryProof",
+    "vauchi_platform::domain_command::DomainCommand::GetRecoveryStatus",
+    "vauchi_platform::domain_command::DomainCommand::GetRetriesForContact",
+    "vauchi_platform::domain_command::DomainCommand::GetRetryCount",
+    "vauchi_platform::domain_command::DomainCommand::GetSuggestedLabels",
+    "vauchi_platform::domain_command::DomainCommand::GetTotalPendingCount",
+    "vauchi_platform::domain_command::DomainCommand::GrantConsent",
+    "vauchi_platform::domain_command::DomainCommand::HardDeleteImportedContact",
+    "vauchi_platform::domain_command::DomainCommand::HardShred",
+    "vauchi_platform::domain_command::DomainCommand::HasSeenAhaMoment",
+    "vauchi_platform::domain_command::DomainCommand::HideContact",
+    "vauchi_platform::domain_command::DomainCommand::HideFieldFromContact",
+    "vauchi_platform::domain_command::DomainCommand::IgnoreContact",
+    "vauchi_platform::domain_command::DomainCommand::ImportBackup",
+    "vauchi_platform::domain_command::DomainCommand::ImportContactsFromVcf",
+    "vauchi_platform::domain_command::DomainCommand::ImportFullBackup",
+    "vauchi_platform::domain_command::DomainCommand::InitDemoContactIfNeeded",
+    "vauchi_platform::domain_command::DomainCommand::IsCertificatePinningEnabled",
+    "vauchi_platform::domain_command::DomainCommand::IsDemoUpdateAvailable",
+    "vauchi_platform::domain_command::DomainCommand::IsDuressEnabled",
+    "vauchi_platform::domain_command::DomainCommand::IsFieldVisibleToContact",
+    "vauchi_platform::domain_command::DomainCommand::IsOfflineQueueFull",
+    "vauchi_platform::domain_command::DomainCommand::IsOnboardingComplete",
+    "vauchi_platform::domain_command::DomainCommand::IsPasswordEnabled",
+    "vauchi_platform::domain_command::DomainCommand::IsPrimaryDevice",
+    "vauchi_platform::domain_command::DomainCommand::ListArchivedContacts",
+    "vauchi_platform::domain_command::DomainCommand::ListContacts",
+    "vauchi_platform::domain_command::DomainCommand::ListContactsPaginated",
+    "vauchi_platform::domain_command::DomainCommand::ListDecoyContacts",
+    "vauchi_platform::domain_command::DomainCommand::ListHiddenContacts",
+    "vauchi_platform::domain_command::DomainCommand::ListLabels",
+    "vauchi_platform::domain_command::DomainCommand::ListSocialNetworks",
+    "vauchi_platform::domain_command::DomainCommand::ManualRetry",
+    "vauchi_platform::domain_command::DomainCommand::MergeContacts",
+    "vauchi_platform::domain_command::DomainCommand::PanicShred",
+    "vauchi_platform::domain_command::DomainCommand::ParseDeviceLinkQr",
+    "vauchi_platform::domain_command::DomainCommand::ParseRecoveryClaim",
+    "vauchi_platform::domain_command::DomainCommand::PendingUpdateCount",
+    "vauchi_platform::domain_command::DomainCommand::RemoveContact",
+    "vauchi_platform::domain_command::DomainCommand::RemoveContactFieldOverride",
+    "vauchi_platform::domain_command::DomainCommand::RemoveContactFromGroup",
+    "vauchi_platform::domain_command::DomainCommand::RemoveField",
+    "vauchi_platform::domain_command::DomainCommand::RenameLabel",
+    "vauchi_platform::domain_command::DomainCommand::ResetAhaMoments",
+    "vauchi_platform::domain_command::DomainCommand::ResetOnboarding",
+    "vauchi_platform::domain_command::DomainCommand::RestoreDemoContact",
+    "vauchi_platform::domain_command::DomainCommand::RevokeConsent",
+    "vauchi_platform::domain_command::DomainCommand::RunContentUpdateCycle",
+    "vauchi_platform::domain_command::DomainCommand::SaveRecoveryResponse",
+    "vauchi_platform::domain_command::DomainCommand::ScheduleIdentityDeletion",
+    "vauchi_platform::domain_command::DomainCommand::SearchContacts",
+    "vauchi_platform::domain_command::DomainCommand::SearchSocialNetworks",
+    "vauchi_platform::domain_command::DomainCommand::SendEmergencyBroadcast",
+    "vauchi_platform::domain_command::DomainCommand::SetAvatarPreference",
+    "vauchi_platform::domain_command::DomainCommand::SetContactCustomAvatar",
+    "vauchi_platform::domain_command::DomainCommand::SetContactFieldNote",
+    "vauchi_platform::domain_command::DomainCommand::SetContactFieldOverride",
+    "vauchi_platform::domain_command::DomainCommand::SetContactNickname",
+    "vauchi_platform::domain_command::DomainCommand::SetContactNote",
+    "vauchi_platform::domain_command::DomainCommand::SetDisplayName",
+    "vauchi_platform::domain_command::DomainCommand::SetDisplayNamePreference",
+    "vauchi_platform::domain_command::DomainCommand::SetGroupFieldVisibility",
+    "vauchi_platform::domain_command::DomainCommand::SetOwnAvatar",
+    "vauchi_platform::domain_command::DomainCommand::SetPinnedCertificate",
+    "vauchi_platform::domain_command::DomainCommand::SetProposalTrusted",
+    "vauchi_platform::domain_command::DomainCommand::SetupAppPassword",
+    "vauchi_platform::domain_command::DomainCommand::SetupDuressPassword",
+    "vauchi_platform::domain_command::DomainCommand::ShowFieldToContact",
+    "vauchi_platform::domain_command::DomainCommand::ShredStatus",
+    "vauchi_platform::domain_command::DomainCommand::SkipOnboardingStep",
+    "vauchi_platform::domain_command::DomainCommand::SoftDeleteImportedContact",
+    "vauchi_platform::domain_command::DomainCommand::SoftShred",
+    "vauchi_platform::domain_command::DomainCommand::Sync",
+    "vauchi_platform::domain_command::DomainCommand::TriggerDemoUpdate",
+    "vauchi_platform::domain_command::DomainCommand::TrustContactForRecovery",
+    "vauchi_platform::domain_command::DomainCommand::TrustedContactCount",
+    "vauchi_platform::domain_command::DomainCommand::TryTriggerAhaMoment",
+    "vauchi_platform::domain_command::DomainCommand::TryTriggerAhaMomentWithContext",
+    "vauchi_platform::domain_command::DomainCommand::UnarchiveContact",
+    "vauchi_platform::domain_command::DomainCommand::UndoDeleteImportedContact",
+    "vauchi_platform::domain_command::DomainCommand::UnhideContact",
+    "vauchi_platform::domain_command::DomainCommand::UnignoreContact",
+    "vauchi_platform::domain_command::DomainCommand::UnlinkDevice",
+    "vauchi_platform::domain_command::DomainCommand::UntrustContactForRecovery",
+    "vauchi_platform::domain_command::DomainCommand::UpdateField",
+    "vauchi_platform::domain_command::DomainCommand::UploadGuardianEntries",
+    "vauchi_platform::domain_command::DomainCommand::VerifyContact",
+    "vauchi_platform::domain_command::DomainCommand::VerifyRecoveryProof",
+    "vauchi_platform::domain_command::DomainCommandResult::AhaMomentOpt",
+    "vauchi_platform::domain_command::DomainCommandResult::AuthMode",
+    "vauchi_platform::domain_command::DomainCommandResult::AvatarOpt",
+    "vauchi_platform::domain_command::DomainCommandResult::BackoffSeconds",
+    "vauchi_platform::domain_command::DomainCommandResult::Bool",
+    "vauchi_platform::domain_command::DomainCommandResult::BroadcastResult",
+    "vauchi_platform::domain_command::DomainCommandResult::ConsentRecords",
+    "vauchi_platform::domain_command::DomainCommandResult::ConsentStatus",
+    "vauchi_platform::domain_command::DomainCommandResult::ContactCardPayload",
+    "vauchi_platform::domain_command::DomainCommandResult::ContactDetailView",
+    "vauchi_platform::domain_command::DomainCommandResult::ContactDisplayOptions",
+    "vauchi_platform::domain_command::DomainCommandResult::ContactOpt",
+    "vauchi_platform::domain_command::DomainCommandResult::ContactSingle",
+    "vauchi_platform::domain_command::DomainCommandResult::Contacts",
+    "vauchi_platform::domain_command::DomainCommandResult::ContentUpdateCycle",
+    "vauchi_platform::domain_command::DomainCommandResult::Count",
+    "vauchi_platform::domain_command::DomainCommandResult::DecoyContacts",
+    "vauchi_platform::domain_command::DomainCommandResult::DeletionInfo",
+    "vauchi_platform::domain_command::DomainCommandResult::DeliveryRecordOpt",
+    "vauchi_platform::domain_command::DomainCommandResult::DeliveryRecords",
+    "vauchi_platform::domain_command::DomainCommandResult::DeliverySummary",
+    "vauchi_platform::domain_command::DomainCommandResult::DemoContactOpt",
+    "vauchi_platform::domain_command::DomainCommandResult::DemoContactState",
+    "vauchi_platform::domain_command::DomainCommandResult::DeviceDeliveries",
+    "vauchi_platform::domain_command::DomainCommandResult::DeviceLinkData",
+    "vauchi_platform::domain_command::DomainCommandResult::DeviceLinkInfo",
+    "vauchi_platform::domain_command::DomainCommandResult::Devices",
+    "vauchi_platform::domain_command::DomainCommandResult::DuplicatePairs",
+    "vauchi_platform::domain_command::DomainCommandResult::FieldNotes",
+    "vauchi_platform::domain_command::DomainCommandResult::GdprExport",
+    "vauchi_platform::domain_command::DomainCommandResult::ImportResult",
+    "vauchi_platform::domain_command::DomainCommandResult::Label",
+    "vauchi_platform::domain_command::DomainCommandResult::LabelDetail",
+    "vauchi_platform::domain_command::DomainCommandResult::Labels",
+    "vauchi_platform::domain_command::DomainCommandResult::OnboardingProgress",
+    "vauchi_platform::domain_command::DomainCommandResult::OnboardingStep",
+    "vauchi_platform::domain_command::DomainCommandResult::OptionalEmergencyConfig",
+    "vauchi_platform::domain_command::DomainCommandResult::OptionalRecoveryProgress",
+    "vauchi_platform::domain_command::DomainCommandResult::RecoveryClaim",
+    "vauchi_platform::domain_command::DomainCommandResult::RecoveryProgress",
+    "vauchi_platform::domain_command::DomainCommandResult::RecoveryVerification",
+    "vauchi_platform::domain_command::DomainCommandResult::RecoveryVoucher",
+    "vauchi_platform::domain_command::DomainCommandResult::RetryEntries",
+    "vauchi_platform::domain_command::DomainCommandResult::ShredCompleted",
+    "vauchi_platform::domain_command::DomainCommandResult::ShredScheduled",
+    "vauchi_platform::domain_command::DomainCommandResult::ShredStatus",
+    "vauchi_platform::domain_command::DomainCommandResult::SocialNetworks",
+    "vauchi_platform::domain_command::DomainCommandResult::StringOpt",
+    "vauchi_platform::domain_command::DomainCommandResult::Strings",
+    "vauchi_platform::domain_command::DomainCommandResult::SyncResult",
+    "vauchi_platform::domain_command::DomainCommandResult::Text",
+    "vauchi_platform::domain_command::DomainCommandResult::Unit",
+    "vauchi_platform::exchange_view::uniffi::exchange_view_state",
+    "vauchi_platform::logging::uniffi::init_mobile_logging",
+    "vauchi_platform::platform_app_engine::uniffi::PlatformAppEngine::dispatch_domain_command",
+    "vauchi_platform::platform_app_engine::uniffi::PlatformAppEngine::dispatch_json",
+    "vauchi_platform::platform_app_engine::uniffi::PlatformAppEngine::has_identity",
+    "vauchi_platform::platform_app_engine::uniffi::PlatformAppEngine::initial_commands_json",
+    "vauchi_platform::platform_app_engine::uniffi::PlatformAppEngine::on_wakeup",
+    "vauchi_platform::platform_app_engine::uniffi::PlatformAppEngine::open_with_keychain",
+    "vauchi_platform::platform_app_engine::uniffi::PlatformAppEngine::periodic_sync_tick",
+    "vauchi_platform::platform_app_engine::uniffi::PlatformAppEngine::poll_notifications",
+    "vauchi_platform::platform_app_engine::uniffi::PlatformAppEngine::set_device_capabilities_json",
+    "vauchi_platform::platform_app_engine::uniffi::PlatformAppEngine::set_event_listener",
+    "vauchi_platform::platform_app_engine::uniffi::PlatformAppEngine::set_network_online",
+    "vauchi_platform::platform_app_engine::uniffi::PlatformAppEngine::set_render_context_json",
+    "vauchi_platform::platform_app_engine::uniffi::PlatformEventListener",
+    "vauchi_platform::platform_app_engine::uniffi::PlatformEventListener::on_presentation_invalidated",
+    "vauchi_platform::policies::uniffi::mobile_clipboard_policy",
+    "vauchi_platform::policies::uniffi::mobile_generate_storage_key",
+    "vauchi_platform::policies::uniffi::mobile_storage_key_byte_length",
+    "vauchi_platform::types::device::uniffi::sync_status_view",
+    "vauchi_platform::uniffi::MobilePlatformKeychain",
+    "vauchi_platform::uniffi::MobilePlatformKeychain::delete_key",
+    "vauchi_platform::uniffi::MobilePlatformKeychain::load_key",
+    "vauchi_platform::uniffi::MobilePlatformKeychain::save_key",
+    "vauchi_platform::uniffi::app_compat_version",
+    "vauchi_platform::uniffi::core_version",
+    "vauchi_platform::uniffi::generate_storage_key",
+    "vauchi_platform::uniffi::get_aha_moment_localized",
+    "vauchi_platform::uniffi::get_available_locales",
+    "vauchi_platform::uniffi::get_available_themes",
+    "vauchi_platform::uniffi::get_default_theme_id",
+    "vauchi_platform::uniffi::get_locale_info",
+    "vauchi_platform::uniffi::get_string",
+    "vauchi_platform::uniffi::get_string_with_args",
+    "vauchi_platform::uniffi::get_theme",
+    "vauchi_platform::uniffi::hardware_event_json",
+    "vauchi_platform::uniffi::init_locales",
+    "vauchi_platform::uniffi::is_allowed_scheme",
+    "vauchi_platform::uniffi::is_blocked_scheme",
+    "vauchi_platform::uniffi::is_safe_url",
+    "vauchi_platform::uniffi::is_valid_relay_url",
+    "vauchi_platform::uniffi::parse_locale_code",
+    "vauchi_platform::uniffi::presentation_contract_fixture_json",
+    "vauchi_platform::uniffi::widget_panic_shred",
+    "vauchi_platform::validation::uniffi::mobile_is_valid_email",
+    "vauchi_platform::validation::uniffi::mobile_is_valid_pem_certificate",
+    "vauchi_platform::validation::uniffi::mobile_is_valid_phone",
+    "vauchi_platform::validation::uniffi::mobile_is_valid_relay_url",
+    "vauchi_platform::validation::uniffi::passcode_max_length",
+    "vauchi_platform::validation::uniffi::passcode_min_length",
+    "vauchi_platform::validation::uniffi::password_min_length",
+    "vauchi_platform::validation::uniffi::recovery_claim_min_input_length",
+    "vauchi_platform::validation::uniffi::recovery_public_key_hex_length"
+  ],
+  "exceptions": {
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::AhaMoment\",\"vauchi_core::onboarding::AhaMomentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentTracker]\",\"vauchi_core::onboarding::AhaMomentTracker\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentTracker]::try_trigger\",\"vauchi_core::onboarding::AhaMomentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentTracker]::try_trigger_with_context\",\"vauchi_core::onboarding::AhaMomentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]\",\"vauchi_core::onboarding::AhaMomentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::has_animation\",\"vauchi_core::onboarding::AhaMomentType::CardCreationComplete\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::has_animation\",\"vauchi_core::onboarding::AhaMomentType::DeviceLinked\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::has_animation\",\"vauchi_core::onboarding::AhaMomentType::FirstContactAdded\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::has_animation\",\"vauchi_core::onboarding::AhaMomentType::FirstEdit\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::has_animation\",\"vauchi_core::onboarding::AhaMomentType::FirstFieldEdit\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::has_animation\",\"vauchi_core::onboarding::AhaMomentType::FirstOutboundDelivered\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::has_animation\",\"vauchi_core::onboarding::AhaMomentType::FirstUpdateReceived\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::has_animation\",\"vauchi_core::onboarding::AhaMomentType::ThreeContactsReached\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::message\",\"vauchi_core::onboarding::AhaMomentType::CardCreationComplete\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::message\",\"vauchi_core::onboarding::AhaMomentType::DeviceLinked\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::message\",\"vauchi_core::onboarding::AhaMomentType::FirstContactAdded\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::message\",\"vauchi_core::onboarding::AhaMomentType::FirstEdit\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::message\",\"vauchi_core::onboarding::AhaMomentType::FirstFieldEdit\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::message\",\"vauchi_core::onboarding::AhaMomentType::FirstOutboundDelivered\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::message\",\"vauchi_core::onboarding::AhaMomentType::FirstUpdateReceived\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::message\",\"vauchi_core::onboarding::AhaMomentType::ThreeContactsReached\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::title\",\"vauchi_core::onboarding::AhaMomentType::CardCreationComplete\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::title\",\"vauchi_core::onboarding::AhaMomentType::DeviceLinked\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::title\",\"vauchi_core::onboarding::AhaMomentType::FirstContactAdded\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::title\",\"vauchi_core::onboarding::AhaMomentType::FirstEdit\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::title\",\"vauchi_core::onboarding::AhaMomentType::FirstFieldEdit\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::title\",\"vauchi_core::onboarding::AhaMomentType::FirstOutboundDelivered\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::title\",\"vauchi_core::onboarding::AhaMomentType::FirstUpdateReceived\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMomentType]::title\",\"vauchi_core::onboarding::AhaMomentType::ThreeContactsReached\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMoment]::message\",\"vauchi_core::onboarding::AhaMomentType::FirstContactAdded\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMoment]::message\",\"vauchi_core::onboarding::AhaMomentType::FirstOutboundDelivered\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMoment]::message\",\"vauchi_core::onboarding::AhaMomentType::FirstUpdateReceived\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMoment]::new\",\"vauchi_core::onboarding::AhaMomentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::impl[AhaMoment]::with_context\",\"vauchi_core::onboarding::AhaMomentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::module\",\"vauchi_core::onboarding::AhaMomentTracker\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/aha_moments\",\"vauchi-core/onboarding\",\"vauchi-core/src/aha_moments.rs\",\"vauchi_core::aha_moments::module\",\"vauchi_core::onboarding::AhaMomentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/consent.rs\",\"vauchi_core::api::consent::impl[ConsentManager < 'a >]::check\",\"vauchi_core::consent::ConsentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/consent.rs\",\"vauchi_core::api::consent::impl[ConsentManager < 'a >]::export_consent_log\",\"vauchi_core::consent::ConsentRecord\"]": {
+      "count": 2,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/consent.rs\",\"vauchi_core::api::consent::impl[ConsentManager < 'a >]::export_consent_log\",\"vauchi_core::consent::ConsentType::parse\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/consent.rs\",\"vauchi_core::api::consent::impl[ConsentManager < 'a >]::export_consent_log_with_version\",\"vauchi_core::consent::ConsentRecord\"]": {
+      "count": 2,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/consent.rs\",\"vauchi_core::api::consent::impl[ConsentManager < 'a >]::export_consent_log_with_version\",\"vauchi_core::consent::ConsentType::parse\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/consent.rs\",\"vauchi_core::api::consent::impl[ConsentManager < 'a >]::grant\",\"vauchi_core::consent::ConsentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/consent.rs\",\"vauchi_core::api::consent::impl[ConsentManager < 'a >]::grant_with_version\",\"vauchi_core::consent::ConsentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/consent.rs\",\"vauchi_core::api::consent::impl[ConsentManager < 'a >]::revoke\",\"vauchi_core::consent::ConsentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/consent.rs\",\"vauchi_core::api::consent::module\",\"vauchi_core::consent::ConsentRecord\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/consent.rs\",\"vauchi_core::api::consent::module\",\"vauchi_core::consent::ConsentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/mod.rs\",\"vauchi_core::api::module\",\"vauchi_core::consent::ConsentRecord\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/mod.rs\",\"vauchi_core::api::module\",\"vauchi_core::consent::ConsentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/vauchi/features.rs\",\"vauchi_core::api::vauchi::features::impl[Vauchi]::check_consent\",\"vauchi_core::consent::ConsentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/vauchi/features.rs\",\"vauchi_core::api::vauchi::features::impl[Vauchi]::export_consent_log\",\"vauchi_core::consent::ConsentRecord\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/vauchi/features.rs\",\"vauchi_core::api::vauchi::features::impl[Vauchi]::get_consent_status\",\"vauchi_core::consent::ConsentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/vauchi/features.rs\",\"vauchi_core::api::vauchi::features::impl[Vauchi]::grant_consent\",\"vauchi_core::consent::ConsentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/vauchi/features.rs\",\"vauchi_core::api::vauchi::features::impl[Vauchi]::revoke_consent\",\"vauchi_core::consent::ConsentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/vauchi/features.rs\",\"vauchi_core::api::vauchi::features::module\",\"vauchi_core::consent::ConsentRecord\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/consent\",\"vauchi-core/src/api/vauchi/features.rs\",\"vauchi_core::api::vauchi::features::module\",\"vauchi_core::consent::ConsentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/emergency\",\"vauchi-core/src/api/mod.rs\",\"vauchi_core::api::module\",\"vauchi_core::emergency::BiometricUnlockOutcome\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/emergency\",\"vauchi-core/src/api/mod.rs\",\"vauchi_core::api::module\",\"vauchi_core::emergency::MAX_TRUSTED_CONTACTS\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/emergency\",\"vauchi-core/src/api/vauchi/emergency.rs\",\"vauchi_core::api::vauchi::emergency::impl[Vauchi]::configure_emergency_broadcast\",\"vauchi_core::emergency::EmergencyBroadcastConfig\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/emergency\",\"vauchi-core/src/api/vauchi/emergency.rs\",\"vauchi_core::api::vauchi::emergency::impl[Vauchi]::configure_emergency_broadcast\",\"vauchi_core::emergency::MAX_TRUSTED_CONTACTS\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/emergency\",\"vauchi-core/src/api/vauchi/emergency.rs\",\"vauchi_core::api::vauchi::emergency::impl[Vauchi]::get_emergency_wipe_status\",\"vauchi_core::emergency::EmergencyWipeStatus\"]": {
+      "count": 2,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/emergency\",\"vauchi-core/src/api/vauchi/emergency.rs\",\"vauchi_core::api::vauchi::emergency::impl[Vauchi]::load_emergency_config\",\"vauchi_core::emergency::EmergencyBroadcastConfig\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/emergency\",\"vauchi-core/src/api/vauchi/emergency.rs\",\"vauchi_core::api::vauchi::emergency::module\",\"vauchi_core::emergency::EmergencyBroadcastConfig\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/emergency\",\"vauchi-core/src/api/vauchi/emergency.rs\",\"vauchi_core::api::vauchi::emergency::module\",\"vauchi_core::emergency::MAX_TRUSTED_CONTACTS\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/emergency\",\"vauchi-core/src/api/vauchi/mod.rs\",\"vauchi_core::api::vauchi::module\",\"vauchi_core::emergency::BiometricUnlockOutcome\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/emergency\",\"vauchi-core/src/api/vauchi/security.rs\",\"vauchi_core::api::vauchi::security::impl[Vauchi]::biometric_unlock_check\",\"vauchi_core::emergency::BiometricUnlockOutcome\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/emergency\",\"vauchi-core/src/api/vauchi/security.rs\",\"vauchi_core::api::vauchi::security::impl[Vauchi]::biometric_unlock_decision\",\"vauchi_core::emergency::BiometricUnlockOutcome\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/emergency\",\"vauchi-core/src/api/vauchi/security.rs\",\"vauchi_core::api::vauchi::security::impl[Vauchi]::biometric_unlock_decision\",\"vauchi_core::emergency::BiometricUnlockOutcome::PromptForDuressPin\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/emergency\",\"vauchi-core/src/api/vauchi/security.rs\",\"vauchi_core::api::vauchi::security::impl[Vauchi]::biometric_unlock_decision\",\"vauchi_core::emergency::BiometricUnlockOutcome::Unlocked\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/emergency\",\"vauchi-core/src/api/vauchi/security.rs\",\"vauchi_core::api::vauchi::security::module\",\"vauchi_core::emergency::BiometricUnlockOutcome\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/exchange_types\",\"vauchi-core/src/api/contact_manager.rs\",\"vauchi_core::api::contact_manager::impl[ContactManager < 'a >]::add_contact\",\"vauchi_core::exchange_types::EventOrigin::Local\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/exchange_types\",\"vauchi-core/src/api/events.rs\",\"vauchi_core::api::events::VauchiEvent\",\"vauchi_core::exchange_types::EventOrigin\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/exchange_types\",\"vauchi-core/src/api/events.rs\",\"vauchi_core::api::events::impl[VauchiEvent]::contact_added\",\"vauchi_core::exchange_types::EventOrigin\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/exchange_types\",\"vauchi-core/src/api/events.rs\",\"vauchi_core::api::events::module\",\"vauchi_core::exchange_types::EventOrigin\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/exchange_types\",\"vauchi-core/src/api/mod.rs\",\"vauchi_core::api::module\",\"vauchi_core::exchange_types::EventOrigin\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/exchange_types\",\"vauchi-core/src/api/vauchi/contacts.rs\",\"vauchi_core::api::vauchi::contacts::impl[Vauchi]::update_contact\",\"vauchi_core::exchange_types::EventOrigin::Local\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/exchange_types\",\"vauchi-core/src/api/vauchi/contacts.rs\",\"vauchi_core::api::vauchi::contacts::module\",\"vauchi_core::exchange_types::EventOrigin\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/exchange_types\",\"vauchi-core/src/api/vauchi/propagation.rs\",\"vauchi_core::api::vauchi::propagation::sync_item_event\",\"vauchi_core::exchange_types::EventOrigin\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/exchange_types\",\"vauchi-core/src/api/vauchi/propagation.rs\",\"vauchi_core::api::vauchi::propagation::sync_item_event\",\"vauchi_core::exchange_types::EventOrigin::Synced\"]": {
+      "count": 2,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/onboarding\",\"vauchi-core/src/api/contact_manager.rs\",\"vauchi_core::api::contact_manager::impl[ContactManager < 'a >]::trigger_first_contact_moment\",\"vauchi_core::onboarding::AhaMomentType::FirstContactAdded\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/onboarding\",\"vauchi-core/src/api/vauchi/features.rs\",\"vauchi_core::api::vauchi::features::impl[Vauchi]::demo_contact_state\",\"vauchi_core::onboarding::DemoContactState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/onboarding\",\"vauchi-core/src/api/vauchi/features.rs\",\"vauchi_core::api::vauchi::features::impl[Vauchi]::has_seen_aha_moment\",\"vauchi_core::onboarding::AhaMomentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/onboarding\",\"vauchi-core/src/api/vauchi/features.rs\",\"vauchi_core::api::vauchi::features::impl[Vauchi]::initialize_demo_contact\",\"vauchi_core::onboarding::DemoContactState::new_active\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/onboarding\",\"vauchi-core/src/api/vauchi/features.rs\",\"vauchi_core::api::vauchi::features::impl[Vauchi]::mark_aha_moments_seen\",\"vauchi_core::onboarding::AhaMomentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/onboarding\",\"vauchi-core/src/api/vauchi/features.rs\",\"vauchi_core::api::vauchi::features::impl[Vauchi]::try_trigger_aha_moment\",\"vauchi_core::onboarding::AhaMomentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/onboarding\",\"vauchi-core/src/api/vauchi/features.rs\",\"vauchi_core::api::vauchi::features::impl[Vauchi]::try_trigger_aha_moment_with_context\",\"vauchi_core::onboarding::AhaMomentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/onboarding\",\"vauchi-core/src/api/vauchi/features.rs\",\"vauchi_core::api::vauchi::features::module\",\"vauchi_core::onboarding::AhaMomentType\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/onboarding\",\"vauchi-core/src/api/vauchi/features.rs\",\"vauchi_core::api::vauchi::features::module\",\"vauchi_core::onboarding::DemoContactState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/onboarding\",\"vauchi-core/src/api/vauchi/onboarding.rs\",\"vauchi_core::api::vauchi::onboarding::impl[Vauchi]::advance_onboarding\",\"vauchi_core::onboarding::OnboardingProgress\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/onboarding\",\"vauchi-core/src/api/vauchi/onboarding.rs\",\"vauchi_core::api::vauchi::onboarding::impl[Vauchi]::current_onboarding_step\",\"vauchi_core::onboarding::OnboardingStep\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/onboarding\",\"vauchi-core/src/api/vauchi/onboarding.rs\",\"vauchi_core::api::vauchi::onboarding::impl[Vauchi]::get_onboarding_progress\",\"vauchi_core::onboarding::OnboardingProgress\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/onboarding\",\"vauchi-core/src/api/vauchi/onboarding.rs\",\"vauchi_core::api::vauchi::onboarding::impl[Vauchi]::skip_onboarding_step\",\"vauchi_core::onboarding::OnboardingProgress\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/onboarding\",\"vauchi-core/src/api/vauchi/onboarding.rs\",\"vauchi_core::api::vauchi::onboarding::module\",\"vauchi_core::onboarding::OnboardingProgress\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/onboarding\",\"vauchi-core/src/api/vauchi/onboarding.rs\",\"vauchi_core::api::vauchi::onboarding::module\",\"vauchi_core::onboarding::OnboardingStep\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/onboarding\",\"vauchi-core/src/api/vauchi/sync_http.rs\",\"vauchi_core::api::vauchi::sync_http::impl[Vauchi]::trigger_sync_aha_moments\",\"vauchi_core::onboarding::AhaMomentType::FirstOutboundDelivered\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/onboarding\",\"vauchi-core/src/api/vauchi/sync_http.rs\",\"vauchi_core::api::vauchi::sync_http::impl[Vauchi]::trigger_sync_aha_moments\",\"vauchi_core::onboarding::AhaMomentType::FirstUpdateReceived\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/reminders\",\"vauchi-core/src/api/sync/card_update.rs\",\"vauchi_core::api::sync::card_update::process_single_card_update_for_device\",\"vauchi_core::reminders::OwnCardRepropagateState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/reminders\",\"vauchi-core/src/api/sync/registry_handshake.rs\",\"vauchi_core::api::sync::registry_handshake::rearm_owed_card_repropagation\",\"vauchi_core::reminders::OwnCardRepropagateState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/reminders\",\"vauchi-core/src/api/vauchi/features.rs\",\"vauchi_core::api::vauchi::features::impl[Vauchi]::run_owed_repropagation\",\"vauchi_core::reminders::OwnCardRepropagateState::default\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/reminders\",\"vauchi-core/src/api/vauchi/identity.rs\",\"vauchi_core::api::vauchi::identity::impl[Vauchi]::load_backup_reminder_state\",\"vauchi_core::reminders::BackupReminderState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/reminders\",\"vauchi-core/src/api/vauchi/identity.rs\",\"vauchi_core::api::vauchi::identity::impl[Vauchi]::mark_own_card_repropagate\",\"vauchi_core::reminders::OwnCardRepropagateState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/reminders\",\"vauchi-core/src/api/vauchi/identity.rs\",\"vauchi_core::api::vauchi::identity::impl[Vauchi]::save_backup_reminder_state\",\"vauchi_core::reminders::BackupReminderState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/reminders\",\"vauchi-core/src/api/vauchi/identity.rs\",\"vauchi_core::api::vauchi::identity::module\",\"vauchi_core::reminders::BackupReminderState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/settings\",\"vauchi-core/src/api/config.rs\",\"vauchi_core::api::config::impl[crate :: types :: SettingsFlags]\",\"vauchi_core::settings::SettingsFlags\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/settings\",\"vauchi-core/src/api/vauchi/identity.rs\",\"vauchi_core::api::vauchi::identity::impl[Vauchi]::load_settings_flags\",\"vauchi_core::settings::SettingsFlags\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/settings\",\"vauchi-core/src/api/vauchi/identity.rs\",\"vauchi_core::api::vauchi::identity::impl[Vauchi]::save_settings_flags\",\"vauchi_core::settings::SettingsFlags\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/api\",\"vauchi-core/settings\",\"vauchi-core/src/api/vauchi/identity.rs\",\"vauchi_core::api::vauchi::identity::module\",\"vauchi_core::settings::SettingsFlags\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/backup\",\"vauchi-core/exchange_types\",\"vauchi-core/src/backup/snapshot/contacts.rs\",\"vauchi_core::backup::snapshot::contacts::RelationshipState\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/backup\",\"vauchi-core/exchange_types\",\"vauchi-core/src/backup/snapshot/contacts.rs\",\"vauchi_core::backup::snapshot::contacts::RelationshipState\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/backup\",\"vauchi-core/exchange_types\",\"vauchi-core/src/backup/snapshot/contacts.rs\",\"vauchi_core::backup::snapshot::contacts::module\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/backup\",\"vauchi-core/exchange_types\",\"vauchi-core/src/backup/snapshot/contacts.rs\",\"vauchi_core::backup::snapshot::contacts::module\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/backup\",\"vauchi-core/storage\",\"vauchi-core/src/backup/snapshot/mod.rs\",\"vauchi_core::backup::snapshot::impl[BackupSnapshot]::capture\",\"vauchi_core::storage::Storage\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/backup\",\"vauchi-core/storage\",\"vauchi-core/src/backup/snapshot/mod.rs\",\"vauchi_core::backup::snapshot::module\",\"vauchi_core::storage::Storage\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/backup\",\"vauchi-core/visibility\",\"vauchi-core/src/backup/contact_backup.rs\",\"vauchi_core::backup::contact_backup::BackupContactCard\",\"vauchi_core::visibility::VisibilityRules\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/backup\",\"vauchi-core/visibility\",\"vauchi-core/src/backup/contact_backup.rs\",\"vauchi_core::backup::contact_backup::module\",\"vauchi_core::visibility::VisibilityRules\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/kind.rs\",\"vauchi_core::contact::kind::ExchangedData\",\"vauchi_core::exchange::reciprocity::ConfirmationChannel\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/kind.rs\",\"vauchi_core::contact::kind::ExchangedData\",\"vauchi_core::exchange::reciprocity::Reciprocity\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/kind.rs\",\"vauchi_core::contact::kind::ExchangedData\",\"vauchi_core::exchange::trust_metrics::TrustMetrics\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/kind.rs\",\"vauchi_core::contact::kind::module\",\"vauchi_core::exchange::reciprocity::ConfirmationChannel\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/kind.rs\",\"vauchi_core::contact::kind::module\",\"vauchi_core::exchange::reciprocity::Reciprocity\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/kind.rs\",\"vauchi_core::contact::kind::module\",\"vauchi_core::exchange::trust_metrics::TrustMetrics\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::confirmation_channel\",\"vauchi_core::exchange::reciprocity::ConfirmationChannel\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::derive_reciprocity_tokens\",\"vauchi_core::exchange::reciprocity_tokens::ConfirmationTokenPair\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::derive_reciprocity_tokens\",\"vauchi_core::exchange::reciprocity_tokens::derive_confirmation_tokens\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::reciprocity\",\"vauchi_core::exchange::reciprocity::Reciprocity\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::reciprocity\",\"vauchi_core::exchange::reciprocity::Reciprocity::Pending\"]": {
+      "count": 2,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::reciprocity\",\"vauchi_core::exchange::reciprocity::Reciprocity::Unknown\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::reciprocity\",\"vauchi_core::exchange::reciprocity::Reciprocity::Unreciprocated\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::set_confirmation_channel\",\"vauchi_core::exchange::reciprocity::ConfirmationChannel\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::set_reciprocity\",\"vauchi_core::exchange::reciprocity::Reciprocity\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::set_trust_metrics\",\"vauchi_core::exchange::trust_metrics::TrustMetrics\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::trust_metrics\",\"vauchi_core::exchange::trust_metrics::TrustMetrics\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::module\",\"vauchi_core::exchange::reciprocity::ConfirmationChannel\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::module\",\"vauchi_core::exchange::reciprocity::Reciprocity\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::module\",\"vauchi_core::exchange::trust_metrics::TrustMetrics\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/kind.rs\",\"vauchi_core::contact::kind::ExchangedData\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/kind.rs\",\"vauchi_core::contact::kind::ExchangedData\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/kind.rs\",\"vauchi_core::contact::kind::module\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/kind.rs\",\"vauchi_core::contact::kind::module\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::exchange_transport\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::from_exchange\",\"vauchi_core::exchange_types::ExchangeTransport::Qr\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::from_exchange\",\"vauchi_core::exchange_types::ProximityConfidence::Unknown\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::from_exchange_full\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::from_exchange_full\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::from_exchange_with_proximity\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::from_link_exchange\",\"vauchi_core::exchange_types::ExchangeTransport::Link\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::from_sync_data_full\",\"vauchi_core::exchange_types::ExchangeTransport::Qr\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::from_sync_data_full\",\"vauchi_core::exchange_types::ProximityConfidence::Unknown\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::proximity_confidence\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::proximity_confidence\",\"vauchi_core::exchange_types::ProximityConfidence::Unknown\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::set_exchange_transport\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::set_proximity_confidence\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::trust_level\",\"vauchi_core::exchange_types::ExchangeTransport::Ble\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::trust_level\",\"vauchi_core::exchange_types::ExchangeTransport::Nfc\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::impl[Contact]::trust_level\",\"vauchi_core::exchange_types::ProximityConfidence::High\"]": {
+      "count": 2,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::module\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/mod.rs\",\"vauchi_core::contact::module\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/statistics.rs\",\"vauchi_core::contact::statistics::ContactStatistics\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/statistics.rs\",\"vauchi_core::contact::statistics::compute_statistics\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/statistics.rs\",\"vauchi_core::contact::statistics::module\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/warnings.rs\",\"vauchi_core::contact::warnings::GuardianDiversityWarning\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/warnings.rs\",\"vauchi_core::contact::warnings::check_guardian_diversity\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact\",\"vauchi-core/exchange_types\",\"vauchi-core/src/contact/warnings.rs\",\"vauchi_core::contact::warnings::module\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact_card\",\"vauchi-core/visibility\",\"vauchi-core/src/contact_card/mod.rs\",\"vauchi_core::contact_card::ContactCard\",\"vauchi_core::visibility::VisibilityRules\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact_card\",\"vauchi-core/visibility\",\"vauchi-core/src/contact_card/mod.rs\",\"vauchi_core::contact_card::impl[ContactCard]::field_visibility\",\"vauchi_core::visibility::VisibilityRules\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact_card\",\"vauchi-core/visibility\",\"vauchi-core/src/contact_card/mod.rs\",\"vauchi_core::contact_card::impl[ContactCard]::field_visibility_mut\",\"vauchi_core::visibility::VisibilityRules\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact_card\",\"vauchi-core/visibility\",\"vauchi-core/src/contact_card/mod.rs\",\"vauchi_core::contact_card::impl[ContactCard]::from_backup_parts\",\"vauchi_core::visibility::VisibilityRules\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact_card\",\"vauchi-core/visibility\",\"vauchi-core/src/contact_card/mod.rs\",\"vauchi_core::contact_card::impl[ContactCard]::new\",\"vauchi_core::visibility::VisibilityRules::new\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/contact_card\",\"vauchi-core/visibility\",\"vauchi-core/src/contact_card/mod.rs\",\"vauchi_core::contact_card::module\",\"vauchi_core::visibility::VisibilityRules\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/demo_contact\",\"vauchi-core/onboarding\",\"vauchi-core/src/demo_contact.rs\",\"vauchi_core::demo_contact::impl[DemoContactState]\",\"vauchi_core::onboarding::DemoContactState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/demo_contact\",\"vauchi-core/onboarding\",\"vauchi-core/src/demo_contact.rs\",\"vauchi_core::demo_contact::module\",\"vauchi_core::onboarding::DemoContactState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/accelerometer.rs\",\"vauchi_core::exchange::accelerometer::impl[ProximityVerifier for AccelerometerVerifier]::confidence_level\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/accelerometer.rs\",\"vauchi_core::exchange::accelerometer::impl[ProximityVerifier for AccelerometerVerifier]::confidence_level\",\"vauchi_core::exchange_types::ProximityConfidence::High\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/accelerometer.rs\",\"vauchi_core::exchange::accelerometer::module\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/audio_cpal.rs\",\"vauchi_core::exchange::audio_cpal::CpalAudioBackend\",\"vauchi_core::exchange_types::AudioCapability\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/audio_cpal.rs\",\"vauchi_core::exchange::audio_cpal::impl[CpalAudioBackend]::check_capability\",\"vauchi_core::exchange_types::AudioCapability\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/audio_cpal.rs\",\"vauchi_core::exchange::audio_cpal::impl[CpalAudioBackend]::detect_capability\",\"vauchi_core::exchange_types::AudioCapability\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/audio_cpal.rs\",\"vauchi_core::exchange::audio_cpal::impl[CpalAudioBackend]::detect_capability\",\"vauchi_core::exchange_types::AudioCapability::EmitOnly\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/audio_cpal.rs\",\"vauchi_core::exchange::audio_cpal::impl[CpalAudioBackend]::detect_capability\",\"vauchi_core::exchange_types::AudioCapability::Full\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/audio_cpal.rs\",\"vauchi_core::exchange::audio_cpal::impl[CpalAudioBackend]::detect_capability\",\"vauchi_core::exchange_types::AudioCapability::None\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/audio_cpal.rs\",\"vauchi_core::exchange::audio_cpal::impl[CpalAudioBackend]::detect_capability\",\"vauchi_core::exchange_types::AudioCapability::ReceiveOnly\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/audio_cpal.rs\",\"vauchi_core::exchange::audio_cpal::impl[CpalAudioBackend]::emit_samples\",\"vauchi_core::exchange_types::AudioCapability::None\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/audio_cpal.rs\",\"vauchi_core::exchange::audio_cpal::impl[CpalAudioBackend]::emit_samples\",\"vauchi_core::exchange_types::AudioCapability::ReceiveOnly\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/audio_cpal.rs\",\"vauchi_core::exchange::audio_cpal::impl[CpalAudioBackend]::record_samples\",\"vauchi_core::exchange_types::AudioCapability::EmitOnly\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/audio_cpal.rs\",\"vauchi_core::exchange::audio_cpal::impl[CpalAudioBackend]::record_samples\",\"vauchi_core::exchange_types::AudioCapability::None\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/audio_cpal.rs\",\"vauchi_core::exchange::audio_cpal::impl[Default for CpalAudioBackend]::default\",\"vauchi_core::exchange_types::AudioCapability::None\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/audio_cpal.rs\",\"vauchi_core::exchange::audio_cpal::module\",\"vauchi_core::exchange_types::AudioCapability\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/ble.rs\",\"vauchi_core::exchange::ble::impl[ProximityVerifier for MockBLEVerifier]::confidence_level\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/ble.rs\",\"vauchi_core::exchange::ble::impl[ProximityVerifier for MockBLEVerifier]::confidence_level\",\"vauchi_core::exchange_types::ProximityConfidence::Medium\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/capability/readiness.rs\",\"vauchi_core::exchange::capability::readiness::module\",\"vauchi_core::exchange_types::AudioCapability\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/capability/readiness.rs\",\"vauchi_core::exchange::capability::readiness::requirement_present\",\"vauchi_core::exchange_types::AudioCapability::EmitOnly\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/capability/readiness.rs\",\"vauchi_core::exchange::capability::readiness::requirement_present\",\"vauchi_core::exchange_types::AudioCapability::Full\"]": {
+      "count": 2,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/capability/readiness.rs\",\"vauchi_core::exchange::capability::readiness::requirement_present\",\"vauchi_core::exchange_types::AudioCapability::ReceiveOnly\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/capability/types.rs\",\"vauchi_core::exchange::capability::types::DeviceCapabilities\",\"vauchi_core::exchange_types::AudioCapability\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/capability/types.rs\",\"vauchi_core::exchange::capability::types::module\",\"vauchi_core::exchange_types::AudioCapability\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/mod.rs\",\"vauchi_core::exchange::module\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/mod.rs\",\"vauchi_core::exchange::module\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/proximity.rs\",\"vauchi_core::exchange::proximity::ProximityVerifier\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/proximity.rs\",\"vauchi_core::exchange::proximity::impl[ProximityVerifier for ManualConfirmationVerifier]::confidence_level\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/proximity.rs\",\"vauchi_core::exchange::proximity::impl[ProximityVerifier for ManualConfirmationVerifier]::confidence_level\",\"vauchi_core::exchange_types::ProximityConfidence::Medium\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/proximity.rs\",\"vauchi_core::exchange::proximity::module\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::ExchangeEvent\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::ExchangeSession\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::ExchangeSession\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::attempt_transport_fallback\",\"vauchi_core::exchange_types::ExchangeTransport::Qr\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::confidence_label\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::confidence_label\",\"vauchi_core::exchange_types::ProximityConfidence::High\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::confidence_label\",\"vauchi_core::exchange_types::ProximityConfidence::Low\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::confidence_label\",\"vauchi_core::exchange_types::ProximityConfidence::Medium\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::confidence_label\",\"vauchi_core::exchange_types::ProximityConfidence::Unknown\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::emit_initial_commands\",\"vauchi_core::exchange_types::ExchangeTransport::Ble\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::emit_initial_commands\",\"vauchi_core::exchange_types::ExchangeTransport::Nfc\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::emit_initial_commands\",\"vauchi_core::exchange_types::ExchangeTransport::Qr\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::emit_initial_commands\",\"vauchi_core::exchange_types::ExchangeTransport::Usb\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::handle_ble_characteristic_data\",\"vauchi_core::exchange_types::ExchangeTransport::Ble\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::handle_ble_connected\",\"vauchi_core::exchange_types::ExchangeTransport::Ble\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::handle_ble_payload_exchanged\",\"vauchi_core::exchange_types::ExchangeTransport::Ble\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::handle_ble_proximity_verified\",\"vauchi_core::exchange_types::ExchangeTransport::Ble\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::handle_direct_bytes_received\",\"vauchi_core::exchange_types::ExchangeTransport::Usb\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::handle_nfc_tap_complete\",\"vauchi_core::exchange_types::ExchangeTransport::Nfc\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::handle_perform_key_agreement\",\"vauchi_core::exchange_types::ExchangeTransport::Nfc\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::handle_perform_key_agreement\",\"vauchi_core::exchange_types::ExchangeTransport::Usb\"]": {
+      "count": 2,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::handle_perform_key_agreement\",\"vauchi_core::exchange_types::ProximityConfidence::High\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::handle_process_qr\",\"vauchi_core::exchange_types::ExchangeTransport::Qr\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::handle_start_ble_exchange\",\"vauchi_core::exchange_types::ExchangeTransport::Ble\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::handle_start_qr\",\"vauchi_core::exchange_types::ExchangeTransport::Qr\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::handle_they_scanned_our_qr\",\"vauchi_core::exchange_types::ExchangeTransport::Qr\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::new_ble\",\"vauchi_core::exchange_types::ExchangeTransport::Ble\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::new_ble\",\"vauchi_core::exchange_types::ProximityConfidence::Unknown\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::new_nfc\",\"vauchi_core::exchange_types::ExchangeTransport::Nfc\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::new_nfc\",\"vauchi_core::exchange_types::ProximityConfidence::Unknown\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::new_qr\",\"vauchi_core::exchange_types::ExchangeTransport::Qr\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::new_qr\",\"vauchi_core::exchange_types::ProximityConfidence::Unknown\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::new_usb\",\"vauchi_core::exchange_types::ExchangeTransport::Usb\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::new_usb\",\"vauchi_core::exchange_types::ProximityConfidence::Unknown\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::proximity_confidence\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::run_proximity_check\",\"vauchi_core::exchange_types::ProximityConfidence::Low\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::run_proximity_check\",\"vauchi_core::exchange_types::ProximityConfidence::Unknown\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::transport\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::transport_label\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::transport_label\",\"vauchi_core::exchange_types::ExchangeTransport::Audio\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::transport_label\",\"vauchi_core::exchange_types::ExchangeTransport::Ble\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::transport_label\",\"vauchi_core::exchange_types::ExchangeTransport::Link\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::transport_label\",\"vauchi_core::exchange_types::ExchangeTransport::MultiStage\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::transport_label\",\"vauchi_core::exchange_types::ExchangeTransport::Nfc\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::transport_label\",\"vauchi_core::exchange_types::ExchangeTransport::Qr\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::impl[ExchangeSession]::transport_label\",\"vauchi_core::exchange_types::ExchangeTransport::Usb\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::module\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/session.rs\",\"vauchi_core::exchange::session::module\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/trust_metrics.rs\",\"vauchi_core::exchange::trust_metrics::TrustMetrics\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/trust_metrics.rs\",\"vauchi_core::exchange::trust_metrics::TrustMetrics\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/trust_metrics.rs\",\"vauchi_core::exchange::trust_metrics::impl[TransportProximity]::for_transport\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/trust_metrics.rs\",\"vauchi_core::exchange::trust_metrics::impl[TransportProximity]::for_transport\",\"vauchi_core::exchange_types::ExchangeTransport::Audio\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/trust_metrics.rs\",\"vauchi_core::exchange::trust_metrics::impl[TransportProximity]::for_transport\",\"vauchi_core::exchange_types::ExchangeTransport::Ble\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/trust_metrics.rs\",\"vauchi_core::exchange::trust_metrics::impl[TransportProximity]::for_transport\",\"vauchi_core::exchange_types::ExchangeTransport::Link\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/trust_metrics.rs\",\"vauchi_core::exchange::trust_metrics::impl[TransportProximity]::for_transport\",\"vauchi_core::exchange_types::ExchangeTransport::MultiStage\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/trust_metrics.rs\",\"vauchi_core::exchange::trust_metrics::impl[TransportProximity]::for_transport\",\"vauchi_core::exchange_types::ExchangeTransport::Nfc\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/trust_metrics.rs\",\"vauchi_core::exchange::trust_metrics::impl[TransportProximity]::for_transport\",\"vauchi_core::exchange_types::ExchangeTransport::Qr\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/trust_metrics.rs\",\"vauchi_core::exchange::trust_metrics::impl[TransportProximity]::for_transport\",\"vauchi_core::exchange_types::ExchangeTransport::Usb\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/trust_metrics.rs\",\"vauchi_core::exchange::trust_metrics::impl[TrustMetrics]::new\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/trust_metrics.rs\",\"vauchi_core::exchange::trust_metrics::impl[TrustMetrics]::new\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/trust_metrics.rs\",\"vauchi_core::exchange::trust_metrics::module\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/exchange\",\"vauchi-core/exchange_types\",\"vauchi-core/src/exchange/trust_metrics.rs\",\"vauchi_core::exchange::trust_metrics::module\",\"vauchi_core::exchange_types::ProximityConfidence\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/identity\",\"vauchi-core/exchange\",\"vauchi-core/src/identity/mod.rs\",\"vauchi_core::identity::impl[Identity]::create_device_link_initiator\",\"vauchi_core::exchange::device_link::initiator::DeviceLinkInitiator\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/identity\",\"vauchi-core/exchange\",\"vauchi-core/src/identity/mod.rs\",\"vauchi_core::identity::impl[Identity]::create_device_link_initiator\",\"vauchi_core::exchange::device_link::initiator::DeviceLinkInitiator::new\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/identity\",\"vauchi-core/exchange\",\"vauchi-core/src/identity/mod.rs\",\"vauchi_core::identity::impl[Identity]::restore_device_link_initiator\",\"vauchi_core::exchange::device_link::initiator::DeviceLinkInitiatorRestored\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/identity\",\"vauchi-core/exchange\",\"vauchi-core/src/identity/mod.rs\",\"vauchi_core::identity::impl[Identity]::restore_device_link_initiator\",\"vauchi_core::exchange::device_link::initiator::DeviceLinkInitiatorRestored::new\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/identity\",\"vauchi-core/exchange\",\"vauchi-core/src/identity/mod.rs\",\"vauchi_core::identity::impl[Identity]::restore_device_link_initiator\",\"vauchi_core::exchange::device_link::qr::DeviceLinkQR\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/network\",\"vauchi-core/api\",\"vauchi-core/src/network/relay_client.rs\",\"vauchi_core::network::relay_client::impl< T : Transport >[crate :: api :: PurgeSender for RelayClient < T >]\",\"vauchi_core::api::shred::PurgeSender\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/network\",\"vauchi-core/api\",\"vauchi-core/src/network/relay_client.rs\",\"vauchi_core::network::relay_client::impl< T : Transport >[crate :: api :: PurgeSender for RelayClient < T >]::send_purge\",\"vauchi_core::api::pre_signed::PreSignedPurgeRequest\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/network\",\"vauchi-core/api\",\"vauchi-core/src/network/relay_client.rs\",\"vauchi_core::network::relay_client::impl< T : Transport >[crate :: api :: PurgeSender for RelayClient < T >]::send_purge\",\"vauchi_core::api::shred::ShredError\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/network\",\"vauchi-core/api\",\"vauchi-core/src/network/relay_client.rs\",\"vauchi_core::network::relay_client::impl< T : Transport >[crate :: api :: PurgeSender for RelayClient < T >]::send_purge\",\"vauchi_core::api::shred::ShredError::FileError\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/network\",\"vauchi-core/api\",\"vauchi-core/src/network/relay_client.rs\",\"vauchi_core::network::relay_client::impl< T : Transport >[crate :: api :: RevocationSender for RelayClient < T >]\",\"vauchi_core::api::shred::RevocationSender\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/network\",\"vauchi-core/api\",\"vauchi-core/src/network/relay_client.rs\",\"vauchi_core::network::relay_client::impl< T : Transport >[crate :: api :: RevocationSender for RelayClient < T >]::send_revocation_delivery\",\"vauchi_core::api::shred::ShredError\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/network\",\"vauchi-core/api\",\"vauchi-core/src/network/relay_client.rs\",\"vauchi_core::network::relay_client::impl< T : Transport >[crate :: api :: RevocationSender for RelayClient < T >]::send_revocation_delivery\",\"vauchi_core::api::shred::ShredError::FileError\"]": {
+      "count": 2,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/platform\",\"vauchi-core/backup\",\"vauchi-core/src/platform/event_json.rs\",\"vauchi_core::platform::event_json::MAX_EVENT_JSON_BYTES\",\"vauchi_core::backup::full_backup::MAX_FULL_BACKUP_BYTES\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/platform\",\"vauchi-core/backup\",\"vauchi-core/src/platform/event_json.rs\",\"vauchi_core::platform::event_json::module\",\"vauchi_core::backup::full_backup::MAX_FULL_BACKUP_BYTES\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/api\",\"vauchi-core/src/storage/stores/identity.rs\",\"vauchi_core::storage::stores::identity::impl[IdentityStore < '_ >]::load_password_config\",\"vauchi_core::api::app_password::AppPasswordConfig\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/api\",\"vauchi-core/src/storage/stores/identity.rs\",\"vauchi_core::storage::stores::identity::impl[IdentityStore < '_ >]::load_password_config\",\"vauchi_core::api::app_password::AppPasswordConfig::from_stored\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/emergency\",\"vauchi-core/src/storage/stores/emergency.rs\",\"vauchi_core::storage::stores::emergency::impl[EmergencyStore < '_ >]::load_emergency_config\",\"vauchi_core::emergency::EmergencyBroadcastConfig\"]": {
+      "count": 2,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/emergency\",\"vauchi-core/src/storage/stores/emergency.rs\",\"vauchi_core::storage::stores::emergency::impl[EmergencyStore < '_ >]::save_emergency_config\",\"vauchi_core::emergency::EmergencyBroadcastConfig\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/emergency\",\"vauchi-core/src/storage/stores/emergency.rs\",\"vauchi_core::storage::stores::emergency::module\",\"vauchi_core::emergency::EmergencyBroadcastConfig\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/exchange\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_exchange_defaults\",\"vauchi_core::exchange::defaults::ExchangeDefaults\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/exchange\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::save_exchange_defaults\",\"vauchi_core::exchange::defaults::ExchangeDefaults\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/exchange_types\",\"vauchi-core/src/storage/stores/contact_row.rs\",\"vauchi_core::storage::stores::contact_row::impl[ContactStore < '_ >]::row_to_exchanged_contact\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/exchange_types\",\"vauchi-core/src/storage/stores/contact_row.rs\",\"vauchi_core::storage::stores::contact_row::module\",\"vauchi_core::exchange_types::ExchangeTransport\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_aha_tracker\",\"vauchi_core::onboarding::AhaMomentTracker\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_aha_tracker\",\"vauchi_core::onboarding::AhaMomentTracker::from_json\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_demo_contact_state\",\"vauchi_core::onboarding::DemoContactState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_demo_contact_state\",\"vauchi_core::onboarding::DemoContactState::from_json\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_onboarding_progress\",\"vauchi_core::onboarding::OnboardingProgress\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_onboarding_progress\",\"vauchi_core::onboarding::OnboardingProgress::from_json\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_or_create_aha_tracker\",\"vauchi_core::onboarding::AhaMomentTracker\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_or_create_aha_tracker\",\"vauchi_core::onboarding::AhaMomentTracker::new\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_or_create_demo_contact_state\",\"vauchi_core::onboarding::DemoContactState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_or_create_demo_contact_state\",\"vauchi_core::onboarding::DemoContactState::new_active\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_or_create_onboarding_progress\",\"vauchi_core::onboarding::OnboardingProgress\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_or_create_onboarding_progress\",\"vauchi_core::onboarding::OnboardingProgress::new\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_ux_state\",\"vauchi_core::onboarding::AhaMomentTracker\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_ux_state\",\"vauchi_core::onboarding::DemoContactState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::save_aha_tracker\",\"vauchi_core::onboarding::AhaMomentTracker\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::save_demo_contact_state\",\"vauchi_core::onboarding::DemoContactState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::save_onboarding_progress\",\"vauchi_core::onboarding::OnboardingProgress\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::save_ux_state\",\"vauchi_core::onboarding::AhaMomentTracker\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::save_ux_state\",\"vauchi_core::onboarding::DemoContactState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::module\",\"vauchi_core::onboarding::AhaMomentTracker\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::module\",\"vauchi_core::onboarding::DemoContactState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/onboarding\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::module\",\"vauchi_core::onboarding::OnboardingProgress\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/reminders\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_backup_reminder_state\",\"vauchi_core::reminders::BackupReminderState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/reminders\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_backup_reminder_state\",\"vauchi_core::reminders::BackupReminderState::from_json\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/reminders\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_own_card_repropagate\",\"vauchi_core::reminders::OwnCardRepropagateState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/reminders\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_own_card_repropagate\",\"vauchi_core::reminders::OwnCardRepropagateState::default\"]": {
+      "count": 2,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/reminders\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_own_card_repropagate\",\"vauchi_core::reminders::OwnCardRepropagateState::from_json\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/reminders\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::save_backup_reminder_state\",\"vauchi_core::reminders::BackupReminderState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/reminders\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::save_own_card_repropagate\",\"vauchi_core::reminders::OwnCardRepropagateState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/reminders\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::module\",\"vauchi_core::reminders::BackupReminderState\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/settings\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_settings_flags\",\"vauchi_core::settings::SettingsFlags\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/settings\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::load_settings_flags\",\"vauchi_core::settings::SettingsFlags::from_json\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/settings\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::impl[UxStore < '_ >]::save_settings_flags\",\"vauchi_core::settings::SettingsFlags\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/storage\",\"vauchi-core/settings\",\"vauchi-core/src/storage/stores/ux.rs\",\"vauchi_core::storage::stores::ux::module\",\"vauchi_core::settings::SettingsFlags\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/sync\",\"vauchi-core/network\",\"vauchi-core/src/sync/safety_alert.rs\",\"vauchi_core::sync::safety_alert::AlertContent\",\"vauchi_core::network::message::GeoLocation\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/sync\",\"vauchi-core/network\",\"vauchi-core/src/sync/safety_alert.rs\",\"vauchi_core::sync::safety_alert::impl[SafetyAlertPayload]::location\",\"vauchi_core::network::message::GeoLocation\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/sync\",\"vauchi-core/network\",\"vauchi-core/src/sync/safety_alert.rs\",\"vauchi_core::sync::safety_alert::impl[SafetyAlertPayload]::new\",\"vauchi_core::network::message::GeoLocation\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    },
+    "[\"vauchi-core/sync\",\"vauchi-core/network\",\"vauchi-core/src/sync/safety_alert.rs\",\"vauchi_core::sync::safety_alert::module\",\"vauchi_core::network::message::GeoLocation\"]": {
+      "count": 1,
+      "issue": "vauchi/private#765",
+      "reason": "Existing compatibility import."
+    }
+  },
+  "schema_version": 1
+}

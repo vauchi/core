@@ -125,7 +125,7 @@ variables:
   # keeps the SHA form because tags here are not protected), the lint:typos
   # linux tag (vauchi/scripts!552) and retired_boundary_vocabulary
   # (vauchi/scripts!502).
-  VAUCHI_SCRIPTS_REF: "1e039df4a5488fdca44d7254cec79157dc408edf"
+  VAUCHI_SCRIPTS_REF: "724f91aa1e16a30e0eca441f5020e4cfebc9df9e"
   # cargo audit runs with --deny warnings; every entry here is an
   # advisory with no fix available to us, not one we chose to skip.
   #   RUSTSEC-2026-0192  ttf-parser unmaintained, reached through
@@ -572,19 +572,31 @@ lint:cabi-header:
     - cargo build -p vauchi-cabi
     - git diff --exit-code vauchi-cabi/include/vauchi.h || { echo "CABI header is stale — rebuild with 'cargo build -p vauchi-cabi' and commit the updated include/vauchi.h"; exit 1; }
 
-# Legacy-surface ratchet metric (Phase 0 / Task 0.1 / Step 2 of
-# `_private/docs/planning/todo/2026-05-11-pure-functional-core-program-plan.md`).
-#
-# Counts the legacy domain-typed binding surface (mobile_*.rs UniFFI
-# exports, non-Humble PlatformAppEngine methods, ambient nondeterminism
-# in vauchi-core, etc.) on HEAD and on origin/main, then prints the
-# delta. Any counter that GREW vs main is flagged in red and exits
-# non-zero — but the job is `allow_failure: true` until Phase 6 /
-# Task 6.3 flips it to a hard gate.
-#
-# The audit script lives in the scripts repo and is cloned the same
-# way as `lint:cross-cutting-blocking`. If the script is not yet on
-# the pinned scripts revision, the job no-ops cleanly.
+# Fail closed when the pinned analyzer or its source inputs are missing.
+lint:architecture:
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/rust:1.93.1
+  tags: [docker]
+  needs: []
+  allow_failure: false
+  before_script:
+    - |
+      VAUCHI_CI_SCRIPTS_DIR=$(mktemp -d)
+      export VAUCHI_CI_SCRIPTS_DIR
+      git -C "$VAUCHI_CI_SCRIPTS_DIR" init
+      git -C "$VAUCHI_CI_SCRIPTS_DIR" remote add origin https://gitlab.com/vauchi/scripts.git
+      git -C "$VAUCHI_CI_SCRIPTS_DIR" fetch --depth=1 origin "$VAUCHI_SCRIPTS_REF"
+      git -C "$VAUCHI_CI_SCRIPTS_DIR" checkout --detach FETCH_HEAD
+      test -f "$VAUCHI_CI_SCRIPTS_DIR/scripts/architecture-check.sh"
+      test -f "$VAUCHI_CI_SCRIPTS_DIR/tools/architecture-check/Cargo.lock"
+    - git fetch --depth=1 origin main:refs/remotes/origin/main
+  script:
+    - bash "$VAUCHI_CI_SCRIPTS_DIR/scripts/architecture-check.sh" "$CI_PROJECT_DIR" check origin/main
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# Older aggregate surface metric remains advisory alongside the exact ratchet.
 metric:audit-mobile-surface:
   stage: lint
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21

@@ -46,6 +46,7 @@ fn config() -> SettingsConfig {
         debug_mode: false,
         backup_reminder_frequency: "Weekly".into(),
         last_backup_display: None,
+        delayed_fetching: Default::default(),
     }
 }
 

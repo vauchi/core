@@ -267,6 +267,7 @@ impl AppEngine {
                             .and_then(|s| s.last_backup_timestamp)
                             .map(|t| crate::relative_time::format_relative_time(now, t, locale))
                     },
+                    delayed_fetching: Default::default(),
                 };
                 let mode = match screen {
                     AppScreen::SettingsAdvanced => SettingsMode::Advanced,

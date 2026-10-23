@@ -200,7 +200,7 @@ pub use screen_catalog_fixture::{
 };
 #[cfg(feature = "network-rustls")]
 pub use session_pin::{SESSION_PIN_SCREEN_ID, SessionPinEngine};
-pub use settings::{SettingsConfig, SettingsEngine, SettingsMode};
+pub use settings::{DelayedFetching, SettingsConfig, SettingsEngine, SettingsMode};
 pub use support::SupportEngine;
 pub use tag_promotion::{PromotionField, TagPromotionEngine};
 pub use tags_list::{TagSummary, TagsEngine};

@@ -19,8 +19,8 @@
 //! through review diffs rather than through user reports.
 
 use vauchi_app::ui::{
-    AppEngine, AppScreen, Component, DropdownOption, SettingsConfig, SettingsEngine,
-    SettingsItemKind, WorkflowEngine,
+    AppEngine, AppScreen, Component, DelayedFetching, DropdownOption, SettingsConfig,
+    SettingsEngine, SettingsItemKind, WorkflowEngine,
 };
 use vauchi_core::api::Vauchi;
 
@@ -70,6 +70,7 @@ fn sample_settings_config() -> SettingsConfig {
         debug_mode: false,
         backup_reminder_frequency: "Weekly".into(),
         last_backup_display: None,
+        delayed_fetching: DelayedFetching::Off,
     }
 }
 
@@ -319,5 +320,60 @@ fn backup_reminder_frequency_renders_in_the_settings_language() {
         "backup_reminders detail",
         &detail(backup_detail("de")),
         &detail(backup_detail("en")),
+    );
+}
+
+fn network_value(delayed_fetching: DelayedFetching) -> (SettingsItemKind, Option<String>) {
+    let engine = SettingsEngine::new_advanced(SettingsConfig {
+        delayed_fetching,
+        ..sample_settings_config()
+    });
+    engine
+        .current_screen()
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::SettingsGroup { id, items, .. } if id == "network" => items
+                .iter()
+                .find(|i| i.id == "delayed_fetching")
+                .map(|i| (i.kind.clone(), i.label.clone().into())),
+            _ => None,
+        })
+        .expect("network group must contain the delayed_fetching item")
+}
+
+fn value(text: &str) -> SettingsItemKind {
+    SettingsItemKind::Value { value: text.into() }
+}
+
+// The synchronous fetch stays as a fallback, and taking it must be
+// visible (owner decision 2026-10-23 on vauchi/private#628).
+// @internal
+#[test]
+fn delayed_fetching_shows_its_window_when_on() {
+    let (kind, label) = network_value(DelayedFetching::On { window_minutes: 15 });
+
+    assert_eq!(label.as_deref(), Some("Delayed fetching"));
+    assert_eq!(kind, value("On, up to 15 min"));
+}
+
+// @internal
+#[test]
+fn delayed_fetching_says_when_the_relay_does_not_offer_it() {
+    let (kind, _) = network_value(DelayedFetching::Off);
+
+    assert_eq!(kind, value("Off: your relay doesn't offer it"));
+}
+
+// @internal
+#[test]
+fn delayed_fetching_says_when_the_relay_stopped_offering_it() {
+    let (kind, _) = network_value(DelayedFetching::Withdrawn {
+        when: "3 hours ago".into(),
+    });
+
+    assert_eq!(
+        kind,
+        value("Off: your relay stopped offering it (3 hours ago)")
     );
 }

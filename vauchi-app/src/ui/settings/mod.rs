@@ -10,6 +10,21 @@ use serde::{Deserialize, Serialize};
 
 mod groups;
 
+/// Whether sync fetches take the outer relay's delayed path
+/// (vauchi/private#628). The synchronous fallback is shown, not taken
+/// silently (owner decision 2026-10-23).
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DelayedFetching {
+    /// The relay does not offer delayed fetches.
+    #[default]
+    Off,
+    /// Fetches are answered within `window_minutes`.
+    On { window_minutes: u64 },
+    /// The relay stopped offering them; `when` is already localized.
+    Withdrawn { when: String },
+}
+
 /// Configuration values displayed and toggled on the settings screen.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -68,6 +83,8 @@ pub struct SettingsConfig {
     pub content_updates: vauchi_core::settings::ContentUpdates,
     #[serde(default = "default_true")]
     pub content_updates_in_background: bool,
+    #[serde(default)]
+    pub delayed_fetching: DelayedFetching,
 }
 
 fn default_true() -> bool {

@@ -765,10 +765,10 @@ test:core-32bit:
     RUSTC_WRAPPER: ""
   cache:
     key: core-32bit-${CI_COMMIT_REF_SLUG}
-    fallback_keys: [core-32bit-${CI_DEFAULT_BRANCH}]
+    fallback_keys: ["core-32bit-${CI_DEFAULT_BRANCH}"]
     paths: [.cargo-i386/registry/, target-i386/]
   script:
-    - test "$(getconf LONG_BIT)" = 32 || { echo "ERROR: expected a 32-bit userland, got $(getconf LONG_BIT)-bit"; exit 1; }
+    - 'test "$(getconf LONG_BIT)" = 32 || { echo "ERROR: expected a 32-bit userland, got $(getconf LONG_BIT)-bit"; exit 1; }'
     - cargo test --locked -p vauchi-core --lib --features test-kdf
 
 test:cucumber:

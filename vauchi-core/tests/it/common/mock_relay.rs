@@ -335,6 +335,11 @@ impl MockRelay {
         self.with_gateway(|gateway| gateway.async_refused = true);
     }
 
+    /// Serves `/v2/ohttp-async` again after [`Self::refuse_async_path`].
+    pub fn accept_async_path(&self) {
+        self.with_gateway(|gateway| gateway.async_refused = false);
+    }
+
     /// Drops every held answer, as an outer-relay restart does.
     pub fn forget_async_answers(&self) {
         self.with_gateway(|gateway| gateway.async_answers.clear());

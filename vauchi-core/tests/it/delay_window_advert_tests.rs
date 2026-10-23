@@ -13,9 +13,11 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use vauchi_core::api::{Vauchi, VauchiConfig};
+use vauchi_core::api::{FetchPath, Vauchi, VauchiConfig};
+use vauchi_core::clock::FakeClock;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::network::OhttpClient;
+use vauchi_core::rng::OsSecureRng;
 use vauchi_core::sleeper::FakeSleeper;
 use vauchi_protocol::ohttp_key::window_of;
 
@@ -37,14 +39,16 @@ fn outer_relay() -> MockRelay {
 }
 
 /// A client of `outer` storing in `db`, with delayed mode left to the
-/// advertisement (`RelayConfig::ohttp_delayed` off).
+/// advertisement (`RelayConfig::ohttp_delayed` off), its wall clock at
+/// [`NOW`].
 fn client(outer: &MockRelay, application: &MockRelay, db: &Path, key: &SymmetricKey) -> Client {
     let config = VauchiConfig::with_storage_path(db)
         .with_storage_key(key.clone())
         .with_relay_url(application.url())
         .with_ohttp_relay_url(outer.url());
     let sleeper = Arc::new(FakeSleeper::new());
-    let mut vauchi = Vauchi::new(config)
+    let clock = FakeClock::new(std::time::UNIX_EPOCH + Duration::from_secs(NOW)).shared();
+    let mut vauchi = Vauchi::new_with(config, clock, OsSecureRng::shared(), None)
         .expect("create Vauchi")
         .with_sleeper(sleeper.clone());
     if vauchi.identity().is_none() {
@@ -232,4 +236,84 @@ fn a_waiting_sync_waits_the_advertised_window() {
         .expect("sync");
 
     assert_eq!(client.sleeper.calls(), vec![POLL; 4], "120 s in 30 s polls");
+}
+
+/// Withdraws the delayed path the way a relay without it answers: no
+/// window on synchronous answers and `404` on delayed posts.
+fn withdraw(outer: &MockRelay) {
+    outer.advertise_delay_window(None);
+    outer.refuse_async_path();
+}
+
+// A fallback to synchronous fetches must be visible (owner decision
+// 2026-10-23 on #628): a relay that never offered delayed fetches and one
+// that stopped are told apart.
+// @internal
+#[test]
+fn a_relay_that_never_offered_delayed_fetches_reports_the_synchronous_path() {
+    let world = World::new();
+    let mut client = world.client();
+
+    sync(&mut client);
+
+    assert_eq!(client.vauchi.fetch_path(), FetchPath::Synchronous);
+}
+
+// @internal
+#[test]
+fn an_advertised_window_reports_the_delayed_path_and_its_window() {
+    let world = World::new();
+    world.outer.advertise_delay_window(Some("900"));
+    let mut client = world.client();
+
+    sync(&mut client);
+
+    assert_eq!(
+        client.vauchi.fetch_path(),
+        FetchPath::Delayed {
+            window: Duration::from_secs(900)
+        }
+    );
+}
+
+// @internal
+#[test]
+fn a_withdrawn_path_is_reported_with_when_it_was_withdrawn_across_a_restart() {
+    let world = World::new();
+    world.outer.advertise_delay_window(Some("900"));
+    let mut client = world.client();
+    sync(&mut client);
+    withdraw(&world.outer);
+
+    sync(&mut client);
+
+    let withdrawn = FetchPath::SynchronousSinceWithdrawn { since_unix: NOW };
+    assert_eq!(client.vauchi.fetch_path(), withdrawn);
+    assert_eq!(
+        world.client().vauchi.fetch_path(),
+        withdrawn,
+        "after a restart"
+    );
+}
+
+// @internal
+#[test]
+fn a_renewed_advertisement_clears_the_withdrawal() {
+    let world = World::new();
+    world.outer.advertise_delay_window(Some("900"));
+    let mut client = world.client();
+    sync(&mut client);
+    withdraw(&world.outer);
+    sync(&mut client);
+    world.outer.accept_async_path();
+    world.outer.advertise_delay_window(Some("600"));
+
+    sync(&mut client);
+
+    assert_eq!(
+        client.vauchi.fetch_path(),
+        FetchPath::Delayed {
+            window: Duration::from_secs(600)
+        }
+    );
 }

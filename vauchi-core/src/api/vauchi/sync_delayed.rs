@@ -16,6 +16,18 @@ use crate::network::DelayWindowAdvert;
 /// Shortest pause between collects, so a zero interval cannot spin.
 const MIN_POLL: Duration = Duration::from_millis(100);
 
+/// Which path a sync's fetches take through the outer relay (#628).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FetchPath {
+    /// Through the delayed path, collected after up to `window`.
+    Delayed { window: Duration },
+    /// Synchronous: the outer relay has not offered delayed fetches.
+    Synchronous,
+    /// Synchronous since the outer relay stopped offering delayed fetches
+    /// at `since_unix` (owner decision 2026-10-23: a fallback is visible).
+    SynchronousSinceWithdrawn { since_unix: u64 },
+}
+
 impl Vauchi {
     /// Syncs, then, when fetches go through the delayed path, keeps syncing
     /// every `poll` until the outer relay's delay window has passed and a fetch answer has been collected, or `max_wait` of pauses
@@ -69,6 +81,11 @@ impl Vauchi {
                 .ohttp_delayed
                 .then_some(self.config.relay.ohttp_delay_window)
         })
+    }
+
+    /// The path the next sync's fetches take.
+    pub fn fetch_path(&self) -> FetchPath {
+        todo!("#628 fetch path report")
     }
 
     /// Keeps or forgets the outer relay's window as its last answer said.

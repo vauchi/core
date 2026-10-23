@@ -132,17 +132,7 @@ impl DeviceLinkInitiator {
         proof: &ProximityProof,
         now: u64,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        // DL-6: Reject self-linking — device name must not match any active device.
-        // Note: This is a name-based heuristic. Proper enforcement requires a
-        // protocol change to include device_id in DeviceLinkRequest.
-        if self
-            .registry
-            .active_devices()
-            .iter()
-            .any(|d| d.device_name == request.device_name)
-        {
-            return Err(ExchangeError::SelfLinkingNotAllowed);
-        }
+        refuse_a_taken_device_name(&self.registry, &request.device_name)?;
 
         let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
         validate_proximity_proof(self.qr.link_key(), proof, &confirmation_code, now)?;
@@ -294,17 +284,7 @@ impl DeviceLinkInitiatorRestored {
         proof: &ProximityProof,
         now: u64,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        // DL-6: Reject self-linking — device name must not match any active device.
-        // Note: This is a name-based heuristic. Proper enforcement requires a
-        // protocol change to include device_id in DeviceLinkRequest.
-        if self
-            .registry
-            .active_devices()
-            .iter()
-            .any(|d| d.device_name == request.device_name)
-        {
-            return Err(ExchangeError::SelfLinkingNotAllowed);
-        }
+        refuse_a_taken_device_name(&self.registry, &request.device_name)?;
 
         let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
         validate_proximity_proof(self.qr.link_key(), proof, &confirmation_code, now)?;
@@ -388,4 +368,20 @@ fn validate_proximity_proof(
             Ok(())
         }
     }
+}
+
+/// DL-6: rejects self-linking. Name-based, because the request carries no
+/// device id; proper enforcement needs that protocol change.
+fn refuse_a_taken_device_name(
+    registry: &DeviceRegistry,
+    device_name: &str,
+) -> Result<(), ExchangeError> {
+    if registry
+        .active_devices()
+        .iter()
+        .any(|d| d.device_name == device_name)
+    {
+        return Err(ExchangeError::SelfLinkingNotAllowed);
+    }
+    Ok(())
 }

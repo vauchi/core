@@ -825,6 +825,11 @@ test:formal:
   needs: []
   variables:
     FORMAL_HOME: ${CI_PROJECT_DIR}/.formal
+    # The image's own, not the template's ${CI_PROJECT_DIR}/.cargo: that
+    # makes the repo's .cargo/config.toml (clang + mold, absent here)
+    # cargo's home config, which `cargo install kani-verifier` then reads;
+    # and `kani setup` needs rustup where CARGO_HOME points.
+    CARGO_HOME: /usr/local/cargo
   cache:
     key: core-formal
     paths: [.formal/]

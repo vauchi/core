@@ -91,8 +91,22 @@ fn fill(app: &mut AppEngine, commands: &[Command], surface: &str, value: &str) -
 ///
 /// `DuressPinEngine` is a four-step sub-flow (overview → enter PIN → confirm
 /// → alerts), so no single dispatch completes it.
-/// Types `duress_pin` into the duress PIN inputs and `app_password` into
-/// the password input the session PIN step shows (#777).
+fn labelled_inputs(nodes: &[PresentationNode]) -> Vec<(BindingId, String)> {
+    let mut found = Vec::new();
+    for node in nodes {
+        match node {
+            PresentationNode::Input {
+                binding_id, label, ..
+            } => found.push((binding_id.clone(), label.clone())),
+            PresentationNode::Group { children, .. } => found.extend(labelled_inputs(children)),
+            _ => {}
+        }
+    }
+    found
+}
+
+/// Types `app_password` into every password input (setting one, and the
+/// session PIN step, #777) and `duress_pin` into the rest.
 fn drive_until_native_back(
     app: &mut AppEngine,
     mut commands: Vec<Command>,
@@ -109,9 +123,8 @@ fn drive_until_native_back(
             _ => None,
         }) {
             let surface_id = surface.surface_id.clone();
-            let password_input = input_binding(&surface.nodes, "password");
-            for binding_id in all_input_bindings(&surface.nodes) {
-                let value = if password_input.as_ref() == Some(&binding_id) {
+            for (binding_id, label) in labelled_inputs(&surface.nodes) {
+                let value = if label.to_lowercase().contains("password") {
                     app_password
                 } else {
                     duress_pin
@@ -310,6 +323,31 @@ fn completing_duress_setup_terminates_the_entry_flow() {
         app.vauchi().is_duress_enabled().expect("duress state"),
         "the duress PIN must be persisted before the flow terminates"
     );
+}
+
+/// A password set at the start of this flow opens the session, so the
+/// session PIN step in front of the duress PIN accepts it (#777).
+// @internal
+#[test]
+fn a_password_set_in_this_flow_passes_the_step_before_the_duress_pin() {
+    let mut app = AppEngine::for_duress_setup(identity_core());
+    let commands = app
+        .initial_commands()
+        .expect("initial duress-entry commands");
+
+    // Save password, set up, continue, continue, confirm the step: 5 steps.
+    // Rejected PINs would lock the app and need far more to finish.
+    let after_submit = drive_until_native_back(&mut app, commands, "987654", "new-pin-1234", 6);
+
+    assert!(
+        after_submit.contains(&Command::PerformNativeBack),
+        "the flow must complete, got {:?}",
+        after_submit
+            .iter()
+            .map(|c| c.variant_name())
+            .collect::<Vec<_>>()
+    );
+    assert!(app.vauchi().is_duress_enabled().expect("duress state"));
 }
 
 // @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation

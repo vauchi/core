@@ -269,6 +269,132 @@ fn back_from_the_format_choice_returns_to_privacy_and_ends_the_export() {
     assert_eq!(screen_id(&engine), "export_await_presence");
 }
 
+const CHOSEN_PIN: &str = "chosen-pin-4821";
+
+fn submit_first_app_password(engine: &mut AppEngine, password: &str) {
+    engine.navigate_to(AppScreen::ChangePassword);
+    for field in ["new_password", "confirm_password"] {
+        let _ = engine.handle_action(UserAction::TextChanged {
+            component_id: field.into(),
+            value: password.into(),
+        });
+    }
+    let _ = press(engine, "submit");
+}
+
+// Whoever holds the unlocked phone must not trade the OS check for a
+// password they just chose (#766). The session that set it stays
+// unauthenticated, so the attack locks the app and reopens it with that
+// password before exporting.
+// @internal
+#[test]
+fn a_first_app_password_set_without_the_os_check_never_verifies_an_export() {
+    let mut engine = privacy_screen(true);
+    enrolled(&mut engine);
+
+    submit_first_app_password(&mut engine, CHOSEN_PIN);
+    let _ = engine.drain_pending_commands();
+    let _ = engine.vauchi_mut().authenticate(CHOSEN_PIN);
+    engine.navigate_to(AppScreen::Privacy);
+    export_with_pin(&mut engine, CHOSEN_PIN);
+
+    assert_ne!(screen_id(&engine), "export_choose_format");
+    assert!(!engine.vauchi().is_password_enabled().unwrap());
+}
+
+// @internal
+#[test]
+fn the_first_app_password_is_set_once_the_os_check_passes() {
+    let mut engine = privacy_screen(true);
+    enrolled(&mut engine);
+
+    submit_first_app_password(&mut engine, CHOSEN_PIN);
+
+    assert!(matches!(
+        presence_request(&mut engine),
+        Some(Command::RevealUserPresenceSecret { .. })
+    ));
+    assert!(!engine.vauchi().is_password_enabled().unwrap());
+    let _ = engine.handle_hardware_event(Event::UserPresenceSecretRevealed {
+        secret: SECRET.to_vec().into(),
+    });
+    assert!(engine.vauchi().is_password_enabled().unwrap());
+    assert!(
+        engine
+            .vauchi()
+            .confirm_session_password(CHOSEN_PIN)
+            .unwrap()
+    );
+}
+
+// @internal
+#[test]
+fn before_any_enrolment_the_first_app_password_has_the_shell_seal_a_secret() {
+    let mut engine = privacy_screen(true);
+
+    submit_first_app_password(&mut engine, CHOSEN_PIN);
+
+    assert!(matches!(
+        presence_request(&mut engine),
+        Some(Command::CreateUserPresenceSecret { .. })
+    ));
+    let _ = engine.handle_hardware_event(Event::UserPresenceSecretCreated {
+        secret: SECRET.to_vec().into(),
+    });
+    assert!(engine.vauchi().is_password_enabled().unwrap());
+}
+
+// @internal
+#[test]
+fn a_wrong_secret_or_a_cancelled_check_sets_no_app_password() {
+    for answer in [
+        Event::UserPresenceSecretRevealed {
+            secret: vec![1; 32].into(),
+        },
+        Event::UserPresenceCheckCancelled,
+    ] {
+        let mut engine = privacy_screen(true);
+        enrolled(&mut engine);
+        submit_first_app_password(&mut engine, CHOSEN_PIN);
+        let _ = presence_request(&mut engine);
+
+        let _ = engine.handle_hardware_event(answer.clone());
+
+        assert!(
+            !engine.vauchi().is_password_enabled().unwrap(),
+            "{answer:?} must not set the password"
+        );
+    }
+}
+
+// A lost sealed secret leaves the app password as the only way back to
+// exporting (#739), so an unavailable check does not block it.
+// @internal
+#[test]
+fn when_the_os_check_is_unavailable_the_first_app_password_is_set() {
+    let mut engine = privacy_screen(true);
+    enrolled(&mut engine);
+    submit_first_app_password(&mut engine, CHOSEN_PIN);
+    let _ = presence_request(&mut engine);
+
+    let _ = engine.handle_hardware_event(Event::HardwareUnavailable {
+        transport: "user_presence".into(),
+    });
+
+    assert!(engine.vauchi().is_password_enabled().unwrap());
+}
+
+// @internal
+#[test]
+fn without_the_capability_the_first_app_password_is_set_at_once() {
+    let mut engine = privacy_screen(false);
+
+    submit_first_app_password(&mut engine, CHOSEN_PIN);
+
+    assert_eq!(presence_request(&mut engine), None);
+    assert!(engine.vauchi().is_password_enabled().unwrap());
+}
+
 // @scenario: privacy_compliance :: Export asks me to set an app password when nothing else can check it is me
 #[test]
 fn without_the_capability_export_still_asks_for_an_app_password() {

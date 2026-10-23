@@ -11,7 +11,7 @@ use rusqlite::{Connection, params};
 use std::sync::Arc;
 
 use super::super::{Storage, StorageError};
-use crate::network::PinnedCertificate;
+use crate::crypto::pinning::PinnedCertificate;
 
 /// Scoped persistence view for the pin_cache domain.
 pub struct PinCacheStore<'a> {

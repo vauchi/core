@@ -8,10 +8,12 @@ pub mod cek;
 pub mod chain;
 pub mod encryption;
 pub mod kdf;
+pub mod ohttp_key_trust;
 pub mod padding;
 #[cfg(kani)]
 mod padding_proofs;
 pub mod password_kdf;
+pub mod pinning;
 pub mod ratchet;
 #[cfg(feature = "testing")]
 pub mod shamir;

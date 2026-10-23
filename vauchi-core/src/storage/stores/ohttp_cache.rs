@@ -8,7 +8,7 @@
 
 use crate::clock::Clock;
 #[cfg(feature = "network-rustls")]
-use crate::network::ohttp_key_trust::{HeldOhttpKey, OhttpAnchor};
+use crate::crypto::ohttp_key_trust::{HeldOhttpKey, OhttpAnchor};
 use rusqlite::{Connection, params};
 use std::sync::Arc;
 

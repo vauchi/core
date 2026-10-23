@@ -550,6 +550,13 @@ impl AppEngine {
                 // existing password to setup_app_password and clobber it.
                 match self.vauchi.is_password_enabled() {
                     Err(e) => Some(format!("Could not read password state: {e}")),
+                    Ok(false) if self.device_capabilities.can_seal_user_presence => {
+                        current.zeroize();
+                        self.pending_first_password =
+                            Some(zeroize::Zeroizing::new(std::mem::take(&mut new)));
+                        self.request_user_presence("change_password.presence_prompt");
+                        return ActionResult::UpdateScreen(self.engine.current_screen());
+                    }
                     Ok(had_password) => {
                         let result = if had_password {
                             self.vauchi.change_app_password(&current, &new)
@@ -580,6 +587,12 @@ impl AppEngine {
                 };
             }
         }
+        self.finish_password_change(password_was_set)
+    }
+
+    /// Leaves the password screen once a change ends: on to the duress PIN
+    /// for that entry flow, back otherwise.
+    pub(super) fn finish_password_change(&mut self, password_was_set: bool) -> ActionResult {
         // A duress-setup entry flow only opened this screen to satisfy core's
         // app-password precondition; on success it continues to the PIN step
         // rather than unwinding to a navigation root it never came from.

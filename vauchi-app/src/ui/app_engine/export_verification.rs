@@ -38,7 +38,7 @@ impl AppEngine {
                 self.engine.engine_output(),
                 Some(EngineOutput::AwaitingUserPresence)
             ) {
-                self.request_user_presence();
+                self.request_user_presence("privacy.export_presence_prompt");
             }
             return Some(result);
         }
@@ -79,8 +79,8 @@ impl AppEngine {
 
     /// Asks the shell for the OS user-presence check: to seal a fresh secret
     /// the first time on this device, to reveal it after that.
-    fn request_user_presence(&mut self) {
-        let prompt = self.t("privacy.export_presence_prompt");
+    pub(super) fn request_user_presence(&mut self, prompt_key: &str) {
+        let prompt = self.t(prompt_key);
         let command = if self.vauchi.has_user_presence_secret().unwrap_or(false) {
             Command::RevealUserPresenceSecret { prompt }
         } else {
@@ -92,6 +92,9 @@ impl AppEngine {
     /// The shell's answer to the user-presence check. `None` unless an
     /// export is waiting on it: a secret nobody asked for confirms nothing.
     pub(super) fn handle_user_presence_event(&mut self, event: &Event) -> Option<ActionResult> {
+        if self.pending_first_password.is_some() {
+            return self.handle_first_password_presence(event);
+        }
         if !matches!(self.screen, AppScreen::Privacy)
             || !matches!(
                 self.engine.engine_output(),
@@ -140,6 +143,45 @@ impl AppEngine {
             .engine
             .apply_update(EngineUpdate::GdprExport(GdprExportUpdate::PinRejected));
         Some(ActionResult::UpdateScreen(self.engine.current_screen()))
+    }
+
+    /// The shell's answer to the check that guards a first app password
+    /// (#766). An unavailable check still sets it: a lost sealed secret
+    /// leaves the app password as the only way back to exporting (#739).
+    fn handle_first_password_presence(&mut self, event: &Event) -> Option<ActionResult> {
+        let confirmed = match event {
+            Event::UserPresenceSecretCreated { secret } => self
+                .vauchi
+                .enroll_user_presence_secret(secret.as_bytes())
+                .unwrap_or(false),
+            Event::UserPresenceSecretRevealed { secret } => self
+                .vauchi
+                .confirm_user_presence_secret(secret.as_bytes())
+                .unwrap_or(false),
+            Event::HardwareUnavailable { transport } if transport == USER_PRESENCE_TRANSPORT => {
+                true
+            }
+            Event::UserPresenceCheckCancelled => {
+                self.pending_first_password = None;
+                return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
+            }
+            _ => return None,
+        };
+        let password = self.pending_first_password.take()?;
+        if !confirmed {
+            if let Some(locked) = self.record_confirm_pin_miss() {
+                return Some(locked);
+            }
+            return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
+        }
+        if let Err(e) = self.vauchi.setup_app_password(&password) {
+            return Some(ActionResult::ShowAlert {
+                title: self.t("error.title"),
+                message: format!("Could not set password: {e}"),
+            });
+        }
+        self.confirm_pin_failures = 0;
+        Some(self.finish_password_change(true))
     }
 
     /// Counts a wrong PIN at any re-confirmation step and locks the app

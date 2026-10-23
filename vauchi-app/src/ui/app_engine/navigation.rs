@@ -187,6 +187,7 @@ impl AppEngine {
         } else if self.session_locked {
             return self.engine.current_screen();
         }
+        self.pending_first_password = None;
         // Refresh identity from storage if a sibling `Vauchi` instance
         // (e.g. `VauchiPlatform` on iOS/Android) wrote one to disk after
         // this AppEngine was constructed. Without this, screen builders
@@ -335,6 +336,7 @@ impl AppEngine {
         if self.is_locked() {
             return self.engine.current_screen();
         }
+        self.pending_first_password = None;
         if self.engine.navigate_back_within() {
             // Re-decorate the same engine's screen exactly as
             // `navigate_to_internal` does for its final return, so the

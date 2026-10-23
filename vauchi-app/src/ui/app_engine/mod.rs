@@ -212,6 +212,10 @@ pub struct AppEngine {
     /// counted together so moving between steps cannot reset it; survives
     /// leaving the screen for the same reason (#469).
     confirm_pin_failures: usize,
+    /// A first app password held until the OS user-presence check passes on
+    /// a device that can run it, so holding the unlocked phone is not enough
+    /// to choose one (#766). Leaving the screen drops it.
+    pub(super) pending_first_password: Option<zeroize::Zeroizing<String>>,
     /// Where this device is reachable on the network it is attached to, as
     /// reported by the shell (ADR-070).
     ///
@@ -627,6 +631,7 @@ impl AppEngine {
             #[cfg(all(feature = "network-http", feature = "storage"))]
             device_link_initiator: None,
             confirm_pin_failures: 0,
+            pending_first_password: None,
             local_network_address: None,
             #[cfg(all(feature = "network-http", feature = "storage"))]
             device_link_responder: None,

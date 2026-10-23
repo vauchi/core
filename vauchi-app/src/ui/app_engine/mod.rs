@@ -480,20 +480,12 @@ impl AppEngine {
 
     /// Drops every cached screen and rebuilds the active one in place, so
     /// the next `current_screen()` reflects reloaded content without a
-    /// navigation.
+    /// navigation. A screen a background machine advances keeps its engine,
+    /// as in `invalidate_screen`: rebuilding device linking mid-ceremony
+    /// dropped the code on screen and refused its confirmation
+    /// (vauchi/private#758).
     fn rebuild_screens(&mut self) {
-        self.engine_cache.clear();
-        let screen = self.screen.clone();
-        self.engine = Self::create_engine(
-            &self.vauchi,
-            &screen,
-            self.preview_as_contact.as_deref(),
-            &self.device_capabilities,
-            &self.transport_readiness,
-            &self.render_context,
-            &self.pending_exchange_groups,
-            self.glance_display_qr.as_deref(),
-        );
+        self.invalidate_all();
     }
 
     /// Rebuilds what is derived from the active social-network registry

@@ -38,7 +38,7 @@
 include:
   - project: 'vauchi/scripts'
     # Pin the commit because tags are not protected.
-    ref: 1e039df4a5488fdca44d7254cec79157dc408edf
+    ref: 724f91aa1e16a30e0eca441f5020e4cfebc9df9e
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -583,10 +583,10 @@ lint:architecture:
     - |
       VAUCHI_CI_SCRIPTS_DIR=$(mktemp -d)
       export VAUCHI_CI_SCRIPTS_DIR
-      git -C "$VAUCHI_CI_SCRIPTS_DIR" init
-      git -C "$VAUCHI_CI_SCRIPTS_DIR" remote add origin https://gitlab.com/vauchi/scripts.git
-      git -C "$VAUCHI_CI_SCRIPTS_DIR" fetch --depth=1 origin "$VAUCHI_SCRIPTS_REF"
-      git -C "$VAUCHI_CI_SCRIPTS_DIR" checkout --detach FETCH_HEAD
+      git -C "${VAUCHI_CI_SCRIPTS_DIR}" init
+      git -C "${VAUCHI_CI_SCRIPTS_DIR}" remote add origin https://gitlab.com/vauchi/scripts.git
+      git -C "${VAUCHI_CI_SCRIPTS_DIR}" fetch --depth=1 origin "${VAUCHI_SCRIPTS_REF}"
+      git -C "${VAUCHI_CI_SCRIPTS_DIR}" checkout --detach FETCH_HEAD
       test -f "$VAUCHI_CI_SCRIPTS_DIR/scripts/architecture-check.sh"
       test -f "$VAUCHI_CI_SCRIPTS_DIR/tools/architecture-check/Cargo.lock"
     - git fetch --depth=1 origin main:refs/remotes/origin/main

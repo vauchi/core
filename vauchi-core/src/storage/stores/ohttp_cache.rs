@@ -106,6 +106,41 @@ impl OhttpCacheStore<'_> {
         Ok(())
     }
 
+    /// Note that `relay_url` stopped offering the delayed path now.
+    pub fn record_delay_withdrawal(&self, relay_url: &str) -> Result<(), StorageError> {
+        let now = self.now_secs();
+        self.conn.execute(
+            "INSERT OR REPLACE INTO ohttp_delay_withdrawn (relay_url, withdrawn_at) \
+             VALUES (?1, ?2)",
+            params![relay_url, now as i64],
+        )?;
+        Ok(())
+    }
+
+    /// When `relay_url` stopped offering the delayed path, unless it offers
+    /// it again.
+    pub fn load_delay_withdrawal(&self, relay_url: &str) -> Result<Option<u64>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT withdrawn_at FROM ohttp_delay_withdrawn WHERE relay_url = ?1",
+            params![relay_url],
+            |row| row.get::<_, i64>(0),
+        );
+        match result {
+            Ok(at) => Ok(u64::try_from(at).ok()),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
+    /// Forget a withdrawal: `relay_url` offers the delayed path again.
+    pub fn clear_delay_withdrawal(&self, relay_url: &str) -> Result<(), StorageError> {
+        self.conn.execute(
+            "DELETE FROM ohttp_delay_withdrawn WHERE relay_url = ?1",
+            params![relay_url],
+        )?;
+        Ok(())
+    }
+
     /// Keep `held` as the signed key for `relay_url` (#288), replacing the
     /// one held before.
     #[cfg(feature = "network-rustls")]

@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 84] = [
+const MIGRATIONS: [Migration; 85] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -692,7 +692,22 @@ const MIGRATIONS: [Migration; 84] = [
         name: "user_presence_digest",
         action: MigrationAction::Sql(MIGRATION_V84_USER_PRESENCE_DIGEST),
     },
+    Migration {
+        version: 85,
+        name: "ohttp_delay_withdrawn",
+        action: MigrationAction::Sql(MIGRATION_V85_OHTTP_DELAY_WITHDRAWN),
+    },
 ];
+
+/// Migration v85: when an outer relay stopped offering the delayed path a
+/// client had used (#628, owner decision 2026-10-23), so the synchronous
+/// fallback can be shown rather than taken silently.
+const MIGRATION_V85_OHTTP_DELAY_WITHDRAWN: &str = "
+    CREATE TABLE IF NOT EXISTS ohttp_delay_withdrawn (
+        relay_url TEXT PRIMARY KEY,
+        withdrawn_at INTEGER NOT NULL
+    );
+";
 
 /// Migration v83: the delay window each outer relay advertises (#628 D-F6
 /// amendment). Kept so a restarted process fetches through the delayed path

@@ -85,7 +85,17 @@ impl Vauchi {
 
     /// The path the next sync's fetches take.
     pub fn fetch_path(&self) -> FetchPath {
-        todo!("#628 fetch path report")
+        if let Some(window) = self.delayed_window() {
+            return FetchPath::Delayed { window };
+        }
+        self.storage
+            .ohttp_cache()
+            .load_delay_withdrawal(&self.config.relay.ohttp_endpoint())
+            .ok()
+            .flatten()
+            .map_or(FetchPath::Synchronous, |since_unix| {
+                FetchPath::SynchronousSinceWithdrawn { since_unix }
+            })
     }
 
     /// Keeps or forgets the outer relay's window as its last answer said.
@@ -95,8 +105,21 @@ impl Vauchi {
         // Best-effort: a failed write only defers the switch to a later sync.
         #[allow(clippy::let_underscore_must_use)]
         let _ = match advert {
-            Some(DelayWindowAdvert::Advertised(window)) => cache.save_delay_window(&relay, window),
-            Some(DelayWindowAdvert::Withdrawn) => cache.clear_delay_window(&relay),
+            Some(DelayWindowAdvert::Advertised(window)) => cache
+                .save_delay_window(&relay, window)
+                .and_then(|()| cache.clear_delay_withdrawal(&relay)),
+            Some(DelayWindowAdvert::Withdrawn) => {
+                // Only a window this client used makes a withdrawal: a relay
+                // that never offered one is the plain synchronous case.
+                let had_window = matches!(cache.load_delay_window(&relay), Ok(Some(_)));
+                cache.clear_delay_window(&relay).and_then(|()| {
+                    if had_window {
+                        cache.record_delay_withdrawal(&relay)
+                    } else {
+                        Ok(())
+                    }
+                })
+            }
             None => Ok(()),
         };
     }

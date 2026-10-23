@@ -581,12 +581,15 @@ lint:architecture:
   allow_failure: false
   variables:
     RUSTC_WRAPPER: "sccache"
+    CARGO_HOME: "${CI_PROJECT_DIR}/.cargo-architecture"
     SCCACHE_DIR: "${CI_PROJECT_DIR}/.cache/sccache/architecture"
     SCCACHE_CACHE_SIZE: "256M"
   cache:
     key: "architecture-sccache-${VAUCHI_SCRIPTS_REF}"
     paths:
       - .cache/sccache/architecture/
+      - .cargo-architecture/registry/index/
+      - .cargo-architecture/registry/cache/
   before_script:
     - apt-get update -qq
     - apt-get install -y --no-install-recommends sccache

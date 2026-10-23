@@ -11,7 +11,7 @@
 
 use super::Vauchi;
 use crate::api::error::{VauchiError, VauchiResult};
-use crate::contact_card::ContactCard;
+use crate::card::ContactCard;
 use crate::exchange::X3DHKeyPair;
 use crate::exchange::link_initiator::{
     LinkInitiatorFailureReason, LinkInitiatorSession, LinkInitiatorState,

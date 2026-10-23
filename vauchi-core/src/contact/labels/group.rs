@@ -175,7 +175,7 @@ impl Group {
                 let normalized = crate::text::normalize_text(raw);
                 if normalized.is_empty() {
                     self.bio_override = None;
-                } else if normalized.chars().count() > crate::contact_card::MAX_BIO_LENGTH {
+                } else if normalized.chars().count() > crate::card::MAX_BIO_LENGTH {
                     return Err(GroupError::InvalidBio(
                         "Bio override cannot exceed 160 characters".to_string(),
                     ));
@@ -209,7 +209,7 @@ impl Group {
         match avatar {
             None => self.avatar_override = None,
             Some(raw) => {
-                let webp = crate::contact_card::normalize_avatar(raw)
+                let webp = crate::card::normalize_avatar(raw)
                     .map_err(|e| GroupError::InvalidAvatar(e.to_string()))?;
                 self.avatar_override = Some(webp);
             }
@@ -411,11 +411,11 @@ mod tests {
             .expect("whitespace clears");
         assert_eq!(label.bio_override(), None);
 
-        let too_long = "a".repeat(crate::contact_card::MAX_BIO_LENGTH + 1);
+        let too_long = "a".repeat(crate::card::MAX_BIO_LENGTH + 1);
         let result = label.set_bio_override(Some(&too_long), 0);
         assert!(matches!(result, Err(GroupError::InvalidBio(_))));
 
-        let max_bio = "b".repeat(crate::contact_card::MAX_BIO_LENGTH);
+        let max_bio = "b".repeat(crate::card::MAX_BIO_LENGTH);
         label
             .set_bio_override(Some(&max_bio), 0)
             .expect("160 chars should succeed");
@@ -508,7 +508,7 @@ mod tests {
     #[test]
     fn test_label_bio_override_caps_by_chars_not_bytes() {
         let mut label = Group::new("group-family-4".to_string(), "Family", 0);
-        let cap = crate::contact_card::MAX_BIO_LENGTH;
+        let cap = crate::card::MAX_BIO_LENGTH;
 
         // 'ä' (U+00E4) is NFC-stable and 2 bytes: `cap` of them is within the
         // char cap but exceeds it in bytes — the cap must count chars.

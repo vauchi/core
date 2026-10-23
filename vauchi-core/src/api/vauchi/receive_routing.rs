@@ -447,7 +447,7 @@ pub(crate) fn build_token_to_contact_map(
 mod tests {
     use super::*;
     use crate::SymmetricKey;
-    use crate::contact_card::ContactCard;
+    use crate::card::ContactCard;
     use crate::sync::safety_alert::AlertKind;
 
     fn exchanged_contact(label: &str) -> Contact {

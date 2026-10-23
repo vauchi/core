@@ -6,8 +6,8 @@
 
 use std::collections::HashSet;
 
+use crate::card::{ContactField, FieldType};
 use crate::contact::Contact;
-use crate::contact_card::{ContactField, FieldType};
 
 /// A detected duplicate pair with similarity score.
 #[derive(Clone, Debug)]

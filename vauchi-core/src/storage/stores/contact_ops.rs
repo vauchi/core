@@ -8,7 +8,7 @@ use rusqlite::params;
 
 use super::super::StorageError;
 use super::ContactStore;
-use crate::contact_card::ContactCard;
+use crate::card::ContactCard;
 use crate::crypto::cek::ContentEncryptionKey;
 
 impl ContactStore<'_> {

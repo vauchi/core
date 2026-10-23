@@ -435,8 +435,8 @@ mod tests {
     }
 
     use crate::DeviceSyncOrchestrator;
+    use crate::card::ContactCard;
     use crate::contact::Contact;
-    use crate::contact_card::ContactCard;
     use crate::storage::Storage;
     use crate::sync::DeviceSyncPayload;
 
@@ -464,8 +464,8 @@ mod tests {
         let mut own_card = ContactCard::new("Alice");
         // Test setup: ignore field-add result (test focuses on sync below)
         #[allow(clippy::let_underscore_must_use)]
-        let _ = own_card.add_field(crate::contact_card::ContactField::new(
-            crate::contact_card::FieldType::Email,
+        let _ = own_card.add_field(crate::card::ContactField::new(
+            crate::card::FieldType::Email,
             "email",
             "alice@example.com",
             0,

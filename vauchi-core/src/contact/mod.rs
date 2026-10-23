@@ -33,9 +33,9 @@ pub use tag::Tag;
 pub use trust::TrustLevel;
 pub use visibility::{FieldVisibility, VisibilityRules};
 
+use crate::card::ContactCard;
 use crate::contact::reciprocity::{ConfirmationChannel, Reciprocity};
 use crate::contact::trust_metrics::TrustMetrics;
-use crate::contact_card::ContactCard;
 use crate::crypto::SymmetricKey;
 use crate::crypto::cek::ContentEncryptionKey;
 use crate::exchange_types::ExchangeTransport;
@@ -643,10 +643,7 @@ impl Contact {
     }
 
     /// Updates the contact's display name.
-    pub fn set_display_name(
-        &mut self,
-        name: &str,
-    ) -> Result<(), crate::contact_card::ContactCardError> {
+    pub fn set_display_name(&mut self, name: &str) -> Result<(), crate::card::ContactCardError> {
         self.card.set_display_name(name)?;
         self.display_name = name.to_string();
         Ok(())

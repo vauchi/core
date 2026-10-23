@@ -253,7 +253,7 @@ impl Vauchi {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::contact_card::ContactCard;
+    use crate::card::ContactCard;
     use crate::identity::device::DeviceInfo;
     use crate::sync::device_sync::ContactSyncData;
 

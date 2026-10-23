@@ -8,9 +8,9 @@
 
 use std::sync::Arc;
 
+use crate::card::{ContactCard, ContactField};
 use crate::contact::Contact;
 use crate::contact::display::{DisplayNamePreference, resolve_display_name};
-use crate::contact_card::{ContactCard, ContactField};
 use crate::storage::Storage;
 
 use super::error::{VauchiError, VauchiResult};
@@ -629,7 +629,7 @@ impl<'a> ContactManager<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::contact_card::FieldType;
+    use crate::card::FieldType;
     use crate::crypto::SymmetricKey;
     use std::sync::atomic::{AtomicUsize, Ordering};
 

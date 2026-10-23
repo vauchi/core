@@ -554,8 +554,8 @@ mod tests {
     }
 
     fn add_test_contact(storage: &crate::storage::Storage, _contact_id: &str) {
+        use crate::card::ContactCard;
         use crate::contact::Contact;
-        use crate::contact_card::ContactCard;
         use crate::crypto::SymmetricKey;
 
         let card = ContactCard::new("Test Contact");

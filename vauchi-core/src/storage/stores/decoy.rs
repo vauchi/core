@@ -12,7 +12,7 @@ use rusqlite::{Connection, params};
 use std::sync::Arc;
 
 use super::super::{Storage, StorageError};
-use crate::contact_card::ContactCard;
+use crate::card::ContactCard;
 use sha2::{Digest, Sha256};
 
 /// Scoped persistence view for the decoy domain.

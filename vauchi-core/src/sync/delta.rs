@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
 
-use crate::contact_card::{ContactCard, ContactField};
+use crate::card::{ContactCard, ContactField};
 use crate::identity::Identity;
 
 /// Aggregated validation count for a single field in a card update.

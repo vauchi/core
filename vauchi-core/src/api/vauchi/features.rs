@@ -6,8 +6,8 @@
 //! block/unblock, consent, recovery readiness, and visibility re-propagation.
 
 use crate::aha_moments::AhaMoment;
+use crate::card::ContactCard;
 use crate::contact::Contact;
-use crate::contact_card::ContactCard;
 use crate::demo_contact::{DemoContactCard, DemoTip, generate_demo_contact_card};
 use crate::network::MultiRelayConfig;
 use crate::onboarding::AhaMomentType;

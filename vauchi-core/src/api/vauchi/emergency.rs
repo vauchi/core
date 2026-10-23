@@ -7,7 +7,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::contact_card::ContactCard;
+use crate::card::ContactCard;
 use crate::rng::SecureRngExt;
 
 use crate::storage::{SecureStorage, Storage, StorageError};

@@ -8,7 +8,7 @@
 
 use image::GrayImage;
 
-use crate::qr::scanner::{ScanResult, decode_rqrr, decode_rxing};
+use crate::qr_decode::{ScanResult, decode_rqrr, decode_rxing};
 
 /// Scan a QR code using YOLO detection → crop → rqrr decode pipeline.
 ///

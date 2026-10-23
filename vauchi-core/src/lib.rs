@@ -174,9 +174,11 @@ pub use demo_contact::{
     DEMO_CONTACT_ID, DEMO_CONTACT_NAME, DemoContactCard, DemoTip, DemoTipCategory,
     generate_demo_contact_card, get_demo_tips,
 };
+pub mod card;
 pub mod diagnostic;
 pub mod onboarding;
 pub mod qr;
+pub mod qr_decode;
 pub use onboarding::display_name_suggestions;
 pub mod social;
 pub use social::{SocialNetwork, SocialNetworkRegistry};

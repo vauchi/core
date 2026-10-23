@@ -12,7 +12,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::contact_card::{ContactCard, ContactField, FieldType};
+use crate::card::{ContactCard, ContactField, FieldType};
 
 /// Full contact card payload exchanged during BLE proximity exchange.
 ///

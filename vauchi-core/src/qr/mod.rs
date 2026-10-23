@@ -2,12 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Production QR code scanning.
+//! Compatibility paths for QR code scanning.
 //!
-//! rxing/rqrr-based decoder pipeline used by Android and iOS mobile
-//! scanners. Always compiled — do not gate behind any feature. Diagnostic
-//! variants (preprocessing, YOLO) live in `crate::diagnostic` behind the
-//! `diagnostic-scanner` / `diagnostic-yolo` features.
+//! New production callers use `crate::qr_decode`. Optional diagnostic
+//! wrappers remain in `scanner` for existing consumers.
 
 pub mod scanner;
 

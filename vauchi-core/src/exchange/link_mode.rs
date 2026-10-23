@@ -19,7 +19,7 @@ use sha2::{Digest, Sha256};
 use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
 use zeroize::Zeroizing;
 
-use crate::contact_card::ContactCard;
+use crate::card::ContactCard;
 use crate::crypto::encryption::SymmetricKey;
 use crate::crypto::kdf::HKDF;
 use crate::crypto::signing::{Signature, SigningKeyPair, verify_signature};

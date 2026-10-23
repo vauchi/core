@@ -451,7 +451,7 @@ pub fn scan_qr(
     width: u32,
     height: u32,
 ) -> MobileScanResult {
-    use vauchi_core::qr::scanner::{ScannerBackend, scan_qr_from_luma};
+    use vauchi_core::qr_decode::{ScannerBackend, scan_qr_from_luma};
 
     let rust_backend = match backend {
         MobileScannerBackend::RqrrRaw => ScannerBackend::RqrrRaw,
@@ -460,8 +460,8 @@ pub fn scan_qr(
     scan_qr_from_luma(rust_backend, &luma_data, width, height).into()
 }
 
-impl From<vauchi_core::qr::scanner::ScanResult> for MobileScanResult {
-    fn from(result: vauchi_core::qr::scanner::ScanResult) -> Self {
+impl From<vauchi_core::qr_decode::ScanResult> for MobileScanResult {
+    fn from(result: vauchi_core::qr_decode::ScanResult) -> Self {
         Self {
             decoded: result.decoded,
             decoded_all: result.decoded_all,
@@ -484,7 +484,8 @@ pub fn diagnostic_scan_qr_with_config(
     config: MobilePreprocessConfig,
 ) -> MobileScanResult {
     use vauchi_core::diagnostic::preprocess::PreprocessConfig;
-    use vauchi_core::qr::scanner::{ScannerBackend, scan_qr_from_luma_with_config};
+    use vauchi_core::qr::scanner::scan_qr_from_luma_with_config;
+    use vauchi_core::qr_decode::ScannerBackend;
 
     let rust_backend = match backend {
         MobileScannerBackend::RqrrRaw => ScannerBackend::RqrrRaw,
@@ -538,12 +539,12 @@ pub fn diagnostic_scan_qr_yolo(
     height: u32,
     confidence_threshold: f32,
 ) -> MobileScanResult {
-    use vauchi_core::qr::scanner::scan_qr_yolo;
+    use vauchi_core::diagnostic::yolo_scan::scan_qr_yolo;
     let mut guard = YOLO_DETECTOR.lock().unwrap();
     match guard.as_mut() {
         Some(detector) => {
             scan_qr_yolo(detector, &luma_data, width, height, confidence_threshold).into()
         }
-        None => vauchi_core::qr::scanner::ScanResult::default().into(),
+        None => vauchi_core::qr_decode::ScanResult::default().into(),
     }
 }

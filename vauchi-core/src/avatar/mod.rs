@@ -8,7 +8,7 @@
 //! all platforms produce identical output. Frontends never generate avatars
 //! locally — they display the WebP bytes returned by these functions.
 
-pub use crate::contact_card::{MAX_AVATAR_SIZE, normalize_avatar};
+pub use crate::card::{MAX_AVATAR_SIZE, normalize_avatar};
 
 /// Generate a solid-color circle avatar image.
 ///

@@ -19,8 +19,8 @@ use super::direct_transport::UsbRole;
 use super::nfc_handshake::NfcHandshakeSession;
 use super::trust_metrics::TrustMetrics;
 use super::{ExchangeError, ExchangeQR, ProximityConfidence, ProximityVerifier, X3DHKeyPair};
+use crate::card::ContactCard;
 use crate::contact::Contact;
-use crate::contact_card::ContactCard;
 use crate::crypto::kdf::HKDF;
 
 /// HKDF domain-separation label for the USB/direct-transport card-exchange key
@@ -1364,8 +1364,8 @@ impl ExchangeSession {
             // for operators (corrupt-payload rates from peers).
             // PII-safe: ContactCardError variants carry no field value
             // or label.
-            if let Err(e) = their_card.add_field(crate::contact_card::ContactField::new(
-                crate::contact_card::FieldType::Custom,
+            if let Err(e) = their_card.add_field(crate::card::ContactField::new(
+                crate::card::FieldType::Custom,
                 label,
                 value,
                 self.clock.unix_seconds(),

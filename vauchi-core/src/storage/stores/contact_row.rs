@@ -8,9 +8,9 @@ use crate::crypto::SymmetricKey;
 
 use super::super::StorageError;
 use super::ContactStore;
+use crate::card::ContactCard;
 use crate::contact::Contact;
 use crate::contact::ImportSource;
-use crate::contact_card::ContactCard;
 use crate::crypto::cek::ContentEncryptionKey;
 use crate::exchange::TrustMetrics;
 use crate::exchange::reciprocity::{ConfirmationChannel, Reciprocity};

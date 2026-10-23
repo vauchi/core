@@ -5,8 +5,8 @@
 // Production module (always compiled):
 // - exchange_debug: timestamped event log consumed by exchange/session.rs
 //
-// Production QR scanner lives in `crate::qr::scanner` (moved 2026-04-19
-// for architectural separation — no diagnostic code in production).
+// Production decoding is in `crate::qr_decode` to avoid a dependency
+// cycle through the compatibility scanner's diagnostic adapters.
 #[cfg(feature = "testing")]
 pub mod exchange_debug;
 #[cfg(not(feature = "testing"))]

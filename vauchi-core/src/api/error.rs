@@ -9,8 +9,8 @@
 use thiserror::Error;
 
 use crate::api::sync::SyncError;
+use crate::card::{ContactCardError, ValidationError};
 use crate::contact::ContactError;
-use crate::contact_card::{ContactCardError, ValidationError};
 use crate::exchange::ExchangeError;
 use crate::network::NetworkError;
 use crate::storage::StorageError;

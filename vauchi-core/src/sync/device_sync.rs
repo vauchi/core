@@ -403,7 +403,7 @@ pub enum SyncItem {
     /// variants for any future non-JSON storage codec.
     CardFieldSynced {
         /// Complete field, including its stable identifier.
-        field: crate::contact_card::ContactField,
+        field: crate::card::ContactField,
         /// Explicit own-card visibility for this field, if configured.
         ///
         /// `None` retains the privacy-first unruled state rather than the

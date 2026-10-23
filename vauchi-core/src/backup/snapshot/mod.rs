@@ -12,8 +12,8 @@ use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
+use crate::card::ContactCard;
 use crate::contact::{Contact, Group};
-use crate::contact_card::ContactCard;
 use crate::identity::Identity;
 use crate::sync::GroupSyncData;
 

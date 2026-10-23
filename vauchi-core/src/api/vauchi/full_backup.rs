@@ -6,7 +6,7 @@
 
 use crate::api::{VauchiError, VauchiResult};
 use crate::backup::snapshot::{self, BackupSnapshot};
-use crate::contact_card::ContactCard;
+use crate::card::ContactCard;
 use crate::identity::Identity;
 
 use super::Vauchi;

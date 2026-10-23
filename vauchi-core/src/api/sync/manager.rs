@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use thiserror::Error;
 
-use crate::contact_card::ContactCard;
+use crate::card::ContactCard;
 use crate::rng::{SecureRng, SecureRngExt};
 use crate::storage::{PendingUpdate, Storage, StorageError, UpdateStatus};
 use crate::sync::SyncState;

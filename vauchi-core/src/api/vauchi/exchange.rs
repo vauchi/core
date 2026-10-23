@@ -4,8 +4,8 @@
 
 //! Exchange operations: QR code generation for contact exchange.
 
+use crate::card::ContactCard;
 use crate::contact::Contact;
-use crate::contact_card::ContactCard;
 use crate::crypto::ratchet::DoubleRatchetState;
 use crate::exchange::{ExchangeEvent, ExchangeSession, ManualConfirmationVerifier};
 

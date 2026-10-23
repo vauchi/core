@@ -9,8 +9,8 @@
 //! `.file-size-baseline` ("the nickname/display-preference cluster is
 //! the natural carve-out target").
 
+use crate::card::normalize_avatar;
 use crate::contact::display::{AvatarPreference, ContactDisplayOptions, DisplayNamePreference};
-use crate::contact_card::normalize_avatar;
 
 use super::super::error::{VauchiError, VauchiResult};
 use super::Vauchi;
@@ -179,9 +179,8 @@ impl Vauchi {
     /// Accepts any supported image format (PNG, JPEG, BMP, WebP).
     /// Core normalizes to WebP <= 32 KB internally (ADR-042).
     pub fn set_contact_custom_avatar(&self, contact_id: &str, data: &[u8]) -> VauchiResult<()> {
-        let webp = normalize_avatar(data).map_err(|e: crate::contact_card::ContactCardError| {
-            VauchiError::InvalidState(e.to_string())
-        })?;
+        let webp = normalize_avatar(data)
+            .map_err(|e: crate::card::ContactCardError| VauchiError::InvalidState(e.to_string()))?;
         self.storage
             .contacts()
             .save_contact_custom_avatar(contact_id, &webp)?;

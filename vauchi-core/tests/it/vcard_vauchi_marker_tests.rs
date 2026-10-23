@@ -40,7 +40,8 @@ fn an_exported_contact_carries_its_vauchi_id_and_kind() {
     let bob = exchanged("Bob");
     let carol = imported("contact-carol", "Carol");
 
-    let bob_vcf = export_contact_vcard(&bob);
+    let export: fn(&Contact) -> String = export_contact_vcard;
+    let bob_vcf = export(&bob);
     let carol_vcf = export_contact_vcard(&carol);
 
     assert!(
@@ -60,6 +61,25 @@ fn an_exported_contact_carries_its_vauchi_id_and_kind() {
         carol_vcf.contains("\r\nX-VAUCHI-KIND:imported\r\n"),
         "{carol_vcf}"
     );
+}
+
+// @internal — preserve the dereference coercions accepted by the concrete Contact API.
+#[test]
+fn contact_export_accepts_existing_reference_and_smart_pointer_callers() {
+    let contact = imported("contact-carol", "Carol");
+    let expected = "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Carol\r\nX-VAUCHI-ID:contact-carol\r\nX-VAUCHI-KIND:imported\r\nEND:VCARD";
+    let boxed = Box::new(contact.clone());
+    let shared = std::sync::Arc::new(contact.clone());
+    let borrowed = &contact;
+
+    assert_eq!(export_contact_vcard(&contact), expected);
+    assert_eq!(export_contact_vcard(&boxed), expected);
+    assert_eq!(export_contact_vcard(&shared), expected);
+    assert_eq!(export_contact_vcard(&borrowed), expected);
+
+    let export = export_contact_vcard;
+    assert_eq!(export(&boxed), expected);
+    assert_eq!(export(&contact), expected);
 }
 
 // @scenario: privacy_compliance :: A vCard export carries Vauchi origin markers

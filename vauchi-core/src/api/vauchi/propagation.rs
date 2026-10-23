@@ -4,7 +4,7 @@
 
 //! Card propagation, CEK migration, device lookup, content updates, and sync item application.
 
-use crate::contact_card::{ContactCard, ContactField};
+use crate::card::{ContactCard, ContactField};
 use crate::rng::SecureRngExt;
 
 use super::super::error::{VauchiError, VauchiResult};
@@ -97,7 +97,7 @@ impl Vauchi {
     /// This method encrypts the full own card as a delta (empty → current)
     /// and queues it for delivery on the next `sync()` call.
     pub fn queue_initial_card_for_contact(&self, contact_id: &str) -> VauchiResult<()> {
-        use crate::contact_card::ContactCard;
+        use crate::card::ContactCard;
         use crate::storage::{PendingUpdate, UpdateStatus};
 
         let identity = self
@@ -554,8 +554,8 @@ impl Vauchi {
                     timestamp,
                 } => match self.storage.contacts().load_contact(contact_id)? {
                     Some(mut contact) => {
-                        let card: crate::contact_card::ContactCard =
-                            serde_json::from_str(card_json).map_err(|error| {
+                        let card: crate::card::ContactCard = serde_json::from_str(card_json)
+                            .map_err(|error| {
                                 VauchiError::InvalidState(format!(
                                     "invalid device-synced contact card: {error}"
                                 ))
@@ -638,7 +638,7 @@ impl Vauchi {
                             } else {
                                 // Field not found — add as new
                                 let field = ContactField::new(
-                                    crate::contact_card::FieldType::Custom,
+                                    crate::card::FieldType::Custom,
                                     field_label,
                                     new_value,
                                     self.clock.unix_seconds(),

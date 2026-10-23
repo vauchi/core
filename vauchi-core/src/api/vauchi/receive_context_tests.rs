@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use super::*;
-use crate::contact_card::ContactCard;
+use crate::card::ContactCard;
 use crate::crypto::SymmetricKey;
 use crate::network::mailbox_token::{
     compute_device_mailbox_token, compute_device_sync_token, compute_mailbox_token, token_hex,

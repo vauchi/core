@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::DeviceSyncError;
+use crate::card::ContactCard;
 use crate::contact::{Contact, Group, ImportSource};
-use crate::contact_card::ContactCard;
 use crate::crypto::SymmetricKey;
 use crate::identifiers::IdentityKey;
 

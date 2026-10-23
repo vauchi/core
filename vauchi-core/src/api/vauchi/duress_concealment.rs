@@ -14,7 +14,7 @@
 
 use std::sync::{Mutex, MutexGuard};
 
-use crate::contact_card::ContactCard;
+use crate::card::ContactCard;
 use crate::storage::Storage;
 
 use super::{AuthMode, Vauchi};

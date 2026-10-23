@@ -667,7 +667,7 @@ impl Vauchi {
     pub fn add_imported_contact_field(
         &self,
         id: &str,
-        field_type: crate::contact_card::FieldType,
+        field_type: crate::card::FieldType,
         label: &str,
         value: &str,
     ) -> VauchiResult<()> {
@@ -682,7 +682,7 @@ impl Vauchi {
             ));
         }
         let mut card = contact.card().clone();
-        card.add_field(crate::contact_card::ContactField::new(
+        card.add_field(crate::card::ContactField::new(
             field_type,
             label,
             value,

@@ -20,8 +20,8 @@
 use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, Zeroizing};
 
+use crate::card::ContactCard;
 use crate::contact::{Contact, ImportSource};
-use crate::contact_card::ContactCard;
 use crate::crypto::{decrypt, derive_key_argon2id, encrypt, random_bytes};
 use crate::visibility::VisibilityRules;
 
@@ -145,7 +145,7 @@ pub(crate) struct BackupContactCard {
     schema_version: u32,
     id: String,
     display_name: String,
-    fields: Vec<crate::contact_card::ContactField>,
+    fields: Vec<crate::card::ContactField>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -471,7 +471,7 @@ mod tests {
     // @scenario: security :: Every successful contact backup export is importable
     #[test]
     fn test_crypto_hardening_contact_backup_export_rejects_output_over_import_limit() {
-        use crate::contact_card::{ContactField, FieldType, MAX_FIELDS};
+        use crate::card::{ContactField, FieldType, MAX_FIELDS};
 
         let fields: Vec<ContactField> = (0..MAX_FIELDS)
             .map(|i| {

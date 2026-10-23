@@ -9,8 +9,8 @@
 
 use std::collections::HashMap;
 
+use crate::card::FieldType;
 use crate::contact::Contact;
-use crate::contact_card::FieldType;
 use crate::exchange_types::ExchangeTransport;
 
 /// Freshness threshold: contacts updated within this many seconds are "fresh".

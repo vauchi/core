@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use crate::contact_card::{ContactCard, ContactField};
+use crate::card::{ContactCard, ContactField};
 use crate::identity::Identity;
 use crate::reminders::BackupReminderState;
 use crate::settings::SettingsFlags;
@@ -216,7 +216,7 @@ impl Vauchi {
 
         // Create contact card if none exists
         if self.storage.contacts().load_own_card()?.is_none() {
-            let card = crate::contact_card::ContactCard::new(&name);
+            let card = crate::card::ContactCard::new(&name);
             self.storage.contacts().save_own_card(&card)?;
         }
 

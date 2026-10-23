@@ -10,7 +10,7 @@
 use base64::prelude::*;
 
 use super::{ContactCard, ContactField, FieldType, MAX_DISPLAY_NAME_LENGTH};
-use crate::contact_card::field::MAX_VALUE_LENGTH;
+use crate::card::MAX_VALUE_LENGTH;
 
 /// Maximum import file size: 10 MB.
 const MAX_FILE_SIZE: usize = 10 * 1024 * 1024;

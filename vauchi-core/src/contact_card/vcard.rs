@@ -4,8 +4,8 @@
 
 //! vCard 4.0 Export/Import (RFC 6350)
 
+use crate::card::{ContactCard, ContactField, FieldType};
 use crate::contact::Contact;
-use crate::contact_card::{ContactCard, ContactField, FieldType};
 
 /// Exports a ContactCard to vCard 4.0 format.
 pub fn export_vcard(card: &ContactCard) -> String {

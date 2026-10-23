@@ -51,7 +51,7 @@ pub use content::MobileContentCycleOutcome;
 // - generate_qr_bitmap: own-card QR display on Android/iOS
 // - MobileQrBitmap, MobileQrEccLevel: params/return types for generation
 // - MobileScannerBackend, MobileScanResult, scan_qr: production scanner
-//   (rxing/rqrr pipeline from `vauchi_core::qr::scanner`)
+//   (rxing/rqrr pipeline from `vauchi_core::qr_decode`)
 pub use diagnostic::{
     MobileQrBitmap, MobileQrEccLevel, MobileScanResult, MobileScannerBackend, generate_qr_bitmap,
     scan_qr,

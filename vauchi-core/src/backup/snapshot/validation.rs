@@ -6,10 +6,10 @@
 
 use std::collections::HashSet;
 
-use crate::contact::{Contact, MAX_LABELS};
-use crate::contact_card::{
+use crate::card::{
     ContactCard, MAX_AVATAR_SIZE, MAX_BIO_LENGTH, MAX_DISPLAY_NAME_LENGTH, MAX_FIELDS,
 };
+use crate::contact::{Contact, MAX_LABELS};
 
 use super::super::{BackupError, extract_master_seed};
 use super::BackupSnapshot;

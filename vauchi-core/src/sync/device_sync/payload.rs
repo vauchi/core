@@ -6,8 +6,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::card::ContactCard;
 use crate::contact::Contact;
-use crate::contact_card::ContactCard;
 
 use super::{
     ContactActivationSyncData, ContactDeviceRegistrySyncData, ContactExchangeLocation,

@@ -32,8 +32,8 @@ use zeroize::{Zeroize, Zeroizing};
 
 use super::BackupError;
 use super::contact_backup::ContactBackupEntry;
+use crate::card::ContactCard;
 use crate::contact::Contact;
-use crate::contact_card::ContactCard;
 use crate::crypto::kdf::HKDF;
 use crate::crypto::{
     SymmetricKey, decrypt, decrypt_with_ad, derive_key_argon2id, encrypt, encrypt_with_ad,
@@ -119,7 +119,7 @@ pub(super) mod backup_contact_card {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     use crate::backup::contact_backup::BackupContactCard;
-    use crate::contact_card::ContactCard;
+    use crate::card::ContactCard;
 
     pub fn serialize<S: Serializer>(
         card: &Option<ContactCard>,

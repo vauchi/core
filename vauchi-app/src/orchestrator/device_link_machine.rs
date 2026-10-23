@@ -44,7 +44,8 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use vauchi_core::api::DeviceSyncOrchestrator;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::exchange::{
-    DeviceLinkInitiator, DeviceLinkJoinInvitation, DeviceLinkRequest, ExchangeError, ProximityProof,
+    DeviceLinkInitiator, DeviceLinkJoinInvitation, DeviceLinkRefusalReason, DeviceLinkRequest,
+    ExchangeError, ProximityProof,
 };
 use vauchi_core::identity::Identity;
 use vauchi_core::storage::Storage;
@@ -224,7 +225,7 @@ impl DeviceLinkInitiatorMachine {
                     };
                 }
                 match broker.exchange_complete(&broker_code) {
-                    Ok(Some(claim_b64)) => self.on_claim(&claim_b64, now),
+                    Ok(Some(claim_b64)) => self.on_claim(broker, &claim_b64, now),
                     Ok(None) => {
                         self.state = State::AwaitingClaim { broker_code };
                         InitiatorEvent::None
@@ -242,10 +243,12 @@ impl DeviceLinkInitiatorMachine {
                 sender_token,
             } => {
                 if self.confirm_deadline_unix.is_some_and(|d| now >= d) {
-                    self.state = State::Failed;
-                    return InitiatorEvent::Failed {
-                        reason: "user_confirm_timeout".to_string(),
-                    };
+                    return self.refuse(
+                        broker,
+                        &sender_token,
+                        DeviceLinkRefusalReason::ConfirmationTimedOut,
+                        "user_confirm_timeout",
+                    );
                 }
                 self.state = State::AwaitingConfirmation {
                     request,
@@ -293,15 +296,20 @@ impl DeviceLinkInitiatorMachine {
         }
     }
 
-    /// User declined the link → `Failed("user_denied")`.
-    pub fn deny(&mut self) -> InitiatorEvent {
-        if matches!(self.state, State::AwaitingConfirmation { .. }) {
-            self.state = State::Failed;
-            InitiatorEvent::Failed {
-                reason: "user_denied".to_string(),
+    /// User declined the link → `Failed("user_denied")`, and the joiner
+    /// is told so on its return channel.
+    pub fn deny(&mut self, broker: &dyn DeviceLinkBroker) -> InitiatorEvent {
+        match std::mem::replace(&mut self.state, State::Failed) {
+            State::AwaitingConfirmation { sender_token, .. } => self.refuse(
+                broker,
+                &sender_token,
+                DeviceLinkRefusalReason::Declined,
+                "user_denied",
+            ),
+            other => {
+                self.state = other;
+                InitiatorEvent::None
             }
-        } else {
-            InitiatorEvent::None
         }
     }
 
@@ -309,6 +317,25 @@ impl DeviceLinkInitiatorMachine {
     pub fn cancel(&mut self) -> InitiatorEvent {
         self.state = State::Cancelled;
         InitiatorEvent::None
+    }
+
+    /// Ends the ceremony and tells the joiner why on its return channel.
+    /// Best effort: a refusal the relay loses leaves the joiner waiting
+    /// for the QR's expiry, as before (vauchi/private#780).
+    fn refuse(
+        &mut self,
+        broker: &dyn DeviceLinkBroker,
+        sender_token: &str,
+        reason: DeviceLinkRefusalReason,
+        reason_id: &str,
+    ) -> InitiatorEvent {
+        self.state = State::Failed;
+        if let Ok(refusal) = self.initiator.refuse(reason) {
+            let _ = broker.exchange_claim(sender_token, &BASE64.encode(refusal));
+        }
+        InitiatorEvent::Failed {
+            reason: reason_id.to_string(),
+        }
     }
 
     /// Post the relay offer and emit `QrReady`. Sets the QR-expiry
@@ -341,7 +368,12 @@ impl DeviceLinkInitiatorMachine {
 
     /// Decode a claim, prepare the confirmation, and move to
     /// `AwaitingConfirmation`. Self-contained so `advance` stays flat.
-    fn on_claim(&mut self, claim_b64: &str, now: u64) -> InitiatorEvent {
+    fn on_claim(
+        &mut self,
+        broker: &dyn DeviceLinkBroker,
+        claim_b64: &str,
+        now: u64,
+    ) -> InitiatorEvent {
         let (request_bytes, sender_token) = match decode_claim(claim_b64) {
             Ok(pair) => pair,
             Err(reason) => {
@@ -362,12 +394,12 @@ impl DeviceLinkInitiatorMachine {
                     identity_fingerprint: confirmation.identity_fingerprint,
                 }
             }
-            Err(ExchangeError::SelfLinkingNotAllowed) => {
-                self.state = State::Failed;
-                InitiatorEvent::Failed {
-                    reason: "device_name_taken".to_string(),
-                }
-            }
+            Err(ExchangeError::SelfLinkingNotAllowed) => self.refuse(
+                broker,
+                &sender_token,
+                DeviceLinkRefusalReason::DeviceNameTaken,
+                "device_name_taken",
+            ),
             Err(e) => {
                 self.state = State::Failed;
                 InitiatorEvent::Failed {
@@ -778,7 +810,7 @@ mod tests {
         let _ = m.advance(&broker, NOW); // offer
         let _ = m.advance(&broker, NOW + 1); // poll → claim
         assert_eq!(m.phase(), InitiatorPhase::AwaitingConfirmation);
-        let event = m.deny();
+        let event = m.deny(&broker);
         assert_eq!(
             event,
             InitiatorEvent::Failed {

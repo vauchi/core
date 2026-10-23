@@ -622,7 +622,7 @@ fn a_joiner_learns_the_host_declined_on_its_next_poll() {
     let _ = joiner.advance(&broker, NOW + 1);
     let _ = host.advance(&broker, NOW + 2);
 
-    let _ = host.deny();
+    let _ = host.deny(&broker);
     let _ = host.advance(&broker, NOW + 3);
 
     let told = joiner.advance(&broker, NOW + 4);

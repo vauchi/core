@@ -21,7 +21,8 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 
 use vauchi_core::exchange::{
-    DeviceLinkJoinInvitation, DeviceLinkQR, DeviceLinkResponder, DeviceLinkResponse, ExchangeError,
+    DeviceLinkJoinInvitation, DeviceLinkQR, DeviceLinkRefusalReason, DeviceLinkResponder,
+    DeviceLinkResponse, ExchangeError,
 };
 
 use super::device_link_relay::{ClaimPayload, DeviceLinkBroker};
@@ -64,6 +65,7 @@ pub enum ResponderEvent {
     /// [`DeviceLinkResponderMachine::take_response`] and adopt it.
     ResponseReady,
     /// Terminal failure (stable reason ids: `qr_expired`, `decrypt_error`,
+    /// the host's `user_denied`, `user_confirm_timeout`, `device_name_taken`,
     /// `invalid_qr`, `relay_failed`, `link_failed`).
     Failed { reason: String },
 }
@@ -248,7 +250,8 @@ impl DeviceLinkResponderMachine {
         ResponderEvent::RequestPosted { confirmation_code }
     }
 
-    /// Decrypt the initiator's response into a `DeviceLinkResponse`.
+    /// Decrypt the initiator's response into a `DeviceLinkResponse`, or
+    /// its refusal into the reason it gave.
     fn on_response(
         &mut self,
         responder: DeviceLinkResponder,
@@ -269,7 +272,15 @@ impl DeviceLinkResponderMachine {
                 self.state = State::Completed;
                 ResponderEvent::ResponseReady
             }
-            Err(e) => self.fail(&e),
+            Err(e) => match responder.process_refusal(&bytes) {
+                Ok(reason) => {
+                    self.state = State::Failed;
+                    ResponderEvent::Failed {
+                        reason: refusal_reason_id(reason).to_string(),
+                    }
+                }
+                Err(_) => self.fail(&e),
+            },
         }
     }
 
@@ -292,6 +303,16 @@ impl DeviceLinkResponderMachine {
         ResponderEvent::Failed {
             reason: failure_reason(e).to_string(),
         }
+    }
+}
+
+/// The host's stated reason, as the same stable id the host's own screen
+/// uses for it.
+fn refusal_reason_id(reason: DeviceLinkRefusalReason) -> &'static str {
+    match reason {
+        DeviceLinkRefusalReason::Declined => "user_denied",
+        DeviceLinkRefusalReason::ConfirmationTimedOut => "user_confirm_timeout",
+        DeviceLinkRefusalReason::DeviceNameTaken => "device_name_taken",
     }
 }
 

@@ -198,7 +198,9 @@ impl AppEngine {
             (ActionResult::DeviceLinkConfirmManual { code }, Some(holder)) => {
                 Some(holder.machine.confirm_manual(code.clone(), now))
             }
-            (ActionResult::DeviceLinkDeny, Some(holder)) => Some(holder.machine.deny()),
+            (ActionResult::DeviceLinkDeny, Some(holder)) => {
+                Some(holder.machine.deny(holder.transport.as_ref()))
+            }
             _ => None,
         };
         if let Some(event) = event {

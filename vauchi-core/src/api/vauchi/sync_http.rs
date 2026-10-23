@@ -137,8 +137,16 @@ impl Vauchi {
             &self.config.relay.server_url,
             self.config.relay.connect_timeout_ms,
         ));
-        if self.delayed_window().is_some() {
+        // Phones show no other trace of which path a fetch took (#628 rig check).
+        if let Some(window) = self.delayed_window() {
+            tracing::info!(
+                "[Sync] fetch path: delayed, window {} s, {} answers collected",
+                window.as_secs(),
+                self.answered_delayed_fetches()
+            );
             adapter = adapter.with_delayed(self.delayed_ohttp.clone());
+        } else {
+            tracing::info!("[Sync] fetch path: direct");
         }
 
         // Connect adapter (relay health check)

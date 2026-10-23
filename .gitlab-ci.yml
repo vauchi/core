@@ -589,7 +589,7 @@ lint:architecture:
       git -C "${VAUCHI_CI_SCRIPTS_DIR}" checkout --detach FETCH_HEAD
       test -f "$VAUCHI_CI_SCRIPTS_DIR/scripts/architecture-check.sh"
       test -f "$VAUCHI_CI_SCRIPTS_DIR/tools/architecture-check/Cargo.lock"
-    - git fetch --depth=1 origin main:refs/remotes/origin/main
+    - git fetch --depth=1 origin +main:refs/remotes/origin/main
   script:
     - bash "$VAUCHI_CI_SCRIPTS_DIR/scripts/architecture-check.sh" "$CI_PROJECT_DIR" check origin/main
   rules:

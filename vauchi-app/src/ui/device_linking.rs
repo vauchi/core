@@ -768,6 +768,7 @@ fn failure_detail(reason: &str, locale: Locale) -> String {
         "user_confirm_timeout" => "device_link.failure_confirm_timeout",
         "cancelled" => "device_link.failure_cancelled",
         "qr_expired" => "device_link.failure_qr_expired",
+        "device_name_taken" => "device_link.failure_device_name_taken",
         _ => "device_link.failure_generic",
     };
     get_string(locale, key)

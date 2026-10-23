@@ -789,15 +789,28 @@ test:core-32bit:
   variables:
     CARGO_HOME: ${CI_PROJECT_DIR}/.cargo-i386
     CARGO_TARGET_DIR: ${CI_PROJECT_DIR}/target-i386
-    # The image has no sccache; empty overrides .cargo/config.toml's wrapper.
-    RUSTC_WRAPPER: ""
+    CARGO_INCREMENTAL: "0"
+    RUSTC_WRAPPER: "sccache"
+    SCCACHE_DIR: ${CI_PROJECT_DIR}/.cache/sccache/i386
+    SCCACHE_CACHE_SIZE: "1G"
   cache:
     key: core-32bit-${CI_COMMIT_REF_SLUG}
     fallback_keys: ["core-32bit-${CI_DEFAULT_BRANCH}"]
-    paths: [.cargo-i386/registry/, target-i386/]
+    paths: [.cargo-i386/registry/, target-i386/, .cache/sccache/i386/]
   script:
     - 'test "$(getconf LONG_BIT)" = 32 || { echo "ERROR: expected a 32-bit userland, got $(getconf LONG_BIT)-bit"; exit 1; }'
+    - apt-get update -qq
+    - apt-get install -y --no-install-recommends sccache
+    - sh ci/tests/rust-cache.test.sh
     - cargo test --locked -p vauchi-core --lib --features test-kdf
+  after_script:
+    - sccache --show-stats
+  rules:
+    - !reference [.validation-rust, rules]
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths: [ci/tests/rust-cache.test.sh]
 
 test:cucumber:
   # .timeout-cold-rebuild: compiles the full workspace before running

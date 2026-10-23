@@ -35,7 +35,7 @@ schemars = { version = "0.8", optional = true }
 # Remote content (optional). ureq matches vauchi-core's sync HTTP stack;
 # the async content-updates surface uses spawn_blocking.
 ureq = { version = "3", default-features = false, features = ["json", "rustls-no-provider", "rustls-webpki-roots", "gzip"], optional = true }
-tokio = { version = "1.0", features = ["rt"], optional = true }
+tokio = { version = "1.53.3", features = ["rt"], optional = true }
 # Cached content is stored gzipped (vauchi/private#733 D9); already a
 # vauchi-core dependency.
 flate2 = { version = "1.0", optional = true }

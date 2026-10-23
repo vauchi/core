@@ -310,11 +310,15 @@ impl DeviceLinkJoinEngine {
     }
 }
 
-/// Map the responder machine's stable failure id to a user-facing
-/// sentence, mirroring `device_linking::failure_detail`.
+/// Map the responder machine's stable failure id, or the reason the host
+/// stated, to a user-facing sentence, mirroring
+/// `device_linking::failure_detail`.
 fn failure_detail(reason: &str, locale: Locale) -> String {
     let key = match reason {
         "qr_expired" => "device_link.failure_qr_expired",
+        "user_denied" => "device_link.failure_user_denied",
+        "user_confirm_timeout" => "device_link.failure_confirm_timeout",
+        "device_name_taken" => "device_link.failure_device_name_taken",
         "relay_failed" => "device_link.failure_generic",
         "decrypt_error" => "device_link.failure_generic",
         "invalid_qr" => "device_link.failure_generic",

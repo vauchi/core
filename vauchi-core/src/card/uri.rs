@@ -48,7 +48,7 @@ const BLOCKED_SCHEMES: &[&str] = &["javascript", "vbscript", "data", "file", "ft
 /// # Examples
 ///
 /// ```
-/// use vauchi_core::contact_card::is_valid_phone;
+/// use vauchi_core::card::is_valid_phone;
 ///
 /// assert!(is_valid_phone("+1-555-123-4567"));
 /// assert!(is_valid_phone("(555) 123-4567"));
@@ -84,7 +84,7 @@ pub fn is_valid_phone(value: &str) -> bool {
 /// # Examples
 ///
 /// ```
-/// use vauchi_core::contact_card::is_valid_email;
+/// use vauchi_core::card::is_valid_email;
 ///
 /// assert!(is_valid_email("alice@example.com"));
 /// assert!(is_valid_email("alice@localhost"));
@@ -128,7 +128,7 @@ pub fn is_blocked_scheme(scheme: &str) -> bool {
 /// # Examples
 ///
 /// ```
-/// use vauchi_core::contact_card::is_safe_url;
+/// use vauchi_core::card::is_safe_url;
 ///
 /// assert!(is_safe_url("https://example.com"));
 /// assert!(is_safe_url("tel:+1234567890"));
@@ -411,7 +411,7 @@ impl ContactField {
     /// # Examples
     ///
     /// ```
-    /// use vauchi_core::contact_card::{ContactField, FieldType, ContactAction};
+    /// use vauchi_core::card::{ContactField, FieldType, ContactAction};
     ///
     /// let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567", 0);
     /// let actions = field.to_secondary_actions();
@@ -614,6 +614,7 @@ mod tests {
         assert!(is_safe_url("geo:0,0?q=address"));
     }
 
+    // @internal — active-content and local-file schemes must never become contact actions.
     #[test]
     fn test_is_safe_url_blocked_schemes() {
         assert!(!is_safe_url("javascript:alert(1)"));
@@ -624,12 +625,14 @@ mod tests {
         assert!(!is_safe_url("blob:http://example.com/uuid"));
     }
 
+    // @internal — unrecognized handlers are outside the contact action allowlist.
     #[test]
     fn test_is_safe_url_unknown_schemes() {
         assert!(!is_safe_url("custom://something"));
         assert!(!is_safe_url("myapp://deeplink"));
     }
 
+    // @internal — empty and schemeless input cannot bypass URI validation.
     #[test]
     fn test_is_safe_url_edge_cases() {
         assert!(!is_safe_url(""));
@@ -639,6 +642,7 @@ mod tests {
         assert!(!is_safe_url("just some text"));
     }
 
+    // @internal — scheme blocking is case-insensitive and retains legitimate handlers.
     #[test]
     fn test_is_blocked_scheme() {
         assert!(is_blocked_scheme("javascript"));

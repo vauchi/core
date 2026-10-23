@@ -330,8 +330,13 @@ impl DeviceLinkInitiatorMachine {
         reason_id: &str,
     ) -> InitiatorEvent {
         self.state = State::Failed;
-        if let Ok(refusal) = self.initiator.refuse(reason) {
-            let _ = broker.exchange_claim(sender_token, &BASE64.encode(refusal));
+        let delivered = self.initiator.refuse(reason).is_ok_and(|refusal| {
+            broker
+                .exchange_claim(sender_token, &BASE64.encode(refusal))
+                .is_ok()
+        });
+        if !delivered {
+            tracing::warn!("device-link: the refusal did not reach the joiner");
         }
         InitiatorEvent::Failed {
             reason: reason_id.to_string(),

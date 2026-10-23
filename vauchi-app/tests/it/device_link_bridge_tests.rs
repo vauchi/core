@@ -272,3 +272,75 @@ fn bridges_return_none_when_not_on_device_linking_screen() {
     assert!(engine.device_link_completed().is_none());
     assert!(engine.device_link_failed("reason".into()).is_none());
 }
+
+// @scenario: pair5_device_link_bridge :: a content update while the code is shown keeps the codes-match action
+/// The TUI checks for content every 30 s. When an update applied while
+/// "Device Wants to Link" was on screen, the linking screen was rebuilt
+/// from scratch, so the published "codes match" was refused as an unknown
+/// interaction and no TUI could approve a new device (vauchi/private#758).
+#[test]
+fn a_content_update_while_the_code_is_shown_keeps_the_confirmation() {
+    use vauchi_core::{Event, InputMode, MotionPreference};
+
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let _ = engine.dispatch(Event::PresentationEnvironmentChanged {
+        available_width: 160,
+        available_height: 40,
+        input_modes: vec![InputMode::Keyboard],
+        motion: MotionPreference::Full,
+    });
+    let _ = engine.navigate_to(AppScreen::DeviceManagement);
+    let link = published_primary(&mut engine, ".link_device");
+    activate(&mut engine, link).expect("Core opens device linking");
+    let _ = engine.device_link_request_received("Dana_1".into(), "403-843".into());
+
+    let codes_match = published_primary(&mut engine, ".codes_match");
+    engine.reload_locales();
+    activate(&mut engine, codes_match).expect("Core accepts the action it published");
+    assert_eq!(engine.current_screen().screen_id, "link_completing");
+}
+
+/// The context-bar primary action whose interaction id ends with `suffix`,
+/// with the surface Core published it on.
+fn published_primary(
+    engine: &mut AppEngine,
+    suffix: &str,
+) -> (
+    vauchi_core::platform::SurfaceId,
+    vauchi_core::platform::InteractionId,
+) {
+    engine
+        .initial_commands()
+        .expect("commands")
+        .into_iter()
+        .find_map(|command| match command {
+            vauchi_core::platform::Command::SetContextBar {
+                surface_id, bar, ..
+            } => bar
+                .primary
+                .filter(|action| action.interaction_id.as_str().ends_with(suffix))
+                .map(|action| (surface_id, action.interaction_id)),
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("no published primary action ending {suffix}"))
+}
+
+/// What a shell sends for a primary action: the surface, then the action.
+fn activate(
+    engine: &mut AppEngine,
+    (surface_id, interaction_id): (
+        vauchi_core::platform::SurfaceId,
+        vauchi_core::platform::InteractionId,
+    ),
+) -> Result<(), vauchi_app::ui::AppPresentationError> {
+    engine.dispatch(vauchi_core::Event::SurfaceActivated {
+        surface_id: surface_id.clone(),
+    })?;
+    engine.dispatch(vauchi_core::Event::ActionActivated {
+        surface_id,
+        interaction_id,
+    })?;
+    Ok(())
+}

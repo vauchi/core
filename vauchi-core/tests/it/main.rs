@@ -172,6 +172,7 @@ mod device_link_join_adopt_tests;
 mod device_link_local_invitation_tests;
 mod device_link_proximity_tests;
 mod device_link_ratchet_resume_tests;
+mod device_link_refusal_tests;
 mod device_link_response_bytes_tests;
 mod device_link_stale_ohttp_key_tests;
 mod device_linking_engine_tests;

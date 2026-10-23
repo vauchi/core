@@ -815,6 +815,34 @@ test:core-32bit:
         compare_to: refs/heads/$CI_DEFAULT_BRANCH
         paths: [ci/tests/rust-cache.test.sh]
 
+# Kani proofs of the untrusted-byte parsers and the Tamarin model of the
+# in-person QR exchange (#757). Runs only when what they check changes.
+test:formal:
+  extends: [.timeout-long]
+  stage: test
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/rust:1.93.1-bookworm
+  tags: [docker]
+  needs: []
+  variables:
+    FORMAL_HOME: ${CI_PROJECT_DIR}/.formal
+  cache:
+    key: core-formal
+    paths: [.formal/]
+  script:
+    - sh ci/formal-verification.sh
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - vauchi-core/src/crypto/padding*.rs
+          - vauchi-core/src/exchange/**/*.rs
+          - vauchi-core/src/recovery/**/*.rs
+          - vauchi-core/verification/**/*
+          - ci/formal-verification.sh
+          - Cargo.lock
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "schedule"
+
 test:cucumber:
   # .timeout-cold-rebuild: compiles the full workspace before running
   # cucumber — see the template comment.

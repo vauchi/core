@@ -213,6 +213,7 @@ mod tests {
         assert!(unpad(&bad).is_none());
     }
 
+    // @internal
     #[test]
     fn test_unpad_rejects_length_prefix_near_u32_max_at_every_buffer_size() {
         for declared_len in [u32::MAX - 3, u32::MAX - 1, u32::MAX] {

@@ -9,6 +9,8 @@ pub mod chain;
 pub mod encryption;
 pub mod kdf;
 pub mod padding;
+#[cfg(kani)]
+mod padding_proofs;
 pub mod password_kdf;
 pub mod ratchet;
 #[cfg(feature = "testing")]

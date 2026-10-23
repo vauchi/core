@@ -8,6 +8,7 @@
 //! `ShredManager` orchestrator and `widget_panic_shred` entry point.
 
 mod manager;
+mod relay_sender;
 mod storage;
 
 use crate::api::pre_signed::PreSignedPurgeRequest;

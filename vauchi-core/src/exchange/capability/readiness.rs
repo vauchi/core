@@ -41,7 +41,7 @@
 
 use crate::exchange::capability::types::DeviceCapabilities;
 use crate::exchange::mode::DeviceRequirement;
-use crate::types::AudioCapability;
+use crate::exchange_types::AudioCapability;
 use std::collections::HashMap;
 
 /// Runtime OS-permission state for a transport requirement.

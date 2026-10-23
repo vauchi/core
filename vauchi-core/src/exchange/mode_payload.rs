@@ -61,7 +61,7 @@ mod tests {
     use crate::exchange::capability::types::DeviceCapabilities;
     use crate::exchange::exchange_id::ExchangeId;
     use crate::exchange::mode::ExchangeMode;
-    use crate::types::AudioCapability;
+    use crate::exchange_types::AudioCapability;
 
     fn sample_payload() -> ExchangeModePayload {
         ExchangeModePayload {

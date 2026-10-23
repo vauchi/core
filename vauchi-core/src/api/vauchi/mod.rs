@@ -123,7 +123,7 @@ pub enum AuthMode {
     Unauthenticated,
 }
 
-pub use crate::types::BiometricUnlockOutcome;
+pub use crate::emergency::BiometricUnlockOutcome;
 
 /// Outcome of a `Vauchi::sync()` call.
 #[derive(Debug)]

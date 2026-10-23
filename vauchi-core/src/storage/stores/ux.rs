@@ -12,11 +12,11 @@ use rusqlite::{Connection, params};
 use std::sync::Arc;
 
 use super::super::{Storage, StorageError};
-use crate::types::AhaMomentTracker;
-use crate::types::BackupReminderState;
-use crate::types::DemoContactState;
-use crate::types::OnboardingProgress;
-use crate::types::SettingsFlags;
+use crate::onboarding::AhaMomentTracker;
+use crate::onboarding::DemoContactState;
+use crate::onboarding::OnboardingProgress;
+use crate::reminders::BackupReminderState;
+use crate::settings::SettingsFlags;
 
 /// Scoped persistence view for the ux domain.
 pub struct UxStore<'a> {
@@ -155,7 +155,7 @@ impl UxStore<'_> {
     /// repeat exchange skips the group gate with the prior selection.
     pub fn save_exchange_defaults(
         &self,
-        defaults: &crate::types::ExchangeDefaults,
+        defaults: &crate::exchange::ExchangeDefaults,
     ) -> Result<(), StorageError> {
         let json = serde_json::to_string(defaults)
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
@@ -173,7 +173,7 @@ impl UxStore<'_> {
     /// Loads the last-used exchange defaults, if any were stored.
     pub fn load_exchange_defaults(
         &self,
-    ) -> Result<Option<crate::types::ExchangeDefaults>, StorageError> {
+    ) -> Result<Option<crate::exchange::ExchangeDefaults>, StorageError> {
         let result = self.conn.query_row(
             "SELECT exchange_defaults_encrypted FROM ux_state WHERE id = 1",
             [],
@@ -325,7 +325,7 @@ impl UxStore<'_> {
     /// Saves the own-card repropagation marker (encrypted).
     pub fn save_own_card_repropagate(
         &self,
-        state: &crate::types::OwnCardRepropagateState,
+        state: &crate::reminders::OwnCardRepropagateState,
     ) -> Result<(), StorageError> {
         let json = state
             .to_json()
@@ -349,7 +349,7 @@ impl UxStore<'_> {
     /// Loads the own-card repropagation marker, defaulting to "not owed".
     pub fn load_own_card_repropagate(
         &self,
-    ) -> Result<crate::types::OwnCardRepropagateState, StorageError> {
+    ) -> Result<crate::reminders::OwnCardRepropagateState, StorageError> {
         let result = self.conn.query_row(
             "SELECT own_card_repropagate_encrypted FROM ux_state WHERE id = 1",
             [],
@@ -365,13 +365,13 @@ impl UxStore<'_> {
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 let json = String::from_utf8(decrypted)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                let state = crate::types::OwnCardRepropagateState::from_json(&json)
+                let state = crate::reminders::OwnCardRepropagateState::from_json(&json)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 Ok(state)
             }
-            Ok(_) => Ok(crate::types::OwnCardRepropagateState::default()),
+            Ok(_) => Ok(crate::reminders::OwnCardRepropagateState::default()),
             Err(rusqlite::Error::QueryReturnedNoRows) => {
-                Ok(crate::types::OwnCardRepropagateState::default())
+                Ok(crate::reminders::OwnCardRepropagateState::default())
             }
             Err(e) => Err(StorageError::Database(e)),
         }

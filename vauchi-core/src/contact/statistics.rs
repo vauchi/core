@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use crate::contact::Contact;
 use crate::contact_card::FieldType;
-use crate::types::ExchangeTransport;
+use crate::exchange_types::ExchangeTransport;
 
 /// Freshness threshold: contacts updated within this many seconds are "fresh".
 const FRESHNESS_THRESHOLD_SECS: u64 = 90 * 24 * 60 * 60; // 90 days

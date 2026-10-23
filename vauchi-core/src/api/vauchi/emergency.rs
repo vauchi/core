@@ -18,7 +18,8 @@ use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventDispatcher, VauchiEvent};
 use super::super::shred::{ShredManager, widget_panic_shred};
 use super::Vauchi;
-use crate::types::{EmergencyBroadcastConfig, MAX_TRUSTED_CONTACTS};
+use crate::emergency::EmergencyBroadcastConfig;
+use crate::emergency::MAX_TRUSTED_CONTACTS;
 
 impl Vauchi {
     // === Emergency Broadcast ===
@@ -305,7 +306,7 @@ impl Vauchi {
     ///
     /// In duress mode the duress, broadcast and trusted-contact parts are the
     /// concealed view: an app with none of them set up (#462).
-    pub fn get_emergency_wipe_status(&self) -> VauchiResult<crate::types::EmergencyWipeStatus> {
+    pub fn get_emergency_wipe_status(&self) -> VauchiResult<crate::emergency::EmergencyWipeStatus> {
         let concealed = self.in_duress_mode();
         let broadcast_configured = !concealed
             && self
@@ -341,7 +342,7 @@ impl Vauchi {
 
         let password_enabled = self.is_password_enabled()?;
 
-        Ok(crate::types::EmergencyWipeStatus {
+        Ok(crate::emergency::EmergencyWipeStatus {
             broadcast_configured,
             duress_configured,
             deletion_scheduled,

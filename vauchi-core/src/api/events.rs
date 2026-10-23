@@ -15,7 +15,7 @@ use crate::sync::SyncState;
 /// Unique identifier for a registered event handler.
 pub type HandlerId = u64;
 
-pub use crate::types::EventOrigin;
+pub use crate::exchange_types::EventOrigin;
 
 /// Events emitted by Vauchi.
 #[derive(Debug, Clone)]

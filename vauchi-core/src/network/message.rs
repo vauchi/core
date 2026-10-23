@@ -246,16 +246,7 @@ pub struct EmergencyAlert {
     pub location: Option<GeoLocation>,
 }
 
-/// Geographic location with optional accuracy.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct GeoLocation {
-    /// Latitude in decimal degrees.
-    pub latitude: f64,
-    /// Longitude in decimal degrees.
-    pub longitude: f64,
-    /// Location accuracy in meters.
-    pub accuracy_meters: Option<f32>,
-}
+pub use crate::emergency::GeoLocation;
 
 /// Version negotiation message for protocol compatibility.
 ///

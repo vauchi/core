@@ -27,8 +27,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::signing::{PublicKey, Signature};
+use crate::emergency::GeoLocation;
 use crate::identity::Identity;
-use crate::network::GeoLocation;
 use crate::sync::delta::DeltaError;
 
 /// Domain separation for the safety-alert signature (prevents cross-context

@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::contact::Contact;
 use crate::exchange::{ConfirmationChannel, Reciprocity, TrustMetrics};
-use crate::{ExchangeTransport, ProximityConfidence};
+use crate::exchange_types::ExchangeTransport;
+use crate::exchange_types::ProximityConfidence;
 
 use super::super::BackupError;
 use super::super::contact_backup::ContactBackupEntry;

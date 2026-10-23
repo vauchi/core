@@ -365,7 +365,7 @@ impl<'a> ContactManager<'a> {
             return;
         };
         let Some(moment) = tracker.try_trigger_with_context(
-            crate::types::AhaMomentType::FirstContactAdded,
+            crate::onboarding::AhaMomentType::FirstContactAdded,
             display_name.to_string(),
         ) else {
             return;

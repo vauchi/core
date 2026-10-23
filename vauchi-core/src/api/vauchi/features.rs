@@ -10,8 +10,9 @@ use crate::contact::Contact;
 use crate::contact_card::ContactCard;
 use crate::demo_contact::{DemoContactCard, DemoTip, generate_demo_contact_card};
 use crate::network::MultiRelayConfig;
+use crate::onboarding::AhaMomentType;
+use crate::onboarding::DemoContactState;
 use crate::rng::SecureRngExt;
-use crate::types::{AhaMomentType, DemoContactState};
 
 use super::super::consent::{ConsentManager, ConsentRecord, ConsentType};
 use super::super::contact_manager::ContactManager;
@@ -769,7 +770,7 @@ impl Vauchi {
         if all_ok {
             self.storage
                 .ux()
-                .save_own_card_repropagate(&crate::types::OwnCardRepropagateState::default())?;
+                .save_own_card_repropagate(&crate::reminders::OwnCardRepropagateState::default())?;
         } else {
             state.failed_attempts = state.failed_attempts.saturating_add(1);
             self.storage.ux().save_own_card_repropagate(&state)?;

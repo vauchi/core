@@ -144,7 +144,7 @@ fn requirement_name(req: &DeviceRequirement) -> &'static str {
 mod tests {
     use super::*;
     use crate::exchange::capability::types::DeviceCapabilities;
-    use crate::types::AudioCapability;
+    use crate::exchange_types::AudioCapability;
 
     fn full_caps() -> DeviceCapabilities {
         DeviceCapabilities {

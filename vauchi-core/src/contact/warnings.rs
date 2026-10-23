@@ -10,7 +10,7 @@
 use std::collections::HashSet;
 
 use crate::contact::Contact;
-use crate::types::ExchangeTransport;
+use crate::exchange_types::ExchangeTransport;
 
 /// Warning: all recovery guardians use the same exchange transport.
 #[derive(Debug)]

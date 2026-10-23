@@ -12,9 +12,12 @@ pub mod kind;
 pub mod labels;
 pub mod merge;
 pub mod place;
+pub mod reciprocity;
+pub mod reciprocity_tokens;
 pub mod statistics;
 pub mod tag;
 pub mod trust;
+pub mod trust_metrics;
 pub mod warnings;
 
 #[cfg(feature = "testing")]
@@ -30,12 +33,13 @@ pub use tag::Tag;
 pub use trust::TrustLevel;
 pub use visibility::{FieldVisibility, VisibilityRules};
 
+use crate::contact::reciprocity::{ConfirmationChannel, Reciprocity};
+use crate::contact::trust_metrics::TrustMetrics;
 use crate::contact_card::ContactCard;
 use crate::crypto::SymmetricKey;
 use crate::crypto::cek::ContentEncryptionKey;
-use crate::exchange::TrustMetrics;
-use crate::exchange::reciprocity::{ConfirmationChannel, Reciprocity};
-use crate::types::{ExchangeTransport, ProximityConfidence};
+use crate::exchange_types::ExchangeTransport;
+use crate::exchange_types::ProximityConfidence;
 
 /// The duration of the undo window for soft-delete operations.
 ///
@@ -398,11 +402,11 @@ impl Contact {
     pub fn derive_reciprocity_tokens(
         &self,
         our_identity: &[u8; 32],
-    ) -> Option<crate::exchange::reciprocity_tokens::ConfirmationTokenPair> {
+    ) -> Option<crate::contact::reciprocity_tokens::ConfirmationTokenPair> {
         let shared = self.shared_key()?;
         let their = self.public_key()?;
         Some(
-            crate::exchange::reciprocity_tokens::derive_confirmation_tokens(
+            crate::contact::reciprocity_tokens::derive_confirmation_tokens(
                 shared.as_bytes(),
                 our_identity,
                 their,

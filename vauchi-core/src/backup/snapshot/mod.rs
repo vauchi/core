@@ -15,7 +15,6 @@ use zeroize::Zeroize;
 use crate::contact::{Contact, Group};
 use crate::contact_card::ContactCard;
 use crate::identity::Identity;
-use crate::storage::Storage;
 use crate::sync::GroupSyncData;
 
 use super::{BackupError, FullBackupEnvelope, IdentitySection};
@@ -51,33 +50,14 @@ pub(crate) struct VisibilityOverride {
 }
 
 impl BackupSnapshot {
-    pub fn capture(storage: &Storage, identity: &Identity, now: u64) -> Result<Self, BackupError> {
-        let map_error = |_| BackupError::Serialization("Could not read backup state".into());
-        let mut contacts = storage.contacts().list_contacts().map_err(map_error)?;
-        contacts.extend(
-            storage
-                .contacts()
-                .list_archived_contacts()
-                .map_err(map_error)?,
-        );
-        let groups = storage.labels().load_all_groups().map_err(map_error)?;
-        let contact_ids: std::collections::HashSet<_> = contacts.iter().map(|c| c.id()).collect();
-        let mut overrides = Vec::new();
-        for (contact_id, fields) in storage
-            .labels()
-            .load_all_contact_overrides()
-            .map_err(map_error)?
-        {
-            if contact_ids.contains(contact_id.as_str()) {
-                overrides.extend(fields.into_iter().map(|(field_id, visible)| {
-                    VisibilityOverride {
-                        contact_id: contact_id.clone(),
-                        field_id,
-                        visible,
-                    }
-                }));
-            }
-        }
+    pub(crate) fn from_captured_state(
+        identity: &Identity,
+        now: u64,
+        own_card: Option<ContactCard>,
+        contacts: Vec<Contact>,
+        groups: Vec<Group>,
+        overrides: Vec<VisibilityOverride>,
+    ) -> Result<Self, BackupError> {
         let mut snapshot = Self {
             version: SNAPSHOT_VERSION.into(),
             created_at: now,
@@ -87,7 +67,7 @@ impl BackupSnapshot {
                 device_index: identity.device_index(),
                 device_name: identity.device_info().device_name().into(),
             },
-            own_card: storage.contacts().load_own_card().map_err(map_error)?,
+            own_card,
             contacts: contacts
                 .iter()
                 .map(SnapshotContact::capture)

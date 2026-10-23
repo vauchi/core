@@ -169,7 +169,7 @@ pub use sync::{
 pub use app_password::{AppPasswordConfig, AuthResult};
 
 // Emergency Broadcast System
-pub use crate::types::MAX_TRUSTED_CONTACTS;
+pub use crate::emergency::MAX_TRUSTED_CONTACTS;
 pub use emergency::BroadcastResult;
 
 // Vauchi

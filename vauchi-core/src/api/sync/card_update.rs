@@ -269,7 +269,7 @@ pub fn process_single_card_update_for_device(
     {
         storage
             .ux()
-            .save_own_card_repropagate(&crate::types::OwnCardRepropagateState {
+            .save_own_card_repropagate(&crate::reminders::OwnCardRepropagateState {
                 needs_repropagate: true,
                 failed_attempts: 0,
             })?;

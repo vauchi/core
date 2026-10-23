@@ -8,6 +8,7 @@
 //! The existing device generates a QR containing a link key, the new device
 //! scans it and receives the encrypted master seed to derive identical keys.
 
+mod identity_factory;
 mod initiator;
 mod invitation;
 mod qr;

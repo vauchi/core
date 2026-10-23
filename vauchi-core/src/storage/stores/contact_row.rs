@@ -14,7 +14,7 @@ use crate::contact_card::ContactCard;
 use crate::crypto::cek::ContentEncryptionKey;
 use crate::exchange::TrustMetrics;
 use crate::exchange::reciprocity::{ConfirmationChannel, Reciprocity};
-use crate::types::ExchangeTransport;
+use crate::exchange_types::ExchangeTransport;
 
 /// Columns `ContactRow::from_row` reads, for every contact SELECT.
 pub(super) const CONTACT_COLUMNS: &str = "id, public_key, card_encrypted, shared_key_encrypted, visibility_rules_encrypted, exchange_timestamp, fingerprint_verified, blocked, hidden, favorite, recovery_trusted, proposal_trusted, cek_encrypted, exchange_transport, has_recovered, card_updated_at, relay_url_encrypted, trust_metrics, contact_kind, import_source, imported_at, original_uid_encrypted, deleted_at, archived, archived_at, ignored, ignored_at, reciprocity, confirmation_channel";

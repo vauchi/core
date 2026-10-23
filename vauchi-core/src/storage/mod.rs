@@ -7,6 +7,8 @@
 //! Provides encrypted local storage for contacts, identity, and sync state.
 //! Uses SQLite with application-level encryption for sensitive data.
 
+#[cfg(feature = "network-rustls")]
+mod backup_snapshot;
 mod connection;
 mod device;
 mod key_check;

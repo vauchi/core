@@ -12,7 +12,7 @@ use rusqlite::{Connection, params};
 use std::sync::Arc;
 
 use super::super::{Storage, StorageError};
-use crate::types::EmergencyBroadcastConfig;
+use crate::emergency::EmergencyBroadcastConfig;
 
 /// Scoped persistence view for the emergency domain.
 pub struct EmergencyStore<'a> {

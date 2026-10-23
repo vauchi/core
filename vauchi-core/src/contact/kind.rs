@@ -17,10 +17,11 @@
 use serde::{Deserialize, Serialize};
 
 use crate::contact::VisibilityRules;
+use crate::contact::reciprocity::{ConfirmationChannel, Reciprocity};
+use crate::contact::trust_metrics::TrustMetrics;
 use crate::crypto::SymmetricKey;
-use crate::exchange::TrustMetrics;
-use crate::exchange::reciprocity::{ConfirmationChannel, Reciprocity};
-use crate::types::{ExchangeTransport, ProximityConfidence};
+use crate::exchange_types::ExchangeTransport;
+use crate::exchange_types::ProximityConfidence;
 
 /// Distinguishes exchanged contacts (with crypto) from imported contacts (no crypto).
 #[derive(Clone, Debug)]

@@ -125,7 +125,7 @@ impl IdentityStore<'_> {
     /// Returns `None` if no password has been set (all password columns are NULL).
     pub fn load_password_config(
         &self,
-    ) -> Result<Option<crate::api::app_password::AppPasswordConfig>, StorageError> {
+    ) -> Result<Option<crate::identity::password_config::AppPasswordConfig>, StorageError> {
         let result = self.conn.query_row(
             "SELECT password_hash_encrypted, password_salt, duress_hash_encrypted, duress_salt, duress_enabled FROM identity WHERE id = 1",
             [],
@@ -180,7 +180,7 @@ impl IdentityStore<'_> {
                 };
 
                 Ok(Some(
-                    crate::api::app_password::AppPasswordConfig::from_stored(
+                    crate::identity::password_config::AppPasswordConfig::from_stored(
                         password_hash,
                         password_salt,
                         duress_hash,

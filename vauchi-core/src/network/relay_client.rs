@@ -614,29 +614,6 @@ impl<T: Transport> RelayClient<T> {
     }
 }
 
-impl<T: Transport> crate::api::PurgeSender for RelayClient<T> {
-    fn send_purge(
-        &mut self,
-        purge: &crate::api::PreSignedPurgeRequest,
-        now: u64,
-    ) -> Result<bool, crate::api::ShredError> {
-        let request = PurgeRequest {
-            public_key: crate::identifiers::IdentityKey::from(purge.public_key),
-            signature: purge.signature.clone(),
-            purge_token: purge.purge_token,
-            timestamp: purge.timestamp,
-        };
-
-        match self.send_purge_request(&request, now) {
-            Ok(_) => Ok(true),
-            Err(e) => Err(crate::api::ShredError::FileError(format!(
-                "Relay purge failed: {}",
-                e
-            ))),
-        }
-    }
-}
-
 impl<T: Transport> RelayClient<T> {
     /// Sends a pre-built revocation blob to a contact's mailbox token as an
     /// ordinary `EncryptedUpdate`. Unlike a bare `IdentityRevoked` envelope
@@ -672,28 +649,6 @@ impl<T: Transport> RelayClient<T> {
         let message_id = envelope.message_id.clone();
         self.connection.send(&envelope)?;
         Ok(message_id)
-    }
-}
-
-impl<T: Transport> crate::api::RevocationSender for RelayClient<T> {
-    fn send_revocation_delivery(
-        &mut self,
-        token: &str,
-        blob_b64: &str,
-        now: u64,
-    ) -> Result<bool, crate::api::ShredError> {
-        use base64::Engine;
-        let ciphertext = base64::engine::general_purpose::STANDARD
-            .decode(blob_b64)
-            .map_err(|e| {
-                crate::api::ShredError::FileError(format!("invalid revocation blob: {e}"))
-            })?;
-        match self.send_revocation_blob(token, ciphertext, now) {
-            Ok(_) => Ok(true),
-            Err(e) => Err(crate::api::ShredError::FileError(format!(
-                "Relay revocation failed: {e}"
-            ))),
-        }
     }
 }
 

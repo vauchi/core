@@ -23,7 +23,7 @@
 //! - Background noise rejection via bandpass filtering
 
 use super::proximity::ProximityError;
-use crate::types::AudioCapability;
+use crate::exchange_types::AudioCapability;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};

@@ -28,19 +28,7 @@ pub enum AuthResult {
     Invalid,
 }
 
-/// App password configuration with hashed credentials.
-///
-/// Stores Argon2id hashes and salts for the normal app password and
-/// optional duress PIN. Verification uses constant-time comparison
-/// and always checks both hashes to prevent timing attacks.
-#[derive(Clone)]
-pub struct AppPasswordConfig {
-    password_hash: [u8; 32],
-    password_salt: [u8; 16],
-    duress_hash: Option<[u8; 32]>,
-    duress_salt: Option<[u8; 16]>,
-    duress_enabled: bool,
-}
+pub use crate::identity::password_config::AppPasswordConfig;
 
 impl AppPasswordConfig {
     /// Creates a new password configuration by hashing the given password.
@@ -51,13 +39,7 @@ impl AppPasswordConfig {
         let salt = generate_salt()?;
         let hash = hash_password(password, &salt)?;
 
-        Ok(AppPasswordConfig {
-            password_hash: hash,
-            password_salt: salt,
-            duress_hash: None,
-            duress_salt: None,
-            duress_enabled: false,
-        })
+        Ok(Self::from_stored(hash, salt, None, None, false))
     }
 
     /// Sets up a duress PIN on this configuration.
@@ -66,8 +48,8 @@ impl AppPasswordConfig {
     /// Generates a separate salt and Argon2id hash.
     pub fn setup_duress(&mut self, duress_password: &str) -> VauchiResult<()> {
         // Verify the duress password is different from the normal password
-        let candidate_hash = hash_password(duress_password, &self.password_salt)?;
-        if bool::from(candidate_hash.ct_eq(&self.password_hash)) {
+        let candidate_hash = hash_password(duress_password, self.password_salt())?;
+        if bool::from(candidate_hash.ct_eq(self.password_hash())) {
             return Err(VauchiError::InvalidState(
                 "duress password must differ from normal password".into(),
             ));
@@ -76,9 +58,13 @@ impl AppPasswordConfig {
         let salt = generate_salt()?;
         let hash = hash_password(duress_password, &salt)?;
 
-        self.duress_hash = Some(hash);
-        self.duress_salt = Some(salt);
-        self.duress_enabled = true;
+        *self = Self::from_stored(
+            *self.password_hash(),
+            *self.password_salt(),
+            Some(hash),
+            Some(salt),
+            true,
+        );
 
         Ok(())
     }
@@ -91,15 +77,15 @@ impl AppPasswordConfig {
     /// matches, or `AuthResult::Invalid` if neither matches.
     pub fn verify(&self, password: &str) -> AuthResult {
         // Always hash against the normal salt
-        let normal_hash = match hash_password(password, &self.password_salt) {
+        let normal_hash = match hash_password(password, self.password_salt()) {
             Ok(h) => h,
             Err(_) => return AuthResult::Invalid,
         };
-        let normal_match = bool::from(normal_hash.ct_eq(&self.password_hash));
+        let normal_match = bool::from(normal_hash.ct_eq(self.password_hash()));
 
         // Always hash against the duress salt (if present) — even if normal matched
         let duress_match = if let (Some(duress_salt), Some(duress_hash)) =
-            (&self.duress_salt, &self.duress_hash)
+            (self.duress_salt(), self.duress_hash())
         {
             match hash_password(password, duress_salt) {
                 Ok(h) => bool::from(h.ct_eq(duress_hash)),
@@ -130,7 +116,7 @@ impl AppPasswordConfig {
     ///
     /// On error the config state is unchanged.
     pub fn change_password(&mut self, new_password: &str) -> VauchiResult<()> {
-        if let (Some(duress_salt), Some(duress_hash)) = (&self.duress_salt, &self.duress_hash) {
+        if let (Some(duress_salt), Some(duress_hash)) = (self.duress_salt(), self.duress_hash()) {
             let candidate = hash_password(new_password, duress_salt)?;
             if bool::from(candidate.ct_eq(duress_hash)) {
                 return Err(VauchiError::InvalidState(
@@ -141,53 +127,14 @@ impl AppPasswordConfig {
 
         let new_salt = generate_salt()?;
         let new_hash = hash_password(new_password, &new_salt)?;
-        self.password_salt = new_salt;
-        self.password_hash = new_hash;
+        *self = Self::from_stored(
+            new_hash,
+            new_salt,
+            self.duress_hash().copied(),
+            self.duress_salt().copied(),
+            self.duress_enabled(),
+        );
         Ok(())
-    }
-
-    /// Constructs an `AppPasswordConfig` from raw stored values.
-    ///
-    /// Used by the storage layer when loading persisted password config.
-    pub fn from_stored(
-        password_hash: [u8; 32],
-        password_salt: [u8; 16],
-        duress_hash: Option<[u8; 32]>,
-        duress_salt: Option<[u8; 16]>,
-        duress_enabled: bool,
-    ) -> Self {
-        AppPasswordConfig {
-            password_hash,
-            password_salt,
-            duress_hash,
-            duress_salt,
-            duress_enabled,
-        }
-    }
-
-    /// Returns the password hash.
-    pub fn password_hash(&self) -> &[u8; 32] {
-        &self.password_hash
-    }
-
-    /// Returns the password salt.
-    pub fn password_salt(&self) -> &[u8; 16] {
-        &self.password_salt
-    }
-
-    /// Returns the duress hash, if configured.
-    pub fn duress_hash(&self) -> Option<&[u8; 32]> {
-        self.duress_hash.as_ref()
-    }
-
-    /// Returns the duress salt, if configured.
-    pub fn duress_salt(&self) -> Option<&[u8; 16]> {
-        self.duress_salt.as_ref()
-    }
-
-    /// Returns whether duress mode is enabled.
-    pub fn duress_enabled(&self) -> bool {
-        self.duress_enabled
     }
 }
 

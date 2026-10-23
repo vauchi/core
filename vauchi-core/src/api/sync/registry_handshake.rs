@@ -209,7 +209,7 @@ pub(crate) fn receive_genesis_registry_ack(
 fn rearm_owed_card_repropagation(storage: &Storage) -> Result<(), CardUpdateError> {
     storage
         .ux()
-        .save_own_card_repropagate(&crate::types::OwnCardRepropagateState {
+        .save_own_card_repropagate(&crate::reminders::OwnCardRepropagateState {
             needs_repropagate: true,
             failed_attempts: 0,
         })?;

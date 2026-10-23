@@ -101,3 +101,14 @@ pub enum BiometricUnlockOutcome {
     /// final [`crate::api::AuthMode`].
     PromptForDuressPin,
 }
+
+/// Geographic location with optional accuracy.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct GeoLocation {
+    /// Latitude in decimal degrees.
+    pub latitude: f64,
+    /// Longitude in decimal degrees.
+    pub longitude: f64,
+    /// Location accuracy in meters.
+    pub accuracy_meters: Option<f32>,
+}

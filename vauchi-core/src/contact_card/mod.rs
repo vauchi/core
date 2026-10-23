@@ -34,7 +34,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 
 use crate::text::normalize_text;
-use crate::types::VisibilityRules;
+use crate::visibility::VisibilityRules;
 use thiserror::Error;
 
 /// Maximum number of fields per contact card.

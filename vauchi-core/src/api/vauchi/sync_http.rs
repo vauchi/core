@@ -716,11 +716,11 @@ impl Vauchi {
         let candidates = [
             (
                 received > 0,
-                crate::types::AhaMomentType::FirstUpdateReceived,
+                crate::onboarding::AhaMomentType::FirstUpdateReceived,
             ),
             (
                 sent > 0,
-                crate::types::AhaMomentType::FirstOutboundDelivered,
+                crate::onboarding::AhaMomentType::FirstOutboundDelivered,
             ),
         ];
         for (happened, moment_type) in candidates {
@@ -1323,7 +1323,7 @@ mod tests {
     // @internal
     #[test]
     fn a_cycle_fires_the_milestones_for_what_it_moved() {
-        let moments = |received, sent| -> Vec<crate::types::AhaMomentType> {
+        let moments = |received, sent| -> Vec<crate::onboarding::AhaMomentType> {
             let mut vauchi = Vauchi::in_memory().unwrap();
             vauchi.create_identity("Alice").unwrap();
             vauchi
@@ -1336,11 +1336,11 @@ mod tests {
         assert!(moments(0, 0).is_empty());
         assert_eq!(
             moments(0, 2),
-            [crate::types::AhaMomentType::FirstOutboundDelivered]
+            [crate::onboarding::AhaMomentType::FirstOutboundDelivered]
         );
         assert_eq!(
             moments(3, 0),
-            [crate::types::AhaMomentType::FirstUpdateReceived]
+            [crate::onboarding::AhaMomentType::FirstUpdateReceived]
         );
     }
 

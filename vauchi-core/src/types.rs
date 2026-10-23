@@ -10,11 +10,8 @@
 //! `lib.rs` — stable, so no consumer changed. New code should import from
 //! the owning module directly.
 //!
-//! The neutral-leaf modules (`emergency`, `settings`, `reminders`,
-//! `exchange_types`, `visibility`, `consent`) preserve the original
-//! anti-cycle intent: they are always compiled and depend on nothing, so
-//! the storage↔api and contact↔contact_card cycles these types once
-//! guarded against stay broken.
+//! These public aliases support existing consumers. Internal code imports
+//! the defining module; the architecture gate prevents new facade routes.
 
 pub use crate::consent::{ConsentRecord, ConsentType};
 pub use crate::emergency::{

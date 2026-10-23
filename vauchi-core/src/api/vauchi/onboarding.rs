@@ -10,7 +10,8 @@
 
 use crate::contact::Group;
 
-use crate::types::{OnboardingProgress, OnboardingStep};
+use crate::onboarding::OnboardingProgress;
+use crate::onboarding::OnboardingStep;
 
 use super::super::error::VauchiResult;
 use super::Vauchi;

@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 use crate::contact_card::{ContactCard, ContactField};
 use crate::identity::Identity;
-use crate::types::BackupReminderState;
-use crate::types::SettingsFlags;
+use crate::reminders::BackupReminderState;
+use crate::settings::SettingsFlags;
 
 use crate::storage::SecureStorage;
 
@@ -577,12 +577,12 @@ impl Vauchi {
     /// Public so a frontend that edits the own card directly (rather than via
     /// the `*_own_field` API) can arm the same retry path.
     pub fn mark_own_card_repropagate(&self) -> VauchiResult<()> {
-        self.storage
-            .ux()
-            .save_own_card_repropagate(&crate::types::OwnCardRepropagateState {
+        self.storage.ux().save_own_card_repropagate(
+            &crate::reminders::OwnCardRepropagateState {
                 needs_repropagate: true,
                 failed_attempts: 0,
-            })?;
+            },
+        )?;
         Ok(())
     }
 

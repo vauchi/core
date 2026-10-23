@@ -14,9 +14,8 @@
 //! - Alerts are E2E encrypted with each contact's shared key
 //!
 //! `MAX_TRUSTED_CONTACTS` and `DEFAULT_EMERGENCY_MESSAGE` live in
-//! `crate::types` (ungated, so the no-default-features build can reach
-//! them). The module-boundary lint forbids re-exporting them from this
-//! leaf feature module, so callers import from `crate::types` directly.
+//! `crate::emergency`, which is also available without network features.
+//! Internal callers import from that owning module directly.
 
 /// Minimum seconds between emergency broadcasts (UX guard).
 ///

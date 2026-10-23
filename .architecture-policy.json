@@ -57,6 +57,7 @@
     "vauchi-core/identity": 1,
     "vauchi-core/install_id": 0,
     "vauchi-core/lib": 5,
+    "vauchi-core/limits": 0,
     "vauchi-core/monotonic": 0,
     "vauchi-core/network": 4,
     "vauchi-core/onboarding": 3,

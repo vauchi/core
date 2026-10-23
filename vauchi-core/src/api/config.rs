@@ -121,7 +121,7 @@ impl Default for VauchiConfig {
     }
 }
 
-impl crate::types::SettingsFlags {
+impl crate::settings::SettingsFlags {
     /// Overwrites the settings-toggle subset from a config, preserving every
     /// non-toggle flag (e.g. `field_centric_visibility_migrated`). Replaces
     /// the former `From<&VauchiConfig>` projection, whose whole-struct

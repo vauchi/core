@@ -282,4 +282,4 @@ impl ProximityVerifier for ManualConfirmationVerifier {
     }
 }
 
-pub use crate::types::ProximityConfidence;
+pub use crate::exchange_types::ProximityConfidence;

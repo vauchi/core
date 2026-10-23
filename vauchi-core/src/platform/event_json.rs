@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use super::{Event, InputValue};
-use crate::backup::MAX_FULL_BACKUP_BYTES;
+use crate::limits::MAX_FULL_BACKUP_BYTES;
 
 /// Maximum JSON payload accepted by the generic presentation dispatch path.
 ///

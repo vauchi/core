@@ -23,7 +23,7 @@ use zeroize::{Zeroize, Zeroizing};
 use crate::contact::{Contact, ImportSource};
 use crate::contact_card::ContactCard;
 use crate::crypto::{decrypt, derive_key_argon2id, encrypt, random_bytes};
-use crate::types::VisibilityRules;
+use crate::visibility::VisibilityRules;
 
 /// Backup format version byte for contact backups.
 pub(crate) const CONTACT_BACKUP_VERSION: u8 = 0x01;

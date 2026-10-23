@@ -35,7 +35,7 @@ use crate::{Command, Event};
 const SESSION_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Transport mechanism used for this exchange session.
-pub use crate::types::ExchangeTransport;
+pub use crate::exchange_types::ExchangeTransport;
 
 /// State of an exchange session.
 #[derive(Debug)]

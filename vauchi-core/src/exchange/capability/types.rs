@@ -6,7 +6,7 @@
 //!
 //! Static description of what hardware a device supports.
 
-use crate::types::AudioCapability;
+use crate::exchange_types::AudioCapability;
 use serde::{Deserialize, Serialize};
 
 /// Static description of device hardware capabilities.

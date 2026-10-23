@@ -6,7 +6,8 @@
 //!
 //! Tracks user consent for data processing activities (GDPR Article 7).
 
-pub use crate::types::{ConsentRecord, ConsentType};
+pub use crate::consent::ConsentRecord;
+pub use crate::consent::ConsentType;
 
 /// Aggregated consent status for a specific consent type.
 ///

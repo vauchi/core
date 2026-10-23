@@ -11,7 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::types::DemoContactState;
+use crate::onboarding::DemoContactState;
 
 /// Demo contact display name
 pub const DEMO_CONTACT_NAME: &str = "Vauchi Tips";

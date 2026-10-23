@@ -600,3 +600,92 @@ fn a_device_linked_after_contacts_exist_receives_them_with_the_own_card() {
     let values: Vec<&str> = own_card.fields().iter().map(|f| f.value()).collect();
     assert_eq!(values, vec!["5550301"]);
 }
+
+/// The host ending the ceremony told the joiner nothing: it polled until
+/// the QR expired and then blamed the QR (vauchi/private#780).
+// @internal
+#[test]
+fn a_joiner_learns_the_host_declined_on_its_next_poll() {
+    let (initiator, _identity) = initiator_for("Alice", [0x5Au8; 32]);
+    let broker = RelayLikeBroker::new();
+    let mut host = DeviceLinkInitiatorMachine::new(
+        initiator,
+        "alice-identity".to_string(),
+        TIMEOUT_SECS,
+        None,
+    );
+    let _ = host.advance(&broker, NOW);
+    let invitation = host.join_invitation().expect("invitation");
+    let mut joiner =
+        DeviceLinkResponderMachine::new(invitation, "New Phone".to_string(), TIMEOUT_SECS)
+            .expect("invitation parses");
+    let _ = joiner.advance(&broker, NOW + 1);
+    let _ = host.advance(&broker, NOW + 2);
+
+    let _ = host.deny();
+    let _ = host.advance(&broker, NOW + 3);
+
+    let told = joiner.advance(&broker, NOW + 4);
+    assert!(
+        matches!(&told, ResponderEvent::Failed { reason } if reason == "user_denied"),
+        "the joiner must learn the host declined, not wait for the QR; got {told:?}"
+    );
+}
+
+// @internal
+#[test]
+fn a_joiner_learns_the_host_stopped_waiting_for_confirmation() {
+    let (initiator, _identity) = initiator_for("Alice", [0x5Au8; 32]);
+    let broker = RelayLikeBroker::new();
+    let mut host = DeviceLinkInitiatorMachine::new(
+        initiator,
+        "alice-identity".to_string(),
+        TIMEOUT_SECS,
+        None,
+    );
+    let _ = host.advance(&broker, NOW);
+    let invitation = host.join_invitation().expect("invitation");
+    let mut joiner =
+        DeviceLinkResponderMachine::new(invitation, "New Phone".to_string(), TIMEOUT_SECS)
+            .expect("invitation parses");
+    let _ = joiner.advance(&broker, NOW + 1);
+    let _ = host.advance(&broker, NOW + 2);
+
+    let timed_out = host.advance(&broker, NOW + 2 + 61);
+    assert!(
+        matches!(&timed_out, InitiatorEvent::Failed { reason } if reason == "user_confirm_timeout"),
+        "the host's own confirmation window must end the ceremony; got {timed_out:?}"
+    );
+
+    let told = joiner.advance(&broker, NOW + 2 + 62);
+    assert!(
+        matches!(&told, ResponderEvent::Failed { reason } if reason == "user_confirm_timeout"),
+        "the joiner must learn the host stopped waiting; got {told:?}"
+    );
+}
+
+// @internal
+#[test]
+fn a_joiner_learns_its_name_is_already_linked() {
+    let (initiator, identity) = initiator_for("Alice", [0x5Au8; 32]);
+    let taken_name = identity.device_info().device_name().to_string();
+    let broker = RelayLikeBroker::new();
+    let mut host = DeviceLinkInitiatorMachine::new(
+        initiator,
+        "alice-identity".to_string(),
+        TIMEOUT_SECS,
+        None,
+    );
+    let _ = host.advance(&broker, NOW);
+    let invitation = host.join_invitation().expect("invitation");
+    let mut joiner = DeviceLinkResponderMachine::new(invitation, taken_name, TIMEOUT_SECS)
+        .expect("invitation parses");
+    let _ = joiner.advance(&broker, NOW + 1);
+    let _ = host.advance(&broker, NOW + 2);
+
+    let told = joiner.advance(&broker, NOW + 3);
+    assert!(
+        matches!(&told, ResponderEvent::Failed { reason } if reason == "device_name_taken"),
+        "the joiner must learn its name is taken, so it can pick another; got {told:?}"
+    );
+}

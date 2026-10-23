@@ -236,3 +236,39 @@ fn foreign_update_is_rejected() {
     assert!(!engine.apply_update(EngineUpdate::ConfirmPendingDelete));
     assert_eq!(screen_id(&engine), "device_link_join");
 }
+
+/// The host now says why it ended the ceremony; the joiner showed every
+/// reason as the generic failure (vauchi/private#780).
+// @internal
+#[test]
+fn the_failed_screen_gives_the_reason_the_host_stated() {
+    let cases = [
+        ("user_denied", "The other device declined the link."),
+        (
+            "user_confirm_timeout",
+            "The confirmation timed out — both devices must confirm within 60 seconds. Try again.",
+        ),
+        (
+            "device_name_taken",
+            "A device with this name is already linked. On the new device, start again and give it a different name.",
+        ),
+    ];
+    for (reason, sentence) in cases {
+        let mut engine = engine();
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: JOIN_ACTION_ID.into(),
+        });
+        let _ = engine.apply_update(EngineUpdate::DeviceLinkJoin(DeviceLinkJoinUpdate::Failed(
+            reason.into(),
+        )));
+        let detail = engine
+            .current_screen()
+            .components
+            .iter()
+            .find_map(|c| match c {
+                crate::ui::Component::StatusIndicator { detail, .. } => detail.clone(),
+                _ => None,
+            });
+        assert_eq!(detail.as_deref(), Some(sentence), "reason {reason}");
+    }
+}

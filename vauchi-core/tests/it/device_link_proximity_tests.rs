@@ -519,19 +519,13 @@ fn test_self_linking_same_device_name_rejected() {
     let encrypted_request = responder
         .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
         .unwrap();
-    let (confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
-
-    let proof = ProximityProof::manual_confirmation(
-        initiator.qr().link_key(),
-        &confirmation.confirmation_code,
-        now_unix_secs(),
-    );
-
-    let result = initiator.confirm_link(&request, &proof, now_unix_secs());
+    // Refused before the codes are compared, so the user is not asked to
+    // confirm a link that cannot succeed (vauchi/private#671).
+    let result = initiator.prepare_confirmation(&encrypted_request);
     assert!(
         matches!(result, Err(ExchangeError::SelfLinkingNotAllowed)),
-        "Linking with same device name as existing device must be rejected, got err: {:?}",
-        result.err()
+        "Linking with same device name as existing device must be rejected, got: {:?}",
+        result.map(|(confirmation, _)| confirmation.device_name)
     );
 }
 
@@ -565,21 +559,11 @@ fn test_self_linking_restored_initiator_rejected() {
     let encrypted_request = responder
         .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
         .unwrap();
-    let (confirmation, request) = restored_initiator
-        .prepare_confirmation(&encrypted_request)
-        .unwrap();
-
-    let proof = ProximityProof::manual_confirmation(
-        restored_initiator.qr().link_key(),
-        &confirmation.confirmation_code,
-        now_unix_secs(),
-    );
-
-    let result = restored_initiator.confirm_link(&request, &proof, now_unix_secs());
+    let result = restored_initiator.prepare_confirmation(&encrypted_request);
     assert!(
         matches!(result, Err(ExchangeError::SelfLinkingNotAllowed)),
-        "Restored initiator must also reject self-linking, got err: {:?}",
-        result.err()
+        "Restored initiator must also reject self-linking, got: {:?}",
+        result.map(|(confirmation, _)| confirmation.device_name)
     );
 }
 

@@ -478,6 +478,38 @@ fn the_joiner_gets_nothing_until_the_user_confirms_on_the_host() {
     );
 }
 
+/// A joiner naming itself after a device already in the registry used to get
+/// the codes compared and confirmed, and only then refused, as a generic
+/// failure: the user was never told to pick another name
+/// (vauchi/private#671).
+// @internal
+#[test]
+fn a_joiner_named_like_a_linked_device_is_refused_before_any_code_is_shown() {
+    let (initiator, identity) = initiator_for("Alice", [0x5Au8; 32]);
+    let taken_name = identity.device_info().device_name().to_string();
+    let broker = RelayLikeBroker::new();
+    let mut host = DeviceLinkInitiatorMachine::new(
+        initiator,
+        "alice-identity".to_string(),
+        TIMEOUT_SECS,
+        None,
+    );
+
+    let _ = host.advance(&broker, NOW);
+    let invitation = host.join_invitation().expect("invitation");
+    let mut joiner = DeviceLinkResponderMachine::new(invitation, taken_name, TIMEOUT_SECS)
+        .expect("invitation parses");
+    let _ = joiner.advance(&broker, NOW + 1);
+
+    let refused = host.advance(&broker, NOW + 2);
+    assert!(
+        matches!(&refused, InitiatorEvent::Failed { reason } if reason == "device_name_taken"),
+        "the host must refuse a taken name before the codes are compared, with \
+         a reason the screen can explain; got {refused:?}"
+    );
+    assert_eq!(host.phase(), InitiatorPhase::Failed);
+}
+
 /// A device linked after the owner exchanged with someone and filled in
 /// their card receives those contacts and entries in the link response;
 /// they predate it in the registry, so device sync never journals them

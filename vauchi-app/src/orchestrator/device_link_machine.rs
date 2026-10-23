@@ -44,7 +44,7 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use vauchi_core::api::DeviceSyncOrchestrator;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::exchange::{
-    DeviceLinkInitiator, DeviceLinkJoinInvitation, DeviceLinkRequest, ProximityProof,
+    DeviceLinkInitiator, DeviceLinkJoinInvitation, DeviceLinkRequest, ExchangeError, ProximityProof,
 };
 use vauchi_core::identity::Identity;
 use vauchi_core::storage::Storage;
@@ -98,7 +98,8 @@ pub enum InitiatorEvent {
         device_index: u32,
     },
     /// Terminal failure (stable reason ids: `qr_expired`,
-    /// `user_denied`, `user_confirm_timeout`, or a relay message).
+    /// `user_denied`, `user_confirm_timeout`, `device_name_taken`, or a
+    /// relay message).
     Failed { reason: String },
 }
 
@@ -359,6 +360,12 @@ impl DeviceLinkInitiatorMachine {
                     device_name: confirmation.device_name,
                     confirmation_code: confirmation.confirmation_code,
                     identity_fingerprint: confirmation.identity_fingerprint,
+                }
+            }
+            Err(ExchangeError::SelfLinkingNotAllowed) => {
+                self.state = State::Failed;
+                InitiatorEvent::Failed {
+                    reason: "device_name_taken".to_string(),
                 }
             }
             Err(e) => {

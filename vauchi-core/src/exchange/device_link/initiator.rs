@@ -79,6 +79,9 @@ impl DeviceLinkInitiator {
         if request.device_name.is_empty() {
             return Err(ExchangeError::InvalidQRFormat);
         }
+        // Before the code is shown, so the user is never asked to confirm a
+        // link that `build_response` would refuse (vauchi/private#671).
+        refuse_a_taken_device_name(&self.registry, &request.device_name)?;
 
         let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
         let identity_fingerprint = self.qr.identity_fingerprint();
@@ -237,6 +240,9 @@ impl DeviceLinkInitiatorRestored {
         if request.device_name.is_empty() {
             return Err(ExchangeError::InvalidQRFormat);
         }
+        // Before the code is shown, so the user is never asked to confirm a
+        // link that `build_response` would refuse (vauchi/private#671).
+        refuse_a_taken_device_name(&self.registry, &request.device_name)?;
 
         let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
         let identity_fingerprint = self.qr.identity_fingerprint();

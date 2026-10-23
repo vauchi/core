@@ -476,7 +476,9 @@ impl CekWrappedPayload {
                 DeltaError::CekDecodeError("invalid ciphertext length field".into())
             })?) as usize;
 
-        if data.len() < 132 + ct_len {
+        // Subtract rather than add: on 32-bit targets `132 + ct_len` wraps
+        // for a declared length near u32::MAX and the check passes (#784).
+        if ct_len > data.len() - 132 {
             return Err(DeltaError::CekDecodeError(format!(
                 "ciphertext truncated: expected {} bytes, have {}",
                 ct_len,

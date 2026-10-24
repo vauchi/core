@@ -44,6 +44,7 @@ impl RenderContext {
     /// A language or theme picked in Core's Settings wins over what an app
     /// pushes: Core renders Settings, so only Core knows the pick
     /// (vauchi/private#790). Before the first pick the app's values stand.
+    #[cfg(feature = "network-rustls")]
     pub(crate) fn apply_saved_appearance(&mut self, vauchi: &vauchi_core::api::Vauchi) {
         if let Some(pick) = vauchi
             .load_settings_flags()

@@ -65,3 +65,6 @@ vauchi-core/locales/
 *.pem
 credentials.json
 service-account*.json
+
+# Kani and Tamarin installs from ci/formal-verification.sh (FORMAL_HOME)
+.formal/

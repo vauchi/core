@@ -768,6 +768,26 @@ test:protocol:
       junit: target/nextest/ci/junit.xml
     expire_in: 1 week
 
+test:hardware:
+  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
+  stage: test
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
+  before_script:
+    - !reference [.self-hosted, before_script]
+  script:
+    - cargo nextest run --profile ci -p vauchi-hardware
+    # Nextest does not execute the compiler-negative documentation fixture.
+    - cargo test --locked -p vauchi-hardware --doc
+  artifacts:
+    when: always
+    reports:
+      junit: target/nextest/ci/junit.xml
+    expire_in: 1 week
+
 # Core ships armeabi-v7a, where usize is 32 bits; arithmetic that wraps only
 # there passes every 64-bit job (private#756: a crafted padding length
 # aborted the app). An i386 userland has the same pointer width natively and

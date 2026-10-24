@@ -1,0 +1,263 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * Social recovery, then rekeying online with every old contact
+ * (vauchi/private#796). Alice's device is stolen; she recovers through
+ * her guardians and rekeys each contact without meeting them again.
+ *
+ *   - Before: Alice made a guardian backup (`export_guardian_backup_with_
+ *     shards`): her master seed and every contact with its identity key
+ *     and shared key, encrypted under a random key split between her
+ *     guardians Bob and Carol (2 of 2 here). The ciphertext is public.
+ *   - The thief gets the old device: Alice's old identity key and every
+ *     shared key on it.
+ *   - Alice makes a new identity. In person, each guardian vouches for
+ *     (old key, new key) and re-seals its shard to the new key
+ *     (`respond_to_recovery`).
+ *   - With both shards Alice opens the backup (`recover_guardian_backup`):
+ *     she knows John's identity key and their shared key, so she can reach
+ *     John's mailbox.
+ *   - Online rekey: Alice signs a fresh exchange key with her new identity
+ *     and sends it to John's mailbox. John answers only for a key his
+ *     accepted proof names (two of his contacts vouched); he signs his
+ *     answer with his identity key, which Alice checks against the backup.
+ *
+ * The attacker owns the network and the relay, holds the stolen device,
+ * and may corrupt any identity. In-person steps are authentic channels.
+ *
+ * Run: tamarin-prover --prove social_recovery.spthy
+ * Prove it can fail:
+ *   -DNO_PROOF_CHECK: John answers any offer that reaches his mailbox;
+ *     the thief, holding the shared key, rekeys John to itself
+ *     (john_rekeys_only_with_the_real_alice falsified).
+ *   -DNO_ANSWER_SIGNATURE: Alice accepts an answer that arrives under the
+ *     shared key; the thief answers as John
+ *     (alice_rekeys_only_with_the_real_john falsified).
+ *   -DONE_GUARDIAN: Carol's shard is public, as with a threshold of one;
+ *     corrupting Bob opens the backup
+ *     (backup_needs_both_guardians falsified).
+ *   -DUNBOUND_ANSWER: John's answer does not name the new identity it
+ *     answers; an attacker with a proof for its own key relays Alice's
+ *     exchange key to John, and Alice and John end with different keys
+ *     (alice_rekeys_only_with_the_real_john falsified).
+ *
+ * Offers and answers travel in the clear here, though Core would send
+ * them to the mailbox under the shared key: every trace that reaches the
+ * rekey went through the theft, which leaks that key, so it protects
+ * nothing the model could check (and it multiplied the search past 8 GB).
+ */
+
+theory VauchiSocialRecovery
+begin
+
+builtins: diffie-hellman, signing, asymmetric-encryption, symmetric-encryption, hashing
+
+#ifdef UNBOUND_ANSWER
+/* John's answer does not name the identity he answers. */
+macros: answered(new_pk) = 'unbound'
+#else
+/* John's answer names the new identity he believes he answers. */
+macros: answered(new_pk) = new_pk
+#endif
+
+restriction Equality:
+  "All x y #i. Eq(x, y) @ i ==> x = y"
+
+restriction Inequality:
+  "All x #i. Neq(x, x) @ i ==> F"
+
+restriction Once:
+  "All x #i #j. Once(x) @ i & Once(x) @ j ==> #i = #j"
+
+/* The cast after their in-person exchanges, and Alice's guardian backup.
+   Bob and Carol are Alice's guardians and John's contacts. */
+rule Setup:
+  let bk = h(<~s1, ~s2>)
+      backup = senc(<~la, 'John', pk(~lj), ~kaj>, bk)
+  in
+  [ Fr(~la), Fr(~lb), Fr(~lc), Fr(~lj), Fr(~kaj), Fr(~s1), Fr(~s2) ]
+  --[ Once('setup'), BackupKey(bk), SharedKey('Alice', 'John', ~kaj) ]->
+  [ !Ltk('Alice', ~la), !Ltk('Bob', ~lb), !Ltk('Carol', ~lc), !Ltk('John', ~lj)
+  , !Contact('Bob', 'Alice', pk(~la)), !Contact('Carol', 'Alice', pk(~la))
+  , !Contact('John', 'Alice', pk(~la))
+  , !Contact('John', 'Bob', pk(~lb)), !Contact('John', 'Carol', pk(~lc))
+  , !Shared('John', 'Alice', ~kaj)
+  , !Shard('Bob', 'Alice', ~s1), !Shard('Carol', 'Alice', ~s2)
+  , !Backup('Alice', ~s1, ~s2, 'John', pk(~lj), ~kaj)
+  , Out(<pk(~la), pk(~lb), pk(~lc), pk(~lj)>), Out(backup)
+  ]
+
+#ifdef ONE_GUARDIAN
+rule Carol_shard_is_public:
+  [ !Shard('Carol', A, s) ]
+  -->
+  [ Out(s) ]
+#endif
+
+/* A corrupted identity gives up its key and, for a guardian, its shard. */
+rule Corrupt_identity:
+  [ !Ltk(A, ltk) ]
+  --[ Compromised(A) ]->
+  [ Out(ltk) ]
+
+rule Corrupt_guardian:
+  [ !Shard(G, A, s) ]
+  --[ Compromised(G) ]->
+  [ Out(s) ]
+
+/* The device is stolen: its identity key and the shared key on it leak. */
+rule Lose_device:
+  [ !Ltk('Alice', old), !Shared(J, 'Alice', k), Fr(~new) ]
+  --[ Once('lose'), Recovered('Alice', pk(old), pk(~new)), LostDevice('Alice') ]->
+  [ !NewLtk('Alice', ~new), !Recovering('Alice', pk(old), pk(~new))
+  , Out(pk(~new)), Out(old), Out(k)
+  ]
+
+rule Corrupt_new_identity:
+  [ !NewLtk(A, new) ]
+  --[ CompromisedNew(A) ]->
+  [ Out(new) ]
+
+/* In person: the guardian vouches for the claim and re-seals its shard
+   to the new key it was shown. */
+rule Vouch_and_reseal:
+  let voucher = <'vauchi-recovery-voucher-v1', old_pk, new_pk, pk(lv)>
+  in
+  [ !Contact(V, A, old_pk), !Recovering(A, old_pk, new_pk), !Ltk(V, lv)
+  , !Shard(V, A, s)
+  ]
+  --[ Vouched(V, old_pk, new_pk) ]->
+  [ Out(<voucher, sign(voucher, lv)>), Out(aenc(s, new_pk)) ]
+
+/* Alice opens the backup with both re-sealed shards. The ciphertext is
+   public (Setup); its contents are read from state keyed by the true
+   shards, which keeps the search finite and still needs both. */
+rule Restore_backup:
+  [ !NewLtk(A, n), In(aenc(s1, pk(n))), In(aenc(s2, pk(n)))
+  , !Backup(A, s1, s2, J, pkj, kaj)
+  ]
+  --[ BackupOpened(A, J, pkj, kaj) ]->
+  [ !Restored(A, n, J, pkj, kaj) ]
+
+/* John accepts once two distinct contacts of his vouched, neither with a
+   key of the recovery itself (#797). */
+rule Accept_proof:
+  let v1 = <'vauchi-recovery-voucher-v1', old_pk, new_pk, pk1>
+      v2 = <'vauchi-recovery-voucher-v1', old_pk, new_pk, pk2>
+  in
+  [ !Contact(J, A, old_pk), !Contact(J, V1, pk1), !Contact(J, V2, pk2)
+  , In(<<v1, s1>, <v2, s2>>)
+  ]
+  --[ Eq(verify(s1, v1, pk1), true), Eq(verify(s2, v2, pk2), true), Neq(pk1, pk2)
+    , Neq(pk1, old_pk), Neq(pk2, old_pk), Neq(pk1, new_pk), Neq(pk2, new_pk)
+    , Accept(J, A, new_pk)
+    ]->
+  [ !Accepted(J, A, new_pk) ]
+
+/* Alice sends John's mailbox a fresh exchange key signed by her new identity. */
+rule Alice_offers:
+  let ga = 'g' ^ ~ea
+      offer = <'vauchi-recovery-rekey-offer', pk(n), ga>
+  in
+  [ !Restored(A, n, J, pkj, kaj), Fr(~ea) ]
+  -->
+  [ AliceOffer(A, n, J, pkj, ~ea), Out(<offer, sign(offer, n)>) ]
+
+#ifdef NO_PROOF_CHECK
+/* John answers whatever new key reaches his mailbox under the shared key. */
+rule John_answers:
+  let offer = <'vauchi-recovery-rekey-offer', new_pk, ga>
+      gj = 'g' ^ ~ej
+      answer = <'vauchi-recovery-rekey-answer', pk(lj), answered(new_pk), gj, ga>
+      k = h(<ga ^ ~ej, new_pk, pk(lj)>)
+  in
+  [ !Shared(J, A, kaj), !Ltk(J, lj), In(<offer, so>), Fr(~ej) ]
+  --[ Eq(verify(so, offer, new_pk), true), JohnRekeyed(J, A, new_pk, k) ]->
+  [ Out(<answer, sign(answer, lj)>) ]
+#else
+/* John answers only the key his accepted proof names. */
+rule John_answers:
+  let offer = <'vauchi-recovery-rekey-offer', new_pk, ga>
+      gj = 'g' ^ ~ej
+      answer = <'vauchi-recovery-rekey-answer', pk(lj), answered(new_pk), gj, ga>
+      k = h(<ga ^ ~ej, new_pk, pk(lj)>)
+  in
+  [ !Accepted(J, A, new_pk), !Shared(J, A, kaj), !Ltk(J, lj)
+  , In(<offer, so>), Fr(~ej)
+  ]
+  --[ Eq(verify(so, offer, new_pk), true), JohnRekeyed(J, A, new_pk, k) ]->
+  [ Out(<answer, sign(answer, lj)>) ]
+#endif
+
+#ifdef NO_ANSWER_SIGNATURE
+/* Alice trusts any answer that arrives under the shared key. */
+rule Alice_completes:
+  let ga = 'g' ^ ea
+      answer = <'vauchi-recovery-rekey-answer', pkj, answered(pk(n)), gj, ga>
+      k = h(<gj ^ ea, pk(n), pkj>)
+  in
+  [ AliceOffer(A, n, J, pkj, ea), !Restored(A, n, J, pkj, kaj)
+  , In(<answer, sa>)
+  ]
+  --[ AliceRekeyed(A, J, pkj, k) ]->
+  [ ]
+#else
+/* Alice checks the answer against John's identity key from the backup. */
+rule Alice_completes:
+  let ga = 'g' ^ ea
+      answer = <'vauchi-recovery-rekey-answer', pkj, answered(pk(n)), gj, ga>
+      k = h(<gj ^ ea, pk(n), pkj>)
+  in
+  [ AliceOffer(A, n, J, pkj, ea), !Restored(A, n, J, pkj, kaj)
+  , In(<answer, sa>)
+  ]
+  --[ Eq(verify(sa, answer, pkj), true), AliceRekeyed(A, J, pkj, k) ]->
+  [ ]
+#endif
+
+lemma executable:
+  exists-trace
+  "Ex A J n pkj k #j #l.
+     JohnRekeyed(J, A, n, k) @ j & AliceRekeyed(A, J, pkj, k) @ l
+     & not (Ex X #c. Compromised(X) @ c)
+     & not (Ex X #c. CompromisedNew(X) @ c)"
+
+/* The thief holds the old device, not the backup: opening it takes both
+   guardians' shards or Alice's new identity. */
+lemma backup_needs_both_guardians:
+  "All bk #s.
+     BackupKey(bk) @ s
+     ==> not (Ex #x. K(bk) @ x)
+         | ((Ex #c. Compromised('Bob') @ c) & (Ex #d. Compromised('Carol') @ d))
+         | (Ex #c. CompromisedNew('Alice') @ c)"
+
+/* John rekeys only to the key Alice really recovered to, unless both
+   helpers he counted were corrupted — although the thief holds the
+   shared key that reaches John's mailbox. */
+lemma john_rekeys_only_with_the_real_alice:
+  "All J A n k #j.
+     JohnRekeyed(J, A, n, k) @ j
+     ==> (Ex o #r. Recovered(A, o, n) @ r)
+         | ((Ex #c. Compromised('Bob') @ c) & (Ex #d. Compromised('Carol') @ d))"
+
+/* Alice rekeys only with the real John, unless John is corrupted —
+   although the thief holds their old shared key. */
+lemma alice_rekeys_only_with_the_real_john:
+  "All A J pkj k #l.
+     AliceRekeyed(A, J, pkj, k) @ l
+     ==> (Ex n #j. JohnRekeyed(J, A, n, k) @ j)
+         | (Ex #c. Compromised(J) @ c)"
+
+/* The new key stays secret from the thief, unless John, Alice's new
+   identity or both guardians are corrupted. */
+lemma new_key_secrecy:
+  "All A J pkj k #l.
+     AliceRekeyed(A, J, pkj, k) @ l
+     ==> not (Ex #x. K(k) @ x)
+         | (Ex #c. Compromised(J) @ c)
+         | (Ex #c. CompromisedNew(A) @ c)
+         | ((Ex #c. Compromised('Bob') @ c) & (Ex #d. Compromised('Carol') @ d))"
+
+end

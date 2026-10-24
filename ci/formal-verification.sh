@@ -123,4 +123,18 @@ tamarin_expect "$models/recovery_acceptance.spthy" verified "-DIN_PERSON" \
 # Without #797's check the stolen device and one corrupted helper suffice.
 tamarin_expect "$models/recovery_acceptance.spthy" falsified "-DNO_LOST_KEY_CHECK" \
     accept_needs_the_real_recovery
+# Social recovery, then rekeying online with every old contact (#796):
+# the guardian backup gives Alice each contact's identity key, so both
+# sides authenticate although the thief holds the shared keys.
+tamarin_expect "$models/social_recovery.spthy" verified "" \
+    executable backup_needs_both_guardians john_rekeys_only_with_the_real_alice \
+    alice_rekeys_only_with_the_real_john new_key_secrecy
+tamarin_expect "$models/social_recovery.spthy" falsified "-DONE_GUARDIAN" \
+    backup_needs_both_guardians
+tamarin_expect "$models/social_recovery.spthy" falsified "-DNO_PROOF_CHECK" \
+    john_rekeys_only_with_the_real_alice
+tamarin_expect "$models/social_recovery.spthy" falsified "-DNO_ANSWER_SIGNATURE" \
+    alice_rekeys_only_with_the_real_john
+tamarin_expect "$models/social_recovery.spthy" falsified "-DUNBOUND_ANSWER" \
+    alice_rekeys_only_with_the_real_john
 echo "formal verification OK"

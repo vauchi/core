@@ -34,6 +34,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- On a device with biometrics, the device or login password no longer
+  passes the OS check that guards export and the first app password:
+  `CreateUserPresenceSecret` carries a `binding` (`biometry` or
+  `device_credential`) that Core picks from `biometric_type`, export
+  there needs an app password, and a lost or unavailable enrolment is
+  refused and counted as a miss, with restore or re-link as the way
+  back. Shells report a missing item as the new
+  `UserPresenceSecretMissing` event. A duress session leaves the
+  enrolment alone (vauchi/private#778).
 - A guardian vouches only for a recovery claim that names one of their
   contacts and carries that contact's key; the vouch screen names the
   contact, and claims and vouchers carry the time

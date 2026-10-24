@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#![cfg(feature = "testing")]
+
 use vauchi_app::ui::{AppEngine, AppScreen, WorkflowEngine};
 use vauchi_core::api::Vauchi;
 use vauchi_core::exchange::mode::ExchangeMode;

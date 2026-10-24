@@ -7,7 +7,17 @@ use vauchi_core::platform::Event;
 use vauchi_core::platform::executor::{DeliveryError, Operation};
 
 /// One producer retains at most its current observation while the host drains
-/// the inbox. Native discovery must serialize calls to `send`.
+/// the inbox. A mutable borrow prevents concurrent pending sends.
+///
+/// ```compile_fail
+/// use vauchi_core::platform::Event;
+/// use vauchi_hardware::EventSender;
+/// async fn concurrent(mut sender: EventSender) {
+///     let first = sender.send(Event::HardwareUnavailable { transport: "BLE".into() });
+///     let second = sender.send(Event::HardwareUnavailable { transport: "BLE".into() });
+///     drop((first, second));
+/// }
+/// ```
 pub struct EventSender {
     pub(crate) operation: Operation,
     pub(crate) capacity: Arc<Notify>,
@@ -15,7 +25,7 @@ pub struct EventSender {
 }
 
 impl EventSender {
-    pub async fn send(&self, mut event: Event) -> Result<(), DeliveryError> {
+    pub async fn send(&mut self, mut event: Event) -> Result<(), DeliveryError> {
         loop {
             let ready = self.capacity.notified();
             tokio::pin!(ready);

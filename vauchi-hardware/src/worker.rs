@@ -50,7 +50,7 @@ async fn scan(
         .await
         .unwrap_or(Err(HardwareFailure::Failed));
     if let Err(failure) = outcome {
-        let events = EventSender {
+        let mut events = EventSender {
             operation: operation.clone(),
             capacity,
             available,

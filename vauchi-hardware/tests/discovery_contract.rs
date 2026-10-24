@@ -22,7 +22,7 @@ impl Discovery for TerminalDiscovery {
     fn scan(
         &self,
         _: String,
-        events: EventSender,
+        mut events: EventSender,
     ) -> Pin<Box<dyn Future<Output = Result<(), HardwareFailure>> + Send + '_>> {
         Box::pin(async move {
             match self.0 {
@@ -68,7 +68,7 @@ impl Discovery for NativeDiscovery {
     fn scan(
         &self,
         service_uuid: String,
-        events: EventSender,
+        mut events: EventSender,
     ) -> Pin<Box<dyn Future<Output = Result<(), HardwareFailure>> + Send + '_>> {
         Box::pin(async move {
             let _release = Release(self.released.clone());

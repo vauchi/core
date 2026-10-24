@@ -77,7 +77,7 @@ impl BleScanner {
 
     pub fn stop(&mut self) {
         if let Some(operation) = self.active.take() {
-            let _ = operation.cancel();
+            operation.cancel();
         }
         self.requests.send_replace(None);
         self.capacity.notify_waiters();
@@ -105,16 +105,18 @@ impl BleScanner {
         self.closed = true;
         self.inbox.close();
         self.stop();
-        if let Some(worker) = self.worker.as_mut() {
+        let result = if let Some(worker) = self.worker.as_mut() {
             worker.abort();
             match worker.await {
-                Ok(()) => (),
-                Err(error) if error.is_cancelled() => (),
-                Err(_) => return Err(ExecutorError::WorkerFailed),
+                Ok(()) => Ok(()),
+                Err(error) if error.is_cancelled() => Ok(()),
+                Err(_) => Err(ExecutorError::WorkerFailed),
             }
-        }
+        } else {
+            Ok(())
+        };
         self.worker.take();
-        Ok(())
+        result
     }
 }
 

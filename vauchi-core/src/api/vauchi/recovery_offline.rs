@@ -12,6 +12,7 @@
 use base64::Engine;
 
 use crate::api::error::{VauchiError, VauchiResult};
+use crate::contact::Contact;
 use crate::recovery::{RecoveryClaim, RecoveryVoucher};
 
 use super::Vauchi;
@@ -29,6 +30,20 @@ impl Vauchi {
             .map_err(|e| VauchiError::Serialization(format!("invalid base64: {e}")))?;
         RecoveryClaim::from_bytes(&claim_bytes)
             .map_err(|e| VauchiError::Serialization(e.to_string()))
+    }
+
+    /// The contact whose key a recovery claim says was lost. Vouching for
+    /// anyone else would sign for a key the helper never met, and the
+    /// helper checks the person in front of them against this contact
+    /// (vauchi/private#708).
+    pub fn recovery_claim_contact(&self, claim: &RecoveryClaim) -> VauchiResult<Contact> {
+        let old_pk = claim.old_pk().as_bytes();
+        self.storage
+            .contacts()
+            .list_contacts()?
+            .into_iter()
+            .find(|contact| contact.public_key() == Some(old_pk))
+            .ok_or_else(|| VauchiError::ContactNotFound(hex::encode(old_pk)))
     }
 
     /// Creates a recovery claim for the given old (lost) identity public
@@ -60,7 +75,11 @@ impl Vauchi {
             .try_into()
             .map_err(|_| VauchiError::Serialization("public key must be 32 bytes".into()))?;
 
-        let claim = RecoveryClaim::new(old_pk, identity.signing_public_key(), 0);
+        let claim = RecoveryClaim::new(
+            old_pk,
+            identity.signing_public_key(),
+            self.clock.unix_seconds(),
+        );
         Ok(base64::engine::general_purpose::STANDARD.encode(claim.to_bytes()))
     }
 
@@ -79,9 +98,14 @@ impl Vauchi {
             .ok_or(VauchiError::IdentityNotInitialized)?;
 
         let claim = self.parse_recovery_claim_b64(claim_b64)?;
-        let voucher =
-            RecoveryVoucher::create_from_claim(&claim, identity.signing_keypair(), None, 0)
-                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        self.recovery_claim_contact(&claim)?;
+        let voucher = RecoveryVoucher::create_from_claim(
+            &claim,
+            identity.signing_keypair(),
+            None,
+            self.clock.unix_seconds(),
+        )
+        .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         Ok(base64::engine::general_purpose::STANDARD.encode(voucher.to_bytes()))
     }
 }

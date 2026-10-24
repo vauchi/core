@@ -127,8 +127,16 @@ fn confirm_voucher_for_a_claim(engine: &mut AppEngine) -> ActionResult {
         v.create_identity("Bob").unwrap();
         v
     };
+    let lost_key = [0xABu8; 32];
+    let helper_knew_them = vauchi_core::Contact::from_exchange(
+        lost_key,
+        vauchi_core::contact_card::ContactCard::new("Bob"),
+        vauchi_core::SymmetricKey::generate(),
+        0,
+    );
+    engine.vauchi().add_contact(helper_knew_them).unwrap();
     let claim = claimant
-        .create_recovery_claim_hex_b64(&hex::encode([0xABu8; 32]))
+        .create_recovery_claim_hex_b64(&hex::encode(lost_key))
         .unwrap();
     engine.navigate_to(AppScreen::RecoveryHelp);
     let _ = press(engine, "vouch");

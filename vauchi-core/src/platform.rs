@@ -28,8 +28,10 @@
 
 use serde::{Deserialize, Serialize};
 
+mod ble_observation;
 mod event_json;
 pub mod executor;
+pub use ble_observation::{BleAdvertisementObservation, BleObservationError};
 mod presentation;
 
 pub use event_json::{
@@ -758,7 +760,12 @@ pub enum Event {
     /// (vauchi/private#733 D6).
     NetworkCostChanged { cost: crate::settings::NetworkCost },
 
-    /// A BLE peripheral was discovered during scanning.
+    /// Raw UUIDs observed by the native BLE scanner. Core decodes any
+    /// protocol token; hardware adapters never interpret UUID payloads.
+    BleAdvertisementObserved(BleAdvertisementObservation),
+
+    /// Compatibility observation carrying an already decoded advertisement
+    /// token. New scanners report `BleAdvertisementObserved` instead.
     BleDeviceDiscovered {
         id: String,
         rssi: i16,

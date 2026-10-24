@@ -88,6 +88,9 @@ pub mod ble;
 #[cfg(not(feature = "testing"))]
 mod ble;
 
+mod ble_advertisement;
+pub use ble_advertisement::advertised_token;
+
 #[cfg(feature = "audio-cpal")]
 pub mod audio_cpal;
 pub mod audio_modem;

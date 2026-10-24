@@ -346,7 +346,10 @@ impl RecoveryVoucher {
             return Err(RecoveryError::ClaimExpired);
         }
 
-        if voucher_keypair.public_key().as_bytes() == claim.new_pk().as_bytes() {
+        let voucher_pk = voucher_keypair.public_key();
+        if voucher_pk.as_bytes() == claim.new_pk().as_bytes()
+            || voucher_pk.as_bytes() == claim.old_pk().as_bytes()
+        {
             return Err(RecoveryError::SelfVouching);
         }
 
@@ -662,7 +665,7 @@ impl RecoveryProof {
             return Err(RecoveryError::MismatchedKeys);
         }
 
-        if voucher.voucher_pk() == &self.new_pk {
+        if self.is_self_voucher(&voucher) {
             return Err(RecoveryError::SelfVouching);
         }
 
@@ -726,6 +729,9 @@ impl RecoveryProof {
             if !seen_vouchers.insert(voucher.voucher_pk) {
                 return Err(RecoveryError::DuplicateVoucher);
             }
+            if self.is_self_voucher(voucher) {
+                return Err(RecoveryError::SelfVouching);
+            }
             if !voucher.verify() {
                 return Err(RecoveryError::InvalidSignature);
             }
@@ -755,6 +761,7 @@ impl RecoveryProof {
         let mutual_vouchers: Vec<_> = self
             .vouchers
             .iter()
+            .filter(|v| !self.is_self_voucher(v))
             .filter(|v| my_contact_pks.contains(v.voucher_pk.as_bytes()))
             .collect();
 
@@ -787,6 +794,13 @@ impl RecoveryProof {
                 total_vouchers: total,
             }
         }
+    }
+
+    /// A voucher from either side of the recovery: the new identity, or the
+    /// old one, whose key is on the lost device and so may be a thief's
+    /// (vauchi/private#797).
+    fn is_self_voucher(&self, voucher: &RecoveryVoucher) -> bool {
+        voucher.voucher_pk == self.new_pk || voucher.voucher_pk == self.old_pk
     }
 
     /// Serializes the proof to bytes.

@@ -845,6 +845,17 @@ fn test_update_display_name_too_long_fails() {
 
 // @internal
 #[test]
+fn test_create_identity_display_name_too_long_fails() {
+    let mut wb = create_test_vauchi();
+
+    let result = wb.create_identity(&"a".repeat(101));
+
+    result.expect_err("a name over 100 characters must be refused");
+    assert!(wb.identity().is_none());
+}
+
+// @internal
+#[test]
 fn test_update_display_name_no_identity_fails() {
     let mut wb = create_test_vauchi();
 

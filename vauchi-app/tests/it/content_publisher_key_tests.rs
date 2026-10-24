@@ -35,7 +35,7 @@ fn anything_but_32_bytes_of_hex_is_refused() {
 }
 
 // @internal
-#[cfg(not(feature = "dev-content-publisher-key"))]
+#[cfg(not(feature = "dev-local-content"))]
 #[test]
 fn a_release_build_trusts_only_the_production_key() {
     let production = "9512ff3a3025f0f11ea1c3d9fceabb0d59993e2bbd87fc13b8e42459d8c8b82d";

@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use vauchi_core::crypto::signing::PublicKey;
 
+#[cfg(not(feature = "dev-local-content"))]
 const PRODUCTION_PUBLISHER_PUBLIC_KEY: [u8; 32] = [
     149, 18, 255, 58, 48, 37, 240, 241, 30, 161, 195, 217, 252, 234, 187, 13, 89, 153, 62, 43, 189,
     135, 252, 19, 184, 228, 36, 89, 216, 200, 184, 45,
@@ -17,7 +18,7 @@ const PRODUCTION_PUBLISHER_PUBLIC_KEY: [u8; 32] = [
 /// The publisher key a dev build trusts instead of the production one, given
 /// at build time, so a device can take a manifest signed on a workstation
 /// from a local relay (vauchi/private#733 T4.2). Off in release bindings.
-#[cfg(feature = "dev-content-publisher-key")]
+#[cfg(feature = "dev-local-content")]
 const DEV_PUBLISHER_PUBLIC_KEY_HEX: &str = env!("VAUCHI_DEV_CONTENT_PUBLISHER_KEY");
 
 /// A publisher key from exactly 32 bytes of hex.
@@ -26,13 +27,13 @@ pub fn publisher_key_from_hex(hex: &str) -> Option<PublicKey> {
     Some(PublicKey::from_bytes(bytes))
 }
 
-#[cfg(feature = "dev-content-publisher-key")]
+#[cfg(feature = "dev-local-content")]
 fn default_publisher_public_key() -> PublicKey {
     publisher_key_from_hex(DEV_PUBLISHER_PUBLIC_KEY_HEX)
         .expect("VAUCHI_DEV_CONTENT_PUBLISHER_KEY is not 32 bytes of hex")
 }
 
-#[cfg(not(feature = "dev-content-publisher-key"))]
+#[cfg(not(feature = "dev-local-content"))]
 fn default_publisher_public_key() -> PublicKey {
     PublicKey::from_bytes(PRODUCTION_PUBLISHER_PUBLIC_KEY)
 }

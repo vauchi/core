@@ -67,7 +67,7 @@ BUILD_MACOS=false
 BUILD_ALL=true
 RELEASE_ONLY=false
 DEV_LOGGING=false
-DEV_CONTENT_KEY=false
+DEV_LOCAL_CONTENT=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -100,12 +100,12 @@ while [[ $# -gt 0 ]]; do
             DEV_LOGGING=true
             shift
             ;;
-        --dev-content-key)
-            DEV_CONTENT_KEY=true
+        --dev-local-content)
+            DEV_LOCAL_CONTENT=true
             shift
             ;;
         --help|-h)
-            echo "Usage: $0 [--ios] [--android] [--macos] [--apple] [--release-only] [--dev-logging] [--dev-content-key]"
+            echo "Usage: $0 [--ios] [--android] [--macos] [--apple] [--release-only] [--dev-logging] [--dev-local-content]"
             echo ""
             echo "Options:"
             echo "  --ios           Build iOS bindings only"
@@ -115,9 +115,10 @@ while [[ $# -gt 0 ]]; do
             echo "  --release-only  Skip simulator/Intel targets (arm64 only)"
             echo "  --dev-logging   Enable the native log backend (internal/dev"
             echo "                  builds only; OFF for store/release bindings)"
-            echo "  --dev-content-key  Trust the content publisher key in"
-            echo "                  VAUCHI_DEV_CONTENT_PUBLISHER_KEY (hex) instead of"
-            echo "                  production (dev builds only, private#733)"
+            echo "  --dev-local-content  Take content from a local relay: trust the"
+            echo "                  publisher key in VAUCHI_DEV_CONTENT_PUBLISHER_KEY (hex)"
+            echo "                  and send OHTTP to VAUCHI_DEV_OHTTP_RELAY_URL when set"
+            echo "                  (dev builds only, private#733)"
             echo "  (no args)       Build all platforms, all targets"
             exit 0
             ;;
@@ -146,14 +147,15 @@ if $DEV_LOGGING; then
     printf '%b\n' "${YELLOW}dev-logging ENABLED — internal/dev binding, not for release${NC}"
 fi
 # The content manager then trusts this key instead of the production one,
-# for a device proof against a local relay (vauchi/private#733 T4.2).
-if $DEV_CONTENT_KEY; then
+# and OHTTP goes to VAUCHI_DEV_OHTTP_RELAY_URL when set, for a device proof
+# against a local relay (vauchi/private#733 T4.2).
+if $DEV_LOCAL_CONTENT; then
     if [ -z "${VAUCHI_DEV_CONTENT_PUBLISHER_KEY:-}" ]; then
-        printf '%b\n' "${RED}--dev-content-key needs VAUCHI_DEV_CONTENT_PUBLISHER_KEY${NC}"
+        printf '%b\n' "${RED}--dev-local-content needs VAUCHI_DEV_CONTENT_PUBLISHER_KEY${NC}"
         exit 1
     fi
-    FEATURES="${FEATURES:+$FEATURES,}dev-content-publisher-key"
-    printf '%b\n' "${YELLOW}dev content publisher key ENABLED — internal/dev binding, not for release${NC}"
+    FEATURES="${FEATURES:+$FEATURES,}dev-local-content"
+    printf '%b\n' "${YELLOW}local content (dev key, dev OHTTP relay) ENABLED — internal/dev binding, not for release${NC}"
 fi
 FEATURE_FLAGS=""
 if [ -n "$FEATURES" ]; then

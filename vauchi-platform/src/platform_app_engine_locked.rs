@@ -42,6 +42,12 @@ impl OpenParams {
     pub(crate) fn open(&self) -> Result<Opened, MobileError> {
         let mut config =
             VauchiConfig::with_storage_path(&self.storage_path).with_relay_url(&self.relay_url);
+        // A local relay in Settings needs a distinct OHTTP route, which
+        // mobile Settings cannot name (vauchi/private#733 T4.2).
+        #[cfg(feature = "dev-local-content")]
+        if let Some(url) = option_env!("VAUCHI_DEV_OHTTP_RELAY_URL") {
+            config = config.with_ohttp_relay_url(url);
+        }
         if let Some(key) = &self.shell_storage_key {
             config = config.with_storage_key(key.clone());
         }

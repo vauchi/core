@@ -432,6 +432,7 @@ mod recovery_claim_review_tests;
 mod recovery_comprehensive_tests;
 mod recovery_engine_tests;
 mod recovery_guardian_api_tests;
+mod recovery_lost_key_voucher_tests;
 mod recovery_readiness_tests;
 mod recovery_storage_tests;
 mod recovery_tests;

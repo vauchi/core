@@ -22,8 +22,10 @@ job=$(awk '
 
 printf '%s\n' "$job" | grep -q '^  allow_failure: false$' \
     || fail "nightly fuzz crashes do not block the scheduled pipeline"
-printf '%s\n' "$job" | grep -q "cargo +nightly fuzz coverage \"\$t\"" \
-    || fail "nightly fuzzing does not measure corpus coverage"
+printf '%s\n' "$job" | grep -q "cargo +nightly fuzz coverage -s none \"\$t\"" \
+    || fail "nightly fuzzing does not measure corpus coverage without ASan, whose odr check aborts every replay on bundled sqlite3 (private#787)"
+printf '%s\n' "$job" | grep -q "cargo +nightly fuzz run {} -- " \
+    || fail "nightly fuzz runs no longer use the default ASan build"
 printf '%s\n' "$job" | grep -q "\"\$LLVM_COV\" report" \
     || fail "nightly fuzzing does not summarize coverage"
 printf '%s\n' "$job" | grep -q 'vauchi-core/fuzz/coverage/' \

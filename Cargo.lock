@@ -4473,6 +4473,7 @@ dependencies = [
 name = "vauchi-hardware"
 version = "0.87.0"
 dependencies = [
+ "futures",
  "thiserror 2.0.18",
  "tokio",
  "vauchi-core",

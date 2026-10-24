@@ -4,5 +4,6 @@
 #![forbid(unsafe_code)]
 
 mod discovery;
+mod worker;
 
 pub use discovery::{BleScanner, Discovery, EventSender, ExecutorError, HardwareFailure};

@@ -13,6 +13,7 @@ publish = false
 vauchi-core.workspace = true
 tokio = { version = "1", features = ["rt", "sync", "macros"] }
 thiserror = "2"
+futures = "0.3"
 
 [lints]
 workspace = true

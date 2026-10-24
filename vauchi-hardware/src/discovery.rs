@@ -5,7 +5,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::runtime::Handle;
-use tokio::sync::Notify;
+use tokio::sync::{Notify, watch};
 use tokio::task::JoinHandle;
 use vauchi_core::platform::Event;
 use vauchi_core::platform::executor::{DeliveryError, EventInbox, InboxLimits, Operation};
@@ -19,7 +19,7 @@ pub enum HardwareFailure {
 }
 
 impl HardwareFailure {
-    fn event(self) -> Event {
+    pub(crate) fn event(self) -> Event {
         match self {
             Self::Unavailable => Event::HardwareUnavailable {
                 transport: "BLE".into(),
@@ -60,8 +60,9 @@ pub trait Discovery: Send + Sync + 'static {
 /// One producer retains at most its current observation while the host drains
 /// the inbox. Native discovery must serialize calls to `send`.
 pub struct EventSender {
-    operation: Operation,
-    capacity: Arc<Notify>,
+    pub(crate) operation: Operation,
+    pub(crate) capacity: Arc<Notify>,
+    pub(crate) available: Arc<Notify>,
 }
 
 impl EventSender {
@@ -72,7 +73,10 @@ impl EventSender {
             // Register before publishing so a concurrent pop cannot be lost.
             ready.as_mut().enable();
             match self.operation.publish(event) {
-                Ok(()) => return Ok(()),
+                Ok(()) => {
+                    self.available.notify_one();
+                    return Ok(());
+                }
                 Err(rejected) if rejected.reason == DeliveryError::Full => {
                     event = rejected.event;
                     ready.await;
@@ -83,19 +87,16 @@ impl EventSender {
     }
 }
 
-struct ActiveScan {
-    operation: Operation,
-    task: JoinHandle<()>,
-}
-
 /// Host-owned discovery executor. The host keeps its runtime alive through
 /// `shutdown`, and serializes event dispatch with `start`, `stop` and disposal.
 pub struct BleScanner {
-    backend: Arc<dyn Discovery>,
-    runtime: Handle,
     inbox: EventInbox,
     capacity: Arc<Notify>,
-    active: Option<ActiveScan>,
+    available: Arc<Notify>,
+    requests: watch::Sender<Option<(String, Operation)>>,
+    worker: Option<JoinHandle<()>>,
+    active: Option<Operation>,
+    closed: bool,
 }
 
 impl BleScanner {
@@ -107,42 +108,40 @@ impl BleScanner {
         if limits.event_bytes.get() < 256 {
             return Err(ExecutorError::EventBudgetTooSmall);
         }
-        Ok(Self {
+        let capacity = Arc::new(Notify::new());
+        let available = Arc::new(Notify::new());
+        let (requests, receiver) = watch::channel(None);
+        let worker = runtime.spawn(crate::worker::run(
             backend,
-            runtime,
+            receiver,
+            capacity.clone(),
+            available.clone(),
+        ));
+        Ok(Self {
             inbox: EventInbox::new(limits),
-            capacity: Arc::new(Notify::new()),
+            capacity,
+            available,
+            requests,
+            worker: Some(worker),
             active: None,
+            closed: false,
         })
     }
 
     /// Replace the native discovery operation. Core chooses its lifetime;
     /// this adapter imposes no scan duration or fallback behavior.
     pub fn start(&mut self, service_uuid: String) -> Result<(), DeliveryError> {
+        if self.closed || self.worker.as_ref().is_none_or(JoinHandle::is_finished) {
+            return Err(DeliveryError::Closed);
+        }
         if service_uuid.len() > 128 {
             return Err(DeliveryError::PayloadTooLarge);
         }
         self.stop();
         let operation = self.inbox.start()?;
-        let events = EventSender {
-            operation: operation.clone(),
-            capacity: self.capacity.clone(),
-        };
-        let backend = self.backend.clone();
-        let completion = operation.clone();
-        let task = self.runtime.spawn(async move {
-            let failure_events = EventSender {
-                operation: completion.clone(),
-                capacity: events.capacity.clone(),
-            };
-            if let Err(failure) = backend.scan(service_uuid, events).await {
-                // Static failure events fit the minimum budget. Waiting for
-                // capacity preserves failure delivery even after a full queue.
-                let _ = failure_events.send(failure.event()).await;
-            }
-            let _ = completion.finish();
-        });
-        self.active = Some(ActiveScan { operation, task });
+        self.requests
+            .send_replace(Some((service_uuid, operation.clone())));
+        self.active = Some(operation);
         Ok(())
     }
 
@@ -155,20 +154,38 @@ impl BleScanner {
     }
 
     pub fn stop(&mut self) {
-        if let Some(active) = &self.active {
-            let _ = active.operation.cancel();
-            active.task.abort();
+        if let Some(operation) = self.active.take() {
+            let _ = operation.cancel();
         }
+        self.requests.send_replace(None);
         self.capacity.notify_waiters();
+    }
+
+    pub async fn next_event(&mut self) -> Option<Event> {
+        let available = self.available.clone();
+        loop {
+            let ready = available.notified();
+            tokio::pin!(ready);
+            ready.as_mut().enable();
+            if self.closed {
+                return None;
+            }
+            if let Some(event) = self.pop() {
+                return Some(event);
+            }
+            ready.await;
+        }
     }
 
     /// Close delivery, cancel pending OS work and wait for its future to be
     /// dropped. Native device acceptance must additionally verify OS cleanup.
     pub async fn shutdown(&mut self) -> Result<(), ExecutorError> {
+        self.closed = true;
         self.inbox.close();
         self.stop();
-        if let Some(active) = self.active.take() {
-            match active.task.await {
+        if let Some(worker) = self.worker.take() {
+            worker.abort();
+            match worker.await {
                 Ok(()) => (),
                 Err(error) if error.is_cancelled() => (),
                 Err(_) => return Err(ExecutorError::WorkerFailed),
@@ -182,5 +199,8 @@ impl Drop for BleScanner {
     fn drop(&mut self) {
         self.inbox.close();
         self.stop();
+        if let Some(worker) = &self.worker {
+            worker.abort();
+        }
     }
 }

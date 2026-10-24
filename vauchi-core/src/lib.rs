@@ -122,7 +122,7 @@ pub use platform::{
     PresentationPaging, PresentationProfile, PresentationQrErrorCorrection, PresentationQrPurpose,
     PresentationQrSize, PresentationRow, PresentationTextStyle, PresentationTokens,
     PresentationTone, QrPlacement, SealedSecret, StandardShortcut, SurfaceId, SurfaceLayout,
-    SurfaceSpec, ToastSpec, WindowClass, event_from_json,
+    SurfaceSpec, ToastSpec, UserPresenceBinding, WindowClass, event_from_json,
 };
 
 pub mod recovery;

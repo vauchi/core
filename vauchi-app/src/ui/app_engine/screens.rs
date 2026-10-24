@@ -614,7 +614,11 @@ impl AppEngine {
                     })
                     .with_consent(consent)
                     .with_app_password_set(vauchi.is_password_enabled().unwrap_or(false))
-                    .with_user_presence_available(device_capabilities.can_seal_user_presence)
+                    // A biometric device exports with its app password (#778).
+                    .with_user_presence_available(
+                        device_capabilities.can_seal_user_presence
+                            && device_capabilities.biometric_type.is_none(),
+                    )
                     .with_trusted_contacts(has_trusted_contacts)
                     .with_deletion_scheduled(scheduled)
                     .with_deletion_executable(executable),

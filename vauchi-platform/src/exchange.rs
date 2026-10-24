@@ -412,6 +412,9 @@ pub enum MobileEvent {
         secret: Vec<u8>,
     },
     UserPresenceCheckCancelled,
+    /// The sealed secret is gone: the enrolment changed or the keystore
+    /// lost the item (#778).
+    UserPresenceSecretMissing,
     // Errors
     HardwareError {
         transport: String,
@@ -560,6 +563,7 @@ impl From<MobileEvent> for Event {
                 }
             }
             MobileEvent::UserPresenceCheckCancelled => Self::UserPresenceCheckCancelled,
+            MobileEvent::UserPresenceSecretMissing => Self::UserPresenceSecretMissing,
         }
     }
 }

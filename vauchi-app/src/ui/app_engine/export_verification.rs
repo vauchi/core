@@ -13,7 +13,7 @@ use crate::ui::lock_screen::DEFAULT_LOCK_MAX_ATTEMPTS;
 use crate::ui::{
     ActionResult, EngineOutput, EngineUpdate, GdprChoice, GdprExportUpdate, UserAction,
 };
-use vauchi_core::{Command, Event};
+use vauchi_core::{AuthMode, Command, Event, UserPresenceBinding};
 use zeroize::Zeroize;
 
 /// The `transport` a shell names in `HardwareUnavailable` when it cannot
@@ -55,8 +55,11 @@ impl AppEngine {
             self.confirm_pin_failures = 0;
             // The password proved the user, so an enrolment whose sealed
             // secret may be gone (#739) can go; the OS check, once the
-            // password is removed, seals a fresh one.
-            if self.vauchi.forget_user_presence_secret().is_err() {
+            // password is removed, seals a fresh one. Not from a duress
+            // session: the enrolment is shared with the real one (#778).
+            if self.vauchi.auth_mode() == AuthMode::Normal
+                && self.vauchi.forget_user_presence_secret().is_err()
+            {
                 tracing::warn!("user-presence enrolment not cleared");
             }
             let _ = self
@@ -84,7 +87,12 @@ impl AppEngine {
         let command = if self.vauchi.has_user_presence_secret().unwrap_or(false) {
             Command::RevealUserPresenceSecret { prompt }
         } else {
-            Command::CreateUserPresenceSecret { prompt }
+            let binding = if self.device_has_biometrics() {
+                UserPresenceBinding::Biometry
+            } else {
+                UserPresenceBinding::DeviceCredential
+            };
+            Command::CreateUserPresenceSecret { prompt, binding }
         };
         self.pending_commands.push_back(command);
     }
@@ -118,6 +126,12 @@ impl AppEngine {
                     .apply_update(EngineUpdate::GdprExport(GdprExportUpdate::Finished));
                 return Some(ActionResult::NavigateTo(self.engine.current_screen()));
             }
+            Event::UserPresenceSecretMissing => {
+                let _ = self.engine.apply_update(EngineUpdate::GdprExport(
+                    GdprExportUpdate::UserPresenceUnavailable,
+                ));
+                return Some(ActionResult::NavigateTo(self.engine.current_screen()));
+            }
             Event::HardwareUnavailable { transport } if transport == USER_PRESENCE_TRANSPORT => {
                 let _ = self.engine.apply_update(EngineUpdate::GdprExport(
                     GdprExportUpdate::UserPresenceUnavailable,
@@ -145,10 +159,35 @@ impl AppEngine {
         Some(ActionResult::UpdateScreen(self.engine.current_screen()))
     }
 
+    /// Whether the device reports biometrics, which decides the seal and
+    /// that export needs an app password there (#778).
+    pub(super) fn device_has_biometrics(&self) -> bool {
+        self.device_capabilities.biometric_type.is_some()
+    }
+
     /// The shell's answer to the check that guards a first app password
-    /// (#766). An unavailable check still sets it: a lost sealed secret
-    /// leaves the app password as the only way back to exporting (#739).
+    /// (#766). Without biometrics an unavailable check or a missing secret
+    /// still sets it: a lost sealed secret leaves the app password as the
+    /// only way back to exporting (#739). With biometrics and an enrolled
+    /// secret they do not, since a new finger, which needs only the device
+    /// password, is what drops the secret; the way back there is restore or
+    /// re-link (#778).
     fn handle_first_password_presence(&mut self, event: &Event) -> Option<ActionResult> {
+        let secret_lost = matches!(event, Event::UserPresenceSecretMissing)
+            || matches!(event, Event::HardwareUnavailable { transport } if transport == USER_PRESENCE_TRANSPORT);
+        if secret_lost
+            && self.device_has_biometrics()
+            && self.vauchi.has_user_presence_secret().unwrap_or(true)
+        {
+            self.pending_first_password = None;
+            if let Some(locked) = self.record_confirm_pin_miss() {
+                return Some(locked);
+            }
+            return Some(ActionResult::ShowAlert {
+                title: self.t("change_password.presence_lost_title"),
+                message: self.t("change_password.presence_lost"),
+            });
+        }
         let confirmed = match event {
             Event::UserPresenceSecretCreated { secret } => self
                 .vauchi
@@ -158,6 +197,7 @@ impl AppEngine {
                 .vauchi
                 .confirm_user_presence_secret(secret.as_bytes())
                 .unwrap_or(false),
+            Event::UserPresenceSecretMissing => true,
             Event::HardwareUnavailable { transport } if transport == USER_PRESENCE_TRANSPORT => {
                 true
             }

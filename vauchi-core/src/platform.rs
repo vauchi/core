@@ -466,14 +466,19 @@ pub enum Command {
     ForgetStoredSecret { handle: String },
     /// Make 32 random bytes and seal them in the platform keystore so that
     /// reading them back needs the operating system's own user-presence
-    /// check (biometric or device credential) every time; run that check
-    /// now, with `prompt` as its reason, and answer
+    /// check, of the kind `binding` names, every time; run that check now,
+    /// with `prompt` as its reason, and answer
     /// [`Event::UserPresenceSecretCreated`]. A shell that cannot answers
-    /// [`Event::HardwareUnavailable`] (#712).
-    CreateUserPresenceSecret { prompt: String },
+    /// [`Event::HardwareUnavailable`] (#712, #778).
+    CreateUserPresenceSecret {
+        prompt: String,
+        binding: UserPresenceBinding,
+    },
     /// Run the operating system's user-presence check with `prompt` as its
     /// reason, unseal the secret from [`Command::CreateUserPresenceSecret`]
-    /// and answer [`Event::UserPresenceSecretRevealed`] (#712).
+    /// and answer [`Event::UserPresenceSecretRevealed`], or
+    /// [`Event::UserPresenceSecretMissing`] when the sealed item is gone
+    /// (#712, #778).
     RevealUserPresenceSecret { prompt: String },
 }
 
@@ -500,6 +505,20 @@ impl std::fmt::Debug for SealedSecret {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("<redacted>")
     }
+}
+
+/// Which operating-system check guards a secret sealed for
+/// [`Command::CreateUserPresenceSecret`]. A biometric seal stops opening
+/// when the enrolled fingers or faces change, so a new enrolment, which
+/// needs only the device password, cannot read it (#778).
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UserPresenceBinding {
+    /// Only the biometrics enrolled when the secret was sealed.
+    Biometry,
+    /// The device credential (passcode or login password), or biometrics.
+    DeviceCredential,
 }
 
 /// Haptic intent for [`Command::Celebrate`]. Closed enum — platforms map
@@ -1011,6 +1030,11 @@ pub enum Event {
     UserPresenceSecretRevealed { secret: SealedSecret },
     /// The user dismissed the operating system's user-presence check.
     UserPresenceCheckCancelled,
+    /// The sealed secret is gone, answering
+    /// [`Command::RevealUserPresenceSecret`]: the enrolment changed or the
+    /// keystore lost the item, unlike [`Event::HardwareUnavailable`],
+    /// which says this device cannot run the check at all (#778).
+    UserPresenceSecretMissing,
 }
 
 // INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access

@@ -22,7 +22,7 @@ fn engine() -> AppEngine {
         .unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::Exchange);
-    engine.select_exchange_mode_for_testing(ExchangeMode::Magic);
+    let _ = engine.select_exchange_mode_for_testing(ExchangeMode::Magic);
     engine
 }
 

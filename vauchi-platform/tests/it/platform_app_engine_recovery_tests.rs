@@ -375,7 +375,7 @@ fn create_recovery_voucher_refuses_a_claim_for_someone_not_a_contact() {
     use vauchi_core::recovery::RecoveryClaim;
     let (engine, _dir) = create_engine_with_identity();
     let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
-    let stranger_claim = RecoveryClaim::new(&[0x33u8; 32], &[0x44u8; 32], now);
+    let stranger_claim = RecoveryClaim::new([0x33u8; 32], [0x44u8; 32], now);
 
     let result = engine.dispatch_domain_command(DomainCommand::CreateRecoveryVoucher {
         claim_b64: base64::engine::general_purpose::STANDARD.encode(stranger_claim.to_bytes()),

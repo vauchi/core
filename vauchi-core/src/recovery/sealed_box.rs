@@ -76,11 +76,14 @@ pub fn seal(plaintext: &[u8], recipient_pk: &PublicKey) -> Result<Vec<u8>, Recov
     OsRng.fill_bytes(&mut nonce_bytes);
     let nonce = XNonce::from(nonce_bytes);
 
+    // INVARIANT: a 32-byte array is always a valid XChaCha20 key
+    // (vauchi/private#761).
+    #[allow(clippy::expect_used)]
     let cipher = XChaCha20Poly1305::new_from_slice(key.as_ref())
         .expect("32-byte key is always valid for XChaCha20Poly1305");
     let ciphertext = cipher
         .encrypt(&nonce, plaintext)
-        .expect("XChaCha20Poly1305 encryption is infallible for valid key/nonce");
+        .map_err(|_| RecoveryError::SerializationError("sealing failed".into()))?;
 
     // 6. Assemble output: ephemeral_pk || nonce || ciphertext+tag.
     let mut out = Vec::with_capacity(capacity(&[32, 24, ciphertext.len()]));
@@ -102,15 +105,15 @@ pub fn open(sealed: &[u8], recipient_secret: &StaticSecret) -> Result<Vec<u8>, R
         return Err(RecoveryError::InvalidFormat);
     }
 
-    let ephemeral_pk_bytes: [u8; 32] = sealed[..32].try_into().expect("slice length checked above");
-    let ephemeral_pk = PublicKey::from(ephemeral_pk_bytes);
+    let (ephemeral_pk_bytes, rest) = sealed
+        .split_first_chunk::<32>()
+        .ok_or(RecoveryError::InvalidFormat)?;
+    let ephemeral_pk = PublicKey::from(*ephemeral_pk_bytes);
 
-    let nonce_bytes: [u8; 24] = sealed[32..56]
-        .try_into()
-        .expect("slice length checked above");
-    let nonce = XNonce::from(nonce_bytes);
-
-    let ciphertext = &sealed[56..];
+    let (nonce_bytes, ciphertext) = rest
+        .split_first_chunk::<24>()
+        .ok_or(RecoveryError::InvalidFormat)?;
+    let nonce = XNonce::from(*nonce_bytes);
 
     // 2. DH: recipient_secret × ephemeral_pk → shared secret.
     let shared = recipient_secret.diffie_hellman(&ephemeral_pk);
@@ -124,6 +127,9 @@ pub fn open(sealed: &[u8], recipient_secret: &StaticSecret) -> Result<Vec<u8>, R
     // 3. Derive symmetric key via HKDF-SHA256 (ADR-007).
     let key = derive_sealed_box_key(shared.as_bytes());
 
+    // INVARIANT: a 32-byte array is always a valid XChaCha20 key
+    // (vauchi/private#761).
+    #[allow(clippy::expect_used)]
     let cipher = XChaCha20Poly1305::new_from_slice(key.as_ref())
         .expect("32-byte key is always valid for XChaCha20Poly1305");
     cipher

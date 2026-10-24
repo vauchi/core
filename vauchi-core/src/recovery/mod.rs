@@ -15,7 +15,16 @@
 //! - `RecoveryProof`: Collection of vouchers proving identity
 //! - `RecoverySettings`: User's recovery preferences
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::arithmetic_side_effects,
+        clippy::indexing_slicing,
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic
+    )
+)]
 
 use crate::capacity::capacity;
 use std::collections::{HashMap, HashSet};
@@ -267,24 +276,24 @@ impl RecoveryClaim {
 
     /// Deserializes a claim from bytes.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, RecoveryError> {
-        // Minimum: version (1) + old_pk (32) + new_pk (32) + timestamp (8) = 73
-        if bytes.len() < 73 {
-            return Err(RecoveryError::InvalidFormat);
-        }
+        // Version (1) + old_pk (32) + new_pk (32) + timestamp (8) = 73
+        let (header, _) = bytes
+            .split_first_chunk::<73>()
+            .ok_or(RecoveryError::InvalidFormat)?;
 
-        let version = bytes[0];
+        let version = header[0];
         if version != 1 {
             return Err(RecoveryError::InvalidFormat);
         }
 
-        let old_pk: [u8; 32] = bytes[1..33]
+        let old_pk: [u8; 32] = header[1..33]
             .try_into()
             .map_err(|_| RecoveryError::InvalidFormat)?;
-        let new_pk: [u8; 32] = bytes[33..65]
+        let new_pk: [u8; 32] = header[33..65]
             .try_into()
             .map_err(|_| RecoveryError::InvalidFormat)?;
         let timestamp = u64::from_le_bytes(
-            bytes[65..73]
+            header[65..73]
                 .try_into()
                 .map_err(|_| RecoveryError::InvalidFormat)?,
         );
@@ -470,46 +479,39 @@ impl RecoveryVoucher {
     /// Accepts both current formats: contact and guardian vouchers.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, RecoveryError> {
         // Version (1) + old_pk (32) + new_pk (32) + voucher_pk (32) + timestamp (8) + signature (64) = 169
-        if bytes.len() < 169 {
-            return Err(RecoveryError::InvalidFormat);
-        }
+        let (header, rest) = bytes
+            .split_first_chunk::<169>()
+            .ok_or(RecoveryError::InvalidFormat)?;
 
-        let version = bytes[0];
+        let version = header[0];
         if version != CONTACT_VOUCHER_FORMAT && version != GUARDIAN_VOUCHER_FORMAT {
             return Err(RecoveryError::InvalidFormat);
         }
 
-        let old_pk: [u8; 32] = bytes[1..33]
+        let old_pk: [u8; 32] = header[1..33]
             .try_into()
             .map_err(|_| RecoveryError::InvalidFormat)?;
-        let new_pk: [u8; 32] = bytes[33..65]
+        let new_pk: [u8; 32] = header[33..65]
             .try_into()
             .map_err(|_| RecoveryError::InvalidFormat)?;
-        let voucher_pk: [u8; 32] = bytes[65..97]
+        let voucher_pk: [u8; 32] = header[65..97]
             .try_into()
             .map_err(|_| RecoveryError::InvalidFormat)?;
         let timestamp = u64::from_le_bytes(
-            bytes[97..105]
+            header[97..105]
                 .try_into()
                 .map_err(|_| RecoveryError::InvalidFormat)?,
         );
-        let signature: [u8; 64] = bytes[105..169]
+        let signature: [u8; 64] = header[105..169]
             .try_into()
             .map_err(|_| RecoveryError::InvalidFormat)?;
 
-        let guardian_token = if version == GUARDIAN_VOUCHER_FORMAT && bytes.len() > 169 {
-            if bytes.len() < 173 {
-                // Need at least 4 bytes for length prefix
-                return Err(RecoveryError::InvalidFormat);
-            }
-            let token_len = u32::from_le_bytes(
-                bytes[169..173]
-                    .try_into()
-                    .map_err(|_| RecoveryError::InvalidFormat)?,
-            ) as usize;
-            let token_bytes = bytes[173..]
-                .get(..token_len)
+        let guardian_token = if version == GUARDIAN_VOUCHER_FORMAT && !rest.is_empty() {
+            let (token_len, token) = rest
+                .split_first_chunk::<4>()
                 .ok_or(RecoveryError::InvalidFormat)?;
+            let token_len = u32::from_le_bytes(*token_len) as usize;
+            let token_bytes = token.get(..token_len).ok_or(RecoveryError::InvalidFormat)?;
             let token = guardian::GuardianToken::from_bytes(token_bytes)?;
             Some(token)
         } else {

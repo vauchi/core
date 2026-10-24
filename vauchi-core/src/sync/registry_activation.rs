@@ -18,7 +18,10 @@
 //! versions). Decode validates structure only — size ceiling and
 //! broadcast-shape parse (DC-01) — and fails closed on anything else.
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use crate::capacity::capacity;
 use crate::identity::RegistryBroadcast;
@@ -282,12 +285,11 @@ impl RegistryPushPayload {
 
     /// Decode from wire (after the version byte has been stripped).
     pub fn decode(data: &[u8]) -> Result<Self, DeltaError> {
-        if data.len() < NONCE_LEN {
-            return Err(DeltaError::PayloadTooShort);
-        }
-        let mut push_nonce = [0u8; NONCE_LEN];
-        push_nonce.copy_from_slice(&data[..NONCE_LEN]);
-        let broadcast_json = data[NONCE_LEN..].to_vec();
+        let (nonce, json) = data
+            .split_first_chunk::<NONCE_LEN>()
+            .ok_or(DeltaError::PayloadTooShort)?;
+        let push_nonce = *nonce;
+        let broadcast_json = json.to_vec();
         validate_broadcast_json(&broadcast_json)?;
         Ok(Self {
             push_nonce,
@@ -352,16 +354,15 @@ impl RegistryAckPayload {
 
     /// Decode from wire (after the version byte has been stripped).
     pub fn decode(data: &[u8]) -> Result<Self, DeltaError> {
-        if data.len() < ACK_PREFIX_LEN {
-            return Err(DeltaError::PayloadTooShort);
-        }
+        let (prefix, rest) = data
+            .split_first_chunk::<ACK_PREFIX_LEN>()
+            .ok_or(DeltaError::PayloadTooShort)?;
         let mut push_nonce = [0u8; NONCE_LEN];
-        push_nonce.copy_from_slice(&data[..NONCE_LEN]);
+        push_nonce.copy_from_slice(&prefix[..NONCE_LEN]);
         let mut version_bytes = [0u8; 8];
-        version_bytes.copy_from_slice(&data[NONCE_LEN..NONCE_LEN + 8]);
+        version_bytes.copy_from_slice(&prefix[NONCE_LEN..NONCE_LEN + 8]);
         let acked_version = u64::from_be_bytes(version_bytes);
-        let echo_flag = data[ACK_PREFIX_LEN - 1];
-        let rest = &data[ACK_PREFIX_LEN..];
+        let echo_flag = prefix[ACK_PREFIX_LEN - 1];
         let broadcast_json = match (echo_flag, rest.is_empty()) {
             (0, true) => None,
             (1, false) => {

@@ -12,7 +12,10 @@
 //! by the Double Ratchet. The CEK adds the ability to remotely render cards
 //! unreadable by destroying the key.
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use super::encryption::{EncryptionError, SymmetricKey, decrypt, encrypt};
 

@@ -4,7 +4,10 @@
 
 //! Version 6 binds its clear version/salt header with AEAD associated data.
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use zeroize::Zeroizing;
 
@@ -63,19 +66,16 @@ pub(crate) fn decode(data: &[u8], password: &str) -> Result<BackupSnapshot, Back
     if data.len() > MAX_FULL_BACKUP_BYTES {
         return Err(BackupError::TooLarge);
     }
-    if data.len() < HEADER_LENGTH {
-        return Err(BackupError::TooShort);
-    }
-    if data[0] != SNAPSHOT_VERSION {
+    let (header, ciphertext) = data
+        .split_first_chunk::<HEADER_LENGTH>()
+        .ok_or(BackupError::TooShort)?;
+    if header[0] != SNAPSHOT_VERSION {
         return BackupSnapshot::from_legacy(import_full_backup(data, password)?);
     }
-    let salt = data[1..HEADER_LENGTH]
-        .try_into()
-        .map_err(|_| BackupError::TooShort)?;
+    let salt = header[1..].try_into().map_err(|_| BackupError::TooShort)?;
     let key = derive_key(password, &salt)?;
     let decrypted = Zeroizing::new(
-        decrypt_with_ad(&key, &data[HEADER_LENGTH..], &data[..HEADER_LENGTH])
-            .map_err(|_| BackupError::DecryptionFailed)?,
+        decrypt_with_ad(&key, ciphertext, header).map_err(|_| BackupError::DecryptionFailed)?,
     );
     let plaintext = Zeroizing::new(decompress_backup(&decrypted)?);
     let snapshot: BackupSnapshot = serde_json::from_slice(&plaintext)

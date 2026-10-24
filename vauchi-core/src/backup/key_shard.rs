@@ -25,7 +25,10 @@
 //! 4. Later, guardians decrypt their shares: [`open_share_for_guardian`].
 //! 5. Reconstruct the key from any threshold of shares: [`reconstruct_backup_key`].
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use std::fmt;
 #[cfg(any(feature = "network-rustls", feature = "testing", test))]
@@ -179,23 +182,22 @@ impl BackupKeyShard {
     /// Returns [`KeyShardError::InvalidFormat`] if the bytes are malformed or
     /// the version is unsupported.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, KeyShardError> {
-        if bytes.len() != Self::SERIALIZED_LENGTH {
-            return Err(KeyShardError::InvalidFormat);
-        }
+        const INDEX_OFFSET: usize = 3 + CEREMONY_ID_LENGTH;
+        let bytes: &[u8; Self::SERIALIZED_LENGTH] =
+            bytes.try_into().map_err(|_| KeyShardError::InvalidFormat)?;
 
         let version = bytes[0];
         if version != SHARD_VERSION {
             return Err(KeyShardError::UnsupportedVersion(version));
         }
 
-        let ceremony_id = bytes[3..3 + CEREMONY_ID_LENGTH]
+        let ceremony_id = bytes[3..INDEX_OFFSET]
             .try_into()
             .map_err(|_| KeyShardError::InvalidFormat)?;
         let metadata = GuardianBackupMetadata::new(bytes[1], bytes[2], ceremony_id)?;
-        let index_offset = 3 + CEREMONY_ID_LENGTH;
-        let index = bytes[index_offset];
+        let index = bytes[INDEX_OFFSET];
 
-        let value: [u8; 32] = bytes[index_offset + 1..]
+        let value: [u8; 32] = bytes[INDEX_OFFSET + 1..]
             .try_into()
             .map_err(|_| KeyShardError::InvalidFormat)?;
 

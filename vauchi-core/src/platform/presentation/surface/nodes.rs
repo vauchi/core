@@ -1,7 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use serde::{Deserialize, Serialize};
 

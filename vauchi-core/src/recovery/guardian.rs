@@ -8,7 +8,10 @@
 //! a creation timestamp, and an Ed25519 signature with domain separation
 //! (ADR-007: `"vauchi-recovery-guardian-v1"`).
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use crate::capacity::capacity;
 use serde::{Deserialize, Serialize};

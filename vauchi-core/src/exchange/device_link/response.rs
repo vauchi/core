@@ -4,7 +4,10 @@
 
 //! Device link response (from existing device containing encrypted seed).
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use crate::byte_reader::ByteReader;
 use zeroize::Zeroize;

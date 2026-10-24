@@ -11,7 +11,10 @@
 //!   - Tag `0x02`: XChaCha20-Poly1305 (24-byte nonce, 16-byte tag)
 //!   - Tag `0x03`: XChaCha20-Poly1305 with associated data (24-byte nonce, 16-byte tag)
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use crate::capacity::capacity;
 use chacha20poly1305::XChaCha20Poly1305;
@@ -195,12 +198,12 @@ pub fn encrypt_with_ad(
 ///
 /// Note: Cannot decrypt tag `0x03` (AD-bound) — use `decrypt_with_ad` instead.
 pub fn decrypt(key: &SymmetricKey, ciphertext: &[u8]) -> Result<Vec<u8>, EncryptionError> {
-    if ciphertext.is_empty() {
+    let Some((&tag, body)) = ciphertext.split_first() else {
         return Err(EncryptionError::CiphertextTooShort);
-    }
+    };
 
-    match ciphertext[0] {
-        ALG_TAG_XCHACHA20 => decrypt_xchacha20(key, &ciphertext[1..]),
+    match tag {
+        ALG_TAG_XCHACHA20 => decrypt_xchacha20(key, body),
         _ => Err(EncryptionError::DecryptionFailed),
     }
 }
@@ -214,12 +217,12 @@ pub fn decrypt_with_ad(
     ciphertext: &[u8],
     ad: &[u8],
 ) -> Result<Vec<u8>, EncryptionError> {
-    if ciphertext.is_empty() {
+    let Some((&tag, body)) = ciphertext.split_first() else {
         return Err(EncryptionError::CiphertextTooShort);
-    }
+    };
 
-    match ciphertext[0] {
-        ALG_TAG_XCHACHA20_AD => decrypt_xchacha20_ad(key, &ciphertext[1..], ad),
+    match tag {
+        ALG_TAG_XCHACHA20_AD => decrypt_xchacha20_ad(key, body, ad),
         _ => Err(EncryptionError::DecryptionFailed),
     }
 }
@@ -233,11 +236,14 @@ fn decrypt_xchacha20(key: &SymmetricKey, data: &[u8]) -> Result<Vec<u8>, Encrypt
         return Err(EncryptionError::CiphertextTooShort);
     }
 
-    let nonce = chacha20poly1305::XNonce::from_slice(&data[..XCHACHA20_NONCE_SIZE]);
+    let (nonce, sealed) = data
+        .split_first_chunk::<XCHACHA20_NONCE_SIZE>()
+        .ok_or(EncryptionError::CiphertextTooShort)?;
+    let nonce = chacha20poly1305::XNonce::from_slice(nonce);
     let cipher = XChaCha20Poly1305::new(key.as_bytes().into());
 
     cipher
-        .decrypt(nonce, &data[XCHACHA20_NONCE_SIZE..])
+        .decrypt(nonce, sealed)
         .map_err(|_| EncryptionError::DecryptionFailed)
 }
 
@@ -254,11 +260,14 @@ fn decrypt_xchacha20_ad(
         return Err(EncryptionError::CiphertextTooShort);
     }
 
-    let nonce = chacha20poly1305::XNonce::from_slice(&data[..XCHACHA20_NONCE_SIZE]);
+    let (nonce, sealed) = data
+        .split_first_chunk::<XCHACHA20_NONCE_SIZE>()
+        .ok_or(EncryptionError::CiphertextTooShort)?;
+    let nonce = chacha20poly1305::XNonce::from_slice(nonce);
     let cipher = XChaCha20Poly1305::new(key.as_bytes().into());
 
     let payload = Payload {
-        msg: &data[XCHACHA20_NONCE_SIZE..],
+        msg: sealed,
         aad: ad,
     };
 

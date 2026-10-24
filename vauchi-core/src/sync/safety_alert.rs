@@ -24,7 +24,10 @@
 //!
 //! [`VersionedPayload`]: crate::sync::delta::VersionedPayload
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use crate::capacity::capacity;
 use serde::{Deserialize, Serialize};
@@ -127,17 +130,17 @@ impl SafetyAlertPayload {
     /// Structural decode only — the caller must [`verify`](Self::verify) the
     /// signature before acting on the alert.
     pub fn decode(data: &[u8]) -> Result<Self, DeltaError> {
-        if data.len() < PREFIX_LEN {
-            return Err(DeltaError::InvalidPayload(format!(
+        let (prefix, content) = data.split_first_chunk::<PREFIX_LEN>().ok_or_else(|| {
+            DeltaError::InvalidPayload(format!(
                 "safety alert: expected >= {PREFIX_LEN} bytes, got {}",
                 data.len()
-            )));
-        }
+            ))
+        })?;
         let mut nonce = [0u8; 32];
-        nonce.copy_from_slice(&data[..32]);
+        nonce.copy_from_slice(&prefix[..32]);
         let mut signature = [0u8; 64];
-        signature.copy_from_slice(&data[32..PREFIX_LEN]);
-        let content_bytes = data[PREFIX_LEN..].to_vec();
+        signature.copy_from_slice(&prefix[32..PREFIX_LEN]);
+        let content_bytes = content.to_vec();
         let content: AlertContent = serde_json::from_slice(&content_bytes)
             .map_err(|e| DeltaError::InvalidPayload(format!("alert content: {e}")))?;
         Ok(Self {

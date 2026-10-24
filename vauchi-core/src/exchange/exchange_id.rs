@@ -8,7 +8,10 @@
 //! lowercase hex string. It uniquely identifies a single contact-exchange
 //! attempt and is safe to share publicly (no sensitive data).
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;

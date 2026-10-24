@@ -8,7 +8,10 @@
 //! This module provides trait definitions, session management, and mock implementations
 //! for BLE-based contact exchange.
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use super::exchange_payload::{
     EXCHANGE_PAYLOAD_SIZE, ParsedPayload, build_exchange_payload, is_payload_expired,
@@ -263,17 +266,17 @@ impl BLEAdvertisement {
 
     /// Parse from bytes.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, BLEError> {
-        if bytes.len() < 128 {
-            return Err(BLEError::InvalidPayload("Too short".into()));
-        }
+        let (record, _) = bytes
+            .split_first_chunk::<128>()
+            .ok_or_else(|| BLEError::InvalidPayload("Too short".into()))?;
 
         let mut exchange_token = [0u8; 32];
         let mut public_key = [0u8; 32];
         let mut signature = [0u8; 64];
 
-        exchange_token.copy_from_slice(&bytes[0..32]);
-        public_key.copy_from_slice(&bytes[32..64]);
-        signature.copy_from_slice(&bytes[64..128]);
+        exchange_token.copy_from_slice(&record[0..32]);
+        public_key.copy_from_slice(&record[32..64]);
+        signature.copy_from_slice(&record[64..128]);
 
         Ok(BLEAdvertisement {
             exchange_token,

@@ -11,7 +11,10 @@
 //! - A DH ratchet (using X25519) for break-in recovery
 //! - Symmetric ratchets (chain keys) for forward secrecy
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

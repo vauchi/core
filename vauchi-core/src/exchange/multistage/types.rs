@@ -9,7 +9,10 @@
 //! - [`ChunkBitmap`] — tracks chunk receipt during DATA stage
 //! - [`QrPayload`] — what core returns to mobile apps for QR display
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 /// QR payload returned to the mobile app for display.
 #[derive(Debug, Clone)]
@@ -127,8 +130,10 @@ impl ChunkBitmap {
     }
 
     pub fn mark_received(&mut self, index: u16) {
-        if index < self.total {
-            self.bits[index as usize / 8] |= 1 << (index % 8);
+        if index < self.total
+            && let Some(byte) = self.bits.get_mut(usize::from(index / 8))
+        {
+            *byte |= 1 << (index % 8);
         }
     }
 
@@ -136,7 +141,9 @@ impl ChunkBitmap {
         if index >= self.total {
             return false;
         }
-        self.bits[index as usize / 8] & (1 << (index % 8)) != 0
+        self.bits
+            .get(usize::from(index / 8))
+            .is_some_and(|byte| byte & (1 << (index % 8)) != 0)
     }
 
     pub fn received_count(&self) -> u16 {
@@ -154,8 +161,9 @@ impl ChunkBitmap {
     pub fn from_bytes(bytes: &[u8], total: u16) -> Self {
         let byte_count = (total as usize).div_ceil(8);
         let mut bits = vec![0u8; byte_count];
-        let copy_len = bits.len().min(bytes.len());
-        bits[..copy_len].copy_from_slice(&bytes[..copy_len]);
+        for (bit_byte, byte) in bits.iter_mut().zip(bytes) {
+            *bit_byte = *byte;
+        }
         ChunkBitmap { bits, total }
     }
 }

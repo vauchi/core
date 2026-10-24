@@ -19,7 +19,10 @@
 //! - Bit 0: has_relay_url — if set, relay_url_len + relay_url follow
 //! - Bits 1-7: reserved (must be zero)
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
@@ -265,40 +268,43 @@ impl ExchangeQR {
         if bytes.len() < 192 {
             return Err(ExchangeError::InvalidQRFormat);
         }
+        let (header, rest) = bytes
+            .split_first_chunk::<127>()
+            .ok_or(ExchangeError::InvalidQRFormat)?;
 
-        if &bytes[0..4] != MAGIC {
+        if &header[0..4] != MAGIC {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
-        let version = bytes[4];
+        let version = header[4];
         if version != PROTOCOL_VERSION {
             return Err(ExchangeError::InvalidProtocolVersion);
         }
 
-        let public_key: [u8; 32] = bytes[5..37]
+        let public_key: [u8; 32] = header[5..37]
             .try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
-        let exchange_key: [u8; 32] = bytes[37..69]
+        let exchange_key: [u8; 32] = header[37..69]
             .try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
-        let exchange_token: [u8; 32] = bytes[69..101]
+        let exchange_token: [u8; 32] = header[69..101]
             .try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
-        let audio_challenge: [u8; 16] = bytes[101..117]
+        let audio_challenge: [u8; 16] = header[101..117]
             .try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
         let timestamp = u64::from_be_bytes(
-            bytes[117..125]
+            header[117..125]
                 .try_into()
                 .map_err(|_| ExchangeError::InvalidQRFormat)?,
         );
 
         let name_len = u16::from_be_bytes(
-            bytes[125..127]
+            header[125..127]
                 .try_into()
                 .map_err(|_| ExchangeError::InvalidQRFormat)?,
         ) as usize;
@@ -309,7 +315,7 @@ impl ExchangeQR {
         }
 
         let invalid = || ExchangeError::InvalidQRFormat;
-        let mut tail = ByteReader::new(&bytes[127..]);
+        let mut tail = ByteReader::new(rest);
 
         let display_name = normalize_text(
             &String::from_utf8(tail.take(name_len).ok_or_else(invalid)?.to_vec())

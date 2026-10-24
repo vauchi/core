@@ -4,7 +4,10 @@
 
 //! Device link request (from new device).
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use crate::crypto::{SymmetricKey, decrypt, encrypt};
 

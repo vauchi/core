@@ -4,7 +4,10 @@
 
 //! Device link QR code generation and parsing.
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
@@ -132,34 +135,34 @@ impl DeviceLinkQR {
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
         // Minimum length: MAGIC(4) + version(1) + identity_key(32) + link_key(32) + timestamp(8) + sig(64) = 141
-        if bytes.len() < 141 {
+        let (header, _) = bytes
+            .split_first_chunk::<141>()
+            .ok_or(ExchangeError::InvalidQRFormat)?;
+
+        if &header[0..4] != DEVICE_LINK_MAGIC {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
-        if &bytes[0..4] != DEVICE_LINK_MAGIC {
-            return Err(ExchangeError::InvalidQRFormat);
-        }
-
-        let version = bytes[4];
+        let version = header[4];
         if version != DEVICE_LINK_VERSION {
             return Err(ExchangeError::InvalidProtocolVersion);
         }
 
-        let identity_public_key: [u8; 32] = bytes[5..37]
+        let identity_public_key: [u8; 32] = header[5..37]
             .try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
-        let link_key: [u8; 32] = bytes[37..69]
+        let link_key: [u8; 32] = header[37..69]
             .try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
         let timestamp = u64::from_be_bytes(
-            bytes[69..77]
+            header[69..77]
                 .try_into()
                 .map_err(|_| ExchangeError::InvalidQRFormat)?,
         );
 
-        let signature: [u8; 64] = bytes[77..141]
+        let signature: [u8; 64] = header[77..141]
             .try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
@@ -199,8 +202,8 @@ impl DeviceLinkQR {
     pub fn identity_fingerprint(&self) -> String {
         let bytes = &self.identity_public_key[..8];
         let hex: Vec<String> = bytes
-            .chunks(2)
-            .map(|c| format!("{:02X}{:02X}", c[0], c[1]))
+            .chunks_exact(2)
+            .map(|pair| pair.iter().map(|b| format!("{b:02X}")).collect())
             .collect();
         hex.join("-")
     }

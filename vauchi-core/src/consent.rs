@@ -11,7 +11,10 @@
 //! crate-root re-export (`vauchi_core::ConsentType`) never disappears
 //! with the feature.
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 /// Types of consent that can be granted or revoked.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]

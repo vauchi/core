@@ -10,7 +10,10 @@
 //! Serialized with `postcard`, then encrypted before BLE transmission.
 //! The CRC16 field is a sanity check — integrity is provided by AEAD encryption.
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use serde::{Deserialize, Serialize};
 

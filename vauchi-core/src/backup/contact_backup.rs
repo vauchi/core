@@ -17,7 +17,10 @@
 //!
 //! The JSON payload is a `Vec<ContactBackupEntry>` — one entry per contact.
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use crate::capacity::capacity;
 use serde::{Deserialize, Serialize};
@@ -392,21 +395,21 @@ pub fn import_contact_backup(data: &[u8], password: &str) -> Result<Vec<Contact>
         return Err(BackupError::TooShort);
     }
 
-    let version = data[0];
+    let Some((&version, body)) = data.split_first() else {
+        return Err(BackupError::TooShort);
+    };
     match version {
-        CONTACT_BACKUP_VERSION => import_v1(&data[1..], password),
+        CONTACT_BACKUP_VERSION => import_v1(body, password),
         other => Err(BackupError::UnsupportedVersion(other)),
     }
 }
 
 /// Import v1: Argon2id + XChaCha20-Poly1305.
 fn import_v1(data: &[u8], password: &str) -> Result<Vec<Contact>, BackupError> {
-    // import_contact_backup refused inputs under 1 + 16 bytes, so after the
-    // version byte at least the 16 salt bytes remain.
-    let salt: [u8; 16] = data[..16]
-        .try_into()
-        .expect("salt slice is exactly 16 bytes");
-    let ciphertext = &data[16..];
+    let (salt, ciphertext) = data
+        .split_first_chunk::<16>()
+        .ok_or(BackupError::TooShort)?;
+    let salt = *salt;
 
     let key =
         derive_key_argon2id(password.as_bytes(), &salt).map_err(|_| BackupError::KeyDerivation)?;

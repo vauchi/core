@@ -14,7 +14,10 @@
 //! `<layout><l1><c1><l2><c2><l3><c3><total>`. An unused echo slot is
 //! `<NO_LAYOUT_DIGIT>0`.
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use super::base45;
 use super::qr_codec::QrCodecError;
@@ -131,11 +134,12 @@ impl TrainingHeader {
         let mut echo = Vec::with_capacity(ECHO_SLOTS);
         let mut seen_unused = false;
         for pair in slots.chunks_exact(2) {
-            match (pair[0], pair[1]) {
-                (NO_LAYOUT_DIGIT, 0) => seen_unused = true,
+            match *pair {
+                [NO_LAYOUT_DIGIT, 0] => seen_unused = true,
                 // Used slots come first: one encoding per header.
                 _ if seen_unused => return Err(QrCodecError::InvalidHeader),
-                (layout, count) => echo.push(LayoutReads { layout, count }),
+                [layout, count] => echo.push(LayoutReads { layout, count }),
+                _ => return Err(QrCodecError::InvalidHeader),
             }
         }
         Self::new(*layout, &echo, *total_reads)

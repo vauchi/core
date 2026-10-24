@@ -15,7 +15,10 @@
 //! `2026-06-10-oob-bootstrap-exchange-rituals`). The 16-byte co-presence nonce
 //! is HKDF-derived from the signed `token`; see [`derive_oob_nonce`].
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
@@ -54,6 +57,7 @@ const OOB_NONCE_DOMAIN: &[u8] = b"vauchi-glance-oob-nonce-v1";
 /// separation keeps it distinct from any other derivation off the same token.
 pub fn derive_oob_nonce(token: &[u8; 32]) -> [u8; OOB_NONCE_SIZE] {
     let okm = HKDF::derive_key(None, token, OOB_NONCE_DOMAIN);
+    let okm: &[u8; 32] = &okm;
     let mut nonce = [0u8; OOB_NONCE_SIZE];
     nonce.copy_from_slice(&okm[..OOB_NONCE_SIZE]);
     nonce

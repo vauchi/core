@@ -16,7 +16,10 @@
 //! It is encoded as a shareable URL so the same payload works for QR scan,
 //! messaging/email, deep links, and (in the future) BLE broadcast.
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use std::net::{IpAddr, SocketAddr};
 

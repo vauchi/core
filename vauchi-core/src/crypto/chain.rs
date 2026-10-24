@@ -7,7 +7,10 @@
 //! Implements symmetric key ratcheting for the Double Ratchet protocol.
 //! Each chain key can derive a message key and advance to the next chain key.
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use super::encryption::SymmetricKey;
 use super::kdf::HKDF;

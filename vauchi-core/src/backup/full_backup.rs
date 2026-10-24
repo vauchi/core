@@ -19,7 +19,10 @@
 //! separation `b"vauchi-backup-v3"`, ensuring v3 backup keys are independent of
 //! v1/v2 keys even with the same password+salt.
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use crate::capacity::capacity;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
@@ -493,7 +496,12 @@ fn guardian_key_confirmation(
     mac.update(header_prefix);
     let output = mac.finalize().into_bytes();
     let mut confirmation = [0u8; KEY_CONFIRMATION_LENGTH];
-    confirmation.copy_from_slice(&output[..KEY_CONFIRMATION_LENGTH]);
+    confirmation.copy_from_slice(
+        output
+            .as_slice()
+            .get(..KEY_CONFIRMATION_LENGTH)
+            .ok_or(BackupError::KeyDerivation)?,
+    );
     Ok(confirmation)
 }
 
@@ -503,21 +511,27 @@ fn parse_guardian_backup_header(
     if data.len() > MAX_GUARDIAN_BACKUP_BYTES {
         return Err(BackupError::TooLarge);
     }
-    if data.len() < GUARDIAN_BACKUP_HEADER_LENGTH {
-        return Err(BackupError::TooShort);
+    let (header, _) = split_guardian_backup_header(data)?;
+    if header[0] != GUARDIAN_BACKUP_VERSION {
+        return Err(BackupError::UnsupportedVersion(header[0]));
     }
-    if data[0] != GUARDIAN_BACKUP_VERSION {
-        return Err(BackupError::UnsupportedVersion(data[0]));
-    }
-    let ceremony_id = data[3..3 + CEREMONY_ID_LENGTH]
+    let ceremony_id = header[3..3 + CEREMONY_ID_LENGTH]
         .try_into()
         .map_err(|_| BackupError::TooShort)?;
-    let metadata = GuardianBackupMetadata::new(data[1], data[2], ceremony_id)
+    let metadata = GuardianBackupMetadata::new(header[1], header[2], ceremony_id)
         .map_err(|_| BackupError::KeyShard("Invalid guardian backup metadata".into()))?;
-    let salt = data[3 + CEREMONY_ID_LENGTH..GUARDIAN_BACKUP_PREFIX_LENGTH]
+    let salt = header[3 + CEREMONY_ID_LENGTH..GUARDIAN_BACKUP_PREFIX_LENGTH]
         .try_into()
         .map_err(|_| BackupError::TooShort)?;
     Ok((metadata, salt))
+}
+
+/// The fixed-length v5 header and the ciphertext after it.
+fn split_guardian_backup_header(
+    data: &[u8],
+) -> Result<(&[u8; GUARDIAN_BACKUP_HEADER_LENGTH], &[u8]), BackupError> {
+    data.split_first_chunk::<GUARDIAN_BACKUP_HEADER_LENGTH>()
+        .ok_or(BackupError::TooShort)
 }
 
 /// Parses the public recovery metadata from a v5 guardian backup header.
@@ -540,8 +554,9 @@ pub(crate) fn guardian_backup_key_matches(
     key: &SymmetricKey,
 ) -> Result<bool, BackupError> {
     let (_, salt) = parse_guardian_backup_header(data)?;
-    let expected = guardian_key_confirmation(key, &salt, &data[..GUARDIAN_BACKUP_PREFIX_LENGTH])?;
-    let actual = &data[GUARDIAN_BACKUP_PREFIX_LENGTH..GUARDIAN_BACKUP_HEADER_LENGTH];
+    let (header, _) = split_guardian_backup_header(data)?;
+    let expected = guardian_key_confirmation(key, &salt, &header[..GUARDIAN_BACKUP_PREFIX_LENGTH])?;
+    let actual = &header[GUARDIAN_BACKUP_PREFIX_LENGTH..];
     Ok(bool::from(expected.as_slice().ct_eq(actual)))
 }
 
@@ -557,15 +572,17 @@ pub fn import_full_backup(data: &[u8], password: &str) -> Result<FullBackupEnvel
         return Err(BackupError::TooShort);
     }
 
-    let version = data[0];
+    let Some((&version, body)) = data.split_first() else {
+        return Err(BackupError::TooShort);
+    };
     if version != FULL_BACKUP_VERSION {
         return Err(BackupError::UnsupportedVersion(version));
     }
 
-    let salt: [u8; 16] = data[1..17]
-        .try_into()
-        .expect("salt slice is exactly 16 bytes");
-    let ciphertext = &data[17..];
+    let (salt, ciphertext) = body
+        .split_first_chunk::<16>()
+        .ok_or(BackupError::TooShort)?;
+    let salt = *salt;
 
     let key = derive_v3_key(password, &salt)?;
 
@@ -588,8 +605,7 @@ pub fn import_guardian_backup(
     key: &SymmetricKey,
 ) -> Result<FullBackupEnvelope, BackupError> {
     let (_metadata, salt) = parse_guardian_backup_header(data)?;
-    let header = &data[..GUARDIAN_BACKUP_HEADER_LENGTH];
-    let ciphertext = &data[GUARDIAN_BACKUP_HEADER_LENGTH..];
+    let (header, ciphertext) = split_guardian_backup_header(data)?;
     let derived_key = derive_guardian_key(key, &salt)?;
 
     let decrypted = Zeroizing::new(

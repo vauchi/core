@@ -7,7 +7,10 @@
 //! Handles multi-device support for Vauchi identities.
 //! Each device gets unique communication keys derived from the master seed.
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use crate::crypto::X3DHKeyPair;
 use crate::crypto::{HKDF, Signature, SigningKeyPair};
@@ -437,7 +440,7 @@ impl DeviceRegistry {
             .position(|d| &d.device_id == new_primary_id)
             .ok_or(DeviceError::DeviceNotFound)?;
 
-        if self.devices[target_idx].revoked {
+        if self.devices.get(target_idx).is_some_and(|d| d.revoked) {
             return Err(DeviceError::CannotTransferToRevoked);
         }
 

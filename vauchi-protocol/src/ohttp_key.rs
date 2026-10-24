@@ -19,7 +19,10 @@
 //! | anchor signature (64)
 //! ```
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 /// Current record version.
 pub const RECORD_VERSION: u8 = 1;
@@ -299,15 +302,17 @@ impl AnchorRollover {
             std::cmp::Ordering::Greater => return Err(RolloverError::TrailingBytes),
             std::cmp::Ordering::Equal => {}
         }
-        if bytes[0] != ROLLOVER_VERSION {
-            return Err(RolloverError::UnknownVersion(bytes[0]));
+        let record: &[u8; ROLLOVER_BYTES] =
+            bytes.try_into().map_err(|_| RolloverError::Truncated)?;
+        if record[0] != ROLLOVER_VERSION {
+            return Err(RolloverError::UnknownVersion(record[0]));
         }
         let mut new_anchor = [0u8; 32];
         let mut next_commitment = [0u8; 32];
         let mut signature = [0u8; 64];
-        new_anchor.copy_from_slice(&bytes[1..33]);
-        next_commitment.copy_from_slice(&bytes[33..65]);
-        signature.copy_from_slice(&bytes[65..]);
+        new_anchor.copy_from_slice(&record[1..33]);
+        next_commitment.copy_from_slice(&record[33..65]);
+        signature.copy_from_slice(&record[65..]);
         Ok(Self {
             new_anchor,
             next_commitment,

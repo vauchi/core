@@ -7,7 +7,10 @@
 //! Provides signing keypair generation and signature operations using the
 //! `ed25519-dalek` cryptographic library.
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use ed25519_dalek::Signer;
 use sha2::Digest;
@@ -77,11 +80,13 @@ impl SigningKeyPair {
         let seed = zeroize::Zeroizing::new(self.inner.to_bytes());
         let mut hash = zeroize::Zeroizing::new([0u8; 64]);
         hash.copy_from_slice(&sha2::Sha512::new().chain_update(seed.as_slice()).finalize());
+        let hash: &[u8; 64] = &hash;
         let mut scalar = zeroize::Zeroizing::new([0u8; 32]);
-        scalar.copy_from_slice(&hash[..32]);
-        scalar[0] &= 248;
-        scalar[31] &= 127;
-        scalar[31] |= 64;
+        let clamped: &mut [u8; 32] = &mut scalar;
+        clamped.copy_from_slice(&hash[..32]);
+        clamped[0] &= 248;
+        clamped[31] &= 127;
+        clamped[31] |= 64;
         x25519_dalek::StaticSecret::from(*scalar)
     }
 }

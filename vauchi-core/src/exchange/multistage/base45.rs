@@ -7,7 +7,10 @@
 //! Encodes binary data into the QR Alphanumeric character set,
 //! producing ~15% smaller QR codes than base64.
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use thiserror::Error;
 
@@ -37,6 +40,9 @@ fn char_to_val(c: u8) -> Result<u32, Base45Error> {
 /// # Panics
 ///
 /// Panics if `value` is 45 or more.
+// INVARIANT: the panic is this function's documented contract; every
+// caller passes a value below 45 (vauchi/private#761).
+#[allow(clippy::indexing_slicing)]
 pub fn digit(value: u8) -> char {
     CHARSET[usize::from(value)] as char
 }
@@ -50,21 +56,23 @@ pub fn digit_value(c: u8) -> Result<u8, Base45Error> {
 pub fn encode(data: &[u8]) -> String {
     let mut result = String::with_capacity(data.len().div_ceil(2).saturating_mul(3));
     for chunk in data.chunks(2) {
-        if chunk.len() == 2 {
-            let n = u16::from_be_bytes([chunk[0], chunk[1]]);
-            let c = n / (45 * 45);
-            let remainder = n % (45 * 45);
-            let b = remainder / 45;
-            let a = remainder % 45;
-            result.push(CHARSET[a as usize] as char);
-            result.push(CHARSET[b as usize] as char);
-            result.push(CHARSET[c as usize] as char);
-        } else {
-            let n = chunk[0] as u16;
-            let b = n / 45;
-            let a = n % 45;
-            result.push(CHARSET[a as usize] as char);
-            result.push(CHARSET[b as usize] as char);
+        match *chunk {
+            [high, low] => {
+                let n = u16::from_be_bytes([high, low]);
+                let c = n / (45 * 45);
+                let remainder = n % (45 * 45);
+                let b = remainder / 45;
+                let a = remainder % 45;
+                result.push(digit(a as u8));
+                result.push(digit(b as u8));
+                result.push(digit(c as u8));
+            }
+            [byte] => {
+                let n = u16::from(byte);
+                result.push(digit((n % 45) as u8));
+                result.push(digit((n / 45) as u8));
+            }
+            _ => {}
         }
     }
     result
@@ -89,19 +97,19 @@ pub fn decode(data: &str) -> Result<Vec<u8>, Base45Error> {
     }
     let mut result = Vec::with_capacity(bytes.len().div_ceil(3).saturating_mul(2));
     for chunk in bytes.chunks(3) {
-        if chunk.len() == 3 {
-            let a = char_to_val(chunk[0])?;
-            let b = char_to_val(chunk[1])?;
-            let c = char_to_val(chunk[2])?;
+        if let [a, b, c] = *chunk {
+            let a = char_to_val(a)?;
+            let b = char_to_val(b)?;
+            let c = char_to_val(c)?;
             let n = chunk_value(&[a, b, c]);
             if n > 65535 {
                 return Err(Base45Error::Overflow);
             }
             result.push((n >> 8) as u8);
             result.push((n & 0xFF) as u8);
-        } else if chunk.len() == 2 {
-            let a = char_to_val(chunk[0])?;
-            let b = char_to_val(chunk[1])?;
+        } else if let [a, b] = *chunk {
+            let a = char_to_val(a)?;
+            let b = char_to_val(b)?;
             let n = chunk_value(&[a, b]);
             if n > 255 {
                 return Err(Base45Error::Overflow);

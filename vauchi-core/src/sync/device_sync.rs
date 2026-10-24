@@ -7,7 +7,10 @@
 //! Handles syncing data between devices belonging to the same identity.
 //! Used during device linking and for ongoing inter-device synchronization.
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use std::collections::HashMap;
 

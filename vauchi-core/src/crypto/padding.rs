@@ -29,7 +29,10 @@
 //! The first 4 bytes are the big-endian original plaintext length.
 //! This allows the receiver to strip padding after decryption.
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use super::random_fill;
 
@@ -60,7 +63,9 @@ pub fn pad(plaintext: &[u8]) -> Vec<u8> {
     padded.extend_from_slice(plaintext);
 
     padded.resize(target_size, 0);
-    random_fill(&mut padded[needed..]);
+    if let Some(padding) = padded.get_mut(needed..) {
+        random_fill(padding);
+    }
 
     padded
 }
@@ -70,13 +75,10 @@ pub fn pad(plaintext: &[u8]) -> Vec<u8> {
 /// Reads the 4-byte length prefix, then extracts that many bytes
 /// of plaintext immediately following the prefix.
 pub fn unpad(padded: &[u8]) -> Option<Vec<u8>> {
-    if padded.len() < LENGTH_PREFIX_SIZE {
-        return None;
-    }
+    let (prefix, body) = padded.split_first_chunk::<LENGTH_PREFIX_SIZE>()?;
+    let len = u32::from_be_bytes(*prefix) as usize;
 
-    let len = u32::from_be_bytes([padded[0], padded[1], padded[2], padded[3]]) as usize;
-
-    Some(padded[LENGTH_PREFIX_SIZE..].get(..len)?.to_vec())
+    Some(body.get(..len)?.to_vec())
 }
 
 /// Validates that a received padded buffer has a valid bucket size (#149).

@@ -13,7 +13,10 @@
 //! The inner payload (before Double Ratchet encryption) uses a version byte prefix:
 //! - `0x08`: CEK-wrapped payload (`CekWrappedPayload`)
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use crate::capacity::capacity;
 use serde::{Deserialize, Serialize};
@@ -464,22 +467,24 @@ impl CekWrappedPayload {
             )));
         }
 
-        let cek: [u8; 32] = data[0..32]
+        let (header, after_header) = data
+            .split_first_chunk::<132>()
+            .ok_or_else(|| DeltaError::CekDecodeError("payload too short".into()))?;
+        let cek: [u8; 32] = header[0..32]
             .try_into()
             .map_err(|_| DeltaError::CekDecodeError("invalid CEK length".into()))?;
-        let signature: [u8; 64] = data[32..96]
+        let signature: [u8; 64] = header[32..96]
             .try_into()
             .map_err(|_| DeltaError::CekDecodeError("invalid signature length".into()))?;
-        let nonce: [u8; 32] = data[96..128]
+        let nonce: [u8; 32] = header[96..128]
             .try_into()
             .map_err(|_| DeltaError::CekDecodeError("invalid nonce length".into()))?;
 
         let ct_len =
-            u32::from_be_bytes(data[128..132].try_into().map_err(|_| {
+            u32::from_be_bytes(header[128..132].try_into().map_err(|_| {
                 DeltaError::CekDecodeError("invalid ciphertext length field".into())
             })?) as usize;
 
-        let after_header = &data[132..];
         let cek_ciphertext = after_header
             .get(..ct_len)
             .ok_or_else(|| {
@@ -575,35 +580,33 @@ impl VersionedPayload {
 
     /// Decode a version-tagged payload.
     pub fn decode(data: &[u8]) -> Result<Self, DeltaError> {
-        if data.is_empty() {
+        let Some((&version, body)) = data.split_first() else {
             return Err(DeltaError::PayloadTooShort);
-        }
+        };
 
-        match data[0] {
+        match version {
             PAYLOAD_VERSION_CEK => {
-                let payload = CekWrappedPayload::decode(&data[1..])?;
+                let payload = CekWrappedPayload::decode(body)?;
                 Ok(VersionedPayload::CekWrapped(payload))
             }
             PAYLOAD_VERSION_RECIPROCITY => {
-                let payload = ReciprocityConfirmPayload::decode(&data[1..], true)?;
+                let payload = ReciprocityConfirmPayload::decode(body, true)?;
                 Ok(VersionedPayload::ReciprocityConfirm(payload))
             }
             PAYLOAD_VERSION_RECIPROCITY_ANSWER => {
-                let payload = ReciprocityConfirmPayload::decode(&data[1..], false)?;
+                let payload = ReciprocityConfirmPayload::decode(body, false)?;
                 Ok(VersionedPayload::ReciprocityConfirm(payload))
             }
             PAYLOAD_VERSION_ALERT => {
-                let payload = crate::sync::safety_alert::SafetyAlertPayload::decode(&data[1..])?;
+                let payload = crate::sync::safety_alert::SafetyAlertPayload::decode(body)?;
                 Ok(VersionedPayload::Alert(payload))
             }
             PAYLOAD_VERSION_REGISTRY_PUSH => {
-                let payload =
-                    crate::sync::registry_activation::RegistryPushPayload::decode(&data[1..])?;
+                let payload = crate::sync::registry_activation::RegistryPushPayload::decode(body)?;
                 Ok(VersionedPayload::RegistryPush(payload))
             }
             PAYLOAD_VERSION_REGISTRY_ACK => {
-                let payload =
-                    crate::sync::registry_activation::RegistryAckPayload::decode(&data[1..])?;
+                let payload = crate::sync::registry_activation::RegistryAckPayload::decode(body)?;
                 Ok(VersionedPayload::RegistryAck(payload))
             }
             v => Err(DeltaError::UnknownPayloadVersion(v)),
@@ -653,16 +656,16 @@ impl ReciprocityConfirmPayload {
     /// Decode from wire format (after version byte has been stripped).
     /// `sender_waiting` comes from that version byte.
     pub fn decode(data: &[u8], sender_waiting: bool) -> Result<Self, DeltaError> {
-        if data.len() != 96 {
-            return Err(DeltaError::InvalidPayload(format!(
+        let record: &[u8; 96] = data.try_into().map_err(|_| {
+            DeltaError::InvalidPayload(format!(
                 "reciprocity confirm: expected 96 bytes, got {}",
                 data.len()
-            )));
-        }
+            ))
+        })?;
         let mut token = [0u8; 32];
-        token.copy_from_slice(&data[..32]);
+        token.copy_from_slice(&record[..32]);
         let mut signature = [0u8; 64];
-        signature.copy_from_slice(&data[32..96]);
+        signature.copy_from_slice(&record[32..96]);
         Ok(Self {
             token,
             signature,

@@ -38,7 +38,10 @@
 //! creation or migration, then stored in SecureStorage. At boot, SMK is loaded
 //! from SecureStorage — never re-derived — to avoid bootstrap deadlock.
 
-#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+)]
 
 use crate::crypto::{HKDF, SymmetricKey};
 use zeroize::{Zeroize, ZeroizeOnDrop};

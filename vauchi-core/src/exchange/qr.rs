@@ -188,8 +188,12 @@ impl ExchangeQR {
     }
 
     /// Checks if the QR code has expired.
+    /// A timestamp too late to carry the expiry window counts as expired:
+    /// the signer chose it, and the sum would overflow (vauchi/private#795).
     pub fn is_expired(&self, now: u64) -> bool {
-        now > self.timestamp + QR_EXPIRY_SECONDS
+        self.timestamp
+            .checked_add(QR_EXPIRY_SECONDS)
+            .is_none_or(|expires_at| now > expires_at)
     }
 
     /// Verifies the signature on the QR code.
@@ -441,13 +445,18 @@ const MAX_CLOCK_DRIFT_SECONDS: u64 = 30;
 /// `MAX_CLOCK_DRIFT_SECONDS` (30 seconds). Otherwise returns
 /// `ExchangeError::ClockDrift` with the signed delta.
 pub fn check_clock_drift(qr_timestamp: u64, now: u64) -> Result<(), ExchangeError> {
-    let drift = (now as i64) - (qr_timestamp as i64);
-
-    if drift.unsigned_abs() > MAX_CLOCK_DRIFT_SECONDS {
-        return Err(ExchangeError::ClockDrift(drift));
+    let distance = now.abs_diff(qr_timestamp);
+    if distance <= MAX_CLOCK_DRIFT_SECONDS {
+        return Ok(());
     }
-
-    Ok(())
+    // Saturates: the signer chose the timestamp, so the drift may not fit
+    // an i64 (vauchi/private#795).
+    let drift = if now >= qr_timestamp {
+        0i64.checked_add_unsigned(distance).unwrap_or(i64::MAX)
+    } else {
+        0i64.checked_sub_unsigned(distance).unwrap_or(i64::MIN)
+    };
+    Err(ExchangeError::ClockDrift(drift))
 }
 
 // INLINE_TEST_REQUIRED: Tests private PROTOCOL_VERSION constant, flags, and version field

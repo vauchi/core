@@ -83,12 +83,16 @@ impl DeviceLinkQR {
 
     /// Returns the Unix timestamp (seconds) when this QR code expires.
     pub fn expires_at(&self) -> u64 {
-        self.timestamp + LINK_QR_EXPIRY_SECONDS
+        self.timestamp.saturating_add(LINK_QR_EXPIRY_SECONDS)
     }
 
     /// Checks if the QR code has expired.
+    /// A timestamp too late to carry the expiry window counts as expired:
+    /// the signer chose it, and the sum would overflow (vauchi/private#795).
     pub fn is_expired(&self, now: u64) -> bool {
-        now > self.timestamp + LINK_QR_EXPIRY_SECONDS
+        self.timestamp
+            .checked_add(LINK_QR_EXPIRY_SECONDS)
+            .is_none_or(|expires_at| now > expires_at)
     }
 
     /// Verifies the signature on the QR code.

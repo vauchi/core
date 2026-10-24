@@ -433,7 +433,10 @@ impl AppEngine {
     /// (2026-07-01-android-contacts-list-stale-after-mutation).
     pub fn invalidate_screen(&mut self, screen: &AppScreen) {
         self.engine_cache.remove(screen);
-        if *screen == self.screen && !Self::holds_live_machine_state(screen) {
+        if *screen == self.screen
+            && !Self::holds_live_machine_state(screen)
+            && !Self::holds_unsaved_input(screen)
+        {
             self.engine = Self::create_engine(
                 &self.vauchi,
                 &self.screen,
@@ -473,6 +476,20 @@ impl AppEngine {
                 | AppScreen::BleExchange { .. }
                 | AppScreen::NfcExchange
                 | AppScreen::DirectTransport
+        )
+    }
+
+    /// Form screens whose engine holds what the user typed and has not
+    /// saved yet.
+    ///
+    /// A background sync that reports a delivery invalidates every screen,
+    /// and rebuilding an open form from storage put the stored value back
+    /// under the user's hands: Save then wrote the old one (#799). A form
+    /// is left by Save or Back, both of which reload what it edits.
+    fn holds_unsaved_input(screen: &AppScreen) -> bool {
+        matches!(
+            screen,
+            AppScreen::FormDialog { .. } | AppScreen::ContactEdit { .. }
         )
     }
 

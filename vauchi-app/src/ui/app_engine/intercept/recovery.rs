@@ -59,14 +59,22 @@ impl AppEngine {
 
         let parse_result = self.vauchi.parse_recovery_claim_b64(&claim_input);
 
-        let update = match parse_result {
-            Ok(claim) => crate::ui::RecoveryHelpUpdate::ParsedClaim(
+        let update = match parse_result
+            .and_then(|claim| Ok((self.vauchi.recovery_claim_contact(&claim)?, claim)))
+        {
+            Ok((contact, claim)) => crate::ui::RecoveryHelpUpdate::ParsedClaim(
                 crate::ui::recovery_help::ParsedClaimSummary {
+                    contact_name: contact.display_name().to_string(),
                     old_pk_hex: hex::encode::<&[u8]>(claim.old_pk().as_ref()),
                     new_pk_hex: hex::encode::<&[u8]>(claim.new_pk().as_ref()),
                     is_expired: claim.is_expired(self.vauchi.clock().unix_seconds()),
                 },
             ),
+            Err(vauchi_core::VauchiError::ContactNotFound(_)) => {
+                crate::ui::RecoveryHelpUpdate::ClaimParseError(
+                    self.t("recovery.claim_not_a_contact"),
+                )
+            }
             Err(e) => crate::ui::RecoveryHelpUpdate::ClaimParseError(format!("Invalid claim: {e}")),
         };
         self.engine

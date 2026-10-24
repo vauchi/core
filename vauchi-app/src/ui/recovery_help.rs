@@ -39,6 +39,8 @@ enum HelpStep {
 /// raw byte arrays. The frontend only needs the prefix for display.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ParsedClaimSummary {
+    /// The contact whose key the claim says was lost (vauchi/private#708).
+    pub contact_name: String,
     pub old_pk_hex: String,
     pub new_pk_hex: String,
     pub is_expired: bool,
@@ -284,6 +286,11 @@ impl RecoveryHelpEngine {
             icon: Some("lifebuoy".into()),
             title: self.t("recovery.claim_details_title"),
             items: vec![
+                InfoItem {
+                    icon: None,
+                    title: self.t("recovery.claimed_contact_label"),
+                    detail: claim.map(|c| c.contact_name.clone()).unwrap_or_default(),
+                },
                 InfoItem {
                     icon: None,
                     title: self.t("recovery.old_id_label"),
@@ -620,6 +627,7 @@ mod tests {
         let _ = press(&mut engine, "verify_claim");
 
         engine.set_parsed_claim(ParsedClaimSummary {
+            contact_name: "Alice".into(),
             old_pk_hex: "abcd1234".repeat(8),
             new_pk_hex: "ef567890".repeat(8),
             is_expired: false,
@@ -644,6 +652,7 @@ mod tests {
     fn confirm_screen_disables_create_for_expired_claim() {
         let mut engine = RecoveryHelpEngine::new();
         engine.set_parsed_claim(ParsedClaimSummary {
+            contact_name: "Alice".into(),
             old_pk_hex: "00".repeat(32),
             new_pk_hex: "11".repeat(32),
             is_expired: true,
@@ -714,6 +723,7 @@ mod tests {
     fn create_voucher_returns_complete_so_intercept_can_sign() {
         let mut engine = RecoveryHelpEngine::new();
         engine.set_parsed_claim(ParsedClaimSummary {
+            contact_name: "Alice".into(),
             old_pk_hex: "ab".repeat(32),
             new_pk_hex: "cd".repeat(32),
             is_expired: false,
@@ -766,6 +776,7 @@ mod tests {
     fn back_from_confirm_returns_to_paste_and_clears_claim() {
         let mut engine = RecoveryHelpEngine::new();
         engine.set_parsed_claim(ParsedClaimSummary {
+            contact_name: "Alice".into(),
             old_pk_hex: "ab".repeat(32),
             new_pk_hex: "cd".repeat(32),
             is_expired: false,

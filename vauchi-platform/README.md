@@ -70,7 +70,8 @@ val contacts = vauchi.listContacts()
 
 ## Thread Safety
 
-The API is designed for mobile environments where UI and background threads interact:
+The API is designed for mobile environments where UI and background threads
+interact:
 
 - `VauchiPlatform` is `Send + Sync`
 - Storage connections are created on-demand per operation

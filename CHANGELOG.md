@@ -45,6 +45,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - Tokio is required at 1.53.3 or later for RUSTSEC-2026-0386.
 - The fuzz nightly replays coverage without ASan, whose odr check
   aborted every replay on bundled sqlite3 (vauchi/private#787).
+- The parsers of untrusted input deny `clippy::arithmetic_side_effects`:
+  declared lengths slice with bounds checks, and chain and ratchet
+  generations stop at `GenerationLimitExceeded` instead of wrapping
+  (vauchi/private#761).
 
 ## [0.87.0] — 2026-10-23
 

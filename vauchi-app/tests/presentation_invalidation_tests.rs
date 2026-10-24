@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use std::sync::mpsc::TryRecvError;
 use vauchi_app::ui::AppEngine;
 use vauchi_core::{Command, Event, NotificationUrgency, Vauchi, VauchiEvent};
 
@@ -49,4 +50,55 @@ fn invalidation_returns_pending_notification_once_with_the_refreshed_surface() {
         0
     );
     assert_eq!(app.drain_pending_notifications(), Vec::new());
+}
+
+// @internal — polling shells receive one opaque wakeup, never domain payloads.
+#[test]
+fn presentation_subscription_coalesces_events_without_blocking_the_engine() {
+    let app = app();
+    let receiver = app.subscribe_presentation_invalidations();
+    assert_eq!(
+        receiver.try_recv(),
+        Ok(()),
+        "registration requests a refresh"
+    );
+    for _ in 0..100 {
+        app.vauchi().dispatch_event(VauchiEvent::ContentUpdated);
+    }
+    assert_eq!(receiver.try_recv(), Ok(()));
+    assert_eq!(receiver.try_recv(), Err(TryRecvError::Empty));
+}
+
+// @internal — replacing a shell drops the old sender and preserves a pending refresh.
+#[test]
+fn replacement_disconnects_the_old_subscription() {
+    let app = app();
+    let old = app.subscribe_presentation_invalidations();
+    assert_eq!(old.try_recv(), Ok(()));
+    let current = app.subscribe_presentation_invalidations();
+    app.vauchi().dispatch_event(VauchiEvent::ContentUpdated);
+    assert_eq!(old.try_recv(), Err(TryRecvError::Disconnected));
+    assert_eq!(current.try_recv(), Ok(()));
+    assert_eq!(current.try_recv(), Err(TryRecvError::Empty));
+}
+
+// @internal — native receiver disposal must not break Core's event handling.
+#[test]
+fn discarded_subscription_can_be_replaced_after_an_event() {
+    let app = app();
+    drop(app.subscribe_presentation_invalidations());
+    app.vauchi().dispatch_event(VauchiEvent::ContentUpdated);
+    let current = app.subscribe_presentation_invalidations();
+    assert_eq!(current.try_recv(), Ok(()));
+    assert_eq!(current.try_recv(), Err(TryRecvError::Empty));
+}
+
+// @internal — a surviving shell receiver cannot retain its engine's sender.
+#[test]
+fn engine_disposal_disconnects_the_subscription() {
+    let app = app();
+    let receiver = app.subscribe_presentation_invalidations();
+    assert_eq!(receiver.try_recv(), Ok(()));
+    drop(app);
+    assert_eq!(receiver.try_recv(), Err(TryRecvError::Disconnected));
 }

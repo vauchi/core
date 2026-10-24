@@ -53,6 +53,7 @@ mod notifications;
 #[cfg(test)]
 mod onboarding_shortfall_tests;
 mod overlays;
+mod presentation_invalidation;
 mod presentation_protocol;
 // INLINE_TEST_REQUIRED: injects a legacy ExchangeEngine into the private
 // `engine`/`screen` fields to drive the persist-at-Complete hook.
@@ -149,6 +150,7 @@ pub struct AppEngine {
     poll_count: u32,
     /// Channel receiver for events to be persisted to the activity log.
     event_rx: mpsc::Receiver<VauchiEvent>,
+    presentation_invalidation: std::sync::Arc<presentation_invalidation::PresentationInvalidation>,
     /// Active event handler ID, used to unregister on drop.
     _event_handler_id: HandlerId,
     /// IDs of the two contacts selected for merge (primary_id, secondary_id).
@@ -562,12 +564,19 @@ impl AppEngine {
         // we wrap it in a Mutex.
         let (event_tx, event_rx) = mpsc::channel();
         let event_tx = std::sync::Mutex::new(event_tx);
+        let presentation_invalidation =
+            std::sync::Arc::new(presentation_invalidation::PresentationInvalidation::default());
+        let invalidation = std::sync::Arc::downgrade(&presentation_invalidation);
         let event_handler_id = vauchi.add_event_handler(std::sync::Arc::new(move |event| {
+            let refresh = !super::affected_screens(&event).is_empty();
             if let Ok(tx) = event_tx.lock() {
                 // best-effort: channel send fails only if the receiver
                 // was dropped (AppEngine is being torn down)
                 #[allow(clippy::let_underscore_must_use)]
                 let _ = tx.send(event);
+            }
+            if refresh && let Some(invalidation) = invalidation.upgrade() {
+                invalidation.notify();
             }
         }));
 
@@ -620,6 +629,7 @@ impl AppEngine {
             last_poll_ms: None,
             poll_count: 0,
             event_rx,
+            presentation_invalidation,
             _event_handler_id: event_handler_id,
             pending_merge: None,
             pending_backup_reminder,

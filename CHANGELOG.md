@@ -29,10 +29,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   (vauchi/private#733).
 - CI: `test:formal` runs the Kani parser proofs and the Tamarin
   exchange, device-link and reciprocity-confirmation models
-  (vauchi/private#757); `test:core-32bit` also runs the 32-bit
+  (vauchi/private#757) and the recovery-acceptance model of both rekey
+  designs (vauchi/private#796); `test:core-32bit` also runs the 32-bit
   integration tests (vauchi/private#784).
 
 ### Fixed
+
+- A voucher signed by either key of a recovery, the lost device's old
+  key or the new one, is refused and never counted, so whoever holds
+  the lost device cannot vouch for its own recovery
+  (vauchi/private#797).
 
 - On a device with biometrics, the device or login password no longer
   passes the OS check that guards export and the first app password:

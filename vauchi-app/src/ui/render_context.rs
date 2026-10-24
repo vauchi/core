@@ -41,6 +41,20 @@ pub struct RenderContext {
 }
 
 impl RenderContext {
+    /// A language or theme picked in Core's Settings wins over what an app
+    /// pushes: Core renders Settings, so only Core knows the pick
+    /// (vauchi/private#790). Before the first pick the app's values stand.
+    pub(crate) fn apply_saved_appearance(&mut self, vauchi: &vauchi_core::api::Vauchi) {
+        if let Some(pick) = vauchi
+            .load_settings_flags()
+            .ok()
+            .and_then(|flags| flags.appearance)
+        {
+            self.locale = pick.locale;
+            self.theme_id = pick.theme_id;
+        }
+    }
+
     /// The picked language if Core has its strings, else the system
     /// language if Core has its strings, else English — the resolution
     /// every locale-threaded engine factory arm uses.

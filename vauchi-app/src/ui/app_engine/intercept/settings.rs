@@ -153,11 +153,8 @@ impl AppEngine {
         // item_id = the picked option id. The reserved id "follow_system"
         // means "let the OS decide" — maps to None per ADR-047.
         //
-        // S6 of 2026-05-16-settings-storage-by-sensitivity: vault write
-        // retired; RenderContext is the single source of truth. The
-        // frontend's setRenderContextJson push at boot + on every
-        // per-platform OS-native persist (UserDefaults / SharedPreferences)
-        // owns the durability.
+        // Core renders Settings, so Core keeps the pick in the settings
+        // flags; no app hears of it to store it (vauchi/private#790).
         if let UserAction::ListItemSelected {
             component_id,
             item_id,
@@ -171,6 +168,15 @@ impl AppEngine {
                 "language" => ctx.locale = new_value,
                 _ => unreachable!(),
             }
+            let mut flags = self.vauchi.load_settings_flags().unwrap_or_default();
+            flags.appearance = Some(vauchi_core::settings::AppearancePick {
+                locale: ctx.locale.clone(),
+                theme_id: ctx.theme_id.clone(),
+            });
+            // Best effort, like the other settings toggles: the pick still
+            // applies now and is lost only if storage refuses the write.
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = self.vauchi.save_settings_flags(&flags);
             self.set_render_context(ctx);
         }
     }

@@ -432,7 +432,8 @@ impl AppEngine {
     /// A change of rendered language invalidates every cached screen,
     /// because the shell's first push can arrive after the start screen
     /// was built in English (vauchi/private#721).
-    pub fn set_render_context(&mut self, ctx: crate::ui::RenderContext) {
+    pub fn set_render_context(&mut self, mut ctx: crate::ui::RenderContext) {
+        ctx.apply_saved_appearance(&self.vauchi);
         let language_changed = ctx.resolved_locale() != self.render_context.resolved_locale();
         self.wanted_locales_changed |=
             ctx.wanted_locale_codes() != self.render_context.wanted_locale_codes();
@@ -538,7 +539,8 @@ impl AppEngine {
             AppScreen::MyInfo
         };
         let caps = DeviceCapabilities::default();
-        let initial_render_context = crate::ui::RenderContext::default();
+        let mut initial_render_context = crate::ui::RenderContext::default();
+        initial_render_context.apply_saved_appearance(&vauchi);
         let engine = Self::create_engine(
             &vauchi,
             &screen,
@@ -611,7 +613,7 @@ impl AppEngine {
             #[cfg(feature = "content-updates")]
             content_runner: None,
             transport_readiness: TransportReadiness::default(),
-            render_context: crate::ui::RenderContext::default(),
+            render_context: initial_render_context,
             update_status: AppUpdateStatus::UpToDate,
             update_dismissed: false,
             last_poll_time: now,

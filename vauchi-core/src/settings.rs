@@ -121,6 +121,19 @@ pub struct SettingsFlags {
     /// stored before this field existed updating in the background.
     #[serde(default = "default_true")]
     pub content_updates_in_background: bool,
+    /// The language and theme picked in Core's Settings. `None` until the
+    /// first pick, so an app's own stored choice still applies
+    /// (vauchi/private#790).
+    #[serde(default)]
+    pub appearance: Option<AppearancePick>,
+}
+
+/// A language and theme picked in Settings; a `None` field is "Follow
+/// system" (ADR-047).
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct AppearancePick {
+    pub locale: Option<String>,
+    pub theme_id: Option<String>,
 }
 
 impl Default for SettingsFlags {
@@ -137,6 +150,7 @@ impl Default for SettingsFlags {
             first_group_education_shown: false,
             content_updates: ContentUpdates::On,
             content_updates_in_background: true,
+            appearance: None,
         }
     }
 }

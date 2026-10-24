@@ -23,8 +23,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - Platform callbacks are bound to a cancellable operation lifetime:
   stale observations, closed inboxes and resource-budget overruns are
   rejected.
-- Dev bindings can trust a test content publisher key from
-  `VAUCHI_DEV_CONTENT_PUBLISHER_KEY` (vauchi/private#733).
+- Dev bindings built with `dev-local-content` can trust a test content
+  publisher key (`VAUCHI_DEV_CONTENT_PUBLISHER_KEY`) and send OHTTP to a
+  local relay's own route (`VAUCHI_DEV_OHTTP_RELAY_URL`)
+  (vauchi/private#733).
 - CI: `test:formal` runs the Kani parser proofs and the Tamarin
   exchange and device-link models (vauchi/private#757);
   `test:core-32bit` also runs the 32-bit integration tests
@@ -34,6 +36,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 - A new device refuses a linked seed whose identity is not the one the
   scanned QR names (vauchi/private#789).
+- A QR timestamp near `u64::MAX` counts as expired instead of
+  overflowing and aborting the app (vauchi/private#795).
 - The sync payload and recovery voucher parsers compare a declared
   length without wrapping on a 32-bit `usize` (vauchi/private#784).
 - Completed and backpressured hardware observations are kept, and a

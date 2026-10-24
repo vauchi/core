@@ -36,7 +36,7 @@
   "a11y.step_of": "Step {current} of {total}",
   "a11y.toast_prefix": "Toast: {message}",
   "a11y.toggle_label": "{name} toggle",
-  "about.body": "Vauchi — Privacy-focused updatable contact cards.\n\nVersion 0.5.0\nLicense: GPL-3.0-or-later",
+  "about.body": "Vauchi — Privacy-focused updatable contact cards.\n\nVersion 0.5.0\nLicense: AGPL-3.0-or-later (core), GPL-3.0-or-later (app)",
   "about.what_is_vauchi.body": "Vauchi is a privacy-focused contact card app. You exchange cards in person via QR code. Your data is encrypted end-to-end and never stored on our servers. When you update your card, all your contacts receive the update automatically.",
   "about.what_is_vauchi.link_label": "Learn more",
   "about.what_is_vauchi.title": "What is Vauchi?",

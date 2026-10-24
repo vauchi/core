@@ -8,6 +8,7 @@ members = [
     "vauchi-app",
     "vauchi-cabi",
     "vauchi-core",
+    "vauchi-hardware",
     "vauchi-platform",
     "vauchi-protocol",
 ]

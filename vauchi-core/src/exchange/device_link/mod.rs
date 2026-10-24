@@ -128,7 +128,8 @@ mod tests {
     #[test]
     fn test_device_link_response_roundtrip() {
         let master_seed = [0x42u8; 32];
-        let identity = Identity::create("Alice", 0);
+        let identity =
+            Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
         let registry = create_test_registry(&identity);
 
         let response =
@@ -145,7 +146,8 @@ mod tests {
     #[test]
     fn test_device_link_response_encryption() {
         let master_seed = [0x42u8; 32];
-        let identity = Identity::create("Alice", 0);
+        let identity =
+            Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
         let registry = create_test_registry(&identity);
 
         let response = DeviceLinkResponse::new(master_seed, "Alice".to_string(), 1, registry);
@@ -162,7 +164,13 @@ mod tests {
     #[test]
     fn test_device_link_full_flow() {
         let master_seed_a = [0x42u8; 32];
-        let identity_a = Identity::create("Alice", 0);
+        let identity_a = Identity::from_device_link(
+            master_seed_a,
+            "Alice".into(),
+            0,
+            "Primary Device".into(),
+            0,
+        );
         let registry_a = create_test_registry(&identity_a);
 
         let initiator = DeviceLinkInitiator::new(master_seed_a, &identity_a, registry_a, 0u64);
@@ -253,7 +261,8 @@ mod tests {
     #[test]
     fn test_device_link_response_with_sync_payload() {
         let master_seed = [0x42u8; 32];
-        let identity = Identity::create("Alice", 0);
+        let identity =
+            Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
         let registry = create_test_registry(&identity);
 
         let sync_payload = r#"{"contacts":[],"own_card_json":"{}","version":1}"#;
@@ -275,7 +284,8 @@ mod tests {
     #[test]
     fn test_device_link_response_encryption_with_sync_payload() {
         let master_seed = [0x42u8; 32];
-        let identity = Identity::create("Alice", 0);
+        let identity =
+            Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
         let registry = create_test_registry(&identity);
 
         let sync_payload = r#"{"contacts":[{"id":"test"}]}"#;
@@ -357,7 +367,8 @@ mod tests {
     #[test]
     fn test_device_link_prepare_confirmation_empty_device_name() {
         let master_seed = [0x42u8; 32];
-        let identity = Identity::create("Alice", 0);
+        let identity =
+            Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
         let registry = create_test_registry(&identity);
         let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry, 0u64);
 
@@ -387,7 +398,8 @@ mod tests {
     #[test]
     fn test_device_link_response_wrong_key() {
         let master_seed = [0x42u8; 32];
-        let identity = Identity::create("Alice", 0);
+        let identity =
+            Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
         let registry = create_test_registry(&identity);
 
         let response = DeviceLinkResponse::new(master_seed, "Alice".to_string(), 1, registry);
@@ -427,7 +439,8 @@ mod tests {
     #[test]
     fn test_device_link_initiator_qr_accessor() {
         let master_seed = [0x42u8; 32];
-        let identity = Identity::create("Alice", 0);
+        let identity =
+            Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
         let registry = create_test_registry(&identity);
         let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry, 0u64);
 
@@ -456,7 +469,8 @@ mod tests {
     #[test]
     fn test_device_link_with_full_sync_payload() {
         let master_seed = [0x42u8; 32];
-        let identity = Identity::create("Alice", 0);
+        let identity =
+            Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
         let registry = create_test_registry(&identity);
         let storage = create_test_storage();
 
@@ -526,7 +540,8 @@ mod tests {
     #[test]
     fn test_device_link_initiator_restored_flow() {
         let master_seed = [0x42u8; 32];
-        let identity = Identity::create("Alice", 0);
+        let identity =
+            Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
         let registry = create_test_registry(&identity);
 
         let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry.clone(), 0u64);
@@ -584,7 +599,8 @@ mod tests {
     #[test]
     fn test_confirmation_code_matches_both_sides() {
         let master_seed = [0x42u8; 32];
-        let identity = Identity::create("Alice", 0);
+        let identity =
+            Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
         let registry = create_test_registry(&identity);
 
         let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry, 0u64);
@@ -610,7 +626,8 @@ mod tests {
     #[test]
     fn test_prepare_and_confirm_flow() {
         let master_seed = [0x42u8; 32];
-        let identity = Identity::create("Alice", 0);
+        let identity =
+            Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
         let registry = create_test_registry(&identity);
 
         let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry, 0u64);
@@ -645,7 +662,8 @@ mod tests {
     #[test]
     fn test_prepare_and_confirm_with_sync_flow() {
         let master_seed = [0x42u8; 32];
-        let identity = Identity::create("Alice", 0);
+        let identity =
+            Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
         let registry = create_test_registry(&identity);
         let storage = create_test_storage();
 
@@ -723,7 +741,8 @@ mod tests {
     #[test]
     fn test_identity_fingerprint_matches_both_sides() {
         let master_seed = [0x42u8; 32];
-        let identity = Identity::create("Alice", 0);
+        let identity =
+            Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
         let registry = create_test_registry(&identity);
 
         let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry, 0u64);
@@ -745,7 +764,8 @@ mod tests {
     #[test]
     fn test_deprecated_process_request_still_works() {
         let master_seed = [0x42u8; 32];
-        let identity = Identity::create("Alice", 0);
+        let identity =
+            Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
         let registry = create_test_registry(&identity);
 
         let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry, 0u64);
@@ -776,7 +796,8 @@ mod tests {
     #[test]
     fn test_restored_initiator_confirmation_flow() {
         let master_seed = [0x42u8; 32];
-        let identity = Identity::create("Alice", 0);
+        let identity =
+            Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
         let registry = create_test_registry(&identity);
 
         let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry.clone(), 0u64);

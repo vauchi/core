@@ -30,7 +30,8 @@ fn create_test_registry(identity: &Identity) -> DeviceRegistry {
 #[test]
 fn test_build_response_rejected_without_proximity() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice", 0);
+    let identity =
+        Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
     let registry = create_test_registry(&identity);
 
     // Initiator with a wrong proximity proof
@@ -74,7 +75,8 @@ fn test_build_response_rejected_without_proximity() {
 #[test]
 fn test_build_response_succeeds_after_proximity_verified() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice", 0);
+    let identity =
+        Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(
@@ -125,7 +127,8 @@ fn test_build_response_succeeds_after_proximity_verified() {
 #[test]
 fn test_restored_initiator_requires_proximity() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice", 0);
+    let identity =
+        Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(
@@ -188,7 +191,8 @@ fn now_unix_secs() -> u64 {
 #[test]
 fn test_confirm_link_with_manual_proof_succeeds() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice", 0);
+    let identity =
+        Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(
@@ -237,7 +241,8 @@ fn test_confirm_link_with_manual_proof_succeeds() {
 #[test]
 fn test_confirm_link_with_expired_manual_rejected() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice", 0);
+    let identity =
+        Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(
@@ -283,7 +288,8 @@ fn test_confirm_link_with_expired_manual_rejected() {
 #[test]
 fn test_confirm_link_with_wrong_mac_rejected() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice", 0);
+    let identity =
+        Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(
@@ -330,7 +336,8 @@ fn test_confirm_link_with_wrong_mac_rejected() {
 #[test]
 fn test_cross_session_manual_mac_replay_rejected() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice", 0);
+    let identity =
+        Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
     let registry = create_test_registry(&identity);
 
     // Session A — compute a valid manual MAC
@@ -404,7 +411,8 @@ fn test_cross_session_manual_mac_replay_rejected() {
 #[test]
 fn test_manual_proof_at_exactly_60_seconds_accepted() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice", 0);
+    let identity =
+        Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(
@@ -448,7 +456,8 @@ fn test_manual_proof_at_exactly_60_seconds_accepted() {
 #[test]
 fn test_manual_proof_at_61_seconds_rejected() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice", 0);
+    let identity =
+        Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(
@@ -496,7 +505,8 @@ fn test_manual_proof_at_61_seconds_rejected() {
 #[test]
 fn test_self_linking_same_device_name_rejected() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice", 0);
+    let identity =
+        Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(
@@ -534,7 +544,8 @@ fn test_self_linking_same_device_name_rejected() {
 #[test]
 fn test_self_linking_restored_initiator_rejected() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice", 0);
+    let identity =
+        Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(
@@ -572,7 +583,8 @@ fn test_self_linking_restored_initiator_rejected() {
 #[test]
 fn test_different_device_name_allowed() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice", 0);
+    let identity =
+        Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(
@@ -626,7 +638,7 @@ mod proximity_proof_proptests {
             #[test]
             fn test_expired_manual_timestamp_always_rejected(age in 61u64..=86400u64) {
                 let master_seed = [0x42u8; 32];
-                let identity = Identity::create("Alice", 0);
+                let identity = Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
                 let registry = create_test_registry(&identity);
                 let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry, vauchi_core::clock::SystemClock::shared().unix_seconds());
 
@@ -654,7 +666,7 @@ mod proximity_proof_proptests {
             #[test]
             fn test_tampered_confirmation_mac_always_rejected(tampered_mac in prop::array::uniform32(any::<u8>())) {
                 let master_seed = [0x42u8; 32];
-                let identity = Identity::create("Alice", 0);
+                let identity = Identity::from_device_link(master_seed, "Alice".into(), 0, "Primary Device".into(), 0);
                 let registry = create_test_registry(&identity);
                 let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry, vauchi_core::clock::SystemClock::shared().unix_seconds());
 

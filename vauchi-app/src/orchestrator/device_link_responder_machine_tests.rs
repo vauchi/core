@@ -28,7 +28,8 @@ fn create_test_registry(identity: &Identity) -> DeviceRegistry {
 }
 
 fn build_initiator(name: &str, seed: u8) -> DeviceLinkInitiator {
-    let identity = Identity::create(name, 0);
+    let identity =
+        Identity::from_device_link([seed; 32], name.into(), 0, "Primary Device".into(), 0);
     let registry = create_test_registry(&identity);
     DeviceLinkInitiator::new([seed; 32], &identity, registry, NOW)
 }

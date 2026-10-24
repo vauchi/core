@@ -123,7 +123,13 @@ impl DeviceLinkBroker for RelayLikeBroker {
 
 /// A real initiator for an identity that owns exactly one device.
 fn initiator_for(display_name: &str, master_seed: [u8; 32]) -> (DeviceLinkInitiator, Identity) {
-    let identity = Identity::create(display_name, NOW);
+    let identity = Identity::from_device_link(
+        master_seed,
+        display_name.into(),
+        0,
+        "Primary Device".into(),
+        NOW,
+    );
     let registry = DeviceRegistry::new(
         identity.device_info().to_registered(&master_seed),
         identity.signing_keypair(),

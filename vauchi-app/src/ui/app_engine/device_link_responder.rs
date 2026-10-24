@@ -275,7 +275,8 @@ mod tests {
     }
 
     fn sample_invitation_and_initiator(now: u64) -> (String, DeviceLinkInitiator) {
-        let identity = Identity::create("Alice", 0);
+        let identity =
+            Identity::from_device_link([0x11u8; 32], "Alice".into(), 0, "Primary Device".into(), 0);
         let registry = create_test_registry(&identity);
         let initiator = DeviceLinkInitiator::new([0x11u8; 32], &identity, registry, now);
         let url = DeviceLinkJoinInvitation {
@@ -356,7 +357,8 @@ mod tests {
     #[test]
     fn start_responder_rejects_relay_without_outer_ohttp_metadata() {
         let mut app = fresh_app_engine();
-        let identity = Identity::create("Alice", 0);
+        let identity =
+            Identity::from_device_link([0x11u8; 32], "Alice".into(), 0, "Primary Device".into(), 0);
         let registry = create_test_registry(&identity);
         let initiator = DeviceLinkInitiator::new([0x11u8; 32], &identity, registry, NOW);
         let url = DeviceLinkJoinInvitation {

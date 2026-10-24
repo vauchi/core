@@ -854,6 +854,22 @@ fn test_create_identity_display_name_too_long_fails() {
     assert!(wb.identity().is_none());
 }
 
+/// The limit counts characters, as the card does: 100 three-byte
+/// characters fit, 101 do not.
+// @internal
+#[test]
+fn test_update_display_name_counts_characters_not_bytes() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    wb.update_display_name(&"名".repeat(100))
+        .expect("100 characters are within the limit");
+    let too_long = wb.update_display_name(&"名".repeat(101));
+
+    assert_eq!(wb.identity().unwrap().display_name(), "名".repeat(100));
+    too_long.expect_err("101 characters must be refused");
+}
+
 // @internal
 #[test]
 fn test_update_display_name_no_identity_fails() {

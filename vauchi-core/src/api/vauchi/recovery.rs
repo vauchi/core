@@ -270,12 +270,16 @@ impl Vauchi {
             .as_ref()
             .ok_or(VauchiError::IdentityNotInitialized)?;
 
-        // Verify the contact exists
-        let _contact = self
+        // The guardian checks the person against this contact, so the
+        // claim must be for the contact's key (vauchi/private#708).
+        let contact = self
             .storage
             .contacts()
             .load_contact(contact_id)?
             .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
+        if contact.public_key() != Some(claim.old_pk().as_bytes()) {
+            return Err(VauchiError::ContactNotFound(hex::encode(claim.old_pk())));
+        }
 
         // Query relay for guardian entries
         let guardian_hash = compute_guardian_hash(claim.old_pk().as_bytes());
@@ -320,15 +324,13 @@ impl Vauchi {
         })?;
 
         // Create voucher: signs (old_pk, new_pk) with our keypair, attaching the guardian token
-        let voucher = RecoveryVoucher::create(
-            *claim.old_pk(),
-            *claim.new_pk(),
+        RecoveryVoucher::create_from_claim(
+            claim,
             identity.signing_keypair(),
             Some(token),
-            0,
-        );
-
-        Ok(voucher)
+            self.clock.unix_seconds(),
+        )
+        .map_err(|e| VauchiError::InvalidState(e.to_string()))
     }
 
     /// Saves a recovery response (accept, reject, or remind me later).

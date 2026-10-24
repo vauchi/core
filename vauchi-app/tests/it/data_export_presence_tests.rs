@@ -65,7 +65,8 @@ fn the_first_export_has_the_shell_seal_a_secret_and_continues_once_it_does() {
     let _ = press(&mut engine, "export");
 
     assert_eq!(screen_id(&engine), "export_await_presence");
-    let Some(Command::CreateUserPresenceSecret { prompt }) = presence_request(&mut engine) else {
+    let Some(Command::CreateUserPresenceSecret { prompt, .. }) = presence_request(&mut engine)
+    else {
         panic!("the first export asks the shell to seal a secret");
     };
     assert!(!prompt.is_empty(), "the OS prompt carries Core's copy");

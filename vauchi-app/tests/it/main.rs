@@ -77,6 +77,7 @@ mod contextual_surface_tests;
 #[path = "../contextual_undo_tests.rs"]
 mod contextual_undo_tests;
 mod credential_change_pin_tests;
+mod data_export_biometric_tests;
 mod data_export_duress_tests;
 mod data_export_format_tests;
 mod data_export_presence_tests;

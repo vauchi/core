@@ -286,6 +286,7 @@ fn every_mobile_event() -> Vec<MobileEvent> {
             secret: vec![9; 32],
         },
         MobileEvent::UserPresenceCheckCancelled,
+        MobileEvent::UserPresenceSecretMissing,
         MobileEvent::HardwareError {
             transport: "ble".into(),
             error: "radio off".into(),
@@ -340,6 +341,7 @@ fn variant_name(event: &MobileEvent) -> &'static str {
         MobileEvent::UserPresenceSecretCreated { .. } => "UserPresenceSecretCreated",
         MobileEvent::UserPresenceSecretRevealed { .. } => "UserPresenceSecretRevealed",
         MobileEvent::UserPresenceCheckCancelled => "UserPresenceCheckCancelled",
+        MobileEvent::UserPresenceSecretMissing => "UserPresenceSecretMissing",
         MobileEvent::HardwareError { .. } => "HardwareError",
         MobileEvent::HardwareUnavailable { .. } => "HardwareUnavailable",
         MobileEvent::PermissionDenied { .. } => "PermissionDenied",
@@ -357,7 +359,7 @@ fn hardware_event_json_carries_every_mobile_event_through_the_canonical_reader()
     let covered: std::collections::BTreeSet<_> = events.iter().map(variant_name).collect();
     assert_eq!(
         covered.len(),
-        33,
+        34,
         "a sample for each MobileEvent variant: {covered:?}"
     );
 
@@ -397,6 +399,10 @@ fn hardware_event_json_writes_the_user_presence_events_the_shells_wrote_by_hand(
         (
             MobileEvent::UserPresenceCheckCancelled,
             r#""UserPresenceCheckCancelled""#,
+        ),
+        (
+            MobileEvent::UserPresenceSecretMissing,
+            r#""UserPresenceSecretMissing""#,
         ),
     ];
 

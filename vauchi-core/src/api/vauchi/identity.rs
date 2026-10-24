@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use crate::card::{ContactCard, ContactField};
+use crate::card::{ContactCard, ContactField, MAX_DISPLAY_NAME_LENGTH};
 use crate::identity::Identity;
 use crate::reminders::BackupReminderState;
 use crate::settings::SettingsFlags;
@@ -383,7 +383,7 @@ impl Vauchi {
                 "Display name cannot be empty".into(),
             ));
         }
-        if name.len() > 100 {
+        if name.chars().count() > MAX_DISPLAY_NAME_LENGTH {
             return Err(VauchiError::InvalidState(
                 "Display name cannot exceed 100 characters".into(),
             ));

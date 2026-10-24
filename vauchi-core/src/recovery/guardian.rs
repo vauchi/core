@@ -10,7 +10,13 @@
 
 #![cfg_attr(
     not(test),
-    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+    deny(
+        clippy::arithmetic_side_effects,
+        clippy::indexing_slicing,
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic
+    )
 )]
 
 use crate::capacity::capacity;
@@ -115,6 +121,9 @@ impl GuardianToken {
     }
 
     /// Serializes the token to postcard bytes.
+    // INVARIANT: postcard into a growable Vec fails only on sequences of
+    // unknown length, which derived Serialize never emits (vauchi/private#761).
+    #[allow(clippy::expect_used)]
     pub fn to_bytes(&self) -> Vec<u8> {
         postcard::to_allocvec(self).expect("GuardianToken serialization must not fail")
     }

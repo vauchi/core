@@ -23,7 +23,7 @@ fn create_test_contact() -> Contact {
 #[test]
 fn test_contact_sync_data_roundtrip() {
     let contact = create_test_contact();
-    let sync_data = ContactSyncData::from_contact(&contact);
+    let sync_data = ContactSyncData::from_contact(&contact).expect("an exchanged contact syncs");
     let restored = sync_data.to_contact().unwrap();
 
     assert_eq!(restored.id(), contact.id());
@@ -36,7 +36,7 @@ fn test_contact_sync_data_roundtrip() {
 #[test]
 fn test_contact_sync_data_serialization() {
     let contact = create_test_contact();
-    let sync_data = ContactSyncData::from_contact(&contact);
+    let sync_data = ContactSyncData::from_contact(&contact).expect("an exchanged contact syncs");
 
     let json = serde_json::to_string(&sync_data).unwrap();
     let restored: ContactSyncData = serde_json::from_str(&json).unwrap();
@@ -112,7 +112,7 @@ fn test_sync_item_card_updated() {
 #[test]
 fn test_sync_item_contact_added() {
     let contact = create_test_contact();
-    let sync_data = ContactSyncData::from_contact(&contact);
+    let sync_data = ContactSyncData::from_contact(&contact).expect("an exchanged contact syncs");
 
     let item = SyncItem::ContactAdded {
         contact_data: sync_data,
@@ -495,7 +495,8 @@ fn test_device_sync_payload_backward_compat_no_imported_field() {
 #[test]
 fn test_contact_sync_data_to_contact_rejects_degenerate_shared_key() {
     let contact = create_test_contact();
-    let mut sync_data = ContactSyncData::from_contact(&contact);
+    let mut sync_data =
+        ContactSyncData::from_contact(&contact).expect("an exchanged contact syncs");
     sync_data.shared_key = [0u8; 32];
 
     let result = sync_data.to_contact();

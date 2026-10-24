@@ -15,7 +15,13 @@
 
 #![cfg_attr(
     not(test),
-    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+    deny(
+        clippy::arithmetic_side_effects,
+        clippy::indexing_slicing,
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic
+    )
 )]
 
 use crate::capacity::capacity;
@@ -349,6 +355,8 @@ impl CardDelta {
     /// Compresses a payload using DEFLATE compression.
     ///
     /// Useful for reducing the size of delta payloads before transmission.
+    // INVARIANT: writing into a Vec cannot fail (vauchi/private#761).
+    #[allow(clippy::expect_used)]
     pub fn compress_payload(payload: &[u8]) -> Vec<u8> {
         use flate2::Compression;
         use flate2::write::DeflateEncoder;
@@ -406,7 +414,12 @@ impl CardDelta {
             sender_pk,
             recipient_pk,
         };
-        serde_json::to_vec(&signable).expect("SignableDelta serialization is infallible")
+        // INVARIANT: SignableDelta holds no maps, so serde_json cannot fail
+        // (vauchi/private#761).
+        #[allow(clippy::expect_used)]
+        let bytes =
+            serde_json::to_vec(&signable).expect("SignableDelta serialization is infallible");
+        bytes
     }
 }
 

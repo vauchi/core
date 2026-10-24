@@ -9,7 +9,13 @@
 
 #![cfg_attr(
     not(test),
-    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+    deny(
+        clippy::arithmetic_side_effects,
+        clippy::indexing_slicing,
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic
+    )
 )]
 
 use crate::crypto::X3DHKeyPair;
@@ -414,6 +420,9 @@ impl DeviceRegistry {
     }
 
     /// Serializes the registry to JSON.
+    // INVARIANT: derived Serialize with string-keyed maps; serde_json fails
+    // only on non-string map keys (vauchi/private#761).
+    #[allow(clippy::expect_used)]
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).expect("Registry serialization should not fail")
     }
@@ -625,6 +634,9 @@ impl RegistryBroadcast {
     }
 
     /// Serializes to JSON.
+    // INVARIANT: derived Serialize with string-keyed maps; serde_json fails
+    // only on non-string map keys (vauchi/private#761).
+    #[allow(clippy::expect_used)]
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).expect("Broadcast serialization should not fail")
     }

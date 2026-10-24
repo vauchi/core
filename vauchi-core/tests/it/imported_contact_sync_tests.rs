@@ -13,7 +13,7 @@ use vauchi_core::ImportSource;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::sync::{ImportedContactSyncData, SyncItem};
+use vauchi_core::sync::{ContactSyncData, ImportedContactSyncData, SyncItem};
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -174,6 +174,21 @@ fn imported_sync_data_returns_none_for_exchanged() {
     assert!(
         result.is_none(),
         "from_contact must return None for an exchanged contact"
+    );
+}
+
+/// `ContactSyncData::from_contact` returns `None` for an imported contact —
+/// it has no keys to sync — instead of panicking.
+// @internal
+#[test]
+fn exchanged_sync_data_returns_none_for_imported() {
+    let contact = make_imported("Mallory");
+
+    let result = ContactSyncData::from_contact(&contact);
+
+    assert!(
+        result.is_none(),
+        "from_contact must return None for an imported contact"
     );
 }
 

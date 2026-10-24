@@ -6,7 +6,13 @@
 
 #![cfg_attr(
     not(test),
-    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+    deny(
+        clippy::arithmetic_side_effects,
+        clippy::indexing_slicing,
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic
+    )
 )]
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
@@ -186,6 +192,9 @@ impl DeviceLinkQR {
         use qrcode::QrCode;
 
         let data = self.to_data_string();
+        // INVARIANT: the payload is a fixed 141 bytes, far under QR capacity
+        // (vauchi/private#761).
+        #[allow(clippy::expect_used)]
         let code = QrCode::new(&data).expect("QR generation should not fail");
 
         code.render()

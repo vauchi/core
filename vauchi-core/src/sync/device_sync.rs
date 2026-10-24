@@ -9,7 +9,13 @@
 
 #![cfg_attr(
     not(test),
-    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+    deny(
+        clippy::arithmetic_side_effects,
+        clippy::indexing_slicing,
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic
+    )
 )]
 
 use std::collections::HashMap;
@@ -489,6 +495,9 @@ impl SyncItem {
     }
 
     /// Serializes this item to JSON.
+    // INVARIANT: derived Serialize with string-keyed maps; serde_json fails
+    // only on non-string map keys (vauchi/private#761).
+    #[allow(clippy::expect_used)]
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).expect("SyncItem serialization should not fail")
     }
@@ -609,6 +618,9 @@ impl InterDeviceSyncState {
     }
 
     /// Serializes the sync state to JSON.
+    // INVARIANT: derived Serialize with string-keyed maps; serde_json fails
+    // only on non-string map keys (vauchi/private#761).
+    #[allow(clippy::expect_used)]
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).expect("InterDeviceSyncState serialization should not fail")
     }
@@ -756,6 +768,9 @@ impl VersionVector {
     }
 
     /// Serializes the version vector to JSON.
+    // INVARIANT: derived Serialize with string-keyed maps; serde_json fails
+    // only on non-string map keys (vauchi/private#761).
+    #[allow(clippy::expect_used)]
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).expect("VersionVector serialization should not fail")
     }

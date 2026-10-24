@@ -21,7 +21,13 @@
 
 #![cfg_attr(
     not(test),
-    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+    deny(
+        clippy::arithmetic_side_effects,
+        clippy::indexing_slicing,
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic
+    )
 )]
 
 use crate::capacity::capacity;
@@ -490,6 +496,8 @@ fn guardian_key_confirmation(
         HKDF::expand(&prk, GUARDIAN_KEY_CONFIRMATION_HKDF_INFO, 32)
             .map_err(|_| BackupError::KeyDerivation)?,
     );
+    // INVARIANT: HMAC takes a key of any length (vauchi/private#761).
+    #[allow(clippy::expect_used)]
     let mut mac = HmacSha256::new_from_slice(&confirmation_key)
         .expect("HKDF produces a valid HMAC key length");
     mac.update(GUARDIAN_KEY_CONFIRMATION_DOMAIN);

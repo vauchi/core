@@ -261,8 +261,7 @@ impl Vauchi {
     /// Adds a new contact from an exchange.
     pub fn add_contact(&self, contact: Contact) -> VauchiResult<()> {
         // Record sync before add (need contact data while we still own it)
-        if contact.is_exchanged() {
-            let sync_data = crate::sync::ContactSyncData::from_contact(&contact);
+        if let Some(sync_data) = crate::sync::ContactSyncData::from_contact(&contact) {
             self.record_sync_item(crate::sync::SyncItem::ContactAdded {
                 contact_data: sync_data,
                 timestamp: self.now_timestamp(),
@@ -302,8 +301,7 @@ impl Vauchi {
         match manager.update_contact(contact) {
             Ok(_) => Ok(()),
             Err(VauchiError::ContactNotFound(_)) => {
-                if contact.is_exchanged() {
-                    let sync_data = crate::sync::ContactSyncData::from_contact(contact);
+                if let Some(sync_data) = crate::sync::ContactSyncData::from_contact(contact) {
                     self.record_sync_item(crate::sync::SyncItem::ContactAdded {
                         contact_data: sync_data,
                         timestamp: self.now_timestamp(),

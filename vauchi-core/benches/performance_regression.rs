@@ -368,7 +368,8 @@ fn bench_sync_latency_10_devices(c: &mut Criterion) {
                 let items: Vec<SyncItem> = contacts
                     .iter()
                     .map(|c| SyncItem::ContactAdded {
-                        contact_data: vauchi_core::sync::ContactSyncData::from_contact(c),
+                        contact_data: vauchi_core::sync::ContactSyncData::from_contact(c)
+                            .expect("an exchanged contact syncs"),
                         timestamp: 1234567890,
                     })
                     .collect();

@@ -13,7 +13,13 @@
 
 #![cfg_attr(
     not(test),
-    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+    deny(
+        clippy::arithmetic_side_effects,
+        clippy::indexing_slicing,
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic
+    )
 )]
 
 use super::ExchangeError;
@@ -70,6 +76,8 @@ impl ExchangeNfc {
         timestamp: u64,
     ) -> Self {
         let bytes = build_exchange_payload(NFC_MAGIC, identity, ephemeral, token, timestamp);
+        // INVARIANT: re-parses the payload just built above (vauchi/private#761).
+        #[allow(clippy::expect_used)]
         let inner = parse_exchange_payload(&bytes, NFC_MAGIC, ExchangeError::InvalidNfcFormat)
             .expect("Freshly built payload should parse");
         ExchangeNfc { inner }

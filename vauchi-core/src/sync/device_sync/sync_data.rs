@@ -65,20 +65,19 @@ impl ContactSyncData {
     /// Creates sync data from a contact.
     ///
     /// Only exchanged contacts can be synced (imported contacts have no crypto
-    /// fields). Panics if called on an imported contact — callers should filter.
-    pub fn from_contact(contact: &Contact) -> Self {
-        // All synced contacts are exchanged. Imported contacts are not synced.
-        let ex = contact
-            .kind()
-            .exchanged_data()
-            .expect("Only exchanged contacts can be synced");
+    /// fields); an imported contact returns `None`.
+    // INVARIANT: derived Serialize with string-keyed maps; serde_json fails
+    // only on non-string map keys (vauchi/private#761).
+    #[allow(clippy::expect_used)]
+    pub fn from_contact(contact: &Contact) -> Option<Self> {
+        let ex = contact.kind().exchanged_data()?;
 
         let card_json =
             serde_json::to_string(contact.card()).expect("Card serialization should not fail");
         let visibility_rules_json = serde_json::to_string(&ex.visibility_rules)
             .expect("Visibility rules serialization should not fail");
 
-        ContactSyncData {
+        Some(ContactSyncData {
             id: contact.id().to_string(),
             public_key: IdentityKey::from(ex.public_key),
             display_name: contact.display_name().to_string(),
@@ -93,7 +92,7 @@ impl ContactSyncData {
             favorite: contact.is_favorite(),
             archived_at: contact.archived_at(),
             ignored_at: contact.ignored_at(),
-        }
+        })
     }
 
     /// Converts sync data back to a contact.

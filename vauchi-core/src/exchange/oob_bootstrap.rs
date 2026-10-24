@@ -17,7 +17,13 @@
 
 #![cfg_attr(
     not(test),
-    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+    deny(
+        clippy::arithmetic_side_effects,
+        clippy::indexing_slicing,
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic
+    )
 )]
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
@@ -89,6 +95,8 @@ impl OobBootstrapQr {
         timestamp: u64,
     ) -> Self {
         let bytes = build_exchange_payload(OOB_QR_MAGIC, identity, ephemeral, token, timestamp);
+        // INVARIANT: re-parses the payload just built above (vauchi/private#761).
+        #[allow(clippy::expect_used)]
         let inner = parse_exchange_payload(&bytes, OOB_QR_MAGIC, ExchangeError::InvalidQRFormat)
             .expect("freshly built OOB payload must parse");
         Self { inner }

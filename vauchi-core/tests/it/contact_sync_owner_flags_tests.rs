@@ -74,7 +74,7 @@ proptest! {
     // @scenario: device_management :: New device receives full state
     #[test]
     fn full_link_payload_preserves_every_owner_flag(flags in owner_flags()) {
-        let json = serde_json::to_string(&ContactSyncData::from_contact(&contact_with(&flags))).unwrap();
+        let json = serde_json::to_string(&ContactSyncData::from_contact(&contact_with(&flags)).expect("an exchanged contact syncs")).unwrap();
         let restored: ContactSyncData = serde_json::from_str(&json).unwrap();
 
         prop_assert_eq!(flags_of(&restored.to_contact().unwrap()), flags);
@@ -86,15 +86,17 @@ proptest! {
 // @scenario: device_management :: New device receives full state
 #[test]
 fn payload_without_owner_flags_decodes_with_defaults() {
-    let mut value =
-        serde_json::to_value(ContactSyncData::from_contact(&contact_with(&OwnerFlags {
+    let mut value = serde_json::to_value(
+        ContactSyncData::from_contact(&contact_with(&OwnerFlags {
             blocked: true,
             hidden: true,
             favorite: true,
             archived_at: Some(7),
             ignored_at: Some(9),
-        })))
-        .unwrap();
+        }))
+        .expect("an exchanged contact syncs"),
+    )
+    .unwrap();
     let object = value.as_object_mut().unwrap();
     for field in ["blocked", "hidden", "favorite", "archived_at", "ignored_at"] {
         object.remove(field);

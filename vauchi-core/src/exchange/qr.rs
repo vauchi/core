@@ -21,7 +21,13 @@
 
 #![cfg_attr(
     not(test),
-    deny(clippy::arithmetic_side_effects, clippy::indexing_slicing)
+    deny(
+        clippy::arithmetic_side_effects,
+        clippy::indexing_slicing,
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic
+    )
 )]
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
@@ -368,6 +374,9 @@ impl ExchangeQR {
         use qrcode::QrCode;
 
         let data = self.to_qr_url();
+        // TODO(vauchi/private#802): an over-long display name can exceed QR
+        // capacity and panic here until create_identity enforces the limit.
+        #[allow(clippy::expect_used)]
         let code = QrCode::new(&data).expect("QR generation should not fail");
 
         code.render()

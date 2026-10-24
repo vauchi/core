@@ -148,7 +148,8 @@ fn test_conflict_contact_add_then_remove() {
     // Contact added at t=1000
     let contact = create_test_contact("Eve");
     let contact_id = contact.id().to_string();
-    let contact_data = vauchi_core::sync::ContactSyncData::from_contact(&contact);
+    let contact_data = vauchi_core::sync::ContactSyncData::from_contact(&contact)
+        .expect("an exchanged contact syncs");
     let add_item = SyncItem::ContactAdded {
         contact_data,
         timestamp: 1000,
@@ -170,7 +171,8 @@ fn test_conflict_contact_add_then_remove() {
 
     // Re-add at t=1500 (older than remove — should be rejected)
     let contact2 = create_test_contact("Eve");
-    let contact_data2 = vauchi_core::sync::ContactSyncData::from_contact(&contact2);
+    let contact_data2 = vauchi_core::sync::ContactSyncData::from_contact(&contact2)
+        .expect("an exchanged contact syncs");
     let readd_item = SyncItem::ContactAdded {
         contact_data: contact_data2,
         timestamp: 1500,

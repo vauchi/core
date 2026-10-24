@@ -411,7 +411,8 @@ fn test_checkpoint_save_load_roundtrip() {
                 ContactCard::new("Bob"),
                 SymmetricKey::generate(),
                 0,
-            )),
+            ))
+            .expect("an exchanged contact syncs"),
             timestamp: 300,
         },
     ];

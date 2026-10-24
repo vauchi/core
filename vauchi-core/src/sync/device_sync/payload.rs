@@ -77,12 +77,15 @@ impl DeviceSyncPayload {
         let mut imported = Vec::new();
         for contact in contacts {
             if contact.is_exchanged() {
-                exchanged.push(ContactSyncData::from_contact(contact));
+                exchanged.extend(ContactSyncData::from_contact(contact));
             } else if let Some(sync_data) = ImportedContactSyncData::from_contact(contact) {
                 imported.push(sync_data);
             }
         }
 
+        // INVARIANT: derived Serialize with string-keyed maps; serde_json fails
+        // only on non-string map keys (vauchi/private#761).
+        #[allow(clippy::expect_used)]
         let own_card_json =
             serde_json::to_string(own_card).expect("Card serialization should not fail");
 
@@ -145,6 +148,9 @@ impl DeviceSyncPayload {
     }
 
     /// Serializes the payload to JSON.
+    // INVARIANT: derived Serialize with string-keyed maps; serde_json fails
+    // only on non-string map keys (vauchi/private#761).
+    #[allow(clippy::expect_used)]
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).expect("DeviceSyncPayload serialization should not fail")
     }

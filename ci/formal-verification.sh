@@ -112,4 +112,15 @@ tamarin_expect "$models/reciprocity.spthy" falsified "-DNO_SIGNATURE" \
     a_leaked_shared_key_also_needs_the_identity_key
 tamarin_expect "$models/reciprocity.spthy" falsified "-DNO_SIGNATURE -DSYMMETRIC_TOKENS" \
     confirmed_means_the_peer_confirmed
+# Recovery acceptance (#796): both rekey designs; the remote one cannot
+# authenticate John to Alice, which the exists-trace lemma records.
+tamarin_expect "$models/recovery_acceptance.spthy" verified "" \
+    executable accept_needs_the_real_recovery john_key_secrecy \
+    a_stranger_can_rekey_with_the_recovering_user
+tamarin_expect "$models/recovery_acceptance.spthy" verified "-DIN_PERSON" \
+    executable accept_needs_the_real_recovery john_key_secrecy \
+    alice_rekeys_only_with_an_accepting_contact
+# Without #797's check the stolen device and one corrupted helper suffice.
+tamarin_expect "$models/recovery_acceptance.spthy" falsified "-DNO_LOST_KEY_CHECK" \
+    accept_needs_the_real_recovery
 echo "formal verification OK"

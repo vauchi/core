@@ -1,0 +1,207 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * Accepting a contact's recovery (vauchi/private#796): the acceptance
+ * Core runs today, and two candidate designs for the key exchange that
+ * has to follow it. It found #797: the lost device's own key counted as a
+ * voucher.
+ *
+ *   - Alice loses her device and makes a new identity; its key replaces
+ *     her old one (recovery/mod.rs `RecoveryClaim`).
+ *   - A helper vouches by signing (old key, new key, own key) for a claim
+ *     shown in person, and only when the old key is the helper's contact
+ *     (vauchi/private#708).
+ *   - John accepts the proof once two distinct contacts of his vouched
+ *     (`RecoveryProof::verify_for_contact`, verification threshold 2).
+ *   - John then needs a shared key with Alice's new identity:
+ *       default: remotely, each side signing a fresh exchange key with its
+ *         identity key over a hostile network (link mode with the ADR-050
+ *         v2 bootstrap signature);
+ *       -DIN_PERSON: through a new in-person exchange (qr_exchange.spthy).
+ *
+ * The attacker owns the network and the relay, may steal Alice's old
+ * device (its key) and may corrupt any helper's identity key. In-person
+ * steps are authentic channels.
+ *
+ * Run: tamarin-prover --prove recovery_acceptance.spthy
+ *      tamarin-prover --prove -DIN_PERSON recovery_acceptance.spthy
+ * Prove it can fail: -DNO_LOST_KEY_CHECK (a voucher signed with the old
+ *   key counts, as before #797); accept_needs_the_real_recovery must then
+ *   be falsified: the stolen device and one corrupted helper suffice.
+ * Helpers vouch only for a contact (#708); the variant without that check
+ *   exhausts 8 GB, so #708 rests on its tests.
+ */
+
+theory VauchiRecoveryAcceptance
+begin
+
+builtins: diffie-hellman, signing, hashing
+
+restriction Equality:
+  "All x y #i. Eq(x, y) @ i ==> x = y"
+
+restriction Inequality:
+  "All x #i. Neq(x, x) @ i ==> F"
+
+restriction Once:
+  "All x #i #j. Once(x) @ i & Once(x) @ j ==> #i = #j"
+
+/* The cast, after their in-person exchanges: Bob, Carol and John know
+   Alice; John also knows Bob and Carol, the helpers he will count. */
+rule Setup:
+  [ Fr(~la), Fr(~lb), Fr(~lc), Fr(~lj) ]
+  --[ Once('setup') ]->
+  [ !Ltk('Alice', ~la), !Ltk('Bob', ~lb), !Ltk('Carol', ~lc), !Ltk('John', ~lj)
+  , !Contact('Bob', 'Alice', pk(~la)), !Contact('Carol', 'Alice', pk(~la))
+  , !Contact('John', 'Alice', pk(~la))
+  , !Contact('John', 'Bob', pk(~lb)), !Contact('John', 'Carol', pk(~lc))
+  , Out(<pk(~la), pk(~lb), pk(~lc), pk(~lj)>)
+  ]
+
+rule Corrupt_identity:
+  [ !Ltk(A, ltk) ]
+  --[ Compromised(A) ]->
+  [ Out(ltk) ]
+
+/* Alice loses her device; a thief may have its key. She makes a new identity. */
+rule Lose_device:
+  [ !Ltk('Alice', old), Fr(~new) ]
+  --[ Once('lose'), Recovered('Alice', pk(old), pk(~new)), LostDevice('Alice') ]->
+  [ !NewLtk('Alice', ~new), !Recovering('Alice', pk(old), pk(~new))
+  , Out(pk(~new)), Out(old)
+  ]
+
+rule Corrupt_new_identity:
+  [ !NewLtk(A, new) ]
+  --[ CompromisedNew(A) ]->
+  [ Out(new) ]
+
+/* The recovering person stands in front of a helper who has her old key. */
+rule Vouch:
+  let voucher = <'vauchi-recovery-voucher-v1', old_pk, new_pk, pk(lv)>
+  in
+  [ !Contact(V, A, old_pk), !Recovering(A, old_pk, new_pk), !Ltk(V, lv) ]
+  --[ Vouched(V, old_pk, new_pk) ]->
+  [ Out(<voucher, sign(voucher, lv)>) ]
+
+#ifdef NO_LOST_KEY_CHECK
+/* Before #797: a voucher signed with the old key counts. */
+rule Accept_proof:
+  let v1 = <'vauchi-recovery-voucher-v1', old_pk, new_pk, pk1>
+      v2 = <'vauchi-recovery-voucher-v1', old_pk, new_pk, pk2>
+  in
+  [ !Contact(J, A, old_pk), !Contact(J, V1, pk1), !Contact(J, V2, pk2)
+  , In(<<v1, s1>, <v2, s2>>)
+  ]
+  --[ Eq(verify(s1, v1, pk1), true), Eq(verify(s2, v2, pk2), true), Neq(pk1, pk2)
+    , Accept(J, A, old_pk, new_pk, V1, V2)
+    ]->
+  [ !Accepted(J, A, new_pk) ]
+#else
+/* John accepts once two distinct contacts of his vouched, neither with a
+   key of the recovery itself (`RecoveryProof::is_self_voucher`). */
+rule Accept_proof:
+  let v1 = <'vauchi-recovery-voucher-v1', old_pk, new_pk, pk1>
+      v2 = <'vauchi-recovery-voucher-v1', old_pk, new_pk, pk2>
+  in
+  [ !Contact(J, A, old_pk), !Contact(J, V1, pk1), !Contact(J, V2, pk2)
+  , In(<<v1, s1>, <v2, s2>>)
+  ]
+  --[ Eq(verify(s1, v1, pk1), true), Eq(verify(s2, v2, pk2), true), Neq(pk1, pk2)
+    , Neq(pk1, old_pk), Neq(pk2, old_pk), Neq(pk1, new_pk), Neq(pk2, new_pk)
+    , Accept(J, A, old_pk, new_pk, V1, V2)
+    ]->
+  [ !Accepted(J, A, new_pk) ]
+#endif
+
+#ifdef IN_PERSON
+/* John and Alice meet again and exchange; the meeting shows John the
+   device that holds the new key. */
+rule Reexchange_in_person:
+  [ !Accepted(J, A, pk(n)), !NewLtk(A, n), !Ltk(J, lj), Fr(~k) ]
+  --[ JohnRekeyed(J, A, pk(n), ~k), AliceRekeyed(A, pk(lj), ~k) ]->
+  [ ]
+#else
+/* Alice's new identity publishes a signed exchange key. */
+rule Alice_publishes:
+  let ga = 'g' ^ ~ea
+      offer = <'vauchi-recovery-rekey-offer', pk(n), ga>
+  in
+  [ !NewLtk(A, n), Fr(~ea) ]
+  -->
+  [ AliceOffer(A, n, ~ea), Out(<offer, sign(offer, n)>) ]
+
+/* John answers the key his accepted proof names. */
+rule John_answers:
+  let offer = <'vauchi-recovery-rekey-offer', new_pk, ga>
+      gj = 'g' ^ ~ej
+      answer = <'vauchi-recovery-rekey-answer', pk(lj), gj, ga>
+      k = h(<ga ^ ~ej, new_pk, pk(lj)>)
+  in
+  [ !Accepted(J, A, new_pk), !Ltk(J, lj), In(<offer, so>), Fr(~ej) ]
+  --[ Eq(verify(so, offer, new_pk), true), JohnRekeyed(J, A, new_pk, k) ]->
+  [ Out(<answer, sign(answer, lj)>) ]
+
+rule Alice_completes:
+  let ga = 'g' ^ ea
+      answer = <'vauchi-recovery-rekey-answer', pkj, gj, ga>
+      k = h(<gj ^ ea, pk(n), pkj>)
+  in
+  [ AliceOffer(A, n, ea), In(<answer, sa>) ]
+  --[ Eq(verify(sa, answer, pkj), true), AliceRekeyed(A, pkj, k) ]->
+  [ ]
+#endif
+
+lemma executable:
+  exists-trace
+  "Ex J A o n V1 V2 k pkj #a #j #l.
+     Accept(J, A, o, n, V1, V2) @ a & JohnRekeyed(J, A, n, k) @ j
+     & AliceRekeyed(A, pkj, k) @ l
+     & not (Ex X #c. Compromised(X) @ c)
+     & not (Ex X #c. CompromisedNew(X) @ c)"
+
+/* John replaces a contact's key only with the key that contact really
+   recovered to, unless both helpers he counted were compromised (their key
+   corrupted or on a lost device). The recovering person's own lost device
+   never counts as one of them (#797). */
+lemma accept_needs_the_real_recovery:
+  "All J A o n V1 V2 #a.
+     Accept(J, A, o, n, V1, V2) @ a
+     ==> (Ex #r. Recovered(A, o, n) @ r)
+         | (not (V1 = A) & not (V2 = A)
+            & ((Ex #c. Compromised(V1) @ c) | (Ex #c. LostDevice(V1) @ c))
+            & ((Ex #d. Compromised(V2) @ d) | (Ex #d. LostDevice(V2) @ d)))"
+
+/* John's new key with the recovered contact stays secret unless both
+   counted helpers or the contact's new identity are corrupted. */
+lemma john_key_secrecy:
+  "All J A n k #j.
+     JohnRekeyed(J, A, n, k) @ j
+     ==> not (Ex #x. K(k) @ x)
+         | (Ex #c. CompromisedNew(A) @ c)
+         | (Ex o V1 V2 #a.
+              Accept(J, A, o, n, V1, V2) @ a
+              & not (V1 = A) & not (V2 = A)
+              & ((Ex #c. Compromised(V1) @ c) | (Ex #c. LostDevice(V1) @ c))
+              & ((Ex #d. Compromised(V2) @ d) | (Ex #d. LostDevice(V2) @ d)))"
+
+#ifdef IN_PERSON
+/* Alice shares the key only with someone who accepted her recovery. */
+lemma alice_rekeys_only_with_an_accepting_contact:
+  "All A pkj k #l.
+     AliceRekeyed(A, pkj, k) @ l
+     ==> Ex J n #j. JohnRekeyed(J, A, n, k) @ j"
+#else
+/* Limit: remotely, Alice cannot tell an old contact from a stranger: she
+   lost every contact with her device, so any identity can answer her. */
+lemma a_stranger_can_rekey_with_the_recovering_user:
+  exists-trace
+  "Ex A pkj k #l.
+     AliceRekeyed(A, pkj, k) @ l
+     & not (Ex J n #j. JohnRekeyed(J, A, n, k) @ j)
+     & not (Ex X #c. CompromisedNew(X) @ c)"
+#endif
+
+end

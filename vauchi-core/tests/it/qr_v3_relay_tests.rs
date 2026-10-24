@@ -33,6 +33,30 @@ fn v3_roundtrip_no_relay_metadata() {
     assert!(parsed.verify_signature());
 }
 
+/// A name the card accepts — 100 characters, here 400 bytes — must survive
+/// the QR, and 101 characters must not, even in fewer bytes (private#802).
+// @internal
+#[test]
+fn v3_roundtrip_keeps_a_full_length_multibyte_name() {
+    let ephemeral = X3DHKeyPair::generate();
+    let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
+    let full = "𝄞".repeat(100);
+    let over = "名".repeat(101);
+
+    let parsed = ExchangeQR::from_data_string(
+        &ExchangeQR::generate(&Identity::create(&full, 0), &ephemeral, now).to_data_string(),
+    );
+    let rejected = ExchangeQR::from_data_string(
+        &ExchangeQR::generate(&Identity::create(&over, 0), &ephemeral, now).to_data_string(),
+    );
+
+    assert_eq!(
+        parsed.expect("a 100-character name parses").display_name(),
+        full
+    );
+    rejected.expect_err("a 101-character name is over the card's limit");
+}
+
 // ── Roundtrip with relay metadata ──────────────────────────────────
 
 // @internal

@@ -368,6 +368,26 @@ fn create_recovery_voucher_rejects_self_vouching() {
     );
 }
 
+// @internal
+#[test]
+fn create_recovery_voucher_refuses_a_claim_for_someone_not_a_contact() {
+    use base64::Engine;
+    use vauchi_core::recovery::RecoveryClaim;
+    let (engine, _dir) = create_engine_with_identity();
+    let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
+    let stranger_claim = RecoveryClaim::new(&[0x33u8; 32], &[0x44u8; 32], now);
+
+    let result = engine.dispatch_domain_command(DomainCommand::CreateRecoveryVoucher {
+        claim_b64: base64::engine::general_purpose::STANDARD.encode(stranger_claim.to_bytes()),
+    });
+
+    let err = format!(
+        "{:?}",
+        result.expect_err("a stranger's claim must be refused")
+    );
+    assert!(err.contains("not a contact"), "error must say why: {err}");
+}
+
 // ── trust_contact_for_recovery / untrust / count ─────────────────────
 //
 // Slice 32g-B (2026-05-17): the direct PAE pub fns retired in favour

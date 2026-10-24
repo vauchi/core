@@ -1,6 +1,7 @@
 {
   "acyclic_crates": [
-    "vauchi-core"
+    "vauchi-core",
+    "vauchi-hardware"
   ],
   "compatibility_modules": [
     "vauchi-core/types"
@@ -9,8 +10,15 @@
     "vauchi-app": 2,
     "vauchi-cabi": 3,
     "vauchi-core": 1,
+    "vauchi-hardware": 2,
     "vauchi-platform": 3,
     "vauchi-protocol": 0
+  },
+  "external_modules": {
+    "vauchi-hardware": ["vauchi-core/platform"]
+  },
+  "dependencies": {
+    "vauchi-hardware": ["vauchi-core", "tokio", "thiserror", "futures-util"]
   },
   "layers": {
     "vauchi-app/activity_log_writer": 1,
@@ -82,6 +90,11 @@
     "vauchi-core/types": 5,
     "vauchi-core/version": 0,
     "vauchi-core/visibility": 1,
+    "vauchi-hardware/delivery": 0,
+    "vauchi-hardware/ports": 1,
+    "vauchi-hardware/worker": 2,
+    "vauchi-hardware/discovery": 3,
+    "vauchi-hardware/lib": 4,
     "vauchi-platform/cached_content": 0,
     "vauchi-platform/content": 0,
     "vauchi-platform/diagnostic": 0,

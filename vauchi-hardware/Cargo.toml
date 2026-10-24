@@ -13,7 +13,7 @@ publish = false
 vauchi-core.workspace = true
 tokio = { version = "1", features = ["rt", "sync", "macros"] }
 thiserror = "2"
-futures = "0.3"
+futures-util = { version = "0.3", default-features = false, features = ["std", "async-await"] }
 
 [lints]
 workspace = true

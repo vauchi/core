@@ -3,7 +3,7 @@
 
 use crate::delivery::EventSender;
 use crate::ports::{Discovery, HardwareFailure};
-use futures::FutureExt;
+use futures_util::FutureExt;
 use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 use tokio::sync::{Notify, watch};

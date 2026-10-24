@@ -738,6 +738,11 @@ criteria = "safe-to-deploy"
 version = "1.2.1"
 criteria = "safe-to-deploy"
 
+[[exemptions.syn]]
+version = "3.0.9"
+criteria = "safe-to-deploy"
+notes = "Unaudited parser dependency of tokio-macros used by the shared hardware worker (#770)."
+
 [[exemptions.synthez]]
 version = "0.3.1"
 criteria = "safe-to-run"
@@ -777,6 +782,11 @@ criteria = "safe-to-deploy"
 [[exemptions.tokio]]
 version = "1.53.3"
 criteria = "safe-to-deploy"
+
+[[exemptions.tokio-macros]]
+version = "2.7.2"
+criteria = "safe-to-deploy"
+notes = "Unaudited select/test procedural macros for the shared hardware worker (#770)."
 
 [[exemptions.tracing]]
 version = "0.1.44"

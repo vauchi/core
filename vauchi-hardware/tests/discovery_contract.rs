@@ -6,8 +6,8 @@ use std::num::NonZeroUsize;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use tokio::sync::{mpsc, oneshot};
-use vauchi_core::platform::Event;
 use vauchi_core::platform::executor::{DeliveryError, InboxLimits};
+use vauchi_core::platform::{BleAdvertisementObservation, BleServiceUuid, Event};
 use vauchi_hardware::{BleScanner, Discovery, EventSender, HardwareFailure};
 
 enum TerminalBehavior {
@@ -32,10 +32,9 @@ impl Discovery for TerminalDiscovery {
                     Err(HardwareFailure::Failed)
                 }
                 TerminalBehavior::Oversized => events
-                    .send(Event::BleDeviceDiscovered {
-                        id: "large".into(),
-                        rssi: -42,
-                        adv_data: vec![1; 1024],
+                    .send(Event::HardwareError {
+                        transport: "BLE".into(),
+                        error: "x".repeat(1024),
                     })
                     .await
                     .map_err(|_| HardwareFailure::InvalidObservation),
@@ -92,11 +91,10 @@ impl Discovery for NativeDiscovery {
 }
 
 fn event(id: &str) -> Event {
-    Event::BleDeviceDiscovered {
-        id: id.into(),
-        rssi: -42,
-        adv_data: vec![1, 2, 3],
-    }
+    Event::BleAdvertisementObserved(
+        BleAdvertisementObservation::new(id.into(), -42, vec![BleServiceUuid::Uuid16([1, 2])])
+            .unwrap(),
+    )
 }
 
 fn limits() -> InboxLimits {
@@ -348,11 +346,11 @@ async fn cancelled_shutdown_can_be_retried_without_losing_native_disposal() {
     f.scanner.start("active".into()).unwrap();
     f.started.recv().await.unwrap();
     let mut first = Box::pin(f.scanner.shutdown());
-    assert!(futures::poll!(&mut first).is_pending());
+    assert!(futures_util::poll!(&mut first).is_pending());
     drop(first);
     assert!(f.released.try_recv().is_err());
     let mut retry = Box::pin(f.scanner.shutdown());
-    assert!(futures::poll!(&mut retry).is_pending());
+    assert!(futures_util::poll!(&mut retry).is_pending());
     retry.await.unwrap();
     assert_eq!(f.released.try_recv(), Ok(()));
 }

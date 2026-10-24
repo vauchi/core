@@ -43,6 +43,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   back. Shells report a missing item as the new
   `UserPresenceSecretMissing` event. A duress session leaves the
   enrolment alone (vauchi/private#778).
+- An open Edit Display Name, Edit Field or Edit Contact form keeps what
+  was typed when a background sync invalidates the screen, instead of
+  saving the stored value (vauchi/private#799).
 - A guardian vouches only for a recovery claim that names one of their
   contacts and carries that contact's key; the vouch screen names the
   contact, and claims and vouchers carry the time

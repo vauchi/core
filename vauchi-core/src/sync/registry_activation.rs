@@ -18,6 +18,9 @@
 //! versions). Decode validates structure only — size ceiling and
 //! broadcast-shape parse (DC-01) — and fails closed on anything else.
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
+use crate::capacity::capacity;
 use crate::identity::RegistryBroadcast;
 use crate::sync::delta::DeltaError;
 
@@ -271,7 +274,7 @@ impl RegistryPushPayload {
     /// Encode to wire (without the `0x05` version byte — use
     /// `VersionedPayload::encode_registry_push`).
     pub fn encode(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(NONCE_LEN + self.broadcast_json.len());
+        let mut buf = Vec::with_capacity(capacity(&[NONCE_LEN, self.broadcast_json.len()]));
         buf.extend_from_slice(&self.push_nonce);
         buf.extend_from_slice(&self.broadcast_json);
         buf
@@ -339,7 +342,7 @@ impl RegistryAckPayload {
     /// `VersionedPayload::encode_registry_ack`).
     pub fn encode(&self) -> Vec<u8> {
         let echo = self.broadcast_json.as_deref().unwrap_or(&[]);
-        let mut buf = Vec::with_capacity(ACK_PREFIX_LEN + echo.len());
+        let mut buf = Vec::with_capacity(capacity(&[ACK_PREFIX_LEN, echo.len()]));
         buf.extend_from_slice(&self.push_nonce);
         buf.extend_from_slice(&self.acked_version.to_be_bytes());
         buf.push(u8::from(self.broadcast_json.is_some()));

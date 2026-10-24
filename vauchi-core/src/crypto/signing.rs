@@ -7,6 +7,8 @@
 //! Provides signing keypair generation and signature operations using the
 //! `ed25519-dalek` cryptographic library.
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use ed25519_dalek::Signer;
 use sha2::Digest;
 use subtle::ConstantTimeEq;

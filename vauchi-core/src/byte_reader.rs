@@ -38,4 +38,9 @@ impl<'a> ByteReader<'a> {
         let len = usize::try_from(self.u32_le()?).ok()?;
         self.take(len)
     }
+
+    /// Every byte has been read.
+    pub(crate) fn is_at_end(&self) -> bool {
+        self.at == self.data.len()
+    }
 }

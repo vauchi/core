@@ -8,6 +8,9 @@
 //! a creation timestamp, and an Ed25519 signature with domain separation
 //! (ADR-007: `"vauchi-recovery-guardian-v1"`).
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
+use crate::capacity::capacity;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
@@ -135,8 +138,12 @@ fn build_signed_message(
     guardian_pk: &[u8; 32],
     created_at: u64,
 ) -> Vec<u8> {
-    let mut msg =
-        Vec::with_capacity(GUARDIAN_DOMAIN.len() + designator_pk.len() + guardian_pk.len() + 8);
+    let mut msg = Vec::with_capacity(capacity(&[
+        GUARDIAN_DOMAIN.len(),
+        designator_pk.len(),
+        guardian_pk.len(),
+        8,
+    ]));
     msg.extend_from_slice(GUARDIAN_DOMAIN);
     msg.extend_from_slice(designator_pk);
     msg.extend_from_slice(guardian_pk);

@@ -9,6 +9,8 @@
 //! - [`ChunkBitmap`] — tracks chunk receipt during DATA stage
 //! - [`QrPayload`] — what core returns to mobile apps for QR display
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 /// QR payload returned to the mobile app for display.
 #[derive(Debug, Clone)]
 pub struct QrPayload {

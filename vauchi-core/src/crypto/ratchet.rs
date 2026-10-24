@@ -11,6 +11,8 @@
 //! - A DH ratchet (using X25519) for break-in recovery
 //! - Symmetric ratchets (chain keys) for forward secrecy
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use subtle::ConstantTimeEq;
@@ -301,7 +303,10 @@ impl DoubleRatchetState {
             ..header
         };
 
-        self.send_message_count += 1;
+        self.send_message_count = self
+            .send_message_count
+            .checked_add(1)
+            .ok_or(ChainError::GenerationLimitExceeded)?;
 
         Ok(message)
     }
@@ -353,7 +358,10 @@ impl DoubleRatchetState {
 
         let (message_key, next_chain) = recv_chain.ratchet()?;
         self.recv_chain = Some(next_chain);
-        self.recv_message_count = message.message_index + 1;
+        self.recv_message_count = message
+            .message_index
+            .checked_add(1)
+            .ok_or(ChainError::GenerationLimitExceeded)?;
 
         let padded = decrypt_with_ad(message_key.symmetric_key(), &message.ciphertext, &ad)
             .map_err(RatchetError::from)?;
@@ -381,16 +389,15 @@ impl DoubleRatchetState {
             return Ok(()); // Nothing to skip
         }
 
-        let skip_count = (until - current) as usize;
-        if self.skipped_keys.len() + skip_count > MAX_SKIPPED_KEYS {
+        let skip_count = until.abs_diff(current) as usize;
+        if self.skipped_keys.len().saturating_add(skip_count) > MAX_SKIPPED_KEYS {
             return Err(RatchetError::TooManySkipped);
         }
 
         let (skipped, new_chain) = recv_chain.skip_to(until)?;
         self.recv_chain = Some(new_chain);
 
-        for (i, key) in skipped.into_iter().enumerate() {
-            let msg_index = current + i as u32;
+        for (msg_index, key) in (current..until).zip(skipped) {
             self.skipped_keys.insert((dh_gen, msg_index), key);
         }
 
@@ -420,7 +427,10 @@ impl DoubleRatchetState {
         self.send_chain = Some(ChainKey::new(*send_chain_key_z));
         self.send_message_count = 0;
 
-        self.dh_generation += 1;
+        self.dh_generation = self
+            .dh_generation
+            .checked_add(1)
+            .ok_or(ChainError::GenerationLimitExceeded)?;
 
         Ok(())
     }

@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use serde::{Deserialize, Serialize};
 
 use super::AccessibilitySpec;
@@ -105,7 +107,11 @@ impl QrPlacement {
     /// A placement, or `None` if the code would be smaller than
     /// [`Self::MIN_SIZE`] or reach outside the square.
     pub fn new(size: u16, x: u16, y: u16) -> Option<Self> {
-        let fits = |offset: u16| offset <= Self::FULL - size;
+        let fits = |offset: u16| {
+            Self::FULL
+                .checked_sub(size)
+                .is_some_and(|room| offset <= room)
+        };
         ((Self::MIN_SIZE..=Self::FULL).contains(&size) && fits(x) && fits(y)).then_some(Self {
             size,
             x,

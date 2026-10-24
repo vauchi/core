@@ -19,6 +19,8 @@
 //! | anchor signature (64)
 //! ```
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 /// Current record version.
 pub const RECORD_VERSION: u8 = 1;
 
@@ -72,7 +74,8 @@ impl IntermediateCert {
         not_before: u64,
         not_after: u64,
     ) -> Vec<u8> {
-        let mut message = Vec::with_capacity(INTERMEDIATE_DOMAIN.len() + PUBLIC_KEY_BYTES + 16);
+        let mut message =
+            Vec::with_capacity(capacity(&[INTERMEDIATE_DOMAIN.len(), PUBLIC_KEY_BYTES, 16]));
         message.extend_from_slice(INTERMEDIATE_DOMAIN);
         message.extend_from_slice(public_key);
         message.extend_from_slice(&not_before.to_be_bytes());
@@ -141,7 +144,8 @@ pub enum SignedKeyConfigError {
 impl SignedKeyConfig {
     /// The bytes the intermediate signs.
     pub fn signing_message(window: u64, key_config: &[u8]) -> Vec<u8> {
-        let mut message = Vec::with_capacity(KEY_CONFIG_DOMAIN.len() + 8 + key_config.len());
+        let mut message =
+            Vec::with_capacity(capacity(&[KEY_CONFIG_DOMAIN.len(), 8, key_config.len()]));
         message.extend_from_slice(KEY_CONFIG_DOMAIN);
         message.extend_from_slice(&window.to_be_bytes());
         message.extend_from_slice(key_config);
@@ -149,7 +153,8 @@ impl SignedKeyConfig {
     }
 
     pub fn encode(&self) -> Vec<u8> {
-        let mut out = Vec::with_capacity(FIXED_HEAD + self.key_config.len() + FIXED_TAIL);
+        let mut out =
+            Vec::with_capacity(capacity(&[FIXED_HEAD, self.key_config.len(), FIXED_TAIL]));
         out.push(RECORD_VERSION);
         out.extend_from_slice(&self.window.to_be_bytes());
         // Encoding an over-bound KeyConfig would produce a record decode
@@ -256,7 +261,10 @@ pub enum RolloverError {
 /// The bytes whose SHA-256 is the commitment to a backup anchor. Hashing is
 /// left to core and the relay: this crate carries no crypto.
 pub fn backup_commitment_message(backup_anchor: &[u8; 32]) -> Vec<u8> {
-    let mut message = Vec::with_capacity(BACKUP_COMMITMENT_DOMAIN.len() + PUBLIC_KEY_BYTES);
+    let mut message = Vec::with_capacity(capacity(&[
+        BACKUP_COMMITMENT_DOMAIN.len(),
+        PUBLIC_KEY_BYTES,
+    ]));
     message.extend_from_slice(BACKUP_COMMITMENT_DOMAIN);
     message.extend_from_slice(backup_anchor);
     message
@@ -265,7 +273,11 @@ pub fn backup_commitment_message(backup_anchor: &[u8; 32]) -> Vec<u8> {
 impl AnchorRollover {
     /// The bytes `new_anchor` signs.
     pub fn signing_message(new_anchor: &[u8; 32], next_commitment: &[u8; 32]) -> Vec<u8> {
-        let mut message = Vec::with_capacity(ROLLOVER_DOMAIN.len() + 2 * PUBLIC_KEY_BYTES);
+        let mut message = Vec::with_capacity(capacity(&[
+            ROLLOVER_DOMAIN.len(),
+            PUBLIC_KEY_BYTES,
+            PUBLIC_KEY_BYTES,
+        ]));
         message.extend_from_slice(ROLLOVER_DOMAIN);
         message.extend_from_slice(new_anchor);
         message.extend_from_slice(next_commitment);
@@ -308,7 +320,10 @@ impl AnchorRollover {
 /// be encoded, and one over [`MAX_ROLLOVER_CHAIN`] is refused on decode.
 pub fn encode_rollover_chain(chain: &[AnchorRollover]) -> Vec<u8> {
     let count = u8::try_from(chain.len()).unwrap_or(u8::MAX);
-    let mut out = Vec::with_capacity(1 + usize::from(count) * ROLLOVER_BYTES);
+    let mut out = Vec::with_capacity(capacity(&[
+        1,
+        usize::from(count).saturating_mul(ROLLOVER_BYTES),
+    ]));
     out.push(count);
     for rollover in chain.iter().take(usize::from(count)) {
         out.extend_from_slice(&rollover.encode());
@@ -334,4 +349,10 @@ pub fn decode_rollover_chain(bytes: &[u8]) -> Result<Vec<AnchorRollover>, Rollov
         .chunks_exact(ROLLOVER_BYTES)
         .map(AnchorRollover::decode)
         .collect()
+}
+
+/// A buffer's parts summed as a capacity hint. Saturates instead of
+/// panicking, since a hint need not be exact (vauchi/private#761).
+fn capacity(parts: &[usize]) -> usize {
+    parts.iter().fold(0, |sum, part| sum.saturating_add(*part))
 }

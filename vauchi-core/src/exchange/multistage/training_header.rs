@@ -14,6 +14,8 @@
 //! `<layout><l1><c1><l2><c2><l3><c3><total>`. An unused echo slot is
 //! `<NO_LAYOUT_DIGIT>0`.
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use super::base45;
 use super::qr_codec::QrCodecError;
 
@@ -94,7 +96,7 @@ impl TrainingHeader {
     fn echoes_a_layout_twice(&self) -> bool {
         self.echo().enumerate().any(|(i, reads)| {
             self.echo()
-                .skip(i + 1)
+                .skip(i.saturating_add(1))
                 .any(|other| other.layout == reads.layout)
         })
     }

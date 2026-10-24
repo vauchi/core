@@ -17,6 +17,9 @@
 //!
 //! The JSON payload is a `Vec<ContactBackupEntry>` — one entry per contact.
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
+use crate::capacity::capacity;
 use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, Zeroizing};
 
@@ -367,7 +370,7 @@ pub fn export_contact_backup(contacts: &[Contact], password: &str) -> Result<Vec
         encrypt(&key, &plaintext).map_err(|e| BackupError::EncryptionFailed(e.to_string()))?;
 
     // Assemble: version || salt || ciphertext
-    let mut out = Vec::with_capacity(1 + 16 + ciphertext.len());
+    let mut out = Vec::with_capacity(capacity(&[1, 16, ciphertext.len()]));
     out.push(CONTACT_BACKUP_VERSION);
     out.extend_from_slice(&salt);
     out.extend_from_slice(&ciphertext);

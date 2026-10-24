@@ -8,6 +8,8 @@
 //! This module provides trait definitions, session management, and mock implementations
 //! for BLE-based contact exchange.
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use super::exchange_payload::{
     EXCHANGE_PAYLOAD_SIZE, ParsedPayload, build_exchange_payload, is_payload_expired,
     parse_exchange_payload, verify_payload_signature,

@@ -8,6 +8,8 @@
 //! Uses X3DH to derive a shared secret, then encrypts the identity key
 //! and display name so the relay cannot read them.
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use serde::{Deserialize, Serialize};
 
 use super::{ExchangeError, X3DH, X3DHKeyPair};

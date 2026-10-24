@@ -15,6 +15,8 @@
 //! `2026-06-10-oob-bootstrap-exchange-rituals`). The 16-byte co-presence nonce
 //! is HKDF-derived from the signed `token`; see [`derive_oob_nonce`].
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 use super::ExchangeError;

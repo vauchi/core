@@ -11,6 +11,9 @@
 //!   - Tag `0x02`: XChaCha20-Poly1305 (24-byte nonce, 16-byte tag)
 //!   - Tag `0x03`: XChaCha20-Poly1305 with associated data (24-byte nonce, 16-byte tag)
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
+use crate::capacity::capacity;
 use chacha20poly1305::XChaCha20Poly1305;
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use thiserror::Error;
@@ -143,7 +146,7 @@ pub fn encrypt(key: &SymmetricKey, plaintext: &[u8]) -> Result<Vec<u8>, Encrypti
         .map_err(|_| EncryptionError::EncryptionFailed)?;
 
     // Tagged format: algorithm_tag || nonce || ciphertext+tag
-    let mut output = Vec::with_capacity(1 + XCHACHA20_NONCE_SIZE + ciphertext.len());
+    let mut output = Vec::with_capacity(capacity(&[1, XCHACHA20_NONCE_SIZE, ciphertext.len()]));
     output.push(ALG_TAG_XCHACHA20);
     output.extend_from_slice(&nonce_bytes);
     output.extend_from_slice(&ciphertext);
@@ -177,7 +180,7 @@ pub fn encrypt_with_ad(
         .encrypt(nonce, payload)
         .map_err(|_| EncryptionError::EncryptionFailed)?;
 
-    let mut output = Vec::with_capacity(1 + XCHACHA20_NONCE_SIZE + ciphertext.len());
+    let mut output = Vec::with_capacity(capacity(&[1, XCHACHA20_NONCE_SIZE, ciphertext.len()]));
     output.push(ALG_TAG_XCHACHA20_AD);
     output.extend_from_slice(&nonce_bytes);
     output.extend_from_slice(&ciphertext);

@@ -8,6 +8,8 @@
 //! primitive (X25519 keypair) used by both exchange and identity modules.
 //! The X3DH *protocol* logic remains in `exchange::x3dh`.
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use rand_core::OsRng;
 use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::Zeroizing;

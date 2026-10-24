@@ -7,6 +7,8 @@
 //! Handles multi-device support for Vauchi identities.
 //! Each device gets unique communication keys derived from the master seed.
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use crate::crypto::X3DHKeyPair;
 use crate::crypto::{HKDF, Signature, SigningKeyPair};
 use serde::{Deserialize, Serialize};
@@ -313,7 +315,7 @@ impl DeviceRegistry {
         }
 
         self.devices.push(device);
-        self.version += 1;
+        self.version = self.version.saturating_add(1);
         self.sign(signing_key);
         Ok(())
     }
@@ -348,7 +350,7 @@ impl DeviceRegistry {
         device.revoked = true;
         device.revoked_at = Some(now);
 
-        self.version += 1;
+        self.version = self.version.saturating_add(1);
         self.sign(signing_key);
         Ok(())
     }
@@ -404,7 +406,7 @@ impl DeviceRegistry {
         }
 
         self.devices.push(device);
-        self.version += 1;
+        self.version = self.version.saturating_add(1);
         Ok(())
     }
 
@@ -446,7 +448,7 @@ impl DeviceRegistry {
         let target_device = self.devices.remove(target_idx);
         self.devices.insert(0, target_device);
 
-        self.version += 1;
+        self.version = self.version.saturating_add(1);
         self.sign(signing_key);
         Ok(())
     }
@@ -580,7 +582,7 @@ impl RegistryBroadcast {
         }
 
         // Timestamp freshness: reject stale broadcasts
-        if now_secs > self.timestamp && (now_secs - self.timestamp) > max_age_secs {
+        if now_secs.saturating_sub(self.timestamp) > max_age_secs {
             return Err(DeviceError::BroadcastStale(format!(
                 "timestamp {} is more than {}s old (now={})",
                 self.timestamp, max_age_secs, now_secs
@@ -588,7 +590,7 @@ impl RegistryBroadcast {
         }
 
         // Reject future timestamps (>60s clock skew tolerance)
-        if self.timestamp > now_secs + 60 {
+        if self.timestamp > now_secs.saturating_add(60) {
             return Err(DeviceError::BroadcastStale(format!(
                 "timestamp {} is in the future (now={})",
                 self.timestamp, now_secs

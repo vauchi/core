@@ -7,6 +7,8 @@
 //! Handles syncing data between devices belonging to the same identity.
 //! Used during device linking and for ongoing inter-device synchronization.
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
@@ -543,8 +545,10 @@ pub fn decode_sync_items_tolerantly(bytes: &[u8]) -> Result<DecodedSyncItems, De
             // The unknown/malformed split is diagnostic only — both are
             // skipped. serde has no typed unknown-variant error, so the
             // stable message prefix is the only available classifier.
-            Err(e) if e.to_string().starts_with("unknown variant") => decoded.unknown_count += 1,
-            Err(_) => decoded.malformed_count += 1,
+            Err(e) if e.to_string().starts_with("unknown variant") => {
+                decoded.unknown_count = decoded.unknown_count.saturating_add(1)
+            }
+            Err(_) => decoded.malformed_count = decoded.malformed_count.saturating_add(1),
         }
     }
     Ok(decoded)
@@ -691,7 +695,7 @@ impl VersionVector {
     /// Increments the version for a device.
     pub fn increment(&mut self, device_id: &[u8; 32]) {
         let current = self.get(device_id);
-        self.versions.insert(*device_id, current + 1);
+        self.versions.insert(*device_id, current.saturating_add(1));
     }
 
     /// Merges two version vectors, taking the max of each device's version.
@@ -780,7 +784,7 @@ pub fn validate_timestamp(timestamp: u64, now: u64) -> bool {
     }
 
     // Reject timestamps more than MAX_FUTURE_DRIFT_SECS in the future
-    timestamp <= now + MAX_FUTURE_DRIFT_SECS
+    timestamp <= now.saturating_add(MAX_FUTURE_DRIFT_SECS)
 }
 
 /// Serde helper for 32-byte arrays.

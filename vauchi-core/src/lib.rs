@@ -28,6 +28,7 @@
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 mod byte_reader;
+mod capacity;
 pub mod clock;
 pub mod limits;
 pub mod monotonic;

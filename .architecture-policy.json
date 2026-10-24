@@ -46,6 +46,7 @@
     "vauchi-core/backup": 3,
     "vauchi-core/card": 1,
     "vauchi-core/byte_reader": 0,
+    "vauchi-core/capacity": 0,
     "vauchi-core/clock": 0,
     "vauchi-core/consent": 1,
     "vauchi-core/contact": 1,

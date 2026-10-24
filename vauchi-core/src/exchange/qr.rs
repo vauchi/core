@@ -19,11 +19,14 @@
 //! - Bit 0: has_relay_url — if set, relay_url_len + relay_url follow
 //! - Bits 1-7: reserved (must be zero)
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 use super::ExchangeError;
 use super::qr_url::{decode_scanned_qr, encode_qr_url};
 use super::x3dh::X3DHKeyPair;
+use crate::byte_reader::ByteReader;
 use crate::crypto::{PublicKey, Signature};
 use crate::identity::Identity;
 #[cfg(feature = "network-rustls")]
@@ -305,49 +308,28 @@ impl ExchangeQR {
             return Err(ExchangeError::DisplayNameTooLong(name_len));
         }
 
-        let name_end = 127 + name_len;
-        if bytes.len() < name_end + 1 {
-            // +1 for flags byte
-            return Err(ExchangeError::InvalidQRFormat);
-        }
+        let invalid = || ExchangeError::InvalidQRFormat;
+        let mut tail = ByteReader::new(&bytes[127..]);
 
         let display_name = normalize_text(
-            &String::from_utf8(bytes[127..name_end].to_vec())
-                .map_err(|_| ExchangeError::InvalidQRFormat)?,
+            &String::from_utf8(tail.take(name_len).ok_or_else(invalid)?.to_vec())
+                .map_err(|_| invalid())?,
         );
 
-        let flags = bytes[name_end];
-        let mut cursor = name_end + 1;
+        let [flags] = tail.array::<1>().ok_or_else(invalid)?;
 
         let relay_url = if flags & FLAG_HAS_RELAY_URL != 0 {
-            if bytes.len() < cursor + 2 {
-                return Err(ExchangeError::InvalidQRFormat);
-            }
-            let url_len = u16::from_be_bytes(
-                bytes[cursor..cursor + 2]
-                    .try_into()
-                    .map_err(|_| ExchangeError::InvalidQRFormat)?,
-            ) as usize;
-            cursor += 2;
-            if bytes.len() < cursor + url_len {
-                return Err(ExchangeError::InvalidQRFormat);
-            }
-            let url = String::from_utf8(bytes[cursor..cursor + url_len].to_vec())
-                .map_err(|_| ExchangeError::InvalidQRFormat)?;
-            cursor += url_len;
-            Some(url)
+            let url_len = usize::from(u16::from_be_bytes(tail.array().ok_or_else(invalid)?));
+            let url_bytes = tail.take(url_len).ok_or_else(invalid)?;
+            Some(String::from_utf8(url_bytes.to_vec()).map_err(|_| invalid())?)
         } else {
             None
         };
 
-        // Remaining bytes must be the signature (64 bytes)
-        if bytes.len() != cursor + 64 {
-            return Err(ExchangeError::InvalidQRFormat);
+        let signature: [u8; 64] = tail.array().ok_or_else(invalid)?;
+        if !tail.is_at_end() {
+            return Err(invalid());
         }
-
-        let signature: [u8; 64] = bytes[cursor..cursor + 64]
-            .try_into()
-            .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
         let qr = ExchangeQR {
             version,

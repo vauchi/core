@@ -4,6 +4,8 @@
 
 //! Device link QR code generation and parsing.
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 use zeroize::Zeroize;

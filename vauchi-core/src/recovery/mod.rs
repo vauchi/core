@@ -15,6 +15,9 @@
 //! - `RecoveryProof`: Collection of vouchers proving identity
 //! - `RecoverySettings`: User's recovery preferences
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
+use crate::capacity::capacity;
 use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
@@ -298,6 +301,8 @@ impl RecoveryClaim {
 /// Domain separator for recovery voucher signatures (ADR-007).
 const VOUCHER_DOMAIN: &[u8] = b"vauchi-recovery-voucher-v1";
 
+const SECONDS_PER_DAY: u64 = 24 * 60 * 60;
+
 /// Serialized voucher from a contact: no guardian token. Not a legacy format;
 /// contact vouching uses it today (vauchi/private#574).
 pub const CONTACT_VOUCHER_FORMAT: u8 = 1;
@@ -387,7 +392,7 @@ impl RecoveryVoucher {
         voucher_pk: &IdentityKey,
         timestamp: u64,
     ) -> Vec<u8> {
-        let mut data = Vec::with_capacity(VOUCHER_DOMAIN.len() + 32 + 32 + 32 + 8);
+        let mut data = Vec::with_capacity(capacity(&[VOUCHER_DOMAIN.len(), 32, 32, 32, 8]));
         data.extend_from_slice(VOUCHER_DOMAIN);
         data.extend_from_slice(old_pk.as_bytes());
         data.extend_from_slice(new_pk.as_bytes());
@@ -499,12 +504,10 @@ impl RecoveryVoucher {
                     .try_into()
                     .map_err(|_| RecoveryError::InvalidFormat)?,
             ) as usize;
-            // Subtract rather than add: on 32-bit targets `173 + token_len`
-            // wraps for a declared length near u32::MAX (#784).
-            if token_len > bytes.len() - 173 {
-                return Err(RecoveryError::InvalidFormat);
-            }
-            let token = guardian::GuardianToken::from_bytes(&bytes[173..173 + token_len])?;
+            let token_bytes = bytes[173..]
+                .get(..token_len)
+                .ok_or(RecoveryError::InvalidFormat)?;
+            let token = guardian::GuardianToken::from_bytes(token_bytes)?;
             Some(token)
         } else {
             None
@@ -573,7 +576,7 @@ impl RecoveryProof {
         threshold: u32,
         now: u64,
     ) -> Self {
-        let expires_at = now + Self::DEFAULT_EXPIRY_DAYS * 24 * 60 * 60;
+        let expires_at = now.saturating_add(Self::DEFAULT_EXPIRY_DAYS * SECONDS_PER_DAY);
 
         Self {
             version: RECOVERY_PROOF_VERSION,
@@ -947,7 +950,7 @@ impl RecoveryReminder {
     /// Checks if the reminder is due (enough time has passed).
     pub fn is_due(&self, now: u64) -> bool {
         let elapsed_secs = now.saturating_sub(self.created_at);
-        let reminder_secs = u64::from(self.reminder_days) * 24 * 60 * 60;
+        let reminder_secs = u64::from(self.reminder_days).saturating_mul(SECONDS_PER_DAY);
 
         elapsed_secs >= reminder_secs
     }

@@ -19,6 +19,9 @@
 //! separation `b"vauchi-backup-v3"`, ensuring v3 backup keys are independent of
 //! v1/v2 keys even with the same password+salt.
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
+use crate::capacity::capacity;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use flate2::Compression;
 use flate2::read::ZlibDecoder;
@@ -368,7 +371,7 @@ pub fn export_full_backup(
     let ciphertext =
         encrypt(&key, &compressed).map_err(|e| BackupError::EncryptionFailed(e.to_string()))?;
 
-    let mut out = Vec::with_capacity(1 + 16 + ciphertext.len());
+    let mut out = Vec::with_capacity(capacity(&[1, 16, ciphertext.len()]));
     out.push(FULL_BACKUP_VERSION);
     out.extend_from_slice(&salt);
     out.extend_from_slice(&ciphertext);
@@ -448,7 +451,7 @@ pub fn export_guardian_backup(
     let ciphertext = encrypt_with_ad(&derived_key, &compressed, &header)
         .map_err(|e| BackupError::EncryptionFailed(e.to_string()))?;
 
-    let mut out = Vec::with_capacity(header.len() + ciphertext.len());
+    let mut out = Vec::with_capacity(capacity(&[header.len(), ciphertext.len()]));
     out.extend_from_slice(&header);
     out.extend_from_slice(&ciphertext);
     if out.len() > MAX_GUARDIAN_BACKUP_BYTES {

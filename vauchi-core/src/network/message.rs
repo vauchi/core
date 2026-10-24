@@ -6,6 +6,8 @@
 //!
 //! Wire protocol message types for relay communication.
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use serde::{Deserialize, Serialize};
 
 use crate::identifiers::{ContactId, DhPublicKey, IdentityKey};

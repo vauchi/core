@@ -29,6 +29,8 @@
 //! The first 4 bytes are the big-endian original plaintext length.
 //! This allows the receiver to strip padding after decryption.
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use super::random_fill;
 
 /// Bucket sizes in bytes (including the 4-byte length prefix).
@@ -48,7 +50,7 @@ const LENGTH_PREFIX_SIZE: usize = 4;
 /// Returns a buffer of exactly the bucket size, containing a 4-byte
 /// big-endian length prefix, the original plaintext, and random padding.
 pub fn pad(plaintext: &[u8]) -> Vec<u8> {
-    let needed = LENGTH_PREFIX_SIZE + plaintext.len();
+    let needed = plaintext.len().saturating_add(LENGTH_PREFIX_SIZE);
     let target_size = select_bucket(needed);
 
     let mut padded = Vec::with_capacity(target_size);
@@ -74,13 +76,7 @@ pub fn unpad(padded: &[u8]) -> Option<Vec<u8>> {
 
     let len = u32::from_be_bytes([padded[0], padded[1], padded[2], padded[3]]) as usize;
 
-    // Subtract rather than add: on 32-bit targets `LENGTH_PREFIX_SIZE + len`
-    // wraps for a prefix near u32::MAX and the check passes (private#756).
-    if len > padded.len() - LENGTH_PREFIX_SIZE {
-        return None;
-    }
-
-    Some(padded[LENGTH_PREFIX_SIZE..LENGTH_PREFIX_SIZE + len].to_vec())
+    Some(padded[LENGTH_PREFIX_SIZE..].get(..len)?.to_vec())
 }
 
 /// Validates that a received padded buffer has a valid bucket size (#149).
@@ -107,7 +103,8 @@ fn select_bucket(size: usize) -> usize {
     } else if size <= BUCKET_LARGE {
         BUCKET_LARGE
     } else {
-        size.div_ceil(OVERFLOW_ALIGNMENT) * OVERFLOW_ALIGNMENT
+        size.div_ceil(OVERFLOW_ALIGNMENT)
+            .saturating_mul(OVERFLOW_ALIGNMENT)
     }
 }
 

@@ -13,6 +13,9 @@
 //! The inner payload (before Double Ratchet encryption) uses a version byte prefix:
 //! - `0x08`: CEK-wrapped payload (`CekWrappedPayload`)
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
+use crate::capacity::capacity;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
@@ -442,7 +445,7 @@ impl CekWrappedPayload {
     /// Wire format: `cek(32) || signature(64) || nonce(32) || cek_ciphertext_len(4 BE) || cek_ciphertext`
     pub fn encode(&self) -> Vec<u8> {
         let ct_len = (self.cek_ciphertext.len() as u32).to_be_bytes();
-        let mut buf = Vec::with_capacity(32 + 64 + 32 + 4 + self.cek_ciphertext.len());
+        let mut buf = Vec::with_capacity(capacity(&[32, 64, 32, 4, self.cek_ciphertext.len()]));
         buf.extend_from_slice(&self.cek);
         buf.extend_from_slice(&self.signature);
         buf.extend_from_slice(&self.nonce);
@@ -476,17 +479,17 @@ impl CekWrappedPayload {
                 DeltaError::CekDecodeError("invalid ciphertext length field".into())
             })?) as usize;
 
-        // Subtract rather than add: on 32-bit targets `132 + ct_len` wraps
-        // for a declared length near u32::MAX and the check passes (#784).
-        if ct_len > data.len() - 132 {
-            return Err(DeltaError::CekDecodeError(format!(
-                "ciphertext truncated: expected {} bytes, have {}",
-                ct_len,
-                data.len() - 132
-            )));
-        }
-
-        let cek_ciphertext = data[132..132 + ct_len].to_vec();
+        let after_header = &data[132..];
+        let cek_ciphertext = after_header
+            .get(..ct_len)
+            .ok_or_else(|| {
+                DeltaError::CekDecodeError(format!(
+                    "ciphertext truncated: expected {} bytes, have {}",
+                    ct_len,
+                    after_header.len()
+                ))
+            })?
+            .to_vec();
 
         Ok(CekWrappedPayload {
             cek,
@@ -524,7 +527,7 @@ impl VersionedPayload {
     /// Encode a CEK-wrapped payload with version prefix.
     pub fn encode_cek(payload: &CekWrappedPayload) -> Vec<u8> {
         let inner = payload.encode();
-        let mut buf = Vec::with_capacity(1 + inner.len());
+        let mut buf = Vec::with_capacity(capacity(&[1, inner.len()]));
         buf.push(PAYLOAD_VERSION_CEK);
         buf.extend_from_slice(&inner);
         buf
@@ -533,7 +536,7 @@ impl VersionedPayload {
     /// Encode a reciprocity confirmation with version prefix.
     pub fn encode_reciprocity(payload: &ReciprocityConfirmPayload) -> Vec<u8> {
         let inner = payload.encode();
-        let mut buf = Vec::with_capacity(1 + inner.len());
+        let mut buf = Vec::with_capacity(capacity(&[1, inner.len()]));
         buf.push(payload.version_byte());
         buf.extend_from_slice(&inner);
         buf
@@ -542,7 +545,7 @@ impl VersionedPayload {
     /// Encode a safety alert with version prefix.
     pub fn encode_alert(payload: &crate::sync::safety_alert::SafetyAlertPayload) -> Vec<u8> {
         let inner = payload.encode();
-        let mut buf = Vec::with_capacity(1 + inner.len());
+        let mut buf = Vec::with_capacity(capacity(&[1, inner.len()]));
         buf.push(PAYLOAD_VERSION_ALERT);
         buf.extend_from_slice(&inner);
         buf
@@ -553,7 +556,7 @@ impl VersionedPayload {
         payload: &crate::sync::registry_activation::RegistryPushPayload,
     ) -> Vec<u8> {
         let inner = payload.encode();
-        let mut buf = Vec::with_capacity(1 + inner.len());
+        let mut buf = Vec::with_capacity(capacity(&[1, inner.len()]));
         buf.push(PAYLOAD_VERSION_REGISTRY_PUSH);
         buf.extend_from_slice(&inner);
         buf
@@ -564,7 +567,7 @@ impl VersionedPayload {
         payload: &crate::sync::registry_activation::RegistryAckPayload,
     ) -> Vec<u8> {
         let inner = payload.encode();
-        let mut buf = Vec::with_capacity(1 + inner.len());
+        let mut buf = Vec::with_capacity(capacity(&[1, inner.len()]));
         buf.push(PAYLOAD_VERSION_REGISTRY_ACK);
         buf.extend_from_slice(&inner);
         buf
@@ -736,7 +739,7 @@ impl ReciprocityConfirmPayload {
         } else {
             RECIPROCITY_ANSWER_DOMAIN
         };
-        let mut msg = Vec::with_capacity(domain.len() + 96);
+        let mut msg = Vec::with_capacity(capacity(&[domain.len(), 96]));
         msg.extend_from_slice(domain);
         msg.extend_from_slice(sender_pk);
         msg.extend_from_slice(recipient_pk);

@@ -10,6 +10,8 @@
 //! Serialized with `postcard`, then encrypted before BLE transmission.
 //! The CRC16 field is a sanity check — integrity is provided by AEAD encryption.
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use serde::{Deserialize, Serialize};
 
 use crate::card::{ContactCard, ContactField, FieldType};

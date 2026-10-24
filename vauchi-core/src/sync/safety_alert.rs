@@ -24,6 +24,9 @@
 //!
 //! [`VersionedPayload`]: crate::sync::delta::VersionedPayload
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
+use crate::capacity::capacity;
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::signing::{PublicKey, Signature};
@@ -112,7 +115,7 @@ impl SafetyAlertPayload {
     /// Encode to wire (without the `0x04` version byte prefix — use
     /// `VersionedPayload::encode_alert`).
     pub fn encode(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(PREFIX_LEN + self.content_bytes.len());
+        let mut buf = Vec::with_capacity(capacity(&[PREFIX_LEN, self.content_bytes.len()]));
         buf.extend_from_slice(&self.nonce);
         buf.extend_from_slice(&self.signature);
         buf.extend_from_slice(&self.content_bytes);
@@ -187,7 +190,7 @@ impl SafetyAlertPayload {
         nonce: &[u8; 32],
         content_bytes: &[u8],
     ) -> Vec<u8> {
-        let mut msg = Vec::with_capacity(ALERT_DOMAIN.len() + 96 + content_bytes.len());
+        let mut msg = Vec::with_capacity(capacity(&[ALERT_DOMAIN.len(), 96, content_bytes.len()]));
         msg.extend_from_slice(ALERT_DOMAIN);
         msg.extend_from_slice(sender_pk);
         msg.extend_from_slice(recipient_pk);

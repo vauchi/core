@@ -11,6 +11,8 @@
 //! Magic bytes: "VNFC"
 //! Payload size: 174 bytes
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use super::ExchangeError;
 use super::exchange_payload::{
     EXCHANGE_PAYLOAD_SIZE, ParsedPayload, build_exchange_payload, is_payload_expired,

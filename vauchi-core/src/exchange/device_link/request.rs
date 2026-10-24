@@ -4,6 +4,8 @@
 
 //! Device link request (from new device).
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use crate::crypto::{SymmetricKey, decrypt, encrypt};
 
 use super::super::ExchangeError;

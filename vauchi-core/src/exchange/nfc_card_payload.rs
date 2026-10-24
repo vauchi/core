@@ -8,6 +8,8 @@
 //! Contains sender identity, display name, exchange key, and CRC16 sanity check.
 //! Security integrity is provided by AEAD (XChaCha20-Poly1305), not CRC16.
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use serde::{Deserialize, Serialize};
 
 /// Plaintext card data exchanged during NFC tap.

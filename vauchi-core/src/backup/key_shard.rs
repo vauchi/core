@@ -25,6 +25,8 @@
 //! 4. Later, guardians decrypt their shares: [`open_share_for_guardian`].
 //! 5. Reconstruct the key from any threshold of shares: [`reconstruct_backup_key`].
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use std::fmt;
 #[cfg(any(feature = "network-rustls", feature = "testing", test))]
 use subtle::ConstantTimeEq;

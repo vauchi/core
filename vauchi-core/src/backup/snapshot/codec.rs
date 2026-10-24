@@ -4,6 +4,8 @@
 
 //! Version 6 binds its clear version/salt header with AEAD associated data.
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use zeroize::Zeroizing;
 
 use crate::crypto::{

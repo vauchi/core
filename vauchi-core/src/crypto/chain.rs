@@ -7,6 +7,8 @@
 //! Implements symmetric key ratcheting for the Double Ratchet protocol.
 //! Each chain key can derive a message key and advance to the next chain key.
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use super::encryption::SymmetricKey;
 use super::kdf::HKDF;
 use thiserror::Error;
@@ -100,7 +102,10 @@ impl ChainKey {
 
         let next_chain = ChainKey {
             key: *next_chain_key_bytes,
-            generation: self.generation + 1,
+            generation: self
+                .generation
+                .checked_add(1)
+                .ok_or(ChainError::GenerationLimitExceeded)?,
         };
 
         Ok((message_key, next_chain))
@@ -110,14 +115,13 @@ impl ChainKey {
     ///
     /// Used when receiving out-of-order messages to derive keys for skipped messages.
     pub fn skip_to(&self, target: u32) -> Result<(Vec<MessageKey>, ChainKey), ChainError> {
-        if target < self.generation {
-            return Err(ChainError::CannotSkipBackwards {
-                current: self.generation,
-                target,
-            });
-        }
-
-        let skip_count = target - self.generation;
+        let skip_count =
+            target
+                .checked_sub(self.generation)
+                .ok_or(ChainError::CannotSkipBackwards {
+                    current: self.generation,
+                    target,
+                })?;
         if skip_count > MAX_SKIP {
             return Err(ChainError::SkipLimitExceeded);
         }

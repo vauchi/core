@@ -19,6 +19,7 @@
 //!
 //! HKDF-SHA256(salt=None, ikm=shared_secret, info="vauchi-sealed-box-v1") → 32-byte symmetric key.
 
+use crate::capacity::capacity;
 use chacha20poly1305::aead::Aead;
 use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce};
 use rand_core::OsRng;
@@ -82,7 +83,7 @@ pub fn seal(plaintext: &[u8], recipient_pk: &PublicKey) -> Result<Vec<u8>, Recov
         .expect("XChaCha20Poly1305 encryption is infallible for valid key/nonce");
 
     // 6. Assemble output: ephemeral_pk || nonce || ciphertext+tag.
-    let mut out = Vec::with_capacity(32 + 24 + ciphertext.len());
+    let mut out = Vec::with_capacity(capacity(&[32, 24, ciphertext.len()]));
     out.extend_from_slice(ephemeral_pk.as_bytes());
     out.extend_from_slice(&nonce_bytes);
     out.extend_from_slice(&ciphertext);

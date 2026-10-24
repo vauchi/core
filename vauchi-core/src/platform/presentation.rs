@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use serde::{Deserialize, Deserializer, Serialize};
 
 const MAX_PRESENTATION_ID_LENGTH: usize = 128;

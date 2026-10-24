@@ -47,6 +47,8 @@
 //!   `bytes_array_32` shape used by `network::message`,
 //!   `sync::device_sync`, and `exchange::encrypted_message`.
 
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+
 use serde::{Deserialize, Serialize};
 use std::fmt;
 

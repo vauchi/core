@@ -156,6 +156,8 @@ impl DeviceSyncPayload {
 
     /// Returns the total number of contacts (exchanged + imported).
     pub fn contact_count(&self) -> usize {
-        self.contacts.len() + self.imported_contacts.len()
+        self.contacts
+            .len()
+            .saturating_add(self.imported_contacts.len())
     }
 }

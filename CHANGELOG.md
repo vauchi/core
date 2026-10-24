@@ -8,6 +8,40 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.88.0] — 2026-10-24
+
+### Added
+
+- `Vauchi::fetch_path` reports whether fetches go through the relay's
+  delayed path, or since when the relay withdrew it (migration v85),
+  and Advanced > Network shows it (vauchi/private#628).
+- A device-link host that declines, times out or finds the name taken
+  tells the joiner at once, with a refusal only that ceremony can
+  read, and the joiner's screen names the reason; a host that leaves
+  the linking screen tells the joiner the link was canceled
+  (vauchi/private#780).
+- Platform callbacks are bound to a cancellable operation lifetime:
+  stale observations, closed inboxes and resource-budget overruns are
+  rejected.
+- Dev bindings can trust a test content publisher key from
+  `VAUCHI_DEV_CONTENT_PUBLISHER_KEY` (vauchi/private#733).
+- CI: `test:formal` runs the Kani parser proofs and the Tamarin
+  exchange and device-link models (vauchi/private#757);
+  `test:core-32bit` also runs the 32-bit integration tests
+  (vauchi/private#784).
+
+### Fixed
+
+- A new device refuses a linked seed whose identity is not the one the
+  scanned QR names (vauchi/private#789).
+- The sync payload and recovery voucher parsers compare a declared
+  length without wrapping on a 32-bit `usize` (vauchi/private#784).
+- Completed and backpressured hardware observations are kept, and a
+  rejected payload is returned for a bounded retry.
+- Tokio is required at 1.53.3 or later for RUSTSEC-2026-0386.
+- The fuzz nightly replays coverage without ASan, whose odr check
+  aborted every replay on bundled sqlite3 (vauchi/private#787).
+
 ## [0.87.0] — 2026-10-23
 
 ### Added

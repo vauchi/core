@@ -26,7 +26,7 @@ mod scheduler;
 mod types;
 
 pub use cache::{CacheError, ContentCache};
-pub use config::{ContentConfig, ContentSource, ContentSourceHandle};
+pub use config::{ContentConfig, ContentSource, ContentSourceHandle, publisher_key_from_hex};
 pub use fetcher::{ContentFetcher, FetchError};
 pub use integrity::{IntegrityError, compute_checksum, verify_checksum, verify_manifest_signature};
 pub use manager::{ApplyResult, ContentError, ContentManager, LocaleStrings};

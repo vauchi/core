@@ -67,6 +67,7 @@ BUILD_MACOS=false
 BUILD_ALL=true
 RELEASE_ONLY=false
 DEV_LOGGING=false
+DEV_CONTENT_KEY=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -99,8 +100,12 @@ while [[ $# -gt 0 ]]; do
             DEV_LOGGING=true
             shift
             ;;
+        --dev-content-key)
+            DEV_CONTENT_KEY=true
+            shift
+            ;;
         --help|-h)
-            echo "Usage: $0 [--ios] [--android] [--macos] [--apple] [--release-only] [--dev-logging]"
+            echo "Usage: $0 [--ios] [--android] [--macos] [--apple] [--release-only] [--dev-logging] [--dev-content-key]"
             echo ""
             echo "Options:"
             echo "  --ios           Build iOS bindings only"
@@ -110,6 +115,9 @@ while [[ $# -gt 0 ]]; do
             echo "  --release-only  Skip simulator/Intel targets (arm64 only)"
             echo "  --dev-logging   Enable the native log backend (internal/dev"
             echo "                  builds only; OFF for store/release bindings)"
+            echo "  --dev-content-key  Trust the content publisher key in"
+            echo "                  VAUCHI_DEV_CONTENT_PUBLISHER_KEY (hex) instead of"
+            echo "                  production (dev builds only, private#733)"
             echo "  (no args)       Build all platforms, all targets"
             exit 0
             ;;
@@ -132,10 +140,24 @@ fi
 # os_log. The generated UniFFI surface is identical either way — the
 # init_mobile_logging() export is a no-op when the feature is off — so
 # bindgen below does not take the flag.
-FEATURE_FLAGS=""
+FEATURES=""
 if $DEV_LOGGING; then
-    FEATURE_FLAGS="--features dev-logging"
+    FEATURES="dev-logging"
     printf '%b\n' "${YELLOW}dev-logging ENABLED — internal/dev binding, not for release${NC}"
+fi
+# The content manager then trusts this key instead of the production one,
+# for a device proof against a local relay (vauchi/private#733 T4.2).
+if $DEV_CONTENT_KEY; then
+    if [ -z "${VAUCHI_DEV_CONTENT_PUBLISHER_KEY:-}" ]; then
+        printf '%b\n' "${RED}--dev-content-key needs VAUCHI_DEV_CONTENT_PUBLISHER_KEY${NC}"
+        exit 1
+    fi
+    FEATURES="${FEATURES:+$FEATURES,}dev-content-publisher-key"
+    printf '%b\n' "${YELLOW}dev content publisher key ENABLED — internal/dev binding, not for release${NC}"
+fi
+FEATURE_FLAGS=""
+if [ -n "$FEATURES" ]; then
+    FEATURE_FLAGS="--features $FEATURES"
 fi
 
 # === iOS Build ===

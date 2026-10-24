@@ -14,6 +14,29 @@ const PRODUCTION_PUBLISHER_PUBLIC_KEY: [u8; 32] = [
     135, 252, 19, 184, 228, 36, 89, 216, 200, 184, 45,
 ];
 
+/// The publisher key a dev build trusts instead of the production one, given
+/// at build time, so a device can take a manifest signed on a workstation
+/// from a local relay (vauchi/private#733 T4.2). Off in release bindings.
+#[cfg(feature = "dev-content-publisher-key")]
+const DEV_PUBLISHER_PUBLIC_KEY_HEX: &str = env!("VAUCHI_DEV_CONTENT_PUBLISHER_KEY");
+
+/// A publisher key from exactly 32 bytes of hex.
+pub fn publisher_key_from_hex(hex: &str) -> Option<PublicKey> {
+    let bytes: [u8; 32] = hex::decode(hex).ok()?.try_into().ok()?;
+    Some(PublicKey::from_bytes(bytes))
+}
+
+#[cfg(feature = "dev-content-publisher-key")]
+fn default_publisher_public_key() -> PublicKey {
+    publisher_key_from_hex(DEV_PUBLISHER_PUBLIC_KEY_HEX)
+        .expect("VAUCHI_DEV_CONTENT_PUBLISHER_KEY is not 32 bytes of hex")
+}
+
+#[cfg(not(feature = "dev-content-publisher-key"))]
+fn default_publisher_public_key() -> PublicKey {
+    PublicKey::from_bytes(PRODUCTION_PUBLISHER_PUBLIC_KEY)
+}
+
 /// Where content files come from instead of straight from the CDN: the
 /// relay's OHTTP `content` action, so the server that learns which language
 /// was asked for cannot tie it to an IP address (vauchi/private#733 D8).
@@ -82,7 +105,7 @@ impl Default for ContentConfig {
             timeout: Duration::from_secs(30),
             max_content_size: 5 * 1024 * 1024, // 5 MB
             proxy_url: None,
-            publisher_public_key: PublicKey::from_bytes(PRODUCTION_PUBLISHER_PUBLIC_KEY),
+            publisher_public_key: default_publisher_public_key(),
             wanted_locales: None,
             source: None,
         }

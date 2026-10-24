@@ -55,6 +55,10 @@ schema-gen = ["schemars", "vauchi-core/schema-gen"]
 # Downstream crates add this to dev-dependencies to drive Layer 1
 # reachability property tests against WorkflowEngine impls.
 test-support = []
+# A dev build trusts the publisher key in VAUCHI_DEV_CONTENT_PUBLISHER_KEY
+# (hex, read at build time) instead of the production key, for a device
+# proof against a local relay (vauchi/private#733 T4.2). Never in release.
+dev-content-publisher-key = ["content-updates"]
 # Forwards `vauchi-core/testing` so the integration test binary can
 # reach `FakeClock` + `DeterministicRng`. Mirrors vauchi-core's
 # `it` test target wiring. Enable via `--features testing`; the

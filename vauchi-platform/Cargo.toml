@@ -19,6 +19,9 @@ default = ["content-updates"]
 # Default-on so mobile bindings expose check_content_updates() / apply_content_updates()
 # instead of silently returning Disabled. Gate 2 of frontend architecture audit (2026-03-18).
 content-updates = ["vauchi-app/content-updates"]
+# Trust the test publisher key in VAUCHI_DEV_CONTENT_PUBLISHER_KEY; dev
+# bindings only (build-bindings.sh --dev-content-key, vauchi/private#733).
+dev-content-publisher-key = ["vauchi-app/dev-content-publisher-key"]
 # Diagnostic QR preprocessing pipeline (imageproc, fast_image_resize, CLAHE,
 # adaptive threshold, unsharp mask). Gates the `diagnostic_scan_qr_with_config`
 # UniFFI export. NOT in defaults — production mobile scanner uses rxing/rqrr

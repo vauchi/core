@@ -408,18 +408,32 @@ impl PlatformAppEngine {
                     }
                 })?;
 
-                if claim.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()) {
+                let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
+                if claim.is_expired(now) {
                     return Err(MobileError::InvalidInput {
                         field: String::new(),
                         detail: "Claim has expired".into(),
                     });
                 }
 
-                let voucher =
-                    RecoveryVoucher::create_from_claim(&claim, identity.signing_keypair(), None, 0)
-                        .map_err(|e| MobileError::Other {
-                            detail: e.to_string(),
-                        })?;
+                let voucher = RecoveryVoucher::create_from_claim(
+                    &claim,
+                    identity.signing_keypair(),
+                    None,
+                    now,
+                )
+                .map_err(|e| MobileError::Other {
+                    detail: e.to_string(),
+                })?;
+                // Only for a contact: the helper checks the person against
+                // them (vauchi/private#708).
+                engine
+                    .vauchi()
+                    .recovery_claim_contact(&claim)
+                    .map_err(|_| MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: "Claim is for someone who is not a contact".into(),
+                    })?;
                 let voucher_data =
                     base64::engine::general_purpose::STANDARD.encode(voucher.to_bytes());
 

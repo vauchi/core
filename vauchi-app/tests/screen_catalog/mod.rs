@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Builds the screen catalog by navigating seeded `AppEngine`s to every
 //! screen reachable without hardware or a peer and recording each

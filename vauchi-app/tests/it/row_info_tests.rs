@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! A single option can explain itself (vauchi/private#479): a row whose
 //! item names an `info_key` carries an info action, and activating it opens

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! ContactDetail exchange-place section (ADR-051, Phase 4c slice 1):
 //! engine rendering + the AppEngine intercept that names / clears a

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! CDN content through the relay's OHTTP `content` action
 //! (vauchi/private#733 D8, D11; ADR-037 addendum 2026-10-22). Only through

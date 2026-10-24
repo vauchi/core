@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Hardware-event toasts and alerts are user-facing copy: they must come
 //! from the locale catalog (ADR-038) and must never leak the raw

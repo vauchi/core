@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 use super::{
     CANCEL_ACTION_ID, DEVICE_NAME_INPUT_ID, DeviceLinkJoinEngine, JOIN_ACTION_ID, RETRY_ACTION_ID,

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Each exchange mode has one pictogram, shown wherever the mode appears, so
 //! a mode is recognisable whatever language its name is in (#473). Shells map

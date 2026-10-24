@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Camera permission/hardware gate state for the multi-stage exchange
 //! engine. Split out of `multi_stage_exchange.rs` (tidy, M3 S5-10) to

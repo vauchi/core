@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Public sync over real OHTTP with constructed exchanged peers and an
 //! in-memory token-filtered gateway. No native exchange or key bootstrap.

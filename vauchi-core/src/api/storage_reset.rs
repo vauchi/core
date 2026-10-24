@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Deleting data no key opens, after the person confirmed starting over
 //! (vauchi/private#580, #581). Shared by the mobile and desktop bindings.

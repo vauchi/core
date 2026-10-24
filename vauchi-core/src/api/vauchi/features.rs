@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Feature operations: aha moments, demo contact, multi-relay, hide/unhide,
 //! block/unblock, consent, recovery readiness, and visibility re-propagation.

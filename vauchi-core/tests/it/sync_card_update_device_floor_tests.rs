@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Tests for the per-(contact, peer-device) stale-version floor
 //! (sync/card_update.rs), split out of `sync_card_update_tests.rs` to keep

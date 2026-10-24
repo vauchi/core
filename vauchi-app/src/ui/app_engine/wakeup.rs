@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! When the app wakes and syncs: the heartbeat's next `ScheduleWakeup`, the
 //! platform scheduler's sync tick, and the live-session checks that set the

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! A platform wakeup syncs with the relay when Core's sync gate says one is
 //! due (vauchi/private#648, owner decision 2026-10-12). Before, `on_wakeup`

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! `Vauchi::perform_emergency_wipe` on a real data directory is the
 //! crypto-shred (vauchi/private#599): it succeeds only once the keys are gone.

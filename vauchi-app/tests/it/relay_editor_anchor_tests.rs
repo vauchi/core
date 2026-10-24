@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! The relay editor takes a custom relay's OHTTP anchor with its URL
 //! (#288, plan 6.1, decision 0.9): without one the app refuses the relay,

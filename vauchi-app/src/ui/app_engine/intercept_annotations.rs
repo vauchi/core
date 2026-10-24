@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Contact-detail annotation intercepts (ADR-051): personal/field notes,
 //! tags, exchange place, faceted search, and tag→group promotion. Split

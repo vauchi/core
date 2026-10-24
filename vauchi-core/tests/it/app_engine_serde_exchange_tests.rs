@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! AppEngine serde roundtrip tests, entry detail delete/undo, exchange session wiring,
 //! and the onboarding random actions proptest (CC-13).

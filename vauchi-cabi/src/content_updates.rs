@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! CDN content for C ABI shells, which schedule nothing themselves
 //! (vauchi/private#733 D10): content cached by an earlier run loads when an

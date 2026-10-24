@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Per-`ProtocolState` rendering tests for `multi_stage_exchange.rs`.
 //! Split out of `multi_stage_exchange_tests.rs` (tidy, M3 S5-10) to

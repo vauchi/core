@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Which locale files a cycle fetches and keeps: only the languages a person
 //! uses — English, the picked one, the system one (vauchi/private#733 D7).

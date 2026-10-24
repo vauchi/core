@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Cross-instance regression coverage for the dual-`Vauchi` pattern used
 //! by the mobile bindings (`VauchiPlatform` + `PlatformAppEngine` each

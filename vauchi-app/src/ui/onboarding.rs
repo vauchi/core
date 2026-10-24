@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Onboarding workflow engine — a pure state machine for the 6-step
 //! onboarding flow (2 pre-gate + 4 main).  No Storage or Vauchi

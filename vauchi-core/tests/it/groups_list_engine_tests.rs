@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! `GroupsEngine` through the public `vauchi_app::ui::*` re-exports. Rows,
 //! Add group and the empty state are pinned in vauchi-app's

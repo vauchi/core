@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! `Vauchi::ignore_contact` / `unignore_contact` (ADR-072): the API half
 //! of ignore, its events, and its linked-device sync item.

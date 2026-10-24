@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Navigation C ABI — exposes `AppEngine::tab_info(locale)` and
 //! `AppEngine::sidebar_items(locale)` so linux-qt / Windows can drive

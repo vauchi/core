@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! S6 of the settings-storage-by-sensitivity plan
 //! (`_private/docs/planning/todo/2026-05-16-settings-storage-by-sensitivity-plan.md`):

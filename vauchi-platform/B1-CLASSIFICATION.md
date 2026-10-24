@@ -1,5 +1,5 @@
 <!-- SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me> -->
-<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <!-- markdownlint-disable MD013 line-length-backtick-exempt -->
 
 # B1 — `VauchiPlatform` → `PlatformAppEngine` Classification

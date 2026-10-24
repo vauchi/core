@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! The web demo's reducer answers every refused event with Core's prepared
 //! alert, as `AppEngine` does for the other shells, so the WASM shell never
 //! shows an error value's text (ADR-045 Am1, vauchi/private#412).

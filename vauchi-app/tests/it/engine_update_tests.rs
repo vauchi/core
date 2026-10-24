@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! `WorkflowEngine::apply_update` — typed hub→engine channel
 //! (`2026-06-10-appengine-typed-engine-channel` Phase 2).

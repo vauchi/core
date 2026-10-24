@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Content updates are a setting: On, Wi-Fi only, Off (vauchi/private#733
 //! D6). Wi-Fi only means an unmetered network; an unknown network counts

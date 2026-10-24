@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Build script for vauchi-app.
 //!
@@ -31,7 +31,7 @@ use std::path::Path;
 /// fallback must be a complete, valid token document. Keep in sync with
 /// `themes/tokens.json` (the contract checker validates the real one).
 const FROZEN_TOKENS_JSON: &str = r##"{
-  "_spdx": "SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>; SPDX-License-Identifier: GPL-3.0-or-later",
+  "_spdx": "SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>; SPDX-License-Identifier: AGPL-3.0-or-later",
   "version": "2.0.0",
   "spacing": { "xxs": 2, "xs": 4, "xs_sm": 6, "sm": 8, "sm_smd": 10, "sm_md": 12, "smd_md": 14, "md": 16, "md_lg": 20, "lg": 24, "xl": 32 },
   "spacing_direction": { "content_start": 16, "content_end": 16, "list_item_start": 8, "list_item_end": 8, "list_item_inline_start": 12, "list_item_inline_end": 12 },

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 // CI-only: packages pre-built JNI libs + Kotlin bindings into AAR for Maven.
 
@@ -77,8 +77,8 @@ publishing {
 
                 licenses {
                     license {
-                        name.set("GPL-3.0-or-later")
-                        url.set("https://www.gnu.org/licenses/gpl-3.0.html")
+                        name.set("AGPL-3.0-or-later")
+                        url.set("https://www.gnu.org/licenses/agpl-3.0.html")
                     }
                 }
 

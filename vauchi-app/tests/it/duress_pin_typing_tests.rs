@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! A duress PIN is stored as typed, whichever way a shell reports its PIN
 //! field (vauchi/private#618). Android sends the field's whole text on each

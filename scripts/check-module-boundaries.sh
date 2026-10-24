@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: AGPL-3.0-or-later
 
 # Module boundary lint — enforces dependency direction rules at CI time.
 # Catches imports that encode wrong dependency arrows between modules.

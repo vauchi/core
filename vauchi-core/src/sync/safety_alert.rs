@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Safety-alert payload — the signed, replay-protected envelope carried by
 //! emergency-broadcast alerts. A duress unlock sends none (ADR-032

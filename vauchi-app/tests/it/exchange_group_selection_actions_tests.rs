@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! M2 S7 (record `2026-06-02-exchange-group-selection-ux` D): the group
 //! selection screen gets a Cancel action that exits the exchange, and the

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Tier-1 exchange reliability gate — BLE pair slice (Phase B of the
 //! exchange-mode program, `2026-07-20-three-tier-exchange-reliability-gate`).

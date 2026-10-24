@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! The vCard export names each contact's Vauchi id and whether it was
 //! exchanged or imported (RFC 6350 §6.10 private `X-` properties), so a

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Glance's failed screen offers only ways out that can work (private#669).
 //! Glance is the QR mode, so its "switch to QR" fallback restarted Glance and

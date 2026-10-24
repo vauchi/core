@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! F4 send gate: per-device fan-out requires `Active`, never registry
 //! presence alone (ADR-064 Amendment 2026-07-25).

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Multi-device convergence tests for sync::device_orchestrator
 //! (Phases 5-6): last-write-wins conflict resolution, bidirectional and

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! The OHTTP forward-hop probe (problems/2026-05-25-relay-ohttp-forward-hop-502,
 //! goal G3): one encapsulated request through relay → gateway, reporting the

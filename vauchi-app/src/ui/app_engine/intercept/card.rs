@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Own-card editing intercepts: avatar edit, add-field dialog, entry-detail
 //! visibility/edit/delete, and exit-preview. Split out of `intercept.rs`

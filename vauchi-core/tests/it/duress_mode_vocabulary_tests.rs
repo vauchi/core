@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Duress mode shows no real groups, tags or places (#468, ADR-032; owner
 //! decision 2026-10-01): they read as none, anything made there looks like

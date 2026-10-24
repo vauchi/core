@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! The link trainer under random sequences of reads, frames, holds and
 //! clock steps (CC-13, #450 plan 2.8). Each frame it draws must follow the

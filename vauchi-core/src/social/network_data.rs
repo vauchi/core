@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Network data as cdn.vauchi.app publishes it, validated whole or not at
 //! all before it reaches the registry (vauchi/private#734 D1, D3; DC-01).

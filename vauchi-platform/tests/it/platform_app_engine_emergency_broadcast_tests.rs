@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Integration tests for the emergency-broadcast methods on
 //! `PlatformAppEngine` (Phase B3 of `2026-04-28-collapse-vauchi-platform-into-app-engine`).

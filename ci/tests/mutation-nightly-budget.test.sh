@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: AGPL-3.0-or-later
 
 # mutation:nightly shares allyson with every MR's cargo jobs. A 1/7 shard
 # (2080 mutants at ~61/h) never finished in 12 h and ran through the

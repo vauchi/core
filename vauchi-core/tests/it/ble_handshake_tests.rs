@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! BLE Handshake Session Tests
 //!
@@ -779,7 +779,7 @@ fn test_initiator_process_key_ack_rejects_self_identity() {
 
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Initiator-side session timeout: if `BLE_HANDSHAKE_EXPIRY_SECS` has
 // elapsed since this session sent its offer, an ack must be rejected

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! M3 (`2026-07-03-core-screens-bypass-i18n`): the device-linking
 //! qr-expired and link-failed screens render in the user's locale.

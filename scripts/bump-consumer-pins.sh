@@ -1,7 +1,7 @@
 #!/bin/bash
 # SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 #
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: AGPL-3.0-or-later
 
 # Open a pin-bump MR in every consumer that ci/consumer-pins.json assigns
 # to bump:consumer-pins (ADR-026 amendment 2026-09-30, #434). The native

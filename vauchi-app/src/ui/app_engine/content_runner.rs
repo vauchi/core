@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! CDN content for shells that drive AppEngine directly (tui, linux-gtk;
 //! vauchi/private#733 D10). One call loads the cached content and starts

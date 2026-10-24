@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Ignore in the app layer (ADR-072): the detail screen offers the
 //! toggle with Core-resolved labels, the `AppEngine` persists it, and

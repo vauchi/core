@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Tests for sync::device_orchestrator (Phases 3-4: orchestrator basics
 //! and the device encryption layer). Conflict-resolution and multi-device

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! The emergency wipe is the crypto-shred (vauchi/private#599): it deletes
 //! every key that opens the data, and the data, so a copy taken before the

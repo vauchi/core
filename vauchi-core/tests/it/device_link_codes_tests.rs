@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Device-link codes and QR lifetime: the link QR lives exactly 5 minutes
 //! (ADR-035), numeric and confirmation codes are `ddd-ddd` drawn across the

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Constructors and `with_*` builders for `ContactDetailEngine`, split
 //! out of `contact_detail.rs` (file-size, VRS04). Child module via

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! A client follows its relay's anchor rollover (#288 plan 2.10, decision
 //! 0.13): when the signed record no longer chains to the anchor it holds,

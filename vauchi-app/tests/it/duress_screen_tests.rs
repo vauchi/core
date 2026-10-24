@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! The Duress PIN screen (#459, design pass #419 item 8; owner decisions
 //! 2026-10-01): once set up it is a management screen — rows for the PIN

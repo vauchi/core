@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Settings link-row routing (GTK-3/QT-3 in
 //! `_private/docs/testing/2026-08-07-exploratory-core-v0.60.1-verification.md`).

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! GDPR / privacy engine — data export, deletion, and consent management.
 //! Copy resolves through `i18n::get_string` in the locale threaded at

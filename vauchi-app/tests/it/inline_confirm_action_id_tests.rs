@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! `Component::InlineConfirm` presses arrive from renderers in the
 //! colon convention (`<component_id>:confirm` / `<component_id>:cancel`

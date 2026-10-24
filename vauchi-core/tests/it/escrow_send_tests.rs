@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Tests for `HttpTransport::escrow` — the core-owned relay escrow send
 //! wrapper (ADR-049 Phase 1 T1). Drives the in-process `MockRelay` over

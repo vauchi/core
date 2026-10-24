@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! A DATA frame's ACK bitmap counts only if the frame authenticates
 //! (vauchi/private#676). The bitmap decides which of our chunks we stop

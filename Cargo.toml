@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 #
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: AGPL-3.0-or-later
 
 [workspace]
 resolver = "3"
@@ -24,7 +24,7 @@ exclude = ["vendor/rqrr"]
 version = "0.87.0"
 edition = "2024"
 rust-version = "1.93"
-license = "GPL-3.0-or-later"
+license = "AGPL-3.0-or-later"
 repository = "https://gitlab.com/vauchi/core"
 authors = ["Vauchi Contributors"]
 

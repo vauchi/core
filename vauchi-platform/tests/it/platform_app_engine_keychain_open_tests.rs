@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! The mobile shells open Core with the platform keychain from the first
 //! call (`PlatformAppEngine::open_with_keychain`), so every key that opens the database lives

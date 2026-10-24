@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! App lifecycle events as core-decided consequences (ADR-021 + ADR-044 Am2a
 //! Family-A). The frontend forwards the raw OS foreground event and core owns

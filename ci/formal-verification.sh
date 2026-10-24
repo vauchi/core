@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: AGPL-3.0-or-later
 #
 # Runs Core's formal checks (#757): the Kani parser proofs and the Tamarin
 # model of the in-person QR exchange. The Tamarin model must still fail

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Frontend-pushed render context — Category-1 settings per
 //! [ADR-047](../../../../../_private/docs/decisions/adr-047-settings-storage-by-sensitivity.md).

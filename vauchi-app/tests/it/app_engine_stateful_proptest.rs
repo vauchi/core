@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! CC-13 stateful property test for `AppEngine` — Task 1.4 of
 //! `_private/docs/planning/todo/2026-05-11-pure-functional-core-program-plan.md`.

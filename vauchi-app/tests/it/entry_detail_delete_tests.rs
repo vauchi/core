@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Deleting an own-card entry (#427, owner decisions 2026-09-28): Delete
 //! sits in the screen body as a destructive row beside the entry, not in

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! The Update Delivery screen (#445, design pass #419 item 5; owner
 //! decisions 2026-09-30): a Recent / Pending / Failed switch with counts

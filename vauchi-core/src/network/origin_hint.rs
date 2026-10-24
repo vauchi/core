@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Origin-device hint: an opaque, recipient-encrypted marker that lets a
 //! receiver select the sender's device-pair ratchet before decrypting, without

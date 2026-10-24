@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Inline tests for `device_linking.rs` — extracted to keep the engine
 //! file under the 1000-line src hard limit. Loaded via `#[path]`.

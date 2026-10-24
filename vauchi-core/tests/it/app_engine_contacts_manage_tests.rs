@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! AppEngine contact management tests: my_info fields, contact detail/edit routing,
 //! contact visibility, duplicate detection, contact merge, and contact limit.

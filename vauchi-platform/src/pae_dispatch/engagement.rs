@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! `engagement` arm group of [`PlatformAppEngine::dispatch_domain_command`] —
 //! split out of `platform_app_engine.rs` (pure code motion).

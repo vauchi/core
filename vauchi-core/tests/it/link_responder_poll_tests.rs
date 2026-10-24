@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! End-to-end tests for the core-driven link-responder escrow poll
 //! (ADR-049 Phase 1 T3). Drives a real `AppEngine` — onboarded, pointed

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! `AppEngine` boundary contract: engine-level domain results are resolved
 //! by `route_result` before they reach a frontend (ADR-043/ADR-044).

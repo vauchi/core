@@ -1,13 +1,13 @@
 # SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 #
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: AGPL-3.0-or-later
 
 language = "C"
 cpp_compat = true
 include_guard = "VAUCHI_CABI_H"
 tab_width = 4
 documentation_style = "doxy"
-header = "/* SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me> */\n/* SPDX-License-Identifier: GPL-3.0-or-later */"
+header = "/* SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me> */\n/* SPDX-License-Identifier: AGPL-3.0-or-later */"
 
 [export]
 prefix = ""

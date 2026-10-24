@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! F4 handshake receive arms — RegistryPush (0x05) / RegistryAck (0x06)
 //! arriving on the ratcheted contact channel (ADR-064 Amendment 2026-07-25).

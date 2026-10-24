@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! The link trainer's layout carried from one exchange to the next on this
 //! device (#450, plan 2.9). A child module because `multi_stage_machine.rs`

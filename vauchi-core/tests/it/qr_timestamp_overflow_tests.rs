@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! A QR's timestamp is chosen by whoever signs it, so it may sit at the
 //! top of `u64`; the expiry and drift checks must refuse it, not overflow.

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Platform-level entry into the engine-owned link-mode responder
 //! (ADR-049). Onboarding → `UserAction::LinkOpened { uri }` → grant must

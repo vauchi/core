@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Tests for the v2 link-mode card payload (ADR-050 Phase 2 T4) — the
 //! signed bootstrap carrying the depositor's X3DH exchange key + relay

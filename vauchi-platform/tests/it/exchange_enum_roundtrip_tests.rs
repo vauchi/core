@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Roundtrip tests for the `MobileCommand` / `MobileEvent` UniFFI mirror
 //! enums (ADR-031). These exercise the public `From` conversions between

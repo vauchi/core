@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! The active social-network registry: the CDN copy once one loads, else
 //! the bundled `networks.json` (vauchi/private#734 D2). Held here, beside

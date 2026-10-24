@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! M2 S1 — last-used exchange defaults (design D2.1,
 //! `2026-07-03-one-tap-exchange` goal 1): a repeat exchange skips the G4

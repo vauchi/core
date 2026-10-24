@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! M4 S1a (`2026-07-03-placebo-accessibility-toggles`): the
 //! `reduce_motion` and `large_touch` accessibility flags take real

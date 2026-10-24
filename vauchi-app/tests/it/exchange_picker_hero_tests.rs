@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! M2 S3 — mode picker: one hero action + "Other ways to connect"
 //! disclosure (design D2.3, user-approved 2026-07-04: hero = last-used,

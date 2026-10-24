@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 //
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Following a relay's anchor rollover (#288 plan 1.5, decision 0.13): the
 //! client moves only to the backup it already committed to, so neither a

@@ -36,6 +36,7 @@ use super::ExchangeError;
 use super::qr_url::{decode_scanned_qr, encode_qr_url};
 use super::x3dh::X3DHKeyPair;
 use crate::byte_reader::ByteReader;
+use crate::card::MAX_DISPLAY_NAME_LENGTH;
 use crate::crypto::{PublicKey, Signature};
 use crate::identity::Identity;
 #[cfg(feature = "network-rustls")]
@@ -54,8 +55,9 @@ const QR_EXPIRY_SECONDS: u64 = 300;
 /// QR code magic bytes to identify Vauchi QR codes.
 const MAGIC: &[u8; 4] = b"WBEX";
 
-/// Maximum allowed display name length in bytes.
-const MAX_DISPLAY_NAME_LEN: usize = 255;
+/// Maximum display name length in bytes: the card's character limit at
+/// UTF-8's widest character, checked before anything is allocated.
+const MAX_DISPLAY_NAME_LEN: usize = MAX_DISPLAY_NAME_LENGTH * 4;
 
 /// Flag: relay URL is present after display name
 const FLAG_HAS_RELAY_URL: u8 = 0x01;
@@ -79,7 +81,7 @@ pub struct ExchangeQR {
     audio_challenge: [u8; 16],
     /// Unix timestamp when QR was generated
     timestamp: u64,
-    /// Displayer's display name (UTF-8, max 255 bytes)
+    /// Displayer's display name (UTF-8, at most the card's 100 characters)
     display_name: String,
     /// Relay URL for per-contact routing (learned during exchange)
     relay_url: Option<String>,
@@ -327,6 +329,9 @@ impl ExchangeQR {
             &String::from_utf8(tail.take(name_len).ok_or_else(invalid)?.to_vec())
                 .map_err(|_| invalid())?,
         );
+        if display_name.chars().count() > MAX_DISPLAY_NAME_LENGTH {
+            return Err(ExchangeError::DisplayNameTooLong(name_len));
+        }
 
         let [flags] = tail.array::<1>().ok_or_else(invalid)?;
 

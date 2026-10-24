@@ -198,7 +198,15 @@ impl AppEngine {
 
         if matches!(event, Event::PresentationInvalidated) {
             self.invalidate_all();
-            return self.initial_commands();
+            let mut commands = self.initial_commands()?;
+            super::result_commands::append_result_commands(
+                ActionResult::Notify {
+                    notifications: self.drain_pending_notifications(),
+                },
+                &mut commands,
+            )
+            .map_err(|variant| AppPresentationError::UnresolvedActionResult { variant })?;
+            return Ok(commands);
         }
 
         if let Event::DeepLinkOpened { uri } = &event {

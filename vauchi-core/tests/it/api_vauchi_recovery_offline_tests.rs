@@ -13,8 +13,11 @@
 use base64::Engine;
 use vauchi_core::Vauchi;
 use vauchi_core::VauchiError;
+use vauchi_core::contact::Contact;
+use vauchi_core::contact_card::ContactCard;
 use vauchi_core::identity::Identity;
 use vauchi_core::recovery::{RecoveryClaim, RecoveryVoucher};
+use vauchi_core::{SymmetricKey, clock::SystemClock};
 
 fn vauchi_with_identity(name: &str) -> Vauchi {
     let mut wb = Vauchi::in_memory().unwrap();
@@ -24,6 +27,31 @@ fn vauchi_with_identity(name: &str) -> Vauchi {
 
 fn b64(bytes: &[u8]) -> String {
     base64::engine::general_purpose::STANDARD.encode(bytes)
+}
+
+fn now() -> u64 {
+    SystemClock::shared().unix_seconds()
+}
+
+/// Adds `identity` to `helper`'s contacts under `name`, as an in-person
+/// exchange would.
+fn add_contact(helper: &Vauchi, identity: &Identity, name: &str) {
+    let contact = Contact::from_exchange(
+        *identity.signing_public_key(),
+        ContactCard::new(name),
+        SymmetricKey::generate(),
+        0,
+    );
+    helper.add_contact(contact).unwrap();
+}
+
+fn claim_b64(old: &Identity, new: &Identity, timestamp: u64) -> String {
+    let claim = RecoveryClaim::new(
+        old.signing_public_key(),
+        new.signing_public_key(),
+        timestamp,
+    );
+    b64(&claim.to_bytes())
 }
 
 // ============================================================
@@ -47,6 +75,21 @@ fn create_recovery_claim_hex_b64_returns_decodable_claim() {
         wb.identity().unwrap().signing_public_key(),
         "new_pk must equal current identity's signing key"
     );
+}
+
+// @internal
+#[test]
+fn create_recovery_claim_hex_b64_stamps_the_current_time() {
+    let wb = vauchi_with_identity("Alice");
+    let before = now();
+
+    let claim_b64 = wb
+        .create_recovery_claim_hex_b64(&hex::encode([0xABu8; 32]))
+        .unwrap();
+
+    let claim = wb.parse_recovery_claim_b64(&claim_b64).unwrap();
+    assert!((before..=now()).contains(&claim.timestamp()));
+    assert!(!claim.is_expired(now()));
 }
 
 // @internal
@@ -146,14 +189,12 @@ fn create_voucher_from_claim_b64_signs_and_returns_decodable_voucher() {
 
     let alice_old = Identity::create("Alice-Old", 0);
     let alice_new = Identity::create("Alice-New", 0);
-    let claim = RecoveryClaim::new(
-        alice_old.signing_public_key(),
-        alice_new.signing_public_key(),
-        0,
-    );
-    let claim_b64 = b64(&claim.to_bytes());
+    add_contact(&helper, &alice_old, "Alice");
+    let before = now();
 
-    let voucher_b64 = helper.create_voucher_from_claim_b64(&claim_b64).unwrap();
+    let voucher_b64 = helper
+        .create_voucher_from_claim_b64(&claim_b64(&alice_old, &alice_new, now()))
+        .unwrap();
 
     let voucher_bytes = base64::engine::general_purpose::STANDARD
         .decode(&voucher_b64)
@@ -171,6 +212,70 @@ fn create_voucher_from_claim_b64_signs_and_returns_decodable_voucher() {
         voucher.verify(),
         "voucher signature must verify against its embedded voucher_pk"
     );
+    assert!(
+        (before..=now()).contains(&voucher.timestamp()),
+        "the voucher carries the time it was signed"
+    );
+}
+
+// @internal
+#[test]
+fn create_voucher_from_claim_b64_refuses_a_claim_for_someone_not_a_contact() {
+    let helper = vauchi_with_identity("Bob");
+    let stranger_old = Identity::create("Stranger-Old", 0);
+    let stranger_new = Identity::create("Stranger-New", 0);
+
+    let result =
+        helper.create_voucher_from_claim_b64(&claim_b64(&stranger_old, &stranger_new, now()));
+
+    assert!(matches!(result, Err(VauchiError::ContactNotFound(_))));
+}
+
+// @internal
+#[test]
+fn create_voucher_from_claim_b64_refuses_an_expired_claim() {
+    let helper = vauchi_with_identity("Bob");
+    let alice_old = Identity::create("Alice-Old", 0);
+    let alice_new = Identity::create("Alice-New", 0);
+    add_contact(&helper, &alice_old, "Alice");
+    let past_the_48_hour_window = now() - RecoveryClaim::MAX_AGE_SECS - 60;
+
+    let result = helper.create_voucher_from_claim_b64(&claim_b64(
+        &alice_old,
+        &alice_new,
+        past_the_48_hour_window,
+    ));
+
+    assert!(matches!(result, Err(VauchiError::InvalidState(_))));
+}
+
+// @internal
+#[test]
+fn recovery_claim_contact_names_the_contact_whose_key_the_claim_carries() {
+    let helper = vauchi_with_identity("Bob");
+    let alice_old = Identity::create("Alice-Old", 0);
+    let alice_new = Identity::create("Alice-New", 0);
+    add_contact(&helper, &alice_old, "Alice");
+    let claim = helper
+        .parse_recovery_claim_b64(&claim_b64(&alice_old, &alice_new, now()))
+        .unwrap();
+
+    let contact = helper.recovery_claim_contact(&claim).unwrap();
+
+    assert_eq!(contact.display_name(), "Alice");
+    assert_eq!(contact.public_key(), Some(alice_old.signing_public_key()));
+}
+
+// @internal
+#[test]
+fn recovery_claim_contact_refuses_a_key_that_is_no_contact() {
+    let helper = vauchi_with_identity("Bob");
+    let claim = RecoveryClaim::new(&[0x33u8; 32], &[0x44u8; 32], now());
+
+    assert!(matches!(
+        helper.recovery_claim_contact(&claim),
+        Err(VauchiError::ContactNotFound(_))
+    ));
 }
 
 // @internal
@@ -179,7 +284,9 @@ fn create_voucher_from_claim_b64_rejects_self_vouching() {
     // The helper IS the recovering identity → SelfVouching error.
     let alice = vauchi_with_identity("Alice");
     let alice_pk = *alice.identity().unwrap().signing_public_key();
-    let claim = RecoveryClaim::new(&[0xAAu8; 32], &alice_pk, 0);
+    let old = Identity::create("Alice-Old", 0);
+    add_contact(&alice, &old, "Old Alice");
+    let claim = RecoveryClaim::new(old.signing_public_key(), &alice_pk, now());
     let claim_b64 = b64(&claim.to_bytes());
 
     let result = alice.create_voucher_from_claim_b64(&claim_b64);

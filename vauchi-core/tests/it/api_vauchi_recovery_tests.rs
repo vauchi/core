@@ -288,6 +288,27 @@ fn vouch_for_claim_requires_identity() {
     assert!(matches!(result, Err(VauchiError::IdentityNotInitialized)));
 }
 
+// @internal
+#[test]
+fn vouch_for_claim_refuses_a_contact_whose_key_the_claim_does_not_carry() {
+    let helper = vauchi_with_identity("Bob");
+    let alice = Identity::create("Alice", 0);
+    let alice_contact = Contact::from_exchange(
+        *alice.signing_public_key(),
+        ContactCard::new("Alice"),
+        SymmetricKey::generate(),
+        0,
+    );
+    let alice_id = alice_contact.id().to_string();
+    helper.add_contact(alice_contact).unwrap();
+    let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
+    let someone_elses_claim = RecoveryClaim::new(&[0x33u8; 32], &[0x44u8; 32], now);
+
+    let result = helper.vouch_for_claim(&someone_elses_claim, &alice_id);
+
+    assert!(matches!(result, Err(VauchiError::ContactNotFound(_))));
+}
+
 // ============================================================
 // verify_recovery_proof (PAE G3 push-down — was inline in
 // vauchi-platform's VerifyRecoveryProof dispatch arm)

@@ -46,7 +46,7 @@ for rule in "${RULES[@]}"; do
 
   # shellcheck disable=SC2086
   # Match only actual use statements, not comments or strings
-  matches=$(grep -rn -E "^\s*$pattern" $glob 2>/dev/null || true)
+  matches=$(grep -rn -E "^[[:space:]]*$pattern" $glob 2>/dev/null || true)
 
   if [ -n "$matches" ]; then
     echo "VIOLATION: $explanation"

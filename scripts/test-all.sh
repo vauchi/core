@@ -34,27 +34,27 @@ run_test() {
     local skip_if_missing="${3:-}"
 
     echo ""
-    echo -e "${BLUE}=== $name ===${NC}"
+    printf '%b\n' "${BLUE}=== $name ===${NC}"
 
     if [[ -n "$skip_if_missing" && ! -d "$skip_if_missing" ]]; then
-        echo -e "${YELLOW}SKIPPED: Directory not found: $skip_if_missing${NC}"
+        printf '%b\n' "${YELLOW}SKIPPED: Directory not found: $skip_if_missing${NC}"
         ((SKIPPED++))
         return 0
     fi
 
     if eval "$cmd"; then
-        echo -e "${GREEN}PASSED: $name${NC}"
+        printf '%b\n' "${GREEN}PASSED: $name${NC}"
         ((PASSED++))
     else
-        echo -e "${RED}FAILED: $name${NC}"
+        printf '%b\n' "${RED}FAILED: $name${NC}"
         ((FAILED++))
         return 1
     fi
 }
 
-echo -e "${YELLOW}╔════════════════════════════════════════╗${NC}"
-echo -e "${YELLOW}║     Vauchi Core Test Suite             ║${NC}"
-echo -e "${YELLOW}╚════════════════════════════════════════╝${NC}"
+printf '%b\n' "${YELLOW}╔════════════════════════════════════════╗${NC}"
+printf '%b\n' "${YELLOW}║     Vauchi Core Test Suite             ║${NC}"
+printf '%b\n' "${YELLOW}╚════════════════════════════════════════╝${NC}"
 echo ""
 echo "Project root: $PROJECT_ROOT"
 echo "Workspace root: $WORKSPACE_ROOT"
@@ -77,11 +77,11 @@ if [[ -d "$ANDROID_DIR" && -f "$ANDROID_DIR/gradlew" ]]; then
     if adb devices 2>/dev/null | grep -q "device$"; then
         run_test "Android Instrumented Tests" "(cd '$ANDROID_DIR' && ./gradlew connectedAndroidTest)" "$ANDROID_DIR"
     else
-        echo -e "${YELLOW}SKIPPED: Android instrumented tests (no device/emulator)${NC}"
+        printf '%b\n' "${YELLOW}SKIPPED: Android instrumented tests (no device/emulator)${NC}"
         ((SKIPPED++))
     fi
 else
-    echo -e "${YELLOW}SKIPPED: Android directory not found or no gradlew${NC}"
+    printf '%b\n' "${YELLOW}SKIPPED: Android directory not found or no gradlew${NC}"
     ((SKIPPED++))
 fi
 
@@ -92,41 +92,41 @@ if [[ -d "$IOS_DIR" && "$(uname)" == "Darwin" ]]; then
     if command -v xcodebuild &>/dev/null; then
         run_test "iOS Unit Tests" "(cd '$IOS_DIR' && xcodebuild test -scheme Vauchi -destination 'platform=iOS Simulator,name=iPhone 15' -quiet)" "$IOS_DIR"
     else
-        echo -e "${YELLOW}SKIPPED: xcodebuild not found (macOS only)${NC}"
+        printf '%b\n' "${YELLOW}SKIPPED: xcodebuild not found (macOS only)${NC}"
         ((SKIPPED++))
     fi
 else
-    echo -e "${YELLOW}SKIPPED: iOS tests (not on macOS or directory missing)${NC}"
+    printf '%b\n' "${YELLOW}SKIPPED: iOS tests (not on macOS or directory missing)${NC}"
     ((SKIPPED++))
 fi
 
 # --- Coverage Report ---
 echo ""
-echo -e "${BLUE}=== Coverage Report ===${NC}"
+printf '%b\n' "${BLUE}=== Coverage Report ===${NC}"
 if command -v cargo-llvm-cov &>/dev/null; then
     cargo llvm-cov --workspace --html --output-dir "$PROJECT_ROOT/target/coverage"
-    echo -e "${GREEN}Coverage report: $PROJECT_ROOT/target/coverage/html/index.html${NC}"
+    printf '%b\n' "${GREEN}Coverage report: $PROJECT_ROOT/target/coverage/html/index.html${NC}"
 else
-    echo -e "${YELLOW}SKIPPED: cargo-llvm-cov not installed${NC}"
+    printf '%b\n' "${YELLOW}SKIPPED: cargo-llvm-cov not installed${NC}"
     echo "Install with: cargo install cargo-llvm-cov"
     ((SKIPPED++))
 fi
 
 # --- Summary ---
 echo ""
-echo -e "${YELLOW}╔════════════════════════════════════════╗${NC}"
-echo -e "${YELLOW}║             Test Summary               ║${NC}"
-echo -e "${YELLOW}╚════════════════════════════════════════╝${NC}"
+printf '%b\n' "${YELLOW}╔════════════════════════════════════════╗${NC}"
+printf '%b\n' "${YELLOW}║             Test Summary               ║${NC}"
+printf '%b\n' "${YELLOW}╚════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "${GREEN}Passed:  $PASSED${NC}"
-echo -e "${RED}Failed:  $FAILED${NC}"
-echo -e "${YELLOW}Skipped: $SKIPPED${NC}"
+printf '%b\n' "${GREEN}Passed:  $PASSED${NC}"
+printf '%b\n' "${RED}Failed:  $FAILED${NC}"
+printf '%b\n' "${YELLOW}Skipped: $SKIPPED${NC}"
 echo ""
 
 if [[ $FAILED -gt 0 ]]; then
-    echo -e "${RED}Some tests failed!${NC}"
+    printf '%b\n' "${RED}Some tests failed!${NC}"
     exit 1
 else
-    echo -e "${GREEN}All tests passed!${NC}"
+    printf '%b\n' "${GREEN}All tests passed!${NC}"
     exit 0
 fi

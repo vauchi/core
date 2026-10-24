@@ -178,6 +178,21 @@ impl AppEngine {
 
     /// Reduce one raw shell event into the next ordered command batch.
     pub fn dispatch(&mut self, event: Event) -> Result<Vec<Command>, AppPresentationError> {
+        let event = match event {
+            Event::BleAdvertisementObserved(observation) => {
+                let Some(adv_data) =
+                    vauchi_core::exchange::advertised_token(observation.service_uuids())
+                else {
+                    return Ok(Vec::new());
+                };
+                Event::BleDeviceDiscovered {
+                    id: observation.id().to_owned(),
+                    rssi: observation.rssi(),
+                    adv_data,
+                }
+            }
+            other => other,
+        };
         self.absorb_applied_content();
         self.clear_open_overlay(&event);
 

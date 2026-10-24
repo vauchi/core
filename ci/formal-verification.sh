@@ -211,6 +211,18 @@ tamarin_expect "$models/device_link.spthy" verified "-DHONEST_RELAY" \
 # Without the code comparison the attacker's own request gets the seed.
 tamarin_expect "$models/device_link.spthy" falsified "-DHONEST_RELAY -DNO_CODE_CHECK" \
     photographed_qr_alone_keeps_the_seed
+# Candidate v2 (#788): every QR copied, the relay hostile, the code ground.
+tamarin_expect "$models/device_link_v2.spthy" verified "" \
+    executable seed_secrecy initiator_agreement joiner_agreement
+# Without the commitment the attacker grinds its nonce to match the code.
+tamarin_expect "$models/device_link_v2.spthy" falsified "-DNO_COMMITMENT" \
+    seed_secrecy initiator_agreement
+# Without DH the link key alone decrypts the seed.
+tamarin_expect "$models/device_link_v2.spthy" falsified "-DNO_DH" \
+    seed_secrecy joiner_agreement
+# Grinding is that attack: without it the no-commitment design holds.
+tamarin_expect "$models/device_link_v2.spthy" verified "-DNO_COMMITMENT -DNO_GRIND" \
+    seed_secrecy initiator_agreement joiner_agreement
 # Reciprocity confirmation: signature and asymmetric tokens each stop a
 # reflected confirmation; only the signature covers a leaked shared key.
 tamarin_expect "$models/reciprocity.spthy" verified "" \

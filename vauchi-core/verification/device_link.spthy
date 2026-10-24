@@ -1,0 +1,223 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * Device linking, as `DeviceLinkInitiator` and `DeviceLinkResponder` run
+ * it (#757):
+ *
+ *   - the existing device shows a QR with its identity key and a random
+ *     32-byte link key, signed with the identity key (device_link/qr.rs);
+ *   - the new device scans it, checks the signature, and sends a request
+ *     with its name and a fresh nonce, encrypted with the link key
+ *     (request.rs, responder.rs);
+ *   - both screens show a code derived from the link key and that nonce
+ *     (types.rs `derive_confirmation_code`); the user compares them and
+ *     confirms on the existing device;
+ *   - the existing device then sends the master seed, encrypted with the
+ *     link key (initiator.rs `build_response`, response.rs), and the new
+ *     device adopts it (api/vauchi/identity.rs `adopt_device_link_response`).
+ *
+ * The QR travels by camera, so only the device in the user's hand reads
+ * it, unless someone photographs the screen: `Leak_qr`. The relay and
+ * every network channel belong to the attacker, as in qr_exchange.spthy.
+ * The identity key is derived from the master seed
+ * (`SigningKeyPair::from_seed`), modelled as pk(seed).
+ *
+ * The code is modelled as an exact hash. The real one is 6 digits, so an
+ * attacker who knows the link key and the joiner's nonce can search for a
+ * nonce of its own with the same code in about a million HMACs;
+ * `initiator_agreement` holds only for an attacker without the link key.
+ *
+ * Out of scope: expiry and the proximity-proof timestamp, refusals, the
+ * device registry and sync payload, the broker codes.
+ *
+ * Run: tamarin-prover --prove device_link.spthy
+ *   The two qr_leak_* lemmas are exists-trace on purpose: they find the
+ *   attacks a photographed QR allows against a relay the threat model
+ *   assumes compromised (docs/src/about/security.md).
+ * Honest relay: tamarin-prover --prove -DHONEST_RELAY device_link.spthy
+ *   (a photographed QR alone keeps the seed: the confirmation code is
+ *   what stops the attacker's own request). Prove it can fail: add
+ *   -DNO_CODE_CHECK, and photographed_qr_alone_keeps_the_seed must be
+ *   falsified.
+ */
+
+theory VauchiDeviceLink
+begin
+
+builtins: signing, symmetric-encryption, hashing
+
+restriction Equality:
+  "All x y #i. Eq(x, y) @ i ==> x = y"
+
+/* An identity: the master seed; its signing key is derived from it. */
+rule Create_identity:
+  [ Fr(~seed) ]
+  --[ Identity($A, pk(~seed)) ]->
+  [ !Seed($A, ~seed), Out(pk(~seed)) ]
+
+/* The existing device shows a link QR on its screen. */
+rule Show_link_qr:
+  let qr = <'WBDL', pk(seed), ~lk>
+  in
+  [ !Seed($A, seed), Fr(~lk), Fr(~sid) ]
+  --[ ShowQr(~sid, $A, pk(seed)) ]->
+  [ Initiator(~sid, $A, seed, ~lk), !Screen(~sid, qr, sign(qr, seed)) ]
+
+/* Someone photographs the QR. */
+rule Leak_qr:
+  let qr = <'WBDL', pk_a, lk>
+  in
+  [ !Screen(sid, qr, sig) ]
+  --[ LeakQr(sid, pk_a) ]->
+  [ Out(<qr, sig>), !Leaked(sid) ]
+
+/* The two codes must match before the user confirms; -DNO_CODE_CHECK
+   drops the comparison to show what it is for. */
+#ifdef NO_CODE_CHECK
+#else
+restriction Codes_match:
+  "All x y #i. CompareCodes(x, y) @ i ==> x = y"
+#endif
+
+#ifdef HONEST_RELAY
+/* The relay delivers each message only to the holder of its code. The
+   attacker can use the relay like anyone else, but holds the broker
+   code only from a photographed QR. */
+rule Attacker_request:
+  [ !Leaked(sid), In(req) ]
+  --[ AttackerRequest(sid) ]->
+  [ RelayRequest(sid, req, 'attacker') ]
+
+rule Attacker_receive:
+  [ RelayResponse(sid, resp, 'attacker') ]
+  -->
+  [ Out(resp) ]
+
+rule Joiner_scan:
+  let qr = <'WBDL', pk_a, lk>
+      code = h(<'vauchi-device-link-confirm-code-v1', lk, ~n>)
+  in
+  [ !Screen(sid, qr, sig), Fr(~n) ]
+  --[ Eq(verify(sig, qr, pk_a), true)
+    , JoinerRequest(sid, $B, ~n)
+    ]->
+  [ Joiner(sid, $B, pk_a, lk)
+  , JoinerCode(sid, code)
+  , RelayRequest(sid, senc(<'request', $B, ~n>, lk), 'joiner')
+  ]
+
+rule Initiator_confirm:
+  let code = h(<'vauchi-device-link-confirm-code-v1', lk, n>)
+  in
+  [ Initiator(sid, A, seed, lk)
+  , RelayRequest(sid, senc(<'request', name, n>, lk), channel)
+  , JoinerCode(sid, joiner_code)
+  ]
+  --[ CompareCodes(code, joiner_code)
+    , Release(sid, A, seed, n)
+    ]->
+  [ RelayResponse(sid, senc(<'response', seed>, lk), channel) ]
+
+rule Joiner_adopt:
+  [ Joiner(sid, B, pk_a, lk)
+  , RelayResponse(sid, senc(<'response', seed>, lk), 'joiner')
+  ]
+  --[ Adopt(sid, B, pk_a, seed) ]->
+  [ ]
+#else
+/* The new device scans the QR and sends its request. */
+rule Joiner_scan:
+  let qr = <'WBDL', pk_a, lk>
+      code = h(<'vauchi-device-link-confirm-code-v1', lk, ~n>)
+  in
+  [ !Screen(sid, qr, sig), Fr(~n) ]
+  --[ Eq(verify(sig, qr, pk_a), true)
+    , JoinerRequest(sid, $B, ~n)
+    ]->
+  [ Joiner(sid, $B, pk_a, lk)
+  , JoinerCode(sid, code)
+  , Out(senc(<'request', $B, ~n>, lk))
+  ]
+
+/* A request arrives; the user compares the two codes and confirms; the
+   existing device sends the seed. */
+rule Initiator_confirm:
+  let code = h(<'vauchi-device-link-confirm-code-v1', lk, n>)
+  in
+  [ Initiator(sid, A, seed, lk)
+  , In(senc(<'request', name, n>, lk))
+  , JoinerCode(sid, joiner_code)
+  ]
+  --[ CompareCodes(code, joiner_code)
+    , Release(sid, A, seed, n)
+    ]->
+  [ Out(senc(<'response', seed>, lk)) ]
+
+/* The new device adopts whatever seed the link key decrypts. */
+rule Joiner_adopt:
+  [ Joiner(sid, B, pk_a, lk), In(senc(<'response', seed>, lk)) ]
+  --[ Adopt(sid, B, pk_a, seed) ]->
+  [ ]
+#endif
+
+/* Sanity: a link can complete with no QR leaked. */
+lemma executable:
+  exists-trace
+  "Ex sid A B s n #i #j.
+     Release(sid, A, s, n) @ i & Adopt(sid, B, pk(s), s) @ j
+     & not (Ex sid2 pk #l. LeakQr(sid2, pk) @ l)"
+
+/* The seed stays secret unless a link QR of that identity was
+   photographed. */
+lemma seed_secrecy:
+  "All sid A s n #i.
+     Release(sid, A, s, n) @ i
+     ==> not (Ex #k. K(s) @ k)
+         | (Ex sid2 #l. LeakQr(sid2, pk(s)) @ l)"
+
+/* The existing device sends the seed only for the request the scanning
+   device made (6-digit caveat above). */
+lemma initiator_agreement:
+  "All sid A s n #i.
+     Release(sid, A, s, n) @ i
+     ==> (Ex B #j. JoinerRequest(sid, B, n) @ j & j < i)
+         | (Ex pk #l. LeakQr(sid, pk) @ l)"
+
+/* The new device ends up with the identity the QR named, sent by that
+   identity's device in this session. */
+lemma joiner_agreement:
+  "All sid B pk_a s #i.
+     Adopt(sid, B, pk_a, s) @ i
+     ==> (pk_a = pk(s) & (Ex A n #j. Release(sid, A, s, n) @ j & j < i))
+         | (Ex pk #l. LeakQr(sid, pk) @ l)"
+
+#ifdef HONEST_RELAY
+/* With an honest relay, a photographed QR alone does not give the seed
+   away: the attacker's own request shows a code the user's new device
+   does not, so the user never confirms it (6-digit caveat above: a
+   1-in-a-million guess). Falsified with -DNO_CODE_CHECK. */
+lemma photographed_qr_alone_keeps_the_seed:
+  "All sid A s n #i.
+     Release(sid, A, s, n) @ i ==> not (Ex #k. K(s) @ k)"
+#else
+/* Limit: with a photographed QR, an attacker who sees the relay traffic
+   reads the seed while both devices report a normal link with matching
+   codes. The confirmation code does not stop it. */
+lemma qr_leak_exposes_seed:
+  exists-trace
+  "Ex sid A B s n #i #j #k #l.
+     Release(sid, A, s, n) @ i & Adopt(sid, B, pk(s), s) @ j
+     & JoinerRequest(sid, B, n) @ l & K(s) @ k
+     & (Ex #m. LeakQr(sid, pk(s)) @ m)"
+
+/* Limit: with a photographed QR, an attacker can hand the new device a
+   seed of its own choosing, since nothing checks pk(seed) against the QR. */
+lemma qr_leak_lets_attacker_choose_joiner_identity:
+  exists-trace
+  "Ex sid B pk_a s #i.
+     Adopt(sid, B, pk_a, s) @ i & not (pk_a = pk(s))"
+#endif
+
+end

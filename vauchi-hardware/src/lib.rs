@@ -3,7 +3,11 @@
 
 #![forbid(unsafe_code)]
 
+mod delivery;
 mod discovery;
+mod ports;
 mod worker;
 
-pub use discovery::{BleScanner, Discovery, EventSender, ExecutorError, HardwareFailure};
+pub use delivery::EventSender;
+pub use discovery::BleScanner;
+pub use ports::{Discovery, ExecutorError, HardwareFailure};

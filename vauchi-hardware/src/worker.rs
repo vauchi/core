@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::{Discovery, EventSender, HardwareFailure};
+use crate::delivery::EventSender;
+use crate::ports::{Discovery, HardwareFailure};
 use futures::FutureExt;
 use std::panic::AssertUnwindSafe;
 use std::sync::Arc;

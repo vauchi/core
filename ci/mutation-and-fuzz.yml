@@ -208,13 +208,17 @@ fuzz:nightly:
       # Replay the accumulated corpus with source coverage instrumentation.
       # Text summaries are kept small enough for long-term CI artifacts while
       # the profdata files remain available for deeper local inspection.
+      # The replay runs without ASan: its odr check aborts on the two
+      # identical static aiOff tables in bundled sqlite3.c, which the
+      # optimiser folds to one address (private#787). The runs above
+      # keep ASan.
       COVERAGE_FAILED=0
       TARGET_TRIPLE=$(rustc +nightly -vV | awk '/^host:/ { print $2 }')
       NIGHTLY_SYSROOT=$(rustc +nightly --print sysroot)
       LLVM_COV="$NIGHTLY_SYSROOT/lib/rustlib/$TARGET_TRIPLE/bin/llvm-cov"
       for t in $TARGETS; do
         echo "COVERAGE: ${t}"
-        if cargo +nightly fuzz coverage "$t"; then
+        if cargo +nightly fuzz coverage -s none "$t"; then
           COVERAGE_BINARY=$(find target -type f \
             -path "*/coverage/*/release/${t}" | head -n 1)
           COVERAGE_PROFILE="coverage/${t}/coverage.profdata"

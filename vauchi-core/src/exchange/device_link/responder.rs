@@ -10,6 +10,7 @@ use super::refusal::{DeviceLinkRefusalReason, decrypt_refusal};
 use super::request::DeviceLinkRequest;
 use super::response::DeviceLinkResponse;
 use super::types::derive_confirmation_code;
+use crate::crypto::SigningKeyPair;
 
 /// State machine for device linking from the new device's perspective.
 pub struct DeviceLinkResponder {
@@ -63,11 +64,18 @@ impl DeviceLinkResponder {
     /// Processes the response from the existing device.
     ///
     /// Returns the master seed, display name, device index, and registry.
+    /// Refuses a seed whose identity key is not the QR's: anyone with a
+    /// copy of the QR holds the link key (vauchi/private#789).
     pub fn process_response(
         &self,
         encrypted_response: &[u8],
     ) -> Result<DeviceLinkResponse, ExchangeError> {
-        DeviceLinkResponse::decrypt(encrypted_response, self.qr.link_key())
+        let response = DeviceLinkResponse::decrypt(encrypted_response, self.qr.link_key())?;
+        let seed_identity_key = SigningKeyPair::from_seed(response.master_seed()).public_key();
+        if seed_identity_key.as_bytes() != self.qr.identity_public_key() {
+            return Err(ExchangeError::IdentityMismatch);
+        }
+        Ok(response)
     }
 
     /// Reads the host's word that it ended the ceremony, instead of a

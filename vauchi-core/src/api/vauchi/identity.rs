@@ -51,18 +51,15 @@ impl Vauchi {
         // Create initial contact card, or update display name on existing card.
         // During onboarding, fields may already be saved to the card before
         // identity creation — preserve them by loading the existing card.
-        let card = match self.storage.contacts().load_own_card()? {
-            Some(mut existing) => {
-                // Propagate validation errors so the user sees why their
-                // display name was rejected instead of seeing the old name
-                // silently retained.
-                existing
-                    .set_display_name(display_name)
-                    .map_err(VauchiError::from)?;
-                existing
-            }
-            None => ContactCard::new(display_name),
-        };
+        // Propagate validation errors so the user sees why their display name
+        // was rejected instead of seeing the old name silently retained.
+        let mut card = self
+            .storage
+            .contacts()
+            .load_own_card()?
+            .unwrap_or_else(|| ContactCard::new(display_name));
+        card.set_display_name(display_name)
+            .map_err(VauchiError::from)?;
         self.storage.contacts().save_own_card(&card)?;
 
         // If SecureStorage is available, derive and store SMK, then rekey storage

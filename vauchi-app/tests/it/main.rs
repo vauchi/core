@@ -22,6 +22,7 @@ mod app_reducer_protocol_tests;
 mod app_undo_protocol_tests;
 mod ble_handshake_app_engine_tests;
 mod ble_link_release_tests;
+mod content_publisher_key_tests;
 mod content_scheduler_tests;
 mod engine_content_updates_tests;
 mod event_notifier_tests;

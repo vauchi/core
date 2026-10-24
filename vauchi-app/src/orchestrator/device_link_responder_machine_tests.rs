@@ -285,3 +285,28 @@ fn full_join_completes() {
     assert_eq!(response.display_name(), "Alice");
     assert_eq!(response.device_index(), 1);
 }
+
+// @internal
+#[test]
+fn a_qr_timestamped_at_the_top_of_u64_fails_the_join_instead_of_aborting() {
+    let identity =
+        Identity::from_device_link([0x11; 32], "Alice".into(), 0, "Primary Device".into(), 0);
+    let qr = vauchi_core::exchange::DeviceLinkQR::generate_with_timestamp(&identity, u64::MAX - 10);
+    let invitation = DeviceLinkJoinInvitation {
+        qr_data: qr.to_data_string(),
+        broker_code: BROKER_CODE.to_string(),
+        relay_url: None,
+        local_rendezvous: None,
+    };
+    let broker = FakeBroker::new();
+    let mut m =
+        DeviceLinkResponderMachine::new(invitation, "My Phone".to_string(), TIMEOUT).unwrap();
+
+    let event = m.advance(&broker, NOW);
+
+    assert!(
+        matches!(event, ResponderEvent::Failed { ref reason } if reason == "qr_expired"),
+        "got {event:?}"
+    );
+    assert!(broker.claims.borrow().is_empty());
+}

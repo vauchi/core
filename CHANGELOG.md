@@ -28,12 +28,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   local relay's own route (`VAUCHI_DEV_OHTTP_RELAY_URL`)
   (vauchi/private#733).
 - CI: `test:formal` runs the Kani parser proofs and the Tamarin
-  exchange and device-link models (vauchi/private#757);
-  `test:core-32bit` also runs the 32-bit integration tests
-  (vauchi/private#784).
+  exchange, device-link and reciprocity-confirmation models
+  (vauchi/private#757); `test:core-32bit` also runs the 32-bit
+  integration tests (vauchi/private#784).
 
 ### Fixed
 
+- A guardian vouches only for a recovery claim that names one of their
+  contacts and carries that contact's key; the vouch screen names the
+  contact, and claims and vouchers carry the time
+  (vauchi/private#708).
 - A new device refuses a linked seed whose identity is not the one the
   scanned QR names (vauchi/private#789).
 - A QR timestamp near `u64::MAX` counts as expired instead of

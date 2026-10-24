@@ -3,7 +3,7 @@
 
 use std::sync::mpsc::TryRecvError;
 use vauchi_app::ui::AppEngine;
-use vauchi_core::{Command, Event, NotificationUrgency, Vauchi, VauchiEvent};
+use vauchi_core::{Command, Event, Vauchi, VauchiEvent};
 
 fn app() -> AppEngine {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -11,9 +11,9 @@ fn app() -> AppEngine {
     AppEngine::new(vauchi)
 }
 
-// @internal — a shell must not need a second domain API to obtain notifications.
+// @internal — mobile shells still rely on their existing notification delivery path (#764).
 #[test]
-fn invalidation_returns_pending_notification_once_with_the_refreshed_surface() {
+fn invalidation_preserves_notifications_for_existing_delivery_paths() {
     let mut app = app();
     app.initial_commands().unwrap();
     app.vauchi()
@@ -36,19 +36,11 @@ fn invalidation_returns_pending_notification_once_with_the_refreshed_surface() {
             _ => None,
         })
         .collect();
-    assert_eq!(notifications.len(), 1);
-    assert_eq!(notifications[0].title, "Emergency Alert");
-    assert_eq!(notifications[0].body, "Contact bob sent an emergency alert");
-    assert_eq!(notifications[0].urgency, NotificationUrgency::Urgent);
-
-    let repeated = app.dispatch(Event::PresentationInvalidated).unwrap();
-    assert_eq!(
-        repeated
-            .iter()
-            .filter(|command| matches!(command, Command::PostNotification { .. }))
-            .count(),
-        0
-    );
+    assert_eq!(notifications, Vec::<&vauchi_core::NotificationSpec>::new());
+    let pending = app.drain_pending_notifications();
+    assert_eq!(pending.len(), 1);
+    assert_eq!(pending[0].title, "Emergency Alert");
+    assert_eq!(pending[0].body, "Contact bob sent an emergency alert");
     assert_eq!(app.drain_pending_notifications(), Vec::new());
 }
 

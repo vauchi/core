@@ -23,7 +23,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-WORKSPACE_ROOT="$(dirname "$PROJECT_ROOT")"
 
 # Version from argument or Cargo.toml (strip v prefix from tags like v0.1.0)
 RAW_VERSION="${1:-$(grep -m1 'version = ' "$PROJECT_ROOT/Cargo.toml" | sed 's/.*"\(.*\)".*/\1/')}"
@@ -46,24 +45,24 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo -e "${YELLOW}╔════════════════════════════════════════╗${NC}"
-echo -e "${YELLOW}║     Package XCFramework v$VERSION         ${NC}"
-echo -e "${YELLOW}╚════════════════════════════════════════╝${NC}"
+printf '%b\n' "${YELLOW}╔════════════════════════════════════════╗${NC}"
+printf '%b\n' "${YELLOW}║     Package XCFramework v$VERSION         ${NC}"
+printf '%b\n' "${YELLOW}╚════════════════════════════════════════╝${NC}"
 echo ""
 
 # Check prerequisites
 if [[ "$(uname)" != "Darwin" ]]; then
-    echo -e "${RED}Error: XCFramework packaging requires macOS${NC}"
+    printf '%b\n' "${RED}Error: XCFramework packaging requires macOS${NC}"
     exit 1
 fi
 
 if [[ ! -f "$IOS_LIBS_DIR/libvauchi_platform_device.a" ]]; then
-    echo -e "${RED}Error: iOS libraries not found. Run build-bindings.sh --ios first${NC}"
+    printf '%b\n' "${RED}Error: iOS libraries not found. Run build-bindings.sh --ios first${NC}"
     exit 1
 fi
 
 if [[ ! -f "$IOS_GENERATED_DIR/vauchi_platform.swift" ]]; then
-    echo -e "${RED}Error: Swift bindings not found. Run build-bindings.sh --ios first${NC}"
+    printf '%b\n' "${RED}Error: Swift bindings not found. Run build-bindings.sh --ios first${NC}"
     exit 1
 fi
 
@@ -75,7 +74,7 @@ mkdir -p "$BUILD_DIR"
 mkdir -p "$DIST_DIR"
 
 # Create module map for the FFI layer
-echo -e "${YELLOW}Creating module map...${NC}"
+printf '%b\n' "${YELLOW}Creating module map...${NC}"
 HEADERS_DIR="$BUILD_DIR/Headers"
 mkdir -p "$HEADERS_DIR"
 
@@ -112,7 +111,7 @@ framework module VauchiPlatformFFI {
 EOF
 
 # Create XCFramework structure for device
-echo -e "${YELLOW}Preparing device slice...${NC}"
+printf '%b\n' "${YELLOW}Preparing device slice...${NC}"
 DEVICE_DIR="$BUILD_DIR/ios-arm64"
 mkdir -p "$DEVICE_DIR/VauchiPlatformFFI.framework"
 cp "$IOS_LIBS_DIR/libvauchi_platform_device.a" "$DEVICE_DIR/VauchiPlatformFFI.framework/VauchiPlatformFFI"
@@ -143,7 +142,7 @@ cat > "$DEVICE_DIR/VauchiPlatformFFI.framework/Info.plist" << EOF
 EOF
 
 # Create XCFramework structure for simulator
-echo -e "${YELLOW}Preparing simulator slice...${NC}"
+printf '%b\n' "${YELLOW}Preparing simulator slice...${NC}"
 SIM_DIR="$BUILD_DIR/ios-arm64_x86_64-simulator"
 mkdir -p "$SIM_DIR/VauchiPlatformFFI.framework"
 cp "$IOS_LIBS_DIR/libvauchi_platform_sim.a" "$SIM_DIR/VauchiPlatformFFI.framework/VauchiPlatformFFI"
@@ -155,7 +154,7 @@ cp "$DEVICE_DIR/VauchiPlatformFFI.framework/Info.plist" "$SIM_DIR/VauchiPlatform
 # Create XCFramework structure for macOS (if macOS libs exist)
 MACOS_FRAMEWORK_ARG=""
 if [[ -f "$MACOS_LIBS_DIR/libvauchi_platform_macos.a" ]]; then
-    echo -e "${YELLOW}Preparing macOS slice (versioned bundle)...${NC}"
+    printf '%b\n' "${YELLOW}Preparing macOS slice (versioned bundle)...${NC}"
     MACOS_DIR="$BUILD_DIR/macos-arm64_x86_64"
     MACOS_FW="$MACOS_DIR/VauchiPlatformFFI.framework"
     # macOS requires versioned framework bundles (not flat iOS-style)
@@ -175,11 +174,11 @@ if [[ -f "$MACOS_LIBS_DIR/libvauchi_platform_macos.a" ]]; then
     (cd "$MACOS_FW" && ln -sf Versions/Current/VauchiPlatformFFI VauchiPlatformFFI)
     MACOS_FRAMEWORK_ARG="-framework $MACOS_FW"
 else
-    echo -e "${YELLOW}No macOS libraries found — XCFramework will be iOS-only${NC}"
+    printf '%b\n' "${YELLOW}No macOS libraries found — XCFramework will be iOS-only${NC}"
 fi
 
 # Create XCFramework
-echo -e "${YELLOW}Creating XCFramework...${NC}"
+printf '%b\n' "${YELLOW}Creating XCFramework...${NC}"
 XCFRAMEWORK_PATH="$BUILD_DIR/VauchiPlatformFFI.xcframework"
 
 xcodebuild -create-xcframework \
@@ -188,7 +187,7 @@ xcodebuild -create-xcframework \
     $MACOS_FRAMEWORK_ARG \
     -output "$XCFRAMEWORK_PATH"
 
-echo -e "${GREEN}XCFramework created at: $XCFRAMEWORK_PATH${NC}"
+printf '%b\n' "${GREEN}XCFramework created at: $XCFRAMEWORK_PATH${NC}"
 
 # Post-process: Re-inject keys that xcodebuild -create-xcframework strips when
 # it regenerates Info.plists for static-library frameworks.
@@ -202,7 +201,7 @@ echo -e "${GREEN}XCFramework created at: $XCFRAMEWORK_PATH${NC}"
 #     libs' build target. The Rust libs build for iOS 10.0 (build-bindings.sh)
 #     and that binary supports 15.0 fine; the declared minimum just has to be
 #     >= the app. Keep in sync with ios/project.yml IPHONEOS_DEPLOYMENT_TARGET.
-echo -e "${YELLOW}Post-processing: Ensuring CFBundleExecutable + MinimumOSVersion in framework slices...${NC}"
+printf '%b\n' "${YELLOW}Post-processing: Ensuring CFBundleExecutable + MinimumOSVersion in framework slices...${NC}"
 FFI_MIN_IOS="15.0"
 while IFS= read -r plist; do
     if ! /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$plist" 2>/dev/null; then
@@ -223,10 +222,10 @@ while IFS= read -r plist; do
             ;;
     esac
 done < <(find "$XCFRAMEWORK_PATH" -name "Info.plist" -path "*/VauchiPlatformFFI.framework/*")
-echo -e "${GREEN}Post-processing complete${NC}"
+printf '%b\n' "${GREEN}Post-processing complete${NC}"
 
 # Create distribution package
-echo -e "${YELLOW}Creating distribution package...${NC}"
+printf '%b\n' "${YELLOW}Creating distribution package...${NC}"
 PACKAGE_DIR="$BUILD_DIR/VauchiPlatform-$VERSION"
 mkdir -p "$PACKAGE_DIR"
 
@@ -285,13 +284,13 @@ cd "$BUILD_DIR"
 zip -ry "$XCFRAMEWORK_ZIP" "VauchiPlatformFFI.xcframework"
 
 # Calculate checksums
-echo -e "${YELLOW}Calculating checksums...${NC}"
+printf '%b\n' "${YELLOW}Calculating checksums...${NC}"
 CHECKSUM=$(swift package compute-checksum "$XCFRAMEWORK_ZIP" 2>/dev/null || shasum -a 256 "$XCFRAMEWORK_ZIP" | cut -d' ' -f1)
 
 echo ""
-echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║         Packaging Complete             ║${NC}"
-echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
+printf '%b\n' "${GREEN}╔════════════════════════════════════════╗${NC}"
+printf '%b\n' "${GREEN}║         Packaging Complete             ║${NC}"
+printf '%b\n' "${GREEN}╚════════════════════════════════════════╝${NC}"
 echo ""
 echo "Version: $VERSION"
 echo ""
@@ -311,7 +310,7 @@ echo "$CHECKSUM" > "$DIST_DIR/VauchiPlatformFFI.xcframework.zip.sha256"
 # Development packages are smoke-test artifacts and must never consume release
 # signing material, even when a protected branch exposes the variable.
 if [[ "$VERSION" == dev-* ]]; then
-    echo -e "${YELLOW}Development package — skipping checksum signing${NC}"
+    printf '%b\n' "${YELLOW}Development package — skipping checksum signing${NC}"
 elif [[ -n "${COSIGN_KEY:-}" ]]; then
     # GitLab file-type variable: env holds a path to a staged file. The
     # nell runner has been observed to drop staging intermittently — env
@@ -328,22 +327,22 @@ elif [[ -n "${COSIGN_KEY:-}" ]]; then
     for attempt in 1 2 3 4 5 6 7 8 9 10; do
         [[ -f "$COSIGN_KEY" ]] && break
         if [[ "$attempt" -lt 10 ]]; then
-            echo -e "${YELLOW}COSIGN_KEY path '$COSIGN_KEY' not present (attempt $attempt/10) — retrying in 3s${NC}" >&2
+            printf '%b\n' "${YELLOW}COSIGN_KEY path '$COSIGN_KEY' not present (attempt $attempt/10) — retrying in 3s${NC}" >&2
             sleep 3
         fi
     done
     if [[ ! -f "$COSIGN_KEY" ]]; then
-        echo -e "${RED}ERROR: COSIGN_KEY env is set to '$COSIGN_KEY' but file does not exist after 10 attempts.${NC}" >&2
-        echo -e "${RED}This is a GitLab Runner file-variable staging failure (runner-side issue).${NC}" >&2
-        echo -e "${RED}Retry the job; if it persists, check runner config on the host.${NC}" >&2
+        printf '%b\n' "${RED}ERROR: COSIGN_KEY env is set to '$COSIGN_KEY' but file does not exist after 10 attempts.${NC}" >&2
+        printf '%b\n' "${RED}This is a GitLab Runner file-variable staging failure (runner-side issue).${NC}" >&2
+        printf '%b\n' "${RED}Retry the job; if it persists, check runner config on the host.${NC}" >&2
         exit 1
     fi
     if [[ ! -s "$COSIGN_KEY" ]]; then
-        echo -e "${RED}ERROR: COSIGN_KEY file '$COSIGN_KEY' is empty — staging produced a zero-byte file.${NC}" >&2
+        printf '%b\n' "${RED}ERROR: COSIGN_KEY file '$COSIGN_KEY' is empty — staging produced a zero-byte file.${NC}" >&2
         exit 1
     fi
     if ! command -v cosign >/dev/null 2>&1; then
-        echo -e "${RED}ERROR: cosign not found on PATH — install via .cosign-install template${NC}" >&2
+        printf '%b\n' "${RED}ERROR: cosign not found on PATH — install via .cosign-install template${NC}" >&2
         exit 1
     fi
     COSIGN_KEY_FILE="$COSIGN_KEY"
@@ -355,16 +354,16 @@ elif [[ -n "${COSIGN_KEY:-}" ]]; then
         # Cleanup trap: secret material must not linger on disk if cosign fails.
         trap 'rm -f "$DECODED_KEY_FILE"' EXIT INT TERM
         if ! base64 -d < "$COSIGN_KEY" > "$DECODED_KEY_FILE" 2>/dev/null; then
-            echo -e "${RED}ERROR: failed to base64-decode COSIGN_KEY at '$COSIGN_KEY'${NC}" >&2
+            printf '%b\n' "${RED}ERROR: failed to base64-decode COSIGN_KEY at '$COSIGN_KEY'${NC}" >&2
             exit 1
         fi
         if ! head -1 "$DECODED_KEY_FILE" | grep -q -- "-----BEGIN"; then
-            echo -e "${RED}ERROR: decoded COSIGN_KEY is not a PEM-formatted key (no -----BEGIN header)${NC}" >&2
+            printf '%b\n' "${RED}ERROR: decoded COSIGN_KEY is not a PEM-formatted key (no -----BEGIN header)${NC}" >&2
             exit 1
         fi
         COSIGN_KEY_FILE="$DECODED_KEY_FILE"
     fi
-    echo -e "${YELLOW}Signing checksum with cosign...${NC}"
+    printf '%b\n' "${YELLOW}Signing checksum with cosign...${NC}"
     cosign sign-blob --yes --key "$COSIGN_KEY_FILE" \
         --bundle "$DIST_DIR/VauchiPlatformFFI.xcframework.zip.sha256.bundle" \
         "$DIST_DIR/VauchiPlatformFFI.xcframework.zip.sha256"
@@ -372,12 +371,12 @@ elif [[ -n "${COSIGN_KEY:-}" ]]; then
         rm -f "$DECODED_KEY_FILE"
         trap - EXIT INT TERM
     fi
-    echo -e "${GREEN}Checksum signed${NC}"
+    printf '%b\n' "${GREEN}Checksum signed${NC}"
 elif [[ -n "${CI:-}" ]]; then
-    echo -e "${RED}ERROR: COSIGN_KEY is required in CI for release signing${NC}"
+    printf '%b\n' "${RED}ERROR: COSIGN_KEY is required in CI for release signing${NC}"
     exit 1
 else
-    echo -e "${YELLOW}COSIGN_KEY not set — skipping checksum signing (local build)${NC}"
+    printf '%b\n' "${YELLOW}COSIGN_KEY not set — skipping checksum signing (local build)${NC}"
 fi
 
 # Ensure all dist artifacts are world-readable — shell runners may have restrictive

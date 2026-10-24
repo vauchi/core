@@ -4,7 +4,7 @@
 
 set -eu
 
-ROOT=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname "$0")/../.." && pwd)
 PIPELINE="$ROOT/.gitlab-ci.yml"
 AUTO_TAG="$ROOT/ci/auto-tag-and-dev-rc.yml"
 failed=0

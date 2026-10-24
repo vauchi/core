@@ -1,0 +1,124 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * Reciprocity confirmation after an exchange (#757), as Core runs it:
+ *
+ *   - each side derives its token from the exchange's shared key and its
+ *     own identity key, HKDF(shared, "vauchi-reciprocity-confirm-v1" ||
+ *     identity), so the two tokens differ (contact/reciprocity_tokens.rs);
+ *   - it sends its token signed over (sender, recipient, token) inside
+ *     the ratchet envelope (sync/delta.rs `ReciprocityConfirmPayload`);
+ *   - the receiver checks the signature with the contact's key and the
+ *     token against the one it expects from that contact, and only then
+ *     marks the contact Confirmed (api/vauchi/receive_routing.rs).
+ *
+ * The exchange itself is qr_exchange.spthy; here it hands both sides a
+ * fresh shared key. The ratchet envelope is abstracted as encryption under
+ * that key in both directions, which lets the attacker reflect a message
+ * back to its sender. The shared key and identity keys may leak.
+ *
+ * Run: tamarin-prover --prove reciprocity.spthy
+ * Each defense alone stops a reflected confirmation; without both,
+ * -DNO_SIGNATURE -DSYMMETRIC_TOKENS, confirmed_means_the_peer_confirmed
+ * must be falsified. Without the signature (-DNO_SIGNATURE) a leaked
+ * shared key alone forges a confirmation:
+ * a_leaked_shared_key_also_needs_the_identity_key falsified.
+ */
+
+theory VauchiReciprocity
+begin
+
+builtins: signing, symmetric-encryption, hashing
+
+#ifdef SYMMETRIC_TOKENS
+macros:
+  token(k, pk_x) = h(<'vauchi-reciprocity-confirm-v1', k>)
+#else
+macros:
+  token(k, pk_x) = h(<'vauchi-reciprocity-confirm-v1', k, pk_x>)
+#endif
+
+restriction Equality:
+  "All x y #i. Eq(x, y) @ i ==> x = y"
+
+restriction Inequality:
+  "All x #i. Neq(x, x) @ i ==> F"
+
+rule Create_identity:
+  [ Fr(~ltk) ]
+  -->
+  [ !Ltk($A, ~ltk), Out(pk(~ltk)) ]
+
+rule Corrupt_identity:
+  [ !Ltk(A, ltk) ]
+  --[ Compromised(A) ]->
+  [ Out(ltk) ]
+
+/* An exchange leaves both sides with the same fresh shared key. */
+rule Exchange:
+  [ !Ltk($A, la), !Ltk($B, lb), Fr(~k) ]
+  --[ Neq($A, $B) ]->
+  [ !Session($A, $B, la, pk(lb), ~k), !Session($B, $A, lb, pk(la), ~k)
+  , Pending($A, $B, pk(lb), ~k), Pending($B, $A, pk(la), ~k)
+  ]
+
+rule Leak_shared_key:
+  [ !Session(A, B, la, pkb, k) ]
+  --[ SharedKeyLeaked(k) ]->
+  [ Out(k) ]
+
+#ifdef NO_SIGNATURE
+rule Send_confirmation:
+  [ !Session(A, B, la, pkb, k) ]
+  --[ SentConfirmation(A, B, k) ]->
+  [ Out(senc(<'confirm', token(k, pk(la))>, k)) ]
+
+rule Receive_confirmation:
+  [ Pending(B, A, pka, k), In(senc(<'confirm', tok>, k)) ]
+  --[ Eq(tok, token(k, pka)), Confirmed(B, A, k) ]->
+  [ ]
+#else
+rule Send_confirmation:
+  let tok = token(k, pk(la))
+      signed = <'vauchi-reciprocity-confirm-sig', pk(la), pkb, tok>
+  in
+  [ !Session(A, B, la, pkb, k) ]
+  --[ SentConfirmation(A, B, k) ]->
+  [ Out(senc(<'confirm', pk(la), pkb, tok, sign(signed, la)>, k)) ]
+
+rule Receive_confirmation:
+  let signed = <'vauchi-reciprocity-confirm-sig', pka, pkr, tok>
+  in
+  [ Pending(B, A, pka, k), In(senc(<'confirm', pka, pkr, tok, sig>, k)) ]
+  --[ Eq(verify(sig, signed, pka), true), Eq(tok, token(k, pka))
+    , Confirmed(B, A, k)
+    ]->
+  [ ]
+#endif
+
+lemma executable:
+  exists-trace
+  "Ex A B k #i #j.
+     Confirmed(A, B, k) @ i & Confirmed(B, A, k) @ j
+     & not (Ex x #l. SharedKeyLeaked(x) @ l)
+     & not (Ex X #c. Compromised(X) @ c)"
+
+/* Confirmed means the contact sent its confirmation for this exchange,
+   unless the shared key leaked: never one's own message reflected. */
+lemma confirmed_means_the_peer_confirmed:
+  "All B A k #i.
+     Confirmed(B, A, k) @ i
+     ==> (Ex #j. SentConfirmation(A, B, k) @ j)
+         | (Ex #l. SharedKeyLeaked(k) @ l)"
+
+/* With the signature, a leaked shared key is not enough: the attacker
+   also needs the contact's identity key. */
+lemma a_leaked_shared_key_also_needs_the_identity_key:
+  "All B A k #i.
+     Confirmed(B, A, k) @ i
+     ==> (Ex #j. SentConfirmation(A, B, k) @ j)
+         | ((Ex #l. SharedKeyLeaked(k) @ l) & (Ex #c. Compromised(A) @ c))"
+
+end

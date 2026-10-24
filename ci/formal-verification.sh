@@ -103,4 +103,13 @@ tamarin_expect "$models/device_link.spthy" verified "-DHONEST_RELAY" \
 # Without the code comparison the attacker's own request gets the seed.
 tamarin_expect "$models/device_link.spthy" falsified "-DHONEST_RELAY -DNO_CODE_CHECK" \
     photographed_qr_alone_keeps_the_seed
+# Reciprocity confirmation: signature and asymmetric tokens each stop a
+# reflected confirmation; only the signature covers a leaked shared key.
+tamarin_expect "$models/reciprocity.spthy" verified "" \
+    executable confirmed_means_the_peer_confirmed \
+    a_leaked_shared_key_also_needs_the_identity_key
+tamarin_expect "$models/reciprocity.spthy" falsified "-DNO_SIGNATURE" \
+    a_leaked_shared_key_also_needs_the_identity_key
+tamarin_expect "$models/reciprocity.spthy" falsified "-DNO_SIGNATURE -DSYMMETRIC_TOKENS" \
+    confirmed_means_the_peer_confirmed
 echo "formal verification OK"

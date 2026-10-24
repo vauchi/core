@@ -5,7 +5,7 @@ use vauchi_app::ui::{AppEngine, AppScreen, WorkflowEngine};
 use vauchi_core::api::Vauchi;
 use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::identity::Identity;
-use vauchi_core::platform::{BleAdvertisementObservation, Command, Event};
+use vauchi_core::platform::{BleAdvertisementObservation, BleServiceUuid, Command, Event};
 
 fn engine() -> AppEngine {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -35,7 +35,15 @@ fn observed(include_service: bool) -> Event {
         ]);
     }
     Event::BleAdvertisementObserved(
-        BleAdvertisementObservation::new("peer".into(), -42, service_uuids).unwrap(),
+        BleAdvertisementObservation::new(
+            "peer".into(),
+            -42,
+            service_uuids
+                .into_iter()
+                .map(BleServiceUuid::Normalized)
+                .collect(),
+        )
+        .unwrap(),
     )
 }
 

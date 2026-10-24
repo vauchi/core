@@ -340,3 +340,19 @@ async fn event_budget_cannot_prevent_reporting_a_native_failure() {
         Err(error) => assert_eq!(error, vauchi_hardware::ExecutorError::EventBudgetTooSmall),
     }
 }
+
+// @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
+#[tokio::test]
+async fn cancelled_shutdown_can_be_retried_without_losing_native_disposal() {
+    let mut f = fixture(None);
+    f.scanner.start("active".into()).unwrap();
+    f.started.recv().await.unwrap();
+    let mut first = Box::pin(f.scanner.shutdown());
+    assert!(futures::poll!(&mut first).is_pending());
+    drop(first);
+    assert!(f.released.try_recv().is_err());
+    let mut retry = Box::pin(f.scanner.shutdown());
+    assert!(futures::poll!(&mut retry).is_pending());
+    retry.await.unwrap();
+    assert_eq!(f.released.try_recv(), Ok(()));
+}

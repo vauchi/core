@@ -3,14 +3,14 @@
 
 use vauchi_core::exchange::{VAUCHI_BLE_SERVICE_UUID, advertised_token};
 use vauchi_core::platform::{
-    BleAdvertisementObservation as BleAdvertisement, Event, event_from_json,
+    BleAdvertisementObservation as BleAdvertisement, BleServiceUuid, Event, event_from_json,
 };
 
-fn uuid(value: &str) -> [u8; 16] {
-    *uuid::Uuid::parse_str(value).unwrap().as_bytes()
+fn uuid(value: &str) -> BleServiceUuid {
+    BleServiceUuid::Normalized(*uuid::Uuid::parse_str(value).unwrap().as_bytes())
 }
 
-fn service() -> [u8; 16] {
+fn service() -> BleServiceUuid {
     uuid(VAUCHI_BLE_SERVICE_UUID)
 }
 
@@ -26,6 +26,26 @@ fn core_decodes_current_and_legacy_advertisement_tokens() {
         Some(vec![0x12, 0x34, 0x56, 0x78])
     );
     assert_eq!(advertised_token(&[service()]), None);
+}
+
+// @scenario: contact_exchange.feature :: Discover nearby Vauchi users via BLE
+#[test]
+fn native_carrier_width_preserves_leading_zero_legacy_tokens() {
+    assert_eq!(
+        advertised_token(&[service(), BleServiceUuid::Uuid32([0, 0, 0x12, 0x34])]),
+        Some(vec![0, 0, 0x12, 0x34])
+    );
+    assert_eq!(
+        advertised_token(&[service(), BleServiceUuid::Uuid16([0x12, 0x34])]),
+        Some(vec![0x12, 0x34])
+    );
+    let expanded = *uuid::Uuid::parse_str("00001234-0000-1000-8000-00805f9b34fb")
+        .unwrap()
+        .as_bytes();
+    assert_eq!(
+        advertised_token(&[service(), BleServiceUuid::Uuid128(expanded)]),
+        None
+    );
 }
 
 // @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
@@ -89,9 +109,7 @@ proptest::proptest! {
     // @scenario: contact_exchange.feature :: Discover nearby Vauchi users via BLE
     #[test]
     fn arbitrary_token_bytes_are_preserved(value in proptest::prelude::any::<u32>()) {
-        let token = uuid::Uuid::from_fields(value, 0, 0x1000, &[0x80,0,0,0x80,0x5f,0x9b,0x34,0xfb]);
         let bytes = value.to_be_bytes();
-        let expected: Vec<u8> = bytes.into_iter().skip(if value <= u16::MAX.into() {2} else {0}).collect();
-        proptest::prop_assert_eq!(advertised_token(&[service(), *token.as_bytes()]), Some(expected));
+        proptest::prop_assert_eq!(advertised_token(&[service(), BleServiceUuid::Uuid32(bytes)]), Some(bytes.to_vec()));
     }
 }

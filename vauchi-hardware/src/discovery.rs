@@ -105,7 +105,7 @@ impl BleScanner {
         self.closed = true;
         self.inbox.close();
         self.stop();
-        if let Some(worker) = self.worker.take() {
+        if let Some(worker) = self.worker.as_mut() {
             worker.abort();
             match worker.await {
                 Ok(()) => (),
@@ -113,6 +113,7 @@ impl BleScanner {
                 Err(_) => return Err(ExecutorError::WorkerFailed),
             }
         }
+        self.worker.take();
         Ok(())
     }
 }

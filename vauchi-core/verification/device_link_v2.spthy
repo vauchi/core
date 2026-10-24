@@ -1,0 +1,205 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * Candidate device-link protocol for #788. The link QR is assumed copied
+ * (photographed) in every trace, and the attacker owns the relay and the
+ * network, as the threat model assumes.
+ *
+ *   - QR: identity key, link key, an X25519 key gA of the existing device,
+ *     and a commitment h(nA) to a nonce it keeps; signed.
+ *   - Request (new device to existing): its X25519 key gB and a nonce nB.
+ *   - The existing device reveals nA only after the request arrived; the
+ *     new device checks it against the commitment from the QR.
+ *   - Both screens show a code over (link key, gA, gB, nB, nA); the user
+ *     compares them and confirms on the existing device.
+ *   - The seed travels under h(link key, DH(gA, gB)); the new device
+ *     refuses a seed whose identity key is not the QR's.
+ *
+ * The code is short: the attacker may "grind" it. Given every input of
+ * one screen's code and all but one input of the other's, it can choose
+ * the missing one so both screens show the same code (`Grind`,
+ * restriction `Codes_match`). It can do that only for a value it still
+ * chooses after it knows all the others, which is what the commitment
+ * denies it.
+ *
+ * Run: tamarin-prover --prove device_link_v2.spthy
+ * Prove it can fail: -DNO_COMMITMENT (the attacker grinds its nonce
+ *   against the new device's code) and -DNO_DH (the link key alone
+ *   decrypts the seed); seed_secrecy must be falsified in each.
+ * Grinding is the attack: with -DNO_COMMITMENT -DNO_GRIND seed_secrecy
+ *   holds again.
+ */
+
+theory VauchiDeviceLinkV2
+begin
+
+builtins: diffie-hellman, signing, symmetric-encryption, hashing
+
+functions: gr/2 [private]
+
+#ifdef NO_DH
+macros:
+  link_seed_key(lk, shared) = lk
+#else
+macros:
+  link_seed_key(lk, shared) = h(<'vauchi-device-link-seed-v2', lk, shared>)
+#endif
+
+restriction Equality:
+  "All x y #i. Eq(x, y) @ i ==> x = y"
+
+/* Equal codes on both screens: the same inputs, or one input of one
+   screen ground against the other screen's inputs. */
+restriction Codes_match:
+  "All a b #i. CompareCodes(a, b) @ i ==>
+     a = b
+     | (Ex x2 x3 x4 x5 #j. Grind(<x2, x3, x4, x5>, b) @ j
+          & a = <gr(<x2, x3, x4, x5>, b), x2, x3, x4, x5>)
+     | (Ex x1 x3 x4 x5 #j. Grind(<x1, x3, x4, x5>, b) @ j
+          & a = <x1, gr(<x1, x3, x4, x5>, b), x3, x4, x5>)
+     | (Ex x1 x2 x4 x5 #j. Grind(<x1, x2, x4, x5>, b) @ j
+          & a = <x1, x2, gr(<x1, x2, x4, x5>, b), x4, x5>)
+     | (Ex x1 x2 x3 x5 #j. Grind(<x1, x2, x3, x5>, b) @ j
+          & a = <x1, x2, x3, gr(<x1, x2, x3, x5>, b), x5>)
+     | (Ex x1 x2 x3 x4 #j. Grind(<x1, x2, x3, x4>, b) @ j
+          & a = <x1, x2, x3, x4, gr(<x1, x2, x3, x4>, b)>)
+     | (Ex x2 x3 x4 x5 #j. Grind(<x2, x3, x4, x5>, a) @ j
+          & b = <gr(<x2, x3, x4, x5>, a), x2, x3, x4, x5>)
+     | (Ex x1 x3 x4 x5 #j. Grind(<x1, x3, x4, x5>, a) @ j
+          & b = <x1, gr(<x1, x3, x4, x5>, a), x3, x4, x5>)
+     | (Ex x1 x2 x4 x5 #j. Grind(<x1, x2, x4, x5>, a) @ j
+          & b = <x1, x2, gr(<x1, x2, x4, x5>, a), x4, x5>)
+     | (Ex x1 x2 x3 x5 #j. Grind(<x1, x2, x3, x5>, a) @ j
+          & b = <x1, x2, x3, gr(<x1, x2, x3, x5>, a), x5>)
+     | (Ex x1 x2 x3 x4 #j. Grind(<x1, x2, x3, x4>, a) @ j
+          & b = <x1, x2, x3, x4, gr(<x1, x2, x3, x4>, a)>)"
+
+/* The attacker searches for a value that completes `rest` to the same
+   code as `target`; it must know both. */
+#ifdef NO_GRIND
+#else
+rule Grind:
+  [ In(rest), In(target) ]
+  --[ Grind(rest, target) ]->
+  [ Out(gr(rest, target)) ]
+#endif
+
+rule Create_identity:
+  [ Fr(~seed) ]
+  --[ Identity($A, pk(~seed)) ]->
+  [ !Seed($A, ~seed), Out(pk(~seed)) ]
+
+#ifdef NO_COMMITMENT
+rule Show_link_qr:
+  let ga = 'g' ^ ~ea
+      qr = <'WBDL', pk(seed), ~lk, ga>
+  in
+  [ !Seed($A, seed), Fr(~lk), Fr(~sid), Fr(~ea) ]
+  --[ ShowQr(~sid, $A, pk(seed)) ]->
+  [ Initiator(~sid, $A, seed, ~lk, ~ea, 'none')
+  , Out(<qr, sign(qr, seed)>)
+  , !Screen(~sid, qr, sign(qr, seed))
+  ]
+
+rule Joiner_scan:
+  let qr = <'WBDL', pk_a, lk, ga>
+      gb = 'g' ^ ~eb
+  in
+  [ !Screen(sid, qr, sig), Fr(~eb), Fr(~nb) ]
+  --[ Eq(verify(sig, qr, pk_a), true)
+    , JoinerRequest(sid, $B, gb)
+    ]->
+  [ Joiner(sid, $B, pk_a, lk, ga, ~eb)
+  , JoinerCode(sid, <lk, ga, gb, ~nb, 'none'>)
+  , Out(senc(<'request', $B, gb, ~nb>, lk))
+  ]
+
+rule Initiator_receive:
+  [ Initiator(sid, A, seed, lk, ea, na), In(senc(<'request', name, gb, nb>, lk)) ]
+  -->
+  [ InitiatorWait(sid, A, seed, lk, ea, na, gb, nb) ]
+#else
+rule Show_link_qr:
+  let ga = 'g' ^ ~ea
+      qr = <'WBDL', pk(seed), ~lk, ga, h(<'commit', ~na>)>
+  in
+  [ !Seed($A, seed), Fr(~lk), Fr(~sid), Fr(~ea), Fr(~na) ]
+  --[ ShowQr(~sid, $A, pk(seed)) ]->
+  [ Initiator(~sid, $A, seed, ~lk, ~ea, ~na)
+  , Out(<qr, sign(qr, seed)>)
+  , !Screen(~sid, qr, sign(qr, seed))
+  ]
+
+rule Joiner_scan:
+  let qr = <'WBDL', pk_a, lk, ga, commitment>
+      gb = 'g' ^ ~eb
+  in
+  [ !Screen(sid, qr, sig), Fr(~eb), Fr(~nb) ]
+  --[ Eq(verify(sig, qr, pk_a), true)
+    , JoinerRequest(sid, $B, gb)
+    ]->
+  [ JoinerSent(sid, $B, pk_a, lk, ga, commitment, ~eb, ~nb)
+  , Out(senc(<'request', $B, gb, ~nb>, lk))
+  ]
+
+/* The nonce is revealed only once a request is in. */
+rule Initiator_receive:
+  [ Initiator(sid, A, seed, lk, ea, na), In(senc(<'request', name, gb, nb>, lk)) ]
+  -->
+  [ InitiatorWait(sid, A, seed, lk, ea, na, gb, nb), Out(<'reveal', na>) ]
+
+rule Joiner_show_code:
+  let gb = 'g' ^ eb
+  in
+  [ JoinerSent(sid, B, pk_a, lk, ga, commitment, eb, nb), In(<'reveal', na>) ]
+  --[ Eq(h(<'commit', na>), commitment) ]->
+  [ Joiner(sid, B, pk_a, lk, ga, eb), JoinerCode(sid, <lk, ga, gb, nb, na>) ]
+#endif
+
+/* The user compares both screens and confirms; the seed goes out under
+   the DH-derived key. */
+rule Initiator_confirm:
+  let ga = 'g' ^ ea
+  in
+  [ InitiatorWait(sid, A, seed, lk, ea, na, gb, nb), JoinerCode(sid, joiner_code) ]
+  --[ CompareCodes(<lk, ga, gb, nb, na>, joiner_code)
+    , Release(sid, A, seed, gb)
+    ]->
+  [ Out(senc(<'response', seed>, link_seed_key(lk, gb ^ ea))) ]
+
+rule Joiner_adopt:
+  [ Joiner(sid, B, pk_a, lk, ga, eb)
+  , In(senc(<'response', seed>, link_seed_key(lk, ga ^ eb)))
+  ]
+  --[ Eq(pk(seed), pk_a)
+    , Adopt(sid, B, pk_a, seed)
+    ]->
+  [ ]
+
+lemma executable:
+  exists-trace
+  "Ex sid A B s gb #i #j #r.
+     Release(sid, A, s, gb) @ i & Adopt(sid, B, pk(s), s) @ j
+     & JoinerRequest(sid, B, gb) @ r
+     & not (Ex rest t #g. Grind(rest, t) @ g)"
+
+/* Every QR is copied, and still the seed stays secret. */
+lemma seed_secrecy:
+  "All sid A s gb #i.
+     Release(sid, A, s, gb) @ i ==> not (Ex #k. K(s) @ k)"
+
+/* The seed goes only to the key of the device that scanned the QR. */
+lemma initiator_agreement:
+  "All sid A s gb #i.
+     Release(sid, A, s, gb) @ i
+     ==> Ex B #j. JoinerRequest(sid, B, gb) @ j & j < i"
+
+/* The new device adopts only the QR's identity, from its device. */
+lemma joiner_agreement:
+  "All sid B pk_a s #i.
+     Adopt(sid, B, pk_a, s) @ i
+     ==> pk_a = pk(s) & (Ex A gb #j. Release(sid, A, s, gb) @ j & j < i)"
+
+end

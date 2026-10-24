@@ -66,25 +66,41 @@ fi
 # where the model's UTF-8 comments fail to decode.
 LC_ALL=C.UTF-8
 export LC_ALL
-model=vauchi-core/verification/qr_exchange.spthy
-out=$(tamarin-prover --prove "$model" 2>&1) || {
-    printf '%s\n' "$out"
-    exit 1
-}
-printf '%s\n' "$out" | grep -E '^  [a-z_]+ \((exists|all)-trace' || true
-for lemma in executable session_key_secrecy no_misbinding; do
-    printf '%s\n' "$out" | grep -qE "^  $lemma \((exists|all)-traces?\): verified" || {
-        echo "FAIL: Tamarin lemma $lemma is not verified" >&2
+# tamarin_expect <model> <verdict> "<flags>" <lemma>...: every lemma must
+# reach <verdict> (verified or falsified) with those -D flags.
+tamarin_expect() {
+    t_model=$1
+    t_verdict=$2
+    t_flags=$3
+    shift 3
+    # shellcheck disable=SC2086 # the flags are separate words
+    t_out=$(tamarin-prover --prove $t_flags "$t_model" 2>&1) || {
+        printf '%s\n' "$t_out"
         exit 1
     }
-done
+    echo "$t_model $t_flags:"
+    printf '%s\n' "$t_out" | grep -E '^  [a-z_]+ \((exists|all)-trace' || true
+    for t_lemma in "$@"; do
+        printf '%s\n' "$t_out" | grep -qE "^  $t_lemma \((exists|all)-traces?\): $t_verdict" || {
+            echo "FAIL: Tamarin lemma $t_lemma is not $t_verdict ($t_model $t_flags)" >&2
+            exit 1
+        }
+    done
+}
 
-out=$(tamarin-prover --prove -DNO_IDENTITY_BINDING "$model" 2>&1) || {
-    printf '%s\n' "$out"
-    exit 1
-}
-printf '%s\n' "$out" | grep -qE '^  no_misbinding \(all-traces\): falsified' || {
-    echo "FAIL: without identity binding, no_misbinding must be falsified" >&2
-    exit 1
-}
+models=vauchi-core/verification
+tamarin_expect "$models/qr_exchange.spthy" verified "" \
+    executable session_key_secrecy no_misbinding
+# Without identity binding an attacker re-signs the peer's ephemeral key.
+tamarin_expect "$models/qr_exchange.spthy" falsified "-DNO_IDENTITY_BINDING" \
+    no_misbinding
+tamarin_expect "$models/device_link.spthy" verified "" \
+    executable seed_secrecy initiator_agreement joiner_agreement \
+    qr_leak_exposes_seed qr_leak_lets_attacker_choose_joiner_identity
+tamarin_expect "$models/device_link.spthy" verified "-DHONEST_RELAY" \
+    executable seed_secrecy initiator_agreement joiner_agreement \
+    photographed_qr_alone_keeps_the_seed
+# Without the code comparison the attacker's own request gets the seed.
+tamarin_expect "$models/device_link.spthy" falsified "-DHONEST_RELAY -DNO_CODE_CHECK" \
+    photographed_qr_alone_keeps_the_seed
 echo "formal verification OK"

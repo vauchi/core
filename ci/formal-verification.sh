@@ -64,12 +64,13 @@ done
 MIRI_TOOLCHAIN=nightly-2026-08-21
 rustup toolchain install "$MIRI_TOOLCHAIN" --profile minimal --component miri,rust-src
 # The image has neither clang nor mold, the linker .cargo/config.toml names;
-# Kani links through its own driver, these cargo runs do not. An env
-# override takes precedence over the config, so Miri's sysroot build and
-# the release build link with the image's cc.
+# Kani links through its own driver, these cargo runs do not. The linker
+# env override takes precedence over the config. The rustflags one does
+# not: CARGO_TARGET_*_RUSTFLAGS appends to the config's array, and mold
+# stayed (job 17451589766); RUSTFLAGS makes cargo ignore target rustflags.
 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=cc
-CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="--cfg rust_analyzer"
-export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS
+RUSTFLAGS="--cfg rust_analyzer"
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER RUSTFLAGS
 for wipe_test in wipe_on_drop_tests heap_wipe_on_drop_tests; do
     cargo +"$MIRI_TOOLCHAIN" miri test -p vauchi-core --no-default-features --features testing \
         --test "$wipe_test"

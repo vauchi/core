@@ -190,12 +190,15 @@ pub fn reconstruct(shares: &[Share], threshold: u8) -> Result<[u8; 32], ShamirEr
         });
     }
 
-    // Check for duplicate indices
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = [false; 256];
     for share in shares {
-        if !seen.insert(share.index) {
+        let seen_index = seen
+            .get_mut(usize::from(share.index))
+            .ok_or(ShamirError::InvalidShareIndex)?;
+        if *seen_index {
             return Err(ShamirError::DuplicateIndices);
         }
+        *seen_index = true;
     }
 
     let mut secret = [0u8; 32];

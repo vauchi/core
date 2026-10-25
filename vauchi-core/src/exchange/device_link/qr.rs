@@ -97,6 +97,11 @@ impl DeviceLinkQR {
         self.timestamp.saturating_add(LINK_QR_EXPIRY_SECONDS)
     }
 
+    /// Byte offset of the link key, so a test can read it back after drop
+    /// (vauchi/private#817).
+    #[cfg(feature = "testing")]
+    pub const LINK_KEY_OFFSET: usize = core::mem::offset_of!(Self, link_key);
+
     /// Checks if the QR code has expired.
     /// A timestamp too late to carry the expiry window counts as expired:
     /// the signer chose it, and the sum would overflow (vauchi/private#795).

@@ -275,6 +275,11 @@ impl DoubleRatchetState {
         *self.our_dh.public_key()
     }
 
+    /// Byte offset of the root key, so a test can read it back after drop
+    /// (vauchi/private#817).
+    #[cfg(feature = "testing")]
+    pub const ROOT_KEY_OFFSET: usize = core::mem::offset_of!(Self, root_key);
+
     /// Whether this session can encrypt. A responder cannot until the
     /// initiator's first message arrives.
     pub fn can_send(&self) -> bool {

@@ -122,3 +122,60 @@ fn an_identity_master_seed_is_all_zero_after_drop() {
 
     assert_eq!(left, [0u8; 32]);
 }
+
+// @internal
+#[cfg(feature = "testing")]
+#[test]
+fn a_double_ratchet_root_key_is_all_zero_after_drop() {
+    use vauchi_core::crypto::DoubleRatchetState;
+    let ratchet = DoubleRatchetState::initialize_responder(
+        &SymmetricKey::from_bytes(SECRET),
+        X3DHKeyPair::generate(),
+    );
+
+    let left: [u8; 32] = field_left_after_drop(ratchet, DoubleRatchetState::ROOT_KEY_OFFSET);
+
+    assert_eq!(left, [0u8; 32]);
+}
+
+// @internal
+#[cfg(feature = "testing")]
+#[test]
+fn a_device_link_initiator_master_seed_is_all_zero_after_drop() {
+    use vauchi_core::exchange::DeviceLinkInitiator;
+    use vauchi_core::identity::DeviceRegistry;
+    let identity = Identity::create("Alice", 0);
+    let registry = DeviceRegistry::new(
+        identity.device_info().to_registered(&SECRET),
+        identity.signing_keypair(),
+    );
+    let initiator = DeviceLinkInitiator::new(SECRET, &identity, registry, 0);
+
+    let left: [u8; 32] = field_left_after_drop(initiator, DeviceLinkInitiator::MASTER_SEED_OFFSET);
+
+    assert_eq!(left, [0u8; 32]);
+}
+
+// @internal
+#[cfg(feature = "testing")]
+#[test]
+fn a_device_link_qr_link_key_is_all_zero_after_drop() {
+    use vauchi_core::exchange::DeviceLinkQR;
+    let qr = DeviceLinkQR::generate(&Identity::create("Alice", 0), 0);
+
+    let left: [u8; 32] = field_left_after_drop(qr, DeviceLinkQR::LINK_KEY_OFFSET);
+
+    assert_eq!(left, [0u8; 32]);
+}
+
+// @internal
+#[cfg(feature = "testing")]
+#[test]
+fn a_commitment_reveal_key_is_all_zero_after_drop() {
+    use vauchi_core::exchange::multistage::commitment::Commitment;
+    let commitment = Commitment::create(b"a card").unwrap();
+
+    let left: [u8; 32] = field_left_after_drop(commitment, Commitment::REVEAL_KEY_OFFSET);
+
+    assert_eq!(left, [0u8; 32]);
+}

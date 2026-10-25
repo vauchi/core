@@ -56,6 +56,11 @@ pub struct Commitment {
 }
 
 impl Commitment {
+    /// Byte offset of the reveal key, so a test can read it back after drop
+    /// (vauchi/private#817).
+    #[cfg(feature = "testing")]
+    pub const REVEAL_KEY_OFFSET: usize = core::mem::offset_of!(Self, reveal_key);
+
     /// Create a new commitment for the given plaintext (no context binding).
     ///
     /// Generates a random reveal key and encrypts with XChaCha20-Poly1305.

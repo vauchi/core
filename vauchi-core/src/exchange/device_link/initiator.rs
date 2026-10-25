@@ -102,6 +102,11 @@ impl DeviceLinkInitiator {
         Ok((confirmation, request))
     }
 
+    /// Byte offset of the master seed, so a test can read it back after drop
+    /// (vauchi/private#817).
+    #[cfg(feature = "testing")]
+    pub const MASTER_SEED_OFFSET: usize = core::mem::offset_of!(Self, master_seed);
+
     /// After the user confirms the link, creates the encrypted response with the
     /// master seed and returns the updated registry and new device info.
     ///

@@ -55,4 +55,12 @@ fn secret_type_contract() {
     >());
     assert!(has_zeroizing_drop::<vauchi_core::crypto::shamir::Share>());
     assert!(has_zeroizing_drop::<vauchi_core::BackupKeyShard>());
+    // Added by vauchi/private#817: these derive ZeroizeOnDrop but were not
+    // listed, so removing their derive went unnoticed.
+    assert!(has_zeroizing_drop::<vauchi_core::BackupKey>());
+    assert!(has_zeroizing_drop::<
+        vauchi_core::crypto::ratchet::SerializedRatchetState,
+    >());
+    assert!(has_zeroizing_drop::<vauchi_core::platform::SealedSecret>());
+    assert!(has_zeroizing_drop::<vauchi_core::api::RelayExchangeOffer>());
 }

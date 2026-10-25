@@ -675,7 +675,9 @@ mod tests {
             device_name: "Test device".into(),
         };
         let key = SymmetricKey::generate();
-        let metadata = GuardianBackupMetadata::new(2, 3, [0x24; CEREMONY_ID_LENGTH]).unwrap();
+        // 2 of 4, so tampering the threshold to 3 still gives valid metadata
+        // and only the AEAD can catch it (one guardian is always spare, #816).
+        let metadata = GuardianBackupMetadata::new(2, 4, [0x24; CEREMONY_ID_LENGTH]).unwrap();
         let backup = export_guardian_backup(&identity, &[], None, &[], &key, metadata, 1).unwrap();
         (backup, key)
     }

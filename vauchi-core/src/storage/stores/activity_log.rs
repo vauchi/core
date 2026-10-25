@@ -27,16 +27,18 @@ impl ActivityLogStore<'_> {
     /// Atomically claim unconsumed rows for notification evaluation.
     ///
     /// Claims survive reopening and do not depend on timestamps or rowid reuse.
-    /// This guarantees at-most-once handoff, not confirmed OS display. Suppressed
-    /// and malformed entries are claimed too, so they cannot replay later.
+    /// This guarantees at-most-once handoff, not confirmed OS display. SQL and
+    /// row-decoding errors roll back all claims. The caller evaluates JSON
+    /// payloads and notification preferences after claiming.
     pub fn claim_notifications(&self) -> Result<Vec<ActivityLogRow>, StorageError> {
-        let mut stmt = self.conn.prepare(
-            "UPDATE activity_log SET notification_claimed = 1
-             WHERE notification_claimed = 0
-             RETURNING event_key, category, contact_id, payload, created_at",
-        )?;
-        let rows = stmt
-            .query_map([], |row| {
+        let tx = self.conn.unchecked_transaction()?;
+        let rows = {
+            let mut stmt = tx.prepare(
+                "UPDATE activity_log SET notification_claimed = 1
+                 WHERE notification_claimed = 0
+                 RETURNING event_key, category, contact_id, payload, created_at",
+            )?;
+            stmt.query_map([], |row| {
                 Ok(ActivityLogRow {
                     event_key: row.get(0)?,
                     category: row.get(1)?,
@@ -45,7 +47,9 @@ impl ActivityLogStore<'_> {
                     created_at: row.get::<_, i64>(4)? as u64,
                 })
             })?
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()?
+        };
+        tx.commit()?;
         Ok(rows)
     }
 

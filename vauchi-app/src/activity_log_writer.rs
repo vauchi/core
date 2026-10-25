@@ -17,7 +17,7 @@ use vauchi_core::storage::{ActivityLogRow, StorageError};
 use crate::notification_types::ActivityLogEntry;
 
 /// Retention window: 7 days in seconds.
-const RETENTION_SECS: u64 = 7 * 24 * 3600;
+pub(crate) const RETENTION_SECS: u64 = 7 * 24 * 3600;
 
 /// Stateless writer that converts `VauchiEvent`s into activity log rows.
 pub struct ActivityLogWriter;

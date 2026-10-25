@@ -7,7 +7,7 @@
 //! `PendingNotification`s. Split out of `mod.rs` (file-size, VRS04).
 
 use super::AppEngine;
-use crate::activity_log_writer::ActivityLogWriter;
+use crate::activity_log_writer::{ActivityLogWriter, RETENTION_SECS};
 use crate::notification_emitter::NotificationEmitter;
 use crate::notification_types::{ActivityLogEntry, NotificationPreferences, PendingNotification};
 
@@ -16,7 +16,7 @@ impl AppEngine {
     ///
     /// Persists buffered events and claims pending activity rows through the
     /// same preference-aware collector as polling. Claims survive reopening;
-    /// a returned notification is handed off at most once, not acknowledged
+    /// each retained activity row is handed off at most once, not acknowledged
     /// as displayed by the OS.
     ///
     /// Frontends should call this after receiving an event callback.
@@ -52,7 +52,11 @@ impl AppEngine {
 
     fn collect_notifications(&mut self) -> Vec<PendingNotification> {
         self.drain_events_to_log();
-        let rows = match self.vauchi.storage().activity_log().claim_notifications() {
+        let store = self.vauchi.storage().activity_log();
+        let rows = match store
+            .activity_log_prune(self.vauchi.clock().unix_seconds(), RETENTION_SECS)
+            .and_then(|_| store.claim_notifications())
+        {
             Ok(rows) => rows,
             Err(e) => {
                 tracing::warn!("collect_notifications: activity claim failed: {e}");

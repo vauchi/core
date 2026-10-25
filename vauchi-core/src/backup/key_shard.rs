@@ -626,7 +626,11 @@ mod tests {
     fn config_validation_rejects_invalid_params() {
         assert!(KeyShardConfig::new(1, 3).is_err());
         assert!(KeyShardConfig::new(4, 3).is_err());
-        assert!(KeyShardConfig::new(2, 11).is_err());
+        // Three to nine guardians (vauchi/private#816).
+        assert!(KeyShardConfig::new(2, 2).is_err());
+        assert!(KeyShardConfig::new(2, 3).is_ok());
+        assert!(KeyShardConfig::new(9, 9).is_ok());
+        assert!(KeyShardConfig::new(2, 10).is_err());
     }
 
     // @internal

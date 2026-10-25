@@ -473,7 +473,8 @@ mod tests {
             Err(ShamirError::ThresholdExceedsCount(4, 3))
         );
         assert_eq!(split(&secret, 2, 1), Err(ShamirError::CountTooLow(1)));
-        assert_eq!(split(&secret, 2, 11), Err(ShamirError::CountTooHigh(11)));
+        assert_eq!(split(&secret, 2, 2), Err(ShamirError::CountTooLow(2)));
+        assert_eq!(split(&secret, 2, 10), Err(ShamirError::CountTooHigh(10)));
     }
 
     // @internal
@@ -625,8 +626,8 @@ mod tests {
             0xDE, 0xF0, 0x0F, 0x1E, 0x2D, 0x3C, 0x4B, 0x5A, 0x69, 0x78, 0x87, 0x96, 0xA5, 0xB4,
             0xC3, 0xD2, 0xE1, 0xF0,
         ];
-        let shares = split(&secret, 2, 10).unwrap();
-        assert_eq!(shares.len(), 10);
+        let shares = split(&secret, 2, 9).unwrap();
+        assert_eq!(shares.len(), 9);
 
         let reconstructed = reconstruct(&shares, 2).unwrap();
         assert_eq!(reconstructed, secret);
@@ -658,14 +659,29 @@ mod tests {
 
     // @internal
     #[test]
-    fn ten_is_the_highest_threshold_reconstruct_accepts() {
+    fn nine_is_the_highest_threshold_reconstruct_accepts() {
         let secret = [0x5Au8; 32];
-        let shares = split(&secret, 10, 10).unwrap();
+        let shares = split(&secret, 9, 9).unwrap();
 
-        assert_eq!(reconstruct(&shares, 10).unwrap(), secret);
+        assert_eq!(reconstruct(&shares, 9).unwrap(), secret);
         assert!(matches!(
-            reconstruct(&shares, 11),
-            Err(ShamirError::ThresholdTooHigh(11))
+            reconstruct(&shares, 10),
+            Err(ShamirError::ThresholdTooHigh(10))
         ));
+    }
+
+    /// Guardians are capped at nine (vauchi/private#816), so a tenth share
+    /// can only come from someone other than a guardian.
+    // @internal
+    #[test]
+    fn reconstruct_refuses_more_shares_than_guardians() {
+        let shares: Vec<Share> = (1..=10)
+            .map(|index| Share {
+                index,
+                value: [index; 32],
+            })
+            .collect();
+
+        assert_eq!(reconstruct(&shares, 2), Err(ShamirError::CountTooHigh(10)));
     }
 }

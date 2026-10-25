@@ -8,6 +8,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.88.1] — 2026-10-25
+
+### Fixed
+
+- A background invalidation no longer throws the duress PIN and app
+  password setups back: what was typed is what gets set
+  (vauchi/private#809).
+- A device-link host fails with `qr_expired` instead of completing a
+  link after the QR expired, and the joiner still reads a response
+  waiting at its deadline (vauchi/private#808).
+
+### Added
+
+- CI: `test:formal` also runs the Kani proofs of the CEK-wrapped card
+  update decoder and Shamir interpolation, the Tamarin card-update
+  model and the Quint device-link model (vauchi/private#757).
+
 ## [0.88.0] — 2026-10-24
 
 ### Added

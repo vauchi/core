@@ -14,29 +14,14 @@ use crate::notification_types::{ActivityLogEntry, NotificationPreferences, Pendi
 impl AppEngine {
     /// Drain pending OS notifications.
     ///
-    /// Processes buffered events through [`ActivityLogWriter`] and
-    /// [`NotificationEmitter`], returning notifications for the frontend
-    /// to display. Each call clears the buffer, so notifications are
-    /// never returned twice.
+    /// Persists buffered events and claims pending activity rows through the
+    /// same preference-aware collector as polling. Claims survive reopening;
+    /// a returned notification is handed off at most once, not acknowledged
+    /// as displayed by the OS.
     ///
     /// Frontends should call this after receiving an event callback.
     pub fn drain_pending_notifications(&mut self) -> Vec<PendingNotification> {
-        let new_entries = self.drain_events_to_log();
-        let new_entries = self.without_ignored_card_updates(new_entries);
-        if new_entries.is_empty() {
-            return Vec::new();
-        }
-
-        let prefs = NotificationPreferences::default();
-        let locale = self.render_context.resolved_locale();
-        NotificationEmitter::evaluate(&new_entries, &prefs, locale, |contact_id| {
-            self.vauchi
-                .get_contact(contact_id)
-                .ok()
-                .flatten()
-                .map(|c| c.display_name().to_string())
-                .unwrap_or_else(|| format!("Contact {}", &contact_id[..8.min(contact_id.len())]))
-        })
+        self.collect_notifications()
     }
 
     /// Poll the activity log and produce pending OS notifications.
@@ -62,26 +47,18 @@ impl AppEngine {
             );
         }
         self.advance_relay_sessions();
+        self.collect_notifications()
+    }
 
-        let now = self.vauchi.clock().unix_seconds();
-
-        // Fetch raw rows from the activity log since the last poll.
-        let rows = match self.vauchi.activity_log_poll(self.last_poll_time, now) {
+    fn collect_notifications(&mut self) -> Vec<PendingNotification> {
+        self.drain_events_to_log();
+        let rows = match self.vauchi.storage().activity_log().claim_notifications() {
             Ok(rows) => rows,
             Err(e) => {
-                tracing::warn!("poll_notifications: activity_log_poll failed: {e}");
+                tracing::warn!("collect_notifications: activity claim failed: {e}");
                 return Vec::new();
             }
         };
-
-        if rows.is_empty() {
-            return Vec::new();
-        }
-
-        // Advance watermark based on rows *fetched*, not rows that survive
-        // parsing/filtering. Unparsable or filtered rows must not cause
-        // unbounded re-processing on every subsequent poll.
-        self.last_poll_time = now;
 
         let entries: Vec<_> = rows
             .into_iter()
@@ -98,23 +75,19 @@ impl AppEngine {
 
         let prefs = NotificationPreferences {
             contact_added_enabled: self.vauchi.config().contact_added_notifications,
-            // Default-on card-update heartbeat (M4 S3), now honoring the
-            // persisted Settings toggle (S3a2). Per-contact mute is a Tier-1
-            // follow-up.
             card_update_enabled: self.vauchi.config().card_update_notifications,
         };
         let locale = self.render_context.resolved_locale();
 
-        // Resolve contact names for body text
         let name_resolver = |contact_id: &str| {
             self.vauchi
-                .storage()
-                .contacts()
-                .load_contact(contact_id)
+                .get_contact(contact_id)
                 .ok()
                 .flatten()
                 .map(|c| c.display_name().to_string())
-                .unwrap_or_else(|| "Unknown contact".to_string())
+                .unwrap_or_else(|| {
+                    format!("Contact {}", contact_id.chars().take(8).collect::<String>())
+                })
         };
 
         NotificationEmitter::evaluate(&entries, &prefs, locale, name_resolver)

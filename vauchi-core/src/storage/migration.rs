@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 85] = [
+const MIGRATIONS: [Migration; 86] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -697,7 +697,20 @@ const MIGRATIONS: [Migration; 85] = [
         name: "ohttp_delay_withdrawn",
         action: MigrationAction::Sql(MIGRATION_V85_OHTTP_DELAY_WITHDRAWN),
     },
+    Migration {
+        version: 86,
+        name: "activity_notification_claims",
+        action: MigrationAction::Sql(MIGRATION_V86_ACTIVITY_NOTIFICATION_CLAIMS),
+    },
 ];
+
+/// Existing history has no reliable delivery state; do not replay it on upgrade (#764).
+const MIGRATION_V86_ACTIVITY_NOTIFICATION_CLAIMS: &str = "
+    ALTER TABLE activity_log ADD COLUMN notification_claimed INTEGER NOT NULL DEFAULT 0;
+    UPDATE activity_log SET notification_claimed = 1;
+    CREATE INDEX idx_activity_notification_pending ON activity_log(notification_claimed)
+        WHERE notification_claimed = 0;
+";
 
 /// Migration v85: when an outer relay stopped offering the delayed path a
 /// client had used (#628, owner decision 2026-10-23), so the synchronous

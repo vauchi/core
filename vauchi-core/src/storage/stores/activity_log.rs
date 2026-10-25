@@ -24,6 +24,31 @@ impl Storage {
 }
 
 impl ActivityLogStore<'_> {
+    /// Atomically claim unconsumed rows for notification evaluation.
+    ///
+    /// Claims survive reopening and do not depend on timestamps or rowid reuse.
+    /// This guarantees at-most-once handoff, not confirmed OS display. Suppressed
+    /// and malformed entries are claimed too, so they cannot replay later.
+    pub fn claim_notifications(&self) -> Result<Vec<ActivityLogRow>, StorageError> {
+        let mut stmt = self.conn.prepare(
+            "UPDATE activity_log SET notification_claimed = 1
+             WHERE notification_claimed = 0
+             RETURNING event_key, category, contact_id, payload, created_at",
+        )?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(ActivityLogRow {
+                    event_key: row.get(0)?,
+                    category: row.get(1)?,
+                    contact_id: row.get(2)?,
+                    payload: row.get(3)?,
+                    created_at: row.get::<_, i64>(4)? as u64,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
     /// Inserts an activity log entry.
     ///
     /// Uses `INSERT OR IGNORE` so duplicate `event_key` values are silently

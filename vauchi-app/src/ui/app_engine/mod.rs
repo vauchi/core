@@ -142,8 +142,6 @@ pub struct AppEngine {
     update_status: AppUpdateStatus,
     /// Whether the user has dismissed the "update available" banner.
     update_dismissed: bool,
-    /// Last timestamp (seconds) when activity log was polled for OS notifications.
-    last_poll_time: u64,
     /// Wall-clock of the previous poll while an exchange is live, and how many
     /// there have been — the pace at which a Hover QR can advance.
     last_poll_ms: Option<u64>,
@@ -608,7 +606,6 @@ impl AppEngine {
             render_context: initial_render_context,
             update_status: AppUpdateStatus::UpToDate,
             update_dismissed: false,
-            last_poll_time: now,
             last_poll_ms: None,
             poll_count: 0,
             event_rx,

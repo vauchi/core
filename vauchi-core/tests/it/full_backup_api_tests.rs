@@ -599,7 +599,7 @@ fn recover_tolerates_foreign_ceremony_response_above_threshold() {
 #[test]
 fn respond_to_recovery_rejects_foreign_share() {
     let alice = setup_vauchi_with_data();
-    let guardians = [guardian("G0"), guardian("G1")];
+    let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
     let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
 
     let (_backup_hex, sealed_shares) = alice
@@ -739,10 +739,10 @@ proptest! {
 }
 
 /// Recovery accepts up to twice the largest guardian count in responses
-/// (10 guardians × 2) and refuses more before opening any of them.
+/// (9 guardians × 2) and refuses more before opening any of them.
 // @scenario: backup_format_versioning :: Guardian recovery tolerates one bad response
 #[test]
-fn recovery_accepts_twenty_responses_and_refuses_twenty_one() {
+fn recovery_accepts_eighteen_responses_and_refuses_nineteen() {
     let alice = setup_vauchi_with_data();
     let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
     let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
@@ -765,8 +765,8 @@ fn recovery_accepts_twenty_responses_and_refuses_twenty_one() {
         responses
     };
 
-    let at_cap = recovering.recover_guardian_backup(&backup_hex, &padded_to(20));
-    let over_cap = recovering.recover_guardian_backup(&backup_hex, &padded_to(21));
+    let at_cap = recovering.recover_guardian_backup(&backup_hex, &padded_to(18));
+    let over_cap = recovering.recover_guardian_backup(&backup_hex, &padded_to(19));
 
     assert_eq!(
         at_cap.unwrap().sections.identity.display_name,

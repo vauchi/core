@@ -28,7 +28,8 @@
 //!
 //! # Constraints
 //!
-//! - `2 <= threshold <= count <= 10`
+//! - `2 <= threshold <= count`, with `MIN_COUNT <= count <= MAX_COUNT`
+//!   (three to nine guardians, vauchi/private#816)
 //! - Secret is exactly 32 bytes (fits a `SymmetricKey` or any 32-byte key).
 //!
 //! # TODO
@@ -43,6 +44,12 @@ use rand_core::RngCore;
 use std::fmt;
 use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop};
+
+/// Fewest shares a secret is split into: fewer guardians than three leave
+/// either no slack or a single point of failure.
+pub const MIN_COUNT: u8 = 3;
+/// Most shares a secret is split into, and most `reconstruct` accepts.
+pub const MAX_COUNT: u8 = 9;
 
 /// Error type for Shamir's Secret Sharing operations.
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
@@ -130,7 +137,7 @@ impl fmt::Debug for Share {
 /// # Arguments
 /// * `secret` - The 32-byte secret to split.
 /// * `threshold` - Minimum shares needed to reconstruct (t, 2 <= t <= count).
-/// * `count` - Total number of shares to generate (n, 2 <= n <= 10).
+/// * `count` - Total number of shares to generate (n, 3 <= n <= 9).
 ///
 /// # Errors
 /// Returns [`ShamirError`] if parameters are invalid.
@@ -180,7 +187,7 @@ pub fn reconstruct(shares: &[Share], threshold: u8) -> Result<[u8; 32], ShamirEr
     if threshold < 2 {
         return Err(ShamirError::ThresholdTooLow(threshold));
     }
-    if threshold > 10 {
+    if threshold > MAX_COUNT {
         return Err(ShamirError::ThresholdTooHigh(threshold));
     }
     if shares.len() < threshold as usize {
@@ -188,6 +195,11 @@ pub fn reconstruct(shares: &[Share], threshold: u8) -> Result<[u8; 32], ShamirEr
             required: threshold,
             got: shares.len(),
         });
+    }
+    if shares.len() > usize::from(MAX_COUNT) {
+        return Err(ShamirError::CountTooHigh(
+            u8::try_from(shares.len()).unwrap_or(u8::MAX),
+        ));
     }
 
     let mut seen = [false; 256];
@@ -203,14 +215,17 @@ pub fn reconstruct(shares: &[Share], threshold: u8) -> Result<[u8; 32], ShamirEr
 
     let mut secret = [0u8; 32];
 
+    // A fixed buffer rather than a Vec per byte: no heap copies of share
+    // bytes, and a shape Kani can reason about (vauchi/private#816).
+    let mut points = [(0u8, 0u8); MAX_COUNT as usize];
     for (byte_pos, secret_byte) in secret.iter_mut().enumerate() {
-        // Collect (x_i, y_i) pairs for this byte position
-        let mut points: Vec<(u8, u8)> = shares
-            .iter()
-            .map(|s| (s.index, s.value[byte_pos]))
-            .collect();
-
-        let interpolation = lagrange_interpolate_at_zero(&points);
+        for (point, share) in points.iter_mut().zip(shares) {
+            *point = (share.index, share.value[byte_pos]);
+        }
+        let interpolation = points
+            .get(..shares.len())
+            .ok_or(ShamirError::CountTooHigh(MAX_COUNT))
+            .and_then(lagrange_interpolate_at_zero);
         for (index, value) in &mut points {
             index.zeroize();
             value.zeroize();
@@ -226,10 +241,10 @@ fn validate_params(threshold: u8, count: u8) -> Result<(), ShamirError> {
     if threshold < 2 {
         return Err(ShamirError::ThresholdTooLow(threshold));
     }
-    if count < 2 {
+    if count < MIN_COUNT {
         return Err(ShamirError::CountTooLow(count));
     }
-    if count > 10 {
+    if count > MAX_COUNT {
         return Err(ShamirError::CountTooHigh(count));
     }
     if threshold > count {

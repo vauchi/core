@@ -349,20 +349,22 @@ impl KeyShardConfig {
 
     /// Minimum allowed threshold.
     pub const MIN_THRESHOLD: u8 = 2;
-    /// Maximum allowed total shares.
-    pub const MAX_COUNT: u8 = 10;
+    /// Fewest guardians.
+    pub const MIN_COUNT: u8 = shamir::MIN_COUNT;
+    /// Most guardians.
+    pub const MAX_COUNT: u8 = shamir::MAX_COUNT;
 
     /// Creates a new configuration with validation.
     ///
     /// # Errors
     /// Returns [`KeyShardError::InvalidParameters`] if parameters are outside
-    /// the allowed range `2 <= threshold <= count <= 10`.
+    /// the allowed range `2 <= threshold <= count`, `3 <= count <= 9`.
     pub fn new(threshold: u8, count: u8) -> Result<Self, KeyShardError> {
         // Match the constraints enforced by Shamir's Secret Sharing.
         if threshold < Self::MIN_THRESHOLD {
             return Err(ShamirError::ThresholdTooLow(threshold).into());
         }
-        if count < Self::MIN_THRESHOLD {
+        if count < Self::MIN_COUNT {
             return Err(ShamirError::CountTooLow(count).into());
         }
         if count > Self::MAX_COUNT {
@@ -478,7 +480,7 @@ mod tests {
     // @internal
     #[test]
     fn backup_key_shard_serialization_round_trip() {
-        let shard = BackupKeyShard::from_parts(metadata(2, 10), 7, [0xABu8; 32]).unwrap();
+        let shard = BackupKeyShard::from_parts(metadata(2, 9), 7, [0xABu8; 32]).unwrap();
         let bytes = shard.to_bytes();
         let parsed = BackupKeyShard::from_bytes(&bytes).unwrap();
         assert_eq!(shard, parsed);

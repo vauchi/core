@@ -23,6 +23,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - Platform callbacks are bound to a cancellable operation lifetime:
   stale observations, closed inboxes and resource-budget overruns are
   rejected.
+- `AppEngine` offers native shells one opaque, coalescing
+  presentation-invalidation receiver, so Core decides which events
+  repaint; a replacement subscription or a dropped engine disconnects
+  it, and `PresentationInvalidated` returns pending notifications with
+  the renderer commands (vauchi/private#764).
+- The new `vauchi-hardware` crate runs native discovery in one bounded
+  worker that disposes every scan on shutdown, and Core decodes raw BLE
+  advertisement observations, rejecting ambiguous ones.
+- Core keeps the language and theme picked in Settings and restores
+  them when an engine opens; before the first pick an app's own stored
+  choice applies (vauchi/private#790).
 - Dev bindings built with `dev-local-content` can trust a test content
   publisher key (`VAUCHI_DEV_CONTENT_PUBLISHER_KEY`) and send OHTTP to a
   local relay's own route (`VAUCHI_DEV_OHTTP_RELAY_URL`)
@@ -59,7 +70,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - A display name is limited to 100 characters everywhere: creating an
   identity refuses a longer one, renaming counts characters instead of
   bytes, and the exchange QR accepts any name the card accepts, up to
-  400 bytes (vauchi/private#802).
+  400 bytes; `ExchangeQR::to_qr_image_string` now returns a `Result`,
+  `SerializationFailed` for a payload past QR capacity, instead of
+  panicking (vauchi/private#802).
 - A new device refuses a linked seed whose identity is not the one the
   scanned QR names (vauchi/private#789).
 - A QR timestamp near `u64::MAX` counts as expired instead of
@@ -77,6 +90,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   arrays, an imported contact yields no sync data instead of panicking,
   and chain and ratchet generations stop at `GenerationLimitExceeded`
   instead of wrapping (vauchi/private#761).
+- A native callback is delivered serially, and BLE carriers keep their
+  width with a disposal that is safe under cancellation.
+
+### Changed
+
+- Core is licensed AGPL-3.0-or-later; versions up to 0.87.0 stay
+  available under GPL-3.0-or-later (vauchi/private#798).
 
 ## [0.87.0] — 2026-10-23
 

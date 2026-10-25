@@ -4471,7 +4471,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-hardware"
-version = "0.87.0"
+version = "0.88.0"
 dependencies = [
  "futures-util",
  "thiserror 2.0.18",

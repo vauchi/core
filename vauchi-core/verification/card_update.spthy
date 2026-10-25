@@ -1,0 +1,143 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Card updates between contacts (#757), as Core sends and receives them:
+ *
+ *   - the sender numbers its updates to each contact 1, 2, 3, ...
+ *     (api/vauchi/propagation.rs) and signs version, changes, a fresh
+ *     nonce, its own key and the recipient's key (sync/delta.rs
+ *     `signable_bytes`, domain "vauchi-delta-v3");
+ *   - the receiver checks the signature against the contact's key and its
+ *     own, refuses a nonce it has seen, and refuses a version below the
+ *     last one it applied (api/sync/card_update.rs steps 6, 7 and 7b).
+ *
+ * The Double Ratchet that carries an update is abstracted as one channel
+ * key per ordered pair of contacts. The relay controls delivery, so it can
+ * withhold, reorder and replay, and the ratchet accepts out-of-order
+ * messages. A channel key can leak (a compromised ratchet state), and so can
+ * an identity key. The ratchet's own forward and post-compromise secrecy
+ * are not modelled: that is the Signal design, analysed elsewhere; this
+ * model covers what Vauchi adds on top of it.
+ *
+ * Run: tamarin-prover --prove card_update.spthy
+ * Controls, each of which must falsify its lemma:
+ *   -DNO_RECIPIENT_BINDING  update_comes_from_the_sender_for_this_recipient
+ *   -DNO_VERSION_FLOOR      no_rollback
+ * no_rollback exists only in that control: with the floor, "versions only
+ * rise" needs induction over the chain of receives that Tamarin does not
+ * finish (no verdict in 7 minutes). Without the nonce check, neither
+ * each_update_is_applied_once nor an exists-trace replay gets a verdict
+ * within 6 GB, so that check has no control here; the lemma is not vacuous,
+ * since it is falsified once a leaked identity key is allowed.
+ */
+
+theory VauchiCardUpdate
+begin
+
+builtins: signing, symmetric-encryption, natural-numbers
+
+#ifdef NO_RECIPIENT_BINDING
+macros:
+  delta(v, c, n, pka, pkb) = <'vauchi-delta-v3', v, c, n, pka>
+#else
+macros:
+  delta(v, c, n, pka, pkb) = <'vauchi-delta-v3', v, c, n, pka, pkb>
+#endif
+
+restriction Equality:
+  "All x y #i. Eq(x, y) @ i ==> x = y"
+
+restriction Inequality:
+  "All x #i. Neq(x, x) @ i ==> F"
+
+restriction One_contact_relationship_per_pair:
+  "All a b #i #j. Contact(a, b) @ i & Contact(a, b) @ j ==> #i = #j"
+
+restriction Each_nonce_once_per_sender:
+  "All b a n #i #j. Nonce(b, a, n) @ i & Nonce(b, a, n) @ j ==> #i = #j"
+
+#ifdef NO_VERSION_FLOOR
+#else
+restriction Version_not_below_floor:
+  "All %v %f #i. NotBelow(%v, %f) @ i ==> %f << %v | %f = %v"
+#endif
+
+rule Identity:
+    [ Fr(~sk) ]
+  --[ Identity($X) ]->
+    [ !Ltk($X, ~sk), !Pk($X, pk(~sk)), Out(pk(~sk)) ]
+
+rule Reveal_identity_key:
+    [ !Ltk(X, sk) ]
+  --[ RevealIdentity(X) ]->
+    [ Out(sk) ]
+
+// The in-person exchange (qr_exchange.spthy) leaves each pair with a
+// channel in each direction; the receiver's floor starts at version 1.
+rule Exchange:
+    [ !Pk(A, pka), !Pk(B, pkb), Fr(~ab), Fr(~ba) ]
+  --[ Contact(A, B), Contact(B, A), Neq(A, B) ]->
+    [ !Channel(A, B, ~ab), !Channel(B, A, ~ba),
+      NextVersion(A, B, %1), NextVersion(B, A, %1),
+      Floor(B, A, %1), Floor(A, B, %1) ]
+
+rule Reveal_channel:
+    [ !Channel(A, B, k) ]
+  --[ RevealChannel(A, B) ]->
+    [ Out(k) ]
+
+rule Send_update:
+    let d = delta(%v, ~changes, ~nonce, pk(ska), pkb)
+    in
+    [ NextVersion(A, B, %v), !Ltk(A, ska), !Pk(B, pkb), !Channel(A, B, k),
+      Fr(~changes), Fr(~nonce) ]
+  --[ Sent(A, B, %v, ~changes) ]->
+    [ NextVersion(A, B, %v %+ %1), Out(senc(<d, sign(d, ska)>, k)) ]
+
+rule Receive_update:
+    let d = delta(%v, changes, nonce, pka, pkb)
+    in
+    [ In(senc(<d, sig>, k)), !Channel(A, B, k), !Pk(A, pka), !Pk(B, pkb),
+      Floor(B, A, %floor) ]
+  --[ Eq(verify(sig, d, pka), true), Nonce(B, A, nonce),
+      NotBelow(%v, %floor), Applied(B, A, %v, changes) ]->
+    [ Floor(B, A, %v) ]
+
+lemma executable:
+  exists-trace
+  "Ex b a %v1 %v2 c1 c2 #i #j.
+      Applied(b, a, %v1, c1) @ i & Applied(b, a, %v2, c2) @ j & #i < #j
+    & not (Ex x #r. RevealIdentity(x) @ r)
+    & not (Ex x y #r. RevealChannel(x, y) @ r)"
+
+// A leaked ratchet state lets the attacker deliver anything over that
+// channel, but an applied update was still signed by the sender for this
+// recipient. Without the recipient's key in the signature, an update meant
+// for another contact (a dishonest one) can be redirected to this one.
+lemma update_comes_from_the_sender_for_this_recipient:
+  "All b a %v c #i. Applied(b, a, %v, c) @ i ==>
+      (Ex #j. Sent(a, b, %v, c) @ j & #j < #i)
+    | (Ex #r. RevealIdentity(a) @ r & #r < #i)"
+
+// Even an attacker holding both channel keys cannot make an update apply
+// twice; the version floor alone accepts an equal version again. With the
+// sender's identity key it can sign anything, so that case is excluded.
+lemma each_update_is_applied_once:
+  "All b a %v c #i #j. Applied(b, a, %v, c) @ i & Applied(b, a, %v, c) @ j
+      ==> #i = #j | (Ex #r. RevealIdentity(a) @ r)"
+
+#ifdef NO_VERSION_FLOOR
+// Without the floor the relay rolls a card back just by reordering.
+lemma no_rollback:
+  "All b a %v1 %v2 c1 c2 #i #j.
+      Applied(b, a, %v1, c1) @ i & Applied(b, a, %v2, c2) @ j & #i < #j
+      ==> not (%v2 << %v1)"
+#endif
+
+lemma changes_stay_secret:
+  "All a b %v c #i. Sent(a, b, %v, c) @ i ==>
+      not (Ex #k. K(c) @ k) | (Ex #r. RevealChannel(a, b) @ r)"
+
+end

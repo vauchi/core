@@ -1,0 +1,53 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Duress cover traffic (#811, ADR-032 addendum 2026-07-04), the design
+ * chosen for a card edit made under the duress PIN: the edit stays in the
+ * session, and the next sync sends each real contact a cover message
+ * instead of the update. One side of the diff is a normal unlock that
+ * sends the coercer's edit; the other is a duress unlock that sends cover.
+ *
+ * The ratchet is abstracted as one channel key per contact; sizes and
+ * timing are outside a symbolic model, so the implementation must pad the
+ * cover message to the update's bucket and send it on the same sync.
+ *
+ * Run: tamarin-prover --diff --prove duress_cover.spthy
+ *   default: the coercer watches the network and the relay; it chose the
+ *     edit, so it knows the plaintext an update would carry. The two sides
+ *     must be indistinguishable (Observational_equivalence verified).
+ *   -DCOERCER_HOLDS_RATCHET: the coercer also extracts the ratchet keys
+ *     from the device. No cover message can then pass for the edit, so
+ *     the equivalence must be falsified: this is the design's limit.
+ */
+
+theory VauchiDuressCover
+begin
+
+builtins: symmetric-encryption
+
+rule Contact:
+    [ Fr(~k) ]
+  --[ Contact() ]->
+    [ !Channel(~k) ]
+
+#ifdef COERCER_HOLDS_RATCHET
+rule Ratchet_keys_extracted:
+    [ !Channel(k) ]
+  --[ Extracted() ]->
+    [ Out(k) ]
+#endif
+
+// The coercer types $edit into the card; the next sync sends either the
+// update carrying it (normal unlock) or cover (duress unlock).
+rule Edit_then_sync:
+    [ !Channel(k), Fr(~nonce) ]
+  --[ Synced() ]->
+    [ Out(senc(diff(<'card-delta', $edit, ~nonce>, <'cover', ~nonce>), k)) ]
+
+lemma executable:
+  exists-trace
+  "Ex #i. Synced() @ i"
+
+end

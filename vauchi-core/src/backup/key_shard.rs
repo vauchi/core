@@ -260,6 +260,7 @@ impl From<ShamirError> for KeyShardError {
             ShamirError::ThresholdTooLow(_)
             | ShamirError::ThresholdTooHigh(_)
             | ShamirError::ThresholdExceedsCount(_, _)
+            | ShamirError::ThresholdEqualsCount(_)
             | ShamirError::CountTooLow(_)
             | ShamirError::CountTooHigh(_)
             | ShamirError::InvalidSecretLength(_) => Self::InvalidParameters,
@@ -358,7 +359,7 @@ impl KeyShardConfig {
     ///
     /// # Errors
     /// Returns [`KeyShardError::InvalidParameters`] if parameters are outside
-    /// the allowed range `2 <= threshold <= count`, `3 <= count <= 9`.
+    /// the allowed range `2 <= threshold < count`, `3 <= count <= 9`.
     pub fn new(threshold: u8, count: u8) -> Result<Self, KeyShardError> {
         // Match the constraints enforced by Shamir's Secret Sharing.
         if threshold < Self::MIN_THRESHOLD {
@@ -372,6 +373,9 @@ impl KeyShardConfig {
         }
         if threshold > count {
             return Err(ShamirError::ThresholdExceedsCount(threshold, count).into());
+        }
+        if threshold == count {
+            return Err(ShamirError::ThresholdEqualsCount(count).into());
         }
         Ok(Self { threshold, count })
     }
@@ -631,7 +635,9 @@ mod tests {
         // Three to nine guardians (vauchi/private#816).
         assert!(KeyShardConfig::new(2, 2).is_err());
         assert!(KeyShardConfig::new(2, 3).is_ok());
-        assert!(KeyShardConfig::new(9, 9).is_ok());
+        assert!(KeyShardConfig::new(8, 9).is_ok());
+        assert!(KeyShardConfig::new(3, 3).is_err());
+        assert!(KeyShardConfig::new(9, 9).is_err());
         assert!(KeyShardConfig::new(2, 10).is_err());
     }
 

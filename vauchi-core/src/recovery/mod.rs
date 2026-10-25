@@ -859,14 +859,15 @@ impl Default for RecoverySettings {
 impl RecoverySettings {
     /// Minimum allowed recovery threshold.
     pub const MIN_RECOVERY_THRESHOLD: u32 = 1;
-    /// Maximum allowed recovery threshold.
-    pub const MAX_RECOVERY_THRESHOLD: u32 = 10;
+    /// Maximum allowed recovery threshold, the same nine as guardians
+    /// (vauchi/private#816).
+    pub const MAX_RECOVERY_THRESHOLD: u32 = 9;
 
     /// Creates new recovery settings with validation.
     ///
     /// # Errors
     /// - `ThresholdTooLow` if recovery_threshold < 1
-    /// - `ThresholdTooHigh` if recovery_threshold > 10
+    /// - `ThresholdTooHigh` if recovery_threshold > 9
     /// - `VerificationThresholdTooLow` if verification_threshold < 1
     /// - `VerificationThresholdTooHigh` if verification_threshold > recovery_threshold
     pub fn new(

@@ -354,7 +354,13 @@ fn recover_rejects_insufficient_shares() {
 #[test]
 fn recover_rejects_tampered_backup_threshold() {
     let alice = setup_vauchi_with_data();
-    let guardians = [guardian("G0"), guardian("G1"), guardian("G2")];
+    // 3 of 4: a threshold may not equal the guardian count (#816).
+    let guardians = [
+        guardian("G0"),
+        guardian("G1"),
+        guardian("G2"),
+        guardian("G3"),
+    ];
     let guardian_pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
 
     let (backup_hex, sealed_shares) = alice

@@ -54,6 +54,17 @@ fn test_recovery_threshold_too_high() {
     assert!(matches!(result, Err(RecoveryError::ThresholdTooHigh)));
 }
 
+/// Vouchers are capped at nine, like guardians (vauchi/private#816).
+// @scenario: contact_recovery :: Recovery threshold limits
+#[test]
+fn nine_vouchers_is_the_highest_recovery_threshold() {
+    assert!(RecoverySettings::new(9, 1).is_ok());
+    assert!(matches!(
+        RecoverySettings::new(10, 1),
+        Err(RecoveryError::ThresholdTooHigh)
+    ));
+}
+
 /// Scenario: Verification threshold limits
 // @scenario: contact_recovery :: Recovery threshold limits
 #[test]

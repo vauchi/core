@@ -230,14 +230,22 @@ pub fn reconstruct(shares: &[Share], threshold: u8) -> Result<[u8; 32], ShamirEr
             .get(..shares.len())
             .ok_or(ShamirError::CountTooHigh(MAX_COUNT))
             .and_then(lagrange_interpolate_at_zero);
-        for (index, value) in &mut points {
-            index.zeroize();
-            value.zeroize();
-        }
+        wipe_points(&mut points);
         *secret_byte = interpolation?;
     }
 
     Ok(secret)
+}
+
+/// Clears the interpolation points once a byte is recovered: they hold
+/// share bytes. Its own function so a Kani proof can stub it — `zeroize`'s
+/// barrier is inline assembly Kani cannot model (#757).
+#[cfg(any(feature = "network-rustls", feature = "testing", test))]
+fn wipe_points(points: &mut [(u8, u8)]) {
+    for (index, value) in points {
+        index.zeroize();
+        value.zeroize();
+    }
 }
 
 /// Validates Shamir parameters.

@@ -256,6 +256,15 @@ impl DeviceLinkInitiatorMachine {
                 };
                 InitiatorEvent::None
             }
+            // The joiner stops waiting when the QR expires, so a link
+            // finished later would register a device that never received
+            // the seed (vauchi/private#808).
+            State::Finalizing { .. } if now >= self.initiator.qr().expires_at() => {
+                self.state = State::Failed;
+                InitiatorEvent::Failed {
+                    reason: "qr_expired".to_string(),
+                }
+            }
             State::Finalizing {
                 request,
                 proof,

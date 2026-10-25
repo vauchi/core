@@ -27,6 +27,7 @@ mod accelerometer_verifier_tests;
 mod accept_encrypted_exchange_tests;
 mod accessibility_tests;
 mod activity_log_storage_tests;
+mod activity_notification_claim_tests;
 mod aha_moments_integration_tests;
 mod animated_qr_transport_tests;
 mod anonymous_sender_epoch_tests;

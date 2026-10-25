@@ -223,18 +223,30 @@ pub fn reconstruct(shares: &[Share], threshold: u8) -> Result<[u8; 32], ShamirEr
     // bytes, and a shape Kani can reason about (vauchi/private#816).
     let mut points = [(0u8, 0u8); MAX_COUNT as usize];
     for (byte_pos, secret_byte) in secret.iter_mut().enumerate() {
-        for (point, share) in points.iter_mut().zip(shares) {
-            *point = (share.index, share.value[byte_pos]);
-        }
-        let interpolation = points
-            .get(..shares.len())
-            .ok_or(ShamirError::CountTooHigh(MAX_COUNT))
-            .and_then(lagrange_interpolate_at_zero);
-        wipe_points(&mut points);
-        *secret_byte = interpolation?;
+        *secret_byte = recover_byte(shares, byte_pos, &mut points)?;
     }
 
     Ok(secret)
+}
+
+/// Recovers the secret byte at `byte_pos` from the shares, through `points`.
+/// One function per byte so a Kani proof can take a single step rather
+/// than 32 (#757).
+#[cfg(any(feature = "network-rustls", feature = "testing", test))]
+fn recover_byte(
+    shares: &[Share],
+    byte_pos: usize,
+    points: &mut [(u8, u8); MAX_COUNT as usize],
+) -> Result<u8, ShamirError> {
+    for (point, share) in points.iter_mut().zip(shares) {
+        *point = (share.index, share.value[byte_pos]);
+    }
+    let interpolation = points
+        .get(..shares.len())
+        .ok_or(ShamirError::CountTooHigh(MAX_COUNT))
+        .and_then(lagrange_interpolate_at_zero);
+    wipe_points(points);
+    interpolation
 }
 
 /// Clears the interpolation points once a byte is recovered: they hold

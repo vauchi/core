@@ -134,22 +134,24 @@ fn to_markdown_empty_log() {
 #[test]
 fn to_markdown_with_events() {
     let mut log = ExchangeDebugLog::new();
-    log.push(ExchangeDebugEvent::SessionStarted {
-        transport: "qr".to_string(),
-    });
-    log.push(ExchangeDebugEvent::QrGenerated);
-    log.push(ExchangeDebugEvent::QrScanned);
-    log.push(ExchangeDebugEvent::ExchangeCompleted);
+    log.push_at(
+        0,
+        ExchangeDebugEvent::SessionStarted {
+            transport: "qr".to_string(),
+        },
+    );
+    log.push_at(5, ExchangeDebugEvent::QrGenerated);
+    log.push_at(40, ExchangeDebugEvent::QrScanned);
+    log.push_at(120, ExchangeDebugEvent::ExchangeCompleted);
 
     let md = log.to_markdown();
     assert!(md.contains("# Exchange Debug Log"));
     assert!(md.contains("4 events"));
     assert!(md.contains("| Elapsed"));
     assert!(md.contains("|---:|---|"));
-    assert!(md.contains("SessionStarted (qr)"));
-    assert!(md.contains("QrGenerated"));
-    assert!(md.contains("ExchangeCompleted"));
-    assert!(md.contains("| 0 |") || md.contains("| 1 |"));
+    assert!(md.contains("| 0 | SessionStarted (qr) |"), "{md}");
+    assert!(md.contains("| 5 | QrGenerated |"), "{md}");
+    assert!(md.contains("| 120 | ExchangeCompleted |"), "{md}");
 }
 
 // @internal

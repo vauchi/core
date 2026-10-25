@@ -68,3 +68,5 @@ service-account*.json
 
 # Kani and Tamarin installs from ci/formal-verification.sh (FORMAL_HOME)
 .formal/
+# Apalache's logs from `quint verify`, written next to the model
+_apalache-out/

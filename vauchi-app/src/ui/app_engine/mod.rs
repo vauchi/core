@@ -558,27 +558,10 @@ impl AppEngine {
 
         let now = vauchi.clock().unix_seconds();
 
-        // Register a permanent event handler that sends VauchiEvents to a channel
-        // for deferred persistence to the activity log (ADR-031).
-        // Since VauchiEvent handler must be Sync but mpsc::Sender is not Sync,
-        // we wrap it in a Mutex.
-        let (event_tx, event_rx) = mpsc::channel();
-        let event_tx = std::sync::Mutex::new(event_tx);
         let presentation_invalidation =
             std::sync::Arc::new(presentation_invalidation::PresentationInvalidation::default());
-        let invalidation = std::sync::Arc::downgrade(&presentation_invalidation);
-        let event_handler_id = vauchi.add_event_handler(std::sync::Arc::new(move |event| {
-            let refresh = !super::affected_screens(&event).is_empty();
-            if let Ok(tx) = event_tx.lock() {
-                // best-effort: channel send fails only if the receiver
-                // was dropped (AppEngine is being torn down)
-                #[allow(clippy::let_underscore_must_use)]
-                let _ = tx.send(event);
-            }
-            if refresh && let Some(invalidation) = invalidation.upgrade() {
-                invalidation.notify();
-            }
-        }));
+        let (event_rx, event_handler_id) =
+            presentation_invalidation.subscribe_to_domain_events(&vauchi);
 
         // Surface safety alerts a previous session accepted but never
         // surfaced (crash between receive-commit and dispatch). At-least-once

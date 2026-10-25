@@ -1,7 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use std::sync::{Mutex, mpsc};
+use std::sync::{Arc, Mutex, mpsc};
+
+use vauchi_core::api::{HandlerId, Vauchi, VauchiEvent};
 
 use super::AppEngine;
 
@@ -11,7 +13,29 @@ pub(super) struct PresentationInvalidation {
 }
 
 impl PresentationInvalidation {
-    pub(super) fn notify(&self) {
+    pub(super) fn subscribe_to_domain_events(
+        self: &Arc<Self>,
+        vauchi: &Vauchi,
+    ) -> (mpsc::Receiver<VauchiEvent>, HandlerId) {
+        // Queue deferred persistence before waking presentation (ADR-031).
+        let (event_tx, event_rx) = mpsc::channel();
+        let event_tx = Mutex::new(event_tx);
+        let invalidation = Arc::downgrade(self);
+        let handler_id = vauchi.add_event_handler(Arc::new(move |event| {
+            let refresh = !crate::ui::affected_screens(&event).is_empty();
+            if let Ok(tx) = event_tx.lock() {
+                // The receiver can disappear during engine disposal.
+                #[allow(clippy::let_underscore_must_use)]
+                let _ = tx.send(event);
+            }
+            if refresh && let Some(invalidation) = invalidation.upgrade() {
+                invalidation.notify();
+            }
+        }));
+        (event_rx, handler_id)
+    }
+
+    fn notify(&self) {
         let mut sender = self
             .sender
             .lock()

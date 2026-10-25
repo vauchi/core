@@ -755,6 +755,46 @@ mod tests {
         assert_eq!(m.phase(), InitiatorPhase::Completed);
     }
 
+    /// The joiner stops waiting when the QR expires
+    /// (2026-08-14-device-link-host-never-shows-the-confirmation-code), so
+    /// the host must not finish after that: it would list a device that
+    /// never received the seed while the joiner says the QR expired. Found
+    /// by the Quint model of both machines (vauchi/private#808).
+    // @internal
+    #[test]
+    fn the_host_does_not_complete_a_link_after_the_qr_expired() {
+        let initiator = build_initiator("Alice", 0x11);
+        let qr_expires_at = initiator.qr().expires_at();
+        let claim_b64 = responder_claim_b64(&initiator, "RESP_CODE");
+        let broker = FakeBroker::new("B");
+        broker.push_complete(Ok(Some(claim_b64)));
+        let mut m = machine(initiator);
+
+        let _ = m.advance(&broker, NOW);
+        let code = match m.advance(&broker, qr_expires_at - 30) {
+            InitiatorEvent::ConfirmationRequired {
+                confirmation_code, ..
+            } => confirmation_code,
+            other => panic!("expected ConfirmationRequired, got {other:?}"),
+        };
+
+        // Inside the host's 60-second confirmation window, past the QR.
+        let _ = m.confirm_manual(code, qr_expires_at + 10);
+        let event = m.advance(&broker, qr_expires_at + 11);
+
+        assert_eq!(
+            event,
+            InitiatorEvent::Failed {
+                reason: "qr_expired".to_string()
+            }
+        );
+        assert_eq!(m.phase(), InitiatorPhase::Failed);
+        assert!(
+            !broker.calls.borrow().contains(&"claim"),
+            "no response may reach the relay after the QR expired"
+        );
+    }
+
     /// The headline claim of ADR-070 Phase 1: a whole ceremony runs with
     /// no relay in it. Uses the real rendezvous rather than `FakeBroker`,
     /// so the claim genuinely travels initiator → rendezvous → initiator,

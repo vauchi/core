@@ -286,6 +286,43 @@ fn full_join_completes() {
     assert_eq!(response.device_index(), 1);
 }
 
+/// The host saves the new device before it sends the seed, so a seed
+/// posted before the deadline but first polled after it must still be
+/// read; giving up unread leaves the host listing a device without its
+/// seed. Found by the Quint model of both machines (vauchi/private#808).
+// @internal
+#[test]
+fn a_response_waiting_at_the_deadline_is_still_read() {
+    let initiator = build_initiator("Alice", 0x11);
+    let invitation = build_invitation(&initiator);
+    let broker = FakeBroker::new();
+    let mut m =
+        DeviceLinkResponderMachine::new(invitation, "My Phone".to_string(), TIMEOUT).unwrap();
+    let _ = m.advance(&broker, NOW);
+
+    let claim_b64 = &broker.claims.borrow()[0].1;
+    let claim_bytes = base64::engine::general_purpose::STANDARD
+        .decode(claim_b64)
+        .unwrap();
+    let claim: super::ClaimPayload = serde_json::from_slice(&claim_bytes).unwrap();
+    let (confirmation, request) = initiator.prepare_confirmation(&claim.request).unwrap();
+    let proof = ProximityProof::manual_confirmation(
+        initiator.qr().link_key(),
+        &confirmation.confirmation_code,
+        NOW,
+    );
+    let (encrypted_response, _registry, _new_device) =
+        initiator.confirm_link(&request, &proof, NOW).unwrap();
+    broker.push_complete(Ok(Some(
+        base64::engine::general_purpose::STANDARD.encode(&encrypted_response),
+    )));
+
+    let event = m.advance(&broker, initiator.qr().expires_at());
+
+    assert_eq!(event, ResponderEvent::ResponseReady);
+    assert_eq!(m.phase(), ResponderPhase::Completed);
+}
+
 // @internal
 #[test]
 fn a_qr_timestamped_at_the_top_of_u64_fails_the_join_instead_of_aborting() {

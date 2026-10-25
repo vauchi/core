@@ -719,4 +719,16 @@ mod tests {
 
         assert_eq!(reconstruct(&shares, 2), Err(ShamirError::CountTooHigh(10)));
     }
+
+    /// The points hold share bytes; the Kani proof of `reconstruct` stubs
+    /// this wipe, so this test is what checks it (vauchi/private#817).
+    // @internal
+    #[test]
+    fn wipe_points_clears_every_index_and_value() {
+        let mut points = [(0xA5u8, 0x5Au8); MAX_COUNT as usize];
+
+        wipe_points(&mut points);
+
+        assert_eq!(points, [(0u8, 0u8); MAX_COUNT as usize]);
+    }
 }

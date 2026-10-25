@@ -46,6 +46,13 @@ for harness in \
     recovery_claim_parse_never_panics_and_reads_each_field_at_its_offset; do
     cargo kani -p vauchi-core --harness "$harness"
 done
+# These stub format! or gf_mul, which CBMC cannot finish within the limits;
+# each harness says why its stub keeps the proof meaningful.
+for harness in \
+    cek_wrapped_payload_decode_never_panics_and_reads_each_field_at_its_offset \
+    interpolation_never_panics_and_refuses_a_zero_or_repeated_x; do
+    cargo kani -p vauchi-core -Z stubbing --harness "$harness"
+done
 
 # ── Tamarin ───────────────────────────────────────────────────────────
 if [ ! -x "$FORMAL_HOME/bin/tamarin-prover" ]; then

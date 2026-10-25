@@ -10,8 +10,12 @@
 //! CBMC stalls on bit-by-bit GF(256) multiplication, so `gf_mul` returns an
 //! arbitrary byte here; the unit tests check it against an independent
 //! reference for every pair of bytes and `gf_inv` for every non-zero byte.
-//! `reconstruct` itself has no proof: its per-byte `Vec` of points gives no
-//! verdict in 15 minutes even with the interpolation stubbed.
+//!
+//! `reconstruct` itself has no proof: it wipes its points with `zeroize`,
+//! whose optimization barrier is inline assembly Kani cannot model, and a
+//! stub of `zeroize::optimization_barrier` does not reach the copy inlined
+//! into `<u8 as Zeroize>::zeroize`. With ten arbitrary share indices CBMC
+//! also ran past 8 GB.
 
 use super::{ShamirError, lagrange_interpolate_at_zero};
 

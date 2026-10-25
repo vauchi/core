@@ -8,4 +8,10 @@ fn uniffi_returns_the_core_owned_fixture_bytes() {
         vauchi_platform::presentation_contract_fixture_json(),
         vauchi_app::ui::presentation_contract_fixture_json()
     );
+    let fixture: serde_json::Value =
+        serde_json::from_str(&vauchi_platform::presentation_contract_fixture_json()).unwrap();
+    assert_eq!(
+        fixture["effect_commands"][0]["PostNotification"]["notification"]["notification_id"],
+        "opaque-notification-17"
+    );
 }

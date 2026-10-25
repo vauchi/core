@@ -10,6 +10,21 @@ use vauchi_core::{
     Vauchi,
 };
 
+// @internal — shells receive the same opaque notification identity through the fixture API.
+#[test]
+fn shared_fixture_preserves_notification_identity() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(vauchi_app::ui::presentation_contract_fixture_json()).unwrap();
+    let wire = &fixture["effect_commands"];
+    let commands: Vec<Command> = serde_json::from_value(wire.clone()).unwrap();
+    assert_eq!(commands.len(), 1);
+    assert_eq!(
+        wire[0]["PostNotification"]["notification"]["notification_id"],
+        "opaque-notification-17"
+    );
+    assert_eq!(serde_json::to_value(commands).unwrap(), *wire);
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct PresentationContractFixture {
     schema_version: u32,

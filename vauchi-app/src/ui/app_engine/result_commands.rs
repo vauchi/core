@@ -123,6 +123,44 @@ pub(super) fn append_result_commands(
 mod tests {
     use super::*;
 
+    // @internal — the migration adapter must preserve the existing OS replacement key.
+    #[test]
+    fn notification_result_preserves_opaque_identity() {
+        use crate::notification_types::{NotificationCategory, PendingNotification};
+
+        let mut commands = Vec::new();
+        append_result_commands(
+            ActionResult::Notify {
+                notifications: vec![PendingNotification {
+                    event_key: "opaque/通知/17".into(),
+                    category: NotificationCategory::EmergencyAlert,
+                    title: "Prepared title".into(),
+                    body: "Prepared body".into(),
+                    contact_id: "internal-contact".into(),
+                    deep_link_uri: None,
+                    os_category_id: "category".into(),
+                    os_channel_id: "channel".into(),
+                    priority: NotificationPriority::Urgent,
+                    os_category_options: vec![],
+                }],
+            },
+            &mut commands,
+        )
+        .unwrap();
+
+        assert_eq!(
+            serde_json::to_value(commands).unwrap(),
+            serde_json::json!([
+                {"PostNotification": {"notification": {
+                    "notification_id": "opaque/通知/17",
+                    "title": "Prepared title", "body": "Prepared body",
+                    "deep_link_uri": null, "category_id": "category", "channel_id": "channel",
+                    "urgency": "urgent", "category_options": []
+                }}}
+            ])
+        );
+    }
+
     // @internal
     #[test]
     fn alert_and_native_back_become_generic_commands() {

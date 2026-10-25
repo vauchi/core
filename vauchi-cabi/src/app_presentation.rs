@@ -170,6 +170,11 @@ mod tests {
             fixture,
             vauchi_app::ui::presentation_contract_fixture_json()
         );
+        let fixture_json: serde_json::Value = serde_json::from_str(fixture).unwrap();
+        assert_eq!(
+            fixture_json["effect_commands"][0]["PostNotification"]["notification"]["notification_id"],
+            "opaque-notification-17"
+        );
         // SAFETY: The pointer is owned by the C ABI and freed exactly once.
         unsafe { crate::vauchi_string_free(fixture_ptr) };
     }

@@ -6,6 +6,33 @@ use vauchi_core::{
     NotificationUrgency, ToastSpec,
 };
 
+// @internal — native replacement identities must survive the canonical JSON boundary.
+proptest::proptest! {
+    #[test]
+    fn notification_identity_survives_command_decoding(id in ".{1,128}") {
+        let wire = serde_json::json!({"PostNotification": {"notification": {
+            "notification_id": id,
+            "title": "Prepared title", "body": "Prepared body",
+            "deep_link_uri": null, "category_id": "category", "channel_id": "channel",
+            "urgency": "default", "category_options": []
+        }}});
+        let command: Command = serde_json::from_value(wire.clone()).unwrap();
+        proptest::prop_assert_eq!(serde_json::to_value(command).unwrap(), wire);
+    }
+}
+
+// @internal — older producers can still send anonymous notifications during migration.
+#[test]
+fn notification_without_identity_remains_readable() {
+    let wire = serde_json::json!({"PostNotification": {"notification": {
+        "title": "Prepared title", "body": "Prepared body",
+        "deep_link_uri": null, "category_id": "category", "channel_id": "channel",
+        "urgency": "default", "category_options": []
+    }}});
+    let command: Command = serde_json::from_value(wire.clone()).unwrap();
+    assert_eq!(serde_json::to_value(command).unwrap(), wire);
+}
+
 // @internal
 #[test]
 fn generic_shell_effects_round_trip_without_domain_results() {

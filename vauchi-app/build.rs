@@ -46,7 +46,23 @@ const FROZEN_TOKENS_JSON: &str = r##"{
   "image": { "hero_size": 88 }
 }"##;
 
+/// Release bindings are built in tag pipelines; a dev-only feature there
+/// would ship a test content-publisher key or a native log backend
+/// (private#794).
+fn refuse_dev_build_in_tag_pipeline() {
+    println!("cargo::rerun-if-env-changed=CI_COMMIT_TAG");
+    let dev_build = env::var_os("CARGO_FEATURE_DEV_BUILD").is_some();
+    let tag = env::var("CI_COMMIT_TAG").unwrap_or_default();
+    assert!(
+        !dev_build || tag.is_empty(),
+        "tag pipeline {tag} builds with a dev-only feature (dev-logging or \
+         dev-local-content); release bindings must not carry one (private#794)"
+    );
+}
+
 fn main() {
+    refuse_dev_build_in_tag_pipeline();
+
     let out_dir = env::var("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("bundled_locale.rs");
 

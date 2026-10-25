@@ -46,7 +46,7 @@ testing = ["vauchi-app/testing"]
 # vauchi-app `log::` call sites are silent no-ops (the `log` facade
 # discards records when no logger is installed). Frontends enable this
 # only in their debug build config. See logging.rs and logging-rules.md.
-dev-logging = ["dep:tracing-subscriber", "dep:tracing-oslog", "dep:ndk-sys"]
+dev-logging = ["dep:tracing-subscriber", "dep:tracing-oslog", "dep:ndk-sys", "vauchi-app/dev-build"]
 
 [dependencies]
 # Core Vauchi library (with rustls for Android/iOS - no OpenSSL dependency)

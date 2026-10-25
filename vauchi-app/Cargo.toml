@@ -58,7 +58,10 @@ test-support = []
 # A dev build trusts the publisher key in VAUCHI_DEV_CONTENT_PUBLISHER_KEY
 # (hex, read at build time) instead of the production key, for a device
 # proof against a local relay (vauchi/private#733 T4.2). Never in release.
-dev-local-content = ["content-updates"]
+dev-local-content = ["content-updates", "dev-build"]
+# Set by every dev-only feature so build.rs can refuse them in a tag
+# pipeline, where release bindings are built (private#794).
+dev-build = []
 # Forwards `vauchi-core/testing` so the integration test binary can
 # reach `FakeClock` + `DeterministicRng`. Mirrors vauchi-core's
 # `it` test target wiring. Enable via `--features testing`; the

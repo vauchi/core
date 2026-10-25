@@ -18,7 +18,7 @@ secure-storage = ["vauchi-core/secure-storage-linux"]
 # Dev/debug-only stderr tracing subscriber. OFF in release: a shipped
 # desktop binary installs no subscriber, so vauchi-app `tracing::` events
 # are dropped. The C host enables this only in its debug build config.
-dev-logging = ["dep:tracing-subscriber"]
+dev-logging = ["dep:tracing-subscriber", "vauchi-app/dev-build"]
 
 [dependencies]
 vauchi-core = { workspace = true, default-features = false, features = ["storage", "network-rustls", "network-http"] }

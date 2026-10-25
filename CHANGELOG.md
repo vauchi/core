@@ -29,8 +29,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   (vauchi/private#733).
 - CI: `test:formal` runs the Kani parser proofs and the Tamarin
   exchange, device-link and reciprocity-confirmation models
-  (vauchi/private#757) and the recovery-acceptance model of both rekey
-  designs (vauchi/private#796); `test:core-32bit` also runs the 32-bit
+  (vauchi/private#757), the recovery-acceptance model of both rekey
+  designs and the model of social recovery with online rekeying
+  (vauchi/private#796); `test:core-32bit` also runs the 32-bit
   integration tests (vauchi/private#784).
 
 ### Fixed
@@ -39,7 +40,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   key or the new one, is refused and never counted, so whoever holds
   the lost device cannot vouch for its own recovery
   (vauchi/private#797).
-
 - On a device with biometrics, the device or login password no longer
   passes the OS check that guards export and the first app password:
   `CreateUserPresenceSecret` carries a `binding` (`biometry` or
@@ -56,6 +56,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   contacts and carries that contact's key; the vouch screen names the
   contact, and claims and vouchers carry the time
   (vauchi/private#708).
+- A display name is limited to 100 characters everywhere: creating an
+  identity refuses a longer one, renaming counts characters instead of
+  bytes, and the exchange QR accepts any name the card accepts, up to
+  400 bytes (vauchi/private#802).
 - A new device refuses a linked seed whose identity is not the one the
   scanned QR names (vauchi/private#789).
 - A QR timestamp near `u64::MAX` counts as expired instead of

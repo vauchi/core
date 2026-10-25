@@ -1,5 +1,21 @@
 {
   "schema_version": 1,
+  "effect_commands": [
+    {
+      "PostNotification": {
+        "notification": {
+          "notification_id": "opaque-notification-17",
+          "title": "Prepared title",
+          "body": "Prepared body",
+          "deep_link_uri": null,
+          "category_id": "category",
+          "channel_id": "channel",
+          "urgency": "default",
+          "category_options": []
+        }
+      }
+    }
+  ],
   "initial_commands": [
     {
       "ReplaceSurface": {

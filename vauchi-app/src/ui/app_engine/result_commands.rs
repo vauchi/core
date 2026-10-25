@@ -73,6 +73,7 @@ pub(super) fn append_result_commands(
             commands.extend(notifications.into_iter().map(|notification| {
                 Command::PostNotification {
                     notification: NotificationSpec {
+                        notification_id: Some(notification.event_key),
                         title: notification.title,
                         body: notification.body,
                         deep_link_uri: notification.deep_link_uri,

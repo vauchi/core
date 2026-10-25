@@ -61,6 +61,10 @@ pub enum NotificationUrgency {
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NotificationSpec {
+    /// Opaque OS replacement identity. Forward unchanged; never parse it.
+    /// Absent only for older command producers that posted anonymously.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notification_id: Option<String>,
     pub title: String,
     pub body: String,
     pub deep_link_uri: Option<String>,

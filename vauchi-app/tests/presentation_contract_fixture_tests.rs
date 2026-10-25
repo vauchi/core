@@ -28,6 +28,7 @@ fn shared_fixture_preserves_notification_identity() {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct PresentationContractFixture {
     schema_version: u32,
+    effect_commands: Vec<Command>,
     initial_commands: Vec<Command>,
     steps: Vec<PresentationContractStep>,
     expected_state: ExpectedPresentationState,
@@ -128,6 +129,18 @@ fn current_fixture() -> PresentationContractFixture {
 
     PresentationContractFixture {
         schema_version: 1,
+        effect_commands: vec![Command::PostNotification {
+            notification: vauchi_core::NotificationSpec {
+                notification_id: Some("opaque-notification-17".into()),
+                title: "Prepared title".into(),
+                body: "Prepared body".into(),
+                deep_link_uri: None,
+                category_id: "category".into(),
+                channel_id: "channel".into(),
+                urgency: vauchi_core::NotificationUrgency::Default,
+                category_options: vec![],
+            },
+        }],
         initial_commands,
         steps: vec![
             PresentationContractStep {

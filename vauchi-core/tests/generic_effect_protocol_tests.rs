@@ -78,6 +78,7 @@ fn generic_shell_effects_round_trip_without_domain_results() {
 fn notification_command_contains_only_prepared_os_presentation() {
     let command = Command::PostNotification {
         notification: NotificationSpec {
+            notification_id: Some("opaque-notification-17".into()),
             title: "Card updated".into(),
             body: "Ada updated their card.".into(),
             deep_link_uri: Some("vauchi://contact/opaque".into()),

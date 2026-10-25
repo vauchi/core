@@ -5,10 +5,10 @@
 
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use vauchi_app::notification_types::PendingNotification;
+use vauchi_app::notification_types::{ActivityLogEntry, PendingNotification};
 use vauchi_app::ui::{AppEngine, UserAction, WorkflowEngine};
 use vauchi_core::clock::FakeClock;
-use vauchi_core::{Vauchi, VauchiEvent};
+use vauchi_core::{Vauchi, VauchiEvent, storage::ActivityLogRow};
 
 const NOW: u64 = 1_700_000_000;
 
@@ -153,4 +153,63 @@ fn notification_delivery_unicode_unknown_contact_does_not_panic() {
     let pending = engine.drain_pending_notifications();
     assert_eq!(pending.len(), 1);
     assert_eq!(pending[0].contact_id, "日本語の連絡先");
+}
+
+fn stored_alert(event_key: &str, created_at: u64) -> ActivityLogRow {
+    ActivityLogRow {
+        event_key: event_key.into(),
+        category: "emergency".into(),
+        contact_id: Some("bob".into()),
+        payload: serde_json::to_string(&ActivityLogEntry::EmergencyAlertReceived {
+            contact_id: "bob".into(),
+        })
+        .unwrap(),
+        created_at,
+    }
+}
+
+// @internal — collection honors retention even if no new domain event triggers pruning (#764).
+#[test]
+fn notification_delivery_replays_pending_recent_rows_but_not_expired_history() {
+    let (mut engine, _) = engine();
+    for row in [
+        stored_alert("expired", NOW - 8 * 86400),
+        stored_alert("pending", NOW - 60),
+    ] {
+        engine
+            .vauchi()
+            .storage()
+            .activity_log()
+            .activity_log_insert(&row)
+            .unwrap();
+    }
+    let pending = engine.drain_pending_notifications();
+    assert_eq!(pending.len(), 1);
+    assert_eq!(pending[0].event_key, "pending");
+    assert_eq!(engine.poll_notifications(), Vec::new());
+}
+
+// @internal — malformed JSON is consumed once without losing neighboring valid entries (#764).
+#[test]
+fn notification_delivery_consumes_malformed_payload_without_blocking_valid_rows() {
+    let (mut engine, _) = engine();
+    let mut malformed = stored_alert("malformed", NOW);
+    malformed.payload = "not JSON".into();
+    engine
+        .vauchi()
+        .storage()
+        .activity_log()
+        .activity_log_insert(&malformed)
+        .unwrap();
+    alert(&engine, 1);
+    assert_alert(&engine.drain_pending_notifications(), 1);
+    assert_eq!(
+        engine
+            .vauchi()
+            .storage()
+            .activity_log()
+            .claim_notifications()
+            .unwrap(),
+        Vec::new()
+    );
 }

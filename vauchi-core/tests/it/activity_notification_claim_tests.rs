@@ -144,3 +144,34 @@ fn notification_claim_failure_is_atomic() {
     claimed.sort_by(|a, b| a.event_key.cmp(&b.event_key));
     assert_eq!(claimed, vec![row("a", 1), row("b", 2)]);
 }
+
+// @internal — decoding a malformed database row must roll back every handoff (#764).
+#[test]
+fn notification_claim_decode_failure_keeps_valid_rows_pending() {
+    let storage = Storage::in_memory(key()).unwrap();
+    for entry in [row("a", 1), row("b", 2)] {
+        storage.activity_log().activity_log_insert(&entry).unwrap();
+    }
+    storage
+        .connection()
+        .execute(
+            "UPDATE activity_log SET payload = x'80' WHERE event_key = 'b'",
+            [],
+        )
+        .unwrap();
+    let error = storage.activity_log().claim_notifications().unwrap_err();
+    assert!(
+        error.to_string().contains("Invalid column type Blob"),
+        "{error}"
+    );
+    storage
+        .connection()
+        .execute(
+            "UPDATE activity_log SET payload = '{}' WHERE event_key = 'b'",
+            [],
+        )
+        .unwrap();
+    let mut claimed = storage.activity_log().claim_notifications().unwrap();
+    claimed.sort_by(|a, b| a.event_key.cmp(&b.event_key));
+    assert_eq!(claimed, vec![row("a", 1), row("b", 2)]);
+}

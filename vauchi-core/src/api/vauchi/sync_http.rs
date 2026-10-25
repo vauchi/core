@@ -21,8 +21,8 @@
 //! 5. Send phase: delegates to `SendPhase` for outbound updates + ACKs.
 //! 6. Returns combined `VauchiSyncOutcome`.
 
+use crate::api::config::http_origin;
 use std::time::Duration;
-use url::{Origin, Url};
 
 /// Recommended interval (seconds) between scheduled sync ticks.
 ///
@@ -1206,10 +1206,9 @@ impl Vauchi {
     }
 
     fn distinct_ohttp_route(&self) -> Option<String> {
-        let application_origin = http_origin(&self.config.relay.server_url)?;
-        let outer = self.http_relay_url();
-        let outer_origin = http_origin(&outer)?;
-        (application_origin != outer_origin).then_some(outer)
+        self.config
+            .relay
+            .ohttp_route_for(&self.config.relay.server_url)
     }
 
     fn action_ohttp_route(&self, application_relay_url: &str) -> Option<String> {
@@ -1272,27 +1271,6 @@ fn classify_inbound_blob(
             ciphertext,
         },
     }
-}
-
-fn http_origin(url: &str) -> Option<Origin> {
-    let mut parsed = Url::parse(url).ok()?;
-    // Relay URLs are commonly written with the WebSocket scheme; the origin
-    // they name is the same host over HTTP(S).
-    match parsed.scheme() {
-        "ws" => parsed.set_scheme("http").ok()?,
-        "wss" => parsed.set_scheme("https").ok()?,
-        _ => {}
-    }
-    if !matches!(parsed.scheme(), "http" | "https")
-        || parsed.host().is_none()
-        || !parsed.username().is_empty()
-        || parsed.password().is_some()
-        || parsed.fragment().is_some()
-        || parsed.query().is_some()
-    {
-        return None;
-    }
-    Some(parsed.origin())
 }
 
 /// The gateway holds the previous, current and next window's keys.

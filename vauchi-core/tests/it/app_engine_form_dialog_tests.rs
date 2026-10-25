@@ -392,6 +392,7 @@ fn form_dialog_cancel_does_not_save_modified_name() {
 fn form_dialog_edit_relay_url_navigates_back() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
+    vauchi.config_mut().relay.ohttp_relay_url = Some("https://ohttp.relay.example.com".into());
     let mut engine = AppEngine::new(vauchi);
 
     engine.navigate_to(AppScreen::FormDialog {

@@ -71,6 +71,12 @@ impl AppEngine {
                 // every frontend (mobile had no Backend, so this was a no-op).
                 Some(FormInput::EditRelayUrl { url, anchor }) => {
                     match relay_anchor_input(&url, &anchor) {
+                        Ok(_) if !self.vauchi.config().relay.has_ohttp_route(url.trim()) => {
+                            ActionResult::ValidationError {
+                                component_id: "relay_url".into(),
+                                message: self.t("validation.relay_ohttp_route_missing"),
+                            }
+                        }
                         Ok(anchor) => {
                             let result = self.vauchi.set_relay(&url, anchor);
                             self.form_saved(result)

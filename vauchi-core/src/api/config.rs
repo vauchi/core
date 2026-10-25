@@ -432,6 +432,27 @@ pub(crate) fn ohttp_endpoint(server_url: &str, ohttp_relay_url: Option<&str>) ->
     server_url.to_string()
 }
 
+pub(crate) fn http_origin(url: &str) -> Option<url::Origin> {
+    let mut parsed = url::Url::parse(url).ok()?;
+    // Relay URLs are commonly written with the WebSocket scheme; the origin
+    // they name is the same host over HTTP(S).
+    match parsed.scheme() {
+        "ws" => parsed.set_scheme("http").ok()?,
+        "wss" => parsed.set_scheme("https").ok()?,
+        _ => {}
+    }
+    if !matches!(parsed.scheme(), "http" | "https")
+        || parsed.host().is_none()
+        || !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || parsed.fragment().is_some()
+        || parsed.query().is_some()
+    {
+        return None;
+    }
+    Some(parsed.origin())
+}
+
 /// Whether `server_url`'s host is the production data relay.
 ///
 /// Matches the host component exactly (after stripping scheme, port, path)
@@ -476,6 +497,21 @@ impl RelayConfig {
     /// (decision 0.9).
     pub fn requires_ohttp_anchor(server_url: &str) -> bool {
         !is_production_relay(server_url)
+    }
+
+    /// Whether actions could reach a relay at `server_url` under this
+    /// config: Core never sends OHTTP straight to the data relay (ADR-037),
+    /// so it needs an OHTTP relay on another origin. Settings refuses a relay
+    /// without one (#791).
+    pub fn has_ohttp_route(&self, server_url: &str) -> bool {
+        self.ohttp_route_for(server_url).is_some()
+    }
+
+    pub(crate) fn ohttp_route_for(&self, server_url: &str) -> Option<String> {
+        let application_origin = http_origin(server_url)?;
+        let outer = ohttp_endpoint(server_url, self.ohttp_relay_url.as_deref());
+        let outer_origin = http_origin(&outer)?;
+        (application_origin != outer_origin).then_some(outer)
     }
 
     /// The anchor `server_url`'s gateway keys must chain to: the configured

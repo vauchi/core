@@ -485,11 +485,16 @@ impl AppEngine {
     /// A background sync that reports a delivery invalidates every screen,
     /// and rebuilding an open form from storage put the stored value back
     /// under the user's hands: Save then wrote the old one (#799). A form
-    /// is left by Save or Back, both of which reload what it edits.
+    /// is left by Save or Back, both of which reload what it edits. The
+    /// password and duress PIN setups lost their input the same way, the
+    /// duress one falling back to its overview mid-setup.
     fn holds_unsaved_input(screen: &AppScreen) -> bool {
         matches!(
             screen,
-            AppScreen::FormDialog { .. } | AppScreen::ContactEdit { .. }
+            AppScreen::FormDialog { .. }
+                | AppScreen::ContactEdit { .. }
+                | AppScreen::ChangePassword
+                | AppScreen::DuressPin
         )
     }
 

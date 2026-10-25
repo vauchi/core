@@ -193,10 +193,13 @@ quint_expect() {
     q_verdict=$2
     q_mode=$3
     q_invariant=$4
+    # Both violations the model found took 12 steps; 15 keeps a margin
+    # without Apalache's cost at 25, which ran 33 minutes on CI. The
+    # simulator's Rust evaluator needs glibc 2.39, newer than this image's.
     if [ "$q_mode" = verify ]; then
-        set -- verify --max-steps=25
+        set -- verify --max-steps=15
     else
-        set -- run --max-steps=40 --max-samples=20000 --seed=7
+        set -- run --backend=typescript --max-steps=40 --max-samples=20000 --seed=7
     fi
     q_out=$(HOME=$quint_home quint "$@" --main="$q_main" --invariant="$q_invariant" \
         vauchi-app/verification/device_link_machines.qnt 2>&1) || true

@@ -63,9 +63,11 @@ done
 # optimizer keeps the wipe. Kani's own nightly carries Miri too.
 MIRI_TOOLCHAIN=nightly-2026-08-21
 rustup toolchain install "$MIRI_TOOLCHAIN" --profile minimal --component miri,rust-src
-cargo +"$MIRI_TOOLCHAIN" miri test -p vauchi-core --no-default-features --features testing \
-    --test wipe_on_drop_tests
-cargo test --release -p vauchi-core --features testing --test wipe_on_drop_tests
+for wipe_test in wipe_on_drop_tests heap_wipe_on_drop_tests; do
+    cargo +"$MIRI_TOOLCHAIN" miri test -p vauchi-core --no-default-features --features testing \
+        --test "$wipe_test"
+    cargo test --release -p vauchi-core --features testing --test "$wipe_test"
+done
 
 # ── Tamarin ───────────────────────────────────────────────────────────
 if [ ! -x "$FORMAL_HOME/bin/tamarin-prover" ]; then

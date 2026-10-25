@@ -2552,6 +2552,7 @@
   "validation.password_mismatch": "Passwords do not match",
   "validation.relay_anchor_format": "An anchor is 64 hexadecimal characters",
   "validation.relay_anchor_required": "A custom relay needs its OHTTP anchor",
+  "validation.relay_ohttp_route_missing": "This relay needs a separate OHTTP relay, which Vauchi can't set yet",
   "validation.required": "This field is required",
   "validation.too_long": "Must be at most {max} characters",
   "validation.too_short": "Must be at least {min} characters",

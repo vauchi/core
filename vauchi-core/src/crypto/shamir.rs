@@ -339,6 +339,10 @@ fn gf_inv(a: u8) -> Result<u8, ShamirError> {
     Ok(gf_mul(a126, a128))
 }
 
+#[cfg(kani)]
+#[path = "shamir_proofs.rs"]
+mod proofs;
+
 // INLINE_TEST_REQUIRED: GF(256) arithmetic and Shamir split/reconstruct logic are
 // security-critical; inline tests keep the field operations next to the code they
 // verify and make regression tests cheap to add.

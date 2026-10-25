@@ -343,3 +343,39 @@ fn the_pin_field_never_carries_the_digits_back_to_the_shell() {
     let field = pin_field(&commands).expect("a PIN field on screen");
     assert_eq!(field.value, "•••");
 }
+
+/// A sync that reports a delivery invalidates the presentation while the
+/// PIN is being typed. The setup must carry on where it was, not fall back
+/// to its overview with the PIN gone (#799 kept open forms only; macOS
+/// DuressUnlockUITests lost the PIN this way).
+// @scenario: duress_mode.feature :: Enable duress PIN in settings
+#[test]
+fn a_duress_pin_typed_before_an_invalidation_is_the_pin_set() {
+    let mut vauchi = Vauchi::in_memory().expect("in-memory core");
+    vauchi.create_identity("Alice").expect("identity");
+    vauchi.setup_app_password(PASSWORD).expect("app password");
+    vauchi.authenticate(PASSWORD).expect("unlock");
+    let mut app = AppEngine::for_duress_setup(vauchi);
+    let mut commands = app.initial_commands().expect("initial commands");
+
+    commands = activate_next(&mut app, &commands); // overview → enter PIN
+    let _ = type_pin(&mut app, commands, Shell::OwnText, DURESS_PIN);
+    commands = app
+        .dispatch(Event::PresentationInvalidated)
+        .expect("invalidation");
+    assert_eq!(
+        pin_field(&commands).map(|field| field.value.chars().count()),
+        Some(DURESS_PIN.len()),
+        "the PIN step should survive the invalidation with the PIN typed"
+    );
+    commands = activate_next(&mut app, &commands); // → confirm PIN
+    let _ = type_pin(&mut app, commands, Shell::OwnText, DURESS_PIN);
+    commands = app
+        .dispatch(Event::PresentationInvalidated)
+        .expect("invalidation");
+    commands = activate_next(&mut app, &commands); // → session PIN step (#777)
+    commands = enter_password(&mut app, commands);
+    let _ = activate_next(&mut app, &commands); // save
+
+    assert_eq!(unlocks_as(&mut app, DURESS_PIN), Some(AuthMode::Duress));
+}

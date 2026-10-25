@@ -139,3 +139,25 @@ fn a_nickname_typed_before_an_invalidation_is_the_nickname_saved() {
         Some("Amazing Grace")
     );
 }
+
+// @scenario: duress_mode.feature :: Enable duress password (requires app password)
+#[test]
+fn a_password_typed_before_an_invalidation_is_the_password_set() {
+    let mut engine = engine_named("Ana");
+    let _ = engine.navigate_to(AppScreen::Settings);
+    let _ = engine.navigate_to(AppScreen::ChangePassword);
+    type_into(&mut engine, "new_password", "correct horse 591");
+    type_into(&mut engine, "confirm_password", "correct horse 591");
+
+    invalidate(&mut engine);
+    submit(&mut engine);
+
+    assert!(engine.vauchi().is_password_enabled().unwrap());
+    assert!(
+        engine
+            .vauchi_mut()
+            .authenticate("correct horse 591")
+            .is_ok()
+    );
+    assert!(engine.vauchi_mut().authenticate("wrong horse 591").is_err());
+}

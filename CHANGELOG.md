@@ -8,6 +8,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.89.0] — 2026-10-25
+
+### Changed
+
+- `NotificationSpec` carries an optional opaque `notification_id` so native
+  executors can preserve the existing OS replacement identity. Rust struct
+  literals must supply this new field; older anonymous command JSON remains
+  compatible. This source API change requires the new minor release.
+- The shared presentation fixture includes an `effect_commands` corpus.
+  Strict fixture readers must explicitly accept that field.
+
 ## [0.88.1] — 2026-10-25
 
 ### Fixed

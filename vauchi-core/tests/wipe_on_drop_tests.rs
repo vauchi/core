@@ -20,6 +20,7 @@ use std::mem::{ManuallyDrop, size_of};
 
 use vauchi_core::crypto::cek::ContentEncryptionKey;
 use vauchi_core::crypto::{MessageKey, SymmetricKey, X3DHKeyPair};
+#[cfg(feature = "testing")]
 use vauchi_core::identity::Identity;
 
 const SECRET: [u8; 32] = [0xA5; 32];
@@ -43,6 +44,7 @@ fn bytes_left_after_drop<T>(value: T) -> Vec<u8> {
 /// Drops `value` where it stands and returns the `N` bytes at `offset` in
 /// its storage: for a type with padding, where only a field's bytes are
 /// known to be initialized.
+#[cfg(feature = "testing")]
 fn field_left_after_drop<T, const N: usize>(value: T, offset: usize) -> [u8; N] {
     assert!(offset + N <= size_of::<T>());
     let mut slot = ManuallyDrop::new(value);

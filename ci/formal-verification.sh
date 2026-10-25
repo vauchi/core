@@ -56,6 +56,16 @@ for harness in \
     cargo kani -p vauchi-core -Z stubbing --harness "$harness"
 done
 
+# ── Wipe on drop: Miri and release (#817) ─────────────────────────────
+# Kani cannot model zeroize's barrier; these tests read a dropped value's
+# storage back. Miri shows each read is defined behaviour; release shows the
+# optimizer keeps the wipe. Kani's own nightly carries Miri too.
+MIRI_TOOLCHAIN=nightly-2026-08-21
+rustup toolchain install "$MIRI_TOOLCHAIN" --profile minimal --component miri,rust-src
+cargo +"$MIRI_TOOLCHAIN" miri test -p vauchi-core --no-default-features --features testing \
+    --test wipe_on_drop_tests
+cargo test --release -p vauchi-core --features testing --test wipe_on_drop_tests
+
 # ── Tamarin ───────────────────────────────────────────────────────────
 if [ ! -x "$FORMAL_HOME/bin/tamarin-prover" ]; then
     scratch=$(mktemp -d)

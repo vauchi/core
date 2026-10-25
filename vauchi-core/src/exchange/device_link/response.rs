@@ -182,5 +182,8 @@ impl DeviceLinkResponse {
 impl Drop for DeviceLinkResponse {
     fn drop(&mut self) {
         self.master_seed.zeroize();
+        // The sync payload carries every contact's shared key
+        // (vauchi/private#818).
+        self.sync_payload_json.zeroize();
     }
 }

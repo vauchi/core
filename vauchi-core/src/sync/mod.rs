@@ -8,6 +8,8 @@
 //! Handles offline queuing, retry logic, and state tracking.
 
 pub mod delta;
+#[cfg(kani)]
+mod delta_proofs;
 pub mod device_sync;
 pub mod merkle;
 pub mod registry_activation;

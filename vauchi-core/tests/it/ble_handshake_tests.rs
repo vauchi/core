@@ -120,22 +120,9 @@ fn test_tampered_aad_fails_decryption() {
     assert!(result.is_err(), "Wrong AAD must fail AEAD authentication");
 }
 
-// @scenario: ble_exchange :: Symmetric key is zeroized on drop
-#[test]
-fn test_zeroize_on_drop() {
-    // Documents the ZeroizeOnDrop contract: SymmetricKey derives ZeroizeOnDrop.
-    // We cannot directly observe zeroization in safe Rust, but we verify
-    // the type is constructed and dropped without panic.
-    let key = SymmetricKey::generate();
-    let key_bytes = *key.as_bytes();
-    assert!(
-        key_bytes.iter().any(|&b| b != 0),
-        "Generated key must not be all zeros"
-    );
-    drop(key);
-    // After drop, key material would be zeroized by ZeroizeOnDrop.
-    // The contract is enforced by the derive macro; this test documents it.
-}
+// "Symmetric key is zeroized on drop" is checked by
+// tests/wipe_on_drop_tests.rs, which reads the memory after drop
+// (vauchi/private#817).
 
 // ============================================================
 // State Machine: Construction & Initial State

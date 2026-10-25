@@ -237,7 +237,24 @@ fn v3_qr_image_generation_with_relay() {
         0u64,
     );
 
-    let image = qr.to_qr_image_string();
+    let image = qr.to_qr_image_string().expect("a short relay URL fits");
     assert!(!image.is_empty(), "QR image should be generated");
     assert!(image.contains('█'), "QR image should contain dark cells");
+}
+
+/// `generate_with_relay` takes any relay URL, so one past QR capacity must
+/// be an error rather than a panic (private#802).
+// @internal
+#[test]
+fn v3_qr_image_rejects_a_payload_past_qr_capacity() {
+    let identity = Identity::create("Grace", 0);
+    let ephemeral = X3DHKeyPair::generate();
+    let relay_url = format!("https://relay.vauchi.app/{}", "a".repeat(4000));
+
+    let qr = ExchangeQR::generate_with_relay(&identity, &ephemeral, Some(relay_url), 0u64);
+
+    assert!(matches!(
+        qr.to_qr_image_string(),
+        Err(vauchi_core::exchange::ExchangeError::SerializationFailed)
+    ));
 }

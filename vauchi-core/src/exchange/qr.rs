@@ -375,20 +375,20 @@ impl ExchangeQR {
     }
 
     /// Generates an actual QR code image as a string representation.
-    pub fn to_qr_image_string(&self) -> String {
+    ///
+    /// Fails with `SerializationFailed` when the payload exceeds QR
+    /// capacity, which an unvalidated relay URL can cause.
+    pub fn to_qr_image_string(&self) -> Result<String, ExchangeError> {
         use qrcode::QrCode;
 
-        let data = self.to_qr_url();
-        // TODO(vauchi/private#802): an over-long display name can exceed QR
-        // capacity and panic here until create_identity enforces the limit.
-        #[allow(clippy::expect_used)]
-        let code = QrCode::new(&data).expect("QR generation should not fail");
+        let code = QrCode::new(self.to_qr_url()).map_err(|_| ExchangeError::SerializationFailed)?;
 
-        code.render()
+        Ok(code
+            .render()
             .light_color(' ')
             .dark_color('█')
             .quiet_zone(false)
-            .build()
+            .build())
     }
 }
 

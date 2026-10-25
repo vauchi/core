@@ -2,9 +2,10 @@
 # SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
-# Runs Core's formal checks (#757): the Kani parser proofs and the Tamarin
-# model of the in-person QR exchange. The Tamarin model must still fail
-# without identity binding, or a weakened lemma would pass unnoticed.
+# Runs Core's formal checks (#757): the Kani parser proofs, the Tamarin
+# protocol models and the Quint model of the device-link machines. Each
+# model also runs a control that must fail, or a weakened lemma or
+# invariant would pass unnoticed.
 #
 # Usage: ci/formal-verification.sh   (from the core repo root)
 # Tools are cached under $FORMAL_HOME (default: ./.formal).
@@ -153,4 +154,64 @@ tamarin_expect "$models/card_update.spthy" falsified "-DNO_RECIPIENT_BINDING" \
     update_comes_from_the_sender_for_this_recipient
 tamarin_expect "$models/card_update.spthy" falsified "-DNO_VERSION_FLOOR" \
     no_rollback
+
+# ── Quint ─────────────────────────────────────────────────────────────
+# The device-link host and joiner machines (#757, #808). `quint verify`
+# runs Apalache, which needs Java 17+; Quint fetches Apalache and its
+# evaluator into $HOME/.quint, so HOME points into the cache.
+NODE_VERSION=22.20.0
+JRE_VERSION=21.0.8_9
+QUINT_VERSION=0.33.0
+if [ ! -x "$FORMAL_HOME/node/bin/node" ]; then
+    scratch=$(mktemp -d)
+    fetch "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.gz" "$scratch/node.tar.gz"
+    mkdir -p "$FORMAL_HOME/node"
+    tar -xzf "$scratch/node.tar.gz" -C "$FORMAL_HOME/node" --strip-components=1
+    rm -rf "$scratch"
+fi
+if [ ! -x "$FORMAL_HOME/jre/bin/java" ]; then
+    scratch=$(mktemp -d)
+    jre_tag=$(printf '%s' "$JRE_VERSION" | sed 's/_/%2B/')
+    fetch "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-$jre_tag/OpenJDK21U-jre_x64_linux_hotspot_$JRE_VERSION.tar.gz" "$scratch/jre.tar.gz"
+    mkdir -p "$FORMAL_HOME/jre"
+    tar -xzf "$scratch/jre.tar.gz" -C "$FORMAL_HOME/jre" --strip-components=1
+    rm -rf "$scratch"
+fi
+JAVA_HOME=$FORMAL_HOME/jre
+PATH="$FORMAL_HOME/node/bin:$JAVA_HOME/bin:$FORMAL_HOME/quint/node_modules/.bin:$PATH"
+export JAVA_HOME PATH
+if ! quint --version 2>/dev/null | grep -qx "$QUINT_VERSION"; then
+    npm install --prefix "$FORMAL_HOME/quint" --no-audit --no-fund \
+        "@informalsystems/quint@$QUINT_VERSION"
+fi
+quint_home=$FORMAL_HOME/quint-home
+mkdir -p "$quint_home"
+# quint_expect <main> <ok|violation> <run|verify> <invariant>: exhaustive
+# `verify` for the claims, the simulator for controls that must break.
+quint_expect() {
+    q_main=$1
+    q_verdict=$2
+    q_mode=$3
+    q_invariant=$4
+    if [ "$q_mode" = verify ]; then
+        set -- verify --max-steps=25
+    else
+        set -- run --max-steps=40 --max-samples=20000 --seed=7
+    fi
+    q_out=$(HOME=$quint_home quint "$@" --main="$q_main" --invariant="$q_invariant" \
+        vauchi-app/verification/device_link_machines.qnt 2>&1) || true
+    echo "device_link_machines.qnt $q_main $q_mode $q_invariant:"
+    printf '%s\n' "$q_out" | grep -E '^\[(ok|violation)\]' || true
+    printf '%s\n' "$q_out" | grep -q "^\[$q_verdict\]" || {
+        printf '%s\n' "$q_out" | tail -20
+        echo "FAIL: Quint invariant $q_invariant is not $q_verdict ($q_main $q_mode)" >&2
+        exit 1
+    }
+}
+quint_expect reliable_relay ok verify no_device_registered_for_a_failed_joiner
+quint_expect reliable_relay ok verify joiner_seed_implies_registered
+# Without the host's expiry check the host registers a device whose
+# joiner gave up; a lost response still does, which #808 leaves open.
+quint_expect before_808 violation run no_device_registered_for_a_failed_joiner
+quint_expect lossy_relay violation run no_device_registered_for_a_failed_joiner
 echo "formal verification OK"

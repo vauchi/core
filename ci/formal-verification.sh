@@ -144,4 +144,13 @@ tamarin_expect "$models/social_recovery.spthy" falsified "-DNO_ANSWER_SIGNATURE"
     alice_rekeys_only_with_the_real_john
 tamarin_expect "$models/social_recovery.spthy" falsified "-DUNBOUND_ANSWER" \
     alice_rekeys_only_with_the_real_john
+# Card updates (#757): the signature binds the recipient, and the version
+# floor stops a relay that only reorders from rolling a card back.
+tamarin_expect "$models/card_update.spthy" verified "" \
+    executable update_comes_from_the_sender_for_this_recipient \
+    each_update_is_applied_once changes_stay_secret
+tamarin_expect "$models/card_update.spthy" falsified "-DNO_RECIPIENT_BINDING" \
+    update_comes_from_the_sender_for_this_recipient
+tamarin_expect "$models/card_update.spthy" falsified "-DNO_VERSION_FLOOR" \
+    no_rollback
 echo "formal verification OK"

@@ -4,13 +4,16 @@
 
 //! The relay editor takes a custom relay's OHTTP anchor with its URL
 //! (#288, plan 6.1, decision 0.9): without one the app refuses the relay,
-//! inline on the anchor input, and Vauchi's own relay needs none.
+//! inline on the anchor input, and Vauchi's own relay needs none. Core
+//! never sends OHTTP straight to the data relay (ADR-037), so a custom relay
+//! without a separate OHTTP relay is refused too (#791).
 
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, Component, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
 
 const DEFAULT_RELAY: &str = "https://relay.vauchi.app";
 const CUSTOM_RELAY: &str = "https://relay.self-hosted.example";
+const CUSTOM_OHTTP_RELAY: &str = "https://ohttp.self-hosted.example";
 const ANCHOR: [u8; 32] = [0x5a; 32];
 
 fn engine_with(vauchi: Vauchi) -> AppEngine {
@@ -27,6 +30,13 @@ fn engine_with(vauchi: Vauchi) -> AppEngine {
 fn fresh_engine() -> AppEngine {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Ada").unwrap();
+    engine_with(vauchi)
+}
+
+fn engine_with_ohttp_relay() -> AppEngine {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Ada").unwrap();
+    vauchi.config_mut().relay.ohttp_relay_url = Some(CUSTOM_OHTTP_RELAY.into());
     engine_with(vauchi)
 }
 
@@ -76,7 +86,7 @@ fn inline_validation_error(result: ActionResult, component_id: &str) -> String {
 // @internal
 #[test]
 fn a_custom_relay_is_saved_with_its_anchor() {
-    let mut engine = fresh_engine();
+    let mut engine = engine_with_ohttp_relay();
     type_into(&mut engine, "relay_url", CUSTOM_RELAY);
     type_into(&mut engine, "relay_anchor", &hex::encode_upper(ANCHOR));
 
@@ -100,6 +110,22 @@ fn a_custom_relay_without_an_anchor_is_refused_inline() {
     let message = inline_validation_error(submit(&mut engine), "relay_anchor");
 
     assert_eq!(message, "A custom relay needs its OHTTP anchor");
+    assert_eq!(engine.vauchi().config().relay.server_url, DEFAULT_RELAY);
+}
+
+// @internal
+#[test]
+fn a_custom_relay_without_an_ohttp_relay_is_refused_inline() {
+    let mut engine = fresh_engine();
+    type_into(&mut engine, "relay_url", CUSTOM_RELAY);
+    type_into(&mut engine, "relay_anchor", &hex::encode_upper(ANCHOR));
+
+    let message = inline_validation_error(submit(&mut engine), "relay_url");
+
+    assert_eq!(
+        message,
+        "This relay needs a separate OHTTP relay, which Vauchi can't set yet"
+    );
     assert_eq!(engine.vauchi().config().relay.server_url, DEFAULT_RELAY);
 }
 

@@ -233,3 +233,45 @@ fn the_builders_relay_url_drops_the_configured_anchor() {
     assert_eq!(vauchi.config().relay.server_url, "https://two.example");
     assert_eq!(vauchi.config().relay.ohttp_trust_anchor(), None);
 }
+
+/// Core never sends OHTTP straight to the data relay (ADR-037): a relay is
+/// reachable only through an OHTTP relay on another origin (#791).
+// @internal
+#[test]
+fn only_a_relay_behind_a_separate_ohttp_relay_has_an_ohttp_route() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = VauchiConfig::with_storage_path(dir.path().join("v.db"))
+        .with_storage_key(SymmetricKey::generate());
+    let mut vauchi = Vauchi::new(config).unwrap();
+
+    assert!(vauchi.config().relay.has_ohttp_route(DEFAULT_RELAY));
+    assert!(
+        vauchi
+            .config()
+            .relay
+            .has_ohttp_route("wss://relay.vauchi.app")
+    );
+    assert!(
+        !vauchi
+            .config()
+            .relay
+            .has_ohttp_route("https://my.relay.example")
+    );
+    assert!(!vauchi.config().relay.has_ohttp_route("not a url"));
+
+    vauchi.config_mut().relay.ohttp_relay_url = Some("https://ohttp.my.relay.example".into());
+    assert!(
+        vauchi
+            .config()
+            .relay
+            .has_ohttp_route("https://my.relay.example")
+    );
+
+    vauchi.config_mut().relay.ohttp_relay_url = Some("https://my.relay.example/ohttp".into());
+    assert!(
+        !vauchi
+            .config()
+            .relay
+            .has_ohttp_route("https://my.relay.example")
+    );
+}

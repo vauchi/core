@@ -52,6 +52,7 @@ done
 for harness in \
     cek_wrapped_payload_decode_never_panics_and_reads_each_field_at_its_offset \
     interpolation_never_panics_and_refuses_a_zero_or_repeated_x \
+    recover_byte_never_panics \
     reconstruct_refuses_more_shares_than_guardians; do
     cargo kani -p vauchi-core -Z stubbing --harness "$harness"
 done

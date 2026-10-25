@@ -171,6 +171,12 @@ impl Identity {
         &self.master_seed
     }
 
+    /// Byte offset of the master seed within an `Identity`, so a test can
+    /// read exactly those bytes back after drop: the struct has padding,
+    /// and reading all of it is undefined behaviour (vauchi/private#817).
+    #[cfg(feature = "testing")]
+    pub const MASTER_SEED_OFFSET: usize = core::mem::offset_of!(Identity, master_seed);
+
     /// Returns the public signing key bytes.
     pub fn signing_public_key(&self) -> &[u8; 32] {
         &self.signing_public_key

@@ -93,7 +93,7 @@ fn recover_byte_never_panics() {
     let result = recover_byte(&all[..count], byte_pos, &mut points);
 
     if count > usize::from(MAX_COUNT) {
-        assert!(result.is_err());
+        assert_eq!(result, Err(ShamirError::CountTooHigh(MAX_COUNT)));
     }
 }
 
@@ -112,5 +112,13 @@ fn reconstruct_refuses_more_shares_than_guardians() {
     ));
     let threshold: u8 = kani::any();
 
-    assert!(reconstruct(&shares[..], threshold).is_err());
+    let error = reconstruct(&shares[..], threshold).unwrap_err();
+
+    // A threshold outside 2..=8 is refused first; any other sees ten shares.
+    assert!(matches!(
+        error,
+        ShamirError::ThresholdTooLow(_)
+            | ShamirError::ThresholdTooHigh(_)
+            | ShamirError::CountTooHigh(10)
+    ));
 }

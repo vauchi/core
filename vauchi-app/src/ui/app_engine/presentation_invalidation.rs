@@ -39,8 +39,9 @@ impl PresentationInvalidation {
 }
 
 impl AppEngine {
-    /// Subscribe to opaque presentation invalidations. Echo each wakeup as
-    /// [`vauchi_core::Event::PresentationInvalidated`] and execute its commands.
+    /// Subscribe to opaque presentation invalidations. Request
+    /// [`Self::initial_commands`] on the owning event loop to repaint the
+    /// current presentation without discarding in-progress editor state.
     ///
     /// At most one wakeup is queued. Registration includes an initial wakeup
     /// and replaces the previous sender; discard any previous receiver.

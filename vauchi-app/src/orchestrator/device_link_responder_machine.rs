@@ -145,14 +145,18 @@ impl DeviceLinkResponderMachine {
                 response_code,
                 deadline_unix,
             } => {
-                if now >= deadline_unix {
-                    self.state = State::Failed;
-                    return ResponderEvent::Failed {
-                        reason: "qr_expired".to_string(),
-                    };
-                }
+                // Poll before giving up: the host saves the new device
+                // before it sends the seed, so a seed sent in time must be
+                // read even if it is first polled after the deadline
+                // (vauchi/private#808).
                 match broker.exchange_complete(&response_code) {
                     Ok(Some(response_b64)) => self.on_response(responder, &response_b64),
+                    Ok(None) if now >= deadline_unix => {
+                        self.state = State::Failed;
+                        ResponderEvent::Failed {
+                            reason: "qr_expired".to_string(),
+                        }
+                    }
                     Ok(None) => {
                         self.state = State::AwaitingResponse {
                             responder,

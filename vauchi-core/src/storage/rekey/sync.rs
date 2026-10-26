@@ -40,6 +40,37 @@ impl Storage {
     }
 
     /// Re-encrypt version_vector: vector_json_encrypted
+    /// Re-encrypt receive_checkpoints: checkpoint_json_encrypted, one row
+    /// per relay/identity/device scope (vauchi/private#691).
+    pub(super) fn rekey_receive_checkpoints(
+        &self,
+        old_key: &SymmetricKey,
+        new_key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT scope, checkpoint_json_encrypted FROM receive_checkpoints")
+            .map_err(|e| StorageError::Migration(format!("Read receive_checkpoints: {e}")))?;
+        let rows: Vec<(String, Vec<u8>)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| StorageError::Migration(format!("Query receive_checkpoints: {e}")))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| StorageError::Migration(format!("Collect receive_checkpoints: {e}")))?;
+        for (scope, enc) in &rows {
+            let plain = decrypt(old_key, enc)
+                .map_err(|e| StorageError::Migration(format!("Decrypt receive_checkpoint: {e}")))?;
+            let new_enc = encrypt(new_key, &plain)
+                .map_err(|e| StorageError::Migration(format!("Encrypt receive_checkpoint: {e}")))?;
+            self.conn
+                .execute(
+                    "UPDATE receive_checkpoints SET checkpoint_json_encrypted = ?1 WHERE scope = ?2",
+                    params![new_enc, scope],
+                )
+                .map_err(|e| StorageError::Migration(format!("Update receive_checkpoint: {e}")))?;
+        }
+        Ok(())
+    }
+
     pub(super) fn rekey_version_vector(
         &self,
         old_key: &SymmetricKey,

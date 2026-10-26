@@ -67,6 +67,6 @@ pub use recovery::RecoveryStore;
 pub use replay::ReplayStore;
 pub use retry::RetryStore;
 pub use safety_alert::{GenesisFactWrite, SafetyAlertFactStore, StoredSafetyAlertFact};
-pub use sync::SyncStore;
+pub use sync::{ReceiveScope, SyncStore};
 pub use tag::TagStore;
 pub use ux::UxStore;

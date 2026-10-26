@@ -73,6 +73,7 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     // V15 medium-priority
     ("device_info", "device_info_encrypted"),
     ("version_vector", "vector_json_encrypted"),
+    ("receive_checkpoints", "checkpoint_json_encrypted"),
     ("contact_sync_timestamps", "last_sync_at_encrypted"),
     ("pending_updates", "payload_encrypted"),
     ("retry_entries", "payload_encrypted"),
@@ -269,6 +270,9 @@ impl Storage {
 
             self.rekey_version_vector(old_key, &new_key)?;
             report(&mut completed, "version_vector");
+
+            self.rekey_receive_checkpoints(old_key, &new_key)?;
+            report(&mut completed, "receive_checkpoints");
 
             self.rekey_field_timestamps(old_key, &new_key)?;
             report(&mut completed, "field_timestamps");

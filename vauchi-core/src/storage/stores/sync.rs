@@ -21,6 +21,29 @@ use rusqlite::{Connection, params};
 use super::super::{Storage, StorageError};
 use crate::clock::Clock;
 use crate::crypto::SymmetricKey;
+
+/// Where a receive checkpoint applies: one relay, one identity, one
+/// device (vauchi/private#691). The row is keyed by a hash of the three,
+/// so the table names none of them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReceiveScope {
+    key: String,
+}
+
+impl ReceiveScope {
+    pub fn new(relay_url: &str, identity: &[u8; 32], device: &[u8; 32]) -> Self {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(b"vauchi-receive-scope-v1");
+        hasher.update((relay_url.len() as u64).to_le_bytes());
+        hasher.update(relay_url.as_bytes());
+        hasher.update(identity);
+        hasher.update(device);
+        Self {
+            key: hex::encode(hasher.finalize()),
+        }
+    }
+}
 use crate::sync::device_sync::{FieldStamp, InterDeviceSyncState, SyncItem, VersionVector};
 
 /// Scoped persistence view for the sync domain: inter-device sync state, the
@@ -156,6 +179,56 @@ impl SyncStore<'_> {
             params![device_id.as_slice()],
         )?;
         Ok(rows > 0)
+    }
+
+    /// Records that this device has read `scope`'s mailboxes to exhaustion
+    /// up to `day` (vauchi/private#691).
+    pub fn save_receive_checkpoint(
+        &self,
+        scope: &ReceiveScope,
+        day: u64,
+    ) -> Result<(), StorageError> {
+        let json = serde_json::json!({ "day": day }).to_string();
+        let encrypted = crate::crypto::encrypt(self.key, json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let now = self.now_secs();
+        self.conn.execute(
+            "INSERT INTO receive_checkpoints (scope, checkpoint_json_encrypted, updated_at)
+             VALUES (?1, ?2, ?3)
+             ON CONFLICT(scope) DO UPDATE SET checkpoint_json_encrypted = ?2, updated_at = ?3",
+            params![scope.key, encrypted, now as i64],
+        )?;
+        Ok(())
+    }
+
+    /// The last day this device read `scope`'s mailboxes to exhaustion,
+    /// if it ever has.
+    pub fn load_receive_checkpoint(
+        &self,
+        scope: &ReceiveScope,
+    ) -> Result<Option<u64>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT checkpoint_json_encrypted FROM receive_checkpoints WHERE scope = ?1",
+            params![scope.key],
+            |row| row.get::<_, Vec<u8>>(0),
+        );
+        match result {
+            Ok(encrypted) => {
+                let decrypted = crate::crypto::decrypt(self.key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let value: serde_json::Value = serde_json::from_slice(&decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                value
+                    .get("day")
+                    .and_then(serde_json::Value::as_u64)
+                    .map(Some)
+                    .ok_or_else(|| {
+                        StorageError::Serialization("receive checkpoint without a day".into())
+                    })
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
     }
 
     /// Saves the local version vector (encrypted).

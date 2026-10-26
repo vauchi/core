@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 87] = [
+const MIGRATIONS: [Migration; 88] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -707,7 +707,22 @@ const MIGRATIONS: [Migration; 87] = [
         name: "duress_own_card",
         action: MigrationAction::Sql(MIGRATION_V87_DURESS_OWN_CARD),
     },
+    Migration {
+        version: 88,
+        name: "receive_checkpoints",
+        action: MigrationAction::Sql(MIGRATION_V88_RECEIVE_CHECKPOINTS),
+    },
 ];
+
+/// Migration v88: the last day a device read a relay's mailboxes to
+/// exhaustion, per relay, identity and device (vauchi/private#691).
+const MIGRATION_V88_RECEIVE_CHECKPOINTS: &str = "
+    CREATE TABLE IF NOT EXISTS receive_checkpoints (
+        scope TEXT PRIMARY KEY,
+        checkpoint_json_encrypted BLOB NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+";
 
 /// Existing history has no reliable delivery state; do not replay it on upgrade (#764).
 const MIGRATION_V86_ACTIVITY_NOTIFICATION_CLAIMS: &str = "

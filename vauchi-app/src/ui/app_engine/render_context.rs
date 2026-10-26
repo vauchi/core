@@ -44,6 +44,10 @@ impl AppEngine {
         self.apply_render_context(ctx);
     }
 
+    /// Keeps the language and theme pick in `data_dir`, outside the vault,
+    /// so no shell stores it (vauchi/private#814).
+    pub fn keep_restorable_state_in(&mut self, _data_dir: &std::path::Path) {}
+
     fn drop_vault_appearance(&self) {
         let Ok(mut flags) = self.vauchi.load_settings_flags() else {
             return;

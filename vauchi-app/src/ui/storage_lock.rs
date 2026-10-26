@@ -89,6 +89,10 @@ impl StorageLockPresentation {
 
     /// The language and theme of the next render, from the shell's push and
     /// the pick it keeps for Core (vauchi/private#814).
+    /// Shows the pick Core kept in `data_dir` before storage opens
+    /// (vauchi/private#814).
+    pub fn keep_restorable_state_in(&mut self, _data_dir: &std::path::Path) {}
+
     pub fn set_render_context(&mut self, mut context: RenderContext) {
         context.apply_restorable_state();
         context.system_color_scheme = context

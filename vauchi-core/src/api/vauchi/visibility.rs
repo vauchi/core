@@ -240,7 +240,9 @@ impl Vauchi {
             is_visible,
             timestamp: self.now_timestamp(),
         });
-        Ok(())
+        // What this contact may see changed; the next tick sends the field
+        // or its removal (private#691).
+        self.mark_own_card_repropagate()
     }
 
     /// Removes a per-contact visibility override.
@@ -260,7 +262,7 @@ impl Vauchi {
             field_id: field_id.to_string(),
             timestamp: self.now_timestamp(),
         });
-        Ok(())
+        self.mark_own_card_repropagate()
     }
 
     /// Marks an own-card field as part of the **public base** — visible to an

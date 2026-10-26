@@ -68,6 +68,7 @@ mod recovery_help;
 mod recovery_status;
 mod rejection;
 pub mod render_context;
+mod restorable_state;
 mod screen;
 #[cfg(feature = "network-rustls")]
 mod session_pin;

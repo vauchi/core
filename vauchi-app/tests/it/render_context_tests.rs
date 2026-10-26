@@ -38,6 +38,7 @@ fn set_render_context_round_trips_both_fields() {
         system_locale: None,
         theme_id: Some("cyber".to_string()),
         system_color_scheme: None,
+        restorable_state: None,
     });
     let ctx = engine.render_context();
     assert_eq!(ctx.locale.as_deref(), Some("de"));
@@ -53,12 +54,14 @@ fn set_render_context_overwrites_previous() {
         system_locale: None,
         theme_id: Some("cyber".to_string()),
         system_color_scheme: None,
+        restorable_state: None,
     });
     engine.set_render_context(RenderContext {
         locale: Some("fr".to_string()),
         system_locale: None,
         theme_id: Some("classic".to_string()),
         system_color_scheme: None,
+        restorable_state: None,
     });
     let ctx = engine.render_context();
     assert_eq!(ctx.locale.as_deref(), Some("fr"));
@@ -75,6 +78,7 @@ fn set_render_context_fields_independent() {
         system_locale: None,
         theme_id: None,
         system_color_scheme: None,
+        restorable_state: None,
     });
     let ctx = engine.render_context();
     assert_eq!(ctx.locale.as_deref(), Some("de"));
@@ -96,6 +100,7 @@ fn render_context_is_storage_independent() {
         system_locale: None,
         theme_id: Some("cyber".to_string()),
         system_color_scheme: None,
+        restorable_state: None,
     });
     let ctx = engine.render_context();
     assert_eq!(ctx.locale.as_deref(), Some("de"));

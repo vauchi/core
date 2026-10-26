@@ -482,6 +482,11 @@ pub enum Command {
     /// [`Event::UserPresenceSecretMissing`] when the sealed item is gone
     /// (#712, #778).
     RevealUserPresenceSecret { prompt: String },
+    /// Keep `state` in the platform's per-device app storage, outside
+    /// Core's storage, in place of what was kept before; hand it back
+    /// unchanged as `restorable_state` in every render-context push, before
+    /// storage opens too. Only Core reads it (vauchi/private#814).
+    SaveRestorableState { state: String },
 }
 
 /// A secret a shell sealed behind the platform's user-presence check:
@@ -710,6 +715,7 @@ impl Command {
             Self::ForgetStoredSecret { .. } => "ForgetStoredSecret",
             Self::CreateUserPresenceSecret { .. } => "CreateUserPresenceSecret",
             Self::RevealUserPresenceSecret { .. } => "RevealUserPresenceSecret",
+            Self::SaveRestorableState { .. } => "SaveRestorableState",
         }
     }
 }

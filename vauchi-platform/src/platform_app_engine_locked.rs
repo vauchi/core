@@ -110,7 +110,7 @@ impl LockedStart {
     }
 
     pub(crate) fn keep_render_context(&mut self, context: RenderContext) {
-        self.presentation.set_locale(context.resolved_locale());
+        self.presentation.set_render_context(context.clone());
         self.pending.render_context = Some(context);
     }
 }

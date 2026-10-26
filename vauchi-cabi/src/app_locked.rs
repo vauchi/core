@@ -110,7 +110,7 @@ impl LockedStart {
     }
 
     pub(crate) fn keep_render_context(&mut self, context: RenderContext) {
-        self.presentation.set_locale(context.resolved_locale());
+        self.presentation.set_render_context(context.clone());
         self.pending_render_context = Some(context);
     }
 }
@@ -203,11 +203,11 @@ impl VauchiApp {
                 }
             }
             Opened::Locked(reason) => {
+                let mut presentation =
+                    StorageLockPresentation::new(reason, render_context.resolved_locale());
+                presentation.set_render_context(render_context.clone());
                 let start = LockedStart {
-                    presentation: StorageLockPresentation::new(
-                        reason,
-                        render_context.resolved_locale(),
-                    ),
+                    presentation,
                     params,
                     pending_callback: callback.map(Some),
                     pending_render_context: Some(render_context),

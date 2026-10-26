@@ -153,8 +153,8 @@ impl AppEngine {
         // item_id = the picked option id. The reserved id "follow_system"
         // means "let the OS decide" — maps to None per ADR-047.
         //
-        // Core renders Settings, so Core keeps the pick in the settings
-        // flags; no app hears of it to store it (vauchi/private#790).
+        // Core renders Settings, so Core hands the pick to the shell to keep
+        // (vauchi/private#814).
         if let UserAction::ListItemSelected {
             component_id,
             item_id,
@@ -168,16 +168,21 @@ impl AppEngine {
                 "language" => ctx.locale = new_value,
                 _ => unreachable!(),
             }
-            let mut flags = self.vauchi.load_settings_flags().unwrap_or_default();
-            flags.appearance = Some(vauchi_core::settings::AppearancePick {
+            let pick = vauchi_core::settings::AppearancePick {
                 locale: ctx.locale.clone(),
                 theme_id: ctx.theme_id.clone(),
-            });
+            };
+            // The vault copy serves a shell that does not keep the pick yet
+            // (vauchi/private#814).
+            let mut flags = self.vauchi.load_settings_flags().unwrap_or_default();
+            flags.appearance = Some(pick.clone());
             // Best effort, like the other settings toggles: the pick still
             // applies now and is lost only if storage refuses the write.
             #[allow(clippy::let_underscore_must_use)]
             let _ = self.vauchi.save_settings_flags(&flags);
-            self.set_render_context(ctx);
+            self.keep_restorable_state(&pick);
+            ctx.restorable_state = Some(crate::ui::restorable_state::encode(&pick));
+            self.apply_render_context(ctx);
         }
     }
 

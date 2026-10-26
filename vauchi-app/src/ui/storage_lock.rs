@@ -15,7 +15,7 @@ use vauchi_core::{Command, Event, SurfaceId};
 use super::rejection;
 use super::{
     ActionStyle, ContextualSurface, ContextualSurfaceRoute, PreparedSurface, PreparedSurfaceError,
-    PresentationCoordinator, ScreenAction, ScreenModel, UserAction,
+    PresentationCoordinator, RenderContext, ScreenAction, ScreenModel, UserAction,
 };
 use crate::i18n::{Locale, get_string};
 
@@ -57,6 +57,7 @@ enum Screen {
 pub struct StorageLockPresentation {
     screen: Screen,
     locale: Locale,
+    render_context: RenderContext,
     revision: u64,
     /// The next locked render asks for the platform prompt. Set at start and
     /// after a tapped Unlock; never after a prompt-triggered retry, so a
@@ -73,6 +74,7 @@ impl StorageLockPresentation {
         Self {
             screen: screen_for(reason),
             locale,
+            render_context: RenderContext::default(),
             revision: 0,
             prompt_on_render: true,
             retry_from_tap: false,
@@ -83,6 +85,17 @@ impl StorageLockPresentation {
     /// The language of the next render (from the shell's render context).
     pub fn set_locale(&mut self, locale: Locale) {
         self.locale = locale;
+    }
+
+    /// The language and theme of the next render, from the shell's push and
+    /// the pick it keeps for Core (vauchi/private#814).
+    pub fn set_render_context(&mut self, mut context: RenderContext) {
+        context.apply_restorable_state();
+        context.system_color_scheme = context
+            .system_color_scheme
+            .or(self.render_context.system_color_scheme);
+        self.locale = context.resolved_locale();
+        self.render_context = context;
     }
 
     pub fn initial_commands(&mut self) -> Vec<Command> {
@@ -117,6 +130,18 @@ impl StorageLockPresentation {
     }
 
     fn environment_changed(&mut self, event: Event) -> Vec<Command> {
+        let theme_before = self.render_context.theme().id;
+        if let Event::PresentationEnvironmentChanged { color_scheme, .. } = &event {
+            self.render_context.system_color_scheme = *color_scheme;
+        }
+        let mut commands = self.coordinate(event);
+        if self.render_context.theme().id != theme_before {
+            commands.extend(self.render());
+        }
+        commands
+    }
+
+    fn coordinate(&mut self, event: Event) -> Vec<Command> {
         let coordinator = match self.coordinator.as_mut() {
             Some(coordinator) => coordinator,
             None => {
@@ -159,8 +184,13 @@ impl StorageLockPresentation {
     fn route(&self, event: Event) -> Option<Routed> {
         let screen = self.current_screen();
         let surface_id = SurfaceId::new(screen.screen_id.clone()).ok()?;
-        let prepared =
-            PreparedSurface::from_screen(surface_id.clone(), self.revision, &screen).ok()?;
+        let prepared = PreparedSurface::from_screen_in(
+            surface_id.clone(),
+            self.revision,
+            &screen,
+            &self.render_context,
+        )
+        .ok()?;
         let route = match prepared.reduce(event.clone()) {
             Ok(action) => ContextualSurfaceRoute::UserAction(action),
             Err(PreparedSurfaceError::UnknownBinding) => self
@@ -188,8 +218,12 @@ impl StorageLockPresentation {
         let Ok(surface_id) = SurfaceId::new(screen.screen_id.clone()) else {
             return self.rejection();
         };
-        let Ok(prepared) = PreparedSurface::from_screen(surface_id.clone(), self.revision, &screen)
-        else {
+        let Ok(prepared) = PreparedSurface::from_screen_in(
+            surface_id.clone(),
+            self.revision,
+            &screen,
+            &self.render_context,
+        ) else {
             return self.rejection();
         };
         let Ok(contextual) = self.contextual(surface_id.clone(), &screen) else {

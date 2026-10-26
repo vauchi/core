@@ -43,22 +43,46 @@ pub struct RenderContext {
     /// (vauchi/private#814).
     #[serde(skip)]
     pub system_color_scheme: Option<vauchi_core::ColorScheme>,
+    /// The value Core asked the shell to keep with
+    /// `Command::SaveRestorableState`, handed back unchanged. Its pick
+    /// replaces `locale` and `theme_id` (vauchi/private#814).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restorable_state: Option<String>,
 }
 
 impl RenderContext {
-    /// A language or theme picked in Core's Settings wins over what an app
-    /// pushes: Core renders Settings, so only Core knows the pick
-    /// (vauchi/private#790). Before the first pick the app's values stand.
+    /// A language or theme picked in Core's Settings and kept in the vault
+    /// wins over what an app pushes (vauchi/private#790); the pick applied,
+    /// if any. A shell that keeps the pick itself makes this copy redundant
+    /// (vauchi/private#814). Before the first pick the app's values stand.
     #[cfg(feature = "network-rustls")]
-    pub(crate) fn apply_saved_appearance(&mut self, vauchi: &vauchi_core::api::Vauchi) {
-        if let Some(pick) = vauchi
+    pub(crate) fn apply_saved_appearance(
+        &mut self,
+        vauchi: &vauchi_core::api::Vauchi,
+    ) -> Option<vauchi_core::settings::AppearancePick> {
+        let pick = vauchi
             .load_settings_flags()
             .ok()
-            .and_then(|flags| flags.appearance)
-        {
-            self.locale = pick.locale;
-            self.theme_id = pick.theme_id;
-        }
+            .and_then(|flags| flags.appearance)?;
+        self.locale = pick.locale.clone();
+        self.theme_id = pick.theme_id.clone();
+        Some(pick)
+    }
+
+    /// Replaces the shell's own choice with the pick from the value it
+    /// keeps for Core. Whether the shell handed back a value Core could
+    /// read, which proves it keeps them; a damaged one changes nothing.
+    pub fn apply_restorable_state(&mut self) -> bool {
+        let Some(pick) = self
+            .restorable_state
+            .as_deref()
+            .and_then(super::restorable_state::decode)
+        else {
+            return false;
+        };
+        self.locale = pick.locale;
+        self.theme_id = pick.theme_id;
+        true
     }
 
     /// The theme to paint: the pick, else the default for the OS light or

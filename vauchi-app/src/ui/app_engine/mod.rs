@@ -432,9 +432,45 @@ impl AppEngine {
     /// A change of rendered language invalidates every cached screen,
     /// because the shell's first push can arrive after the start screen
     /// was built in English (vauchi/private#721).
+    ///
+    /// A value the shell keeps for Core carries the pick and makes the
+    /// vault copy redundant; without one, the vault copy applies and is
+    /// handed to the shell to keep (vauchi/private#814).
     pub fn set_render_context(&mut self, mut ctx: crate::ui::RenderContext) {
-        ctx.apply_saved_appearance(&self.vauchi);
-        ctx.system_color_scheme = self.render_context.system_color_scheme;
+        if ctx.apply_restorable_state() {
+            self.drop_vault_appearance();
+        } else if let Some(pick) = ctx.apply_saved_appearance(&self.vauchi) {
+            self.keep_restorable_state(&pick);
+        }
+        ctx.system_color_scheme = ctx
+            .system_color_scheme
+            .or(self.render_context.system_color_scheme);
+        self.apply_render_context(ctx);
+    }
+
+    fn drop_vault_appearance(&self) {
+        let Ok(mut flags) = self.vauchi.load_settings_flags() else {
+            return;
+        };
+        if flags.appearance.take().is_some() {
+            // Best effort: a copy left behind is only read when the shell
+            // hands nothing back, and then it is the pick anyway.
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = self.vauchi.save_settings_flags(&flags);
+        }
+    }
+
+    /// Queues the pick for the shell to keep, replacing one still queued.
+    pub(crate) fn keep_restorable_state(&mut self, pick: &vauchi_core::settings::AppearancePick) {
+        self.pending_commands
+            .retain(|command| !matches!(command, vauchi_core::Command::SaveRestorableState { .. }));
+        self.pending_commands
+            .push_back(vauchi_core::Command::SaveRestorableState {
+                state: crate::ui::restorable_state::encode(pick),
+            });
+    }
+
+    pub(crate) fn apply_render_context(&mut self, ctx: crate::ui::RenderContext) {
         let language_changed = ctx.resolved_locale() != self.render_context.resolved_locale();
         self.wanted_locales_changed |=
             ctx.wanted_locale_codes() != self.render_context.wanted_locale_codes();

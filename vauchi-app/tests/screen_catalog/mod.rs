@@ -145,6 +145,7 @@ impl<'a> Recorder<'a> {
             system_locale: None,
             theme_id: None,
             system_color_scheme: None,
+            restorable_state: None,
         });
         // `AppEngine::new` built the boot screen under the default locale;
         // rebuild it under the pushed one, the way a shell's boot does.

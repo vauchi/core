@@ -55,6 +55,7 @@ fn theme_dropdown_selected_reflects_pushed_render_context() {
         system_locale: None,
         theme_id: Some("cyber".to_string()),
         system_color_scheme: None,
+        restorable_state: None,
     });
 
     assert_eq!(
@@ -80,6 +81,7 @@ fn language_dropdown_selected_reflects_pushed_render_context() {
         system_locale: None,
         theme_id: None,
         system_color_scheme: None,
+        restorable_state: None,
     });
 
     assert_eq!(
@@ -97,6 +99,7 @@ fn render_context_fields_are_independent_at_render_time() {
         system_locale: None,
         theme_id: None,
         system_color_scheme: None,
+        restorable_state: None,
     });
 
     assert_eq!(
@@ -161,6 +164,7 @@ fn follow_system_selection_clears_render_context_field() {
         system_locale: None,
         theme_id: Some("cyber".to_string()),
         system_color_scheme: None,
+        restorable_state: None,
     });
     engine.navigate_to(AppScreen::SettingsAppearance);
 

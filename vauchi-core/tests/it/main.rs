@@ -213,6 +213,7 @@ mod duress_contact_reads_by_id_tests;
 mod duress_mode_concealment_tests;
 mod duress_mode_device_tests;
 mod duress_mode_vocabulary_tests;
+mod duress_own_card_tests;
 mod duress_pin_engine_tests;
 mod duress_pin_tests;
 mod duress_pin_validation_tests;

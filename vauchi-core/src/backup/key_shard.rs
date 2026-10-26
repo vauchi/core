@@ -241,6 +241,10 @@ pub enum KeyShardError {
     #[error("Duplicate key shard indices")]
     DuplicateIndices,
 
+    /// A guardian key appears in two groups (vauchi/private#815).
+    #[error("A guardian is in two groups")]
+    DuplicateGuardian,
+
     #[error("Key shard reconstruction failed")]
     ReconstructionFailed,
 

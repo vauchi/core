@@ -11,6 +11,7 @@
 
 pub mod contact_backup;
 pub mod full_backup;
+pub mod guardian_groups;
 #[cfg(feature = "network-rustls")]
 mod guardian_recovery;
 mod key_shard;
@@ -33,6 +34,7 @@ pub use full_backup::{
 pub(crate) use full_backup::{decode_backup_hex_with_limit, decode_full_backup_hex};
 #[cfg(feature = "network-rustls")]
 pub(crate) use full_backup::{decode_guardian_backup_hex, guardian_backup_metadata};
+pub use guardian_groups::GuardianGroups;
 #[cfg(all(feature = "network-rustls", not(feature = "testing")))]
 pub(crate) use key_shard::reconstruct_backup_key;
 #[cfg(feature = "testing")]

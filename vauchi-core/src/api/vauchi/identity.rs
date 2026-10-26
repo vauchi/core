@@ -688,13 +688,56 @@ impl Vauchi {
         guardian_pks: &[[u8; 32]],
         threshold: u8,
     ) -> VauchiResult<(String, Vec<Vec<u8>>)> {
+        let config = crate::backup::KeyShardConfig::new(threshold, guardian_pks.len() as u8)
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        let (blob_hex, shards) = self.export_guardian_backup_shards(config)?;
+
+        let mut sealed_shares = Vec::with_capacity(guardian_pks.len());
+        for (shard, pk) in shards.iter().zip(guardian_pks.iter()) {
+            sealed_shares.push(seal_shard_to_guardian(shard, pk)?);
+        }
+        Ok((blob_hex, sealed_shares))
+    }
+
+    /// Exports a guardian backup that recovery needs one member of every
+    /// group for (vauchi/private#815): one share per group, sealed to each
+    /// of its members, so members of a group recover as one.
+    ///
+    /// Returns the backup and, per group in `groups` order, one sealed
+    /// share per member in member order. Any one member of each group
+    /// re-sealing their share to the recovering identity suffices for
+    /// [`Self::recover_guardian_backup`]; a group with no member left locks
+    /// the backup.
+    ///
+    /// # Errors
+    /// Returns [`VauchiError::InvalidState`] if a guardian key is invalid.
+    pub fn export_guardian_backup_for_groups(
+        &self,
+        groups: &crate::backup::GuardianGroups,
+    ) -> VauchiResult<(String, Vec<Vec<Vec<u8>>>)> {
+        let (blob_hex, shards) = self.export_guardian_backup_shards(groups.config())?;
+
+        let mut sealed_groups = Vec::with_capacity(groups.groups().len());
+        for (shard, members) in shards.iter().zip(groups.groups()) {
+            let mut sealed_members = Vec::with_capacity(members.len());
+            for pk in members {
+                sealed_members.push(seal_shard_to_guardian(shard, pk)?);
+            }
+            sealed_groups.push(sealed_members);
+        }
+        Ok((blob_hex, sealed_groups))
+    }
+
+    /// The guardian backup blob (hex) and its unsealed shards for `config`;
+    /// the callers above seal each shard to its guardians.
+    fn export_guardian_backup_shards(
+        &self,
+        config: crate::backup::KeyShardConfig,
+    ) -> VauchiResult<(String, Vec<crate::backup::BackupKeyShard>)> {
         let identity = self
             .identity
             .as_ref()
             .ok_or(VauchiError::IdentityNotInitialized)?;
-
-        let config = crate::backup::KeyShardConfig::new(threshold, guardian_pks.len() as u8)
-            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         let metadata = crate::backup::GuardianBackupMetadata::generate(config);
 
         let identity_data = crate::backup::FullBackupIdentityData {
@@ -733,19 +776,11 @@ impl Vauchi {
         let shards = crate::backup::split_backup_key(&backup_key, metadata)
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
 
-        let mut sealed_shares = Vec::with_capacity(guardian_pks.len());
-        for (shard, pk) in shards.iter().zip(guardian_pks.iter()) {
-            let x25519_pk = ed25519_pk_to_x25519(pk)?;
-            let sealed = crate::backup::seal_share_for_guardian(shard, &x25519_pk)
-                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-            sealed_shares.push(sealed);
-        }
-
         // best-effort timestamp update
         #[allow(clippy::let_underscore_must_use)]
         let _ = self.record_backup_completed();
 
-        Ok((hex::encode(blob), sealed_shares))
+        Ok((hex::encode(blob), shards))
     }
 
     /// Re-seals a guardian entry for a recovering party without exposing key
@@ -849,6 +884,15 @@ impl Vauchi {
 
 fn guardian_recovery_failed() -> VauchiError {
     VauchiError::Configuration("Guardian backup recovery failed".into())
+}
+
+fn seal_shard_to_guardian(
+    shard: &crate::backup::BackupKeyShard,
+    guardian_pk: &[u8; 32],
+) -> VauchiResult<Vec<u8>> {
+    let x25519_pk = ed25519_pk_to_x25519(guardian_pk)?;
+    crate::backup::seal_share_for_guardian(shard, &x25519_pk)
+        .map_err(|e| VauchiError::InvalidState(e.to_string()))
 }
 
 /// Converts an Ed25519 public key to an X25519 (Curve25519) public key.

@@ -69,7 +69,8 @@ impl Drop for BackupRecoveryEngine {
 enum BackupStep {
     ChooseMode,
     EnterPassword,
-    ConfirmReplace,
+    /// A backup restores only into an app with no identity (vauchi/private#819).
+    RestoreNeedsEmptyApp,
     ConfirmPassword,
     Processing,
     Complete,
@@ -83,7 +84,7 @@ impl BackupRecoveryEngine {
     /// If `None`, starts at the mode selection step.
     pub fn new(mode: Option<BackupMode>, has_identity: bool, locale: Locale) -> Self {
         let (step, mode) = match mode {
-            Some(m) => (BackupStep::EnterPassword, m),
+            Some(m) => (Self::first_step(&m, has_identity), m),
             None => (BackupStep::ChooseMode, BackupMode::Create),
         };
         Self {
@@ -106,6 +107,13 @@ impl BackupRecoveryEngine {
         self.last_backup = last_backup;
         self.now = now;
         self
+    }
+
+    fn first_step(mode: &BackupMode, has_identity: bool) -> BackupStep {
+        match mode {
+            BackupMode::Restore if has_identity => BackupStep::RestoreNeedsEmptyApp,
+            _ => BackupStep::EnterPassword,
+        }
     }
 
     fn last_backup_line(&self) -> String {
@@ -184,31 +192,18 @@ impl BackupRecoveryEngine {
     fn total_steps(&self) -> u8 {
         match self.mode {
             BackupMode::Create => 4,
-            BackupMode::Restore => {
-                if self.has_identity {
-                    4
-                } else {
-                    3
-                }
-            }
+            BackupMode::Restore => 3,
         }
     }
 
     fn progress(&self) -> Option<Progress> {
         let current_step = match self.step {
-            BackupStep::ChooseMode => return None,
+            BackupStep::ChooseMode | BackupStep::RestoreNeedsEmptyApp => return None,
             BackupStep::EnterPassword => 1,
-            BackupStep::ConfirmReplace => 2,
             BackupStep::ConfirmPassword => 2,
             BackupStep::Processing => match self.mode {
                 BackupMode::Create => 3,
-                BackupMode::Restore => {
-                    if self.has_identity {
-                        3
-                    } else {
-                        2
-                    }
-                }
+                BackupMode::Restore => 2,
             },
             BackupStep::Complete => self.total_steps(),
             BackupStep::Failed => self.total_steps(),
@@ -358,26 +353,24 @@ impl BackupRecoveryEngine {
         }
     }
 
-    fn confirm_replace_screen(&self) -> ScreenModel {
+    fn restore_needs_empty_app_screen(&self) -> ScreenModel {
         ScreenModel {
-            screen_id: "backup_confirm_replace".into(),
-            title: self.t("backup.replace_confirm"),
+            screen_id: "backup_restore_needs_empty".into(),
+            title: self.t("backup.wizard.restore_needs_empty_title"),
             subtitle: None,
-            components: vec![Component::InlineConfirm {
-                id: "replace".into(),
-                warning: self.t("backup.wizard.replace_warning"),
-                confirm_text: self.t("backup.replace_button"),
-                cancel_text: self.t("action.cancel"),
-                confirm_action_id: "confirm_replace".into(),
-                cancel_action_id: "cancel_replace".into(),
-                destructive: true,
-                a11y: Some(A11y {
-                    label: Some(self.t("backup.wizard.replace_a11y")),
-                    hint: Some(self.t("backup.wizard.replace_warning")),
-                    role: Some(AccessibilityRole::Alert),
-                }),
+            components: vec![Component::Text {
+                id: "restore_needs_empty".into(),
+                content: self.t("backup.wizard.restore_needs_empty_body"),
+                style: TextStyle::Body,
+                a11y: None,
             }],
-            contextual_actions: vec![],
+            contextual_actions: vec![ScreenAction {
+                id: "back".into(),
+                label: self.t("action.back"),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: Some(A11y::labeled(self.t("action.back"))),
+            }],
             progress: self.progress(),
             ..Default::default()
         }
@@ -566,7 +559,7 @@ impl WorkflowEngine for BackupRecoveryEngine {
         match self.step {
             BackupStep::ChooseMode => self.choose_screen(),
             BackupStep::EnterPassword => self.password_screen(),
-            BackupStep::ConfirmReplace => self.confirm_replace_screen(),
+            BackupStep::RestoreNeedsEmptyApp => self.restore_needs_empty_app_screen(),
             BackupStep::ConfirmPassword => self.confirm_screen(),
             BackupStep::Processing => self.processing_screen(),
             BackupStep::Complete => self.complete_screen(),
@@ -579,6 +572,9 @@ impl WorkflowEngine for BackupRecoveryEngine {
             return false;
         };
         match update {
+            crate::ui::BackupRecoveryUpdate::PickedBackupBytes(_) if self.has_identity => {
+                return false;
+            }
             crate::ui::BackupRecoveryUpdate::PickedBackupBytes(bytes) => {
                 // The picker hands back the exported file verbatim; the
                 // export is hex-encoded ASCII, so lossy decoding cannot
@@ -607,7 +603,7 @@ impl WorkflowEngine for BackupRecoveryEngine {
                 } else {
                     BackupMode::Restore
                 };
-                self.step = BackupStep::EnterPassword;
+                self.step = Self::first_step(&self.mode, self.has_identity);
                 ActionResult::NavigateTo(self.current_screen())
             }
             (
@@ -681,11 +677,7 @@ impl WorkflowEngine for BackupRecoveryEngine {
                         self.step = BackupStep::ConfirmPassword;
                     }
                     BackupMode::Restore => {
-                        if self.has_identity {
-                            self.step = BackupStep::ConfirmReplace;
-                        } else {
-                            self.step = BackupStep::Processing;
-                        }
+                        self.step = BackupStep::Processing;
                     }
                 }
                 ActionResult::NavigateTo(self.current_screen())
@@ -697,17 +689,10 @@ impl WorkflowEngine for BackupRecoveryEngine {
                 ActionResult::NavigateTo(self.current_screen())
             }
 
-            // ConfirmReplace
-            (BackupStep::ConfirmReplace, UserAction::ActionPressed { action_id })
-                if action_id == "confirm_replace" =>
+            (BackupStep::RestoreNeedsEmptyApp, UserAction::ActionPressed { action_id })
+                if action_id == "back" =>
             {
-                self.step = BackupStep::Processing;
-                ActionResult::NavigateTo(self.current_screen())
-            }
-            (BackupStep::ConfirmReplace, UserAction::ActionPressed { action_id })
-                if action_id == "cancel_replace" =>
-            {
-                self.step = BackupStep::EnterPassword;
+                self.step = BackupStep::ChooseMode;
                 ActionResult::NavigateTo(self.current_screen())
             }
 

@@ -122,7 +122,8 @@ fn export_asks_full_or_identity_only_restore_does_not() {
     });
     assert_eq!(level_toggle(&export.current_screen()), Some(false));
 
-    let mut restore = choose();
+    // Restore asks for the file only on an empty app (vauchi/private#819).
+    let mut restore = BackupRecoveryEngine::new(None, false, Locale::ENGLISH);
     open(&mut restore, "restore");
     let screen = restore.current_screen();
     assert_eq!(level_toggle(&screen), None);

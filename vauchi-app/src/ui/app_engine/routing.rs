@@ -152,12 +152,6 @@ impl AppEngine {
             self.rebuild_exchange_engine();
         }
 
-        // ADR-031 file-picker: dispatched by current screen, not by the
-        // narrow screen guard below. The picker is reachable from Contacts
-        // (contacts import — the affordance moved there off the retired
-        // More menu) and — once Phase 2B lands — Onboarding (backup
-        // restore). Phase 2A handles contacts only; backup restore is
-        // deferred (multi-step password flow).
         // ADR-070: a platform fact, not a screen interaction — recorded
         // whatever is on screen, because the next device-link ceremony
         // needs it and the network can change at any time.
@@ -177,10 +171,15 @@ impl AppEngine {
         }
 
         match &event {
+            Event::HardwareError { transport, error } if transport == "file_picker" => {
+                self.pending_contact_import = false;
+                return (!self.session_locked).then(|| self.hardware_error_alert(transport, error));
+            }
             Event::FilePickedFromUser { bytes, filename } => {
                 return self.handle_file_picked(bytes.clone(), filename.clone());
             }
             Event::FilePickCancelledByUser => {
+                self.pending_contact_import = false;
                 // User dismissed the picker — no-op. Frontend stays on
                 // the originating screen with no toast / alert.
                 return None;
@@ -383,41 +382,35 @@ impl AppEngine {
         self.engine.advance_qr_frame()
     }
 
-    /// ADR-031 file-picker handler: route picked bytes by the screen
-    /// that requested the pick. Phase 2A wires `AppScreen::Contacts`
-    /// (contacts import via vCard); Phase 2B adds `AppScreen::Onboarding`
-    /// (backup restore — needs multi-step password flow).
-    ///
-    /// The import affordance moved off the retired More menu onto the
-    /// Contacts screen. This arm has to move with it: the pick is routed
-    /// by the screen that asked for it, so bytes arriving on Contacts
-    /// while this matched More were silently dropped.
-    ///
-    /// Returns `Some(ActionResult)` describing the outcome (toast on
-    /// success, alert on failure, or further commands if a multi-step
-    /// flow continues), or `None` when the current screen does not
-    /// participate in the file-picker protocol.
-    fn handle_file_picked(&mut self, bytes: Vec<u8>, _filename: String) -> Option<ActionResult> {
-        match self.screen {
-            AppScreen::Contacts => {
-                match self.vauchi.import_contacts_from_vcf(&bytes) {
-                    Ok(result) => {
-                        // Rebuild the active list without adding a history entry.
-                        // Same-screen navigation caches the old engine; discard it.
-                        self.engine_cache.remove(&AppScreen::Contacts);
-                        self.navigate_to_internal(AppScreen::Contacts);
-                        self.engine_cache.remove(&AppScreen::Contacts);
-                        Some(format_import_result(
-                            result,
-                            self.render_context.resolved_locale(),
-                        ))
-                    }
-                    Err(e) => Some(ActionResult::ShowAlert {
-                        title: self.t("contacts.import_error_title"),
-                        message: e.to_string(),
-                    }),
+    fn import_contact_file(&mut self, bytes: &[u8]) -> ActionResult {
+        match self.vauchi.import_contacts_from_vcf(bytes) {
+            Ok(result) => {
+                self.engine_cache.remove(&AppScreen::Contacts);
+                if matches!(self.screen, AppScreen::Contacts) {
+                    // Same-screen navigation caches the old engine; discard it.
+                    self.navigate_to_internal(AppScreen::Contacts);
+                    self.engine_cache.remove(&AppScreen::Contacts);
                 }
+                format_import_result(result, self.render_context.resolved_locale())
             }
+            Err(error) => ActionResult::ShowAlert {
+                title: self.t("contacts.import_error_title"),
+                message: error.to_string(),
+            },
+        }
+    }
+
+    /// Native menu imports retain their originating screen; other file flows
+    /// are still routed by the screen that requested them (ADR-031).
+    fn handle_file_picked(&mut self, bytes: Vec<u8>, _filename: String) -> Option<ActionResult> {
+        if std::mem::take(&mut self.pending_contact_import) {
+            if self.session_locked || !self.vauchi.has_identity() {
+                return None;
+            }
+            return Some(self.import_contact_file(&bytes));
+        }
+        match self.screen {
+            AppScreen::Contacts => Some(self.import_contact_file(&bytes)),
             AppScreen::Backup => {
                 // The restore wizard's own file path. Paste cannot carry a
                 // real backup — a 10k-contact export is ~2.2 MB against a

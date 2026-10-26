@@ -98,6 +98,25 @@ pub enum StandardShortcut {
     Back,
     ActivatePrimary,
     Undo,
+    Import,
+}
+
+/// Native placement hints; action meaning remains in Core's opaque bindings.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum ApplicationMenuRole {
+    File,
+    Other,
+}
+
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApplicationMenuSpec {
+    pub role: ApplicationMenuRole,
+    pub label: String,
+    pub items: Vec<ActionSpec>,
 }
 
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]

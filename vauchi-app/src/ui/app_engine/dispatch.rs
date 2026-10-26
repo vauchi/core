@@ -359,6 +359,20 @@ impl AppEngine {
             return Some(ActionResult::NavigateTo(screen));
         }
 
+        if matches!(action, UserAction::ActionPressed { action_id } if action_id == "import_contacts_from_menu")
+            && self.native_import_enabled()
+        {
+            self.pending_contact_import = true;
+            return Some(ActionResult::Commands {
+                commands: vec![vauchi_core::Command::FilePickFromUser {
+                    accepted_mime_types: vcf_mime_types(),
+                    accepted_extensions: vauchi_core::FilePickPurpose::ImportContacts
+                        .accepted_extensions(),
+                    purpose: vauchi_core::FilePickPurpose::ImportContacts,
+                }],
+            });
+        }
+
         // "Import contacts" from contacts → ask the shell for a vCard.
         // ADR-031: core drives the native file picker, it does not navigate.
         // The bytes return through `Event::FilePickedFromUser`.

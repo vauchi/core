@@ -178,6 +178,9 @@ impl AppEngine {
 
     /// Reduce one raw shell event into the next ordered command batch.
     pub fn dispatch(&mut self, event: Event) -> Result<Vec<Command>, AppPresentationError> {
+        if let Event::ApplicationMenuAvailabilityChanged { available } = event {
+            return self.set_application_menu_available(available);
+        }
         if matches!(event, Event::WakeupFired) {
             let notifications = self.on_wakeup();
             let mut commands = Vec::new();
@@ -305,6 +308,9 @@ impl AppEngine {
         self.presentation_coordinator
             .ensure_active_surface(event_surface_id)?;
         let (event_screen, screen, prepared) = self.prepared_visible_surface(event_surface_id)?;
+        if let Some(action) = self.native_menu_action(&event)? {
+            return self.reduce_user_action(action, None);
+        }
         let cause = match &event {
             Event::ActionActivated {
                 surface_id,
@@ -548,6 +554,7 @@ impl AppEngine {
         if let Some(profile) = self.presentation_coordinator.current_profile_command() {
             commands.push(profile);
         }
+        commands.extend(self.application_menu_command()?);
         Ok(commands)
     }
 

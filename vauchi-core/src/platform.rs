@@ -39,10 +39,10 @@ pub use event_json::{
     MAX_EVENT_JSON_NESTING_DEPTH, event_from_json,
 };
 pub use presentation::{
-    AccessibilitySpec, ActionSpec, ActionTone, AlertSpec, BindingId, ChoiceOption, ColorScheme,
-    ContextBar, DocumentSpec, ExportFileSpec, InputMode, InputValue, InteractionId,
-    InvocationOutcome, MotionPreference, NavigationItem, NavigationSpec, NotificationSpec,
-    NotificationUrgency, OverlayKind, OverlaySpec, PaneLayout, PresentationAxis,
+    AccessibilitySpec, ActionSpec, ActionTone, AlertSpec, ApplicationMenuRole, ApplicationMenuSpec,
+    BindingId, ChoiceOption, ColorScheme, ContextBar, DocumentSpec, ExportFileSpec, InputMode,
+    InputValue, InteractionId, InvocationOutcome, MotionPreference, NavigationItem, NavigationSpec,
+    NotificationSpec, NotificationUrgency, OverlayKind, OverlaySpec, PaneLayout, PresentationAxis,
     PresentationColors, PresentationIdError, PresentationImageShape, PresentationInputKind,
     PresentationListStyle, PresentationNode, PresentationPaging, PresentationProfile,
     PresentationQrErrorCorrection, PresentationQrPurpose, PresentationQrSize, PresentationRow,
@@ -487,6 +487,13 @@ pub enum Command {
     /// unchanged as `restorable_state` in every render-context push, before
     /// storage opens too. Only Core reads it (vauchi/private#814).
     SaveRestorableState { state: String },
+    /// Replace Core's native menu contributions. Sent only after the shell
+    /// reports application-menu availability. Native Quit remains shell-owned.
+    SetApplicationMenu {
+        surface_id: SurfaceId,
+        revision: u64,
+        menus: Vec<ApplicationMenuSpec>,
+    },
 }
 
 /// A secret a shell sealed behind the platform's user-presence check:
@@ -696,6 +703,7 @@ impl Command {
             Self::LocationRequest { .. } => "LocationRequest",
             Self::Celebrate { .. } => "Celebrate",
             Self::SetContextBar { .. } => "SetContextBar",
+            Self::SetApplicationMenu { .. } => "SetApplicationMenu",
             Self::SetNavigation { .. } => "SetNavigation",
             Self::PresentOverlay { .. } => "PresentOverlay",
             Self::DismissOverlay { .. } => "DismissOverlay",
@@ -1066,6 +1074,8 @@ pub enum Event {
     /// [`Command::PostNotification`] before adopting this event instead of
     /// the legacy wakeup API; notification handoff is at most once.
     WakeupFired,
+    /// Whether this window can render prepared native application menus.
+    ApplicationMenuAvailabilityChanged { available: bool },
 }
 
 // INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access

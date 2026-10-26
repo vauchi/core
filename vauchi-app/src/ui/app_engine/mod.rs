@@ -46,6 +46,7 @@ mod intercept_annotations;
 mod link_exchange;
 mod link_responder;
 mod multi_stage_exchange;
+mod native_menu;
 mod navigation;
 mod notifications;
 // INLINE_TEST_REQUIRED: pushes a field that fails to save into the private
@@ -296,6 +297,8 @@ pub struct AppEngine {
     retained_detail_screen: Option<AppScreen>,
     /// Monotonic generation of the atomic generic surface command.
     surface_revision: u64,
+    native_menu_available: bool,
+    pending_contact_import: bool,
     /// A window has rendered Core's presentation and not been backgrounded
     /// since. Until then this is a background run (Android's WorkManager
     /// starts the engine cold), which wakes at the drawn background gap
@@ -604,6 +607,8 @@ impl AppEngine {
             presentation_coordinator,
             retained_detail_screen: None,
             surface_revision: 1,
+            native_menu_available: false,
+            pending_contact_import: false,
             in_foreground: false,
             background_budget: None,
             contextual_actions: HashMap::new(),

@@ -162,7 +162,7 @@ fn a_damaged_kept_value_is_ignored_and_the_shells_own_choice_stands() {
         valid.replacen("picked", &"a".repeat(65), 1),
         valid.replacen("picked", "pïcked", 1),
         valid.replacen("\"de\"", "\"xx-not-a-language\"", 1),
-        valid.replacen('}', ",\"extra\":true}", 1),
+        valid.replacen("\"theme_id\"", "\"extra\":true,\"theme_id\"", 1),
         format!("{valid}{}", " ".repeat(2048)),
         valid[..valid.len() - 1].to_string(),
     ];

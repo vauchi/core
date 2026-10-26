@@ -178,6 +178,18 @@ impl AppEngine {
 
     /// Reduce one raw shell event into the next ordered command batch.
     pub fn dispatch(&mut self, event: Event) -> Result<Vec<Command>, AppPresentationError> {
+        if matches!(event, Event::WakeupFired) {
+            let notifications = self.on_wakeup();
+            let mut commands = Vec::new();
+            super::result_commands::append_result_commands(
+                ActionResult::Notify { notifications },
+                &mut commands,
+            )
+            .map_err(|variant| AppPresentationError::UnresolvedActionResult { variant })?;
+            commands.extend(self.drain_pending_commands());
+            return Ok(commands);
+        }
+
         let event = match event {
             Event::BleAdvertisementObserved(observation) => {
                 let Some(adv_data) =

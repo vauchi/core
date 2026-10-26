@@ -95,6 +95,11 @@ impl AppEngine {
     /// underlying advances/poll are no-ops when nothing is due). Public so
     /// `PlatformAppEngine` can expose it via UniFFI. The frontend bootstraps
     /// the loop by calling this once at launch.
+    ///
+    /// Compatibility API for shells still consuming typed notifications.
+    /// New command executors report [`vauchi_core::Event::WakeupFired`]
+    /// through [`Self::dispatch`] to receive notifications and scheduling
+    /// together in the canonical command batch.
     pub fn on_wakeup(&mut self) -> Vec<PendingNotification> {
         let before = self.current_screen();
         self.sync_if_due();

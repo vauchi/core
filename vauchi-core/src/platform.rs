@@ -70,11 +70,11 @@ pub enum Command {
     /// authority on *when* the app-level heartbeat is due; the humble shell
     /// translates this into its platform wakeup — a desktop in-process
     /// interval/thread, iOS `BGAppRefreshTask`, Android `WorkManager` — and,
-    /// when it fires, calls `AppEngine::on_wakeup()`, which runs due work and
+    /// when it fires, reports [`Event::WakeupFired`], which runs due work and
     /// emits the *next* `ScheduleWakeup`. All fields are relative seconds from
     /// now (the OS APIs take intervals, and it frees the shell from reading
     /// core's clock). Every interval is a *hint*: the OS may fire late,
-    /// coalesce, or skip — `on_wakeup` is elapsed-based and idempotent, so a
+    /// coalesce, or skip — wakeup work is elapsed-based and idempotent, so a
     /// missed or doubled wake is safe.
     ScheduleWakeup {
         /// Earliest the shell should wake core (never earlier — battery floor).
@@ -93,7 +93,7 @@ pub enum Command {
         /// a ~300 ms design, and the peer's camera decodes ~30 frames per
         /// second (device-measured 2026-08-19).
         earliest_millis: Option<u32>,
-        /// How long the shell waits before calling `on_wakeup()`, in
+        /// How long the shell waits before reporting [`Event::WakeupFired`], in
         /// milliseconds: `earliest_millis`, else `earliest_secs`, never past
         /// `deadline_secs`. Core computes it so shells stop deriving it from
         /// the fields above, which they did three different ways
@@ -1042,6 +1042,14 @@ pub enum Event {
     /// keystore lost the item, unlike [`Event::HardwareUnavailable`],
     /// which says this device cannot run the check at all (#778).
     UserPresenceSecretMissing,
+
+    /// A timer armed by [`Command::ScheduleWakeup`] fired. May also be sent
+    /// once at startup to bootstrap scheduling. Core runs due work and
+    /// returns prepared effects, including notifications and the next timer,
+    /// through the canonical command batch. Callers must execute
+    /// [`Command::PostNotification`] before adopting this event instead of
+    /// the legacy wakeup API; notification handoff is at most once.
+    WakeupFired,
 }
 
 // INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access

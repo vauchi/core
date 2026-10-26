@@ -558,6 +558,7 @@ mod visibility_enforcement_tests;
 mod visibility_integration_tests;
 mod visibility_label_sync_tests;
 mod visibility_label_tests;
+mod visibility_override_propagation_tests;
 mod visibility_repropagate_tests;
 mod visibility_rules_encryption_tests;
 mod wave2_api_tests;

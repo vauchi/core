@@ -130,6 +130,37 @@ pub fn receive_days(today: u64, checkpoint: Option<u64>) -> std::ops::RangeInclu
     start.min(today)..=today
 }
 
+/// How many owed days one receive pass takes on at most, so a client
+/// back after months stays bounded per cycle and today's mail keeps its
+/// turn (vauchi/private#691).
+pub const CATCH_UP_DAYS_PER_CYCLE: u64 = 14;
+
+/// What one receive pass covers (vauchi/private#691).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReceivePlan {
+    /// The day epochs to register and route, ascending: the oldest chunk
+    /// of what is still owed, plus yesterday and today.
+    pub days: Vec<u64>,
+    /// The checkpoint an exhaustive pass over `days` may record.
+    pub checkpoint_after: u64,
+}
+
+/// Plans one receive pass: the first [`CATCH_UP_DAYS_PER_CYCLE`] of
+/// [`receive_days`] and the live days.
+pub fn plan_receive(today: u64, checkpoint: Option<u64>) -> ReceivePlan {
+    let owed = receive_days(today, checkpoint);
+    let chunk_end = owed
+        .start()
+        .saturating_add(CATCH_UP_DAYS_PER_CYCLE - 1)
+        .min(today);
+    let mut days: std::collections::BTreeSet<u64> = (*owed.start()..=chunk_end).collect();
+    days.extend(today.saturating_sub(1)..=today);
+    ReceivePlan {
+        days: days.into_iter().collect(),
+        checkpoint_after: chunk_end,
+    }
+}
+
 /// Encode a 32-byte token as a lowercase hex string for wire transmission.
 pub fn token_hex(token: &MailboxToken) -> String {
     hex::encode(token.as_bytes())

@@ -78,6 +78,9 @@ pub struct HttpTransportAdapter {
     /// forward limit (more blobs remain). Drives the receive phase's
     /// drain-until-empty loop via [`Self::last_fetch_truncated`].
     last_truncated: bool,
+    /// The last fetch stopped at a rate limit with some mailboxes unread:
+    /// the receiver must not count that pass as exhaustive (private#691).
+    last_rate_limited: bool,
     /// When set, fetches and acknowledgements go through the outer relay's
     /// delayed path (#628) and their answers are collected on a later cycle.
     delayed: Option<Arc<Mutex<DelayedRequests>>>,
@@ -102,6 +105,7 @@ impl HttpTransportAdapter {
             ack_queue: Vec::new(),
             has_fetched: false,
             last_truncated: false,
+            last_rate_limited: false,
             delayed: None,
             delayed_polled: false,
             mailbox_context: None,
@@ -135,6 +139,19 @@ impl HttpTransportAdapter {
     /// remain). The receive phase drains by re-fetching while this is `true`.
     pub fn last_fetch_truncated(&self) -> bool {
         self.last_truncated
+    }
+
+    /// Whether the last fetch left mailboxes unread at a rate limit.
+    pub fn last_fetch_rate_limited(&self) -> bool {
+        self.last_rate_limited
+    }
+
+    /// Whether fetches posted on the delayed path still await their
+    /// answer: their mailboxes are not read yet (private#691).
+    pub fn delayed_fetches_outstanding(&self) -> bool {
+        self.delayed
+            .as_ref()
+            .is_some_and(|delayed| !lock(delayed).fetches.is_empty())
     }
 
     /// Re-arm a fetch after the caller has queued ACKs for the current page.
@@ -327,6 +344,7 @@ impl super::transport::Transport for HttpTransportAdapter {
 
         self.has_fetched = true;
         self.last_truncated = false;
+        self.last_rate_limited = false;
         match self.delayed.clone() {
             Some(delayed) if !self.delayed_polled => {
                 self.delayed_polled = true;
@@ -404,7 +422,10 @@ impl HttpTransportAdapter {
                         &context,
                     );
                 }
-                Err(NetworkError::RateLimited { .. }) if !self.pending_blobs.is_empty() => break,
+                Err(NetworkError::RateLimited { .. }) if !self.pending_blobs.is_empty() => {
+                    self.last_rate_limited = true;
+                    break;
+                }
                 Err(e) => return Err(e),
             }
         }

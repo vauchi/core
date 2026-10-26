@@ -18,10 +18,10 @@ pub(super) fn registered_mailboxes(
     identity: &Identity,
     contacts: &[Contact],
     relay: &RelayConfig,
-    days: std::ops::RangeInclusive<u64>,
+    days: &[u64],
 ) -> MailboxContext {
     let mut routes = HashMap::new();
-    for token_day in days {
+    for &token_day in days {
         for contact in contacts
             .iter()
             .filter(|c| c.is_exchanged() && !c.is_blocked())

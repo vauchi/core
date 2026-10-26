@@ -425,6 +425,7 @@ impl Vauchi {
         const MAX_RECEIVE_PAGES: usize = 64;
         let (mut received, mut fetched, mut rejected, mut unresolved) = (0, 0, 0, 0);
         let mut reject_reasons: Vec<String> = Vec::new();
+        let mut exhausted = false;
         for _ in 0..MAX_RECEIVE_PAGES {
             let (r, f, rej, unr, reasons) = self.run_receive_page(identity, contacts, adapter)?;
             received += r;
@@ -438,9 +439,17 @@ impl Vauchi {
             // otherwise ACKs for this page are queued, so re-arm and re-fetch —
             // the next receive() flushes them before polling the remainder.
             if f == 0 || !adapter.last_fetch_truncated() {
+                exhausted = true;
                 break;
             }
             adapter.allow_refetch();
+        }
+        // The checkpoint moves only once every mailbox this pass planned
+        // was read: not past the page cap, a rate limit, or a delayed fetch
+        // still awaiting its answer (private#691).
+        if exhausted && !adapter.last_fetch_rate_limited() && !adapter.delayed_fetches_outstanding()
+        {
+            self.record_receive_checkpoint(identity)?;
         }
         Ok((
             received,

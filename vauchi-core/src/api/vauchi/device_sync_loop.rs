@@ -48,12 +48,12 @@ impl Vauchi {
         contacts: &[Contact],
         adapter: &mut HttpTransportAdapter,
     ) -> VauchiResult<()> {
-        let day = current_day_epoch(self.clock.unix_seconds());
+        let plan = self.receive_plan(identity)?;
         let context = std::sync::Arc::new(super::receive_context::registered_mailboxes(
             identity,
             contacts,
             &self.config.relay,
-            day.saturating_sub(1)..=day,
+            &plan.days,
         ));
         let batches = padded_registration_batches(
             self.rng.as_ref(),
@@ -72,6 +72,37 @@ impl Vauchi {
             adapter.send(&envelope).map_err(VauchiError::Network)?;
         }
 
+        Ok(())
+    }
+
+    /// This relay, identity and device's receive checkpoint scope.
+    fn receive_scope(&self, identity: &Identity) -> crate::storage::ReceiveScope {
+        crate::storage::ReceiveScope::new(
+            &self.config.relay.server_url,
+            identity.signing_public_key(),
+            identity.device_id(),
+        )
+    }
+
+    /// The days this receive pass registers and routes (private#691).
+    pub(super) fn receive_plan(
+        &self,
+        identity: &Identity,
+    ) -> VauchiResult<crate::network::mailbox_token::ReceivePlan> {
+        let day = current_day_epoch(self.clock.unix_seconds());
+        let checkpoint = self
+            .storage
+            .sync()
+            .load_receive_checkpoint(&self.receive_scope(identity))?;
+        Ok(crate::network::mailbox_token::plan_receive(day, checkpoint))
+    }
+
+    /// Records that this pass read every mailbox it planned.
+    pub(super) fn record_receive_checkpoint(&self, identity: &Identity) -> VauchiResult<()> {
+        let plan = self.receive_plan(identity)?;
+        self.storage
+            .sync()
+            .save_receive_checkpoint(&self.receive_scope(identity), plan.checkpoint_after)?;
         Ok(())
     }
 

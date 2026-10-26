@@ -24,15 +24,28 @@ pub struct TagStore<'a> {
     conn: &'a Connection,
     key: &'a SymmetricKey,
     clock: &'a Arc<dyn Clock>,
+    /// The real `tags` table, or the duress session's twin
+    /// (vauchi/private#813).
+    table: &'static str,
 }
 
 impl Storage {
     /// Scoped persistence view for the tag domain.
     pub fn tags(&self) -> TagStore<'_> {
+        self.tags_in("tags")
+    }
+
+    /// The duress session's tags, persistent and never the real ones.
+    pub fn duress_tags(&self) -> TagStore<'_> {
+        self.tags_in("duress_tags")
+    }
+
+    fn tags_in(&self, table: &'static str) -> TagStore<'_> {
         TagStore {
             conn: &self.conn,
             key: &self.encryption_key,
             clock: &self.clock,
+            table,
         }
     }
 }
@@ -49,8 +62,11 @@ impl TagStore<'_> {
 
         self.conn
             .execute(
-                "INSERT INTO tags (id, name_encrypted, contact_ids_json, created_at)
+                &format!(
+                    "INSERT INTO {} (id, name_encrypted, contact_ids_json, created_at)
                  VALUES (?1, ?2, ?3, ?4)",
+                    self.table
+                ),
                 rusqlite::params![tag.id, name_encrypted, contact_ids_json, tag.created_at],
             )
             .map_err(StorageError::from)?;
@@ -72,8 +88,11 @@ impl TagStore<'_> {
 
         self.conn
             .execute(
-                "INSERT OR REPLACE INTO tags (id, name_encrypted, contact_ids_json, created_at)
+                &format!(
+                    "INSERT OR REPLACE INTO {} (id, name_encrypted, contact_ids_json, created_at)
                  VALUES (?1, ?2, ?3, ?4)",
+                    self.table
+                ),
                 rusqlite::params![tag.id, name_encrypted, contact_ids_json, tag.created_at],
             )
             .map_err(StorageError::from)?;
@@ -83,7 +102,10 @@ impl TagStore<'_> {
     /// Returns the tag with the given ID, or `None` if not found.
     pub fn get_tag(&self, id: &str) -> Result<Option<Tag>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT id, name_encrypted, contact_ids_json, created_at FROM tags WHERE id = ?1",
+            &format!(
+                "SELECT id, name_encrypted, contact_ids_json, created_at FROM {} WHERE id = ?1",
+                self.table
+            ),
             rusqlite::params![id],
             |row| {
                 Ok((
@@ -106,11 +128,12 @@ impl TagStore<'_> {
     pub fn list_tags(&self) -> Result<Vec<Tag>, StorageError> {
         let mut stmt = self
             .conn
-            .prepare(
+            .prepare(&format!(
                 "SELECT id, name_encrypted, contact_ids_json, created_at
-                 FROM tags
+                 FROM {}
                  ORDER BY created_at ASC",
-            )
+                self.table
+            ))
             .map_err(StorageError::from)?;
 
         let rows: Vec<(String, Vec<u8>, String, u64)> = stmt
@@ -133,7 +156,10 @@ impl TagStore<'_> {
     pub fn delete_tag(&self, id: &str) -> Result<bool, StorageError> {
         let rows = self
             .conn
-            .execute("DELETE FROM tags WHERE id = ?1", rusqlite::params![id])
+            .execute(
+                &format!("DELETE FROM {} WHERE id = ?1", self.table),
+                rusqlite::params![id],
+            )
             .map_err(StorageError::from)?;
         Ok(rows > 0)
     }
@@ -181,7 +207,7 @@ impl TagStore<'_> {
         let current_json: String = self
             .conn
             .query_row(
-                "SELECT contact_ids_json FROM tags WHERE id = ?1",
+                &format!("SELECT contact_ids_json FROM {} WHERE id = ?1", self.table),
                 rusqlite::params![tag_id],
                 |row| row.get(0),
             )
@@ -208,7 +234,10 @@ impl TagStore<'_> {
 
         self.conn
             .execute(
-                "UPDATE tags SET contact_ids_json = ?1 WHERE id = ?2",
+                &format!(
+                    "UPDATE {} SET contact_ids_json = ?1 WHERE id = ?2",
+                    self.table
+                ),
                 rusqlite::params![updated_json, tag_id],
             )
             .map_err(StorageError::from)?;

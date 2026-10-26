@@ -24,15 +24,28 @@ pub struct PlaceStore<'a> {
     conn: &'a Connection,
     key: &'a SymmetricKey,
     clock: &'a Arc<dyn Clock>,
+    /// The real `places` table, or the duress session's twin
+    /// (vauchi/private#813).
+    table: &'static str,
 }
 
 impl Storage {
     /// Scoped persistence view for the place domain.
     pub fn places(&self) -> PlaceStore<'_> {
+        self.places_in("places")
+    }
+
+    /// The duress session's places, persistent and never the real ones.
+    pub fn duress_places(&self) -> PlaceStore<'_> {
+        self.places_in("duress_places")
+    }
+
+    fn places_in(&self, table: &'static str) -> PlaceStore<'_> {
         PlaceStore {
             conn: &self.conn,
             key: &self.encryption_key,
             clock: &self.clock,
+            table,
         }
     }
 }
@@ -60,7 +73,10 @@ impl PlaceStore<'_> {
     /// Returns the place with the given id, or `None`.
     pub fn get_place(&self, id: &str) -> Result<Option<Place>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT id, data_encrypted, created_at FROM places WHERE id = ?1",
+            &format!(
+                "SELECT id, data_encrypted, created_at FROM {} WHERE id = ?1",
+                self.table
+            ),
             rusqlite::params![id],
             |row| {
                 Ok((
@@ -81,7 +97,10 @@ impl PlaceStore<'_> {
     pub fn list_places(&self) -> Result<Vec<Place>, StorageError> {
         let mut stmt = self
             .conn
-            .prepare("SELECT id, data_encrypted, created_at FROM places ORDER BY created_at ASC")
+            .prepare(&format!(
+                "SELECT id, data_encrypted, created_at FROM {} ORDER BY created_at ASC",
+                self.table
+            ))
             .map_err(StorageError::from)?;
         let rows: Vec<(String, Vec<u8>, u64)> = stmt
             .query_map([], |row| {
@@ -101,7 +120,10 @@ impl PlaceStore<'_> {
     pub fn delete_place(&self, id: &str) -> Result<bool, StorageError> {
         let rows = self
             .conn
-            .execute("DELETE FROM places WHERE id = ?1", rusqlite::params![id])
+            .execute(
+                &format!("DELETE FROM {} WHERE id = ?1", self.table),
+                rusqlite::params![id],
+            )
             .map_err(StorageError::from)?;
         Ok(rows > 0)
     }
@@ -137,8 +159,11 @@ impl PlaceStore<'_> {
             .map_err(|e| StorageError::Encryption(format!("Encrypt place: {e}")))?;
         self.conn
             .execute(
-                "INSERT OR REPLACE INTO places (id, data_encrypted, created_at)
+                &format!(
+                    "INSERT OR REPLACE INTO {} (id, data_encrypted, created_at)
                  VALUES (?1, ?2, ?3)",
+                    self.table
+                ),
                 rusqlite::params![place.id, data_encrypted, place.created_at],
             )
             .map_err(StorageError::from)?;

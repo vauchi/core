@@ -27,6 +27,10 @@ pub struct LabelStore<'a> {
     conn: &'a Connection,
     key: &'a SymmetricKey,
     clock: &'a Arc<dyn Clock>,
+    /// The tables this view reads and writes: the real vocabulary, or the
+    /// duress session's twin of it (vauchi/private#813).
+    labels_table: &'static str,
+    overrides_table: &'static str,
 }
 
 const LABEL_COLUMNS: &str = "id, name_encrypted, contacts_json_encrypted, visible_fields_json_encrypted, display_name_override_encrypted, bio_override_encrypted, avatar_override_encrypted, created_at, modified_at";
@@ -61,10 +65,29 @@ impl EncryptedLabelRow {
 impl Storage {
     /// Scoped persistence view for the visibility-label domain.
     pub fn labels(&self) -> LabelStore<'_> {
+        self.labels_in("visibility_labels", "contact_visibility_overrides")
+    }
+
+    /// The duress session's groups and overrides: a persistent twin the
+    /// real vocabulary never sees (vauchi/private#813).
+    pub fn duress_labels(&self) -> LabelStore<'_> {
+        self.labels_in(
+            "duress_visibility_labels",
+            "duress_contact_visibility_overrides",
+        )
+    }
+
+    fn labels_in(
+        &self,
+        labels_table: &'static str,
+        overrides_table: &'static str,
+    ) -> LabelStore<'_> {
         LabelStore {
             conn: &self.conn,
             key: &self.encryption_key,
             clock: &self.clock,
+            labels_table,
+            overrides_table,
         }
     }
 }
@@ -117,9 +140,9 @@ impl LabelStore<'_> {
         };
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO visibility_labels
+            &format!("INSERT OR REPLACE INTO {}
              (id, name_encrypted, name_hmac, contacts_json_encrypted, visible_fields_json_encrypted, created_at, modified_at, display_name_override_encrypted, bio_override_encrypted, avatar_override_encrypted)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)", self.labels_table),
             rusqlite::params![
                 label.id(),
                 name_encrypted,
@@ -139,7 +162,10 @@ impl LabelStore<'_> {
     /// Loads a visibility label by ID (decrypted).
     pub fn load_group(&self, label_id: &str) -> Result<Group, StorageError> {
         let row = self.conn.query_row(
-            &format!("SELECT {LABEL_COLUMNS} FROM visibility_labels WHERE id = ?1"),
+            &format!(
+                "SELECT {LABEL_COLUMNS} FROM {} WHERE id = ?1",
+                self.labels_table
+            ),
             [label_id],
             EncryptedLabelRow::from_row,
         )?;
@@ -150,9 +176,10 @@ impl LabelStore<'_> {
     /// Labels are sorted by decrypted name in Rust since encrypted names
     /// cannot be sorted in SQL (#128).
     pub fn load_all_groups(&self) -> Result<Vec<Group>, StorageError> {
-        let mut stmt = self
-            .conn
-            .prepare(&format!("SELECT {LABEL_COLUMNS} FROM visibility_labels"))?;
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {LABEL_COLUMNS} FROM {}",
+            self.labels_table
+        ))?;
         let rows = stmt
             .query_map([], EncryptedLabelRow::from_row)?
             .collect::<Result<Vec<_>, _>>()?;
@@ -235,9 +262,10 @@ impl LabelStore<'_> {
     }
     /// Deletes a visibility label.
     pub fn delete_group(&self, label_id: &str) -> Result<(), StorageError> {
-        let changes = self
-            .conn
-            .execute("DELETE FROM visibility_labels WHERE id = ?1", [label_id])?;
+        let changes = self.conn.execute(
+            &format!("DELETE FROM {} WHERE id = ?1", self.labels_table),
+            [label_id],
+        )?;
 
         if changes == 0 {
             return Err(StorageError::NotFound("Label not found".to_string()));
@@ -253,9 +281,12 @@ impl LabelStore<'_> {
         is_visible: bool,
     ) -> Result<(), StorageError> {
         self.conn.execute(
-            "INSERT OR REPLACE INTO contact_visibility_overrides
+            &format!(
+                "INSERT OR REPLACE INTO {}
              (contact_id, field_id, is_visible)
              VALUES (?1, ?2, ?3)",
+                self.overrides_table
+            ),
             (contact_id, field_id, is_visible as i32),
         )?;
 
@@ -268,8 +299,11 @@ impl LabelStore<'_> {
         field_id: &str,
     ) -> Result<(), StorageError> {
         self.conn.execute(
-            "DELETE FROM contact_visibility_overrides
+            &format!(
+                "DELETE FROM {}
              WHERE contact_id = ?1 AND field_id = ?2",
+                self.overrides_table
+            ),
             (contact_id, field_id),
         )?;
 
@@ -280,10 +314,11 @@ impl LabelStore<'_> {
         &self,
         contact_id: &str,
     ) -> Result<HashMap<String, bool>, StorageError> {
-        let mut stmt = self.conn.prepare(
-            "SELECT field_id, is_visible FROM contact_visibility_overrides
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT field_id, is_visible FROM {}
              WHERE contact_id = ?1",
-        )?;
+            self.overrides_table
+        ))?;
 
         let rows = stmt.query_map([contact_id], |row| {
             let field_id: String = row.get(0)?;
@@ -303,9 +338,10 @@ impl LabelStore<'_> {
     pub fn load_all_contact_overrides(
         &self,
     ) -> Result<HashMap<String, HashMap<String, bool>>, StorageError> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT contact_id, field_id, is_visible FROM contact_visibility_overrides")?;
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT contact_id, field_id, is_visible FROM {}",
+            self.overrides_table
+        ))?;
 
         let rows = stmt.query_map([], |row| {
             let contact_id: String = row.get(0)?;
@@ -328,7 +364,7 @@ impl LabelStore<'_> {
     /// Deletes all per-contact overrides for a contact.
     pub fn delete_all_contact_overrides(&self, contact_id: &str) -> Result<(), StorageError> {
         self.conn.execute(
-            "DELETE FROM contact_visibility_overrides WHERE contact_id = ?1",
+            &format!("DELETE FROM {} WHERE contact_id = ?1", self.overrides_table),
             [contact_id],
         )?;
 
@@ -387,7 +423,10 @@ impl LabelStore<'_> {
         // Check for duplicate via HMAC lookup (#128)
         let name_hmac = self.compute_lookup_hmac(b"Vauchi_Label_Name_HMAC_v1", name.as_bytes());
         let existing = self.conn.query_row(
-            "SELECT COUNT(*) FROM visibility_labels WHERE name_hmac = ?1",
+            &format!(
+                "SELECT COUNT(*) FROM {} WHERE name_hmac = ?1",
+                self.labels_table
+            ),
             [&name_hmac],
             |row| row.get::<_, i32>(0),
         )?;
@@ -398,11 +437,11 @@ impl LabelStore<'_> {
             ));
         }
 
-        let count = self
-            .conn
-            .query_row("SELECT COUNT(*) FROM visibility_labels", [], |row| {
-                row.get::<_, i32>(0)
-            })?;
+        let count = self.conn.query_row(
+            &format!("SELECT COUNT(*) FROM {}", self.labels_table),
+            [],
+            |row| row.get::<_, i32>(0),
+        )?;
 
         if count >= crate::contact::MAX_LABELS as i32 {
             return Err(StorageError::Serialization(format!(
@@ -436,7 +475,10 @@ impl LabelStore<'_> {
         let new_name_hmac =
             self.compute_lookup_hmac(b"Vauchi_Label_Name_HMAC_v1", new_name.as_bytes());
         let existing = self.conn.query_row(
-            "SELECT COUNT(*) FROM visibility_labels WHERE name_hmac = ?1 AND id != ?2",
+            &format!(
+                "SELECT COUNT(*) FROM {} WHERE name_hmac = ?1 AND id != ?2",
+                self.labels_table
+            ),
             rusqlite::params![new_name_hmac, label_id],
             |row| row.get::<_, i32>(0),
         )?;
@@ -452,7 +494,10 @@ impl LabelStore<'_> {
         let now = self.now_secs();
 
         let changes = self.conn.execute(
-            "UPDATE visibility_labels SET name_encrypted = ?1, name_hmac = ?2, modified_at = ?3 WHERE id = ?4",
+            &format!(
+                "UPDATE {} SET name_encrypted = ?1, name_hmac = ?2, modified_at = ?3 WHERE id = ?4",
+                self.labels_table
+            ),
             rusqlite::params![name_encrypted, new_name_hmac, now as i64, label_id],
         )?;
 

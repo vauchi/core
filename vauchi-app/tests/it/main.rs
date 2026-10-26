@@ -218,6 +218,7 @@ mod recovery_help_i18n_tests;
 mod recovery_screen_tests;
 mod recovery_status_i18n_tests;
 mod recovery_vouch_contact_tests;
+mod refresh_requested_tests;
 mod relay_editor_anchor_tests;
 mod render_context_tests;
 #[path = "../responsive_presentation_tests.rs"]

@@ -118,6 +118,26 @@ tamarin_expect() {
     done
 }
 
+# tamarin_diff_expect <model> <verdict> "<flags>": the model's two sides
+# (`diff(...)`) must be observationally equivalent (verified) or
+# distinguishable (falsified) with those -D flags.
+tamarin_diff_expect() {
+    d_model=$1
+    d_verdict=$2
+    d_flags=$3
+    # shellcheck disable=SC2086 # the flags are separate words
+    d_out=$(tamarin-prover --prove --diff $d_flags "$d_model" 2>&1) || {
+        printf '%s\n' "$d_out"
+        exit 1
+    }
+    echo "$d_model --diff $d_flags:"
+    printf '%s\n' "$d_out" | grep -E '^  DiffLemma:' || true
+    printf '%s\n' "$d_out" | grep -qE "^  DiffLemma:  Observational_equivalence : $d_verdict" || {
+        echo "FAIL: Tamarin observational equivalence is not $d_verdict ($d_model --diff $d_flags)" >&2
+        exit 1
+    }
+}
+
 models=vauchi-core/verification
 tamarin_expect "$models/qr_exchange.spthy" verified "" \
     executable session_key_secrecy no_misbinding
@@ -176,6 +196,12 @@ tamarin_expect "$models/card_update.spthy" falsified "-DNO_RECIPIENT_BINDING" \
     update_comes_from_the_sender_for_this_recipient
 tamarin_expect "$models/card_update.spthy" falsified "-DNO_VERSION_FLOOR" \
     no_rollback
+
+# Duress cover (#811, ADR-032): a coercer watching the wire cannot tell a
+# duress unlock that sends cover from a normal unlock that sends their
+# edit — unless they also extract the ratchet keys, the design's limit.
+tamarin_diff_expect "$models/duress_cover.spthy" verified ""
+tamarin_diff_expect "$models/duress_cover.spthy" falsified "-DCOERCER_HOLDS_RATCHET"
 
 # ── Quint ─────────────────────────────────────────────────────────────
 # The device-link host and joiner machines (#757, #808). `quint verify`

@@ -220,6 +220,7 @@ mod relay_editor_anchor_tests;
 mod render_context_tests;
 #[path = "../responsive_presentation_tests.rs"]
 mod responsive_presentation_tests;
+mod restorable_state_tests;
 mod result_routing_wiring_tests;
 mod row_info_tests;
 mod settings_canvas_tests;

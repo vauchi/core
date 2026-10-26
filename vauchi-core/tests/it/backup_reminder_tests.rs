@@ -68,7 +68,7 @@ fn backup_reminder_state_record_reminder_increments() {
 
 // ── Reminder scheduling logic ────────────────────────────────────────────────
 
-// @scenario: backup_reminder :: reminders disabled
+// @scenario: backup_reminder :: User disables backup reminders via frequency "Never"
 // @internal
 #[test]
 fn is_reminder_due_false_when_disabled() {
@@ -85,7 +85,7 @@ fn is_reminder_due_false_when_disabled() {
     assert!(!state2.is_reminder_due(now, identity_created));
 }
 
-// @scenario: backup_reminder :: first reminder after 7 days
+// @scenario: backup_reminder :: First reminder fires 7 days after identity creation
 // @internal
 #[test]
 fn is_reminder_due_after_7_days_first_time() {
@@ -105,7 +105,7 @@ fn is_reminder_not_due_before_7_days() {
     assert!(!state.is_reminder_due(now, identity_created));
 }
 
-// @scenario: backup_reminder :: monthly frequency at 30-day threshold
+// @scenario: backup_reminder :: Monthly frequency fires at 30 days
 // @internal
 #[test]
 fn is_reminder_due_after_30_days_monthly() {
@@ -122,7 +122,7 @@ fn is_reminder_due_after_30_days_monthly() {
     assert!(!state.is_reminder_due(now_early, 0));
 }
 
-// @scenario: backup_reminder :: Monthly frequency fires at 30 days
+// @scenario: backup_reminder :: Monthly frequency suppresses reminder at 7 days
 // @internal
 #[test]
 fn is_reminder_due_monthly_frequency() {
@@ -139,7 +139,6 @@ fn is_reminder_due_monthly_frequency() {
     assert!(state.is_reminder_due(now_31d, identity_created));
 }
 
-// @scenario: backup_reminder :: frequency cycling
 // @internal
 #[test]
 fn reminder_frequency_cycles() {
@@ -191,16 +190,17 @@ fn backup_reminder_storage_roundtrip() {
 
 // ── Export integration ───────────────────────────────────────────────────────
 
-// @scenario: backup_reminder :: export updates reminder state
+// @scenario: backup_reminder :: Successful backup resets the reminder timer
 // @internal
 #[test]
 fn export_backup_updates_reminder_state() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("TestUser").unwrap();
 
-    // Before export, no backup timestamp
-    let state_before = vauchi.load_backup_reminder_state().unwrap();
-    assert_eq!(state_before.last_backup_timestamp, None);
+    let mut overdue = BackupReminderState::new();
+    overdue.last_backup_timestamp = Some(1);
+    overdue.reminder_count = 2;
+    vauchi.save_backup_reminder_state(&overdue).unwrap();
 
     let _backup = vauchi.export_backup(BACKUP_PASSWORD).unwrap();
 
@@ -210,11 +210,14 @@ fn export_backup_updates_reminder_state() {
         "export_backup should set last_backup_timestamp"
     );
     assert_eq!(state_after.reminder_count, 0);
-
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs();
     let ts = state_after.last_backup_timestamp.unwrap();
     assert!(now - ts < 5, "timestamp should be recent");
+    assert!(
+        !state_after.is_reminder_due(now, 0),
+        "a fresh backup leaves no reminder for the next launch"
+    );
 }

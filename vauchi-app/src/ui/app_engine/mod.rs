@@ -181,6 +181,8 @@ pub struct AppEngine {
     /// (brightness, idle timer, future orientation lock, haptics).
     /// Phase 2b of `2026-05-04-exchange-command-screen-presentation`.
     pending_commands: std::collections::VecDeque<vauchi_core::Command>,
+    /// Where Core keeps the pick, once a shell names its data directory.
+    kept_state_file: Option<crate::ui::restorable_state::KeptStateFile>,
     /// Contact id awaiting an `Event::LocationResult` after an exchange
     /// emitted `Command::LocationRequest` (ADR-051 capture-at-exchange).
     /// Recorded via `Vauchi::set_exchange_location`; a location denial /
@@ -564,6 +566,7 @@ impl AppEngine {
             network_online: true,
             sync_chrome_status: SyncChromeStatus::Idle,
             pending_commands: std::collections::VecDeque::new(),
+            kept_state_file: None,
             pending_location_contact: None,
             legacy_exchange_persisted: None,
             exchange_was_reconnection: false,

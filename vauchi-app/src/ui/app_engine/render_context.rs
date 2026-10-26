@@ -33,6 +33,9 @@ impl AppEngine {
     /// vault copy redundant; without one, the vault copy applies and is
     /// handed to the shell to keep (vauchi/private#814).
     pub fn set_render_context(&mut self, mut ctx: crate::ui::RenderContext) {
+        if ctx.restorable_state.is_none() {
+            ctx.restorable_state = self.kept_state_file.as_ref().and_then(|file| file.read());
+        }
         if ctx.apply_restorable_state() {
             self.drop_vault_appearance();
         } else if let Some(pick) = ctx.apply_saved_appearance(&self.vauchi) {
@@ -46,7 +49,14 @@ impl AppEngine {
 
     /// Keeps the language and theme pick in `data_dir`, outside the vault,
     /// so no shell stores it (vauchi/private#814).
-    pub fn keep_restorable_state_in(&mut self, _data_dir: &std::path::Path) {}
+    pub fn keep_restorable_state_in(&mut self, data_dir: &std::path::Path) {
+        self.kept_state_file = Some(crate::ui::restorable_state::KeptStateFile::in_dir(data_dir));
+        let ctx = crate::ui::RenderContext {
+            restorable_state: None,
+            ..self.render_context.clone()
+        };
+        self.set_render_context(ctx);
+    }
 
     fn drop_vault_appearance(&self) {
         let Ok(mut flags) = self.vauchi.load_settings_flags() else {
@@ -60,8 +70,16 @@ impl AppEngine {
         }
     }
 
-    /// Queues the pick for the shell to keep, replacing one still queued.
+    /// Keeps the pick in the data directory when Core has one; otherwise
+    /// queues it for a shell that keeps it, replacing one still queued.
     pub(crate) fn keep_restorable_state(&mut self, pick: &vauchi_core::settings::AppearancePick) {
+        if let Some(file) = &self.kept_state_file {
+            // Best effort: until the file is written the vault copy still
+            // carries the pick.
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = file.write(&crate::ui::restorable_state::encode(pick));
+            return;
+        }
         self.pending_commands
             .retain(|command| !matches!(command, vauchi_core::Command::SaveRestorableState { .. }));
         self.pending_commands

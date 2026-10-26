@@ -8,6 +8,9 @@
 //! size bound, of another version, with unknown fields or with a value
 //! Core would not offer is ignored whole.
 
+use std::io::{self, Read};
+use std::path::{Path, PathBuf};
+
 use serde::{Deserialize, Serialize};
 use vauchi_core::settings::AppearancePick;
 
@@ -57,4 +60,40 @@ fn is_theme_id(id: &str) -> bool {
         && id
             .bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_')
+}
+
+const FILE_NAME: &str = "restorable_state";
+/// Far above `MAX_STATE_BYTES`; it only stops a damaged or planted file
+/// from being read whole. `decode` applies the real bound.
+const MAX_FILE_BYTES: u64 = 4096;
+
+/// The pick kept in a data directory, outside the vault, so it applies
+/// before storage opens and no shell stores it (vauchi/private#814).
+#[derive(Debug, Clone)]
+pub(crate) struct KeptStateFile(PathBuf);
+
+impl KeptStateFile {
+    pub(crate) fn in_dir(data_dir: &Path) -> Self {
+        Self(data_dir.join(FILE_NAME))
+    }
+
+    pub(crate) fn read(&self) -> Option<String> {
+        let file = std::fs::File::open(&self.0).ok()?;
+        if file.metadata().ok()?.len() > MAX_FILE_BYTES {
+            return None;
+        }
+        let mut state = String::new();
+        file.take(MAX_FILE_BYTES + 1)
+            .read_to_string(&mut state)
+            .ok()?;
+        Some(state)
+    }
+
+    pub(crate) fn write(&self, state: &str) -> io::Result<()> {
+        let partial = self.0.with_extension("partial");
+        std::fs::write(&partial, state)?;
+        // A rename replaces the kept value whole, so a crash mid-write leaves
+        // the previous one.
+        std::fs::rename(partial, &self.0)
+    }
 }

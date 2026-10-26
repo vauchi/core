@@ -58,6 +58,7 @@ pub struct StorageLockPresentation {
     screen: Screen,
     locale: Locale,
     render_context: RenderContext,
+    kept_state_file: Option<crate::ui::restorable_state::KeptStateFile>,
     revision: u64,
     /// The next locked render asks for the platform prompt. Set at start and
     /// after a tapped Unlock; never after a prompt-triggered retry, so a
@@ -75,6 +76,7 @@ impl StorageLockPresentation {
             screen: screen_for(reason),
             locale,
             render_context: RenderContext::default(),
+            kept_state_file: None,
             revision: 0,
             prompt_on_render: true,
             retry_from_tap: false,
@@ -87,13 +89,23 @@ impl StorageLockPresentation {
         self.locale = locale;
     }
 
-    /// The language and theme of the next render, from the shell's push and
-    /// the pick it keeps for Core (vauchi/private#814).
     /// Shows the pick Core kept in `data_dir` before storage opens
     /// (vauchi/private#814).
-    pub fn keep_restorable_state_in(&mut self, _data_dir: &std::path::Path) {}
+    pub fn keep_restorable_state_in(&mut self, data_dir: &std::path::Path) {
+        self.kept_state_file = Some(crate::ui::restorable_state::KeptStateFile::in_dir(data_dir));
+        let context = RenderContext {
+            restorable_state: None,
+            ..self.render_context.clone()
+        };
+        self.set_render_context(context);
+    }
 
+    /// The language and theme of the next render, from the shell's push and
+    /// the pick Core keeps (vauchi/private#814).
     pub fn set_render_context(&mut self, mut context: RenderContext) {
+        if context.restorable_state.is_none() {
+            context.restorable_state = self.kept_state_file.as_ref().and_then(|file| file.read());
+        }
         context.apply_restorable_state();
         context.system_color_scheme = context
             .system_color_scheme

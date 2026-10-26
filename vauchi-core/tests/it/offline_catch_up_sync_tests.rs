@@ -31,23 +31,43 @@ use vauchi_protocol::ohttp_key::window_of;
 
 const OFFLINE_DAYS: u64 = 100;
 
-fn client(
+/// A client's durable half: its database and the key that opens it.
+struct Install {
+    dir: tempfile::TempDir,
+    key: SymmetricKey,
+}
+
+/// Opens (or reopens) the client on `install`'s database.
+fn open(
+    install: &Install,
     outer: &MockRelay,
     application: &MockRelay,
     clock: Arc<FakeClock>,
-    name: &str,
-) -> (Vauchi, tempfile::TempDir) {
-    let dir = tempfile::tempdir().unwrap();
-    let config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
-        .with_storage_key(SymmetricKey::generate())
+) -> Vauchi {
+    let config = VauchiConfig::with_storage_path(install.dir.path().join("vauchi.db"))
+        .with_storage_key(install.key.clone())
         .with_relay_url(application.url())
         .with_ohttp_relay_url(outer.url());
     let mut client = Vauchi::new_with(config, clock, OsSecureRng::shared(), None)
         .unwrap()
         .with_sleeper(Arc::new(FakeSleeper::new()));
-    client.create_identity(name).unwrap();
     client.set_ohttp_key_for_testing(OhttpClient::new(outer.ohttp_key_config()).unwrap());
-    (client, dir)
+    client
+}
+
+fn client(
+    outer: &MockRelay,
+    application: &MockRelay,
+    clock: Arc<FakeClock>,
+    name: &str,
+) -> (Vauchi, Install) {
+    let install = Install {
+        dir: tempfile::tempdir().unwrap(),
+        key: SymmetricKey::generate(),
+    };
+    let mut client = open(&install, outer, application, clock);
+    client.create_identity(name).unwrap();
+    (client, install)
 }
 
 fn sync(client: &mut Vauchi) -> VauchiSyncOutcome {
@@ -82,8 +102,8 @@ fn a_client_offline_100_days_catches_up_in_bounded_steps() {
     let clock = Arc::new(FakeClock::new(UNIX_EPOCH + Duration::from_secs(NOW)));
     outer.enable_ohttp_gateway(&SignedGateway::new(0x63), window_of(NOW));
     outer.enable_gateway_mailboxes(clock.clone(), 2);
-    let (mut alice, _alice_dir) = client(&outer, &application, clock.clone(), "Alice");
-    let (mut bob, _bob_dir) = client(&outer, &application, clock.clone(), "Bob");
+    let (mut alice, _alice_install) = client(&outer, &application, clock.clone(), "Alice");
+    let (mut bob, _bob_install) = client(&outer, &application, clock.clone(), "Bob");
     let linked = link_contacts(&alice, &bob, "Bob");
     let send_day = current_day_epoch(NOW);
 
@@ -166,4 +186,89 @@ fn a_client_offline_100_days_catches_up_in_bounded_steps() {
         send_day,
     ));
     assert!(probe.fetch(&[old_token]).unwrap().is_empty());
+}
+
+/// Bob shares a field, then revokes it a month later, both while Alice is
+/// away; her catch-up applies the share before the revocation, keeps its
+/// place across a restart, and ends with the field gone.
+// @scenario: message_delivery :: Receive pending updates when coming online
+#[test]
+fn a_revocation_sent_while_offline_lands_after_the_share_and_survives_a_restart() {
+    let outer = MockRelay::start();
+    let application = MockRelay::start();
+    let clock = Arc::new(FakeClock::new(UNIX_EPOCH + Duration::from_secs(NOW)));
+    outer.enable_ohttp_gateway(&SignedGateway::new(0x64), window_of(NOW));
+    outer.enable_gateway_mailboxes(clock.clone(), 2);
+    let (alice, alice_install) = client(&outer, &application, clock.clone(), "Alice");
+    let (mut bob, _bob_install) = client(&outer, &application, clock.clone(), "Bob");
+    let linked = link_contacts(&alice, &bob, "Bob");
+    let share_day = current_day_epoch(NOW);
+
+    let mut updated = bob.own_card().unwrap().unwrap().clone();
+    let field = ContactField::new(FieldType::Email, "Email", "bob@example.invalid", 0);
+    let field_id = field.id().to_string();
+    updated.add_field(field).unwrap();
+    bob.update_own_card(&updated).unwrap();
+    bob.set_contact_visibility_override(&linked.host_contact_id, &field_id, true)
+        .unwrap();
+    sync(&mut bob);
+
+    clock.advance(Duration::from_secs(30 * DAY));
+    let revoke_day = share_day + 30;
+    bob.set_contact_visibility_override(&linked.host_contact_id, &field_id, false)
+        .unwrap();
+    let revoked = sync(&mut bob);
+    assert!(
+        matches!(&revoked, VauchiSyncOutcome::Ok { sent, .. } if *sent > 0),
+        "{revoked:?}"
+    );
+
+    clock.advance(Duration::from_secs(70 * DAY));
+    let today = share_day + OFFLINE_DAYS;
+    let fields = |alice: &Vauchi| {
+        alice
+            .get_contact(&linked.peer_contact_id)
+            .unwrap()
+            .unwrap()
+            .card()
+            .fields()
+            .iter()
+            .map(|field| field.value().to_string())
+            .collect::<Vec<_>>()
+    };
+
+    // The share's day is in the second chunk, the revocation's in the fifth.
+    let mut alice = alice;
+    for _ in 0..3 {
+        sync(&mut alice);
+    }
+    assert_eq!(fields(&alice), vec!["bob@example.invalid"]);
+    let resumed_from = checkpoint(&alice, &application).unwrap();
+    assert!(resumed_from < revoke_day);
+
+    drop(alice);
+    let mut alice = open(&alice_install, &outer, &application, clock.clone());
+    assert_eq!(checkpoint(&alice, &application), Some(resumed_from));
+    let mut cycles = 0;
+    while checkpoint(&alice, &application) != Some(today) {
+        cycles += 1;
+        assert!(cycles <= RETAINED_DAYS / (CATCH_UP_DAYS_PER_CYCLE - 2) + 2);
+        sync(&mut alice);
+    }
+
+    assert_eq!(fields(&alice), Vec::<String>::new());
+    let mut probe = HttpTransport::new(HttpTransportConfig::for_testing(outer.url(), 2_000));
+    probe.set_ohttp(OhttpClient::new(outer.ohttp_key_config()).unwrap());
+    let alice_pk = *alice.identity().unwrap().signing_public_key();
+    for day in [share_day, revoke_day] {
+        let token = token_hex(&compute_mailbox_token(
+            linked.shared_secret.as_bytes(),
+            &alice_pk,
+            day,
+        ));
+        assert!(
+            probe.fetch(&[token]).unwrap().is_empty(),
+            "day {day}'s mailbox must be acknowledged"
+        );
+    }
 }

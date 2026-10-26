@@ -72,7 +72,7 @@ fn is_refused(result: Result<vauchi_core::backup::FullBackupEnvelope, VauchiErro
 // @scenario: backup_recovery :: A whole group missing blocks recovery
 #[test]
 fn every_shape_recovers_with_one_from_each_group_and_not_without() {
-    let mut alice = identity("Alice Smith");
+    let alice = identity("Alice Smith");
     alice
         .add_contact(Contact::from_exchange(
             [7; 32],

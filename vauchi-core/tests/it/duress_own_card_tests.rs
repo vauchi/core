@@ -47,10 +47,6 @@ fn has_phone(card: &ContactCard) -> bool {
     card.fields().iter().any(|f| f.label() == "Phone")
 }
 
-fn pending_updates(wb: &Vauchi) -> usize {
-    wb.storage().pending().count_all_pending_updates().unwrap()
-}
-
 // @scenario: duress_mode :: Cannot access real contacts from duress mode
 #[test]
 fn a_duress_edit_survives_a_lock_and_a_second_duress_unlock() {

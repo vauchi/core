@@ -34,6 +34,14 @@ impl PreparedDevicePayload {
     }
 }
 
+/// A card delta stamped, signed and CEK-wrapped for one contact
+/// (`Vauchi::cek_wrapped_card_delta`).
+pub(crate) struct SealedCardDelta {
+    pub(crate) payload_bytes: Vec<u8>,
+    pub(crate) cek: crate::crypto::cek::ContentEncryptionKey,
+    pub(crate) version: u32,
+}
+
 impl Vauchi {
     // === Card Propagation Operations ===
 
@@ -263,49 +271,18 @@ impl Vauchi {
         &self,
         identity: &crate::identity::Identity,
         contact: &mut crate::contact::Contact,
-        mut delta: crate::sync::delta::CardDelta,
+        delta: crate::sync::delta::CardDelta,
         extra_persist: impl FnOnce(&[PreparedDevicePayload]) -> VauchiResult<()>,
     ) -> VauchiResult<Vec<PreparedDevicePayload>> {
-        use crate::crypto::cek::ContentEncryptionKey;
-        use crate::sync::delta::{CekWrappedPayload, VersionedPayload};
-
         let contact_id = contact.id().to_string();
-
-        // Version tracking for downgrade detection (#42)
-        let next_version = self
-            .storage
-            .contacts()
-            .last_sent_delta_version(&contact_id)
-            .unwrap_or(0)
-            + 1;
-        delta.set_version(next_version);
-
-        // Sign delta with our identity, bound to recipient
-        let recipient_pk = *contact
-            .public_key()
-            .ok_or_else(|| VauchiError::InvalidState("Contact has no public key".into()))?;
-        delta.sign(identity, &recipient_pk);
-
-        let delta_bytes =
-            serde_json::to_vec(&delta).map_err(|e| VauchiError::Serialization(e.to_string()))?;
-
-        let new_cek = ContentEncryptionKey::generate();
-        let cek_ciphertext = new_cek
-            .encrypt(&delta_bytes)
-            .map_err(|e| VauchiError::Crypto(format!("CEK encrypt: {:?}", e)))?;
-        let wrapped = CekWrappedPayload {
-            cek: new_cek.to_bytes(),
-            cek_ciphertext,
-            signature: delta.signature,
-            nonce: delta.nonce,
-        };
-        let payload_bytes = VersionedPayload::encode_cek(&wrapped);
+        let sealed = self.cek_wrapped_card_delta(identity, contact, delta)?;
+        let next_version = sealed.version;
 
         let prepared =
-            self.encrypt_payload_for_contact_devices(identity, contact, &payload_bytes)?;
+            self.encrypt_payload_for_contact_devices(identity, contact, &sealed.payload_bytes)?;
 
         self.storage.with_savepoint(|| -> VauchiResult<()> {
-            contact.set_cek(new_cek);
+            contact.set_cek(sealed.cek);
             self.storage.contacts().save_contact(contact)?;
             for payload in prepared.iter().filter(|p| p.persist_session) {
                 self.storage.ratchets().save_ratchet_state_for_device(
@@ -323,6 +300,53 @@ impl Vauchi {
         })?;
 
         Ok(prepared)
+    }
+
+    /// Stamps, signs and CEK-wraps `delta` for `contact`: the plaintext the
+    /// contact's ratchet sessions encrypt, with the CEK and version to persist
+    /// once it is sent.
+    pub(crate) fn cek_wrapped_card_delta(
+        &self,
+        identity: &crate::identity::Identity,
+        contact: &crate::contact::Contact,
+        mut delta: crate::sync::delta::CardDelta,
+    ) -> VauchiResult<SealedCardDelta> {
+        use crate::crypto::cek::ContentEncryptionKey;
+        use crate::sync::delta::{CekWrappedPayload, VersionedPayload};
+
+        // Version tracking for downgrade detection (#42)
+        let version = self
+            .storage
+            .contacts()
+            .last_sent_delta_version(contact.id())
+            .unwrap_or(0)
+            + 1;
+        delta.set_version(version);
+
+        // Sign delta with our identity, bound to recipient
+        let recipient_pk = *contact
+            .public_key()
+            .ok_or_else(|| VauchiError::InvalidState("Contact has no public key".into()))?;
+        delta.sign(identity, &recipient_pk);
+
+        let delta_bytes =
+            serde_json::to_vec(&delta).map_err(|e| VauchiError::Serialization(e.to_string()))?;
+
+        let cek = ContentEncryptionKey::generate();
+        let cek_ciphertext = cek
+            .encrypt(&delta_bytes)
+            .map_err(|e| VauchiError::Crypto(format!("CEK encrypt: {:?}", e)))?;
+        let wrapped = CekWrappedPayload {
+            cek: cek.to_bytes(),
+            cek_ciphertext,
+            signature: delta.signature,
+            nonce: delta.nonce,
+        };
+        Ok(SealedCardDelta {
+            payload_bytes: VersionedPayload::encode_cek(&wrapped),
+            cek,
+            version,
+        })
     }
 
     /// This identity's signed registry broadcast for genesis announcement.

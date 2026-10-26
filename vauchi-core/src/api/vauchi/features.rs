@@ -20,6 +20,13 @@ use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::VauchiEvent;
 use super::{RecoveryReadiness, Vauchi};
 
+/// A contact's share of an own-card repropagation (`Vauchi::owed_card_delta`).
+pub(crate) struct OwedCardDelta {
+    pub(crate) delta: crate::sync::delta::CardDelta,
+    /// The field ids the delta carries — the contact's next last-sent baseline.
+    pub(crate) new_visible: std::collections::HashSet<String>,
+}
+
 impl Vauchi {
     /// Diagnostic dump of a contact's F4 sync/handshake state — debug-only
     /// observability for the lost-primary certification (2026-07-26). Reveals
@@ -611,7 +618,6 @@ impl Vauchi {
     /// by their current visibility rules. Skips if the contact has no ratchet.
     pub(crate) fn repropagate_to_contact(&self, contact_id: &str) -> VauchiResult<()> {
         use crate::storage::{PendingUpdate, UpdateStatus};
-        use crate::sync::delta::CardDelta;
 
         let identity = self
             .identity
@@ -630,74 +636,11 @@ impl Vauchi {
             .load_contact(contact_id)?
             .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
 
-        // Ok, not ContactBlocked: nothing is owed to a blocked contact, so the
-        // owed-repropagation pass must not count it as a failure and retry (ADR-056).
-        if contact.is_blocked() {
+        let Some(OwedCardDelta { delta, new_visible }) =
+            self.owed_card_delta(&own_card, &contact)?
+        else {
             return Ok(());
-        }
-
-        // Legacy peers need their original session; device-aware peers can
-        // bootstrap pair sessions from the verified registry below.
-        if self
-            .storage
-            .device()
-            .load_contact_active_devices(contact_id)?
-            .is_empty()
-            && self
-                .storage
-                .ratchets()
-                .load_ratchet_state(contact_id)?
-                .is_none()
-        {
-            return Ok(());
-        }
-
-        // The fields currently visible to this contact (effective, group-aware)
-        // — also the new last-sent baseline.
-        let contact_id_owned = contact_id.to_string();
-        let new_visible: std::collections::HashSet<String> = own_card
-            .fields()
-            .iter()
-            .map(|f| f.id().to_string())
-            .filter(|fid| {
-                self.get_effective_field_visibility(&contact_id_owned, fid)
-                    .unwrap_or(false)
-            })
-            .collect();
-
-        // Add/modify delta for the currently-visible fields (from an empty
-        // baseline, so the receiver re-applies idempotently). The baseline name
-        // is the name the contact LAST received (default "" forces the current
-        // name onto the first send) — so a rename emits a `DisplayNameChanged`
-        // exactly when it changed. Stamping the baseline with the *current* name
-        // (the old behaviour) neutralised the diff, so renames never propagated
-        // (2026-06-29-card-update-duplicate-message-paths).
-        let last_sent_name = self
-            .storage
-            .contacts()
-            .load_last_sent_display_name(contact_id)?
-            .unwrap_or_default();
-        let empty_card = ContactCard::new(&last_sent_name);
-        let mut delta = CardDelta::compute(&empty_card, &own_card, self.clock.unix_seconds())
-            .filter_with(|field_id| new_visible.contains(field_id));
-
-        // Revocation (2026-06-08-card-revocation-not-propagated, fix C): fields
-        // the contact last saw but may no longer see get an explicit `Removed`
-        // change so the peer drops them. `None` baseline (first send) → no
-        // removals (we have no record of what was previously shared).
-        if let Some(prev) = self
-            .storage
-            .contacts()
-            .load_last_sent_visible_fields(contact_id)?
-        {
-            for revoked in prev.difference(&new_visible) {
-                delta
-                    .changes
-                    .push(crate::sync::delta::FieldChange::Removed {
-                        field_id: revoked.clone(),
-                    });
-            }
-        }
+        };
 
         if delta.is_empty() {
             // Nothing to add or remove; still record the baseline so a later
@@ -738,6 +681,90 @@ impl Vauchi {
             Ok(())
         })?;
         Ok(())
+    }
+
+    /// What a repropagation owes `contact`: `own_card` as this contact may
+    /// see it, sent from an empty baseline so the receiver re-applies it
+    /// idempotently, plus revocations of fields it last saw. `None` when
+    /// nothing may be sent to this contact at all.
+    pub(crate) fn owed_card_delta(
+        &self,
+        own_card: &ContactCard,
+        contact: &Contact,
+    ) -> VauchiResult<Option<OwedCardDelta>> {
+        use crate::sync::delta::CardDelta;
+
+        let contact_id = contact.id();
+
+        // None, not ContactBlocked: nothing is owed to a blocked contact, so the
+        // owed-repropagation pass must not count it as a failure and retry (ADR-056).
+        if contact.is_blocked() {
+            return Ok(None);
+        }
+
+        // Legacy peers need their original session; device-aware peers can
+        // bootstrap pair sessions from the verified registry below.
+        if self
+            .storage
+            .device()
+            .load_contact_active_devices(contact_id)?
+            .is_empty()
+            && self
+                .storage
+                .ratchets()
+                .load_ratchet_state(contact_id)?
+                .is_none()
+        {
+            return Ok(None);
+        }
+
+        // The fields currently visible to this contact (effective, group-aware)
+        // — also the new last-sent baseline.
+        let new_visible: std::collections::HashSet<String> = own_card
+            .fields()
+            .iter()
+            .map(|f| f.id().to_string())
+            .filter(|fid| {
+                self.get_effective_field_visibility(contact_id, fid)
+                    .unwrap_or(false)
+            })
+            .collect();
+
+        // Add/modify delta for the currently-visible fields (from an empty
+        // baseline, so the receiver re-applies idempotently). The baseline name
+        // is the name the contact LAST received (default "" forces the current
+        // name onto the first send) — so a rename emits a `DisplayNameChanged`
+        // exactly when it changed. Stamping the baseline with the *current* name
+        // (the old behaviour) neutralised the diff, so renames never propagated
+        // (2026-06-29-card-update-duplicate-message-paths).
+        let last_sent_name = self
+            .storage
+            .contacts()
+            .load_last_sent_display_name(contact_id)?
+            .unwrap_or_default();
+        let empty_card = ContactCard::new(&last_sent_name);
+        let mut delta = CardDelta::compute(&empty_card, own_card, self.clock.unix_seconds())
+            .filter_with(|field_id| new_visible.contains(field_id));
+
+        // Revocation (2026-06-08-card-revocation-not-propagated, fix C): fields
+        // the contact last saw but may no longer see get an explicit `Removed`
+        // change so the peer drops them. `None` baseline (first send) → no
+        // removals (we have no record of what was previously shared).
+        if let Some(prev) = self
+            .storage
+            .contacts()
+            .load_last_sent_visible_fields(contact_id)?
+        {
+            for revoked in prev.difference(&new_visible) {
+                delta
+                    .changes
+                    .push(crate::sync::delta::FieldChange::Removed {
+                        field_id: revoked.clone(),
+                    });
+            }
+        }
+
+        Ok(Some(OwedCardDelta { delta, new_visible }))
     }
 
     /// Runs the owed own-card repropagation pass.

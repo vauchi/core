@@ -23,7 +23,7 @@ fn vouching_engine(confidence: Confidence) -> RecoveryClaimReviewEngine {
         ReviewMode::Vouching,
         ClaimContext {
             contact_name: "Alice".into(),
-            old_pk_fingerprint: "AB12 CD34 EF56".into(),
+            new_pk_fingerprint: "WXYZ-5678-ABCD-1234".into(),
             mutual_voucher_count: match confidence {
                 Confidence::High => 3,
                 Confidence::Medium => 1,
@@ -40,7 +40,7 @@ fn acceptance_engine(confidence: Confidence) -> RecoveryClaimReviewEngine {
         ReviewMode::Acceptance,
         ClaimContext {
             contact_name: "Alice".into(),
-            old_pk_fingerprint: "AB12 CD34 EF56".into(),
+            new_pk_fingerprint: "WXYZ-5678-ABCD-1234".into(),
             mutual_voucher_count: match confidence {
                 Confidence::High => 3,
                 Confidence::Medium => 1,
@@ -191,29 +191,40 @@ fn low_confidence_has_verify_another_way() {
     assert!(has_verify, "low confidence should have verify_other action");
 }
 
-// @scenario: contact_recovery :: Verify other shows fingerprint
+// @scenario: contact_recovery :: Isolated contact verifies out of band
 #[test]
-fn verify_other_shows_fingerprint() {
+fn verify_other_shows_the_new_identity_fingerprint_and_calls_it_that() {
     let mut engine = vouching_engine(Confidence::Low);
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "verify_other".into(),
     });
-    match result {
-        ActionResult::UpdateScreen(screen) => {
-            let has_fingerprint = screen.components.iter().any(|c| match c {
-                Component::Text { content, .. } => content.contains("AB12 CD34 EF56"),
-                _ => false,
-            });
-            assert!(
-                has_fingerprint,
-                "should show old_pk fingerprint for verification"
-            );
-        }
-        other => panic!("Expected UpdateScreen with fingerprint, got {other:?}"),
-    }
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("Expected UpdateScreen with fingerprint, got {result:?}");
+    };
+    let text = |id: &str| -> String {
+        screen
+            .components
+            .iter()
+            .find_map(|c| match c {
+                Component::Text {
+                    id: cid, content, ..
+                } if cid == id => Some(content.clone()),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("no text component {id:?}"))
+    };
+    // An impersonator knows the old public key; only the claimant holds
+    // the new one, so that is the fingerprint the reviewer must ask for
+    // (vauchi/private#829).
+    assert_eq!(text("fingerprint"), "WXYZ-5678-ABCD-1234");
+    assert_eq!(text("fingerprint_label"), "New identity fingerprint:");
+    assert_eq!(
+        text("instructions"),
+        "Ask the person to read the fingerprint of their new identity aloud over a phone call. \
+         Only they have it; if it matches, you can safely vouch."
+    );
 }
 
-// @scenario: contact_recovery :: Low confidence accept anyway shows confirm
 #[test]
 fn low_confidence_accept_anyway_shows_confirm() {
     let mut engine = acceptance_engine(Confidence::Low);

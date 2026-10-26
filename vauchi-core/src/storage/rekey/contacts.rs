@@ -143,10 +143,11 @@ impl Storage {
         &self,
         old_key: &SymmetricKey,
         new_key: &SymmetricKey,
+        table: &str,
     ) -> Result<(), StorageError> {
         let mut stmt = self
             .conn
-            .prepare("SELECT id, name_encrypted FROM tags")
+            .prepare(&format!("SELECT id, name_encrypted FROM {table}"))
             .map_err(|e| StorageError::Migration(format!("Read tags: {}", e)))?;
 
         let rows: Vec<(String, Vec<u8>)> = stmt
@@ -160,7 +161,7 @@ impl Storage {
                 .map_err(|e| StorageError::Migration(format!("Rekey tag {}: {}", id, e)))?;
             self.conn
                 .execute(
-                    "UPDATE tags SET name_encrypted = ?1 WHERE id = ?2",
+                    &format!("UPDATE {table} SET name_encrypted = ?1 WHERE id = ?2"),
                     params![new_enc, id],
                 )
                 .map_err(|e| StorageError::Migration(format!("Update tag {}: {}", id, e)))?;
@@ -267,10 +268,11 @@ impl Storage {
         &self,
         old_key: &SymmetricKey,
         new_key: &SymmetricKey,
+        table: &str,
     ) -> Result<(), StorageError> {
         let mut stmt = self
             .conn
-            .prepare("SELECT id, data_encrypted FROM places")
+            .prepare(&format!("SELECT id, data_encrypted FROM {table}"))
             .map_err(|e| StorageError::Migration(format!("Read places: {}", e)))?;
         let rows: Vec<(String, Vec<u8>)> = stmt
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
@@ -282,7 +284,7 @@ impl Storage {
                 .map_err(|e| StorageError::Migration(format!("Rekey place {}: {}", id, e)))?;
             self.conn
                 .execute(
-                    "UPDATE places SET data_encrypted = ?1 WHERE id = ?2",
+                    &format!("UPDATE {table} SET data_encrypted = ?1 WHERE id = ?2"),
                     params![new_enc, id],
                 )
                 .map_err(|e| StorageError::Migration(format!("Update place {}: {}", id, e)))?;

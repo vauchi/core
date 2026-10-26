@@ -22,11 +22,8 @@ impl Vauchi {
             .into_iter()
             .map(|place| (place.id, place.name))
             .collect();
-        // One bulk read: a per-contact lookup errors on decoys, which have no
-        // row in the duress store's contact table.
         let place_ids: HashMap<String, String> = self
-            .vocabulary_store()?
-            .list_exchange_locations()?
+            .visible_exchange_locations()?
             .into_iter()
             .filter_map(|(contact_id, loc)| loc.place_id.map(|id| (contact_id, id)))
             .collect();

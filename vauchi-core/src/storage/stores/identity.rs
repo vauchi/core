@@ -203,6 +203,16 @@ impl IdentityStore<'_> {
         // The copy a duress session edited goes with the setup; a new one
         // starts from the real card again (vauchi/private#811).
         self.conn.execute("DELETE FROM duress_own_card", [])?;
+        // And so do the groups, tags and places its sessions made
+        // (vauchi/private#813).
+        for table in [
+            "duress_visibility_labels",
+            "duress_contact_visibility_overrides",
+            "duress_tags",
+            "duress_places",
+        ] {
+            self.conn.execute(&format!("DELETE FROM {table}"), [])?;
+        }
 
         Ok(())
     }

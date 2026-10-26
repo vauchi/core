@@ -211,6 +211,35 @@ fn fixtures() -> Vec<(&'static str, &'static str, &'static [u8])> {
         ),
         ("tags", "name_encrypted", b"climbing"),
         ("places", "data_encrypted", b"{\"name\":\"Home\"}"),
+        // The duress session's twins (vauchi/private#813).
+        (
+            "duress_visibility_labels",
+            "contacts_json_encrypted",
+            b"[\"d1\"]",
+        ),
+        (
+            "duress_visibility_labels",
+            "visible_fields_json_encrypted",
+            b"[\"email\"]",
+        ),
+        ("duress_visibility_labels", "name_encrypted", b"Work"),
+        (
+            "duress_visibility_labels",
+            "display_name_override_encrypted",
+            b"Custom Work",
+        ),
+        (
+            "duress_visibility_labels",
+            "bio_override_encrypted",
+            b"Work bio",
+        ),
+        (
+            "duress_visibility_labels",
+            "avatar_override_encrypted",
+            b"work-avatar",
+        ),
+        ("duress_tags", "name_encrypted", b"books"),
+        ("duress_places", "data_encrypted", b"{\"name\":\"Bern\"}"),
         ("audit_log", "details_encrypted", b"audit-details"),
         ("decoy_contacts", "card_encrypted", b"{\"name\":\"Decoy\"}"),
         ("decoy_contacts", "display_name_encrypted", b"Decoy"),
@@ -258,6 +287,7 @@ const CONTACT_PK: &[u8; 32] = b"\x01\x01\x01\x01\x01\x01\x01\x01\
                                 \x01\x01\x01\x01\x01\x01\x01\x01\
                                 \x01\x01\x01\x01\x01\x01\x01\x01";
 const LABEL_ID: &str = "l1";
+const DURESS_LABEL_ID: &str = "dl1";
 
 #[allow(clippy::too_many_lines)]
 fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
@@ -621,6 +651,42 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     )
     .unwrap();
 
+    // ── the duress twins (vauchi/private#813) ───────────────────
+    let duress_label_name_plain = fx("duress_visibility_labels", "name_encrypted");
+    conn.execute(
+        "INSERT INTO duress_visibility_labels \
+         (id, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, \
+          name_hmac, display_name_override_encrypted, bio_override_encrypted, \
+          avatar_override_encrypted, created_at, modified_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        params![
+            DURESS_LABEL_ID,
+            enc("duress_visibility_labels", "contacts_json_encrypted"),
+            enc("duress_visibility_labels", "visible_fields_json_encrypted"),
+            enc("duress_visibility_labels", "name_encrypted"),
+            label_hmac(key, &duress_label_name_plain),
+            enc(
+                "duress_visibility_labels",
+                "display_name_override_encrypted"
+            ),
+            enc("duress_visibility_labels", "bio_override_encrypted"),
+            enc("duress_visibility_labels", "avatar_override_encrypted"),
+            now,
+            now,
+        ],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO duress_tags (id, name_encrypted, created_at) VALUES ('dt1', ?1, ?2)",
+        params![enc("duress_tags", "name_encrypted"), now],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO duress_places (id, data_encrypted, created_at) VALUES ('dp1', ?1, ?2)",
+        params![enc("duress_places", "data_encrypted"), now],
+    )
+    .unwrap();
+
     // ── audit_log ────────────────────────────────────────────
     conn.execute(
         "INSERT INTO audit_log (event_type, details, details_encrypted, timestamp) \
@@ -734,6 +800,32 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
     // ── tags and places (keyed by id) ────────────────────────
     check_one("tags", "name_encrypted", "id = 't1'", id_eq_1);
     check_one("places", "data_encrypted", "id = 'p1'", id_eq_1);
+
+    // ── the duress twins (vauchi/private#813) ───────────────────
+    for col in [
+        "contacts_json_encrypted",
+        "visible_fields_json_encrypted",
+        "name_encrypted",
+        "display_name_override_encrypted",
+        "bio_override_encrypted",
+        "avatar_override_encrypted",
+    ] {
+        check_one("duress_visibility_labels", col, "id = 'dl1'", id_eq_1);
+    }
+    let duress_hmac: Vec<u8> = conn
+        .query_row(
+            "SELECT name_hmac FROM duress_visibility_labels WHERE id = ?1",
+            [&DURESS_LABEL_ID],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        duress_hmac,
+        label_hmac(new_key, &fx("duress_visibility_labels", "name_encrypted")),
+        "duress label hmac rekeyed"
+    );
+    check_one("duress_tags", "name_encrypted", "id = 'dt1'", id_eq_1);
+    check_one("duress_places", "data_encrypted", "id = 'dp1'", id_eq_1);
 
     // ── identity (3 columns, singleton) ─────────────────────
     for col in [
@@ -1022,6 +1114,7 @@ const COVERED_ELSEWHERE: &[(&str, &str)] = &[
     // Recomputed (not re-encrypted) during rekey; populated and checked in
     // this file through label_hmac rather than through the fixtures.
     ("visibility_labels", "name_hmac"),
+    ("duress_visibility_labels", "name_hmac"),
 ];
 
 // @internal

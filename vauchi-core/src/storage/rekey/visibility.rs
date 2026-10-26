@@ -12,10 +12,11 @@ impl Storage {
         &self,
         old_key: &SymmetricKey,
         new_key: &SymmetricKey,
+        table: &str,
     ) -> Result<(), StorageError> {
         let mut stmt = self
             .conn
-            .prepare("SELECT id, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, display_name_override_encrypted, bio_override_encrypted, avatar_override_encrypted FROM visibility_labels WHERE contacts_json_encrypted IS NOT NULL")
+            .prepare(&format!("SELECT id, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, display_name_override_encrypted, bio_override_encrypted, avatar_override_encrypted FROM {table} WHERE contacts_json_encrypted IS NOT NULL"))
             .map_err(|e| StorageError::Migration(format!("Read labels: {}", e)))?;
 
         #[allow(clippy::type_complexity)]
@@ -157,7 +158,7 @@ impl Storage {
             };
 
             self.conn.execute(
-                "UPDATE visibility_labels SET contacts_json_encrypted = ?1, visible_fields_json_encrypted = ?2, name_encrypted = ?3, name_hmac = ?4, display_name_override_encrypted = ?5, bio_override_encrypted = ?6, avatar_override_encrypted = ?7 WHERE id = ?8",
+                &format!("UPDATE {table} SET contacts_json_encrypted = ?1, visible_fields_json_encrypted = ?2, name_encrypted = ?3, name_hmac = ?4, display_name_override_encrypted = ?5, bio_override_encrypted = ?6, avatar_override_encrypted = ?7 WHERE id = ?8"),
                 params![contacts_new, fields_new, name_new, name_hmac_new, override_new, bio_override_new, avatar_override_new, id],
             ).map_err(|e| StorageError::Migration(format!("Update label: {}", e)))?;
         }

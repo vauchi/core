@@ -32,22 +32,20 @@ impl Vauchi {
 
     /// Lists all visibility labels.
     pub fn list_groups(&self) -> VauchiResult<Vec<crate::contact::Group>> {
-        Ok(self.vocabulary_store()?.labels().load_all_groups()?)
+        Ok(self.labels_slot().load_all_groups()?)
     }
 
     /// Creates a new visibility label.
     pub fn create_group(&self, name: &str) -> VauchiResult<crate::contact::Group> {
-        let group = self.vocabulary_store()?.labels().create_group(name)?;
+        let group = self.labels_slot().create_group(name)?;
         self.record_group_change(&group);
         Ok(group)
     }
 
     /// Renames a visibility label.
     pub fn rename_group(&self, label_id: &str, new_name: &str) -> VauchiResult<()> {
-        self.vocabulary_store()?
-            .labels()
-            .rename_group(label_id, new_name)?;
-        self.record_group_change(&self.vocabulary_store()?.labels().load_group(label_id)?);
+        self.labels_slot().rename_group(label_id, new_name)?;
+        self.record_group_change(&self.labels_slot().load_group(label_id)?);
         Ok(())
     }
 
@@ -61,11 +59,11 @@ impl Vauchi {
         label_id: &str,
         name_override: Option<&str>,
     ) -> VauchiResult<()> {
-        let mut label = self.vocabulary_store()?.labels().load_group(label_id)?;
+        let mut label = self.labels_slot().load_group(label_id)?;
         label
             .set_display_name_override(name_override, self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        self.vocabulary_store()?.labels().save_group(&label)?;
+        self.labels_slot().save_group(&label)?;
         self.record_group_change(&label);
         Ok(())
     }
@@ -79,11 +77,11 @@ impl Vauchi {
         label_id: &str,
         bio_override: Option<&str>,
     ) -> VauchiResult<()> {
-        let mut label = self.vocabulary_store()?.labels().load_group(label_id)?;
+        let mut label = self.labels_slot().load_group(label_id)?;
         label
             .set_bio_override(bio_override, self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        self.vocabulary_store()?.labels().save_group(&label)?;
+        self.labels_slot().save_group(&label)?;
         self.record_group_change(&label);
         Ok(())
     }
@@ -98,11 +96,11 @@ impl Vauchi {
         label_id: &str,
         avatar_override: Option<&[u8]>,
     ) -> VauchiResult<()> {
-        let mut label = self.vocabulary_store()?.labels().load_group(label_id)?;
+        let mut label = self.labels_slot().load_group(label_id)?;
         label
             .set_avatar_override(avatar_override, self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        self.vocabulary_store()?.labels().save_group(&label)?;
+        self.labels_slot().save_group(&label)?;
         self.record_group_change(&label);
         Ok(())
     }
@@ -124,15 +122,15 @@ impl Vauchi {
     /// fields before deletion.
     pub fn delete_group(&self, label_id: &str) -> VauchiResult<()> {
         // Load the label before deletion to capture its visible fields
-        let label = self.vocabulary_store()?.labels().load_group(label_id)?;
+        let label = self.labels_slot().load_group(label_id)?;
         let visible_fields = label.visible_fields().clone();
 
         // Delete the label from storage
-        self.vocabulary_store()?.labels().delete_group(label_id)?;
+        self.labels_slot().delete_group(label_id)?;
 
         // Check if this was the last label. Not in duress mode: the
         // migration writes the real card (#468).
-        let remaining_labels = self.vocabulary_store()?.labels().load_all_groups()?;
+        let remaining_labels = self.labels_slot().load_all_groups()?;
         if !self.in_duress_mode() && remaining_labels.is_empty() && !visible_fields.is_empty() {
             // Transitioning to no-group mode:
             // Migrate visible fields from the deleted label to field_visibility
@@ -151,7 +149,7 @@ impl Vauchi {
 
     /// Gets a visibility label by ID.
     pub fn get_group(&self, label_id: &str) -> VauchiResult<crate::contact::Group> {
-        Ok(self.vocabulary_store()?.labels().load_group(label_id)?)
+        Ok(self.labels_slot().load_group(label_id)?)
     }
 
     /// Gets all contacts that are members of a visibility label.
@@ -163,7 +161,7 @@ impl Vauchi {
         if self.in_duress_mode() {
             return Ok(Vec::new());
         }
-        let label = self.vocabulary_store()?.labels().load_group(label_id)?;
+        let label = self.labels_slot().load_group(label_id)?;
         let mut members = Vec::new();
         for contact_id in label.contacts() {
             if let Some(contact) = self.storage.contacts().load_contact(contact_id)? {
@@ -175,19 +173,17 @@ impl Vauchi {
 
     /// Adds a contact to a visibility label.
     pub fn add_contact_to_group(&self, label_id: &str, contact_id: &str) -> VauchiResult<()> {
-        self.vocabulary_store()?
-            .labels()
+        self.labels_slot()
             .add_contact_to_group(label_id, contact_id)?;
-        self.record_group_change(&self.vocabulary_store()?.labels().load_group(label_id)?);
+        self.record_group_change(&self.labels_slot().load_group(label_id)?);
         Ok(())
     }
 
     /// Removes a contact from a visibility label.
     pub fn remove_contact_from_group(&self, label_id: &str, contact_id: &str) -> VauchiResult<()> {
-        self.vocabulary_store()?
-            .labels()
+        self.labels_slot()
             .remove_contact_from_group(label_id, contact_id)?;
-        self.record_group_change(&self.vocabulary_store()?.labels().load_group(label_id)?);
+        self.record_group_change(&self.labels_slot().load_group(label_id)?);
         Ok(())
     }
 
@@ -196,10 +192,7 @@ impl Vauchi {
         &self,
         contact_id: &str,
     ) -> VauchiResult<Vec<crate::contact::Group>> {
-        Ok(self
-            .vocabulary_store()?
-            .labels()
-            .get_groups_for_contact(contact_id)?)
+        Ok(self.labels_slot().get_groups_for_contact(contact_id)?)
     }
 
     /// Sets field visibility for a label.
@@ -212,10 +205,9 @@ impl Vauchi {
         field_id: &str,
         is_visible: bool,
     ) -> VauchiResult<()> {
-        self.vocabulary_store()?
-            .labels()
+        self.labels_slot()
             .set_group_field_visibility(label_id, field_id, is_visible)?;
-        self.record_group_change(&self.vocabulary_store()?.labels().load_group(label_id)?);
+        self.record_group_change(&self.labels_slot().load_group(label_id)?);
         Ok(())
     }
 

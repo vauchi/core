@@ -21,7 +21,7 @@ impl Vauchi {
 
     /// Lists all named places, oldest first.
     pub fn list_places(&self) -> VauchiResult<Vec<Place>> {
-        Ok(self.vocabulary_store()?.places().list_places()?)
+        Ok(self.places_slot().list_places()?)
     }
 
     /// Creates a named place at the given coordinates. Rejects an empty name.
@@ -37,26 +37,20 @@ impl Vauchi {
                 "Place name cannot be empty".into(),
             ));
         }
-        Ok(self
-            .vocabulary_store()?
-            .places()
-            .create_place(name, latitude, longitude)?)
+        Ok(self.places_slot().create_place(name, latitude, longitude)?)
     }
 
     /// Deletes a named place. Returns `true` if it existed. Contacts that
     /// referenced it keep their raw coordinates; only the name link dangles.
     pub fn delete_place(&self, place_id: &str) -> VauchiResult<bool> {
-        Ok(self.vocabulary_store()?.places().delete_place(place_id)?)
+        Ok(self.places_slot().delete_place(place_id)?)
     }
 
     /// Suggests the nearest named place within the proximity radius of the
     /// given coordinates, or `None` — the proximity-autocomplete read used when
     /// recording a new exchange location (T2.4). Named-place match only.
     pub fn suggest_place_near(&self, latitude: f64, longitude: f64) -> VauchiResult<Option<Place>> {
-        Ok(self
-            .vocabulary_store()?
-            .places()
-            .find_place_near(latitude, longitude)?)
+        Ok(self.places_slot().find_place_near(latitude, longitude)?)
     }
 
     /// Returns the named place whose name matches (trimmed, case-insensitive),
@@ -67,8 +61,7 @@ impl Vauchi {
             return Ok(None);
         }
         Ok(self
-            .vocabulary_store()?
-            .places()
+            .places_slot()
             .list_places()?
             .into_iter()
             .find(|p| p.name.to_lowercase() == needle))
@@ -92,23 +85,20 @@ impl Vauchi {
             longitude,
             place_id: None,
         };
-        self.vocabulary_store()?
-            .save_exchange_location(contact_id, &loc)?;
+        self.reject_concealed_exchange_write(contact_id)?;
+        self.storage.save_exchange_location(contact_id, &loc)?;
         Ok(())
     }
 
     /// Returns a contact's recorded exchange location, or `None`.
     pub fn exchange_location(&self, contact_id: &str) -> VauchiResult<Option<ExchangeLocation>> {
-        Ok(self
-            .vocabulary_store()?
-            .load_exchange_location(contact_id)?)
+        self.visible_exchange_location(contact_id)
     }
 
     /// Clears a contact's exchange location.
     pub fn clear_exchange_location(&self, contact_id: &str) -> VauchiResult<()> {
-        Ok(self
-            .vocabulary_store()?
-            .delete_exchange_location(contact_id)?)
+        self.reject_concealed_exchange_write(contact_id)?;
+        Ok(self.storage.delete_exchange_location(contact_id)?)
     }
 
     /// Names a contact's exchange location (retroactive naming,
@@ -124,20 +114,15 @@ impl Vauchi {
                 "Place name cannot be empty".into(),
             ));
         }
-        let loc = self
-            .vocabulary_store()?
-            .load_exchange_location(contact_id)?
-            .ok_or_else(|| {
-                VauchiError::InvalidState(format!("Contact {contact_id} has no exchange location"))
-            })?;
+        let loc = self.visible_exchange_location(contact_id)?.ok_or_else(|| {
+            VauchiError::InvalidState(format!("Contact {contact_id} has no exchange location"))
+        })?;
 
         let place = match self.find_place_by_name(name)? {
             Some(existing) => existing,
-            None => {
-                self.vocabulary_store()?
-                    .places()
-                    .create_place(name, loc.latitude, loc.longitude)?
-            }
+            None => self
+                .places_slot()
+                .create_place(name, loc.latitude, loc.longitude)?,
         };
 
         let linked = ExchangeLocation {
@@ -145,8 +130,7 @@ impl Vauchi {
             longitude: loc.longitude,
             place_id: Some(place.id.clone()),
         };
-        self.vocabulary_store()?
-            .save_exchange_location(contact_id, &linked)?;
+        self.storage.save_exchange_location(contact_id, &linked)?;
         Ok(place)
     }
 
@@ -155,7 +139,7 @@ impl Vauchi {
     /// absent.
     pub fn place_contact_counts(&self) -> VauchiResult<std::collections::HashMap<String, usize>> {
         let mut counts = std::collections::HashMap::new();
-        for (_, location) in self.vocabulary_store()?.list_exchange_locations()? {
+        for (_, location) in self.visible_exchange_locations()? {
             if let Some(place_id) = location.place_id {
                 *counts.entry(place_id).or_insert(0) += 1;
             }
@@ -170,8 +154,7 @@ impl Vauchi {
     /// ids, anchor first.
     pub fn unnamed_exchange_spots(&self) -> VauchiResult<Vec<Vec<String>>> {
         let mut unnamed: Vec<(String, ExchangeLocation)> = self
-            .vocabulary_store()?
-            .list_exchange_locations()?
+            .visible_exchange_locations()?
             .into_iter()
             .filter(|(_, location)| location.place_id.is_none())
             .collect();

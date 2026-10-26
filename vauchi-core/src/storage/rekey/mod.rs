@@ -143,6 +143,19 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("tags", "name_encrypted"),
     // V50 owner-private named places (ADR-051)
     ("places", "data_encrypted"),
+    // The duress session's twins of the vocabulary tables (private#813).
+    ("duress_visibility_labels", "contacts_json_encrypted"),
+    ("duress_visibility_labels", "visible_fields_json_encrypted"),
+    ("duress_visibility_labels", "name_encrypted"),
+    ("duress_visibility_labels", "name_hmac"),
+    (
+        "duress_visibility_labels",
+        "display_name_override_encrypted",
+    ),
+    ("duress_visibility_labels", "bio_override_encrypted"),
+    ("duress_visibility_labels", "avatar_override_encrypted"),
+    ("duress_tags", "name_encrypted"),
+    ("duress_places", "data_encrypted"),
     // V51 per-contact exchange location (ADR-051)
     ("contacts", "exchange_location_encrypted"),
 ];
@@ -262,8 +275,11 @@ impl Storage {
             self.rekey_device_sync_state(old_key, &new_key)?;
             report(&mut completed, "device_sync_state");
 
-            self.rekey_visibility_labels(old_key, &new_key)?;
+            self.rekey_visibility_labels(old_key, &new_key, "visibility_labels")?;
             report(&mut completed, "visibility_labels");
+
+            self.rekey_visibility_labels(old_key, &new_key, "duress_visibility_labels")?;
+            report(&mut completed, "duress_visibility_labels");
 
             self.rekey_device_info(old_key, &new_key)?;
             report(&mut completed, "device_info");
@@ -341,11 +357,17 @@ impl Storage {
             self.rekey_shared_avatars(old_key, &new_key)?;
             report(&mut completed, "shared_avatars");
 
-            self.rekey_tags(old_key, &new_key)?;
+            self.rekey_tags(old_key, &new_key, "tags")?;
             report(&mut completed, "tags");
 
-            self.rekey_places(old_key, &new_key)?;
+            self.rekey_tags(old_key, &new_key, "duress_tags")?;
+            report(&mut completed, "duress_tags");
+
+            self.rekey_places(old_key, &new_key, "places")?;
             report(&mut completed, "places");
+
+            self.rekey_places(old_key, &new_key, "duress_places")?;
+            report(&mut completed, "duress_places");
 
             self.rekey_exchange_location(old_key, &new_key)?;
             self.rekey_nullable_column(

@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 89] = [
+const MIGRATIONS: [Migration; 90] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -717,7 +717,49 @@ const MIGRATIONS: [Migration; 89] = [
         name: "resync_honored",
         action: MigrationAction::Sql(MIGRATION_V89_RESYNC_HONORED),
     },
+    Migration {
+        version: 90,
+        name: "duress_vocabulary",
+        action: MigrationAction::Sql(MIGRATION_V90_DURESS_VOCABULARY),
+    },
 ];
+
+/// Migration v90: the duress session's persistent twins of the vocabulary
+/// tables — the shape of `visibility_labels`, `contact_visibility_overrides`,
+/// `tags` and `places` as of v89 (vauchi/private#813, after #811's
+/// `duress_own_card`). A duress session reads and writes these; the real
+/// tables never see it.
+const MIGRATION_V90_DURESS_VOCABULARY: &str = "
+    CREATE TABLE IF NOT EXISTS duress_visibility_labels (
+        id TEXT PRIMARY KEY,
+        name_encrypted BLOB,
+        name_hmac BLOB,
+        contacts_json_encrypted BLOB,
+        visible_fields_json_encrypted BLOB,
+        display_name_override_encrypted BLOB,
+        bio_override_encrypted BLOB,
+        avatar_override_encrypted BLOB,
+        created_at INTEGER NOT NULL,
+        modified_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS duress_contact_visibility_overrides (
+        contact_id TEXT NOT NULL,
+        field_id TEXT NOT NULL,
+        is_visible INTEGER NOT NULL,
+        PRIMARY KEY (contact_id, field_id)
+    );
+    CREATE TABLE IF NOT EXISTS duress_tags (
+        id TEXT PRIMARY KEY,
+        name_encrypted BLOB NOT NULL,
+        contact_ids_json TEXT NOT NULL DEFAULT '[]',
+        created_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS duress_places (
+        id TEXT PRIMARY KEY,
+        data_encrypted BLOB NOT NULL,
+        created_at INTEGER NOT NULL
+    );
+";
 
 /// Migration v89: the day a contact's resync request was last honored,
 /// so one is honored at most once a day (vauchi/private#691).

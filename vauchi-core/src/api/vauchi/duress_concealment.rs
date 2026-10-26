@@ -14,8 +14,9 @@
 
 use std::sync::{Mutex, MutexGuard};
 
+use crate::api::error::{VauchiError, VauchiResult};
 use crate::card::ContactCard;
-use crate::storage::Storage;
+use crate::contact::place::ExchangeLocation;
 
 use super::{AuthMode, Vauchi};
 
@@ -39,10 +40,7 @@ impl Vauchi {
     /// Whether `contact_id` names a contact the duress session hides: in
     /// duress mode only decoy ids resolve, as in `get_contact`, so reads keyed
     /// by a real id answer as if it were unknown (ADR-032, private#388).
-    pub(super) fn conceals_contact(
-        &self,
-        contact_id: &str,
-    ) -> crate::api::error::VauchiResult<bool> {
+    pub(super) fn conceals_contact(&self, contact_id: &str) -> VauchiResult<bool> {
         if !self.in_duress_mode() {
             return Ok(false);
         }
@@ -64,26 +62,70 @@ impl Vauchi {
         *self.concealed_duress() = ConcealedDuress::default();
     }
 
-    /// Every unlock starts a fresh session: nothing a duress session saw or
-    /// made outlives it, whichever unlock path ends it.
+    /// Every unlock starts a fresh session: what a duress session saw of
+    /// the setup does not outlive it, whichever unlock path ends it. What
+    /// it made (card, groups, tags, places) persists in the duress twins.
     pub(super) fn enter_auth_mode(&mut self, mode: AuthMode) {
         self.auth_mode = mode;
         self.reset_concealed_duress();
-        self.reset_duress_store();
     }
 
-    /// Where screens read and write groups, tags and places: in duress mode
-    /// an empty session store, so the coercer sees none and what they make
-    /// never reaches the real ones (#468). Engine internals that decide what
-    /// real contacts receive keep using `self.storage`. Fails closed: without
-    /// a session store, duress mode gets an error, never the real data.
-    pub(super) fn vocabulary_store(&self) -> crate::api::error::VauchiResult<&Storage> {
-        if !self.in_duress_mode() {
-            return Ok(&self.storage);
+    /// Where screens read and write groups: the real tables, or under
+    /// duress their persistent twins (#468, vauchi/private#813), so the
+    /// coercer sees none of the real ones, what they make never reaches
+    /// them, and it is still there after a lock. Engine internals that
+    /// decide what real contacts receive keep using `self.storage.labels()`.
+    pub(super) fn labels_slot(&self) -> crate::storage::LabelStore<'_> {
+        if self.in_duress_mode() {
+            self.storage.duress_labels()
+        } else {
+            self.storage.labels()
         }
-        self.duress_store.as_ref().ok_or_else(|| {
-            crate::api::error::VauchiError::InvalidState("no duress session store".into())
-        })
+    }
+
+    pub(super) fn tags_slot(&self) -> crate::storage::TagStore<'_> {
+        if self.in_duress_mode() {
+            self.storage.duress_tags()
+        } else {
+            self.storage.tags()
+        }
+    }
+
+    pub(super) fn places_slot(&self) -> crate::storage::PlaceStore<'_> {
+        if self.in_duress_mode() {
+            self.storage.duress_places()
+        } else {
+            self.storage.places()
+        }
+    }
+
+    /// Exchange locations live on the real contact rows, which a duress
+    /// session never sees: it reads none and records none, the same answer
+    /// an unknown contact gets.
+    pub(super) fn visible_exchange_location(
+        &self,
+        contact_id: &str,
+    ) -> VauchiResult<Option<ExchangeLocation>> {
+        if self.in_duress_mode() {
+            return Ok(None);
+        }
+        Ok(self.storage.load_exchange_location(contact_id)?)
+    }
+
+    pub(super) fn visible_exchange_locations(
+        &self,
+    ) -> VauchiResult<Vec<(String, ExchangeLocation)>> {
+        if self.in_duress_mode() {
+            return Ok(Vec::new());
+        }
+        Ok(self.storage.list_exchange_locations()?)
+    }
+
+    pub(super) fn reject_concealed_exchange_write(&self, contact_id: &str) -> VauchiResult<()> {
+        if self.in_duress_mode() {
+            return Err(VauchiError::ContactNotFound(contact_id.to_string()));
+        }
+        Ok(())
     }
 
     /// The own card a screen reads and writes: the real card, or under
@@ -102,7 +144,7 @@ impl Vauchi {
 
     /// Starts the duress copy from the real card the first time a duress
     /// session needs it; later sessions keep what earlier ones edited.
-    pub(super) fn seed_duress_own_card(&self) -> crate::api::error::VauchiResult<()> {
+    pub(super) fn seed_duress_own_card(&self) -> VauchiResult<()> {
         let contacts = self.storage.contacts();
         if contacts.duress_own_card().load()?.is_none()
             && let Some(real) = contacts.own_card().load()?
@@ -110,14 +152,5 @@ impl Vauchi {
             contacts.duress_own_card().save(&real)?;
         }
         Ok(())
-    }
-
-    /// Starts or ends the duress session store at an unlock.
-    fn reset_duress_store(&mut self) {
-        self.duress_store = if self.in_duress_mode() {
-            Storage::in_memory(crate::crypto::SymmetricKey::generate()).ok()
-        } else {
-            None
-        };
     }
 }

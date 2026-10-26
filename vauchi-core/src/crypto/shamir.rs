@@ -517,11 +517,26 @@ mod tests {
         assert_eq!(split(&secret, 2, 1), Err(ShamirError::CountTooLow(1)));
         assert_eq!(split(&secret, 2, 2), Err(ShamirError::CountTooLow(2)));
         assert_eq!(split(&secret, 2, 10), Err(ShamirError::CountTooHigh(10)));
-        // One guardian must always be spare (vauchi/private#816).
-        assert_eq!(
-            split(&secret, 3, 3),
-            Err(ShamirError::ThresholdEqualsCount(3))
-        );
+    }
+
+    /// Guardians are close people, so needing every one of them is a
+    /// shape the user may choose (vauchi/private#815, relaxing #816).
+    // @scenario: backup_recovery :: A guardian backup may need every guardian
+    #[test]
+    fn every_share_may_be_needed() {
+        let secret = [0x5au8; 32];
+        for count in MIN_COUNT..=MAX_COUNT {
+            let shares = split(&secret, count, count).unwrap();
+            assert_eq!(shares.len(), usize::from(count));
+            assert_eq!(reconstruct(&shares, count), Ok(secret));
+            assert_eq!(
+                reconstruct(&shares[1..], count),
+                Err(ShamirError::InsufficientShares {
+                    required: count,
+                    got: usize::from(count) - 1,
+                })
+            );
+        }
     }
 
     // @internal

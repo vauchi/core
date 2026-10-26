@@ -636,9 +636,18 @@ mod tests {
         assert!(KeyShardConfig::new(2, 2).is_err());
         assert!(KeyShardConfig::new(2, 3).is_ok());
         assert!(KeyShardConfig::new(8, 9).is_ok());
-        assert!(KeyShardConfig::new(3, 3).is_err());
-        assert!(KeyShardConfig::new(9, 9).is_err());
         assert!(KeyShardConfig::new(2, 10).is_err());
+    }
+
+    /// Every guardian may be needed (vauchi/private#815, relaxing #816).
+    // @scenario: backup_recovery :: A guardian backup may need every guardian
+    #[test]
+    fn config_accepts_every_guardian_needed() {
+        for count in [3u8, 9] {
+            let config = KeyShardConfig::new(count, count).unwrap();
+            assert_eq!(config.threshold(), count);
+            assert_eq!(config.count(), count);
+        }
     }
 
     // @internal

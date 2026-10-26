@@ -158,6 +158,9 @@ struct MockGateway {
     encoded_content: std::collections::HashMap<String, (String, Vec<u8>)>,
     /// The OHTTP relay's response cap: a larger `content` answer is a `502`.
     content_answer_limit: Option<usize>,
+    /// How many more `fetch` requests the gateway serves before answering
+    /// `429` (private#691); `None` never limits.
+    fetch_quota: Option<usize>,
 }
 
 pub struct MockRelay {
@@ -249,7 +252,18 @@ impl MockRelay {
             compresses_content: false,
             encoded_content: std::collections::HashMap::new(),
             content_answer_limit: None,
+            fetch_quota: None,
         });
+    }
+
+    /// Serves `allowed` more mailbox fetches, then answers every fetch
+    /// `429` until [`Self::lift_gateway_fetch_limit`].
+    pub fn limit_gateway_fetches(&self, allowed: usize) {
+        self.with_gateway(|gateway| gateway.fetch_quota = Some(allowed));
+    }
+
+    pub fn lift_gateway_fetch_limit(&self) {
+        self.with_gateway(|gateway| gateway.fetch_quota = None);
     }
 
     /// Opt into token-filtered in-memory send/fetch/ack behavior for delivery
@@ -507,6 +521,15 @@ fn serve_ohttp(gateway: &mut MockGateway, body: &[u8]) -> CannedResponse {
         .and_then(|value| value.as_str())
         .unwrap_or_default()
         .to_string();
+    if action == "fetch"
+        && let Some(quota) = gateway.fetch_quota.as_mut()
+    {
+        if *quota == 0 {
+            gateway.actions.push(action);
+            return CannedResponse::rate_limited(Some(1));
+        }
+        *quota -= 1;
+    }
     let reply = if action == "content" {
         use base64::Engine as _;
         let path = request

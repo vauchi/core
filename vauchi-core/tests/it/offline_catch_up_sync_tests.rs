@@ -272,3 +272,71 @@ fn a_revocation_sent_while_offline_lands_after_the_share_and_survives_a_restart(
         );
     }
 }
+
+/// A pass the relay cuts short with a rate limit has not read every
+/// planned mailbox, so the checkpoint stays; the next full pass moves it.
+// @scenario: message_delivery :: Receive pending updates when coming online
+#[test]
+fn a_rate_limited_pass_does_not_move_the_checkpoint() {
+    let outer = MockRelay::start();
+    let application = MockRelay::start();
+    let clock = Arc::new(FakeClock::new(UNIX_EPOCH + Duration::from_secs(NOW)));
+    outer.enable_ohttp_gateway(&SignedGateway::new(0x65), window_of(NOW));
+    outer.enable_gateway_mailboxes(clock.clone(), 2);
+    let (mut alice, _alice_install) = client(&outer, &application, clock.clone(), "Alice");
+    // Three contacts: sixteen planned days times seven tokens is more than
+    // one fetch chunk, so the second chunk can hit the limit.
+    let (mut bob, _bob_install) = client(&outer, &application, clock.clone(), "Bob");
+    let (carol, _carol_install) = client(&outer, &application, clock.clone(), "Carol");
+    let (dave, _dave_install) = client(&outer, &application, clock.clone(), "Dave");
+    let linked_bob = link_contacts(&alice, &bob, "Bob");
+    link_contacts(&alice, &carol, "Carol");
+    link_contacts(&alice, &dave, "Dave");
+    let mut updated = bob.own_card().unwrap().unwrap().clone();
+    let field = ContactField::new(FieldType::Email, "Email", "bob@example.invalid", 0);
+    let field_id = field.id().to_string();
+    updated.add_field(field).unwrap();
+    bob.update_own_card(&updated).unwrap();
+    bob.set_contact_visibility_override(&linked_bob.host_contact_id, &field_id, true)
+        .unwrap();
+    sync(&mut bob);
+    let send_day = current_day_epoch(NOW);
+
+    // Away long enough that the send day falls in the first planned chunk,
+    // so the served chunks can hold the blob.
+    let offline_days = RETAINED_DAYS - 10;
+    clock.advance(Duration::from_secs(offline_days * DAY));
+    let today = send_day + offline_days;
+    let horizon = today - RETAINED_DAYS;
+    assert!(send_day < horizon + CATCH_UP_DAYS_PER_CYCLE);
+
+    // 256 registered tokens fetch in three chunks; the third hits the limit.
+    outer.limit_gateway_fetches(2);
+    alice.set_next_sync_allowed(Instant::now());
+    let limited = alice.sync();
+    assert!(
+        !matches!(&limited, Ok(VauchiSyncOutcome::Ok { errors, .. }) if errors.is_empty() && checkpoint(&alice, &application).is_some()),
+        "a cut-short pass must not look complete: {limited:?}"
+    );
+    assert_eq!(checkpoint(&alice, &application), None);
+
+    outer.lift_gateway_fetch_limit();
+    sync(&mut alice);
+    assert_eq!(
+        checkpoint(&alice, &application),
+        Some(horizon + CATCH_UP_DAYS_PER_CYCLE - 1)
+    );
+    let saved = alice
+        .get_contact(&linked_bob.peer_contact_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        saved
+            .card()
+            .fields()
+            .iter()
+            .map(|field| field.value())
+            .collect::<Vec<_>>(),
+        vec!["bob@example.invalid"]
+    );
+}

@@ -144,3 +144,46 @@ proptest! {
         }
     }
 }
+
+// @internal: Every day a receive plan covers has all three route families — contact identity, contact device-scoped, self device-sync — so a chunk of historical days routes like the live days (private#691).
+#[test]
+fn every_planned_day_routes_all_three_mailbox_families() {
+    use crate::network::mailbox_token::{CATCH_UP_DAYS_PER_CYCLE, plan_receive};
+    let identity = Identity::create("Alice", 0);
+    let relay = RelayConfig::default();
+    let contact = Contact::from_exchange(
+        [7; 32],
+        ContactCard::new("Bob"),
+        SymmetricKey::from_bytes([4; 32]),
+        0,
+    );
+    let contacts = [contact.clone()];
+    let today = 20_000;
+    let plan = plan_receive(today, Some(today - 60));
+    assert_eq!(plan.days.len() as u64, CATCH_UP_DAYS_PER_CYCLE + 2);
+    let context = registered_mailboxes(&identity, &contacts, &relay, &plan.days);
+    let mut routes = ReceiveContext::new(&identity, &contacts, &relay);
+    for &day in &plan.days {
+        for token in [
+            compute_mailbox_token(&[4; 32], identity.signing_public_key(), day),
+            compute_device_mailbox_token(
+                &[4; 32],
+                identity.signing_public_key(),
+                identity.device_id(),
+                day,
+            ),
+        ] {
+            assert!(routes.include(&context, &token_hex(&token)), "day {day}");
+        }
+        let self_token =
+            compute_device_sync_token(identity.master_seed(), identity.device_id(), day);
+        assert!(
+            routes.include(&context, &token_hex(&self_token)),
+            "day {day}"
+        );
+    }
+    assert_eq!(routes.contact_tokens.len(), 2 * plan.days.len());
+    assert_eq!(routes.self_tokens.len(), plan.days.len());
+    let unplanned = compute_mailbox_token(&[4; 32], identity.signing_public_key(), today - 30);
+    assert!(!routes.include(&context, &token_hex(&unplanned)));
+}

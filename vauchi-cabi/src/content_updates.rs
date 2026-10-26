@@ -104,6 +104,13 @@ impl ScheduledCycle {
 impl VauchiApp {
     pub(crate) fn with_content_dir(mut self, data_dir: &Path) -> Self {
         self.content_dir = Some(data_dir.to_path_buf());
+        // Core keeps the language and theme pick beside its content cache
+        // (vauchi/private#814).
+        if let Ok(mut engine) = self.engine.lock()
+            && let Some(engine) = engine.as_mut()
+        {
+            engine.keep_restorable_state_in(data_dir);
+        }
         self
     }
 

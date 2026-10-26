@@ -345,7 +345,10 @@ impl PlatformAppEngine {
         platform_keychain: Option<Arc<dyn crate::MobilePlatformKeychain>>,
     ) -> Arc<Self> {
         Self::build(
-            Some(AppEngine::new(vauchi)),
+            Some(crate::platform_app_engine_locked::engine_keeping_pick(
+                vauchi,
+                &storage_path,
+            )),
             None,
             storage_path,
             relay_url,

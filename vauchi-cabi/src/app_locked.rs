@@ -130,9 +130,9 @@ pub(crate) fn open_app(
     let reopen = params.clone();
     crate::content_updates::load_cached_content(data_path);
     let mut app = match params.open() {
-        Opened::Engine(vauchi) => VauchiApp::opened(AppEngine::new(*vauchi)),
+        Opened::Engine(vauchi) => VauchiApp::opened(engine_keeping_pick(*vauchi, data_path)),
         Opened::Locked(reason) => VauchiApp::locked(LockedStart {
-            presentation: StorageLockPresentation::new(reason, Locale::ENGLISH),
+            presentation: lock_keeping_pick(reason, Locale::ENGLISH, data_path),
             params,
             pending_callback: None,
             pending_render_context: None,
@@ -191,7 +191,7 @@ impl VauchiApp {
         let _ = std::fs::create_dir_all(&params.data_path);
         match params.open() {
             Opened::Engine(vauchi) => {
-                let mut engine = AppEngine::new(*vauchi);
+                let mut engine = engine_keeping_pick(*vauchi, &params.data_path);
                 engine.set_render_context(render_context);
                 engine.set_device_capabilities(capabilities);
                 engine.set_network_online(online);
@@ -204,7 +204,7 @@ impl VauchiApp {
             }
             Opened::Locked(reason) => {
                 let mut presentation =
-                    StorageLockPresentation::new(reason, render_context.resolved_locale());
+                    lock_keeping_pick(reason, render_context.resolved_locale(), &params.data_path);
                 presentation.set_render_context(render_context.clone());
                 let start = LockedStart {
                     presentation,
@@ -302,7 +302,7 @@ impl VauchiApp {
         let commands = match start.params.open() {
             Opened::Locked(reason) => start.presentation.show(reason),
             Opened::Engine(vauchi) => {
-                let mut engine = AppEngine::new(*vauchi);
+                let mut engine = engine_keeping_pick(*vauchi, &start.params.data_path);
                 if let Some(context) = start.pending_render_context.take() {
                     engine.set_render_context(context);
                 }
@@ -322,4 +322,22 @@ impl VauchiApp {
         };
         Some(commands)
     }
+}
+
+/// Core keeps the language and theme pick in the data directory, so the
+/// shell stores nothing for it (vauchi/private#814).
+fn engine_keeping_pick(vauchi: Vauchi, data_dir: &std::path::Path) -> AppEngine {
+    let mut engine = AppEngine::new(vauchi);
+    engine.keep_restorable_state_in(data_dir);
+    engine
+}
+
+fn lock_keeping_pick(
+    reason: StorageLockReason,
+    locale: Locale,
+    data_dir: &std::path::Path,
+) -> StorageLockPresentation {
+    let mut presentation = StorageLockPresentation::new(reason, locale);
+    presentation.keep_restorable_state_in(data_dir);
+    presentation
 }

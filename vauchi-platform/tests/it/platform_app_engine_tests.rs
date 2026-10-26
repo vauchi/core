@@ -1666,3 +1666,43 @@ fn a_listener_that_calls_back_into_the_engine_does_not_deadlock() {
         "the listener's call back into the engine must complete"
     );
 }
+
+/// A pick an earlier run kept in the data directory: the file Core writes
+/// there (vauchi/private#814), standing in for a Settings pick.
+fn keep_latte_from_an_earlier_run(dir: &std::path::Path) {
+    std::fs::write(
+        dir.join("restorable_state"),
+        r#"{"v":1,"locale":null,"theme_id":"catppuccin-latte"}"#,
+    )
+    .expect("write kept pick");
+}
+
+fn first_background(engine: &PlatformAppEngine) -> String {
+    let batch: serde_json::Value =
+        serde_json::from_str(&engine.initial_commands_json().expect("initial commands"))
+            .expect("json");
+    batch["commands"]
+        .as_array()
+        .and_then(|commands| commands.iter().find_map(|c| c.get("ReplaceSurface")))
+        .and_then(|replace| replace["surface"]["tokens"]["colors"]["background"].as_str())
+        .expect("a surface with colours")
+        .to_string()
+}
+
+// @internal
+#[test]
+fn opening_applies_the_pick_core_kept_in_the_data_directory() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    keep_latte_from_an_earlier_run(dir.path());
+
+    let engine = PlatformAppEngine::open_under_shell_key(
+        dir.path().to_string_lossy().to_string(),
+        "https://relay.test".into(),
+        vauchi_core::crypto::SymmetricKey::generate()
+            .as_bytes()
+            .to_vec(),
+    )
+    .expect("create engine");
+
+    assert_eq!(first_background(&engine), "#eff1f5");
+}

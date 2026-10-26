@@ -30,6 +30,8 @@ mod content_updates_tests;
 mod design_tokens;
 mod exchange;
 mod i18n;
+#[cfg(test)]
+mod kept_pick_tests;
 mod logging;
 pub(crate) mod platform_event;
 #[cfg(test)]

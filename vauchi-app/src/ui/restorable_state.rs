@@ -8,7 +8,7 @@
 //! size bound, of another version, with unknown fields or with a value
 //! Core would not offer is ignored whole.
 
-use std::io::{self, Read};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -89,7 +89,10 @@ impl KeptStateFile {
         Some(state)
     }
 
-    pub(crate) fn write(&self, state: &str) -> io::Result<()> {
+    /// Gated like `encode`: its caller in `ui::app_engine` is compiled out
+    /// of the no-default-features build.
+    #[cfg(feature = "network-rustls")]
+    pub(crate) fn write(&self, state: &str) -> std::io::Result<()> {
         let partial = self.0.with_extension("partial");
         std::fs::write(&partial, state)?;
         // A rename replaces the kept value whole, so a crash mid-write leaves

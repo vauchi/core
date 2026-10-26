@@ -1980,7 +1980,6 @@
   "recovery.not_enough_trusted": "Not enough trusted contacts",
   "recovery.not_in_contacts_warning": "This key is NOT in your contacts. Verify in person!",
   "recovery.note": "Note: Recovery requires mutual verification in person.",
-  "recovery.old_fingerprint_label": "Old identity fingerprint:",
   "recovery.old_id": "Old ID: {id}",
   "recovery.old_id_label": "Old ID",
   "recovery.old_identity": "Old Identity:",

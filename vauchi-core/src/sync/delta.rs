@@ -83,6 +83,17 @@ pub fn encode_cover_payload(filler: &[u8]) -> Vec<u8> {
     buf
 }
 
+/// Version byte for a resync request: a client back from longer than the
+/// relay's retention asks the contact to repropagate its visible card
+/// now (vauchi/private#691). No body: the ratchet authenticates the
+/// sender and the receiver repropagates at most once per day.
+pub const PAYLOAD_VERSION_RESYNC_REQUEST: u8 = 0x0a;
+
+/// Encodes a resync request.
+pub fn encode_resync_request() -> Vec<u8> {
+    vec![PAYLOAD_VERSION_RESYNC_REQUEST]
+}
+
 /// Delta encoding error types.
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -555,6 +566,8 @@ pub enum VersionedPayload {
     /// Cover (version 0x09): a duress session's stand-in for a withheld
     /// update; the body carries nothing.
     Cover,
+    /// Please repropagate your visible card to me (vauchi/private#691).
+    ResyncRequest,
 }
 
 impl VersionedPayload {
@@ -639,6 +652,7 @@ impl VersionedPayload {
                 Ok(VersionedPayload::RegistryAck(payload))
             }
             PAYLOAD_VERSION_COVER => Ok(VersionedPayload::Cover),
+            PAYLOAD_VERSION_RESYNC_REQUEST => Ok(VersionedPayload::ResyncRequest),
             v => Err(DeltaError::UnknownPayloadVersion(v)),
         }
     }

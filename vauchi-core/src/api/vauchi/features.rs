@@ -605,7 +605,7 @@ impl Vauchi {
     /// incoming message when this side is a responder that cannot send yet:
     /// that arrival owes a repropagation (`process_single_card_update_for_device`),
     /// so the wait is neither an error nor a spent retry (vauchi/private#294).
-    fn repropagate_or_defer(&self, contact_id: &str) -> VauchiResult<()> {
+    pub(super) fn repropagate_or_defer(&self, contact_id: &str) -> VauchiResult<()> {
         match self.repropagate_to_contact(contact_id) {
             Err(VauchiError::SendDeferred) => Ok(()),
             other => other,

@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 88] = [
+const MIGRATIONS: [Migration; 89] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -712,7 +712,21 @@ const MIGRATIONS: [Migration; 88] = [
         name: "receive_checkpoints",
         action: MigrationAction::Sql(MIGRATION_V88_RECEIVE_CHECKPOINTS),
     },
+    Migration {
+        version: 89,
+        name: "resync_honored",
+        action: MigrationAction::Sql(MIGRATION_V89_RESYNC_HONORED),
+    },
 ];
+
+/// Migration v89: the day a contact's resync request was last honored,
+/// so one is honored at most once a day (vauchi/private#691).
+const MIGRATION_V89_RESYNC_HONORED: &str = "
+    CREATE TABLE IF NOT EXISTS resync_honored (
+        contact_id TEXT PRIMARY KEY,
+        day INTEGER NOT NULL
+    );
+";
 
 /// Migration v88: the last day a device read a relay's mailboxes to
 /// exhaustion, per relay, identity and device (vauchi/private#691).

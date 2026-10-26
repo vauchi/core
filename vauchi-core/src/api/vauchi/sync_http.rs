@@ -621,6 +621,17 @@ impl Vauchi {
             }
         }
 
+        // 3e. Honor resync requests (private#691): our visible card goes
+        // out in this cycle's send phase. Best-effort and rate-limited;
+        // the peer may ask again tomorrow.
+        for outcome in &outcomes {
+            if let Some(contact_id) = outcome.resync_requested_by.as_deref()
+                && let Err(error) = self.honor_resync_request(contact_id)
+            {
+                tracing::warn!("resync request honoring failed: {error}");
+            }
+        }
+
         let received = outcomes.iter().filter(|o| o.decrypted).count();
         let rejected = outcomes
             .iter()

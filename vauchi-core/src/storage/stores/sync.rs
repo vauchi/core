@@ -30,6 +30,19 @@ pub struct ReceiveScope {
     key: String,
 }
 
+/// How far a device has read a scope's mailboxes, and whether it still
+/// owes its contacts a resync request because that reading started
+/// behind the relay's retention (vauchi/private#691).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ReceiveCheckpoint {
+    /// The last day read to exhaustion.
+    pub day: u64,
+    /// Set when a catch-up began behind the retention horizon; cleared
+    /// once the requests are queued.
+    #[serde(default)]
+    pub resync_owed: bool,
+}
+
 impl ReceiveScope {
     pub fn new(relay_url: &str, identity: &[u8; 32], device: &[u8; 32]) -> Self {
         use sha2::{Digest, Sha256};
@@ -182,13 +195,14 @@ impl SyncStore<'_> {
     }
 
     /// Records that this device has read `scope`'s mailboxes to exhaustion
-    /// up to `day` (vauchi/private#691).
+    /// up to `checkpoint.day` (vauchi/private#691).
     pub fn save_receive_checkpoint(
         &self,
         scope: &ReceiveScope,
-        day: u64,
+        checkpoint: &ReceiveCheckpoint,
     ) -> Result<(), StorageError> {
-        let json = serde_json::json!({ "day": day }).to_string();
+        let json = serde_json::to_string(checkpoint)
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
         let encrypted = crate::crypto::encrypt(self.key, json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
         let now = self.now_secs();
@@ -206,7 +220,7 @@ impl SyncStore<'_> {
     pub fn load_receive_checkpoint(
         &self,
         scope: &ReceiveScope,
-    ) -> Result<Option<u64>, StorageError> {
+    ) -> Result<Option<ReceiveCheckpoint>, StorageError> {
         let result = self.conn.query_row(
             "SELECT checkpoint_json_encrypted FROM receive_checkpoints WHERE scope = ?1",
             params![scope.key],
@@ -216,19 +230,37 @@ impl SyncStore<'_> {
             Ok(encrypted) => {
                 let decrypted = crate::crypto::decrypt(self.key, &encrypted)
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
-                let value: serde_json::Value = serde_json::from_slice(&decrypted)
-                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                value
-                    .get("day")
-                    .and_then(serde_json::Value::as_u64)
+                serde_json::from_slice(&decrypted)
                     .map(Some)
-                    .ok_or_else(|| {
-                        StorageError::Serialization("receive checkpoint without a day".into())
-                    })
+                    .map_err(|e| StorageError::Serialization(e.to_string()))
             }
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),
         }
+    }
+
+    /// The day this device last honored `contact_id`'s resync request, if
+    /// ever (vauchi/private#691).
+    pub fn load_resync_honored_day(&self, contact_id: &str) -> Result<Option<u64>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT day FROM resync_honored WHERE contact_id = ?1",
+            params![contact_id],
+            |row| row.get::<_, i64>(0),
+        );
+        match result {
+            Ok(day) => Ok(Some(day.max(0) as u64)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
+    pub fn save_resync_honored_day(&self, contact_id: &str, day: u64) -> Result<(), StorageError> {
+        self.conn.execute(
+            "INSERT INTO resync_honored (contact_id, day) VALUES (?1, ?2)
+             ON CONFLICT(contact_id) DO UPDATE SET day = ?2",
+            params![contact_id, day as i64],
+        )?;
+        Ok(())
     }
 
     /// Saves the local version vector (encrypted).
@@ -600,6 +632,10 @@ impl SyncStore<'_> {
     pub fn forget_contact(&self, contact_id: &str) -> Result<(), StorageError> {
         self.conn.execute(
             "DELETE FROM contact_sync_timestamps WHERE contact_id = ?1",
+            params![contact_id],
+        )?;
+        self.conn.execute(
+            "DELETE FROM resync_honored WHERE contact_id = ?1",
             params![contact_id],
         )?;
         Ok(())

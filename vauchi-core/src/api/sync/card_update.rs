@@ -139,6 +139,10 @@ pub enum ReceiveOutcome {
     /// Cover from a duress session (vauchi/private#811): the ratchet
     /// advanced as for an update, nothing else changed, nothing to show.
     Cover,
+    /// The sender asks us to repropagate our visible card to it; the
+    /// receive loop honors it, at most once per contact per day
+    /// (vauchi/private#691).
+    ResyncRequest,
 }
 
 /// Processes a batch of incoming card updates with full security checks.
@@ -223,7 +227,8 @@ pub fn process_card_updates(
             // not this batch card-update helper; state is already persisted.
             Ok(ReceiveOutcome::RegistryPushReceived(_))
             | Ok(ReceiveOutcome::RegistryAckReceived { .. })
-            | Ok(ReceiveOutcome::Cover) => result.processed += 1,
+            | Ok(ReceiveOutcome::Cover)
+            | Ok(ReceiveOutcome::ResyncRequest) => result.processed += 1,
             Err(_) => result.skipped += 1,
         }
     }
@@ -569,6 +574,26 @@ fn process_single_card_update_for_device_with_budget(
             }
         }
         return Ok(ReceiveOutcome::Cover);
+    }
+
+    // 3c''. Resync request (0x0a, vauchi/private#691): persisted like cover;
+    //       the repropagation it asks for is the receive loop's to queue.
+    if let Ok(VersionedPayload::ResyncRequest) = VersionedPayload::decode(&plaintext) {
+        storage.begin_transaction()?;
+        let request_txn = storage.ratchets().save_ratchet_state_for_device(
+            sender_id,
+            peer_device_id,
+            &ratchet,
+            is_initiator,
+        );
+        match request_txn {
+            Ok(()) => storage.commit()?,
+            Err(e) => {
+                storage.rollback();
+                return Err(e.into());
+            }
+        }
+        return Ok(ReceiveOutcome::ResyncRequest);
     }
 
     // 3d. F4 registry handshake payloads (0x05/0x06) — persist/ack registry
@@ -1099,6 +1124,9 @@ fn decode_versioned_payload(
             }
             Ok(VersionedPayload::Cover) => Err(CardUpdateError::InvalidPayload(
                 "cover not handled here".into(),
+            )),
+            Ok(VersionedPayload::ResyncRequest) => Err(CardUpdateError::InvalidPayload(
+                "resync request not handled here".into(),
             )),
             Ok(VersionedPayload::ReciprocityConfirm(_)) => {
                 // ReciprocityConfirm is not a card delta — handled at caller level

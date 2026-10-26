@@ -94,15 +94,40 @@ impl Vauchi {
             .storage
             .sync()
             .load_receive_checkpoint(&self.receive_scope(identity))?;
-        Ok(crate::network::mailbox_token::plan_receive(day, checkpoint))
+        Ok(crate::network::mailbox_token::plan_receive(
+            day,
+            checkpoint.map(|c| c.day),
+        ))
     }
 
-    /// Records that this pass read every mailbox it planned.
+    /// Records that this pass read every mailbox it planned. A catch-up
+    /// that began behind the retention horizon — or with no checkpoint at
+    /// all — owes the contacts a resync request, sent once it reaches
+    /// today (private#691).
     pub(super) fn record_receive_checkpoint(&self, identity: &Identity) -> VauchiResult<()> {
-        let plan = self.receive_plan(identity)?;
-        self.storage
-            .sync()
-            .save_receive_checkpoint(&self.receive_scope(identity), plan.checkpoint_after)?;
+        use crate::network::mailbox_token::{RETAINED_DAYS, plan_receive};
+        use crate::storage::ReceiveCheckpoint;
+
+        let today = current_day_epoch(self.clock.unix_seconds());
+        let scope = self.receive_scope(identity);
+        let previous = self.storage.sync().load_receive_checkpoint(&scope)?;
+        let began_behind_retention = previous
+            .as_ref()
+            .is_none_or(|c| c.day < today.saturating_sub(RETAINED_DAYS));
+        let mut resync_owed =
+            began_behind_retention || previous.as_ref().is_some_and(|c| c.resync_owed);
+        let plan = plan_receive(today, previous.map(|c| c.day));
+        if resync_owed && plan.checkpoint_after == today {
+            self.request_card_resync()?;
+            resync_owed = false;
+        }
+        self.storage.sync().save_receive_checkpoint(
+            &scope,
+            &ReceiveCheckpoint {
+                day: plan.checkpoint_after,
+                resync_owed,
+            },
+        )?;
         Ok(())
     }
 

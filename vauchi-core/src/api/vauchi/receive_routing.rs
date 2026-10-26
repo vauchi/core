@@ -105,6 +105,9 @@ pub struct BlobOutcome {
     /// Contact to answer with our own confirmation: a verified confirmation
     /// from a peer still waiting for ours (private#663).
     pub reciprocity_answer: Option<String>,
+    /// Contact that asked us to repropagate our visible card to it
+    /// (vauchi/private#691); the receive loop honors it, rate-limited.
+    pub resync_requested_by: Option<String>,
 }
 
 impl BlobOutcome {
@@ -164,6 +167,7 @@ pub(super) fn process_received_blobs_with_routes(
     let mut outcomes = Vec::with_capacity(blobs.len());
     for (message_id, mailbox_token_hex, ciphertext, origin_hint) in blobs {
         let mut reciprocity_answer = None;
+        let mut resync_requested_by = None;
         let (
             token_resolved,
             decrypted,
@@ -226,6 +230,12 @@ pub(super) fn process_received_blobs_with_routes(
                     // Cover from a duress session (vauchi/private#811): the
                     // ratchet advanced, nothing to show, no event.
                     Ok(ReceiveOutcome::Cover) => (true, true, None, None, None, None, None),
+                    // A resync request (vauchi/private#691): the loop queues
+                    // our repropagation; nothing to show, no event.
+                    Ok(ReceiveOutcome::ResyncRequest) => {
+                        resync_requested_by = Some(contact_id.clone());
+                        (true, true, None, None, None, None, None)
+                    }
                     // P3: the signature is verified in
                     // `process_single_card_update`; match the carried token
                     // against the contact's derived `expected_their_token`
@@ -272,6 +282,7 @@ pub(super) fn process_received_blobs_with_routes(
             alert,
             registry_reply,
             reciprocity_answer,
+            resync_requested_by,
         });
     }
     outcomes
@@ -526,6 +537,7 @@ mod tests {
             alert: None,
             registry_reply: None,
             reciprocity_answer: None,
+            resync_requested_by: None,
         }
     }
 
@@ -566,6 +578,7 @@ mod tests {
                 alert: None,
                 registry_reply: None,
                 reciprocity_answer: None,
+                resync_requested_by: None,
             },
         ];
 

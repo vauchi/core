@@ -4,9 +4,9 @@
 
 use proptest::prelude::*;
 use vauchi_core::network::mailbox_token::{
-    RETAINED_DAYS, batch_register_tokens, batch_register_tokens_with_device_sync,
-    compute_device_mailbox_token, compute_device_sync_token, compute_mailbox_token, receive_days,
-    token_hex,
+    CATCH_UP_DAYS_PER_CYCLE, RETAINED_DAYS, batch_register_tokens,
+    batch_register_tokens_with_device_sync, compute_device_mailbox_token,
+    compute_device_sync_token, compute_mailbox_token, plan_receive, receive_days, token_hex,
 };
 
 // Directional tokens are keyed to the recipient. These tests assert only
@@ -481,5 +481,60 @@ proptest! {
         if let Some(day) = checkpoint && day <= today {
             prop_assert!(*days.start() <= day.saturating_sub(1).max(today.saturating_sub(RETAINED_DAYS)));
         }
+    }
+}
+
+/// One receive pass covers the live days and a bounded chunk of what is
+/// still owed, oldest first (vauchi/private#691).
+// @scenario: message_delivery :: Receive pending updates when coming online
+#[test]
+fn a_receive_plan_takes_one_chunk_of_the_owed_days_plus_the_live_days() {
+    let today = 20_000;
+    let horizon = today - RETAINED_DAYS;
+
+    let first = plan_receive(today, None);
+    let mut expected: Vec<u64> = (horizon..horizon + CATCH_UP_DAYS_PER_CYCLE).collect();
+    expected.extend([today - 1, today]);
+    assert_eq!(first.days, expected);
+    assert_eq!(
+        first.checkpoint_after,
+        horizon + CATCH_UP_DAYS_PER_CYCLE - 1
+    );
+
+    let second = plan_receive(today, Some(first.checkpoint_after));
+    assert_eq!(
+        *second.days.first().unwrap(),
+        first.checkpoint_after - 1,
+        "the next chunk re-reads one day for rotation skew"
+    );
+    assert_eq!(
+        second.checkpoint_after,
+        first.checkpoint_after + CATCH_UP_DAYS_PER_CYCLE - 2,
+        "re-reading one day for skew costs one day of progress per cycle"
+    );
+
+    let caught_up = plan_receive(today, Some(today));
+    assert_eq!(caught_up.days, vec![today - 1, today]);
+    assert_eq!(caught_up.checkpoint_after, today);
+
+    let almost = plan_receive(today, Some(today - 3));
+    assert_eq!(
+        almost.days,
+        vec![today - 4, today - 3, today - 2, today - 1, today]
+    );
+    assert_eq!(almost.checkpoint_after, today);
+}
+
+proptest! {
+    // @scenario: message_delivery :: Receive pending updates when coming online
+    #[test]
+    fn a_receive_plan_is_bounded_sorted_and_always_live(today in any::<u64>(), checkpoint in proptest::option::of(any::<u64>())) {
+        let plan = plan_receive(today, checkpoint);
+        prop_assert!(plan.days.len() as u64 <= CATCH_UP_DAYS_PER_CYCLE + 2);
+        prop_assert!(plan.days.windows(2).all(|pair| pair[0] < pair[1]));
+        prop_assert!(plan.days.contains(&today));
+        prop_assert!(plan.days.contains(&today.saturating_sub(1)));
+        prop_assert!(plan.days.iter().all(|day| *day <= today && today - day <= RETAINED_DAYS));
+        prop_assert!(plan.days.contains(&plan.checkpoint_after));
     }
 }

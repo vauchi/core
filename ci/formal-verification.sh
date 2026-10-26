@@ -185,6 +185,10 @@ tamarin_expect "$models/social_recovery.spthy" falsified "-DNO_PROOF_CHECK" \
     john_rekeys_only_with_the_real_alice
 tamarin_expect "$models/social_recovery.spthy" falsified "-DNO_ANSWER_SIGNATURE" \
     alice_rekeys_only_with_the_real_john
+tamarin_expect "$models/social_recovery.spthy" verified "-DGROUP_OF_TWO" \
+    backup_needs_both_guardians
+tamarin_expect "$models/social_recovery.spthy" falsified "-DGROUP_OF_TWO -DONE_GUARDIAN" \
+    backup_needs_both_guardians
 tamarin_expect "$models/social_recovery.spthy" falsified "-DUNBOUND_ANSWER" \
     alice_rekeys_only_with_the_real_john
 # Card updates (#757): the signature binds the recipient, and the version

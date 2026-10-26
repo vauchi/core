@@ -38,6 +38,10 @@
  *   -DONE_GUARDIAN: Carol's shard is public, as with a threshold of one;
  *     corrupting Bob opens the backup
  *     (backup_needs_both_guardians falsified).
+ *   -DGROUP_OF_TWO: Dave holds Carol's shard too, a guardian group of two
+ *     (vauchi/private#815); the backup still needs Bob and one of them
+ *     (backup_needs_both_guardians verified); with -DONE_GUARDIAN as well,
+ *     falsified.
  *   -DUNBOUND_ANSWER: John's answer does not name the new identity it
  *     answers; an attacker with a proof for its own key relays Alice's
  *     exchange key to John, and Alice and John end with different keys
@@ -94,6 +98,15 @@ rule Carol_shard_is_public:
   [ !Shard('Carol', A, s) ]
   -->
   [ Out(s) ]
+#endif
+
+#ifdef GROUP_OF_TWO
+/* Dave is in Carol's guardian group: he holds the same shard, so either
+   of them can stand in for the group (vauchi/private#815). */
+rule Dave_joins_Carols_group:
+  [ !Shard('Carol', A, s), Fr(~ld) ]
+  --[ Once('group_of_two') ]->
+  [ !Shard('Dave', A, s), !Ltk('Dave', ~ld), Out(pk(~ld)) ]
 #endif
 
 /* A corrupted identity gives up its key and, for a guardian, its shard. */
@@ -226,12 +239,23 @@ lemma executable:
 
 /* The thief holds the old device, not the backup: opening it takes both
    guardians' shards or Alice's new identity. */
+#ifdef GROUP_OF_TWO
+/* One member of each group: Bob's, and Carol's or Dave's. */
+lemma backup_needs_both_guardians:
+  "All bk #s.
+     BackupKey(bk) @ s
+     ==> not (Ex #x. K(bk) @ x)
+         | ((Ex #c. Compromised('Bob') @ c)
+            & ((Ex #d. Compromised('Carol') @ d) | (Ex #d. Compromised('Dave') @ d)))
+         | (Ex #c. CompromisedNew('Alice') @ c)"
+#else
 lemma backup_needs_both_guardians:
   "All bk #s.
      BackupKey(bk) @ s
      ==> not (Ex #x. K(bk) @ x)
          | ((Ex #c. Compromised('Bob') @ c) & (Ex #d. Compromised('Carol') @ d))
          | (Ex #c. CompromisedNew('Alice') @ c)"
+#endif
 
 /* John rekeys only to the key Alice really recovered to, unless both
    helpers he counted were corrupted — although the thief holds the

@@ -132,6 +132,7 @@ mod f2_new_4_settings_nav_tests;
 mod field_visibility_label_tests;
 mod file_picker_wiring_tests;
 mod fingerprint_verify_engine_tests;
+mod follow_system_colors_tests;
 mod form_dialog_i18n_tests;
 mod gdpr_i18n_tests;
 mod group_delete_tests;

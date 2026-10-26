@@ -53,7 +53,7 @@ impl Vauchi {
             identity,
             contacts,
             &self.config.relay,
-            day,
+            day.saturating_sub(1)..=day,
         ));
         let batches = padded_registration_batches(
             self.rng.as_ref(),

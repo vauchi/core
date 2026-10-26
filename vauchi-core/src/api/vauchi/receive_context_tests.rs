@@ -14,7 +14,7 @@ use proptest::prelude::*;
 fn mismatched_scope_does_not_authorize_any_route() {
     let identity = Identity::create("Alice", 0);
     let relay = RelayConfig::default();
-    let context = registered_mailboxes(&identity, &[], &relay, 42);
+    let context = registered_mailboxes(&identity, &[], &relay, 41..=42);
     let token = token_hex(&compute_device_sync_token(
         identity.master_seed(),
         identity.device_id(),
@@ -55,7 +55,7 @@ fn removed_blocked_and_rekeyed_contacts_do_not_resolve_the_old_mailbox() {
         SymmetricKey::from_bytes([5; 32]),
         0,
     );
-    let context = registered_mailboxes(&identity, &[original], &relay, 100);
+    let context = registered_mailboxes(&identity, &[original], &relay, 99..=100);
     for contacts in [vec![], vec![blocked], vec![rekeyed]] {
         let mut routes = ReceiveContext::new(&identity, &contacts, &relay);
         for day in [99, 100] {
@@ -88,7 +88,7 @@ fn collecting_multiple_days_keeps_only_the_selected_routes() {
     )];
     let mut received = ReceiveContext::new(&identity, &contacts, &relay);
     for day in [0, 1, 100, 1000, u64::MAX] {
-        let full = registered_mailboxes(&identity, &contacts, &relay, day);
+        let full = registered_mailboxes(&identity, &contacts, &relay, day.saturating_sub(1)..=day);
         let token = token_hex(&compute_mailbox_token(
             &[4; 32],
             identity.signing_public_key(),
@@ -117,7 +117,7 @@ proptest! {
         );
         let contacts = [contact.clone()];
         let mut routes = ReceiveContext::new(&identity, &contacts, &relay);
-        let context = registered_mailboxes(&identity, &contacts, &relay, day);
+        let context = registered_mailboxes(&identity, &contacts, &relay, day.saturating_sub(1)..=day);
         for token_day in [day.saturating_sub(1), day] {
             for token in [
                 compute_mailbox_token(&[4; 32], identity.signing_public_key(), token_day),

@@ -112,6 +112,24 @@ pub fn current_day_epoch(now: u64) -> u64 {
     now / 86400
 }
 
+/// How long the relay keeps an unacknowledged envelope: 120 days
+/// (`relay` `blob_lifetime`, private#691). A client offline longer than
+/// this has nothing left to fetch.
+pub const RETAINED_DAYS: u64 = 120;
+
+/// The day epochs a receiver must still resolve: from the last day it
+/// read to exhaustion (`checkpoint`, one day earlier for rotation skew)
+/// or, without one, the whole retained interval — never more than
+/// [`RETAINED_DAYS`] back, never past `today` (vauchi/private#691).
+pub fn receive_days(today: u64, checkpoint: Option<u64>) -> std::ops::RangeInclusive<u64> {
+    let horizon = today.saturating_sub(RETAINED_DAYS);
+    let start = match checkpoint {
+        Some(day) => horizon.max(day.saturating_sub(1)),
+        None => horizon,
+    };
+    start.min(today)..=today
+}
+
 /// Encode a 32-byte token as a lowercase hex string for wire transmission.
 pub fn token_hex(token: &MailboxToken) -> String {
     hex::encode(token.as_bytes())

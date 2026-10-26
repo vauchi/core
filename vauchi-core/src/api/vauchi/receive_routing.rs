@@ -143,11 +143,12 @@ pub fn process_received_blobs(
     blobs: Vec<(String, String, Vec<u8>, Option<String>)>,
 ) -> Vec<BlobOutcome> {
     let day = crate::network::mailbox_token::current_day_epoch(storage.clock().unix_seconds());
+    // No durable checkpoint on this path: the whole retained interval.
     let token_to_contact = build_token_to_contact_map(
         contacts,
         identity.signing_public_key(),
         identity.device_id(),
-        day,
+        crate::network::mailbox_token::receive_days(day, None),
     );
 
     process_received_blobs_with_routes(identity, storage, contacts, blobs, &token_to_contact)
@@ -392,7 +393,7 @@ pub(crate) fn build_token_to_contact_map(
     contacts: &[Contact],
     own_pubkey: &[u8; 32],
     own_device_id: &[u8; 32],
-    day: u64,
+    days: std::ops::RangeInclusive<u64>,
 ) -> HashMap<String, String> {
     use crate::network::mailbox_token::compute_device_mailbox_token;
     let mut map = HashMap::new();
@@ -405,37 +406,25 @@ pub(crate) fn build_token_to_contact_map(
         };
         let bytes = shared_key.as_bytes();
         let id = contact.id().to_string();
-        // Our directional RECEIVE token from this contact, keyed to our own
-        // identity — so we never resolve (and decrypt-fail) our own sends.
-        map.insert(
-            token_hex(&compute_mailbox_token(bytes, own_pubkey, day)),
-            id.clone(),
-        );
-        // F4: also resolve our DEVICE-scoped receive token so per-device
-        // fan-out copies addressed to THIS device route to the contact
-        // (ADR-064 Amendment 2026-07-25).
-        map.insert(
-            token_hex(&compute_device_mailbox_token(
-                bytes,
-                own_pubkey,
-                own_device_id,
-                day,
-            )),
-            id.clone(),
-        );
-        if day > 0 {
+        for day in days.clone() {
+            // Our directional RECEIVE token from this contact, keyed to our
+            // own identity — so we never resolve (and decrypt-fail) our own
+            // sends.
             map.insert(
-                token_hex(&compute_mailbox_token(bytes, own_pubkey, day - 1)),
+                token_hex(&compute_mailbox_token(bytes, own_pubkey, day)),
                 id.clone(),
             );
+            // F4: also resolve our DEVICE-scoped receive token so per-device
+            // fan-out copies addressed to THIS device route to the contact
+            // (ADR-064 Amendment 2026-07-25).
             map.insert(
                 token_hex(&compute_device_mailbox_token(
                     bytes,
                     own_pubkey,
                     own_device_id,
-                    day - 1,
+                    day,
                 )),
-                id,
+                id.clone(),
             );
         }
     }
@@ -487,7 +476,7 @@ mod tests {
         ));
 
         let contacts = vec![alice.clone(), bob.clone()];
-        let map = build_token_to_contact_map(&contacts, &OWN_PK, &OWN_DEVICE, day);
+        let map = build_token_to_contact_map(&contacts, &OWN_PK, &OWN_DEVICE, day - 1..=day);
 
         assert_eq!(map.get(&alice_today).map(String::as_str), Some(alice.id()));
         assert_eq!(
@@ -510,7 +499,7 @@ mod tests {
             day,
         ));
 
-        let map = build_token_to_contact_map(&[alice], &OWN_PK, &OWN_DEVICE, day);
+        let map = build_token_to_contact_map(&[alice], &OWN_PK, &OWN_DEVICE, day - 1..=day);
 
         assert!(
             !map.contains_key(&alice_today),
@@ -522,7 +511,7 @@ mod tests {
     #[test]
     fn test_build_token_to_contact_map_returns_none_for_unknown_token() {
         let alice = exchanged_contact("A");
-        let map = build_token_to_contact_map(&[alice], &OWN_PK, &OWN_DEVICE, 100);
+        let map = build_token_to_contact_map(&[alice], &OWN_PK, &OWN_DEVICE, 99..=100);
         assert!(!map.contains_key("00".repeat(32).as_str()));
     }
 

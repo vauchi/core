@@ -4,8 +4,9 @@
 
 use proptest::prelude::*;
 use vauchi_core::network::mailbox_token::{
-    batch_register_tokens, batch_register_tokens_with_device_sync, compute_device_mailbox_token,
-    compute_device_sync_token, compute_mailbox_token, token_hex,
+    RETAINED_DAYS, batch_register_tokens, batch_register_tokens_with_device_sync,
+    compute_device_mailbox_token, compute_device_sync_token, compute_mailbox_token, receive_days,
+    token_hex,
 };
 
 // Directional tokens are keyed to the recipient. These tests assert only
@@ -438,4 +439,47 @@ fn registration_on_day_zero_has_no_previous_day() {
         0
     ))));
     assert_eq!(tokens.len(), 256);
+}
+
+/// The receive window a client must still resolve (vauchi/private#691):
+/// never beyond the relay's retention, one day of skew behind the
+/// checkpoint, never past today.
+// @scenario: message_delivery :: Receive pending updates when coming online
+#[test]
+fn receive_days_covers_the_retained_interval_back_to_the_checkpoint() {
+    let today = 20_000;
+
+    assert_eq!(
+        receive_days(today, None),
+        today - RETAINED_DAYS..=today,
+        "no checkpoint: the whole retained interval"
+    );
+    assert_eq!(receive_days(today, Some(today)), today - 1..=today);
+    assert_eq!(receive_days(today, Some(today - 50)), today - 51..=today);
+    assert_eq!(
+        receive_days(today, Some(today - 500)),
+        today - RETAINED_DAYS..=today,
+        "a checkpoint older than retention adds nothing"
+    );
+    assert_eq!(
+        receive_days(today, Some(today + 7)),
+        today..=today,
+        "a checkpoint from a clock that ran ahead never looks past today"
+    );
+    assert_eq!(receive_days(3, None), 0..=3);
+    assert_eq!(receive_days(0, Some(0)), 0..=0);
+}
+
+proptest! {
+    // @scenario: message_delivery :: Receive pending updates when coming online
+    #[test]
+    fn receive_days_is_bounded_and_ends_today(today in any::<u64>(), checkpoint in proptest::option::of(any::<u64>())) {
+        let days = receive_days(today, checkpoint);
+        prop_assert_eq!(*days.end(), today);
+        prop_assert!(*days.start() <= today);
+        prop_assert!(today - *days.start() <= RETAINED_DAYS);
+        if let Some(day) = checkpoint && day <= today {
+            prop_assert!(*days.start() <= day.saturating_sub(1).max(today.saturating_sub(RETAINED_DAYS)));
+        }
+    }
 }

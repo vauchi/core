@@ -28,8 +28,9 @@
 //!
 //! # Constraints
 //!
-//! - `2 <= threshold < count`, with `MIN_COUNT <= count <= MAX_COUNT`
-//!   (three to nine guardians, vauchi/private#816)
+//! - `2 <= threshold <= count`, with `MIN_COUNT <= count <= MAX_COUNT`
+//!   (three to nine guardians, vauchi/private#816; every one of them may
+//!   be needed, vauchi/private#815)
 //! - Secret is exactly 32 bytes (fits a `SymmetricKey` or any 32-byte key).
 //!
 //! # TODO
@@ -63,10 +64,6 @@ pub enum ShamirError {
 
     #[error("Threshold cannot exceed count, got threshold={0}, count={1}")]
     ThresholdExceedsCount(u8, u8),
-
-    /// Every guardian needed means one lost guardian locks the owner out.
-    #[error("Threshold must leave one guardian spare, got {0} of {0}")]
-    ThresholdEqualsCount(u8),
 
     #[error("Count must be at least 2, got {0}")]
     CountTooLow(u8),
@@ -191,7 +188,7 @@ pub fn reconstruct(shares: &[Share], threshold: u8) -> Result<[u8; 32], ShamirEr
     if threshold < 2 {
         return Err(ShamirError::ThresholdTooLow(threshold));
     }
-    if threshold >= MAX_COUNT {
+    if threshold > MAX_COUNT {
         return Err(ShamirError::ThresholdTooHigh(threshold));
     }
     if shares.len() < threshold as usize {
@@ -273,9 +270,6 @@ fn validate_params(threshold: u8, count: u8) -> Result<(), ShamirError> {
     }
     if threshold > count {
         return Err(ShamirError::ThresholdExceedsCount(threshold, count));
-    }
-    if threshold == count {
-        return Err(ShamirError::ThresholdEqualsCount(count));
     }
     Ok(())
 }
@@ -719,16 +713,18 @@ mod tests {
         assert!(!debug.contains("171"));
     }
 
+    /// Nine, the guardian cap, is also the highest threshold: every one of
+    /// nine guardians may be needed (vauchi/private#815).
     // @internal
     #[test]
-    fn eight_is_the_highest_threshold_reconstruct_accepts() {
+    fn nine_is_the_highest_threshold_reconstruct_accepts() {
         let secret = [0x5Au8; 32];
-        let shares = split(&secret, 8, 9).unwrap();
+        let shares = split(&secret, 9, 9).unwrap();
 
-        assert_eq!(reconstruct(&shares[..8], 8).unwrap(), secret);
+        assert_eq!(reconstruct(&shares, 9).unwrap(), secret);
         assert!(matches!(
-            reconstruct(&shares, 9),
-            Err(ShamirError::ThresholdTooHigh(9))
+            reconstruct(&shares, 10),
+            Err(ShamirError::ThresholdTooHigh(10))
         ));
     }
 

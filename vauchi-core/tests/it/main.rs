@@ -137,6 +137,7 @@ mod contact_warnings_tests;
 mod contract_cli_consumer_tests;
 mod contract_tests;
 mod contract_tui_desktop_consumer_tests;
+mod cover_payload_tests;
 mod crash_recovery_tests;
 mod cross_kind_merge_adoption_tests;
 mod cross_platform_sync_tests;

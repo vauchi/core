@@ -85,10 +85,7 @@ impl PreparedSurface {
                     ScreenLayout::Fixed => SurfaceLayout::Fixed,
                     ScreenLayout::Pinned => SurfaceLayout::Pinned,
                 },
-                tokens: presentation_tokens(
-                    &screen.tokens,
-                    &crate::theme::resolve_theme(render_context.theme_id.as_deref()).colors,
-                ),
+                tokens: presentation_tokens(&screen.tokens, &render_context.theme().colors),
                 nodes,
             },
             value_routes: projection.value_routes,

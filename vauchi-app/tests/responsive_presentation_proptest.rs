@@ -26,6 +26,7 @@ fn environment(width: u32) -> Event {
         available_height: 900,
         input_modes: vec![InputMode::Touch],
         motion: MotionPreference::Full,
+        color_scheme: None,
     }
 }
 

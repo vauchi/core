@@ -39,15 +39,15 @@ pub use event_json::{
     MAX_EVENT_JSON_NESTING_DEPTH, event_from_json,
 };
 pub use presentation::{
-    AccessibilitySpec, ActionSpec, ActionTone, AlertSpec, BindingId, ChoiceOption, ContextBar,
-    DocumentSpec, ExportFileSpec, InputMode, InputValue, InteractionId, InvocationOutcome,
-    MotionPreference, NavigationItem, NavigationSpec, NotificationSpec, NotificationUrgency,
-    OverlayKind, OverlaySpec, PaneLayout, PresentationAxis, PresentationColors,
-    PresentationIdError, PresentationImageShape, PresentationInputKind, PresentationListStyle,
-    PresentationNode, PresentationPaging, PresentationProfile, PresentationQrErrorCorrection,
-    PresentationQrPurpose, PresentationQrSize, PresentationRow, PresentationTextStyle,
-    PresentationTokens, PresentationTone, QrPlacement, StandardShortcut, SurfaceId, SurfaceLayout,
-    SurfaceSpec, ToastSpec, WindowClass,
+    AccessibilitySpec, ActionSpec, ActionTone, AlertSpec, BindingId, ChoiceOption, ColorScheme,
+    ContextBar, DocumentSpec, ExportFileSpec, InputMode, InputValue, InteractionId,
+    InvocationOutcome, MotionPreference, NavigationItem, NavigationSpec, NotificationSpec,
+    NotificationUrgency, OverlayKind, OverlaySpec, PaneLayout, PresentationAxis,
+    PresentationColors, PresentationIdError, PresentationImageShape, PresentationInputKind,
+    PresentationListStyle, PresentationNode, PresentationPaging, PresentationProfile,
+    PresentationQrErrorCorrection, PresentationQrPurpose, PresentationQrSize, PresentationRow,
+    PresentationTextStyle, PresentationTokens, PresentationTone, QrPlacement, StandardShortcut,
+    SurfaceId, SurfaceLayout, SurfaceSpec, ToastSpec, WindowClass,
 };
 
 /// A command from core to the frontend requesting a hardware action.
@@ -951,6 +951,10 @@ pub enum Event {
         available_height: u32,
         input_modes: Vec<InputMode>,
         motion: MotionPreference,
+        /// `None` from a shell that does not report it; Core then paints
+        /// the dark default (vauchi/private#814).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        color_scheme: Option<ColorScheme>,
     },
     /// A visible surface became the target of user interaction.
     SurfaceActivated { surface_id: SurfaceId },

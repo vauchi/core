@@ -38,6 +38,11 @@ pub struct RenderContext {
     /// Active theme id (e.g. `"cyber"`, `"classic"`). Same `None`
     /// semantics as `locale`.
     pub theme_id: Option<String>,
+    /// The OS light or dark setting. Skipped on the wire: shells report it
+    /// as a presentation environment observation, not in this push
+    /// (vauchi/private#814).
+    #[serde(skip)]
+    pub system_color_scheme: Option<vauchi_core::ColorScheme>,
 }
 
 impl RenderContext {
@@ -54,6 +59,12 @@ impl RenderContext {
             self.locale = pick.locale;
             self.theme_id = pick.theme_id;
         }
+    }
+
+    /// The theme to paint: the pick, else the default for the OS light or
+    /// dark setting.
+    pub fn theme(&self) -> crate::theme::Theme {
+        crate::theme::resolve_theme(self.theme_id.as_deref(), self.system_color_scheme)
     }
 
     /// The picked language if Core has its strings, else the system

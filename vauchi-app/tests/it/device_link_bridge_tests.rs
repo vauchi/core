@@ -313,6 +313,7 @@ fn a_content_update_while_the_code_is_shown_keeps_the_confirmation() {
         available_height: 40,
         input_modes: vec![InputMode::Keyboard],
         motion: MotionPreference::Full,
+        color_scheme: None,
     });
     let _ = engine.navigate_to(AppScreen::DeviceManagement);
     let link = published_primary(&mut engine, ".link_device");

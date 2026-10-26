@@ -288,11 +288,12 @@ pub fn get_theme(theme_id: String) -> Option<MobileTheme> {
 /// Returns "catppuccin-mocha" for dark mode, "catppuccin-latte" for light mode.
 #[uniffi::export]
 pub fn get_default_theme_id(prefer_dark: bool) -> String {
-    if prefer_dark {
-        "catppuccin-mocha".to_string()
+    let color_scheme = if prefer_dark {
+        vauchi_core::ColorScheme::Dark
     } else {
-        "catppuccin-latte".to_string()
-    }
+        vauchi_core::ColorScheme::Light
+    };
+    vauchi_app::theme::default_theme_id(Some(color_scheme)).to_string()
 }
 
 // ============================================================

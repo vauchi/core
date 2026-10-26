@@ -120,6 +120,7 @@ fn a_late_activation_of_a_surface_left_behind_is_ignored() {
             available_height: 800,
             input_modes: vec![InputMode::Touch],
             motion: MotionPreference::Full,
+            color_scheme: None,
         })
         .expect("phone environment");
 

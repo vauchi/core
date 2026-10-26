@@ -274,6 +274,7 @@ fn test_presentation_environment_event_carries_window_input_and_motion_facts() {
         available_height: 900,
         input_modes: vec![InputMode::Touch, InputMode::Keyboard],
         motion: MotionPreference::Reduced,
+        color_scheme: None,
     };
 
     assert_eq!(

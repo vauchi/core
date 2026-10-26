@@ -51,6 +51,7 @@ fn app_push(locale: Option<&str>, theme_id: Option<&str>) -> RenderContext {
         locale: locale.map(str::to_string),
         system_locale: Some("fr-CH".to_string()),
         theme_id: theme_id.map(str::to_string),
+        system_color_scheme: None,
     }
 }
 

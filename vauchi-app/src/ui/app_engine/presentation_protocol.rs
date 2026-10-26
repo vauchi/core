@@ -244,11 +244,16 @@ impl AppEngine {
             Event::PresentationEnvironmentChanged { .. } | Event::SurfaceActivated { .. }
         ) {
             let before = self.current_screen();
+            let theme_before = self.render_context.theme().id;
+            if let Event::PresentationEnvironmentChanged { color_scheme, .. } = &event {
+                self.render_context.system_color_scheme = *color_scheme;
+            }
             let mut commands = self.presentation_coordinator.handle_event(event)?;
             // A window crossing the short threshold changes a fixed exchange
-            // screen (#513); any other screen must not be sent again, or a
-            // resize would drop its pending Undo.
-            if self.current_screen() != before {
+            // screen (#513), and an OS light/dark switch under "follow
+            // system" changes every colour (#814); any other change must not
+            // send the screen again, or a resize would drop its pending Undo.
+            if self.current_screen() != before || self.render_context.theme().id != theme_before {
                 commands.extend(self.initial_commands()?);
             }
             return Ok(commands);

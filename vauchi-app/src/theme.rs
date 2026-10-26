@@ -676,13 +676,31 @@ pub fn active_themes() -> Vec<Theme> {
     bundled_themes()
 }
 
+/// The theme "follow system" paints in light mode.
+pub const DEFAULT_LIGHT_THEME_ID: &str = "catppuccin-latte";
+
+/// The theme "follow system" paints in dark mode, and when the shell does
+/// not report its mode.
+pub const DEFAULT_DARK_THEME_ID: &str = "catppuccin-mocha";
+
+/// The default theme for the OS light or dark setting.
+pub fn default_theme_id(color_scheme: Option<vauchi_core::ColorScheme>) -> &'static str {
+    match color_scheme {
+        Some(vauchi_core::ColorScheme::Light) => DEFAULT_LIGHT_THEME_ID,
+        _ => DEFAULT_DARK_THEME_ID,
+    }
+}
+
 /// The theme a pick paints: the picked theme from the active catalog, else
-/// the catalog's copy of the default theme, else the bundled default. A
-/// pick can name a theme the catalog no longer has (vauchi/private#814).
-pub fn resolve_theme(theme_id: Option<&str>) -> Theme {
+/// the catalog's default for the OS light or dark setting, else the bundled
+/// default. A pick can name a theme the catalog no longer has
+/// (vauchi/private#814).
+pub fn resolve_theme(
+    theme_id: Option<&str>,
+    color_scheme: Option<vauchi_core::ColorScheme>,
+) -> Theme {
     let themes = active_themes();
-    let default_id = default_theme().id;
-    [theme_id, Some(default_id.as_str())]
+    [theme_id, Some(default_theme_id(color_scheme))]
         .into_iter()
         .flatten()
         .find_map(|id| themes.iter().find(|theme| theme.id == id).cloned())
@@ -691,7 +709,7 @@ pub fn resolve_theme(theme_id: Option<&str>) -> Theme {
 
 fn default_dark() -> Theme {
     Theme {
-        id: "catppuccin-mocha".to_string(),
+        id: DEFAULT_DARK_THEME_ID.to_string(),
         name: "Catppuccin Mocha".to_string(),
         version: "1.0.0".to_string(),
         author: Some("Catppuccin".to_string()),

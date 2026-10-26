@@ -434,6 +434,7 @@ impl AppEngine {
     /// was built in English (vauchi/private#721).
     pub fn set_render_context(&mut self, mut ctx: crate::ui::RenderContext) {
         ctx.apply_saved_appearance(&self.vauchi);
+        ctx.system_color_scheme = self.render_context.system_color_scheme;
         let language_changed = ctx.resolved_locale() != self.render_context.resolved_locale();
         self.wanted_locales_changed |=
             ctx.wanted_locale_codes() != self.render_context.wanted_locale_codes();

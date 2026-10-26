@@ -8,8 +8,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.90.0] — 2026-10-26
+
 ### Added
 
+- `Event::WakeupFired` lets a shell report a timer firing through the
+  canonical event channel. Core returns due notifications as
+  `PostNotification` commands, preserving their opaque replacement IDs,
+  together with the next wakeup and pending presentation commands. A shell
+  must execute native notification commands before adopting this event;
+  legacy notification collection remains compatible.
 - Every surface carries the active theme's colours:
   `PresentationTokens.colors` (`PresentationColors`, `#rrggbb` by generic
   role; optional roles are `null` when the theme leaves them out). A pick
@@ -30,7 +38,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - `PreparedSurface::from_screen_in` takes the `RenderContext` instead of
   a `Locale`. Rust struct literals of `PresentationTokens`,
   `PresentationEnvironmentChanged` and `RenderContext` must supply the
-  new fields, so this needs the next minor release (`lint:semver`).
+  new fields, requiring this minor release (`lint:semver`).
   Strict surface readers must accept `tokens.colors`.
 
 ## [0.89.0] — 2026-10-25

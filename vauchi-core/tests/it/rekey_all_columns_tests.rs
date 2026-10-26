@@ -103,6 +103,11 @@ fn fixtures() -> Vec<(&'static str, &'static str, &'static [u8])> {
         ("contact_field_notes", "note_encrypted", b"phone is work"),
         ("own_card", "card_json_encrypted", b"{\"name\":\"Alice\"}"),
         (
+            "duress_own_card",
+            "card_json_encrypted",
+            b"{\"name\":\"Alicia\"}",
+        ),
+        (
             "device_registry",
             "registry_json_encrypted",
             b"{\"devices\":[]}",
@@ -381,6 +386,14 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
         "INSERT OR REPLACE INTO own_card (id, card_json, card_json_encrypted, updated_at) \
          VALUES (1, '', ?1, ?2)",
         params![enc("own_card", "card_json_encrypted"), now],
+    )
+    .unwrap();
+
+    // ── duress_own_card (singleton; the duress session's copy, #811) ──
+    conn.execute(
+        "INSERT OR REPLACE INTO duress_own_card (id, card_json, card_json_encrypted, updated_at) \
+         VALUES (1, '', ?1, ?2)",
+        params![enc("duress_own_card", "card_json_encrypted"), now],
     )
     .unwrap();
 

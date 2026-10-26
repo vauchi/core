@@ -62,6 +62,7 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("contacts", "cek_encrypted"),
     // V14 high-priority
     ("own_card", "card_json_encrypted"),
+    ("duress_own_card", "card_json_encrypted"),
     ("device_registry", "registry_json_encrypted"),
     ("contact_device_registries", "broadcast_encrypted"),
     // V62 received safety-alert facts
@@ -242,8 +243,11 @@ impl Storage {
             self.rekey_ratchets(old_key, &new_key)?;
             report(&mut completed, "ratchets");
 
-            self.rekey_own_card(old_key, &new_key)?;
+            self.rekey_own_card(old_key, &new_key, "own_card")?;
             report(&mut completed, "own_card");
+
+            self.rekey_own_card(old_key, &new_key, "duress_own_card")?;
+            report(&mut completed, "duress_own_card");
 
             self.rekey_device_registry(old_key, &new_key)?;
             report(&mut completed, "device_registry");

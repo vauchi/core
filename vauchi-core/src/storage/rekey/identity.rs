@@ -88,14 +88,16 @@ impl Storage {
         Ok(())
     }
 
-    /// Re-encrypt own_card: card_json_encrypted
+    /// Re-encrypt an own-card table (`own_card`, `duress_own_card`):
+    /// card_json_encrypted
     pub(super) fn rekey_own_card(
         &self,
         old_key: &SymmetricKey,
         new_key: &SymmetricKey,
+        table: &str,
     ) -> Result<(), StorageError> {
         let result: Result<(Option<Vec<u8>>,), _> = self.conn.query_row(
-            "SELECT card_json_encrypted FROM own_card WHERE id = 1",
+            &format!("SELECT card_json_encrypted FROM {table} WHERE id = 1"),
             [],
             |row| Ok((row.get(0)?,)),
         );
@@ -104,15 +106,15 @@ impl Storage {
             && !enc.is_empty()
         {
             let plain = decrypt(old_key, &enc)
-                .map_err(|e| StorageError::Migration(format!("Decrypt own_card: {}", e)))?;
+                .map_err(|e| StorageError::Migration(format!("Decrypt {table}: {e}")))?;
             let new_enc = encrypt(new_key, &plain)
-                .map_err(|e| StorageError::Migration(format!("Encrypt own_card: {}", e)))?;
+                .map_err(|e| StorageError::Migration(format!("Encrypt {table}: {e}")))?;
             self.conn
                 .execute(
-                    "UPDATE own_card SET card_json_encrypted = ?1 WHERE id = 1",
+                    &format!("UPDATE {table} SET card_json_encrypted = ?1 WHERE id = 1"),
                     params![new_enc],
                 )
-                .map_err(|e| StorageError::Migration(format!("Update own_card: {}", e)))?;
+                .map_err(|e| StorageError::Migration(format!("Update {table}: {e}")))?;
         }
         Ok(())
     }

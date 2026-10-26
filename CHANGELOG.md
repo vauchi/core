@@ -8,6 +8,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- Every surface carries the active theme's colours:
+  `PresentationTokens.colors` (`PresentationColors`, `#rrggbb` by generic
+  role; optional roles are `null` when the theme leaves them out). A pick
+  in Core's Settings colours the next surface, and a duress unlock paints
+  what a normal one does (vauchi/private#814).
+- `PresentationEnvironmentChanged` takes an optional `color_scheme`
+  (`light`/`dark`, omitted when absent). Under "follow system" Core paints
+  the default theme for it, and a switch re-presents the surface at once.
+- `Command::SaveRestorableState { state }`: the shell keeps `state` in
+  its own per-device storage and hands it back unchanged as the
+  render-context field `restorable_state`. It carries the language and
+  theme pick, so the pick applies before storage opens, on the lock
+  screen too. A shell that does not keep it yet still gets the pick from
+  the vault.
+
+### Changed
+
+- `PreparedSurface::from_screen_in` takes the `RenderContext` instead of
+  a `Locale`. Rust struct literals of `PresentationTokens`,
+  `PresentationEnvironmentChanged` and `RenderContext` must supply the
+  new fields, so this needs the next minor release (`lint:semver`).
+  Strict surface readers must accept `tokens.colors`.
+
 ## [0.89.0] — 2026-10-25
 
 ### Changed

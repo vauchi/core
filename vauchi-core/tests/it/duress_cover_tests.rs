@@ -251,6 +251,23 @@ fn a_duress_edit_that_changes_nothing_visible_queues_what_a_normal_one_would() {
 }
 
 /// Labels carry `index` so a sequence never adds the same label twice.
+/// Proptest's counterexample: the duress rename path returned before the
+/// marker a real rename sets, so a rename alone queued no cover.
+// @scenario: duress_mode :: Duress mode looks identical to normal mode
+#[test]
+fn a_rename_alone_under_duress_queues_what_a_normal_one_would() {
+    let edits = [Edit::Rename("A".into())];
+    let mut normal = normal_world();
+    let mut duress = duress_world();
+
+    edit_then_tick(&mut normal, &edits);
+    edit_then_tick(&mut duress, &edits);
+
+    let normal_shape = queue_shape(&normal.alice);
+    assert_eq!(normal_shape.len(), 1, "the real rename reaches Bob once");
+    assert_eq!(queue_shape(&duress.alice), normal_shape);
+}
+
 fn edit_strategy(index: usize) -> impl Strategy<Value = Edit> {
     let label = move |label: String| format!("{label}{index}");
     prop_oneof![

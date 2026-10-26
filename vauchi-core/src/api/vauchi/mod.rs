@@ -46,6 +46,7 @@ mod registry_sibling_apply;
 #[cfg(feature = "network-http")]
 mod relay_purge;
 mod resync;
+mod sealing;
 mod search;
 mod security;
 mod setup;

@@ -27,7 +27,7 @@ fn names<T>(items: Vec<T>, name: impl Fn(&T) -> String) -> Vec<String> {
     items.iter().map(name).collect()
 }
 
-// @scenario: duress_mode :: Changes made in duress mode look like they worked
+// @scenario: duress_mode :: What a duress session makes survives a lock
 #[test]
 fn a_group_a_tag_and_a_place_made_under_duress_survive_a_second_duress_unlock() {
     let mut wb = alice_under_duress();
@@ -53,7 +53,7 @@ fn a_group_a_tag_and_a_place_made_under_duress_survive_a_second_duress_unlock() 
     );
 }
 
-// @scenario: duress_mode :: The duress setup is invisible in duress mode
+// @scenario: duress_mode :: What a duress session makes survives a lock
 #[test]
 fn the_real_vocabulary_stays_untouched_and_the_duress_one_goes_with_duress() {
     let mut wb = alice_under_duress();

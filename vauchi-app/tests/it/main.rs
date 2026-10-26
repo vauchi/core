@@ -234,6 +234,7 @@ mod social_network_display_tests;
 mod stale_binding_event_tests;
 mod status_indicator_label_tests;
 mod storage_lock_presentation_tests;
+mod surface_colors_tests;
 mod sync_chrome_overlay_tests;
 mod system_locale_tests;
 mod update_overlay_tests;

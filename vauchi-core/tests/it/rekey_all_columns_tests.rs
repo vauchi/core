@@ -132,6 +132,11 @@ fn fixtures() -> Vec<(&'static str, &'static str, &'static [u8])> {
         ("device_info", "device_info_encrypted", b"{\"id\":\"dev1\"}"),
         ("version_vector", "vector_json_encrypted", b"{\"v\":7}"),
         (
+            "receive_checkpoints",
+            "checkpoint_json_encrypted",
+            b"{\"day\":20000}",
+        ),
+        (
             "sync_field_timestamps",
             "timestamps_json_encrypted",
             b"{\"field:email\":1700000000000}",
@@ -454,6 +459,14 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
          (id, vector_json_encrypted, updated_at) \
          VALUES (1, ?1, ?2)",
         params![enc("version_vector", "vector_json_encrypted"), now],
+    )
+    .unwrap();
+
+    // ── receive_checkpoints (keyed by scope, #691) ────────────
+    conn.execute(
+        "INSERT INTO receive_checkpoints (scope, checkpoint_json_encrypted, updated_at) \
+         VALUES ('scope-691', ?1, ?2)",
+        params![enc("receive_checkpoints", "checkpoint_json_encrypted"), now],
     )
     .unwrap();
 

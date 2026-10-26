@@ -504,6 +504,7 @@ fn hex(color: (u8, u8, u8)) -> String {
 proptest::proptest! {
     // Black or white reaches at least 4.58:1 on any single colour, so any
     // text becomes AA-readable on any one surface (vauchi/private#814).
+    // @internal
     #[test]
     fn readable_on_reaches_aa_on_any_single_surface(
         text in proptest::prelude::any::<(u8, u8, u8)>(),
@@ -513,6 +514,7 @@ proptest::proptest! {
         proptest::prop_assert!(contrast_ratio(readable, surface) >= 4.5);
     }
 
+    // @internal
     #[test]
     fn readable_text_is_left_as_the_theme_set_it(
         text in proptest::prelude::any::<(u8, u8, u8)>(),

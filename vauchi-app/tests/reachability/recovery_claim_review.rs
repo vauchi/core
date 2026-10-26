@@ -37,7 +37,7 @@ fn engine() -> RecoveryClaimReviewEngine {
         ReviewMode::Vouching,
         ClaimContext {
             contact_name: "Alice".into(),
-            old_pk_fingerprint: "ab12cd34ef56".into(),
+            new_pk_fingerprint: "ab12cd34ef56".into(),
             mutual_voucher_count: 3,
             threshold: 2,
             confidence: Confidence::High,

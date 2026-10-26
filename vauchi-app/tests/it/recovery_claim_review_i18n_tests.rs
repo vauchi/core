@@ -19,7 +19,7 @@ use vauchi_app::ui::recovery_claim_review::{
 fn context() -> ClaimContext {
     ClaimContext {
         contact_name: "Alice".into(),
-        old_pk_fingerprint: "ABCD-1234".into(),
+        new_pk_fingerprint: "ABCD-1234".into(),
         mutual_voucher_count: 2,
         threshold: 3,
         confidence: Confidence::High,

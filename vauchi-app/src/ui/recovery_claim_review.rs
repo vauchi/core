@@ -41,8 +41,10 @@ pub enum Confidence {
 pub struct ClaimContext {
     /// Display name of the contact who is recovering.
     pub contact_name: String,
-    /// Fingerprint of the old public key (for out-of-band verification).
-    pub old_pk_fingerprint: String,
+    /// Fingerprint of the claimant's new identity key, for out-of-band
+    /// verification: an impersonator knows the old public key, so only
+    /// the new one tells the reviewer anything (vauchi/private#829).
+    pub new_pk_fingerprint: String,
     /// Number of mutual contacts who already vouched.
     pub mutual_voucher_count: usize,
     /// Quorum threshold.
@@ -56,7 +58,7 @@ pub struct ClaimContext {
 enum ReviewStep {
     /// Initial review screen — shows confidence and actions.
     Review,
-    /// Out-of-band verification — shows old_pk fingerprint.
+    /// Out-of-band verification — shows the new identity's fingerprint.
     VerifyOutOfBand,
     /// Confirm risky acceptance (low confidence).
     ConfirmAccept,
@@ -325,13 +327,13 @@ impl RecoveryClaimReviewEngine {
                 Component::Text {
                     a11y: None,
                     id: "fingerprint_label".into(),
-                    content: self.t("recovery.old_fingerprint_label"),
+                    content: self.t("recovery.new_fingerprint_label"),
                     style: TextStyle::Caption,
                 },
                 Component::Text {
                     a11y: None,
                     id: "fingerprint".into(),
-                    content: self.context.old_pk_fingerprint.clone(),
+                    content: self.context.new_pk_fingerprint.clone(),
                     style: TextStyle::Title,
                 },
                 Component::Text {

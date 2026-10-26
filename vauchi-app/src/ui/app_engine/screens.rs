@@ -699,7 +699,7 @@ impl AppEngine {
                         ReviewMode::Vouching,
                         ClaimContext {
                             contact_name: "Unknown".into(),
-                            old_pk_fingerprint: String::new(),
+                            new_pk_fingerprint: String::new(),
                             mutual_voucher_count: 0,
                             threshold: 3,
                             confidence: Confidence::Low,

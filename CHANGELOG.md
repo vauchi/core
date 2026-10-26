@@ -8,6 +8,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Restore from Settings on a device that already has an identity no
+  longer offers "Replace Identity?" and then always fails: a backup
+  restores only into an empty app, and the wizard now says so and names
+  Emergency Wipe (vauchi/private#819).
+
 ## [0.90.0] — 2026-10-26
 
 ### Added
@@ -40,13 +47,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   `PresentationEnvironmentChanged` and `RenderContext` must supply the
   new fields, requiring this minor release (`lint:semver`).
   Strict surface readers must accept `tokens.colors`.
-
-### Fixed
-
-- Restore from Settings on a device that already has an identity no
-  longer offers "Replace Identity?" and then always fails: a backup
-  restores only into an empty app, and the wizard now says so and names
-  Emergency Wipe (vauchi/private#819).
 
 ## [0.89.0] — 2026-10-25
 

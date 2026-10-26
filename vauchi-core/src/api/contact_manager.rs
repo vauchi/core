@@ -11,7 +11,7 @@ use std::sync::Arc;
 use crate::card::{ContactCard, ContactField};
 use crate::contact::Contact;
 use crate::contact::display::{DisplayNamePreference, resolve_display_name};
-use crate::storage::Storage;
+use crate::storage::{OwnCardStore, Storage};
 
 use super::error::{VauchiError, VauchiResult};
 use super::events::{EventDispatcher, VauchiEvent};
@@ -25,27 +25,39 @@ use super::events::{EventDispatcher, VauchiEvent};
 /// - Removing contacts
 pub struct ContactManager<'a> {
     storage: &'a Storage,
+    own_card: OwnCardStore<'a>,
     events: Arc<EventDispatcher>,
 }
 
 impl<'a> ContactManager<'a> {
-    /// Creates a new ContactManager.
+    /// Creates a new ContactManager on the real own card.
     pub fn new(storage: &'a Storage, events: Arc<EventDispatcher>) -> Self {
-        ContactManager { storage, events }
+        ContactManager {
+            storage,
+            own_card: storage.contacts().own_card(),
+            events,
+        }
+    }
+
+    /// The own card this manager reads and writes: a session's slot rather
+    /// than the real card (vauchi/private#811).
+    pub fn with_own_card(mut self, own_card: OwnCardStore<'a>) -> Self {
+        self.own_card = own_card;
+        self
     }
 
     // === Own Card Operations ===
 
     /// Gets the user's own contact card.
     pub fn get_own_card(&self) -> VauchiResult<Option<ContactCard>> {
-        Ok(self.storage.contacts().load_own_card()?)
+        Ok(self.own_card.load()?)
     }
 
     /// Updates the user's own contact card.
     ///
     /// Returns the list of changed field names.
     pub fn update_own_card(&self, card: &ContactCard) -> VauchiResult<Vec<String>> {
-        let old_card = self.storage.contacts().load_own_card()?;
+        let old_card = self.own_card.load()?;
         let changed_fields = match &old_card {
             Some(old) => Self::compute_changed_fields(old, card),
             None => card
@@ -55,7 +67,7 @@ impl<'a> ContactManager<'a> {
                 .collect(),
         };
 
-        self.storage.contacts().save_own_card(card)?;
+        self.own_card.save(card)?;
 
         if !changed_fields.is_empty() {
             self.events.dispatch(VauchiEvent::OwnCardUpdated {
@@ -71,20 +83,20 @@ impl<'a> ContactManager<'a> {
     /// During onboarding (before identity creation), creates an empty card
     /// if none exists yet so fields can be added incrementally.
     pub fn add_field_to_own_card(&self, field: ContactField) -> VauchiResult<()> {
-        let mut card = match self.storage.contacts().load_own_card()? {
+        let mut card = match self.own_card.load()? {
             Some(c) => c,
             None => {
                 // During onboarding the card doesn't exist yet — create empty.
                 // Identity creation later links this card to the signing keys.
                 let empty = ContactCard::new("");
-                self.storage.contacts().save_own_card(&empty)?;
+                self.own_card.save(&empty)?;
                 empty
             }
         };
 
         card.add_field(field.clone())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        self.storage.contacts().save_own_card(&card)?;
+        self.own_card.save(&card)?;
 
         self.events.dispatch(VauchiEvent::OwnCardUpdated {
             changed_fields: vec![field.label().to_string()],
@@ -96,9 +108,8 @@ impl<'a> ContactManager<'a> {
     /// Removes a field from the user's own card by label.
     pub fn remove_field_from_own_card(&self, label: &str) -> VauchiResult<bool> {
         let card = self
-            .storage
-            .contacts()
-            .load_own_card()?
+            .own_card
+            .load()?
             .ok_or(VauchiError::IdentityNotInitialized)?;
         let Some(field_id) = card
             .fields()
@@ -116,9 +127,8 @@ impl<'a> ContactManager<'a> {
     /// so this is the way to remove one particular entry (private#649).
     pub fn remove_field_by_id_from_own_card(&self, field_id: &str) -> VauchiResult<Option<String>> {
         let mut card = self
-            .storage
-            .contacts()
-            .load_own_card()?
+            .own_card
+            .load()?
             .ok_or(VauchiError::IdentityNotInitialized)?;
         let Some(label) = card
             .fields()
@@ -132,7 +142,7 @@ impl<'a> ContactManager<'a> {
         card.remove_field(field_id)
             .map_err(|_| VauchiError::InvalidState("Field not found".into()))?;
 
-        self.storage.contacts().save_own_card(&card)?;
+        self.own_card.save(&card)?;
         self.events.dispatch(VauchiEvent::OwnCardUpdated {
             changed_fields: vec![label.clone()],
         });

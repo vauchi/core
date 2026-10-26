@@ -204,7 +204,7 @@ impl Vauchi {
         let mut contact_ids: Vec<String> = tag.contact_ids.into_iter().collect();
         contact_ids.sort();
 
-        let mut visible_fields: Vec<String> = match self.storage.contacts().load_own_card()? {
+        let mut visible_fields: Vec<String> = match self.own_card_slot().load()? {
             Some(card) => card
                 .field_visibility()
                 .everyone_field_ids()

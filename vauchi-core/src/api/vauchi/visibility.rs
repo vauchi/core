@@ -269,12 +269,11 @@ impl Vauchi {
     /// (2026-06-14 visibility layering.)
     pub fn set_own_field_public(&self, field_id: &str) -> VauchiResult<()> {
         let mut card = self
-            .storage
-            .contacts()
-            .load_own_card()?
+            .own_card_slot()
+            .load()?
             .ok_or(VauchiError::IdentityNotInitialized)?;
         card.field_visibility_mut().set_everyone(field_id);
-        self.storage.contacts().save_own_card(&card)?;
+        self.own_card_slot().save(&card)?;
         // A public-base change is what ungrouped contacts may see — arm the
         // repropagation marker so the next sync pass sends the grant/revoke.
         self.mark_own_card_repropagate()?;
@@ -288,12 +287,11 @@ impl Vauchi {
     /// to grouped contacts via their groups (and to anyone via an override).
     pub fn set_own_field_private(&self, field_id: &str) -> VauchiResult<()> {
         let mut card = self
-            .storage
-            .contacts()
-            .load_own_card()?
+            .own_card_slot()
+            .load()?
             .ok_or(VauchiError::IdentityNotInitialized)?;
         card.field_visibility_mut().set_nobody(field_id);
-        self.storage.contacts().save_own_card(&card)?;
+        self.own_card_slot().save(&card)?;
         // See set_own_field_public: arm the marker so the revoke propagates.
         self.mark_own_card_repropagate()?;
         self.journal_own_field(&card, field_id, self.now_timestamp());

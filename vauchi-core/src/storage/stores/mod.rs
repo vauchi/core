@@ -28,6 +28,7 @@ mod genesis_limit;
 mod identity;
 mod labels;
 mod ohttp_cache;
+mod own_card;
 mod pending;
 mod pin_cache;
 mod place;
@@ -57,6 +58,7 @@ pub use genesis_limit::{
 pub use identity::IdentityStore;
 pub use labels::LabelStore;
 pub use ohttp_cache::OhttpCacheStore;
+pub use own_card::OwnCardStore;
 pub use pending::PendingStore;
 pub use pin_cache::PinCacheStore;
 pub use place::PlaceStore;

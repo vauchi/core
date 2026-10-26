@@ -222,6 +222,9 @@ pub(super) fn process_received_blobs_with_routes(
                     Ok(ReceiveOutcome::RegistryAckReceived { reply, .. }) => {
                         (true, true, None, None, None, None, reply)
                     }
+                    // Cover from a duress session (vauchi/private#811): the
+                    // ratchet advanced, nothing to show, no event.
+                    Ok(ReceiveOutcome::Cover) => (true, true, None, None, None, None, None),
                     // P3: the signature is verified in
                     // `process_single_card_update`; match the carried token
                     // against the contact's derived `expected_their_token`

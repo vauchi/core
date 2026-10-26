@@ -69,6 +69,19 @@ pub const PAYLOAD_VERSION_REGISTRY_ACK: u8 = 0x06;
 /// Version byte for a reciprocity confirmation from a sender that already
 /// counts us as confirmed: an answer, never answered (private#663).
 pub const PAYLOAD_VERSION_RECIPROCITY_ANSWER: u8 = 0x07;
+/// Version byte for cover: what a duress session sends in place of the
+/// card update it withheld, the length of that update, so the wire shows
+/// nothing (ADR-032, vauchi/private#811). The receiver drops the body.
+pub const PAYLOAD_VERSION_COVER: u8 = 0x09;
+
+/// Encodes a cover payload whose body is `filler`, to be sized like the
+/// update it stands in for.
+pub fn encode_cover_payload(filler: &[u8]) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(capacity(&[1, filler.len()]));
+    buf.push(PAYLOAD_VERSION_COVER);
+    buf.extend_from_slice(filler);
+    buf
+}
 
 /// Delta encoding error types.
 #[derive(Error, Debug)]
@@ -539,6 +552,9 @@ pub enum VersionedPayload {
     /// Registry ack (version 0x06): confirms a received registry version,
     /// optionally carrying the responder's own broadcast back.
     RegistryAck(crate::sync::registry_activation::RegistryAckPayload),
+    /// Cover (version 0x09): a duress session's stand-in for a withheld
+    /// update; the body carries nothing.
+    Cover,
 }
 
 impl VersionedPayload {
@@ -622,6 +638,7 @@ impl VersionedPayload {
                 let payload = crate::sync::registry_activation::RegistryAckPayload::decode(body)?;
                 Ok(VersionedPayload::RegistryAck(payload))
             }
+            PAYLOAD_VERSION_COVER => Ok(VersionedPayload::Cover),
             v => Err(DeltaError::UnknownPayloadVersion(v)),
         }
     }

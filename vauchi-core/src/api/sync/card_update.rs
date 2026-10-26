@@ -136,6 +136,9 @@ pub enum ReceiveOutcome {
         sender_id: String,
         reply: Option<super::registry_handshake::RegistryReplyNeeded>,
     },
+    /// Cover from a duress session (vauchi/private#811): the ratchet
+    /// advanced as for an update, nothing else changed, nothing to show.
+    Cover,
 }
 
 /// Processes a batch of incoming card updates with full security checks.
@@ -219,7 +222,8 @@ pub fn process_card_updates(
             // Registry-handshake replies are queued on the receive-blob path,
             // not this batch card-update helper; state is already persisted.
             Ok(ReceiveOutcome::RegistryPushReceived(_))
-            | Ok(ReceiveOutcome::RegistryAckReceived { .. }) => result.processed += 1,
+            | Ok(ReceiveOutcome::RegistryAckReceived { .. })
+            | Ok(ReceiveOutcome::Cover) => result.processed += 1,
             Err(_) => result.skipped += 1,
         }
     }
@@ -541,6 +545,30 @@ fn process_single_card_update_for_device_with_budget(
             token,
             sender_waiting,
         });
+    }
+
+    // 3c'. Cover (0x09): a duress session's stand-in for a withheld update
+    //      (vauchi/private#811). The ratchet is persisted as for an update,
+    //      so the sender's next message needs no skipped key and a deferred
+    //      sender is released the same way; nothing else is touched, and it
+    //      must not end as an error, which would keep the ratchet unsaved
+    //      and count as a failure.
+    if let Ok(VersionedPayload::Cover) = VersionedPayload::decode(&plaintext) {
+        storage.begin_transaction()?;
+        let cover_txn = storage.ratchets().save_ratchet_state_for_device(
+            sender_id,
+            peer_device_id,
+            &ratchet,
+            is_initiator,
+        );
+        match cover_txn {
+            Ok(()) => storage.commit()?,
+            Err(e) => {
+                storage.rollback();
+                return Err(e.into());
+            }
+        }
+        return Ok(ReceiveOutcome::Cover);
     }
 
     // 3d. F4 registry handshake payloads (0x05/0x06) — persist/ack registry
@@ -1069,6 +1097,9 @@ fn decode_versioned_payload(
                     .map_err(|_| CardUpdateError::CekDecryptionFailed)?;
                 Ok((decrypted, Some(cek)))
             }
+            Ok(VersionedPayload::Cover) => Err(CardUpdateError::InvalidPayload(
+                "cover not handled here".into(),
+            )),
             Ok(VersionedPayload::ReciprocityConfirm(_)) => {
                 // ReciprocityConfirm is not a card delta — handled at caller level
                 Err(CardUpdateError::InvalidPayload(

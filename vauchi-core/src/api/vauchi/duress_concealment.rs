@@ -23,6 +23,10 @@ use super::{AuthMode, Vauchi};
 pub(super) struct ConcealedDuress {
     pub(super) enabled: bool,
     pub(super) decoys: Vec<(String, String, ContactCard)>,
+    /// A duress edit's owed cover pass (`duress_cover.rs`), where a real
+    /// edit's marker is durable: the marker itself must not outlive the
+    /// session.
+    pub(super) owed_cover: crate::reminders::OwnCardRepropagateState,
 }
 
 pub(super) type ConcealedDuressCell = Mutex<ConcealedDuress>;

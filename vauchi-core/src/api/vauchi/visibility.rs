@@ -324,6 +324,20 @@ impl Vauchi {
         contact_id: &str,
         field_id: &str,
     ) -> VauchiResult<bool> {
+        let own_card = self.own_card_slot().load()?;
+        self.field_visible_to_contact(contact_id, own_card.as_ref(), field_id)
+    }
+
+    /// `get_effective_field_visibility` for a given own card: engine paths
+    /// pass the card they are about to send, so the Visible/Hidden toggle
+    /// read belongs to that card — the real one for a real repropagation,
+    /// the duress copy for its cover (vauchi/private#811).
+    pub(crate) fn field_visible_to_contact(
+        &self,
+        contact_id: &str,
+        own_card: Option<&crate::card::ContactCard>,
+        field_id: &str,
+    ) -> VauchiResult<bool> {
         // Load the contact's visibility rules as fallback
         let contact = self
             .storage
@@ -365,11 +379,7 @@ impl Vauchi {
         if !legacy_allows {
             return Ok(false);
         }
-        Ok(self
-            .storage
-            .contacts()
-            .load_own_card()?
-            .is_some_and(|card| card.field_visibility().is_explicitly_everyone(field_id)))
+        Ok(own_card.is_some_and(|card| card.field_visibility().is_explicitly_everyone(field_id)))
     }
 
     /// Resolves an own-card entry, named by its id or its label, to its id.

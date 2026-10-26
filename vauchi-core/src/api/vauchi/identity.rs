@@ -404,6 +404,7 @@ impl Vauchi {
                 self.events.dispatch(VauchiEvent::OwnCardUpdated {
                     changed_fields: vec!["display_name".into()],
                 });
+                self.mark_own_card_repropagate()?;
             }
             return Ok(());
         }
@@ -594,9 +595,10 @@ impl Vauchi {
     /// Public so a frontend that edits the own card directly (rather than via
     /// the `*_own_field` API) can arm the same retry path.
     pub fn mark_own_card_repropagate(&self) -> VauchiResult<()> {
-        // A duress edit changed the copy, which no contact receives
-        // (vauchi/private#811).
+        // A duress edit changed the copy, which no contact receives; the
+        // tick sends cover in its place (vauchi/private#811).
         if self.in_duress_mode() {
+            self.mark_owed_cover();
             return Ok(());
         }
         self.storage.ux().save_own_card_repropagate(

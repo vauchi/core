@@ -235,7 +235,7 @@ impl Vauchi {
         // (2026-06-08-sync-card-update-not-group-filtered, G4). unwrap_or(false)
         // fails closed on storage error (privacy > completeness).
         let delta = delta.filter_with(|fid| {
-            self.get_effective_field_visibility(contact_id, fid)
+            self.field_visible_to_contact(contact_id, Some(new_card), fid)
                 .unwrap_or(false)
         });
         if delta.is_empty() {
@@ -486,8 +486,11 @@ impl Vauchi {
                 Err(crate::crypto::ratchet::RatchetError::NoSendingChain)
                     if payload.first() == Some(&crate::sync::delta::PAYLOAD_VERSION_ALERT)
                         || (target.is_some()
-                            && payload.first()
-                                == Some(&crate::sync::delta::PAYLOAD_VERSION_CEK)) =>
+                            && matches!(
+                                payload.first(),
+                                Some(&crate::sync::delta::PAYLOAD_VERSION_CEK)
+                                    | Some(&crate::sync::delta::PAYLOAD_VERSION_COVER)
+                            )) =>
                 {
                     let mut sealed = self.genesis_seal_for_cold_start(identity, ex, payload)?;
                     sealed.peer_device_id = peer_device_id;

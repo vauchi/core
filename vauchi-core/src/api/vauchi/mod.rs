@@ -13,6 +13,7 @@ mod contacts;
 mod device_sync_loop;
 mod devices;
 mod duress_concealment;
+mod duress_cover;
 mod emergency;
 #[cfg(feature = "network-http")]
 mod escrow_exchange;

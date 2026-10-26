@@ -9,7 +9,7 @@
 
 use proptest::prelude::*;
 use vauchi_core::api::{AuthMode, ReceiveOutcome, process_single_card_update};
-use vauchi_core::crypto::SymmetricKey;
+use vauchi_core::crypto::{RatchetMessage, SymmetricKey};
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::{Contact, ContactCard, ContactField, FieldType, Vauchi};
 
@@ -99,9 +99,10 @@ fn apply(alice: &mut Vauchi, edit: &Edit) {
     }
 }
 
-/// What a coercer can see of the queue: recipient, kind, size and device
-/// of every pending update, order-free.
-fn queue_shape(wb: &Vauchi) -> Vec<(String, String, usize, Option<[u8; 32]>)> {
+/// What a coercer can see of the queue: kind, padded ciphertext length and
+/// device of every pending update, order-free. (The recipient is Bob in
+/// both worlds; his id differs because his identity does.)
+fn queue_shape(wb: &Vauchi) -> Vec<(String, usize, Option<[u8; 32]>)> {
     let mut shape = Vec::new();
     for contact in wb.storage().contacts().list_contacts().unwrap() {
         for update in wb
@@ -110,10 +111,10 @@ fn queue_shape(wb: &Vauchi) -> Vec<(String, String, usize, Option<[u8; 32]>)> {
             .get_pending_updates(contact.id())
             .unwrap()
         {
+            let message: RatchetMessage = serde_json::from_slice(&update.payload).unwrap();
             shape.push((
-                update.contact_id,
                 update.update_type,
-                update.payload.len(),
+                message.ciphertext.len(),
                 update.target_device_id,
             ));
         }

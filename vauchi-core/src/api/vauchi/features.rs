@@ -591,7 +591,7 @@ impl Vauchi {
             .iter()
             .map(|f| f.id().to_string())
             .filter(|fid| {
-                self.get_effective_field_visibility(contact_id, fid)
+                self.field_visible_to_contact(contact_id, Some(&own_card), fid)
                     .unwrap_or(false)
             })
             .collect();
@@ -725,7 +725,7 @@ impl Vauchi {
             .iter()
             .map(|f| f.id().to_string())
             .filter(|fid| {
-                self.get_effective_field_visibility(contact_id, fid)
+                self.field_visible_to_contact(contact_id, Some(own_card), fid)
                     .unwrap_or(false)
             })
             .collect();
@@ -782,6 +782,9 @@ impl Vauchi {
     /// The sync loop calls this each tick; also exposed so a frontend can force a
     /// flush after an edit without waiting for the next tick.
     pub fn run_owed_repropagation(&self) -> VauchiResult<()> {
+        if self.in_duress_mode() {
+            return self.run_owed_cover();
+        }
         let mut state = self.storage.ux().load_own_card_repropagate()?;
         if !state.should_run() {
             return Ok(());

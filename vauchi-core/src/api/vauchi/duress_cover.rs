@@ -14,8 +14,6 @@
 //! every other trace of a duress session does.
 
 use crate::reminders::OwnCardRepropagateState;
-use crate::rng::SecureRngExt;
-use crate::storage::{PendingUpdate, UpdateStatus};
 use crate::sync::delta::encode_cover_payload;
 
 use super::super::error::{VauchiError, VauchiResult};
@@ -111,31 +109,6 @@ impl Vauchi {
         self.rng.fill_bytes(&mut filler);
         let cover = encode_cover_payload(&filler);
 
-        let prepared = self.encrypt_payload_for_contact_devices(identity, &contact, &cover)?;
-        let now = self.clock.unix_seconds();
-        self.storage.with_savepoint(|| -> VauchiResult<()> {
-            for payload in &prepared {
-                if payload.persist_session {
-                    self.storage.ratchets().save_ratchet_state_for_device(
-                        contact_id,
-                        &payload.peer_device_id,
-                        &payload.session,
-                        payload.is_initiator,
-                    )?;
-                }
-                self.storage.pending().queue_update(&PendingUpdate {
-                    id: self.rng.uuid_v4(),
-                    contact_id: contact_id.to_string(),
-                    update_type: "card_delta".to_string(),
-                    payload: payload.encrypted.clone(),
-                    created_at: now,
-                    retry_count: 0,
-                    status: UpdateStatus::Pending,
-                    target_relay_url: None,
-                    target_device_id: payload.target_device_id(),
-                })?;
-            }
-            Ok(())
-        })
+        self.queue_sealed_payload(identity, &contact, &cover)
     }
 }

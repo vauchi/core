@@ -43,6 +43,47 @@ pub(crate) struct SealedCardDelta {
 }
 
 impl Vauchi {
+    /// Seals `payload` to every active device of `contact` and queues one
+    /// `card_delta` per copy, persisting only the ratchet sessions — for
+    /// payloads that carry no card state (cover, a resync request), where
+    /// no CEK, delta version or baseline moves.
+    pub(super) fn queue_sealed_payload(
+        &self,
+        identity: &crate::identity::Identity,
+        contact: &crate::contact::Contact,
+        payload: &[u8],
+    ) -> VauchiResult<()> {
+        use crate::storage::{PendingUpdate, UpdateStatus};
+
+        let contact_id = contact.id();
+        let prepared = self.encrypt_payload_for_contact_devices(identity, contact, payload)?;
+        let now = self.clock.unix_seconds();
+        self.storage.with_savepoint(|| -> VauchiResult<()> {
+            for copy in &prepared {
+                if copy.persist_session {
+                    self.storage.ratchets().save_ratchet_state_for_device(
+                        contact_id,
+                        &copy.peer_device_id,
+                        &copy.session,
+                        copy.is_initiator,
+                    )?;
+                }
+                self.storage.pending().queue_update(&PendingUpdate {
+                    id: self.rng.uuid_v4(),
+                    contact_id: contact_id.to_string(),
+                    update_type: "card_delta".to_string(),
+                    payload: copy.encrypted.clone(),
+                    created_at: now,
+                    retry_count: 0,
+                    status: UpdateStatus::Pending,
+                    target_relay_url: None,
+                    target_device_id: copy.target_device_id(),
+                })?;
+            }
+            Ok(())
+        })
+    }
+
     // === Card Propagation Operations ===
 
     /// Propagates own card update to all contacts.

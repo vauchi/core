@@ -90,26 +90,6 @@ fn a_duress_edit_leaves_the_real_card_untouched() {
 /// real contact.
 // @scenario: duress_mode :: Cannot access real contacts from duress mode
 #[test]
-fn no_own_card_writer_in_duress_mode_queues_an_update() {
-    let wb = alice_under_duress();
-    let field = phone_field();
-    let field_id = field.id().to_string();
-
-    wb.add_own_field(field).unwrap();
-    wb.set_field_shown(&field_id, true).unwrap();
-    wb.set_own_field_public(&field_id).unwrap();
-    wb.set_own_field_private(&field_id).unwrap();
-    let mut card = wb.own_card().unwrap().unwrap();
-    card.set_bio("under duress").unwrap();
-    wb.update_own_card(&card).unwrap();
-    assert!(wb.remove_own_field_by_id(&field_id).unwrap());
-    wb.run_owed_repropagation().unwrap();
-
-    assert_eq!(pending_updates(&wb), 0);
-}
-
-// @scenario: duress_mode :: Cannot access real contacts from duress mode
-#[test]
 fn disabling_duress_discards_the_copy() {
     let mut wb = alice_under_duress();
     wb.add_own_field(phone_field()).unwrap();

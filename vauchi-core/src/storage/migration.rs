@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 86] = [
+const MIGRATIONS: [Migration; 87] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -701,6 +701,11 @@ const MIGRATIONS: [Migration; 86] = [
         version: 86,
         name: "activity_notification_claims",
         action: MigrationAction::Sql(MIGRATION_V86_ACTIVITY_NOTIFICATION_CLAIMS),
+    },
+    Migration {
+        version: 87,
+        name: "duress_own_card",
+        action: MigrationAction::Sql(MIGRATION_V87_DURESS_OWN_CARD),
     },
 ];
 
@@ -1426,6 +1431,19 @@ const MIGRATION_V54_RELAY_URL: &str = "ALTER TABLE ux_state ADD COLUMN relay_url
 /// holds its own secret, so the digest must not follow the user's settings.
 const MIGRATION_V84_USER_PRESENCE_DIGEST: &str =
     "ALTER TABLE ux_state ADD COLUMN user_presence_digest_encrypted BLOB;";
+
+/// Migration v87: the own card a duress session shows and edits, the same
+/// shape as `own_card` so one store handle serves both. It persists across
+/// duress unlocks, since an edit that vanished would give the mode away
+/// (vauchi/private#811).
+const MIGRATION_V87_DURESS_OWN_CARD: &str = "
+    CREATE TABLE IF NOT EXISTS duress_own_card (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        card_json TEXT NOT NULL,
+        card_json_encrypted BLOB,
+        updated_at INTEGER NOT NULL
+    );
+";
 
 /// Migration v74: the persisted relay's OHTTP trust anchor, next to its URL
 /// (#288, plan 6.1).

@@ -30,11 +30,20 @@ pub struct OwnCardStore<'a> {
 impl<'a> ContactStore<'a> {
     /// The real own card.
     pub fn own_card(&self) -> OwnCardStore<'a> {
+        self.own_card_in("own_card")
+    }
+
+    /// The copy a duress session shows and edits (vauchi/private#811).
+    pub fn duress_own_card(&self) -> OwnCardStore<'a> {
+        self.own_card_in("duress_own_card")
+    }
+
+    fn own_card_in(&self, table: &'static str) -> OwnCardStore<'a> {
         OwnCardStore {
             conn: self.conn,
             key: self.key,
             clock: self.clock,
-            table: "own_card",
+            table,
         }
     }
 }

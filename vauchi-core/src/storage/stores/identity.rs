@@ -200,6 +200,9 @@ impl IdentityStore<'_> {
             "UPDATE identity SET duress_hash_encrypted = NULL, duress_salt = NULL, duress_enabled = 0 WHERE id = 1",
             [],
         )?;
+        // The copy a duress session edited goes with the setup; a new one
+        // starts from the real card again (vauchi/private#811).
+        self.conn.execute("DELETE FROM duress_own_card", [])?;
 
         Ok(())
     }

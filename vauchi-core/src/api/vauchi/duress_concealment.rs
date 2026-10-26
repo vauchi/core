@@ -82,12 +82,30 @@ impl Vauchi {
         })
     }
 
-    /// The own card a screen reads and writes. The real card for now; under
-    /// duress it becomes a copy of its own (vauchi/private#811), so what a
-    /// coercer types reaches no contact. Engine paths that decide what
-    /// contacts receive keep `self.storage.contacts().own_card()`.
+    /// The own card a screen reads and writes: the real card, or under
+    /// duress a copy of its own (vauchi/private#811), so what a coercer
+    /// types reaches no contact. The copy persists across duress unlocks:
+    /// an edit that vanished after a lock would give the mode away. Engine
+    /// paths that decide what contacts receive keep
+    /// `self.storage.contacts().own_card()`.
     pub(super) fn own_card_slot(&self) -> crate::storage::OwnCardStore<'_> {
-        self.storage.contacts().own_card()
+        if self.in_duress_mode() {
+            self.storage.contacts().duress_own_card()
+        } else {
+            self.storage.contacts().own_card()
+        }
+    }
+
+    /// Starts the duress copy from the real card the first time a duress
+    /// session needs it; later sessions keep what earlier ones edited.
+    pub(super) fn seed_duress_own_card(&self) -> crate::api::error::VauchiResult<()> {
+        let contacts = self.storage.contacts();
+        if contacts.duress_own_card().load()?.is_none()
+            && let Some(real) = contacts.own_card().load()?
+        {
+            contacts.duress_own_card().save(&real)?;
+        }
+        Ok(())
     }
 
     /// Starts or ends the duress session store at an unlock.

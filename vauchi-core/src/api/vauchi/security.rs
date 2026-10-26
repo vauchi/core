@@ -144,6 +144,7 @@ impl Vauchi {
             }
             AuthResult::Duress => {
                 self.enter_auth_mode(AuthMode::Duress);
+                self.seed_duress_own_card()?;
                 Ok(AuthMode::Duress)
             }
             AuthResult::Invalid => Err(VauchiError::InvalidState("invalid password".into())),

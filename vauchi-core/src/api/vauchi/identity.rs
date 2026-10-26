@@ -389,6 +389,25 @@ impl Vauchi {
             ));
         }
 
+        // Under duress the rename lands on the copy only: the identity's
+        // name is real, and so is every contact (vauchi/private#811).
+        if self.in_duress_mode() {
+            let mut card = self
+                .own_card_slot()
+                .load()?
+                .ok_or(VauchiError::IdentityNotInitialized)?;
+            let renamed = card.display_name() != name;
+            card.set_display_name(name)
+                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+            self.own_card_slot().save(&card)?;
+            if renamed {
+                self.events.dispatch(VauchiEvent::OwnCardUpdated {
+                    changed_fields: vec!["display_name".into()],
+                });
+            }
+            return Ok(());
+        }
+
         // Get mutable reference to identity
         let identity = self
             .identity
@@ -575,6 +594,11 @@ impl Vauchi {
     /// Public so a frontend that edits the own card directly (rather than via
     /// the `*_own_field` API) can arm the same retry path.
     pub fn mark_own_card_repropagate(&self) -> VauchiResult<()> {
+        // A duress edit changed the copy, which no contact receives
+        // (vauchi/private#811).
+        if self.in_duress_mode() {
+            return Ok(());
+        }
         self.storage.ux().save_own_card_repropagate(
             &crate::reminders::OwnCardRepropagateState {
                 needs_repropagate: true,

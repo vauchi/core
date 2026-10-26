@@ -9,7 +9,10 @@
 //! a group's share is sealed to every one of its members. Members of one
 //! group therefore recover as one — a group with two members has a spare —
 //! and no group can recover without the others. All of three guardians is
-//! three groups of one.
+//! three groups of one — the same mechanic, no screen of its own. A group
+//! holds one to three members (one needed, up to two spares), and the
+//! guardians number at most nine in all, so groups with spares are at most
+//! four.
 
 use std::collections::HashSet;
 
@@ -24,8 +27,15 @@ pub struct GuardianGroups {
 }
 
 impl GuardianGroups {
-    /// Three to nine groups, each with at least one member, at most nine
-    /// members in all (the cap on sealed shares, #816), no key in two groups.
+    /// The most members a group holds: one needed, up to two spares
+    /// (maintainer, 2026-10-26, vauchi/private#815).
+    pub const MAX_MEMBERS_PER_GROUP: usize = 3;
+    /// The most guardians in all, as for flat guardians (#816). With the
+    /// member cap this allows at most four groups once groups have spares.
+    pub const MAX_GUARDIANS: usize = MAX_COUNT as usize;
+
+    /// Three to nine groups of one to three members, at most nine members
+    /// in all, no key in two groups. All of `n` is `n` groups of one.
     ///
     /// # Errors
     /// [`KeyShardError::InvalidParameters`] for a shape outside those
@@ -34,7 +44,11 @@ impl GuardianGroups {
         let count = u8::try_from(groups.len()).map_err(|_| KeyShardError::InvalidParameters)?;
         let config = KeyShardConfig::new(count, count)?;
         let members: usize = groups.iter().map(Vec::len).sum();
-        if groups.iter().any(Vec::is_empty) || members > usize::from(MAX_COUNT) {
+        if members > Self::MAX_GUARDIANS
+            || groups
+                .iter()
+                .any(|group| !(1..=Self::MAX_MEMBERS_PER_GROUP).contains(&group.len()))
+        {
             return Err(KeyShardError::InvalidParameters);
         }
         let mut seen = HashSet::with_capacity(members);

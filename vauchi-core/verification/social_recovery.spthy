@@ -40,8 +40,13 @@
  *     (backup_needs_both_guardians falsified).
  *   -DGROUP_OF_TWO: Dave holds Carol's shard too, a guardian group of two
  *     (vauchi/private#815); the backup still needs Bob and one of them
- *     (backup_needs_both_guardians verified); with -DONE_GUARDIAN as well,
- *     falsified.
+ *     (backup_needs_both_guardians verified, and a_group_mate_can_stand_in:
+ *     Alice restores with Bob and Dave while Carol never vouches); with
+ *     -DONE_GUARDIAN as well, falsified.
+ *   -DTHREE_GROUPS: groups {Bob}, {Carol, Dave}, {Eve, Frank, Grace} and a
+ *     three-shard backup; the backup needs one member of each group
+ *     (backup_needs_both_guardians verified, a_group_mate_can_stand_in with
+ *     Bob, Dave and Grace); with -DONE_GUARDIAN as well, falsified.
  *   -DUNBOUND_ANSWER: John's answer does not name the new identity it
  *     answers; an attacker with a proof for its own key relays Alice's
  *     exchange key to John, and Alice and John end with different keys
@@ -77,6 +82,26 @@ restriction Once:
 
 /* The cast after their in-person exchanges, and Alice's guardian backup.
    Bob and Carol are Alice's guardians and John's contacts. */
+#ifdef THREE_GROUPS
+/* A third shard for a third group, held by Eve. */
+rule Setup:
+  let bk = h(<~s1, ~s2, ~s3>)
+      backup = senc(<~la, 'John', pk(~lj), ~kaj>, bk)
+  in
+  [ Fr(~la), Fr(~lb), Fr(~lc), Fr(~le), Fr(~lj), Fr(~kaj), Fr(~s1), Fr(~s2), Fr(~s3) ]
+  --[ Once('setup'), BackupKey(bk), SharedKey('Alice', 'John', ~kaj) ]->
+  [ !Ltk('Alice', ~la), !Ltk('Bob', ~lb), !Ltk('Carol', ~lc), !Ltk('Eve', ~le)
+  , !Ltk('John', ~lj)
+  , !Contact('Bob', 'Alice', pk(~la)), !Contact('Carol', 'Alice', pk(~la))
+  , !Contact('Eve', 'Alice', pk(~la)), !Contact('John', 'Alice', pk(~la))
+  , !Contact('John', 'Bob', pk(~lb)), !Contact('John', 'Carol', pk(~lc))
+  , !Shared('John', 'Alice', ~kaj)
+  , !Shard('Bob', 'Alice', ~s1), !Shard('Carol', 'Alice', ~s2)
+  , !Shard('Eve', 'Alice', ~s3)
+  , !Backup('Alice', <~s1, ~s2, ~s3>, 'John', pk(~lj), ~kaj)
+  , Out(<pk(~la), pk(~lb), pk(~lc), pk(~le), pk(~lj)>), Out(backup)
+  ]
+#else
 rule Setup:
   let bk = h(<~s1, ~s2>)
       backup = senc(<~la, 'John', pk(~lj), ~kaj>, bk)
@@ -89,9 +114,10 @@ rule Setup:
   , !Contact('John', 'Bob', pk(~lb)), !Contact('John', 'Carol', pk(~lc))
   , !Shared('John', 'Alice', ~kaj)
   , !Shard('Bob', 'Alice', ~s1), !Shard('Carol', 'Alice', ~s2)
-  , !Backup('Alice', ~s1, ~s2, 'John', pk(~lj), ~kaj)
+  , !Backup('Alice', <~s1, ~s2>, 'John', pk(~lj), ~kaj)
   , Out(<pk(~la), pk(~lb), pk(~lc), pk(~lj)>), Out(backup)
   ]
+#endif
 
 #ifdef ONE_GUARDIAN
 rule Carol_shard_is_public:
@@ -101,12 +127,31 @@ rule Carol_shard_is_public:
 #endif
 
 #ifdef GROUP_OF_TWO
-/* Dave is in Carol's guardian group: he holds the same shard, so either
-   of them can stand in for the group (vauchi/private#815). */
+/* Dave is in Carol's guardian group: he holds the same shard and knows
+   Alice, so either of them can stand in for the group (vauchi/private#815). */
 rule Dave_joins_Carols_group:
-  [ !Shard('Carol', A, s), Fr(~ld) ]
+  [ !Shard('Carol', A, s), !Contact('Carol', A, pka), Fr(~ld) ]
   --[ Once('group_of_two') ]->
-  [ !Shard('Dave', A, s), !Ltk('Dave', ~ld), Out(pk(~ld)) ]
+  [ !Shard('Dave', A, s), !Ltk('Dave', ~ld), !Contact('Dave', A, pka), Out(pk(~ld)) ]
+#endif
+
+#ifdef THREE_GROUPS
+/* Groups {Bob}, {Carol, Dave}, {Eve, Frank, Grace}: a group of one, of
+   two and of three, the largest a user may make (vauchi/private#815). */
+rule Dave_joins_Carols_group:
+  [ !Shard('Carol', A, s), !Contact('Carol', A, pka), Fr(~ld) ]
+  --[ Once('dave_joins') ]->
+  [ !Shard('Dave', A, s), !Ltk('Dave', ~ld), !Contact('Dave', A, pka), Out(pk(~ld)) ]
+
+rule Frank_joins_Eves_group:
+  [ !Shard('Eve', A, s), !Contact('Eve', A, pka), Fr(~lf) ]
+  --[ Once('frank_joins') ]->
+  [ !Shard('Frank', A, s), !Ltk('Frank', ~lf), !Contact('Frank', A, pka), Out(pk(~lf)) ]
+
+rule Grace_joins_Eves_group:
+  [ !Shard('Eve', A, s), !Contact('Eve', A, pka), Fr(~lg) ]
+  --[ Once('grace_joins') ]->
+  [ !Shard('Grace', A, s), !Ltk('Grace', ~lg), !Contact('Grace', A, pka), Out(pk(~lg)) ]
 #endif
 
 /* A corrupted identity gives up its key and, for a guardian, its shard. */
@@ -147,12 +192,21 @@ rule Vouch_and_reseal:
 /* Alice opens the backup with both re-sealed shards. The ciphertext is
    public (Setup); its contents are read from state keyed by the true
    shards, which keeps the search finite and still needs both. */
+#ifdef THREE_GROUPS
 rule Restore_backup:
-  [ !NewLtk(A, n), In(aenc(s1, pk(n))), In(aenc(s2, pk(n)))
-  , !Backup(A, s1, s2, J, pkj, kaj)
+  [ !NewLtk(A, n), In(aenc(s1, pk(n))), In(aenc(s2, pk(n))), In(aenc(s3, pk(n)))
+  , !Backup(A, <s1, s2, s3>, J, pkj, kaj)
   ]
   --[ BackupOpened(A, J, pkj, kaj) ]->
   [ !Restored(A, n, J, pkj, kaj) ]
+#else
+rule Restore_backup:
+  [ !NewLtk(A, n), In(aenc(s1, pk(n))), In(aenc(s2, pk(n)))
+  , !Backup(A, <s1, s2>, J, pkj, kaj)
+  ]
+  --[ BackupOpened(A, J, pkj, kaj) ]->
+  [ !Restored(A, n, J, pkj, kaj) ]
+#endif
 
 /* John accepts once two distinct contacts of his vouched, neither with a
    key of the recovery itself (#797). */
@@ -248,7 +302,45 @@ lemma backup_needs_both_guardians:
          | ((Ex #c. Compromised('Bob') @ c)
             & ((Ex #d. Compromised('Carol') @ d) | (Ex #d. Compromised('Dave') @ d)))
          | (Ex #c. CompromisedNew('Alice') @ c)"
-#else
+
+/* Dave can stand in for Carol: Alice restores with Bob and Dave while
+   Carol never vouches. */
+lemma a_group_mate_can_stand_in:
+  exists-trace
+  "Ex A J pkj k o n #i #j.
+     BackupOpened(A, J, pkj, k) @ i & Vouched('Dave', o, n) @ j
+     & not (Ex o2 n2 #c. Vouched('Carol', o2, n2) @ c)
+     & not (Ex X #c. Compromised(X) @ c)
+     & not (Ex X #c. CompromisedNew(X) @ c)"
+#endif
+
+#ifdef THREE_GROUPS
+/* One member of each of the three groups. */
+lemma backup_needs_both_guardians:
+  "All bk #s.
+     BackupKey(bk) @ s
+     ==> not (Ex #x. K(bk) @ x)
+         | ((Ex #c. Compromised('Bob') @ c)
+            & ((Ex #d. Compromised('Carol') @ d) | (Ex #d. Compromised('Dave') @ d))
+            & ((Ex #e. Compromised('Eve') @ e) | (Ex #e. Compromised('Frank') @ e)
+               | (Ex #e. Compromised('Grace') @ e)))
+         | (Ex #c. CompromisedNew('Alice') @ c)"
+
+/* Any member of each group will do: Bob, Dave and Grace restore the
+   backup while Carol, Eve and Frank never vouch. */
+lemma a_group_mate_can_stand_in:
+  exists-trace
+  "Ex A J pkj k o n o2 n2 #i #j #l.
+     BackupOpened(A, J, pkj, k) @ i
+     & Vouched('Dave', o, n) @ j & Vouched('Grace', o2, n2) @ l
+     & not (Ex o3 n3 #c. Vouched('Carol', o3, n3) @ c)
+     & not (Ex o3 n3 #c. Vouched('Eve', o3, n3) @ c)
+     & not (Ex o3 n3 #c. Vouched('Frank', o3, n3) @ c)
+     & not (Ex X #c. Compromised(X) @ c)
+     & not (Ex X #c. CompromisedNew(X) @ c)"
+#endif
+
+#ifdef not GROUP_OF_TWO & not THREE_GROUPS
 lemma backup_needs_both_guardians:
   "All bk #s.
      BackupKey(bk) @ s

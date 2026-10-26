@@ -1001,10 +1001,11 @@ pub enum Event {
     /// The application moved to the background or lost its active session.
     AppBackgrounded,
     /// The user made the platform's refresh gesture (pull to refresh, a
-    /// refresh key). An observation only: Core decides what to refresh and
+    /// refresh key) on `surface_id`. An observation only: Core validates the
+    /// surface as for [`Event::BackRequested`], decides what to refresh and
     /// presents the outcome, so the shell never reads a sync result
     /// (vauchi/private#762).
-    RefreshRequested,
+    RefreshRequested { surface_id: SurfaceId },
     /// The OS allows this app `runs` background executions per `window_secs`
     /// (Android's App Standby bucket); `runs` 0 means no known limit. An
     /// observation only: Core draws the background schedule within it.

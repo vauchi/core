@@ -221,7 +221,7 @@ impl AppEngine {
             return self.observe_background_budget(window_secs, runs);
         }
 
-        if matches!(event, Event::RefreshRequested) {
+        if matches!(event, Event::RefreshRequested { .. }) {
             // The same consequence as the sync chip's `sync_now`: a sync
             // through the timing gate, then its outcome presented
             // (vauchi/private#762). The screen it returns is presented

@@ -423,12 +423,45 @@ pub enum SyncItem {
         /// Timestamp of update.
         timestamp: u64,
     },
+
+    /// Stands in for an item a duress session would have journaled, at
+    /// the same serialized length, so the owner's other devices see the
+    /// same traffic as after a real edit (ADR-032, vauchi/private#811).
+    /// A receiver applies nothing.
+    Cover {
+        /// Random hex of the length that makes up the difference.
+        filler: String,
+        /// The stood-in item's timestamp.
+        timestamp: u64,
+    },
 }
 
 impl SyncItem {
+    /// The cover item of `item`: same serialized length, same timestamp,
+    /// nothing of its content. `random` fills the bytes behind the filler.
+    pub fn cover_of(
+        item: &SyncItem,
+        random: impl FnOnce(&mut [u8]),
+    ) -> Result<SyncItem, serde_json::Error> {
+        let timestamp = item.timestamp();
+        let target_len = serde_json::to_vec(item)?.len();
+        let bare_len = serde_json::to_vec(&SyncItem::Cover {
+            filler: String::new(),
+            timestamp,
+        })?
+        .len();
+        let filler_len = target_len.saturating_sub(bare_len);
+        let mut bytes = vec![0u8; filler_len.div_ceil(2)];
+        random(&mut bytes);
+        let mut filler = hex::encode(bytes);
+        filler.truncate(filler_len);
+        Ok(SyncItem::Cover { filler, timestamp })
+    }
+
     /// Returns the timestamp of this sync item.
     pub fn timestamp(&self) -> u64 {
         match self {
+            SyncItem::Cover { timestamp, .. } => *timestamp,
             SyncItem::ContactAdded { timestamp, .. } => *timestamp,
             SyncItem::ContactRemoved { timestamp, .. } => *timestamp,
             SyncItem::ContactCardUpdated { timestamp, .. } => *timestamp,

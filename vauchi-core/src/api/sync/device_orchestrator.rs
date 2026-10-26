@@ -738,6 +738,9 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             SyncItem::GroupDeleted { group_id, .. } => format!("group:{}", group_id),
             SyncItem::TagChanged { tag_data, .. } => format!("tag:{}", tag_data.id),
             SyncItem::TagDeleted { tag_id, .. } => format!("tag:{}", tag_id),
+            // Each cover is its own key: it conflicts with nothing and
+            // shadows nothing (ADR-032, private#811).
+            SyncItem::Cover { filler, .. } => format!("cover:{}", filler),
             SyncItem::ContactTrustChanged { contact_id, .. } => {
                 format!("trust:{}", contact_id)
             }

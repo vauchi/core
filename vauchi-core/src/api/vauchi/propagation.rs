@@ -790,6 +790,7 @@ impl Vauchi {
                     .delete_tag(tag_id)
                     .map(|_| ())
                     .map_err(|e| e.into()),
+                SyncItem::Cover { .. } => Ok(()),
                 SyncItem::ContactTrustChanged {
                     ref contact_id,
                     recovery_trusted,
@@ -1027,7 +1028,7 @@ fn sync_item_event(item: &crate::sync::device_sync::SyncItem) -> Option<VauchiEv
         SyncItem::GroupDeleted { group_id, .. } => Some(VauchiEvent::LabelSyncCompleted {
             label_id: group_id.clone(),
         }),
-        SyncItem::TagChanged { .. } | SyncItem::TagDeleted { .. } => None,
+        SyncItem::TagChanged { .. } | SyncItem::TagDeleted { .. } | SyncItem::Cover { .. } => None,
         SyncItem::ContactTrustChanged { contact_id, .. } => Some(VauchiEvent::ContactUpdated {
             contact_id: contact_id.clone(),
             changed_fields: vec!["recovery_trusted".to_string()],

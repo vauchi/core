@@ -642,10 +642,11 @@ fn re_saving_unchanged_entries_journals_nothing() {
 
 // vauchi/private#649 review: a duress session shares the real storage, so
 // its own-card visibility changes must not reach the owner's other
-// devices (ADR-032).
+// devices — only cover items that apply nothing do (ADR-032,
+// vauchi/private#811).
 // @internal
 #[test]
-fn in_duress_mode_visibility_changes_are_not_journaled() {
+fn in_duress_mode_visibility_changes_are_journaled_only_as_cover() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let field = ContactField::new(FieldType::Phone, "Phone", "5550301", now());
@@ -657,12 +658,17 @@ fn in_duress_mode_visibility_changes_are_not_journaled() {
     vauchi.authenticate("135790").unwrap();
     let before = journal_for_tablet(&vauchi, registry.clone(), &tablet_id).len();
 
-    let _ = vauchi.set_own_field_public(&field_id);
-    let _ = vauchi.set_own_field_private(&field_id);
+    vauchi.set_own_field_public(&field_id).unwrap();
+    vauchi.set_own_field_private(&field_id).unwrap();
 
-    assert_eq!(
-        journal_for_tablet(&vauchi, registry, &tablet_id).len(),
-        before
+    let journal = journal_for_tablet(&vauchi, registry, &tablet_id);
+    assert_eq!(journal.len(), before + 2);
+    assert!(
+        journal[before..]
+            .iter()
+            .all(|item| matches!(item, SyncItem::Cover { .. })),
+        "got {:?}",
+        &journal[before..]
     );
 }
 

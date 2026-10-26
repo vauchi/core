@@ -22,6 +22,19 @@ use super::super::error::{VauchiError, VauchiResult};
 use super::Vauchi;
 
 impl Vauchi {
+    /// Journals `item` for the owner's other devices — or, under duress,
+    /// a cover item of the same length: the edit itself must not reach
+    /// them, and neither may its absence show.
+    pub(super) fn record_sync_item_or_cover(&self, item: crate::sync::SyncItem) {
+        if !self.in_duress_mode() {
+            return self.record_sync_item(item);
+        }
+        match crate::sync::SyncItem::cover_of(&item, |bytes| self.rng.fill_bytes(bytes)) {
+            Ok(cover) => self.record_sync_item(cover),
+            Err(error) => tracing::warn!(%error, "[DeviceSync] sizing a cover item failed"),
+        }
+    }
+
     /// The duress counterpart of `mark_own_card_repropagate`: a fresh edit
     /// owes a cover pass and resets its retry budget.
     pub(super) fn mark_owed_cover(&self) {

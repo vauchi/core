@@ -494,13 +494,8 @@ impl Vauchi {
     /// Journals an own-card field, with its explicit visibility, for the
     /// owner's other devices.
     pub(super) fn journal_own_field(&self, card: &ContactCard, field_id: &str, timestamp: u64) {
-        // A duress session shares the real storage; nothing it does may
-        // reach the owner's other devices (ADR-032).
-        if self.in_duress_mode() {
-            return;
-        }
         if let Some(field) = card.fields().iter().find(|field| field.id() == field_id) {
-            self.record_sync_item(crate::sync::SyncItem::CardFieldSynced {
+            self.record_sync_item_or_cover(crate::sync::SyncItem::CardFieldSynced {
                 field: field.clone(),
                 field_visibility: explicit_visibility(card, field_id),
                 timestamp,
@@ -536,7 +531,7 @@ impl Vauchi {
             .field_visibility()
             .contains(&field_id)
             .then(|| card.field_visibility().get(&field_id).clone());
-        self.record_sync_item(crate::sync::SyncItem::CardFieldSynced {
+        self.record_sync_item_or_cover(crate::sync::SyncItem::CardFieldSynced {
             field: synced_field,
             field_visibility,
             timestamp: self.now_timestamp(),
@@ -578,10 +573,7 @@ impl Vauchi {
     }
 
     fn journal_own_field_removed_by(&self, label: String, field_id: &str, timestamp: u64) {
-        if self.in_duress_mode() {
-            return;
-        }
-        self.record_sync_item(crate::sync::SyncItem::CardFieldRemoved {
+        self.record_sync_item_or_cover(crate::sync::SyncItem::CardFieldRemoved {
             field_label: label,
             field_id: Some(field_id.to_string()),
             timestamp,

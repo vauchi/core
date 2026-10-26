@@ -167,28 +167,47 @@ fn all_of_three_needs_all_three() {
     assert_eq!(envelope.sections.identity.display_name, "Alice Smith");
 }
 
+/// Nine guardians as 3 + 2 + 2 + 2: four groups, each with a spare, is the
+/// most groups with spares the nine-guardian cap allows (maintainer,
+/// 2026-10-26: at most three members per group).
 // @scenario: backup_recovery :: Recover with one guardian from each group
 #[test]
-fn nine_members_across_three_groups_is_the_largest_shape() {
+fn four_groups_with_spares_is_the_largest_grouped_shape() {
     let guardians = guardians(9);
     let pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
     let groups = GuardianGroups::new(vec![
         pks[0..3].to_vec(),
-        pks[3..6].to_vec(),
-        pks[6..9].to_vec(),
+        pks[3..5].to_vec(),
+        pks[5..7].to_vec(),
+        pks[7..9].to_vec(),
     ])
     .unwrap();
     let (backup_hex, sealed) = alice().export_guardian_backup_for_groups(&groups).unwrap();
-    assert_eq!(sealed.iter().map(Vec::len).sum::<usize>(), 9);
+    assert_eq!(
+        sealed.iter().map(Vec::len).collect::<Vec<_>>(),
+        [3, 2, 2, 2]
+    );
+    assert_eq!(hex::decode(&backup_hex).unwrap()[1..3], [4, 4]);
     let (recovering, pk) = recovering();
+    let member_offsets = [0usize, 3, 5, 7];
     let respond = |group: usize, member: usize| {
-        guardians[group * 3 + member]
+        guardians[member_offsets[group] + member]
             .respond_to_recovery(&sealed[group][member], &pk)
             .unwrap()
     };
 
+    let three_groups = [respond(0, 2), respond(1, 0), respond(2, 1)];
+    let result = recovering.recover_guardian_backup(&backup_hex, &three_groups);
+    assert!(
+        matches!(result, Err(VauchiError::Configuration(_))),
+        "got {result:?}"
+    );
+
     let envelope = recovering
-        .recover_guardian_backup(&backup_hex, &[respond(0, 2), respond(1, 0), respond(2, 1)])
+        .recover_guardian_backup(
+            &backup_hex,
+            &[respond(0, 2), respond(1, 0), respond(2, 1), respond(3, 1)],
+        )
         .unwrap();
 
     assert_eq!(envelope.sections.identity.display_name, "Alice Smith");
@@ -223,13 +242,20 @@ fn shapes_outside_the_bounds_are_refused() {
         Err(KeyShardError::InvalidParameters)
     );
 
-    let ten_members = vec![
-        (1..=4).map(key).collect(),
-        (5..=8).map(key).collect(),
-        vec![key(9), key(10)],
+    let four_in_a_group = vec![(1..=4).map(key).collect(), vec![key(5)], vec![key(6)]];
+    assert_eq!(
+        GuardianGroups::new(four_in_a_group),
+        Err(KeyShardError::InvalidParameters)
+    );
+
+    let ten_guardians = vec![
+        (1..=3).map(key).collect(),
+        (4..=6).map(key).collect(),
+        (7..=9).map(key).collect(),
+        vec![key(10)],
     ];
     assert_eq!(
-        GuardianGroups::new(ten_members),
+        GuardianGroups::new(ten_guardians),
         Err(KeyShardError::InvalidParameters)
     );
 
@@ -238,6 +264,37 @@ fn shapes_outside_the_bounds_are_refused() {
         GuardianGroups::new(ten_groups),
         Err(KeyShardError::InvalidParameters)
     );
+}
+
+/// All of five on the group mechanic: five groups of one, so each of the
+/// five must answer — the same screen as groups with spares.
+// @scenario: backup_recovery :: A guardian backup may need every guardian
+#[test]
+fn all_of_five_is_five_groups_of_one() {
+    let guardians = guardians(5);
+    let groups =
+        GuardianGroups::new(guardians.iter().map(|g| vec![signing_pk(g)]).collect()).unwrap();
+    let (backup_hex, sealed) = alice().export_guardian_backup_for_groups(&groups).unwrap();
+    assert_eq!(hex::decode(&backup_hex).unwrap()[1..3], [5, 5]);
+    let (recovering, pk) = recovering();
+    let respond = |index: usize| {
+        guardians[index]
+            .respond_to_recovery(&sealed[index][0], &pk)
+            .unwrap()
+    };
+
+    let four = (0..4).map(respond).collect::<Vec<_>>();
+    let result = recovering.recover_guardian_backup(&backup_hex, &four);
+    assert!(
+        matches!(result, Err(VauchiError::Configuration(_))),
+        "got {result:?}"
+    );
+
+    let five = (0..5).map(respond).collect::<Vec<_>>();
+    let envelope = recovering
+        .recover_guardian_backup(&backup_hex, &five)
+        .unwrap();
+    assert_eq!(envelope.sections.identity.display_name, "Alice Smith");
 }
 
 // @internal

@@ -676,6 +676,19 @@ pub fn active_themes() -> Vec<Theme> {
     bundled_themes()
 }
 
+/// The theme a pick paints: the picked theme from the active catalog, else
+/// the catalog's copy of the default theme, else the bundled default. A
+/// pick can name a theme the catalog no longer has (vauchi/private#814).
+pub fn resolve_theme(theme_id: Option<&str>) -> Theme {
+    let themes = active_themes();
+    let default_id = default_theme().id;
+    [theme_id, Some(default_id.as_str())]
+        .into_iter()
+        .flatten()
+        .find_map(|id| themes.iter().find(|theme| theme.id == id).cloned())
+        .unwrap_or_else(default_theme)
+}
+
 fn default_dark() -> Theme {
     Theme {
         id: "catppuccin-mocha".to_string(),

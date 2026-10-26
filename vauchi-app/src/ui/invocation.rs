@@ -10,12 +10,13 @@
 //! [`Command::FinishInvocation`]. The shell never reads Core domain state.
 
 use vauchi_core::{
-    AccessibilitySpec, AlertSpec, Command, InvocationOutcome, PresentationTokens, SurfaceId,
-    SurfaceLayout, SurfaceSpec, api::Vauchi,
+    AccessibilitySpec, AlertSpec, Command, InvocationOutcome, SurfaceId, SurfaceLayout,
+    SurfaceSpec, api::Vauchi,
 };
 
 use crate::i18n::{Locale, get_string};
-use crate::theme::DesignTokens;
+use crate::theme::{DesignTokens, default_theme};
+use crate::ui::prepared_surface::presentation_tokens;
 
 mod contacts_list;
 
@@ -74,7 +75,6 @@ pub fn invoke(
 }
 
 fn one_shot_surface(id: &str, title: String, nodes: Vec<vauchi_core::PresentationNode>) -> Command {
-    let tokens = DesignTokens::default();
     Command::ReplaceSurface {
         surface: SurfaceSpec {
             surface_id: SurfaceId::new(id).expect("invocation surface ids are valid"),
@@ -83,13 +83,7 @@ fn one_shot_surface(id: &str, title: String, nodes: Vec<vauchi_core::Presentatio
             title,
             subtitle: None,
             layout: SurfaceLayout::Scroll,
-            tokens: PresentationTokens {
-                spacing_small: tokens.spacing.sm,
-                spacing_medium: tokens.spacing.md,
-                spacing_large: tokens.spacing.lg,
-                corner_radius: tokens.border_radius.md_lg,
-                minimum_target_size: tokens.touch_target.minimum,
-            },
+            tokens: presentation_tokens(&DesignTokens::default(), &default_theme().colors),
             nodes,
         },
     }

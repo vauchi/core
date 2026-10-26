@@ -4,11 +4,12 @@
 use std::collections::HashMap;
 
 use vauchi_core::{
-    BindingId, Command, Event, InputValue, InteractionId, PresentationIdError, PresentationTokens,
-    SurfaceId, SurfaceLayout, SurfaceSpec,
+    BindingId, Command, Event, InputValue, InteractionId, PresentationColors, PresentationIdError,
+    PresentationTokens, SurfaceId, SurfaceLayout, SurfaceSpec,
 };
 
-use super::{ScreenLayout, ScreenModel, UserAction};
+use super::{RenderContext, ScreenLayout, ScreenModel, UserAction};
+use crate::theme::{DesignTokens, ThemeColors};
 
 mod project;
 
@@ -38,23 +39,24 @@ pub struct PreparedSurface {
 }
 
 impl PreparedSurface {
-    /// The projection in English: for tests and the demo. The app projects
-    /// with `from_screen_in` and the person's locale.
+    /// The projection in English with the default theme: for tests and the
+    /// demo. The app projects with `from_screen_in` and the person's render
+    /// context.
     pub fn from_screen(
         surface_id: SurfaceId,
         revision: u64,
         screen: &ScreenModel,
     ) -> Result<Self, PreparedSurfaceError> {
-        Self::from_screen_in(surface_id, revision, screen, crate::i18n::Locale::ENGLISH)
+        Self::from_screen_in(surface_id, revision, screen, &RenderContext::default())
     }
 
     pub fn from_screen_in(
         surface_id: SurfaceId,
         revision: u64,
         screen: &ScreenModel,
-        locale: crate::i18n::Locale,
+        render_context: &RenderContext,
     ) -> Result<Self, PreparedSurfaceError> {
-        let mut projection = Projection::new(revision, locale);
+        let mut projection = Projection::new(revision, render_context.resolved_locale());
         let mut nodes = Vec::with_capacity(screen.components.len());
         for component in &screen.components {
             nodes.push(projection.component(component)?);
@@ -71,7 +73,6 @@ impl PreparedSurface {
             });
         }
 
-        let tokens = &screen.tokens;
         Ok(Self {
             surface: SurfaceSpec {
                 surface_id,
@@ -84,13 +85,10 @@ impl PreparedSurface {
                     ScreenLayout::Fixed => SurfaceLayout::Fixed,
                     ScreenLayout::Pinned => SurfaceLayout::Pinned,
                 },
-                tokens: PresentationTokens {
-                    spacing_small: tokens.spacing.sm,
-                    spacing_medium: tokens.spacing.md,
-                    spacing_large: tokens.spacing.lg,
-                    corner_radius: tokens.border_radius.md_lg,
-                    minimum_target_size: tokens.touch_target.minimum,
-                },
+                tokens: presentation_tokens(
+                    &screen.tokens,
+                    &crate::theme::resolve_theme(render_context.theme_id.as_deref()).colors,
+                ),
                 nodes,
             },
             value_routes: projection.value_routes,
@@ -283,5 +281,34 @@ fn reduce_value(route: &ValueRoute, value: InputValue) -> Result<UserAction, Pre
                 visible,
             })
         }
+    }
+}
+
+pub(crate) fn presentation_tokens(
+    tokens: &DesignTokens,
+    colors: &ThemeColors,
+) -> PresentationTokens {
+    PresentationTokens {
+        spacing_small: tokens.spacing.sm,
+        spacing_medium: tokens.spacing.md,
+        spacing_large: tokens.spacing.lg,
+        corner_radius: tokens.border_radius.md_lg,
+        minimum_target_size: tokens.touch_target.minimum,
+        colors: Box::new(PresentationColors {
+            background: colors.bg_primary.clone(),
+            surface: colors.bg_secondary.clone(),
+            text: colors.text_primary.clone(),
+            text_muted: colors.text_secondary.clone(),
+            accent: colors.accent.clone(),
+            border: colors.border.clone(),
+            success: colors.success.clone(),
+            warning: colors.warning.clone(),
+            error: colors.error.clone(),
+            surface_input: colors.surface_input.clone(),
+            surface_muted: colors.surface_muted.clone(),
+            surface_elevated: colors.surface_elevated.clone(),
+            text_on_accent: colors.text_on_accent.clone(),
+            focus_ring: colors.focus_ring.clone(),
+        }),
     }
 }

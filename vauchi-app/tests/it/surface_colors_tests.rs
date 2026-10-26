@@ -65,7 +65,7 @@ fn surface_colors(engine: &mut AppEngine) -> PresentationColors {
         .expect("initial commands")
         .into_iter()
         .find_map(|command| match command {
-            Command::ReplaceSurface { surface } => Some(surface.tokens.colors),
+            Command::ReplaceSurface { surface } => Some(*surface.tokens.colors),
             _ => None,
         })
         .expect("a surface")

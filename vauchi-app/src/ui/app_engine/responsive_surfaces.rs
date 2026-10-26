@@ -64,7 +64,7 @@ impl AppEngine {
             surface_id.clone(),
             self.surface_revision,
             &model,
-            self.render_context.resolved_locale(),
+            &self.render_context,
         )?;
         Ok(Some(ResponsiveCompanion {
             screen: companion_screen,

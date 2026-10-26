@@ -371,7 +371,7 @@ impl AppEngine {
                 current_surface,
                 self.surface_revision,
                 &screen,
-                self.render_context.resolved_locale(),
+                &self.render_context,
             )?;
             return Ok((self.screen.clone(), screen, prepared));
         }
@@ -485,7 +485,7 @@ impl AppEngine {
             surface_id.clone(),
             self.surface_revision,
             screen,
-            self.render_context.resolved_locale(),
+            &self.render_context,
         )?;
         let contextual = self.contextual_surface_for_screen(surface_id.clone(), screen)?;
         let companion = self.responsive_companion_surface()?;
@@ -674,7 +674,7 @@ impl AppEngine {
             surface_id.clone(),
             self.surface_revision,
             &screen,
-            self.render_context.resolved_locale(),
+            &self.render_context,
         )
         .ok()?;
         Some((surface_id, prepared))

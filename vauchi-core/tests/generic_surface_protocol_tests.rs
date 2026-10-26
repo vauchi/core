@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use vauchi_core::{
-    AccessibilitySpec, BindingId, Command, Event, InputValue, PresentationAxis,
+    AccessibilitySpec, BindingId, Command, Event, InputValue, PresentationAxis, PresentationColors,
     PresentationInputKind, PresentationNode, PresentationTextStyle, PresentationTokens,
     SurfaceLayout, SurfaceSpec,
 };
@@ -25,6 +25,22 @@ fn surface() -> SurfaceSpec {
             spacing_large: 24,
             corner_radius: 12,
             minimum_target_size: 44,
+            colors: Box::new(PresentationColors {
+                background: "#282a36".into(),
+                surface: "#21222c".into(),
+                text: "#f8f8f2".into(),
+                text_muted: "#bfbfbf".into(),
+                accent: "#bd93f9".into(),
+                border: "#6272a4".into(),
+                success: "#50fa7b".into(),
+                warning: "#ffb86c".into(),
+                error: "#ff5555".into(),
+                surface_input: Some("#191a21".into()),
+                surface_muted: None,
+                surface_elevated: None,
+                text_on_accent: None,
+                focus_ring: None,
+            }),
         },
         nodes: vec![PresentationNode::Group {
             id: Some(binding("profile.fields")),

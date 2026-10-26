@@ -48,6 +48,28 @@ pub struct PresentationTokens {
     pub spacing_large: u16,
     pub corner_radius: u16,
     pub minimum_target_size: u16,
+    pub colors: Box<PresentationColors>,
+}
+
+/// The active theme's colours by role, as `#rrggbb`. A `None` role is one
+/// the theme leaves out; the shell paints its nearest required role.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PresentationColors {
+    pub background: String,
+    pub surface: String,
+    pub text: String,
+    pub text_muted: String,
+    pub accent: String,
+    pub border: String,
+    pub success: String,
+    pub warning: String,
+    pub error: String,
+    pub surface_input: Option<String>,
+    pub surface_muted: Option<String>,
+    pub surface_elevated: Option<String>,
+    pub text_on_accent: Option<String>,
+    pub focus_ring: Option<String>,
 }
 
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]

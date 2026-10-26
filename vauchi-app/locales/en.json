@@ -1941,6 +1941,8 @@
   "recovery.give_voucher_detail": "Give this voucher to your contact.",
   "recovery.give_voucher_instruction": "Give this to the person recovering:",
   "recovery.give_voucher_to_contact": "Give this voucher to your contact:",
+  "recovery.guardian_groups_explained": "Guardians can be arranged in groups. One guardian from each group must help you recover, so no single group can do it alone. A group with two or more members has a spare: if one cannot be reached, another can step in.",
+  "recovery.guardians_ideally_strangers": "When every guardian is needed, it is safest if they do not know each other: then no circle of friends can recover your identity without you.",
   "recovery.guardians_not_told": "Vauchi does not tell them they are trusted, and it is safest if you do not either. Only if you lose every device, reach them yourself, one at a time, by phone or in person and never in a shared group, and ask each to vouch for you.",
   "recovery.help_contact_recover": "Help a Contact Recover",
   "recovery.help_contact_recover_description": "If a contact lost their device, you can vouch for their identity.",

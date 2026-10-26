@@ -130,6 +130,7 @@ mod exchange_picker_i18n_tests;
 mod exchange_step_back_tests;
 mod f2_new_4_settings_nav_tests;
 mod field_visibility_label_tests;
+mod file_picker_import_result_tests;
 mod file_picker_wiring_tests;
 mod fingerprint_verify_engine_tests;
 mod follow_system_colors_tests;

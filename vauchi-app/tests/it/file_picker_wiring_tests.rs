@@ -5,12 +5,11 @@
 //! Integration tests for the ADR-031 file-picker wiring.
 //!
 //! Phase 2A of `2026-05-03-core-file-picker-command`: when the user
-//! triggers `import_contacts` on the More screen, AppEngine emits an
+//! triggers `import_contacts` on the Contacts screen, AppEngine emits an
 //! `Command::FilePickFromUser`. The frontend opens the native
 //! picker, then sends `FilePickedFromUser{bytes, filename}` back. Core
 //! routes the bytes by current screen and calls
-//! `Vauchi::import_contacts_from_vcf`, returning a toast with the
-//! imported / skipped counts.
+//! `Vauchi::import_contacts_from_vcf`, returning localized counts and warnings.
 
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
@@ -85,11 +84,7 @@ fn file_picked_on_contacts_imports_vcards() {
 
     match result {
         Some(ActionResult::ShowToast { message, .. }) => {
-            assert!(
-                message.contains("Imported 2"),
-                "expected 'Imported 2' in toast, got {:?}",
-                message
-            );
+            assert_eq!(message, "2 contact(s) imported");
         }
         other => panic!("expected ShowToast for successful import, got {:?}", other),
     }
@@ -115,7 +110,7 @@ fn file_picked_on_contacts_persists_contacts() {
 fn file_picked_with_non_vcard_bytes_imports_zero_contacts() {
     // The vCard parser is intentionally lenient — it skips lines it
     // doesn't understand and returns whatever vCards it finds. Garbage
-    // input produces zero entries and a clean "Imported 0 contacts"
+    // input produces zero entries and a clean "0 contact(s) imported"
     // toast, not an error. This is the desired UX: the user sees a
     // clear empty-result message instead of a stack trace.
     let mut engine = engine_with_identity();
@@ -129,11 +124,7 @@ fn file_picked_with_non_vcard_bytes_imports_zero_contacts() {
 
     match result {
         Some(ActionResult::ShowToast { message, .. }) => {
-            assert!(
-                message.contains("Imported 0"),
-                "expected 'Imported 0' on garbage input, got {:?}",
-                message
-            );
+            assert_eq!(message, "0 contact(s) imported");
         }
         other => panic!("expected ShowToast (lenient parser path), got {:?}", other),
     }
@@ -201,19 +192,14 @@ fn file_picked_with_duplicates_reports_skipped_count() {
     });
 
     match result {
-        Some(ActionResult::ShowToast { message, .. }) => {
-            assert!(
-                message.contains("Imported 0"),
-                "expected 'Imported 0' on full duplicate import, got {:?}",
-                message
-            );
-            assert!(
-                message.contains("skipped"),
-                "expected 'skipped' in toast, got {:?}",
-                message
+        Some(ActionResult::ShowAlert { title, message }) => {
+            assert_eq!(title, "Import Complete");
+            assert_eq!(
+                message,
+                "0 contact(s) imported — 2 skipped (duplicates or invalid)\n\n• Skipped duplicate (UID: bob-uid-1)\n• Skipped duplicate (UID: carol-uid-1)"
             );
         }
-        other => panic!("expected ShowToast, got {:?}", other),
+        other => panic!("expected warning alert, got {:?}", other),
     }
 }
 

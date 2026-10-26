@@ -400,21 +400,17 @@ impl AppEngine {
     fn handle_file_picked(&mut self, bytes: Vec<u8>, _filename: String) -> Option<ActionResult> {
         match self.screen {
             AppScreen::Contacts => {
-                // Contacts import (vCard / VCF). Core handles bytes →
-                // import_contacts_from_vcf; result rendered as a toast
-                // with imported / skipped counts. Warnings beyond the
-                // counts surface in the next visit to ImportSummary
-                // (out of scope for Phase 2A).
                 match self.vauchi.import_contacts_from_vcf(&bytes) {
                     Ok(result) => {
-                        // Refresh the Contacts screen cache so the
-                        // newly imported rows appear on next navigation.
+                        // Rebuild the active list without adding a history entry.
+                        // Same-screen navigation caches the old engine; discard it.
                         self.engine_cache.remove(&AppScreen::Contacts);
-                        Some(ActionResult::ShowToast {
-                            message: format_import_toast(result.imported, result.skipped),
-                            undo_action_id: None,
-                            undo_label: None,
-                        })
+                        self.navigate_to_internal(AppScreen::Contacts);
+                        self.engine_cache.remove(&AppScreen::Contacts);
+                        Some(format_import_result(
+                            result,
+                            self.render_context.resolved_locale(),
+                        ))
                     }
                     Err(e) => Some(ActionResult::ShowAlert {
                         title: self.t("contacts.import_error_title"),
@@ -786,24 +782,45 @@ impl AppEngine {
     }
 }
 
-/// Format the toast message shown after a vCard import completes.
-///
-/// Mirrors the existing macOS / iOS sheet copy so frontends that adopt
-/// the new core-driven flow render the same wording. Pluralization
-/// uses simple English rules — proper i18n is part of D3 (post-MVP).
-fn format_import_toast(imported: usize, skipped: usize) -> String {
-    let imported_word = if imported == 1 { "contact" } else { "contacts" };
-    if skipped == 0 {
-        format!("Imported {} {}", imported, imported_word)
-    } else {
-        let skipped_word = if skipped == 1 {
-            "duplicate"
-        } else {
-            "duplicates"
+/// Keep import copy and warning localization on the app side of the shell boundary.
+fn format_import_result(
+    result: vauchi_core::api::ImportResult,
+    locale: crate::i18n::Locale,
+) -> ActionResult {
+    use crate::i18n::{get_string, get_string_with_args};
+
+    let mut message = get_string_with_args(
+        locale,
+        "import_contacts.result_imported",
+        &[("count", &result.imported.to_string())],
+    );
+    if result.skipped > 0 {
+        message.push_str(" — ");
+        message.push_str(&get_string_with_args(
+            locale,
+            "import_contacts.result_skipped",
+            &[("count", &result.skipped.to_string())],
+        ));
+    }
+    if result.warnings.is_empty() {
+        return ActionResult::ShowToast {
+            message,
+            undo_action_id: None,
+            undo_label: None,
         };
-        format!(
-            "Imported {} {} ({} {} skipped)",
-            imported, imported_word, skipped, skipped_word
-        )
+    }
+    message.push('\n');
+    for warning in result.warnings {
+        let args = warning.args();
+        let args: Vec<_> = args
+            .iter()
+            .map(|(key, value)| (key.as_str(), value.as_str()))
+            .collect();
+        message.push_str("\n• ");
+        message.push_str(&get_string_with_args(locale, warning.i18n_key(), &args));
+    }
+    ActionResult::ShowAlert {
+        title: get_string(locale, "import_contacts.result_complete"),
+        message,
     }
 }

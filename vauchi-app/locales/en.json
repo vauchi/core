@@ -258,6 +258,8 @@
   "backup.wizard.replace_warning": "This will permanently replace your current identity and all contacts.",
   "backup.wizard.restore": "Restore Backup",
   "backup.wizard.restore_failed_title": "Restore Failed",
+  "backup.wizard.restore_needs_empty_body": "A backup can only be restored into an app with no identity, and this device already has one. To restore here, first erase this device's data in Settings › Erase data › Emergency Wipe, then choose Restore from backup on the welcome screen.",
+  "backup.wizard.restore_needs_empty_title": "Restore needs an empty app",
   "backup.wizard.restored_title": "Backup Restored",
   "backup.wizard.restoring_detail": "Decrypting your backup. Large backups can take several minutes on older devices.",
   "backup.wizard.restoring_title": "Restoring backup…",

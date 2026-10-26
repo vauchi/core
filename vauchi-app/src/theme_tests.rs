@@ -496,3 +496,37 @@ fn reloaded_tokens_flow_into_new_screenmodels() {
     );
     reset_design_stores();
 }
+
+fn hex(color: (u8, u8, u8)) -> String {
+    format!("#{:02x}{:02x}{:02x}", color.0, color.1, color.2)
+}
+
+proptest::proptest! {
+    // Black or white reaches at least 4.58:1 on any single colour, so any
+    // text becomes AA-readable on any one surface (vauchi/private#814).
+    #[test]
+    fn readable_on_reaches_aa_on_any_single_surface(
+        text in proptest::prelude::any::<(u8, u8, u8)>(),
+        surface in proptest::prelude::any::<(u8, u8, u8)>(),
+    ) {
+        let readable = parse_hex(&readable_on(&hex(text), &[&hex(surface)])).unwrap();
+        proptest::prop_assert!(contrast_ratio(readable, surface) >= 4.5);
+    }
+
+    #[test]
+    fn readable_text_is_left_as_the_theme_set_it(
+        text in proptest::prelude::any::<(u8, u8, u8)>(),
+        surface in proptest::prelude::any::<(u8, u8, u8)>(),
+    ) {
+        if contrast_ratio(text, surface) >= 4.6 {
+            proptest::prop_assert_eq!(readable_on(&hex(text), &[&hex(surface)]), hex(text));
+        }
+    }
+}
+
+// @internal
+#[test]
+fn a_colour_that_is_not_hex_passes_through_unchanged() {
+    assert_eq!(readable_on("red", &["#ffffff"]), "red");
+    assert_eq!(readable_on("#777777", &["not-a-colour"]), "#777777");
+}

@@ -9,7 +9,7 @@ use vauchi_core::{
 };
 
 use super::{RenderContext, ScreenLayout, ScreenModel, UserAction};
-use crate::theme::{DesignTokens, ThemeColors};
+use crate::theme::{DesignTokens, ThemeColors, readable_on};
 
 mod project;
 
@@ -285,6 +285,16 @@ pub(crate) fn presentation_tokens(
     tokens: &DesignTokens,
     colors: &ThemeColors,
 ) -> PresentationTokens {
+    let text_surfaces: Vec<&str> = [Some(&colors.bg_primary), Some(&colors.bg_secondary)]
+        .into_iter()
+        .chain([
+            colors.surface_input.as_ref(),
+            colors.surface_muted.as_ref(),
+            colors.surface_elevated.as_ref(),
+        ])
+        .flatten()
+        .map(String::as_str)
+        .collect();
     PresentationTokens {
         spacing_small: tokens.spacing.sm,
         spacing_medium: tokens.spacing.md,
@@ -294,8 +304,8 @@ pub(crate) fn presentation_tokens(
         colors: Box::new(PresentationColors {
             background: colors.bg_primary.clone(),
             surface: colors.bg_secondary.clone(),
-            text: colors.text_primary.clone(),
-            text_muted: colors.text_secondary.clone(),
+            text: readable_on(&colors.text_primary, &text_surfaces),
+            text_muted: readable_on(&colors.text_secondary, &text_surfaces),
             accent: colors.accent.clone(),
             border: colors.border.clone(),
             success: colors.success.clone(),
@@ -304,7 +314,10 @@ pub(crate) fn presentation_tokens(
             surface_input: colors.surface_input.clone(),
             surface_muted: colors.surface_muted.clone(),
             surface_elevated: colors.surface_elevated.clone(),
-            text_on_accent: colors.text_on_accent.clone(),
+            text_on_accent: colors
+                .text_on_accent
+                .as_deref()
+                .map(|on_accent| readable_on(on_accent, &[colors.accent.as_str()])),
             focus_ring: colors.focus_ring.clone(),
         }),
     }

@@ -10,6 +10,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- Text colours Core sends reach WCAG AA (4.5:1) on the surfaces they are
+  drawn on, in every theme: a faint `text`, `text_muted` or
+  `text_on_accent` is mixed toward black or white just far enough. Seven
+  bundled pairs fell short (default-light, catppuccin-latte,
+  solarized-dark and -light, gruvbox-dark), and a downloaded theme could
+  too (vauchi/private#814).
 - Restore from Settings on a device that already has an identity no
   longer offers "Replace Identity?" and then always fails: a backup
   restores only into an empty app, and the wizard now says so and names

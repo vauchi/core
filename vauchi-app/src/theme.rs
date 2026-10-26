@@ -538,6 +538,76 @@ fn contrast_ratio(c1: (u8, u8, u8), c2: (u8, u8, u8)) -> f64 {
     (lighter + 0.05) / (darker + 0.05)
 }
 
+/// WCAG AA's 4.5:1 plus a margin: macOS's accessibility audit flagged a
+/// pair measured at 4.505:1 (vauchi/private#814).
+const READABLE_TEXT_CONTRAST: f64 = 4.6;
+const MIX_STEPS: u32 = 50;
+
+/// `text` as given when it reads at AA on every one of `surfaces`;
+/// otherwise mixed toward black or white, whichever reaches it with the
+/// smaller change. Core sends colours a shell paints as they are, so a
+/// faint theme, bundled or downloaded, must not reach the screen
+/// unreadable (vauchi/private#814).
+pub(crate) fn readable_on(text: &str, surfaces: &[&str]) -> String {
+    let Ok(color) = parse_hex(text) else {
+        return text.to_string();
+    };
+    let backgrounds: Vec<(u8, u8, u8)> = surfaces
+        .iter()
+        .filter_map(|surface| parse_hex(surface).ok())
+        .collect();
+    let worst = |candidate: (u8, u8, u8)| {
+        backgrounds
+            .iter()
+            .map(|background| contrast_ratio(candidate, *background))
+            .fold(f64::INFINITY, f64::min)
+    };
+    if backgrounds.is_empty() || worst(color) >= READABLE_TEXT_CONTRAST {
+        return text.to_string();
+    }
+    let first_readable = |target: (u8, u8, u8)| {
+        (1..=MIX_STEPS).find_map(|step| {
+            let mixed = mix(color, target, f64::from(step) / f64::from(MIX_STEPS));
+            (worst(mixed) >= READABLE_TEXT_CONTRAST).then_some((step, mixed))
+        })
+    };
+    let readable = match (first_readable((0, 0, 0)), first_readable((255, 255, 255))) {
+        (Some(darker), Some(lighter)) => Some(if darker.0 <= lighter.0 {
+            darker
+        } else {
+            lighter
+        }),
+        (darker, lighter) => darker.or(lighter),
+    };
+    let chosen = readable.map_or_else(
+        || {
+            // Surfaces both light and dark: no shade reaches AA on all, so
+            // take the end that reads best.
+            if worst((0, 0, 0)) >= worst((255, 255, 255)) {
+                (0, 0, 0)
+            } else {
+                (255, 255, 255)
+            }
+        },
+        |(_, mixed)| mixed,
+    );
+    format!("#{:02x}{:02x}{:02x}", chosen.0, chosen.1, chosen.2)
+}
+
+fn mix(from: (u8, u8, u8), to: (u8, u8, u8), amount: f64) -> (u8, u8, u8) {
+    let channel = |a: u8, b: u8| {
+        let mixed = f64::from(a) + (f64::from(b) - f64::from(a)) * amount;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let rounded = mixed.round().clamp(0.0, 255.0) as u8;
+        rounded
+    };
+    (
+        channel(from.0, to.0),
+        channel(from.1, to.1),
+        channel(from.2, to.2),
+    )
+}
+
 /// Load themes from JSON data (e.g. from themes.json remote content).
 ///
 /// This is the primary way to load themes. The themes.json file in app-files

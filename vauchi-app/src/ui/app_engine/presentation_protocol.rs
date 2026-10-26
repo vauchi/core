@@ -221,7 +221,13 @@ impl AppEngine {
             return self.observe_background_budget(window_secs, runs);
         }
 
-        if matches!(event, Event::RefreshRequested { .. }) {
+        if let Event::RefreshRequested { surface_id } = &event {
+            if self.presentation_coordinator.was_left_behind(surface_id) {
+                tracing::info!("[Presentation] ignored a refresh of a surface Core has left");
+                return Ok(Vec::new());
+            }
+            self.presentation_coordinator
+                .ensure_active_surface(surface_id)?;
             // The same consequence as the sync chip's `sync_now`: a sync
             // through the timing gate, then its outcome presented
             // (vauchi/private#762). The screen it returns is presented

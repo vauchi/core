@@ -10,9 +10,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
-- `Event::RefreshRequested`: a shell reports the platform's refresh gesture,
-  and Core syncs through its timing gate and presents the outcome, as the
-  sync chip does. Coming back online (`set_network_online(true)` after
+- `Event::RefreshRequested { surface_id }`: a shell reports the platform's
+  refresh gesture on a surface; Core validates the surface as for
+  `BackRequested`, then syncs through its timing gate and presents the
+  outcome, as the sync chip does. Coming back online (`set_network_online(true)` after
   `false`) re-sends the heartbeat's `ScheduleWakeup` at once
   (vauchi/private#762).
 

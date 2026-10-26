@@ -145,8 +145,16 @@ impl AppEngine {
     /// decorated with an offline `Component::Banner` via
     /// `apply_offline_overlay`. Audit
     /// `2026-04-28-lifecycle-session-residue-umbrella` P2-D.
+    ///
+    /// Coming back online re-sends the heartbeat at once, so the shell does
+    /// not sleep out a wakeup drawn while offline; whether that heartbeat
+    /// syncs is still the timing gate's call (vauchi/private#762).
     pub fn set_network_online(&mut self, online: bool) {
+        let came_back = online && !self.network_online;
         self.network_online = online;
+        if came_back {
+            self.reschedule_wakeup_for_new_session();
+        }
     }
 
     /// Returns the last frontend-reported network reachability.

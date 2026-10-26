@@ -8,6 +8,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- `Event::RefreshRequested`: a shell reports the platform's refresh gesture,
+  and Core syncs through its timing gate and presents the outcome, as the
+  sync chip does. Coming back online (`set_network_online(true)` after
+  `false`) re-sends the heartbeat's `ScheduleWakeup` at once
+  (vauchi/private#762).
+
 ### Fixed
 
 - Text colours Core sends reach WCAG AA (4.5:1) on the surfaces they are

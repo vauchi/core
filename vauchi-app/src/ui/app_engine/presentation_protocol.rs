@@ -221,6 +221,19 @@ impl AppEngine {
             return self.observe_background_budget(window_secs, runs);
         }
 
+        if matches!(event, Event::RefreshRequested) {
+            // The same consequence as the sync chip's `sync_now`: a sync
+            // through the timing gate, then its outcome presented
+            // (vauchi/private#762). The screen it returns is presented
+            // below as surface commands.
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = self.sync_and_rerender();
+            let screen = self.current_screen();
+            let mut commands = self.surface_commands(&screen)?;
+            commands.extend(self.drain_pending_commands());
+            return Ok(commands);
+        }
+
         if matches!(event, Event::AppBackgrounded) {
             self.in_foreground = false;
             self.refresh_content_snapshot();

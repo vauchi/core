@@ -340,3 +340,82 @@ fn a_rate_limited_pass_does_not_move_the_checkpoint() {
         vec!["bob@example.invalid"]
     );
 }
+
+/// What converges by itself after an expiry gap: the updates Bob sent
+/// while Alice was away longer than retention are gone, and nothing lets
+/// her ask for them — but Bob's next edit repropagates his whole visible
+/// card from an empty baseline, and the ratchet's skipped-key window
+/// absorbs the lost messages, so the card converges then.
+// @scenario: message_delivery :: Message expires after TTL
+#[test]
+fn after_an_expiry_gap_the_senders_next_edit_converges_the_card() {
+    let outer = MockRelay::start();
+    let application = MockRelay::start();
+    let clock = Arc::new(FakeClock::new(UNIX_EPOCH + Duration::from_secs(NOW)));
+    outer.enable_ohttp_gateway(&SignedGateway::new(0x66), window_of(NOW));
+    outer.enable_gateway_mailboxes(clock.clone(), 2);
+    let (mut alice, _alice_install) = client(&outer, &application, clock.clone(), "Alice");
+    let (mut bob, _bob_install) = client(&outer, &application, clock.clone(), "Bob");
+    let linked = link_contacts(&alice, &bob, "Bob");
+    let share = |bob: &mut Vauchi, label: &str, value: &str| {
+        let mut updated = bob.own_card().unwrap().unwrap().clone();
+        let field = ContactField::new(FieldType::Custom, label, value, 0);
+        let field_id = field.id().to_string();
+        updated.add_field(field).unwrap();
+        bob.update_own_card(&updated).unwrap();
+        bob.set_contact_visibility_override(&linked.host_contact_id, &field_id, true)
+            .unwrap();
+    };
+    let fields = |alice: &Vauchi| {
+        let mut values = alice
+            .get_contact(&linked.peer_contact_id)
+            .unwrap()
+            .unwrap()
+            .card()
+            .fields()
+            .iter()
+            .map(|field| field.value().to_string())
+            .collect::<Vec<_>>();
+        values.sort();
+        values
+    };
+
+    share(&mut bob, "first", "one");
+    sync(&mut bob);
+    clock.advance(Duration::from_secs(DAY));
+    share(&mut bob, "second", "two");
+    sync(&mut bob);
+
+    // Away longer than retention: both updates expire unread.
+    clock.advance(Duration::from_secs((RETAINED_DAYS + 10) * DAY));
+    let today = current_day_epoch(NOW) + 1 + RETAINED_DAYS + 10;
+    let mut cycles = 0;
+    while checkpoint(&alice, &application) != Some(today) {
+        cycles += 1;
+        assert!(cycles <= RETAINED_DAYS / (CATCH_UP_DAYS_PER_CYCLE - 2) + 2);
+        sync(&mut alice);
+    }
+    assert_eq!(
+        fields(&alice),
+        Vec::<String>::new(),
+        "nothing survived the gap"
+    );
+
+    // Bob's next edit carries his whole visible card.
+    clock.advance(Duration::from_secs(DAY));
+    share(&mut bob, "third", "three");
+    sync(&mut bob);
+    let collected = sync(&mut alice);
+    assert!(
+        matches!(
+            &collected,
+            VauchiSyncOutcome::Ok {
+                received: 1,
+                unresolved: 0,
+                ..
+            }
+        ),
+        "{collected:?}"
+    );
+    assert_eq!(fields(&alice), vec!["one", "three", "two"]);
+}

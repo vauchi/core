@@ -78,6 +78,10 @@ impl MailboxStore {
         if !(1..=100).contains(&request.mailbox_tokens.len()) {
             return serde_json::json!({ "status": "error", "error": "mailbox_tokens must contain 1-100 entries" });
         }
+        // Withhold what the relay's configured retention has expired, as
+        // handle_fetch_logic does since relay!542 (private#691).
+        let now = self.clock.unix_seconds();
+        let retention_secs = vauchi_core::network::mailbox_token::RETAINED_DAYS * 24 * 60 * 60;
         let mut matching: Vec<_> = self
             .blobs
             .iter()
@@ -85,6 +89,7 @@ impl MailboxStore {
                 blob.mailbox_token
                     .as_ref()
                     .is_some_and(|token| request.mailbox_tokens.contains(token))
+                    && now.saturating_sub(blob.created_at) < retention_secs
             })
             .collect();
         matching.sort_by_key(|blob| blob.created_at);

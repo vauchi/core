@@ -639,6 +639,23 @@ fn on_wakeup_returns_envelope_with_schedule_wakeup_command() {
     );
 }
 
+// @internal — generic dispatch replaces the legacy two-array wakeup envelope (#764).
+#[test]
+fn wakeup_dispatch_returns_schedule_in_the_canonical_batch() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+    let json = engine.dispatch_json(r#""WakeupFired""#.into()).unwrap();
+    let batch: serde_json::Value = serde_json::from_str(&json).unwrap();
+    let commands: Vec<vauchi_core::Command> =
+        serde_json::from_value(batch["commands"].clone()).unwrap();
+    assert_eq!(commands.len(), 1);
+    assert_eq!(
+        commands[0],
+        vauchi_core::Command::schedule_wakeup(30, 90, 30, None)
+    );
+    assert_eq!(current_screen_id(&engine), "my_info");
+}
+
 // ============================================================================
 // Canonical presentation invalidation
 // ============================================================================

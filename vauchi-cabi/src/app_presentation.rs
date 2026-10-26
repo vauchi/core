@@ -201,6 +201,19 @@ mod tests {
         response
     }
 
+    // @internal — C ABI callers use the same canonical wakeup observation (#764).
+    #[test]
+    fn c_abi_wakeup_dispatch_returns_schedule_in_the_canonical_batch() {
+        let response = dispatch_to_json(r#""WakeupFired""#);
+        let batch: serde_json::Value = serde_json::from_str(&response).unwrap();
+        let commands: Vec<vauchi_core::Command> =
+            serde_json::from_value(batch["commands"].clone()).unwrap();
+        assert_eq!(
+            commands,
+            vec![vauchi_core::Command::schedule_wakeup(30, 90, 30, None)]
+        );
+    }
+
     /// A rejection answers with Core-prepared copy, never its own text
     /// (ADR-045 Am1, DC-05).
     fn assert_prepared_rejection_alert(response: &str, rejection_text: &str) {

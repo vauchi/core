@@ -92,6 +92,7 @@ fn checkpoint(client: &Vauchi, application: &MockRelay) -> Option<u64> {
         .sync()
         .load_receive_checkpoint(&scope)
         .unwrap()
+        .map(|checkpoint| checkpoint.day)
 }
 
 // @scenario: message_delivery :: Receive pending updates when coming online
@@ -418,4 +419,101 @@ fn after_an_expiry_gap_the_senders_next_edit_converges_the_card() {
         "{collected:?}"
     );
     assert_eq!(fields(&alice), vec!["one", "three", "two"]);
+}
+
+/// Bob never edits after the share Alice missed; when her catch-up that
+/// started behind retention completes, she asks him to repropagate, he
+/// does on his next sync, and she has his card on hers.
+// @scenario: message_delivery :: A client away longer than retention asks its contacts for their cards
+#[test]
+fn a_catch_up_that_started_behind_retention_ends_with_a_resync_request() {
+    let outer = MockRelay::start();
+    let application = MockRelay::start();
+    let clock = Arc::new(FakeClock::new(UNIX_EPOCH + Duration::from_secs(NOW)));
+    outer.enable_ohttp_gateway(&SignedGateway::new(0x67), window_of(NOW));
+    outer.enable_gateway_mailboxes(clock.clone(), 2);
+    let (mut alice, _alice_install) = client(&outer, &application, clock.clone(), "Alice");
+    let (mut bob, _bob_install) = client(&outer, &application, clock.clone(), "Bob");
+    // Alice must be able to send first, so she links as the initiator:
+    // `link_contacts` makes its host the responder.
+    let linked = link_contacts(&bob, &alice, "Alice");
+    let fields = |alice: &Vauchi| {
+        alice
+            .get_contact(&linked.host_contact_id)
+            .unwrap()
+            .unwrap()
+            .card()
+            .fields()
+            .iter()
+            .map(|field| field.value().to_string())
+            .collect::<Vec<_>>()
+    };
+
+    let mut updated = bob.own_card().unwrap().unwrap().clone();
+    let field = ContactField::new(FieldType::Email, "Email", "bob@example.invalid", 0);
+    let field_id = field.id().to_string();
+    updated.add_field(field).unwrap();
+    bob.update_own_card(&updated).unwrap();
+    bob.set_contact_visibility_override(&linked.peer_contact_id, &field_id, true)
+        .unwrap();
+    sync(&mut bob);
+
+    clock.advance(Duration::from_secs((RETAINED_DAYS + 10) * DAY));
+    let today = current_day_epoch(NOW) + RETAINED_DAYS + 10;
+    let mut cycles = 0;
+    while checkpoint(&alice, &application) != Some(today) {
+        cycles += 1;
+        assert!(cycles <= RETAINED_DAYS / (CATCH_UP_DAYS_PER_CYCLE - 2) + 2);
+        sync(&mut alice);
+    }
+    assert_eq!(fields(&alice), Vec::<String>::new(), "the share expired");
+
+    // Bob's next sync receives the request and sends his card; Alice's
+    // next sync has it.
+    // The request travels with F4 registry-handshake traffic, so count at
+    // least it going in and at least his card going out.
+    let honored = sync(&mut bob);
+    assert!(
+        matches!(&honored, VauchiSyncOutcome::Ok { received, sent, .. } if *received >= 1 && *sent > 0),
+        "{honored:?}"
+    );
+    let answered = sync(&mut alice);
+    assert!(
+        matches!(
+            &answered,
+            VauchiSyncOutcome::Ok {
+                received,
+                unresolved: 0,
+                ..
+            } if *received >= 1
+        ),
+        "{answered:?}"
+    );
+    // (Bob also fans a device-scoped copy out to the device Alice's
+    // registry push named; she holds no session for it yet — the F4
+    // one-sided activation, outside this issue.)
+    assert_eq!(fields(&alice), vec!["bob@example.invalid"]);
+
+    // Asked once and honored once today; the handshake tail that follows
+    // carries no further request.
+    assert_eq!(
+        bob.storage()
+            .sync()
+            .load_resync_honored_day(&linked.peer_contact_id)
+            .unwrap(),
+        Some(today)
+    );
+    let alice_identity = alice.identity().unwrap();
+    let scope = ReceiveScope::new(
+        &application.url(),
+        alice_identity.signing_public_key(),
+        alice_identity.device_id(),
+    );
+    let state = alice
+        .storage()
+        .sync()
+        .load_receive_checkpoint(&scope)
+        .unwrap()
+        .unwrap();
+    assert_eq!((state.day, state.resync_owed), (today, false));
 }

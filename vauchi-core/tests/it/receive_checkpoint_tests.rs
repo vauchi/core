@@ -8,7 +8,7 @@
 
 use vauchi_core::Storage;
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::storage::ReceiveScope;
+use vauchi_core::storage::{ReceiveCheckpoint, ReceiveScope};
 
 fn storage() -> Storage {
     Storage::in_memory(SymmetricKey::generate()).unwrap()
@@ -16,6 +16,13 @@ fn storage() -> Storage {
 
 fn scope(relay: &str, identity: u8, device: u8) -> ReceiveScope {
     ReceiveScope::new(relay, &[identity; 32], &[device; 32])
+}
+
+fn at(day: u64) -> ReceiveCheckpoint {
+    ReceiveCheckpoint {
+        day,
+        resync_owed: false,
+    }
 }
 
 // @scenario: message_delivery :: Receive pending updates when coming online
@@ -28,20 +35,20 @@ fn a_checkpoint_round_trips_and_the_latest_save_wins() {
 
     storage
         .sync()
-        .save_receive_checkpoint(&here, 19_000)
+        .save_receive_checkpoint(&here, &at(19_000))
         .unwrap();
     assert_eq!(
         storage.sync().load_receive_checkpoint(&here).unwrap(),
-        Some(19_000)
+        Some(at(19_000))
     );
 
     storage
         .sync()
-        .save_receive_checkpoint(&here, 19_003)
+        .save_receive_checkpoint(&here, &at(19_003))
         .unwrap();
     assert_eq!(
         storage.sync().load_receive_checkpoint(&here).unwrap(),
-        Some(19_003)
+        Some(at(19_003))
     );
 }
 
@@ -54,7 +61,7 @@ fn a_checkpoint_belongs_to_one_relay_identity_and_device() {
     let here = scope("https://relay.example", 1, 1);
     storage
         .sync()
-        .save_receive_checkpoint(&here, 19_000)
+        .save_receive_checkpoint(&here, &at(19_000))
         .unwrap();
 
     for other in [

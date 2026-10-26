@@ -4,9 +4,9 @@
 
 //! Reachability test for `BackupRecoveryEngine`.
 //!
-//! Multi-step state machine — `ChooseMode → EnterPassword →
-//! {ConfirmReplace | ConfirmPassword} → Processing → {Complete |
-//! Failed}` — with a **distinct `screen_id` per step**, so BFS
+//! Multi-step state machine — `ChooseMode → {EnterPassword →
+//! [ConfirmPassword] → Processing → {Complete | Failed} |
+//! RestoreNeedsEmptyApp}` — with a **distinct `screen_id` per step**, so BFS
 //! traverses across screens (unlike `recovery.rs`, where every
 //! `RecoveryStep` shares one `recovery_status` id and dedup
 //! collapses them).
@@ -15,14 +15,13 @@
 //!
 //! The structural walker fills text inputs as it explores, so it
 //! clears the `EnterPassword` "continue" gate
-//! (`backup_recovery.rs:493`) and advances past it. From the
-//! `has_identity = true` restore path it reaches `ConfirmReplace`
-//! (`backup_confirm_replace`); from the create path it reaches
+//! and advances past it; from the create path it reaches
 //! `ConfirmPassword` (`backup_confirm`). Export and Restore on the
 //! choose screen are rows (#459), `ListItemSelected` pass-throughs the
-//! walk follows, so the declared `ActionPressed` set is
-//! `{back, continue, choose_file}` (password / confirm) ∪
-//! `{confirm_replace, cancel_replace}` (replace).
+//! walk follows. On an empty app the declared `ActionPressed` set is
+//! `{back, continue, choose_file}`; on a device with an identity a
+//! restore stops at `RestoreNeedsEmptyApp` (`backup_restore_needs_empty`,
+//! vauchi/private#819), so `choose_file` is not reachable there.
 //!
 //! ## What stays unreachable (pinned elsewhere)
 //!
@@ -32,7 +31,7 @@
 //! `processing_complete` / `processing_failed` hardware callbacks,
 //! which a structural UI walk cannot fire. Those three ids are
 //! exercised end-to-end by
-//! `core/vauchi-app/tests/it/backup_recovery_confirm_replace_tests.rs`
+//! `core/vauchi-app/tests/it/backup_restore_needs_empty_app_tests.rs`
 //! and `core/vauchi-core/tests/it/backup_recovery_engine_tests.rs`.
 //! Declaring them here would make them orphan handlers (declared,
 //! no affordance emitted on a reachable screen), so they are
@@ -41,9 +40,9 @@
 use vauchi_app::ui::testing::assert_reachability_across_screens;
 use vauchi_app::ui::{BackupRecoveryEngine, WorkflowEngine};
 
-/// Action ids emitted by the BFS-reachable screens (`backup_choose`,
-/// `backup_password`, `backup_confirm`, `backup_confirm_replace`)
-/// and consumed by `BackupRecoveryEngine::handle_action` —
+/// Action ids emitted by the BFS-reachable screens of an empty app
+/// (`backup_choose`, `backup_password`, `backup_confirm`) and consumed
+/// by `BackupRecoveryEngine::handle_action` —
 /// `core/vauchi-app/src/ui/backup_recovery.rs`.
 const HANDLED: &[&str] = &[
     "back",
@@ -53,18 +52,17 @@ const HANDLED: &[&str] = &[
     // MAX_EVENT_INPUT_VALUE_BYTES), so this is the load-bearing path
     // (2026-09-08-full-backup-restore-cannot-be-pasted).
     "choose_file",
-    "confirm_replace",
-    "cancel_replace",
 ];
 
+/// On a device with an identity a restore ends at the explanation, whose
+/// only action is `back`.
+const HANDLED_WITH_IDENTITY: &[&str] = &["back", "continue"];
+
 fn factory() -> BackupRecoveryEngine {
-    // Mode unset → starts on `ChooseMode` (`backup_choose`).
-    // `has_identity = true` is the more demanding path: a restore
-    // routes through `ConfirmReplace` downstream rather than
-    // straight to `Processing`. The reachability surface is
-    // identical either way (both gated behind the password), but
-    // pinning the identity-present construction documents the
-    // realistic post-onboarding entry state.
+    BackupRecoveryEngine::new(None, false, vauchi_app::i18n::Locale::ENGLISH)
+}
+
+fn factory_with_identity() -> BackupRecoveryEngine {
     BackupRecoveryEngine::new(None, true, vauchi_app::i18n::Locale::ENGLISH)
 }
 
@@ -74,4 +72,10 @@ fn backup_choose_screen_is_reachable() {
     let engine = factory();
     assert_eq!(engine.current_screen().screen_id, "backup_choose");
     assert_reachability_across_screens(factory, HANDLED);
+}
+
+// @internal
+#[test]
+fn backup_screens_with_an_identity_are_reachable() {
+    assert_reachability_across_screens(factory_with_identity, HANDLED_WITH_IDENTITY);
 }

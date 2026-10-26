@@ -44,8 +44,8 @@ mod app_password_typing_tests;
 mod avatar_editor_tests;
 mod avatar_editor_wiring_tests;
 mod avatar_i18n_tests;
-mod backup_recovery_confirm_replace_tests;
 mod backup_reminder_toast_tests;
+mod backup_restore_needs_empty_app_tests;
 mod backup_screen_tests;
 mod batch2_i18n_tests;
 mod batch3_i18n_tests;
@@ -221,6 +221,7 @@ mod render_context_tests;
 #[path = "../responsive_presentation_tests.rs"]
 mod responsive_presentation_tests;
 mod restorable_state_tests;
+mod restore_over_identity_tests;
 mod result_routing_wiring_tests;
 mod row_info_tests;
 mod settings_canvas_tests;

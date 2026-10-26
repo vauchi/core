@@ -286,13 +286,9 @@ fn tapping_what_is_vauchi_shows_info_overlay() {
     );
 }
 
-// @internal
-#[test]
-fn tapping_backup_reminders_cycles_frequency() {
-    let mut engine = engine_on(AppScreen::SettingsAdvanced);
-    let _ = tap_row(&mut engine, "backup_reminders");
-    let screen = engine.current_screen();
-    let detail = screen
+fn backup_reminders_detail(engine: &AppEngine) -> Option<String> {
+    engine
+        .current_screen()
         .components
         .iter()
         .find_map(|component| match component {
@@ -304,11 +300,30 @@ fn tapping_backup_reminders_cycles_frequency() {
             }),
             _ => None,
         })
-        .expect("backup_reminders row still rendered");
+        .expect("backup_reminders row still rendered")
+}
+
+// @scenario: backup_reminder :: Settings exposes a cycling frequency control
+// @internal
+#[test]
+fn tapping_backup_reminders_cycles_frequency() {
+    let mut engine = engine_on(AppScreen::SettingsAdvanced);
+    assert_eq!(backup_reminders_detail(&engine).as_deref(), Some("Weekly"));
+
+    let mut seen = Vec::new();
+    for _ in 0..3 {
+        let _ = tap_row(&mut engine, "backup_reminders");
+        seen.push(backup_reminders_detail(&engine));
+    }
+
     assert_eq!(
-        detail.as_deref(),
-        Some("Monthly"),
-        "tap cycles Weekly -> Monthly"
+        seen,
+        vec![
+            Some("Monthly".to_string()),
+            Some("Never".to_string()),
+            Some("Weekly".to_string()),
+        ],
+        "taps cycle Weekly -> Monthly -> Never -> Weekly"
     );
 }
 

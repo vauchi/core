@@ -20,7 +20,7 @@ fn due_engine() -> AppEngine {
     AppEngine::new(vauchi)
 }
 
-// @scenario: backup-reminder :: native toast action opens Backup
+// @scenario: backup_reminder :: First reminder fires 7 days after identity creation
 // @internal
 #[test]
 fn backup_reminder_carries_core_label_and_accepts_toast_action() {
@@ -44,4 +44,17 @@ fn backup_reminder_carries_core_label_and_accepts_toast_action() {
         ActionResult::NavigateTo(screen) => assert_eq!(screen.screen_id, "backup"),
         other => panic!("expected Backup navigation, got {other:?}"),
     }
+}
+
+// @scenario: backup_reminder :: Showing a reminder increments the reminder count
+// @internal
+#[test]
+fn draining_a_backup_reminder_counts_it_as_shown() {
+    let mut engine = due_engine();
+
+    let shown = engine.drain_backup_reminder();
+    assert!(matches!(shown, Some(ActionResult::ShowToast { .. })));
+
+    let state = engine.vauchi().load_backup_reminder_state().unwrap();
+    assert_eq!(state.reminder_count, 1);
 }

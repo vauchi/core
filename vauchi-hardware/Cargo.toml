@@ -19,7 +19,6 @@ futures-util = { version = "0.3", default-features = false, features = ["std", "
 zbus = { version = "=6.0.0", default-features = false, features = ["tokio"] }
 uuid = { version = "1", default-features = false }
 tokio = { version = "1", features = ["net"] }
-serde = "1"
 
 [dev-dependencies]
 tempfile = "3"

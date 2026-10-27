@@ -176,7 +176,7 @@ async fn call<B>(
     body: &B,
 ) -> Result<Message, HardwareFailure>
 where
-    B: serde::Serialize + zbus::DynamicType,
+    B: zbus::export::serde::Serialize + zbus::DynamicType,
 {
     bus.call_method(Some(BLUEZ), path, Some(interface), method, body)
         .await

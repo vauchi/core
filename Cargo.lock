@@ -4570,7 +4570,6 @@ name = "vauchi-hardware"
 version = "0.92.0"
 dependencies = [
  "futures-util",
- "serde",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",

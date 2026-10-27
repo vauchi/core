@@ -5,11 +5,11 @@
 //! Backing out of an edit or a removal of an own-card entry leaves the
 //! card as it was, driven through the events the shells report.
 
-use crate::event_path_support::{action, activate, first_input, row, surfaces};
+use crate::event_path_support::{action, activate, confirmation, first_input, row, surfaces};
 use vauchi_app::ui::{AppEngine, AppScreen};
 use vauchi_core::api::Vauchi;
 use vauchi_core::contact_card::{ContactField, FieldType};
-use vauchi_core::{ActionSpec, Command, Event, InputValue, PresentationNode, SurfaceId};
+use vauchi_core::{Command, Event, InputValue, PresentationNode};
 
 const MOBILE: &str = "+1-555-123-4567";
 
@@ -38,20 +38,6 @@ fn mobile_entry_detail() -> (AppEngine, Vec<Command>) {
     let (surface_id, entry) = row(&my_card, MOBILE);
     let detail = activate(&mut engine, surface_id, &entry);
     (engine, detail)
-}
-
-/// The surface's pending confirmation as (surface, confirm, cancel).
-fn confirmation(commands: &[Command]) -> Option<(SurfaceId, ActionSpec, ActionSpec)> {
-    surfaces(commands)
-        .into_iter()
-        .find_map(|(surface_id, nodes)| {
-            nodes.into_iter().find_map(|node| match node {
-                PresentationNode::Confirmation {
-                    confirm, cancel, ..
-                } => Some((surface_id.clone(), confirm, cancel)),
-                _ => None,
-            })
-        })
 }
 
 fn has_input(commands: &[Command]) -> bool {

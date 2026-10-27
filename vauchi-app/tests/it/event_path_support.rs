@@ -108,3 +108,17 @@ pub fn validation_errors(commands: &[Command]) -> Vec<String> {
         })
         .collect()
 }
+
+/// The surface's pending confirmation as (surface, confirm, cancel).
+pub fn confirmation(commands: &[Command]) -> Option<(SurfaceId, ActionSpec, ActionSpec)> {
+    surfaces(commands)
+        .into_iter()
+        .find_map(|(surface_id, nodes)| {
+            nodes.into_iter().find_map(|node| match node {
+                PresentationNode::Confirmation {
+                    confirm, cancel, ..
+                } => Some((surface_id.clone(), confirm, cancel)),
+                _ => None,
+            })
+        })
+}

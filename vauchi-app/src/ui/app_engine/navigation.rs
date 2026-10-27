@@ -47,7 +47,9 @@ impl AppScreen {
             | Self::VerifyFingerprint { .. }
             | Self::ContactMerge { .. } => Self::Contacts,
             Self::ContactDuplicates | Self::ArchivedContacts => Self::Contacts,
-            Self::MyInfoEntryDetail { .. } | Self::AvatarEditor => Self::MyInfo,
+            Self::MyInfoEntryDetail { .. } | Self::AvatarEditor | Self::ContactPicker => {
+                Self::MyInfo
+            }
             Self::GroupDetail { .. } => Self::Groups,
             Self::TagPromotion { .. } => Self::Tags,
             // Without this the Advanced sub-screen reduced to itself and
@@ -418,6 +420,9 @@ impl AppEngine {
         !matches!(
             screen,
             AppScreen::Lock
+                // Rebuilt on entry, so the contact-list cache invalidations
+                // need not know the picker exists.
+                | AppScreen::ContactPicker
                 | AppScreen::Privacy
                 | AppScreen::FormDialog { .. }
                 | AppScreen::ContactEdit { .. }

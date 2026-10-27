@@ -254,7 +254,7 @@ impl AppEngine {
     ///   otherwise it falls through so the engine keeps its (unchanged)
     ///   in-memory name search.
     pub(super) fn intercept_contact_facets(&mut self, action: &UserAction) -> Option<ActionResult> {
-        if self.screen != AppScreen::Contacts {
+        if !matches!(self.screen, AppScreen::Contacts | AppScreen::ContactPicker) {
             return None;
         }
         match action {

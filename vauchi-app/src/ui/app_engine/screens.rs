@@ -165,6 +165,7 @@ impl AppEngine {
                 Self::create_entry_detail_engine(vauchi, field_id, render_context)
             }
             AppScreen::Contacts
+            | AppScreen::ContactPicker
             | AppScreen::ContactDetail { .. }
             | AppScreen::ContactVisibility { .. }
             | AppScreen::ContactEdit { .. }

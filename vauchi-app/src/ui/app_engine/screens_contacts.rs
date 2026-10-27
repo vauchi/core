@@ -34,12 +34,14 @@ impl AppEngine {
         render_context: &crate::ui::RenderContext,
     ) -> Box<dyn WorkflowEngine> {
         match screen {
-            AppScreen::Contacts => {
+            AppScreen::Contacts | AppScreen::ContactPicker => {
+                let picker = matches!(screen, AppScreen::ContactPicker);
                 let contacts = Self::load_contact_items(vauchi, render_context.resolved_locale());
                 let all_groups = vauchi.list_groups().unwrap_or_default();
                 if all_groups.is_empty() {
                     Box::new(
                         ContactListEngine::new(contacts)
+                            .with_preview_picker(picker)
                             .with_locale(render_context.resolved_locale()),
                     )
                 } else {
@@ -58,6 +60,7 @@ impl AppEngine {
                     }
                     Box::new(
                         ContactListEngine::with_groups(contacts, groups, memberships)
+                            .with_preview_picker(picker)
                             .with_locale(render_context.resolved_locale()),
                     )
                 }

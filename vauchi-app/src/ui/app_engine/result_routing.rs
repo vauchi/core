@@ -110,7 +110,10 @@ impl AppEngine {
                     group_id: contact_id,
                 }))
             }
-            // General contact open — the More/Groups guards above intercept
+            ActionResult::OpenContact { contact_id } if self.screen == AppScreen::ContactPicker => {
+                ActionResult::NavigateTo(self.preview_as(contact_id))
+            }
+            // General contact open — the Groups and picker guards above intercept
             // their reuse of OpenContact first, so this only sees a genuine
             // "open this contact". Core resolves the navigation so the frontend
             // never has to domain-map OpenContact (ADR-043/044; problem
@@ -122,7 +125,7 @@ impl AppEngine {
                 ActionResult::NavigateTo(self.preview_as(contact_id))
             }
             ActionResult::ShowContactPicker => {
-                ActionResult::NavigateTo(self.navigate_to(AppScreen::Contacts))
+                ActionResult::NavigateTo(self.navigate_to(AppScreen::ContactPicker))
             }
             ActionResult::ShowFormDialog {
                 dialog_type,

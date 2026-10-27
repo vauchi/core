@@ -14,6 +14,10 @@ pub enum AppScreen {
     Onboarding,
     MyInfo,
     Contacts,
+    /// The contact list opened from My Card's "Preview as..." row. A row
+    /// chosen here previews my card as that contact instead of opening
+    /// them (private#858).
+    ContactPicker,
     ContactDetail {
         contact_id: String,
     },
@@ -186,6 +190,7 @@ impl AppScreen {
             Self::Onboarding => "onboarding",
             Self::MyInfo => "my_info",
             Self::Contacts => "contacts",
+            Self::ContactPicker => "contact_picker",
             Self::ContactDetail { .. } => "contact_detail",
             Self::ContactEdit { .. } => "contact_edit",
             Self::ContactVisibility { .. } => "contact_visibility",
@@ -256,6 +261,7 @@ impl AppScreen {
             "onboarding" => Self::Onboarding,
             "home" | "my_info" => Self::MyInfo,
             "contacts" => Self::Contacts,
+            "contact_picker" => Self::ContactPicker,
             "exchange" => Self::Exchange,
             "settings" => Self::Settings,
             "settings_advanced" => Self::SettingsAdvanced,
@@ -298,7 +304,7 @@ impl AppScreen {
     /// `MapScreenToParentId`-style switch statements in frontends.
     pub fn parent_screen_id(&self) -> Option<&'static str> {
         match self {
-            Self::MyInfoEntryDetail { .. } => Some("my_info"),
+            Self::MyInfoEntryDetail { .. } | Self::ContactPicker => Some("my_info"),
             Self::ContactDetail { .. }
             | Self::ContactEdit { .. }
             | Self::ContactVisibility { .. }
@@ -351,7 +357,10 @@ impl AppScreen {
             | Self::DeepLinkConsent { .. }
             | Self::DeepLinkResponder { .. }
             | Self::DeviceLinkJoin { .. } => return None,
-            Self::MyInfo | Self::MyInfoEntryDetail { .. } | Self::AvatarEditor => "my_info",
+            Self::MyInfo
+            | Self::MyInfoEntryDetail { .. }
+            | Self::AvatarEditor
+            | Self::ContactPicker => "my_info",
             Self::Contacts
             | Self::ContactDetail { .. }
             | Self::ContactEdit { .. }

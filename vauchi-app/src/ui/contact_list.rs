@@ -80,6 +80,9 @@ pub struct ContactListEngine {
     /// its end; reset to the top whenever the filtered set itself changes
     /// (search, facets, group filter).
     window_offset: usize,
+    /// Opened from My Card to choose whom to preview as: rows pick, and
+    /// the contact-management affordances stay off (private#858).
+    preview_picker: bool,
     locale: Locale,
 }
 
@@ -96,6 +99,7 @@ impl ContactListEngine {
             facet_place: false,
             faceted_ids: None,
             window_offset: 0,
+            preview_picker: false,
             locale: Locale::ENGLISH,
         }
     }
@@ -117,6 +121,7 @@ impl ContactListEngine {
             facet_place: false,
             faceted_ids: None,
             window_offset: 0,
+            preview_picker: false,
             locale: Locale::ENGLISH,
         }
     }
@@ -125,6 +130,16 @@ impl ContactListEngine {
     /// frontend-pushed RenderContext at the AppEngine factory (M3 S6b-2).
     pub fn with_locale(mut self, locale: Locale) -> Self {
         self.locale = locale;
+        self
+    }
+
+    pub fn with_preview_picker(mut self, preview_picker: bool) -> Self {
+        self.preview_picker = preview_picker;
+        if preview_picker {
+            for contact in &mut self.all_contacts {
+                contact.item.actions.clear();
+            }
+        }
         self
     }
 
@@ -483,9 +498,20 @@ impl WorkflowEngine for ContactListEngine {
             );
         }
 
+        // A picker only picks. The management actions are routed only while
+        // the Contacts screen is current (`dispatch.rs`), so here they would
+        // be dead buttons; the group filters narrow the pick and stay.
+        if self.preview_picker {
+            actions.retain(|action| action.id.starts_with("filter_group"));
+        }
+
         ScreenModel {
             screen_id: "contact_list".into(),
-            title: self.t("contacts.title"),
+            title: self.t(if self.preview_picker {
+                "my_info.preview_as_button"
+            } else {
+                "contacts.title"
+            }),
             subtitle: None,
             components,
             contextual_actions: actions,

@@ -1,0 +1,193 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * The BLE handshake, as `BleHandshakeSession` runs it (v4,
+ * `exchange/ble_handshake.rs`; vauchi/private#842, 2026-07-22 tiebreak
+ * design rule 4):
+ *
+ *   - KeyOffer (initiator → responder): identity key, static X25519
+ *     exchange key, fresh ephemeral key, nonce, timestamp and the echoed
+ *     OOB nonce — unsigned;
+ *   - KeyAck (responder → initiator): identity key, exchange key,
+ *     ephemeral key, nonce, card commitment, timestamp — unsigned;
+ *   - session key = HKDF(DH(static, static) ‖ DH(ephemeral, ephemeral),
+ *     salt = sorted nonces, info = sorted exchange keys). The Ed25519
+ *     identity never enters the derivation.
+ *
+ * Glance (the default here): the scanner pins the displayer's identity and
+ * exchange key from the signed QR and echoes its nonce; the displayer
+ * requires that echo. A bystander can photograph the QR. The key is
+ * written as h(DH1, DH2): the nonces and sorted exchange keys the real
+ * salt and info carry add freshness and context, not secrecy or binding,
+ * and every extra DH term in the hash multiplied Tamarin's
+ * precomputation. Timestamps, the card commitment and the reciprocity
+ * ack are out of scope. Every key on the wire is a group element with a known exponent
+ * (`!Static`, `!Ephemeral`): the attacker's own keys are registered and
+ * leaked ones, which is all a DH attacker has anyway, and it keeps the
+ * proof search finite — with free terms Tamarin found no trace of
+ * `executable` in ten minutes.
+ *
+ * STATUS 2026-10-27: no verdict yet. Precomputation takes 70 s; the
+ * `executable` lemma alone ran past two minutes and was stopped when the
+ * machine ran out of memory. Not wired into test:formal until a lemma
+ * has been observed proved or falsified (CC-27).
+ *
+ * Run: tamarin-prover --prove ble_handshake.spthy
+ *   session_key_secrecy: a key both honest sides accepted stays secret
+ *     even when every static key leaks (the ephemerals carry it).
+ *   scanner_binds_the_displayer: when the scanner accepts a key someone
+ *     else knows, that someone is the honest displayer it scanned.
+ * Prove it can fail: tamarin-prover --prove -DRADIO_ONLY ble_handshake.spthy
+ *   Magic, Bump and Shake have no OOB pins: an attacker presents any
+ *   identity with its own exchange key and the scanner lemma is falsified
+ *   — the "role ≠ trust" gap the tiebreak design leaves to the proximity
+ *   gates and the in-person confirmation.
+ * The displayer's side: tamarin-prover --prove -DQR_PRIVATE
+ *   ble_handshake.spthy  (displayer_binds_the_scanner verified only when
+ *   the QR cannot be photographed; by default it is falsified — the
+ *   displayer accepts whoever saw its QR, under any identity, which is
+ *   why the displayer's screen shows the connector's card for the human
+ *   to confirm)
+ */
+
+theory VauchiBleHandshake
+begin
+
+builtins: diffie-hellman, hashing
+
+/* A user: an identity key (a public label here, it never enters the DH)
+   and the static X25519 exchange key. */
+rule Register:
+  [ Fr(~id), Fr(~x) ]
+  --[ Registered($A, ~id) ]->
+  [ !User($A, ~id, ~x), !Static('g' ^ ~x), Out(<~id, 'g' ^ ~x>) ]
+
+/* The attacker's ephemeral keys: group elements it knows the exponent of. */
+rule Attacker_ephemeral:
+  [ Fr(~e) ]
+  --[ ]->
+  [ !Ephemeral('g' ^ ~e), Out(~e) ]
+
+/* The static exchange key leaks (a lost phone, malware). */
+rule Reveal_static:
+  [ !User($A, id, x) ]
+  --[ RevealStatic($A) ]->
+  [ Out(x) ]
+
+/* Glance: the displayer shows a signed QR with a fresh token (the OOB
+   nonce derives from it) and waits as the responder. */
+#ifdef QR_PRIVATE
+rule Display_qr:
+  [ !User($D, id, x), Fr(~q) ]
+  --[ Displayed($D, ~q) ]->
+  [ !Shown($D, id, 'g' ^ x, ~q), Displayer($D, ~q) ]
+#else
+rule Display_qr:
+  [ !User($D, id, x), Fr(~q) ]
+  --[ Displayed($D, ~q) ]->
+  [ !Shown($D, id, 'g' ^ x, ~q), Displayer($D, ~q), Out(<id, 'g' ^ x, ~q>) ]
+#endif
+
+/* In person: the scanner reads the screen and pins what it saw. */
+rule Scan_qr:
+  [ !Shown($D, id_d, xpk_d, q) ]
+  --[ Scanned($S, q) ]->
+  [ Scanner($S, id_d, xpk_d, q) ]
+
+/* ── Initiator (the scanner, or any radio-only side that dials) ────── */
+
+#ifdef RADIO_ONLY
+rule Offer:
+  let offer = <'offer', id_i, 'g' ^ x_i, 'g' ^ ~e_i, ~n_i, 'none'>
+  in
+  [ !User($I, id_i, x_i), Fr(~e_i), Fr(~n_i) ]
+  --[ Offered($I) ]->
+  [ InitiatorWaiting($I, 'none', 'none', ~e_i, ~n_i), !Ephemeral('g' ^ ~e_i), Out(offer) ]
+
+rule Receive_ack:
+  let dh1 = xpk_r ^ x_i
+      dh2 = epk_r ^ e_i
+      k = h(<dh1, dh2>)
+  in
+  [ InitiatorWaiting($I, pin_id, pin_x, e_i, n_i), !User($I, id_i, x_i)
+  , In(<'ack', id_r, xpk_r, epk_r, n_r>), !Static(xpk_r), !Ephemeral(epk_r) ]
+  --[ AcceptI($I, id_i, id_r, k) ]->
+  [ ]
+#else
+rule Offer:
+  let offer = <'offer', id_i, 'g' ^ x_i, 'g' ^ ~e_i, ~n_i, q>
+  in
+  [ !User($I, id_i, x_i), Scanner($I, id_d, xpk_d, q), Fr(~e_i), Fr(~n_i) ]
+  --[ Offered($I) ]->
+  [ InitiatorWaiting($I, id_d, xpk_d, ~e_i, ~n_i), !Ephemeral('g' ^ ~e_i), Out(offer) ]
+
+rule Receive_ack:
+  let dh1 = xpk_r ^ x_i
+      dh2 = epk_r ^ e_i
+      k = h(<dh1, dh2>)
+  in
+  [ InitiatorWaiting($I, id_r, xpk_r, e_i, n_i), !User($I, id_i, x_i)
+  , In(<'ack', id_r, xpk_r, epk_r, n_r>), !Static(xpk_r), !Ephemeral(epk_r) ]
+  --[ AcceptI($I, id_i, id_r, k) ]->
+  [ ]
+#endif
+
+/* ── Responder (the displayer, or any radio-only side that is dialled) ── */
+
+#ifdef RADIO_ONLY
+rule Answer:
+  let dh1 = xpk_i ^ x_r
+      dh2 = epk_i ^ ~e_r
+      k = h(<dh1, dh2>)
+      ack = <'ack', id_r, 'g' ^ x_r, 'g' ^ ~e_r, ~n_r>
+  in
+  [ !User($R, id_r, x_r), Fr(~e_r), Fr(~n_r)
+  , In(<'offer', id_i, xpk_i, epk_i, n_i, echo>), !Static(xpk_i), !Ephemeral(epk_i) ]
+  --[ AcceptR($R, id_r, id_i, k) ]->
+  [ !Ephemeral('g' ^ ~e_r), Out(ack) ]
+#else
+rule Answer:
+  let dh1 = xpk_i ^ x_r
+      dh2 = epk_i ^ ~e_r
+      k = h(<dh1, dh2>)
+      ack = <'ack', id_r, 'g' ^ x_r, 'g' ^ ~e_r, ~n_r>
+  in
+  [ !User($R, id_r, x_r), Displayer($R, q), Fr(~e_r), Fr(~n_r)
+  , In(<'offer', id_i, xpk_i, epk_i, n_i, q>), !Static(xpk_i), !Ephemeral(epk_i) ]
+  --[ AcceptR($R, id_r, id_i, k) ]->
+  [ !Ephemeral('g' ^ ~e_r), Out(ack) ]
+#endif
+
+/* Sanity: two honest users complete a handshake with one key. */
+lemma executable:
+  exists-trace
+  "Ex I R idi idr k #i #j.
+     AcceptI(I, idi, idr, k) @ i & AcceptR(R, idr, idi, k) @ j
+     & not (Ex P #r. RevealStatic(P) @ r)"
+
+/* A key both honest sides accepted stays secret: the ephemeral DH carries
+   it, so even every static key leaking does not expose it. */
+lemma session_key_secrecy:
+  "All I R idi idr k #i #j.
+     AcceptI(I, idi, idr, k) @ i & AcceptR(R, idr, idi, k) @ j
+     ==> not (Ex #m. K(k) @ m)"
+
+/* The scanner's guarantee: if anyone else knows the key the scanner
+   accepted, it is the honest owner of the identity the scanner pinned —
+   unless a static key leaked. */
+lemma scanner_binds_the_displayer:
+  "All I idi idr k #i #m.
+     AcceptI(I, idi, idr, k) @ i & K(k) @ m
+     & not (Ex P #r. RevealStatic(P) @ r)
+     ==> Ex R #j. AcceptR(R, idr, idi, k) @ j"
+
+/* The displayer's guarantee, which holds only while the QR is private. */
+lemma displayer_binds_the_scanner:
+  "All R idr idi k #j #m.
+     AcceptR(R, idr, idi, k) @ j & K(k) @ m
+     & not (Ex P #r. RevealStatic(P) @ r)
+     ==> Ex I #i. AcceptI(I, idi, idr, k) @ i"
+
+end

@@ -329,7 +329,7 @@ fn validation_should(world: &mut VauchiWorld, expected: String) {
         .and_then(|()| {
             if is_social {
                 vauchi_core::contact_card::validate_social_username(
-                    &vauchi_core::social::SocialNetworkRegistry::with_defaults(),
+                    &world.social_networks,
                     &label,
                     &value,
                 )
@@ -379,9 +379,29 @@ fn field_not_saved(world: &mut VauchiWorld) {
 }
 
 // ── Social network fields (offline-cache scenario) ─────────────
-// Note: the `Validate social network username format` outline is NOT bound here:
-// its rule comes from the loaded networks list through the add-entry form, which
-// vauchi-app's social_rule_from_network_list_tests drive (private#631).
+
+/// Stands for the copy the content CDN served; the bundled list until a
+/// step gives a network a rule.
+#[given("the networks list from the content CDN has been loaded")]
+fn networks_list_loaded(world: &mut VauchiWorld) {
+    world.social_networks = vauchi_core::social::SocialNetworkRegistry::with_defaults();
+}
+
+/// A list holding only `network`, whose username rule is data in that list
+/// (private#631): Core has no rule of its own to fall back on.
+#[given(expr = "it gives {string} a username of at most {int} letters, digits or underscores")]
+fn list_gives_username_rule(world: &mut VauchiWorld, network: String, max_len: usize) {
+    let data = serde_json::json!([{
+        "id": network.to_lowercase().replace(' ', ""),
+        "name": network,
+        "url": "https://example.net/{username}",
+        "username": {"max_len": max_len, "charset": "alnum_underscore", "strip_at": true},
+    }]);
+    world.social_networks = vauchi_core::social::SocialNetworkRegistry::from_data_bytes(
+        &serde_json::to_vec(&data).unwrap(),
+    )
+    .expect("valid network data");
+}
 
 #[given("I have previously loaded the social network config")]
 fn previously_loaded_social_config(_world: &mut VauchiWorld) {}

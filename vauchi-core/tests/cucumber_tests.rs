@@ -54,6 +54,9 @@ pub struct VauchiWorld {
     /// Humble-UI driver: the AppEngine hosting `self.vauchi` after
     /// `I open the app` (ADR-021 — flows are ScreenModel-testable in core).
     pub engine: Option<vauchi_app::ui::AppEngine>,
+    /// The networks list social entries are checked against: the bundled
+    /// copy until a step loads another.
+    pub social_networks: vauchi_core::social::SocialNetworkRegistry,
 }
 
 impl std::fmt::Debug for VauchiWorld {
@@ -90,6 +93,7 @@ impl VauchiWorld {
             old_cards: std::collections::BTreeMap::new(),
             sessions: std::collections::BTreeMap::new(),
             engine: None,
+            social_networks: vauchi_core::social::SocialNetworkRegistry::with_defaults(),
         }
     }
 

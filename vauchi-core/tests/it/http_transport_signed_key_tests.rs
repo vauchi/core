@@ -129,7 +129,7 @@ fn a_stale_key_rejection_refetches_the_signed_record() {
 
 /// The hole #288 closes: a refetched key that does not chain to the anchor
 /// is never installed, and the unsigned endpoint is never consulted.
-// @internal
+// @scenario: relay_network :: Relay node authentication
 #[test]
 fn a_refetched_record_under_another_anchor_is_never_installed() {
     let mock = MockRelay::start();

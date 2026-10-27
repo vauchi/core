@@ -177,6 +177,7 @@ mod multi_stage_back_tests;
 mod multi_stage_deadline_tests;
 mod multi_stage_exchange_i18n_tests;
 mod multi_stage_machine_proptest;
+mod my_card_preview_picker_tests;
 mod nfc_exchange_app_engine_tests;
 mod places_screen_tests;
 mod places_tests;

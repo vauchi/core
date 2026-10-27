@@ -99,6 +99,10 @@ fn compact_exchange_screen(
 }
 
 impl AppEngine {
+    // Per-screen factory like `create_engine`: each argument is an independent
+    // input one of the exchange builders reads; a struct would only relocate
+    // the list.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn create_exchange_engine(
         vauchi: &Vauchi,
         screen: &AppScreen,

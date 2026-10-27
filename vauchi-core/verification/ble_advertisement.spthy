@@ -1,0 +1,118 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * The BLE advertisement (vauchi/private#726, 2026-07-22 tiebreak design
+ * rule 1): while a BLE exchange screen is open the phone advertises the
+ * prefix of a role-tiebreak token. The token is fresh per screen entry
+ * (`fresh_attempt_token`); a Glance displayer instead derives it from the
+ * random token in its QR (`attempt_token_from_oob`, modelled as `h`), so
+ * the scanner computes the same value from the QR it scanned and connects
+ * only to an advertiser whose prefix matches (`handle_glance_discovery`).
+ *
+ * The bystander sees everything on the air and can photograph a QR. The
+ * phones' two-byte prefix is the free function `prefix`: a symbolic model
+ * says nothing about collisions, which the handshake's identity, exchange
+ * key and OOB nonce pins resolve (out of scope here, as is which side
+ * dials — Tamarin has no ordering).
+ *
+ * Run: tamarin-prover --prove ble_advertisement.spthy
+ *   scanner_connects_to_the_displayer_it_scanned: an honest advertiser the
+ *   scanner connects to displayed the very QR the scanner read.
+ * Prove it can fail: tamarin-prover --prove -DNO_SCAN_BINDING
+ *   ble_advertisement.spthy  (the scanner connects to any Vauchi advert;
+ *   the lemma must be falsified)
+ * Unlinkability: tamarin-prover --prove --diff -DUNLINKABILITY
+ *   ble_advertisement.spthy  (one device seen twice vs two devices seen
+ *   once must be indistinguishable: Observational_equivalence verified)
+ * Prove it can fail: tamarin-prover --prove --diff -DUNLINKABILITY
+ *   -DKEY_DERIVED_TOKEN ble_advertisement.spthy  (the token is the
+ *   identity key's hash, as it was before #726; the equivalence must be
+ *   falsified)
+ */
+
+theory VauchiBleAdvertisement
+begin
+
+builtins: hashing
+functions: prefix/1
+
+restriction Equality:
+  "All x y #i. Eq(x, y) @ i ==> x = y"
+
+/* A user's long-term identity key, what a bystander must not recover. */
+rule Register_identity:
+  [ Fr(~id) ]
+  --[ Registered($A, ~id) ]->
+  [ !Identity($A, ~id) ]
+
+/* Unlinkability (diff mode only: `diff` does not parse in a trace run,
+   and Tamarin 1.12 does not nest #ifdef, hence the flat guards). A
+   bystander sees two adverts: the left side is one device on its second
+   screen entry, the right side a second device. */
+#ifdef UNLINKABILITY & KEY_DERIVED_TOKEN
+rule Two_sightings:
+  [ !Identity($A, ida), !Identity($B, idb) ]
+  --[ Sightings($A, $B) ]->
+  [ Out(prefix(h(ida))), Out(prefix(diff(h(ida), h(idb)))) ]
+#endif
+#ifdef UNLINKABILITY & not KEY_DERIVED_TOKEN
+rule Two_sightings:
+  [ !Identity($A, ida), !Identity($B, idb), Fr(~t1), Fr(~t2) ]
+  --[ Sightings($A, $B) ]->
+  [ Out(prefix(~t1)), Out(prefix(diff(~t2, ~t2))) ]
+#endif
+#ifdef UNLINKABILITY
+lemma sightings_happen:
+  exists-trace
+  "Ex A B #i. Sightings(A, B) @ i"
+#endif
+
+/* Glance. The displayer shows a QR with a fresh random token; a bystander
+   can photograph it. */
+rule Display_qr:
+  [ !Identity($D, id), Fr(~q) ]
+  --[ Displayed($D, ~q) ]->
+  [ !ShownQr($D, ~q), Out(~q) ]
+
+/* The displayer advertises the token its QR implies. */
+rule Advertise_glance:
+  [ !ShownQr($D, q) ]
+  --[ Advertise($D, h(q)) ]->
+  [ Out(prefix(h(q))) ]
+
+/* In person: the scanner reads the displayer's screen and expects the
+   same token. */
+rule Scan_qr:
+  [ !ShownQr($D, q) ]
+  --[ Scanned($S, q) ]->
+  [ !Expect($S, h(q)) ]
+
+/* A scan result arrives; connect only on the expected prefix. */
+#ifdef NO_SCAN_BINDING
+rule Discover:
+  [ !Expect($S, x), In(p) ]
+  --[ Connect($S, p) ]->
+  [ ]
+#else
+rule Discover:
+  [ !Expect($S, x), In(p) ]
+  --[ Eq(p, prefix(x)), Connect($S, p) ]->
+  [ ]
+#endif
+
+lemma executable:
+  exists-trace
+  "Ex S D q #i #j #k.
+     Displayed(D, q) @ i & Scanned(S, q) @ j & Connect(S, prefix(h(q))) @ k"
+
+/* An honest advertiser the scanner connects to displayed the QR the
+   scanner read. A bystander can still put a photographed QR's prefix on
+   the air; that twin is rejected by the handshake's pins, not here. */
+lemma scanner_connects_to_the_displayer_it_scanned:
+  "All S D x #i #j.
+     Connect(S, prefix(x)) @ i & Advertise(D, x) @ j
+     ==> Ex q #k #l. Scanned(S, q) @ k & Displayed(D, q) @ l & x = h(q)"
+
+end

@@ -210,6 +210,12 @@ tamarin_expect "$models/card_update.spthy" falsified "-DNO_VERSION_FLOOR" \
 # edit — unless they also extract the ratchet keys, the design's limit.
 tamarin_diff_expect "$models/duress_cover.spthy" verified ""
 tamarin_diff_expect "$models/duress_cover.spthy" falsified "-DCOERCER_HOLDS_RATCHET"
+tamarin_expect "$models/ble_advertisement.spthy" verified "" \
+    executable scanner_connects_to_the_displayer_it_scanned
+tamarin_expect "$models/ble_advertisement.spthy" falsified "-DNO_SCAN_BINDING" \
+    scanner_connects_to_the_displayer_it_scanned
+tamarin_diff_expect "$models/ble_advertisement.spthy" verified "-DUNLINKABILITY"
+tamarin_diff_expect "$models/ble_advertisement.spthy" falsified "-DUNLINKABILITY -DKEY_DERIVED_TOKEN"
 
 # ── Quint ─────────────────────────────────────────────────────────────
 # The device-link host and joiner machines (#757, #808). `quint verify`

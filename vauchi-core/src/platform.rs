@@ -496,6 +496,36 @@ pub enum Command {
         revision: u64,
         menus: Vec<ApplicationMenuSpec>,
     },
+    /// A bounded operation for executors advertising correlated file results.
+    /// Echo `request_id` unchanged in one `FilePickCompleted` event.
+    PickFile {
+        request_id: String,
+        title: String,
+        accepted_mime_types: Vec<String>,
+        accepted_extensions: Vec<String>,
+        max_bytes: u64,
+    },
+    /// Dismiss the picker and discard work for this opaque operation id.
+    CancelFilePick { request_id: String },
+}
+
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FilePickFailure {
+    ReadFailed,
+    TooLarge,
+    InvalidRequest,
+    UnsupportedFile,
+}
+
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FilePickOutcome {
+    Selected { bytes: Vec<u8>, filename: String },
+    Cancelled,
+    Failed { code: FilePickFailure },
 }
 
 /// A secret a shell sealed behind the platform's user-presence check:
@@ -706,6 +736,8 @@ impl Command {
             Self::Celebrate { .. } => "Celebrate",
             Self::SetContextBar { .. } => "SetContextBar",
             Self::SetApplicationMenu { .. } => "SetApplicationMenu",
+            Self::PickFile { .. } => "PickFile",
+            Self::CancelFilePick { .. } => "CancelFilePick",
             Self::SetNavigation { .. } => "SetNavigation",
             Self::PresentOverlay { .. } => "PresentOverlay",
             Self::DismissOverlay { .. } => "DismissOverlay",
@@ -1078,6 +1110,12 @@ pub enum Event {
     WakeupFired,
     /// Whether this window can render prepared native application menus.
     ApplicationMenuAvailabilityChanged { available: bool },
+    /// Support for PickFile, CancelFilePick and correlated typed outcomes.
+    FilePickerCapabilitiesChanged { correlated_results: bool },
+    FilePickCompleted {
+        request_id: String,
+        outcome: FilePickOutcome,
+    },
 }
 
 // INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access

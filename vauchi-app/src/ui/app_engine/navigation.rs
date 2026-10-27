@@ -184,7 +184,7 @@ impl AppEngine {
     pub(super) fn navigate_to_internal(&mut self, screen: AppScreen) -> ScreenModel {
         if matches!(screen, AppScreen::Lock) {
             self.session_locked = true;
-            self.pending_contact_import = false;
+            self.cancel_file_pick();
         } else if self.session_locked {
             return self.engine.current_screen();
         }
@@ -201,6 +201,7 @@ impl AppEngine {
         self.retained_detail_screen = screen.parent_screen_id().is_some().then(|| screen.clone());
 
         // Swap in the new screen, get the old one back
+        self.invalidate_file_pick_for_navigation(&screen);
         let old_screen = std::mem::replace(&mut self.screen, screen.clone());
 
         // A fresh attempt token per BLE exchange screen entry: the phones put
@@ -310,9 +311,10 @@ impl AppEngine {
         if self.screen == screen || self.refuses_while_locked(&screen) {
             return;
         }
+        self.invalidate_file_pick_for_navigation(&screen);
         if matches!(screen, AppScreen::Lock) {
             self.session_locked = true;
-            self.pending_contact_import = false;
+            self.cancel_file_pick();
         }
         self.drop_pending_credential_change();
         let new_engine = self.engine_cache.remove(&screen).unwrap_or_else(|| {

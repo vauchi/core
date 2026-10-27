@@ -171,9 +171,12 @@ impl AppEngine {
         }
 
         match &event {
-            Event::HardwareError { transport, error } if transport == "file_picker" => {
+            Event::HardwareError { transport, .. } if transport == "file_picker" => {
                 self.pending_contact_import = false;
-                return (!self.session_locked).then(|| self.hardware_error_alert(transport, error));
+                return (!self.session_locked).then(|| ActionResult::ShowAlert {
+                    title: self.t("hardware.error_title_generic"),
+                    message: self.t("platform.error_could_not_read_file"),
+                });
             }
             Event::FilePickedFromUser { bytes, filename } => {
                 return self.handle_file_picked(bytes.clone(), filename.clone());

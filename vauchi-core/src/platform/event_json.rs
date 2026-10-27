@@ -48,6 +48,20 @@ pub fn event_from_json(json: &str) -> Result<Event, EventJsonError> {
 }
 
 fn validate_event(event: &Event) -> Result<(), EventJsonError> {
+    if let Event::FilePickCompleted {
+        request_id,
+        outcome,
+    } = event
+    {
+        if request_id.is_empty() || request_id.len() > 128 {
+            return Err(EventJsonError::Malformed);
+        }
+        if let super::FilePickOutcome::Selected { bytes, filename } = outcome
+            && (bytes.len() > MAX_FILE_PICK_BYTES || filename.len() > 1024)
+        {
+            return Err(EventJsonError::TooLarge);
+        }
+    }
     if let Event::ValueChanged { value, .. } = event {
         let value_length = match value {
             InputValue::Text(value) => value.len(),

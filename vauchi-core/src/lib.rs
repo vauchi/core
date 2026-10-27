@@ -114,16 +114,16 @@ pub mod platform;
 pub use platform::{
     AccessibilitySpec, ActionSpec, ActionTone, AlertSpec, ApplicationMenuRole, ApplicationMenuSpec,
     BindingId, BleLinkDirection, ChoiceOption, ColorScheme, Command, ContextBar, DocumentSpec,
-    Event, EventJsonError, ExportFileSpec, FilePickPurpose, InputMode, InputValue, InteractionId,
-    InvocationOutcome, MAX_EVENT_INPUT_VALUE_BYTES, MAX_EVENT_JSON_BYTES,
-    MAX_EVENT_JSON_NESTING_DEPTH, MAX_FILE_PICK_BYTES, MotionPreference, NavigationItem,
-    NavigationSpec, NotificationSpec, NotificationUrgency, Orientation, OverlayKind, OverlaySpec,
-    PaneLayout, PresentationAxis, PresentationColors, PresentationIdError, PresentationImageShape,
-    PresentationInputKind, PresentationListStyle, PresentationNode, PresentationPaging,
-    PresentationProfile, PresentationQrErrorCorrection, PresentationQrPurpose, PresentationQrSize,
-    PresentationRow, PresentationTextStyle, PresentationTokens, PresentationTone, QrPlacement,
-    SealedSecret, StandardShortcut, SurfaceId, SurfaceLayout, SurfaceSpec, ToastSpec,
-    UserPresenceBinding, WindowClass, event_from_json,
+    Event, EventJsonError, ExportFileSpec, FilePickFailure, FilePickOutcome, FilePickPurpose,
+    InputMode, InputValue, InteractionId, InvocationOutcome, MAX_EVENT_INPUT_VALUE_BYTES,
+    MAX_EVENT_JSON_BYTES, MAX_EVENT_JSON_NESTING_DEPTH, MAX_FILE_PICK_BYTES, MotionPreference,
+    NavigationItem, NavigationSpec, NotificationSpec, NotificationUrgency, Orientation,
+    OverlayKind, OverlaySpec, PaneLayout, PresentationAxis, PresentationColors,
+    PresentationIdError, PresentationImageShape, PresentationInputKind, PresentationListStyle,
+    PresentationNode, PresentationPaging, PresentationProfile, PresentationQrErrorCorrection,
+    PresentationQrPurpose, PresentationQrSize, PresentationRow, PresentationTextStyle,
+    PresentationTokens, PresentationTone, QrPlacement, SealedSecret, StandardShortcut, SurfaceId,
+    SurfaceLayout, SurfaceSpec, ToastSpec, UserPresenceBinding, WindowClass, event_from_json,
 };
 
 pub mod recovery;

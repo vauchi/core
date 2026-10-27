@@ -178,6 +178,14 @@ impl AppEngine {
 
     /// Reduce one raw shell event into the next ordered command batch.
     pub fn dispatch(&mut self, event: Event) -> Result<Vec<Command>, AppPresentationError> {
+        let Some(event) = self.correlate_file_event(event) else {
+            return Ok(self.drain_pending_commands());
+        };
+        let commands = self.dispatch_event(event)?;
+        Ok(self.correlate_file_commands(commands))
+    }
+
+    fn dispatch_event(&mut self, event: Event) -> Result<Vec<Command>, AppPresentationError> {
         if let Event::ApplicationMenuAvailabilityChanged { available } = event {
             return self.set_application_menu_available(available);
         }

@@ -172,6 +172,10 @@ mod tests {
         );
         let fixture_json: serde_json::Value = serde_json::from_str(fixture).unwrap();
         assert_eq!(
+            fixture_json["file_picker_contract"]["commands"][0]["PickFile"]["request_id"],
+            "opaque-file-1"
+        );
+        assert_eq!(
             fixture_json["effect_commands"][0]["PostNotification"]["notification"]["notification_id"],
             "opaque-notification-17"
         );

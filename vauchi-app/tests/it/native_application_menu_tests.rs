@@ -8,6 +8,7 @@ use vauchi_app::ui::{AppEngine, AppScreen, RenderContext};
 use vauchi_core::api::Vauchi;
 use vauchi_core::{Command, Event};
 
+mod file_picker_lifetime;
 mod safety;
 
 const VCARD: &[u8] = b"BEGIN:VCARD\r\nVERSION:3.0\r\nUID:menu-bob\r\nFN:Bob\r\nEND:VCARD\r\n";
@@ -223,7 +224,7 @@ fn file_read_failure_clears_the_pending_import() {
             _ => None,
         })
         .collect();
-    assert_eq!(messages, vec!["Read failed"]);
+    assert_eq!(messages, vec!["Could not read file"]);
     engine
         .dispatch(Event::FilePickedFromUser {
             bytes: VCARD.to_vec(),

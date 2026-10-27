@@ -14,4 +14,8 @@ fn uniffi_returns_the_core_owned_fixture_bytes() {
         fixture["effect_commands"][0]["PostNotification"]["notification"]["notification_id"],
         "opaque-notification-17"
     );
+    assert_eq!(
+        fixture["file_picker_contract"]["commands"][0]["PickFile"]["request_id"],
+        "opaque-file-1"
+    );
 }

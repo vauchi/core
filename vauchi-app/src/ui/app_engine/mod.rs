@@ -41,6 +41,7 @@ mod help_catalog;
 // `pub(crate)` DirectTransportEngine::outgoing_card seam — crate-internal.
 #[cfg(test)]
 mod factory_filter_tests;
+mod file_picker;
 mod intercept;
 mod intercept_annotations;
 mod link_exchange;
@@ -303,6 +304,8 @@ pub struct AppEngine {
     surface_revision: u64,
     native_menu_available: bool,
     pending_contact_import: bool,
+    correlated_file_picker: bool,
+    pending_file_pick: Option<file_picker::PendingFilePick>,
     /// A window has rendered Core's presentation and not been backgrounded
     /// since. Until then this is a background run (Android's WorkManager
     /// starts the engine cold), which wakes at the drawn background gap
@@ -614,6 +617,8 @@ impl AppEngine {
             surface_revision: 1,
             native_menu_available: false,
             pending_contact_import: false,
+            correlated_file_picker: false,
+            pending_file_pick: None,
             in_foreground: false,
             background_budget: None,
             contextual_actions: HashMap::new(),
@@ -628,7 +633,8 @@ impl AppEngine {
     /// pick up brightness, idle-timer, and (Phase 2c) orientation-lock
     /// commands that core has emitted in response to screen transitions.
     pub fn drain_pending_commands(&mut self) -> Vec<vauchi_core::Command> {
-        self.pending_commands.drain(..).collect()
+        let commands = self.pending_commands.drain(..).collect();
+        self.correlate_file_commands(commands)
     }
 
     /// New themes took effect: the next batch asks the shell, once, to

@@ -1,5 +1,20 @@
 {
   "schema_version": 1,
+  "file_picker_contract": {
+    "commands": [
+      {"PickFile": {"request_id": "opaque-file-1", "title": "Prepared picker title", "accepted_mime_types": ["application/octet-stream"], "accepted_extensions": ["data"], "max_bytes": 3}},
+      {"CancelFilePick": {"request_id": "opaque-file-1"}}
+    ],
+    "events": [
+      {"FilePickerCapabilitiesChanged": {"correlated_results": true}},
+      {"FilePickCompleted": {"request_id": "opaque-file-1", "outcome": {"selected": {"bytes": [0, 128, 255], "filename": "chosen.data"}}}},
+      {"FilePickCompleted": {"request_id": "opaque-file-1", "outcome": "cancelled"}},
+      {"FilePickCompleted": {"request_id": "opaque-file-1", "outcome": {"failed": {"code": "read_failed"}}}},
+      {"FilePickCompleted": {"request_id": "opaque-file-1", "outcome": {"failed": {"code": "too_large"}}}},
+      {"FilePickCompleted": {"request_id": "opaque-file-1", "outcome": {"failed": {"code": "invalid_request"}}}},
+      {"FilePickCompleted": {"request_id": "opaque-file-1", "outcome": {"failed": {"code": "unsupported_file"}}}}
+    ]
+  },
   "effect_commands": [
     {
       "PostNotification": {

@@ -3,6 +3,34 @@
 
 use super::*;
 
+// @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
+#[test]
+fn file_read_failure_uses_downloaded_copy_without_native_error_text() {
+    vauchi_app::i18n::load_locale_from_bytes(
+        "qjb",
+        br#"{
+        "platform.error_could_not_read_file":"Downloaded read failure"
+    }"#,
+    )
+    .unwrap();
+    let mut engine = engine();
+    engine.set_render_context(RenderContext {
+        locale: Some("qjb".into()),
+        ..Default::default()
+    });
+    let shown = menu(&availability(&mut engine, true));
+    engine.dispatch(activation(&shown)).unwrap();
+    let commands = engine
+        .dispatch(Event::HardwareError {
+            transport: "file_picker".into(),
+            error: "Native error exposing /home/person/private-file".into(),
+        })
+        .unwrap();
+    let json = serde_json::to_string(&commands).unwrap();
+    assert!(json.contains("Downloaded read failure"));
+    assert!(!json.contains("Native error"));
+}
+
 fn input_with_value(value: &Value, expected: &str) -> Option<Value> {
     match value {
         Value::Object(fields) => {

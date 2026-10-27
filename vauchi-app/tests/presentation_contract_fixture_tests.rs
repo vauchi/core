@@ -28,6 +28,7 @@ fn shared_fixture_preserves_notification_identity() {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct PresentationContractFixture {
     schema_version: u32,
+    file_picker_contract: serde_json::Value,
     effect_commands: Vec<Command>,
     initial_commands: Vec<Command>,
     steps: Vec<PresentationContractStep>,
@@ -129,6 +130,11 @@ fn current_fixture() -> PresentationContractFixture {
 
     PresentationContractFixture {
         schema_version: 1,
+        file_picker_contract: serde_json::from_str::<serde_json::Value>(
+            vauchi_app::ui::presentation_contract_fixture_json(),
+        )
+        .unwrap()["file_picker_contract"]
+            .clone(),
         effect_commands: vec![Command::PostNotification {
             notification: vauchi_core::NotificationSpec {
                 notification_id: Some("opaque-notification-17".into()),

@@ -359,3 +359,96 @@ fn a_peerless_ble_discovery_offers_nothing_found_via_poll_notifications() {
         "the stall failure must not replace the nothing-found offer"
     );
 }
+
+/// A Magic screen on a fake clock, with a handshake session held.
+#[cfg(feature = "testing")]
+fn magic_with_a_session() -> (Arc<FakeClock>, AppEngine) {
+    let fake = Arc::new(FakeClock::new(
+        SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
+    ));
+    let clock: Arc<dyn Clock> = fake.clone();
+    let mut vauchi = Vauchi::in_memory_with_clock(clock).expect("in-memory Vauchi");
+    vauchi.create_identity("Alice").expect("identity");
+    let mut engine = AppEngine::new(vauchi);
+    let _ = engine.navigate_to(AppScreen::Exchange);
+    let _ =
+        engine.select_exchange_mode_for_testing(vauchi_core::exchange::mode::ExchangeMode::Magic);
+    engine.start_ble_handshake_on_discovery(&[7u8; 32]);
+    assert!(
+        engine.ble_handshake_session_active(),
+        "discovery builds a session"
+    );
+    (fake, engine)
+}
+
+/// The same, with the chrome past discovery (a peer was found and dialled),
+/// so the 60 s stall deadline is the one that fires.
+#[cfg(feature = "testing")]
+fn magic_past_discovery() -> (Arc<FakeClock>, AppEngine) {
+    let (fake, mut engine) = magic_with_a_session();
+    let _ = engine.handle_hardware_event(Event::BleDeviceDiscovered {
+        id: "peer-1".into(),
+        rssi: -45,
+        adv_data: vec![0xFF; 33],
+    });
+    assert_eq!(engine.current_screen().screen_id, "exchange_ble_exchanging");
+    (fake, engine)
+}
+
+// The chrome's terminal screens must not leave the handshake machine
+// holding the link behind them (vauchi/private#843; the Quint model
+// `ble_exchange_machine.qnt` names the three invariants).
+// @scenario: contact_exchange :: BLE exchange rejects expired payload
+#[cfg(feature = "testing")]
+#[test]
+fn a_stall_failure_cancels_the_handshake_session() {
+    let (fake, mut engine) = magic_past_discovery();
+    fake.advance(Duration::from_secs(61));
+    let _ = engine.poll_notifications();
+    assert_eq!(engine.current_screen().screen_id, "exchange_failed");
+    assert!(
+        !engine.ble_handshake_session_active(),
+        "a failed screen must not keep a live machine behind it"
+    );
+}
+
+#[cfg(feature = "testing")]
+#[test]
+fn a_nothing_found_screen_cancels_the_handshake_session() {
+    let (fake, mut engine) = magic_with_a_session();
+    fake.advance(Duration::from_secs(20));
+    let _ = engine.poll_notifications();
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "exchange_ble_nothing_found"
+    );
+    assert!(
+        !engine.ble_handshake_session_active(),
+        "a nothing-found screen must not keep a machine behind it"
+    );
+}
+
+#[cfg(feature = "testing")]
+#[test]
+fn a_retry_on_the_failed_screen_starts_from_no_session() {
+    let (fake, mut engine) = magic_past_discovery();
+    fake.advance(Duration::from_secs(61));
+    let _ = engine.poll_notifications();
+    assert_eq!(engine.current_screen().screen_id, "exchange_failed");
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "retry".into(),
+    });
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "exchange_ble_discovering"
+    );
+    assert!(
+        !engine.ble_handshake_session_active(),
+        "retry must release the finished session so the next discovery can build one"
+    );
+    engine.start_ble_handshake_on_discovery(&[9u8; 32]);
+    assert!(
+        engine.ble_handshake_session_active(),
+        "the retried discovery builds a session"
+    );
+}

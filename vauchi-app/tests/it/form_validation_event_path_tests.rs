@@ -6,106 +6,10 @@
 //! error through the generic command/event protocol the shells use, not
 //! only through the legacy `handle_action` path.
 
+use crate::event_path_support::{action, activate, first_input, row, validation_errors};
 use vauchi_app::ui::{AppEngine, AppScreen};
 use vauchi_core::api::Vauchi;
-use vauchi_core::{ActionSpec, BindingId, Command, Event, InputValue, PresentationNode, SurfaceId};
-
-fn nodes_of(nodes: &[PresentationNode], out: &mut Vec<PresentationNode>) {
-    for node in nodes {
-        out.push(node.clone());
-        if let PresentationNode::Group { children, .. } = node {
-            nodes_of(children, out);
-        }
-    }
-}
-
-fn surfaces(commands: &[Command]) -> Vec<(SurfaceId, Vec<PresentationNode>)> {
-    commands
-        .iter()
-        .filter_map(|command| match command {
-            Command::ReplaceSurface { surface } => {
-                let mut all = Vec::new();
-                nodes_of(&surface.nodes, &mut all);
-                Some((surface.surface_id.clone(), all))
-            }
-            _ => None,
-        })
-        .collect()
-}
-
-fn action(commands: &[Command], label: &str) -> Option<(SurfaceId, ActionSpec)> {
-    commands.iter().rev().find_map(|command| match command {
-        Command::SetContextBar {
-            surface_id, bar, ..
-        } => [&bar.primary, &bar.secondary, &bar.navigation, &bar.back]
-            .into_iter()
-            .flatten()
-            .find(|a| a.label == label)
-            .map(|a| (surface_id.clone(), a.clone())),
-        Command::PresentOverlay {
-            surface_id,
-            overlay,
-            ..
-        } => overlay
-            .items
-            .iter()
-            .find(|a| a.label == label)
-            .map(|a| (surface_id.clone(), a.clone())),
-        _ => None,
-    })
-}
-
-fn activate(engine: &mut AppEngine, surface_id: SurfaceId, action: &ActionSpec) -> Vec<Command> {
-    engine
-        .dispatch(Event::ActionActivated {
-            surface_id,
-            interaction_id: action.interaction_id.clone(),
-        })
-        .expect("activation")
-}
-
-fn row(commands: &[Command], title: &str) -> (SurfaceId, ActionSpec) {
-    surfaces(commands)
-        .into_iter()
-        .find_map(|(surface_id, nodes)| {
-            nodes.iter().find_map(|node| match node {
-                PresentationNode::List { rows, .. } => rows
-                    .iter()
-                    .find(|r| r.title == title)
-                    .and_then(|r| r.activation.clone())
-                    .map(|a| (surface_id.clone(), a)),
-                _ => None,
-            })
-        })
-        .unwrap_or_else(|| panic!("no row {title}: {commands:#?}"))
-}
-
-fn first_input(commands: &[Command]) -> (SurfaceId, BindingId) {
-    surfaces(commands)
-        .into_iter()
-        .find_map(|(surface_id, nodes)| {
-            nodes.iter().find_map(|node| match node {
-                PresentationNode::Input { binding_id, .. } => {
-                    Some((surface_id.clone(), binding_id.clone()))
-                }
-                _ => None,
-            })
-        })
-        .unwrap_or_else(|| panic!("no input: {commands:#?}"))
-}
-
-fn validation_errors(commands: &[Command]) -> Vec<String> {
-    surfaces(commands)
-        .into_iter()
-        .flat_map(|(_, nodes)| nodes)
-        .filter_map(|node| match node {
-            PresentationNode::Input {
-                validation_error, ..
-            } => validation_error,
-            _ => None,
-        })
-        .collect()
-}
+use vauchi_core::{BindingId, Command, Event, InputValue, SurfaceId};
 
 struct SavedForm {
     engine: AppEngine,

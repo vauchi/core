@@ -7,6 +7,7 @@
 mod bluez;
 mod delivery;
 mod discovery;
+mod host;
 mod ports;
 mod worker;
 
@@ -14,4 +15,5 @@ mod worker;
 pub use bluez::BlueZDiscovery;
 pub use delivery::EventSender;
 pub use discovery::BleScanner;
+pub use host::{UnsupportedDiscovery, host_discovery};
 pub use ports::{Discovery, ExecutorError, HardwareFailure};

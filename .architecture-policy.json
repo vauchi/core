@@ -104,6 +104,7 @@
     "vauchi-hardware/worker": 2,
     "vauchi-hardware/bluez": 2,
     "vauchi-hardware/discovery": 3,
+    "vauchi-hardware/host": 3,
     "vauchi-hardware/lib": 4,
     "vauchi-platform/cached_content": 0,
     "vauchi-platform/content": 0,

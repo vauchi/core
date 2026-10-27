@@ -380,9 +380,9 @@ fn field_not_saved(world: &mut VauchiWorld) {
 
 // ── Social network fields (offline-cache scenario) ─────────────
 // Note: "the social network config has been loaded" is intentionally NOT bound here.
-// Core doesn't validate social usernames yet (social field `validate()` always passes),
-// so the `Validate social network username format` outline would produce false-pass
-// failures for its "fail" rows. Those scenarios stay skipped until core validation lands.
+// The `Validate social network username format` outline expects per-network copy
+// ("Invalid Twitter username format") where the forms show "Invalid format", so
+// binding it would fail its "fail" rows on wording, not on the rule (private#631).
 
 #[given("I have previously loaded the social network config")]
 fn previously_loaded_social_config(_world: &mut VauchiWorld) {}

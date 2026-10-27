@@ -66,6 +66,7 @@ fn setup_vauchi_with_data() -> Vauchi {
 
 /// Full backup via Vauchi API: export → import on fresh instance → verify all data.
 // @scenario: backup_format_versioning :: Full backup round-trip via API
+// @scenario: contact_import :: Export and import contact backup
 #[test]
 fn full_backup_api_roundtrip() {
     let v = setup_vauchi_with_data();

@@ -124,6 +124,38 @@ fn test_list_contacts_includes_cek_contacts() {
 
 // === CEK-Protected Display Name ===
 
+fn files_bytes(dir: &std::path::Path) -> Vec<u8> {
+    std::fs::read_dir(dir)
+        .unwrap()
+        .flat_map(|entry| std::fs::read(entry.unwrap().path()).unwrap_or_default())
+        .collect()
+}
+
+// @scenario: privacy_compliance :: Contact display name is protected by crypto-shredding
+#[test]
+fn a_shredded_contacts_name_can_no_longer_be_read_and_never_sat_on_disk() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(&dir.path().join("bob.db"), SymmetricKey::generate()).unwrap();
+    let alice = make_contact_with_cek("Alice Smith");
+    storage.contacts().save_contact(&alice).unwrap();
+
+    storage.contacts().delete_contact_cek(alice.id()).unwrap();
+
+    let loaded = storage.contacts().load_contact(alice.id());
+    assert!(
+        !matches!(loaded, Ok(Some(_))),
+        "the card is unreadable once its key is gone"
+    );
+    let on_disk = files_bytes(dir.path());
+    assert!(!on_disk.is_empty());
+    assert!(
+        !on_disk
+            .windows(b"Alice Smith".len())
+            .any(|w| w == b"Alice Smith"),
+        "no plaintext name in the database files"
+    );
+}
+
 // === Card Encrypted With CEK (not storage key) ===
 
 // @internal

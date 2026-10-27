@@ -3,11 +3,15 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(target_os = "linux")]
+mod bluez;
 mod delivery;
 mod discovery;
 mod ports;
 mod worker;
 
+#[cfg(target_os = "linux")]
+pub use bluez::BlueZDiscovery;
 pub use delivery::EventSender;
 pub use discovery::BleScanner;
 pub use ports::{Discovery, ExecutorError, HardwareFailure};

@@ -49,7 +49,7 @@ fn activation(menu: &Value) -> Event {
     .unwrap()
 }
 
-// @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
+// @scenario: generic_presentation_protocol.feature :: Core chooses a capability-compatible presentation
 #[test]
 fn menus_are_opt_in_and_can_be_removed() {
     let mut engine = engine();
@@ -64,7 +64,7 @@ fn menus_are_opt_in_and_can_be_removed() {
     assert_eq!(menu(&availability(&mut engine, false))["menus"], json!([]));
 }
 
-// @scenario: core_file_picker :: import_contacts action emits FilePickFromUser
+// @scenario: generic_presentation_protocol.feature :: User interaction returns as an opaque event
 #[test]
 fn menu_copy_comes_from_runtime_content_and_activation_is_opaque() {
     vauchi_app::i18n::load_locale_from_bytes(
@@ -112,7 +112,7 @@ fn menu_copy_comes_from_runtime_content_and_activation_is_opaque() {
     assert_eq!(menu(&commands)["menus"][0]["items"][0]["enabled"], false);
 }
 
-// @scenario: core_file_picker :: FilePickedFromUser on Contacts imports vCard
+// @scenario: contact_import.feature :: Import contacts from a vCard file
 #[test]
 fn global_import_keeps_the_originating_screen_and_prepares_results() {
     let mut engine = engine();
@@ -144,7 +144,7 @@ fn global_import_keeps_the_originating_screen_and_prepares_results() {
     assert_eq!(menu(&commands)["menus"][0]["items"][0]["enabled"], true);
 }
 
-// @scenario: core_file_picker :: cancellation produces no result
+// @scenario: generic_presentation_protocol.feature :: User interaction returns as an opaque event
 #[test]
 fn cancelling_clears_the_global_import_request() {
     let mut engine = engine();
@@ -203,7 +203,7 @@ fn stale_menu_actions_cannot_start_an_import() {
     assert_eq!(engine.vauchi().list_contacts().unwrap().len(), 1);
 }
 
-// @scenario: core_file_picker :: cancellation produces no result
+// @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
 #[test]
 fn file_read_failure_clears_the_pending_import() {
     let mut engine = engine();

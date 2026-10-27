@@ -67,7 +67,7 @@ fn messages(commands: &[Command]) -> Vec<(&str, &str)> {
         .collect()
 }
 
-// @scenario: core_file_picker :: FilePickedFromUser on Contacts imports vCard
+// @scenario: contact_import.feature :: Import contacts from a vCard file
 #[test]
 fn successful_import_sends_localized_counts_without_shell_formatting() {
     let mut engine = engine("qia", "");
@@ -76,7 +76,7 @@ fn successful_import_sends_localized_counts_without_shell_formatting() {
     assert_eq!(engine.vauchi().list_contacts().unwrap().len(), 2);
 }
 
-// @scenario: core_file_picker :: garbage bytes import zero contacts cleanly
+// @scenario: contact_import.feature :: Import contacts from a vCard file
 #[test]
 fn empty_import_sends_localized_zero_count() {
     let mut engine = engine("qib", "");
@@ -85,7 +85,7 @@ fn empty_import_sends_localized_zero_count() {
     assert_eq!(engine.vauchi().list_contacts().unwrap().len(), 0);
 }
 
-// @scenario: core_file_picker :: skipped duplicates surface in toast
+// @scenario: contact_import.feature :: Re-import same vCard file does not create duplicates
 #[test]
 fn partial_import_preserves_localized_duplicate_warning_in_alert() {
     let mut engine = engine("qic", BOB);
@@ -100,7 +100,7 @@ fn partial_import_preserves_localized_duplicate_warning_in_alert() {
     assert_eq!(engine.vauchi().list_contacts().unwrap().len(), 2);
 }
 
-// @scenario: core_file_picker :: imported contacts persisted in storage
+// @scenario: contact_import.feature :: Import contacts from a vCard file
 #[test]
 fn import_batch_refreshes_the_visible_contact_rows() {
     let mut engine = engine("qid", "");
@@ -122,7 +122,7 @@ fn import_batch_refreshes_the_visible_contact_rows() {
     assert_eq!(names, vec!["Bob", "Carol"]);
 }
 
-// @scenario: core_file_picker :: FilePickedFromUser on Contacts imports vCard
+// @scenario: contact_import.feature :: Import contacts from a vCard file
 #[test]
 fn import_uses_updated_content_without_recreating_the_engine() {
     let mut engine = engine("qie", "");

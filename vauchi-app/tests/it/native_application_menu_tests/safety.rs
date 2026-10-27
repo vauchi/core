@@ -20,7 +20,7 @@ fn input_with_value(value: &Value, expected: &str) -> Option<Value> {
     }
 }
 
-// @scenario: core_file_picker :: FilePickedFromUser on Contacts imports vCard
+// @scenario: contact_import.feature :: Import contacts from a vCard file
 #[test]
 fn native_import_preserves_an_unsaved_editor() {
     let mut engine = engine();
@@ -109,7 +109,7 @@ fn contacts_does_not_import_without_an_outstanding_request() {
     assert_eq!(engine.vauchi().list_contacts().unwrap().len(), 0);
 }
 
-// @scenario: core_file_picker :: import_contacts action emits FilePickFromUser
+// @scenario: generic_presentation_protocol.feature :: User interaction returns as an opaque event
 #[test]
 fn native_import_dismisses_an_open_overlay_before_showing_the_picker() {
     let mut engine = engine();

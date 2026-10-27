@@ -18,6 +18,16 @@ impl Vauchi {
         });
     }
 
+    /// Journals the current state of every group a deleted contact was in,
+    /// so linked devices converge on the membership-free state (private#854).
+    pub(crate) fn record_groups_left(&self, groups: &[crate::contact::Group]) -> VauchiResult<()> {
+        for group in groups {
+            let updated = self.labels_slot().load_group(group.id())?;
+            self.record_group_change(&updated);
+        }
+        Ok(())
+    }
+
     pub(crate) fn record_group_deletion(&self, group_id: &str) {
         if self.in_duress_mode() {
             return;

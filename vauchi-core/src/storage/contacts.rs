@@ -16,7 +16,10 @@ impl Storage {
         // Without this these rows orphan; a stale contact_sync_timestamps row
         // in particular wrongly gates sync on contact_id reuse (read with
         // `.unwrap_or(0)` in sync/state.rs). See problem
-        // 2026-06-01-contact-delete-orphans.
+        // 2026-06-01-contact-delete-orphans. Group membership is the same
+        // shape: an exchanged contact's id recurs on re-exchange, and a
+        // surviving membership re-grants every field the group shows
+        // (private#854).
         self.conn.execute(
             "DELETE FROM contact_ratchets WHERE contact_id = ?1",
             params![id],
@@ -27,7 +30,7 @@ impl Storage {
         )?;
         self.sync().forget_contact(id)?;
         self.pending().delete_pending_updates_for_contact(id)?;
-        self.labels().delete_all_contact_overrides(id)?;
+        self.labels().remove_contact_from_all_groups(id)?;
         self.conn.execute(
             "DELETE FROM dismissed_duplicates WHERE id1 = ?1 OR id2 = ?1",
             params![id],

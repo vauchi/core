@@ -273,6 +273,7 @@ impl Vauchi {
 
     /// Removes a contact by ID.
     pub fn remove_contact(&self, id: &str) -> VauchiResult<bool> {
+        let groups_left = self.get_groups_for_contact(id)?;
         let manager = ContactManager::new(&self.storage, self.events.clone());
         let removed = manager.remove_contact(id)?;
         if removed {
@@ -280,6 +281,7 @@ impl Vauchi {
                 contact_id: id.to_string(),
                 timestamp: self.now_timestamp(),
             });
+            self.record_groups_left(&groups_left)?;
         }
         Ok(removed)
     }
@@ -402,12 +404,14 @@ impl Vauchi {
 
     /// Permanently deletes an imported contact from storage.
     pub fn hard_delete_imported_contact(&self, id: &str) -> VauchiResult<()> {
+        let groups_left = self.get_groups_for_contact(id)?;
         let manager = ContactManager::new(&self.storage, self.events.clone());
         manager.hard_delete_imported_contact(id)?;
         self.record_sync_item(crate::sync::SyncItem::ContactRemoved {
             contact_id: id.to_string(),
             timestamp: self.now_timestamp(),
         });
+        self.record_groups_left(&groups_left)?;
         Ok(())
     }
 

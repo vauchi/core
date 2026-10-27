@@ -379,10 +379,9 @@ fn field_not_saved(world: &mut VauchiWorld) {
 }
 
 // ── Social network fields (offline-cache scenario) ─────────────
-// Note: "the social network config has been loaded" is intentionally NOT bound here.
-// The `Validate social network username format` outline expects per-network copy
-// ("Invalid Twitter username format") where the forms show "Invalid format", so
-// binding it would fail its "fail" rows on wording, not on the rule (private#631).
+// Note: the `Validate social network username format` outline is NOT bound here:
+// its rule comes from the loaded networks list through the add-entry form, which
+// vauchi-app's social_rule_from_network_list_tests drive (private#631).
 
 #[given("I have previously loaded the social network config")]
 fn previously_loaded_social_config(_world: &mut VauchiWorld) {}

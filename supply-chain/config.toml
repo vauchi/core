@@ -62,8 +62,16 @@ criteria = "safe-to-deploy"
 version = "0.2.5"
 criteria = "safe-to-deploy"
 
+[[exemptions.async-trait]]
+version = "0.1.92"
+criteria = "safe-to-deploy"
+
 [[exemptions.autocfg]]
 version = "1.5.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.bitflags]]
+version = "2.13.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.blake2]]
@@ -234,6 +242,10 @@ criteria = "safe-to-run"
 version = "1.0.0"
 criteria = "safe-to-run"
 
+[[exemptions.endi]]
+version = "1.1.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.fancy-regex]]
 version = "0.17.0"
 criteria = "safe-to-deploy"
@@ -266,12 +278,16 @@ criteria = "safe-to-run"
 version = "0.3.32"
 criteria = "safe-to-deploy"
 
+[[exemptions.futures-core]]
+version = "0.3.34"
+criteria = "safe-to-deploy"
+
 [[exemptions.futures-executor]]
 version = "0.3.32"
 criteria = "safe-to-run"
 
 [[exemptions.futures-io]]
-version = "0.3.32"
+version = "0.3.34"
 criteria = "safe-to-deploy"
 
 [[exemptions.futures-task]]
@@ -434,8 +450,16 @@ criteria = "safe-to-deploy"
 version = "0.3.11"
 criteria = "safe-to-deploy"
 
+[[exemptions.memoffset]]
+version = "0.9.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.minimal-lexical]]
 version = "0.2.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.mio]]
+version = "1.2.4"
 criteria = "safe-to-deploy"
 
 [[exemptions.moxcms]]
@@ -504,6 +528,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.openssl-sys]]
 version = "0.9.117"
+criteria = "safe-to-deploy"
+
+[[exemptions.ordered-stream]]
+version = "0.2.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.ort]]
@@ -706,12 +734,20 @@ criteria = "safe-to-deploy"
 version = "2.17.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.serde_repr]]
+version = "0.1.21"
+criteria = "safe-to-deploy"
+
 [[exemptions.serde_with]]
 version = "3.21.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.serde_with_macros]]
 version = "3.21.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.signal-hook-registry]]
+version = "1.4.8"
 criteria = "safe-to-deploy"
 
 [[exemptions.simba]]
@@ -828,6 +864,10 @@ criteria = "safe-to-run"
 version = "1.20.1"
 criteria = "safe-to-deploy"
 
+[[exemptions.uds_windows]]
+version = "1.2.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.untrusted]]
 version = "0.9.0"
 criteria = "safe-to-deploy"
@@ -900,6 +940,22 @@ criteria = "safe-to-deploy"
 version = "0.4.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.zbus]]
+version = "6.0.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.zbus_macros]]
+version = "6.1.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.zbus_utils]]
+version = "6.0.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.zcheapstr]]
+version = "1.1.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.zerocopy]]
 version = "0.8.54"
 criteria = "safe-to-deploy"
@@ -918,6 +974,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.zeroize_derive]]
 version = "1.5.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.zruntime]]
+version = "0.2.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.zune-core]]

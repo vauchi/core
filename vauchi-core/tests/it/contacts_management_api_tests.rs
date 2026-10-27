@@ -94,3 +94,26 @@ fn a_removed_contact_is_gone() {
     assert!(vauchi.get_contact(&dave).unwrap().is_none());
     assert_eq!(contact_names(&vauchi), ["Bob"]);
 }
+
+// @scenario: privacy_compliance :: Delete specific contacts
+#[test]
+fn a_forgotten_contact_is_gone_until_a_later_exchange_brings_them_back() {
+    let vauchi = create_vauchi_with_identity("Alice");
+    let bob = Identity::create("Bob", 0);
+    let exchange_with_bob = || {
+        Contact::from_exchange(
+            *bob.signing_public_key(),
+            ContactCard::new("Bob"),
+            SymmetricKey::generate(),
+            0,
+        )
+    };
+    let bob_id = exchange_with_bob().id().to_string();
+    vauchi.add_contact(exchange_with_bob()).unwrap();
+
+    assert!(vauchi.remove_contact(&bob_id).unwrap());
+
+    assert!(vauchi.get_contact(&bob_id).unwrap().is_none());
+    vauchi.add_contact(exchange_with_bob()).unwrap();
+    assert_eq!(contact_names(&vauchi), ["Bob"]);
+}

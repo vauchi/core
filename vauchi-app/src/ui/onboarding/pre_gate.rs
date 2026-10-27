@@ -238,6 +238,7 @@ impl OnboardingEngine {
     fn trigger_backup_restore(&self) -> ActionResult {
         ActionResult::Commands {
             commands: vec![Command::FilePickFromUser {
+                max_bytes: Some(vauchi_core::MAX_FILE_PICK_BYTES as u64),
                 accepted_mime_types: backup_mime_types(),
                 accepted_extensions: FilePickPurpose::ImportBackup.accepted_extensions(),
                 purpose: FilePickPurpose::ImportBackup,

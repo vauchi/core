@@ -36,7 +36,7 @@ mod presentation;
 
 pub use event_json::{
     EventJsonError, MAX_EVENT_INPUT_VALUE_BYTES, MAX_EVENT_JSON_BYTES,
-    MAX_EVENT_JSON_NESTING_DEPTH, event_from_json,
+    MAX_EVENT_JSON_NESTING_DEPTH, MAX_FILE_PICK_BYTES, event_from_json,
 };
 pub use presentation::{
     AccessibilitySpec, ActionSpec, ActionTone, AlertSpec, ApplicationMenuRole, ApplicationMenuSpec,
@@ -299,6 +299,8 @@ pub enum Command {
         accepted_mime_types: Vec<String>,
         #[serde(default)]
         accepted_extensions: Vec<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        max_bytes: Option<u64>,
         purpose: FilePickPurpose,
     },
 
@@ -1244,16 +1246,19 @@ mod tests {
             Command::FilePickFromUser {
                 accepted_mime_types: vec!["text/vcard".into(), "text/x-vcard".into()],
                 accepted_extensions: vec![],
+                max_bytes: None,
                 purpose: FilePickPurpose::ImportContacts,
             },
             Command::FilePickFromUser {
                 accepted_mime_types: vec!["application/octet-stream".into()],
                 accepted_extensions: vec![],
+                max_bytes: None,
                 purpose: FilePickPurpose::ImportBackup,
             },
             Command::FilePickFromUser {
                 accepted_mime_types: vec![],
                 accepted_extensions: vec![],
+                max_bytes: None,
                 purpose: FilePickPurpose::Other {
                     label_key: "import.key_bundle".into(),
                 },
@@ -1508,6 +1513,7 @@ mod tests {
             Command::FilePickFromUser {
                 accepted_mime_types: vec![],
                 accepted_extensions: vec![],
+                max_bytes: None,
                 purpose: FilePickPurpose::ImportContacts,
             },
         ];
@@ -1615,14 +1621,17 @@ mod tests {
         let cmd = Command::FilePickFromUser {
             accepted_mime_types: vec!["text/vcard".into(), "text/x-vcard".into()],
             accepted_extensions: vec!["vcf".into()],
+            max_bytes: Some(MAX_FILE_PICK_BYTES as u64),
             purpose: FilePickPurpose::ImportContacts,
         };
         match cmd {
             Command::FilePickFromUser {
                 accepted_mime_types,
                 accepted_extensions,
+                max_bytes,
                 purpose,
             } => {
+                assert_eq!(max_bytes, Some(MAX_FILE_PICK_BYTES as u64));
                 assert_eq!(accepted_mime_types, vec!["text/vcard", "text/x-vcard"]);
                 assert_eq!(accepted_extensions, vec!["vcf"]);
                 assert_eq!(purpose, FilePickPurpose::ImportContacts);
@@ -1709,6 +1718,7 @@ mod tests {
         let cmd = Command::FilePickFromUser {
             accepted_mime_types: vec![],
             accepted_extensions: vec![],
+            max_bytes: None,
             purpose: FilePickPurpose::ImportBackup,
         };
         assert_eq!(cmd.variant_name(), "FilePickFromUser");
@@ -1747,6 +1757,7 @@ mod tests {
         let cmd = Command::FilePickFromUser {
             accepted_mime_types: vec!["text/vcard".into()],
             accepted_extensions: vec!["vcf".into(), "vcard".into()],
+            max_bytes: None,
             purpose: FilePickPurpose::ImportContacts,
         };
         let json = serde_json::to_string(&cmd).unwrap();
@@ -1768,6 +1779,7 @@ mod tests {
             Command::FilePickFromUser {
                 accepted_mime_types: vec!["text/vcard".into()],
                 accepted_extensions: vec![],
+                max_bytes: None,
                 purpose: FilePickPurpose::ImportContacts,
             }
         );

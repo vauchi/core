@@ -184,6 +184,7 @@ impl AppEngine {
     pub(super) fn navigate_to_internal(&mut self, screen: AppScreen) -> ScreenModel {
         if matches!(screen, AppScreen::Lock) {
             self.session_locked = true;
+            self.pending_contact_import = false;
         } else if self.session_locked {
             return self.engine.current_screen();
         }
@@ -311,6 +312,7 @@ impl AppEngine {
         }
         if matches!(screen, AppScreen::Lock) {
             self.session_locked = true;
+            self.pending_contact_import = false;
         }
         self.drop_pending_credential_change();
         let new_engine = self.engine_cache.remove(&screen).unwrap_or_else(|| {

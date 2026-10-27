@@ -8,6 +8,8 @@ use vauchi_app::ui::{AppEngine, AppScreen, RenderContext};
 use vauchi_core::api::Vauchi;
 use vauchi_core::{Command, Event};
 
+mod safety;
+
 const VCARD: &[u8] = b"BEGIN:VCARD\r\nVERSION:3.0\r\nUID:menu-bob\r\nFN:Bob\r\nEND:VCARD\r\n";
 
 fn engine() -> AppEngine {
@@ -97,6 +99,16 @@ fn menu_copy_comes_from_runtime_content_and_activation_is_opaque() {
         })
         .collect();
     assert_eq!(pickers, vec![vec!["vcf", "vcard"]]);
+    let picker = commands
+        .iter()
+        .find_map(|command| {
+            serde_json::to_value(command)
+                .unwrap()
+                .get("FilePickFromUser")
+                .cloned()
+        })
+        .unwrap();
+    assert_eq!(picker["max_bytes"], 32 * 1024 * 1024);
     assert_eq!(menu(&commands)["menus"][0]["items"][0]["enabled"], false);
 }
 

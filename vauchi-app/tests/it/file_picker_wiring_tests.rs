@@ -54,8 +54,10 @@ fn import_contacts_action_emits_file_pick_command() {
                 Command::FilePickFromUser {
                     accepted_mime_types,
                     accepted_extensions,
+                    max_bytes,
                     purpose,
                 } => {
+                    assert_eq!(*max_bytes, Some(vauchi_core::MAX_FILE_PICK_BYTES as u64));
                     assert_eq!(*purpose, FilePickPurpose::ImportContacts);
                     assert_eq!(*accepted_extensions, vec!["vcf", "vcard"]);
                     assert!(

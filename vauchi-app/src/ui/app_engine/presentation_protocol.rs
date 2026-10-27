@@ -308,9 +308,7 @@ impl AppEngine {
         self.presentation_coordinator
             .ensure_active_surface(event_surface_id)?;
         let (event_screen, screen, prepared) = self.prepared_visible_surface(event_surface_id)?;
-        if let Some(action) = self.native_menu_action(&event)? {
-            return self.reduce_user_action(action, None);
-        }
+        let native_action = self.native_menu_action(&event)?;
         let cause = match &event {
             Event::ActionActivated {
                 surface_id,
@@ -318,7 +316,8 @@ impl AppEngine {
             } => Some((surface_id.clone(), interaction_id.clone())),
             _ => None,
         };
-        if let Some(coordinator) = self.contextual_actions.get_mut(event_surface_id)
+        if native_action.is_none()
+            && let Some(coordinator) = self.contextual_actions.get_mut(event_surface_id)
             && matches!(event, Event::ActionActivated { .. })
         {
             let transition = coordinator.handle_event(event.clone())?;
@@ -330,44 +329,48 @@ impl AppEngine {
             }
         }
 
-        let route = match &event {
-            Event::ValueChanged { binding_id, .. }
-            | Event::InputSubmitted { binding_id, .. }
-            | Event::InputFocusEnded { binding_id, .. } => {
-                let binding_id = binding_id.clone();
-                match prepared.reduce(event) {
-                    Ok(action) => ContextualSurfaceRoute::UserAction(action),
-                    Err(PreparedSurfaceError::UnknownBinding)
-                        if prepared.is_stale_binding(&binding_id) =>
-                    {
-                        tracing::info!(
-                            "[Presentation] dropped a value for stale binding {} (surface at revision {})",
-                            binding_id.as_str(),
-                            self.surface_revision
-                        );
-                        return Ok(Vec::new());
+        let route = if let Some(action) = native_action {
+            ContextualSurfaceRoute::UserAction(action)
+        } else {
+            match &event {
+                Event::ValueChanged { binding_id, .. }
+                | Event::InputSubmitted { binding_id, .. }
+                | Event::InputFocusEnded { binding_id, .. } => {
+                    let binding_id = binding_id.clone();
+                    match prepared.reduce(event) {
+                        Ok(action) => ContextualSurfaceRoute::UserAction(action),
+                        Err(PreparedSurfaceError::UnknownBinding)
+                            if prepared.is_stale_binding(&binding_id) =>
+                        {
+                            tracing::info!(
+                                "[Presentation] dropped a value for stale binding {} (surface at revision {})",
+                                binding_id.as_str(),
+                                self.surface_revision
+                            );
+                            return Ok(Vec::new());
+                        }
+                        Err(PreparedSurfaceError::UnknownBinding)
+                            if prepared.is_retired_capture_binding(&binding_id) =>
+                        {
+                            tracing::info!(
+                                "[Presentation] dropped a decode for a camera no longer on screen"
+                            );
+                            return Ok(Vec::new());
+                        }
+                        Err(error) => return Err(error.into()),
                     }
-                    Err(PreparedSurfaceError::UnknownBinding)
-                        if prepared.is_retired_capture_binding(&binding_id) =>
-                    {
-                        tracing::info!(
-                            "[Presentation] dropped a decode for a camera no longer on screen"
-                        );
-                        return Ok(Vec::new());
-                    }
-                    Err(error) => return Err(error.into()),
                 }
-            }
-            Event::ActionActivated { .. } => match prepared.reduce(event.clone()) {
-                Ok(action) => ContextualSurfaceRoute::UserAction(action),
-                Err(PreparedSurfaceError::UnknownBinding) => self
+                Event::ActionActivated { .. } => match prepared.reduce(event.clone()) {
+                    Ok(action) => ContextualSurfaceRoute::UserAction(action),
+                    Err(PreparedSurfaceError::UnknownBinding) => self
+                        .contextual_surface_for_screen(event_surface_id.clone(), &screen)?
+                        .handle_event(event)?,
+                    Err(error) => return Err(error.into()),
+                },
+                _ => self
                     .contextual_surface_for_screen(event_surface_id.clone(), &screen)?
                     .handle_event(event)?,
-                Err(error) => return Err(error.into()),
-            },
-            _ => self
-                .contextual_surface_for_screen(event_surface_id.clone(), &screen)?
-                .handle_event(event)?,
+            }
         };
 
         match route {

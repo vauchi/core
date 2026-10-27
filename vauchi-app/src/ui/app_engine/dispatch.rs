@@ -365,6 +365,7 @@ impl AppEngine {
             self.pending_contact_import = true;
             return Some(ActionResult::Commands {
                 commands: vec![vauchi_core::Command::FilePickFromUser {
+                    max_bytes: Some(vauchi_core::MAX_FILE_PICK_BYTES as u64),
                     accepted_mime_types: vcf_mime_types(),
                     accepted_extensions: vauchi_core::FilePickPurpose::ImportContacts
                         .accepted_extensions(),
@@ -381,6 +382,7 @@ impl AppEngine {
         {
             return Some(ActionResult::Commands {
                 commands: vec![vauchi_core::Command::FilePickFromUser {
+                    max_bytes: Some(vauchi_core::MAX_FILE_PICK_BYTES as u64),
                     accepted_mime_types: vcf_mime_types(),
                     accepted_extensions: vauchi_core::FilePickPurpose::ImportContacts
                         .accepted_extensions(),

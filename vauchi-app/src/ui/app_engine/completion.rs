@@ -82,6 +82,10 @@ impl AppEngine {
                     #[allow(clippy::let_underscore_must_use)]
                     let _ = self.vauchi.create_group(group_name);
                 }
+                // Best-effort like the groups: a user without the tips
+                // contact loses nothing they entered (vauchi/private#762).
+                #[allow(clippy::let_underscore_must_use)]
+                let _ = self.vauchi.initialize_demo_contact();
                 // Slice 32c S2: persist onboarding fields
                 // (phone, email collected during ContactInfo).
                 // `FieldType::from_alias` resolves "phone" /

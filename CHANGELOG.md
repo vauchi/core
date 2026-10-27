@@ -8,6 +8,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Finishing onboarding starts the "Vauchi Tips" demo contact in Core, so
+  its banner shows on Contacts. The mobile shells' own start wrote a file
+  the banner never reads; `DomainCommand::InitDemoContactIfNeeded` is no
+  longer needed after onboarding (vauchi/private#762).
+
 ## [0.91.0] — 2026-10-27
 
 ### Added

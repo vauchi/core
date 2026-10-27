@@ -1098,11 +1098,15 @@ fn glance_scanning_a_peer_qr_connects_only_to_that_peer() {
         select_exchange_mode(e, "Glance");
     }
 
-    // B displays its QR; parse it to learn B's advertised identity.
+    // B displays its QR; parse it to learn what B advertises.
     let b_qr = qr_data_from_batch(&b);
-    let b_identity = *OobBootstrapQr::from_data_string(&b_qr)
-        .expect("B's QR parses")
-        .identity_key();
+    // B advertises the attempt token its QR implies, not its identity
+    // (vauchi/private#726).
+    let b_advert = vauchi_core::exchange::attempt_token_from_oob(
+        OobBootstrapQr::from_data_string(&b_qr)
+            .expect("B's QR parses")
+            .token(),
+    );
 
     // A scans B's QR (the camera Component emits TextChanged on the scan id).
     scan_qr_via_capture_binding(&a, &b_qr);
@@ -1125,7 +1129,7 @@ fn glance_scanning_a_peer_qr_connects_only_to_that_peer() {
         .dispatch_json(hardware_event_json(MobileEvent::BleDeviceDiscovered {
             id: "b-device".into(),
             rssi: -40,
-            adv_data: b_identity.to_vec(),
+            adv_data: b_advert.to_vec(),
         }))
         .expect("B discovery accepted");
     assert!(
@@ -1593,9 +1597,13 @@ fn glance_discovery_via_dispatch_json_connects_to_the_scanned_peer_like_the_type
     }
 
     let b_qr = qr_data_from_batch(&b);
-    let b_identity = *OobBootstrapQr::from_data_string(&b_qr)
-        .expect("B's QR parses")
-        .identity_key();
+    // B advertises the attempt token its QR implies, not its identity
+    // (vauchi/private#726).
+    let b_advert = vauchi_core::exchange::attempt_token_from_oob(
+        OobBootstrapQr::from_data_string(&b_qr)
+            .expect("B's QR parses")
+            .token(),
+    );
 
     scan_qr_via_capture_binding(&a, &b_qr);
 
@@ -1613,7 +1621,7 @@ fn glance_discovery_via_dispatch_json_connects_to_the_scanned_peer_like_the_type
     let discovery = a
         .dispatch_json(
             serde_json::json!({
-                "BleDeviceDiscovered": { "id": "b-device", "rssi": -40, "adv_data": b_identity.to_vec() }
+                "BleDeviceDiscovered": { "id": "b-device", "rssi": -40, "adv_data": b_advert.to_vec() }
             })
             .to_string(),
         )

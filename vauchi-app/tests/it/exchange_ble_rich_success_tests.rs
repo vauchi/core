@@ -63,6 +63,7 @@ fn screen_text(engine: &AppEngine) -> String {
 // A completed BLE exchange renders the rich shared success summary on the
 // BLE chrome — the peer's name (and their shared fields) appear.
 // @scenario: exchange :: BLE ends on the rich success summary
+// @scenario: onboarding :: Exchange success celebration
 // @internal
 #[test]
 fn ble_completion_renders_rich_success_summary() {

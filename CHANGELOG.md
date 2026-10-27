@@ -8,6 +8,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.91.0] — 2026-10-27
+
 ### Added
 
 - `Event::RefreshRequested { surface_id }`: a shell reports the platform's

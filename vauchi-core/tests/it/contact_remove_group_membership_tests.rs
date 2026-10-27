@@ -76,7 +76,7 @@ fn alice_with_dave_in_family() -> (Vauchi, String, String, String) {
     (alice, dave_id, mobile_id, family_id)
 }
 
-// @scenario: contacts_management.feature - Remove contact cleans up visibility rules
+// @scenario: contacts_management :: Remove contact cleans up visibility rules
 #[test]
 fn removed_contact_leaves_every_group_so_a_re_exchange_starts_default_closed() {
     let (alice, dave_id, mobile_id, _family_id) = alice_with_dave_in_family();
@@ -103,7 +103,7 @@ fn removed_contact_leaves_every_group_so_a_re_exchange_starts_default_closed() {
     );
 }
 
-// @scenario: contacts_management.feature - Remove contact cleans up visibility rules
+// @scenario: contacts_management :: Remove contact cleans up visibility rules
 #[test]
 fn removing_a_contact_journals_the_groups_it_left_for_linked_devices() {
     let (alice, dave_id, _mobile_id, family_id) = alice_with_dave_in_family();
@@ -130,7 +130,7 @@ fn removing_a_contact_journals_the_groups_it_left_for_linked_devices() {
     );
 }
 
-// @scenario: contacts_management.feature - Remove contact cleans up visibility rules
+// @scenario: contacts_management :: Remove contact cleans up visibility rules
 #[test]
 fn a_linked_device_applying_contact_removed_drops_the_group_membership_too() {
     let (tablet, dave_id, mobile_id, _family_id) = alice_with_dave_in_family();

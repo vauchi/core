@@ -132,6 +132,7 @@ mod contact_merge_tests;
 mod contact_name_at_rest_tests;
 mod contact_relay_metadata_tests;
 mod contact_relay_storage_tests;
+mod contact_remove_group_membership_tests;
 mod contact_statistics_tests;
 mod contact_sync_owner_flags_tests;
 mod contact_tests;

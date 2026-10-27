@@ -200,17 +200,23 @@ fn test_set_avatar_invalid_format() {
     result.expect_err("expected error for invalid image format");
 }
 
-// @scenario: contact_card_management :: Large avatar image normalized
-// @internal
+// @scenario: contact_card_management :: Oversized avatar input is normalized, not rejected
 #[test]
 fn test_set_avatar_large_image_normalized() {
     let mut card = ContactCard::new("Test");
     let img: RgbaImage = ImageBuffer::from_fn(800, 800, |x, y| {
-        Rgba([(x % 256) as u8, (y % 256) as u8, 128, 255])
+        Rgba([
+            ((x * 7 + y * 13) % 256) as u8,
+            ((x * 11 + y * 3) % 256) as u8,
+            ((x * 5 + y * 17) % 256) as u8,
+            255,
+        ])
     });
     let mut buf = Cursor::new(Vec::new());
     img.write_to(&mut buf, image::ImageFormat::Png).unwrap();
-    card.set_avatar(buf.into_inner()).unwrap();
+    let input = buf.into_inner();
+    assert!(input.len() > 32_768, "input is {} bytes", input.len());
+    card.set_avatar(input).unwrap();
     let avatar = card.avatar().expect("expected Some");
     assert!(
         avatar.len() <= 32_768,

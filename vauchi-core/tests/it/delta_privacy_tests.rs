@@ -14,6 +14,7 @@ const SECRET_NOTE: &str = "SECRET NOTE DO NOT LEAK 7f3a9b2c";
 
 /// SECURITY: Proves that `CardDelta::compute` strips private annotations
 /// from ContactField before placing them in `FieldChange::Added`.
+// @scenario: navigation :: View and edit private note on own field
 // @internal
 #[test]
 fn test_card_delta_never_contains_field_notes() {

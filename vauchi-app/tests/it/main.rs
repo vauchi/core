@@ -28,6 +28,7 @@ mod content_scheduler_tests;
 mod content_update_cycle_tests;
 mod engine_content_updates_tests;
 mod event_notifier_tests;
+mod form_validation_event_path_tests;
 mod glance_displayed_code_tests;
 mod glance_failed_screen_tests;
 mod glance_manual_code_entry_tests;

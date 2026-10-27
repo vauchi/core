@@ -412,6 +412,7 @@ fn a_stall_failure_cancels_the_handshake_session() {
     );
 }
 
+// @internal
 #[cfg(feature = "testing")]
 #[test]
 fn a_nothing_found_screen_cancels_the_handshake_session() {
@@ -428,6 +429,7 @@ fn a_nothing_found_screen_cancels_the_handshake_session() {
     );
 }
 
+// @internal
 #[cfg(feature = "testing")]
 #[test]
 fn a_retry_on_the_failed_screen_starts_from_no_session() {

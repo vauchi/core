@@ -228,3 +228,22 @@ fn onboarding_completion_with_no_fields_does_not_panic_and_creates_identity() {
         "no fields collected → own card has zero fields"
     );
 }
+
+/// Core, not the shell, starts the demo contact once onboarding creates
+/// the identity: the mobile shells' own start wrote a file the contacts
+/// banner never reads (vauchi/private#762).
+// @scenario: demo_contact :: Demo contact appears for users with no contacts
+#[test]
+fn onboarding_completion_starts_the_demo_contact() {
+    let mut engine = AppEngine::new(Vauchi::in_memory().unwrap());
+
+    drive_full_onboarding_with_phone_and_email(&mut engine, "Alice");
+
+    let vauchi = engine.vauchi();
+    assert!(vauchi.is_demo_contact_active().expect("demo state lookup"));
+    let demo = vauchi
+        .demo_contact_card()
+        .expect("demo contact lookup")
+        .expect("a demo contact after onboarding");
+    assert_eq!(demo.display_name, "Vauchi Tips");
+}

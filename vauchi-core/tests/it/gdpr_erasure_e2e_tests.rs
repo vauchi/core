@@ -320,6 +320,7 @@ impl RevocationSender for MockRevocationSender {
 }
 
 // @scenario: privacy_compliance :: Hard shred sends purge and revocations
+// @scenario: privacy_compliance :: Relay notified on identity deletion
 /// C3-1: `hard_shred` sends purge to relay and revocations for all contacts.
 ///
 /// Sets up ShredManager with mock senders, adds contacts, bypasses the grace

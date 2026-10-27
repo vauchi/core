@@ -45,7 +45,7 @@ fn engine(locale: &str, existing: &str) -> AppEngine {
 }
 
 fn pick(engine: &mut AppEngine, text: &str) -> Vec<Command> {
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "import_contacts".into(),
     });
     engine

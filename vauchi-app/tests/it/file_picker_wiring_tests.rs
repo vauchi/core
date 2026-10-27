@@ -78,7 +78,7 @@ fn import_contacts_action_emits_file_pick_command() {
 fn file_picked_on_contacts_imports_vcards() {
     let mut engine = engine_with_identity();
     let _ = engine.navigate_to(AppScreen::Contacts);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "import_contacts".into(),
     });
 
@@ -100,7 +100,7 @@ fn file_picked_on_contacts_imports_vcards() {
 fn file_picked_on_contacts_persists_contacts() {
     let mut engine = engine_with_identity();
     let _ = engine.navigate_to(AppScreen::Contacts);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "import_contacts".into(),
     });
 
@@ -123,7 +123,7 @@ fn file_picked_with_non_vcard_bytes_imports_zero_contacts() {
     // clear empty-result message instead of a stack trace.
     let mut engine = engine_with_identity();
     let _ = engine.navigate_to(AppScreen::Contacts);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "import_contacts".into(),
     });
 
@@ -150,7 +150,7 @@ fn file_picked_with_non_vcard_bytes_imports_zero_contacts() {
 fn file_pick_cancelled_returns_none() {
     let mut engine = engine_with_identity();
     let _ = engine.navigate_to(AppScreen::Contacts);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "import_contacts".into(),
     });
 
@@ -194,7 +194,7 @@ fn file_picked_with_duplicates_reports_skipped_count() {
     let _ = engine.navigate_to(AppScreen::Contacts);
 
     // Import once — both succeed.
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "import_contacts".into(),
     });
     let _ = engine.handle_hardware_event(Event::FilePickedFromUser {
@@ -203,7 +203,7 @@ fn file_picked_with_duplicates_reports_skipped_count() {
     });
 
     // Import the same vCards again — both should be skipped (UID match).
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "import_contacts".into(),
     });
     let result = engine.handle_hardware_event(Event::FilePickedFromUser {

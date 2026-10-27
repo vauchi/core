@@ -89,7 +89,7 @@ pub mod ble;
 mod ble;
 
 mod ble_advertisement;
-pub use ble_advertisement::advertised_token;
+pub use ble_advertisement::{advertised_token, attempt_token_from_oob, fresh_attempt_token};
 
 #[cfg(feature = "audio-cpal")]
 pub mod audio_cpal;

@@ -158,6 +158,7 @@ impl AppEngine {
             &self.render_context,
             &self.pending_exchange_groups,
             self.glance_display_qr.as_deref(),
+            &self.ble_attempt_token,
         );
 
         Some(ActionResult::ShowToast {
@@ -250,6 +251,7 @@ impl AppEngine {
             &self.render_context,
             &self.pending_exchange_groups,
             self.glance_display_qr.as_deref(),
+            &self.ble_attempt_token,
         );
     }
 }

@@ -53,6 +53,7 @@ impl AppEngine {
         render_context: &crate::ui::RenderContext,
         pending_groups: &[String],
         glance_qr: Option<&str>,
+        ble_attempt_token: &[u8; 32],
     ) -> Box<dyn WorkflowEngine> {
         match screen {
             AppScreen::Onboarding => Box::new(
@@ -291,6 +292,7 @@ impl AppEngine {
                 transport_readiness,
                 pending_groups,
                 glance_qr,
+                ble_attempt_token,
                 render_context.resolved_locale(),
             ),
             AppScreen::Help => Box::new(

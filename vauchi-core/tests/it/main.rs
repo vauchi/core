@@ -81,6 +81,7 @@ mod backup_boundary_tests;
 mod backup_format_versioning_tests;
 mod backup_recovery_engine_tests;
 mod backup_reminder_tests;
+mod ble_attempt_token_tests;
 mod ble_chunking_tests;
 mod ble_exchange_tests;
 mod ble_handshake_edge_tests;

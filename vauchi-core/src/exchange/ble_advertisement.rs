@@ -5,6 +5,26 @@ use super::ble::VAUCHI_BLE_SERVICE_UUID;
 use crate::platform::BleServiceUuid;
 use uuid::Uuid;
 
+/// HKDF info for the attempt token a Glance displayer advertises: derived
+/// from its QR's random token so the scanner can expect the same prefix.
+const ATTEMPT_TOKEN_INFO: &[u8] = b"vauchi-ble-attempt-token-v1";
+
+/// A fresh role-tiebreak token for one BLE exchange screen. The phones put
+/// its first bytes on the air as a service UUID; a value derived from a
+/// long-lived key would let a bystander re-recognise the device across
+/// sightings (vauchi/private#726), so it is random per attempt and never
+/// carries role or trust (2026-07-22 tiebreak design, rule 1).
+pub fn fresh_attempt_token() -> [u8; 32] {
+    crate::crypto::random_bytes()
+}
+
+/// The attempt token a Glance displayer advertises, derived from the random
+/// token in its QR: the scanner computes the same value from the QR it
+/// scanned and connects only to the advertiser whose prefix matches.
+pub fn attempt_token_from_oob(qr_token: &[u8; 32]) -> [u8; 32] {
+    *crate::crypto::kdf::HKDF::derive_key(None, qr_token, ATTEMPT_TOKEN_INFO)
+}
+
 /// Decode the two-byte carrier used by current peers and the legacy
 /// four-byte carrier. Ambiguous advertisements must not select a peer by
 /// the host API's UUID iteration order (#770).

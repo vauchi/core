@@ -202,6 +202,14 @@ impl AppEngine {
         // Swap in the new screen, get the old one back
         let old_screen = std::mem::replace(&mut self.screen, screen.clone());
 
+        // A fresh attempt token per BLE exchange screen entry: the phones put
+        // its prefix on the air, and a stable value would let a bystander
+        // re-recognise this device across sightings (vauchi/private#726).
+        // Glance replaces it below with the one its QR implies.
+        if old_screen != screen && matches!(screen, AppScreen::BleExchange { .. }) {
+            self.ble_attempt_token = vauchi_core::exchange::fresh_attempt_token();
+        }
+
         // Glance's one-sided QR must exist BEFORE `create_engine` builds the
         // engine that renders it — the post-build lifecycle sync below runs too
         // late. Generate it ONCE on entry (a stable nonce for the whole attempt;
@@ -226,6 +234,7 @@ impl AppEngine {
                 &self.render_context,
                 &self.pending_exchange_groups,
                 self.glance_display_qr.as_deref(),
+                &self.ble_attempt_token,
             )
         });
 
@@ -314,6 +323,7 @@ impl AppEngine {
                 &self.render_context,
                 &self.pending_exchange_groups,
                 self.glance_display_qr.as_deref(),
+                &self.ble_attempt_token,
             )
         });
         let old_screen = std::mem::replace(&mut self.screen, screen);
@@ -446,6 +456,7 @@ impl AppEngine {
                 &self.render_context,
                 &self.pending_exchange_groups,
                 self.glance_display_qr.as_deref(),
+                &self.ble_attempt_token,
             );
         }
     }

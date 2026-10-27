@@ -30,12 +30,7 @@ fn engine_named(name: &str, email: &str) -> AppEngine {
 }
 
 fn token_of(engine: &AppEngine) -> Vec<u8> {
-    engine
-        .vauchi()
-        .identity()
-        .expect("identity")
-        .signing_public_key()
-        .to_vec()
+    engine.ble_attempt_token().to_vec()
 }
 
 fn screen_text(engine: &AppEngine) -> String {

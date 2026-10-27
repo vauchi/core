@@ -54,14 +54,6 @@ fn displayed_code(engine: &AppEngine) -> String {
         .expect("the glance screen displays this device's code")
 }
 
-fn signing_key(engine: &AppEngine) -> [u8; 32] {
-    *engine
-        .vauchi()
-        .identity()
-        .expect("identity")
-        .signing_public_key()
-}
-
 fn enter_code(engine: &mut AppEngine, code: &str) -> ActionResult {
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: GLANCE_CODE_INPUT_ID.into(),
@@ -126,7 +118,7 @@ fn camera_less_scanner_completes_glance_by_entering_the_displayed_code() {
     };
     assert_eq!(screen.screen_id, "exchange_ble_discovering");
 
-    bob.handle_glance_discovery("alice-device", &signing_key(&alice));
+    bob.handle_glance_discovery("alice-device", &alice.ble_attempt_token());
     assert!(
         bob.ble_handshake_session_active(),
         "the typed code must pin Alice exactly as a camera scan would"
@@ -167,7 +159,7 @@ fn garbage_code_fails_to_retry_and_pins_nobody() {
         "the failed screen offers retry"
     );
 
-    bob.handle_glance_discovery("alice-device", &signing_key(&alice));
+    bob.handle_glance_discovery("alice-device", &alice.ble_attempt_token());
     assert!(
         !bob.ble_handshake_session_active(),
         "a rejected code must not pin any peer"

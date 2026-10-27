@@ -64,6 +64,7 @@ fn cable_engine_transmits_only_selected_group_fields() {
         &ctx,
         &[work_id],
         None,
+        &[0u8; 32],
     );
     let dt = engine
         .as_any()

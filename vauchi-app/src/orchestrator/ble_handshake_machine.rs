@@ -170,6 +170,11 @@ pub struct BleOobBinding {
     /// Require the peer's KeyOffer to echo this nonce; absence/mismatch
     /// aborts (displayer side).
     pub required_oob_nonce: Option<[u8; 16]>,
+    /// The attempt token the displayer advertises, derived from the scanned
+    /// QR (vauchi/private#726): the scanner connects only to an advertiser
+    /// whose prefix matches. Read by the discovery gate, never forwarded to
+    /// the session (scanner side).
+    pub expected_advert: Option<[u8; 32]>,
 }
 
 /// Forward the present [`BleOobBinding`] fields to the session before the

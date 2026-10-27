@@ -299,10 +299,16 @@ impl AppEngine {
         Some((identity_key, x3dh, ble_card))
     }
 
+    /// The role-tiebreak token this device advertises on the BLE exchange
+    /// screen (vauchi/private#726).
+    pub fn ble_attempt_token(&self) -> [u8; 32] {
+        self.ble_attempt_token
+    }
+
     /// Build the BLE handshake session when a peer is discovered. The
     /// role is decided from the symmetric tiebreak tokens — this
-    /// device's identity signing key (the same value the engine
-    /// advertises) vs the peer's advertised `peer_token` — via the
+    /// device's attempt token (the same value the engine advertises,
+    /// never the identity key) vs the peer's advertised `peer_token` — via the
     /// shared [`decide_ble_role`], so the session role always agrees
     /// with `BleExchangeFlow`'s connect decision. Idempotent:
     /// `ensure_ble_handshake_session` is a no-op once a session is held,
@@ -317,7 +323,7 @@ impl AppEngine {
             tracing::warn!("BLE: cannot start handshake — no identity / card");
             return;
         };
-        let role = decide_ble_role(&identity_key, peer_token);
+        let role = decide_ble_role(&self.ble_attempt_token, peer_token);
         tracing::info!("[Exchange] BLE peer discovered — starting handshake");
         // `None`: radio-only discovery has no OOB peer. The Glance scanner path
         // (which forces Initiator + supplies the scanned binding) lands in the

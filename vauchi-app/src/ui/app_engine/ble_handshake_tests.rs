@@ -148,18 +148,8 @@ fn two_device_ble_exchange_peer_receives_only_group_visible_fields() {
     vauchi_bob.create_identity("Bob").expect("identity");
     let mut bob = AppEngine::new(vauchi_bob);
 
-    let alice_token = alice
-        .vauchi
-        .identity()
-        .expect("alice identity")
-        .signing_public_key()
-        .to_vec();
-    let bob_token = bob
-        .vauchi
-        .identity()
-        .expect("bob identity")
-        .signing_public_key()
-        .to_vec();
+    let alice_token = alice.ble_attempt_token().to_vec();
+    let bob_token = bob.ble_attempt_token().to_vec();
 
     // Each discovers the other → builds a session with the tiebreak role.
     alice.start_ble_handshake_on_discovery(&bob_token);
@@ -220,18 +210,8 @@ fn two_device_ble_exchange_persists_contact_for_both_roles() {
     vb.create_identity("Bob").expect("bob identity");
     let mut bob = AppEngine::new(vb);
 
-    let alice_token = alice
-        .vauchi
-        .identity()
-        .expect("alice identity")
-        .signing_public_key()
-        .to_vec();
-    let bob_token = bob
-        .vauchi
-        .identity()
-        .expect("bob identity")
-        .signing_public_key()
-        .to_vec();
+    let alice_token = alice.ble_attempt_token().to_vec();
+    let bob_token = bob.ble_attempt_token().to_vec();
 
     alice.start_ble_handshake_on_discovery(&bob_token);
     bob.start_ble_handshake_on_discovery(&alice_token);
@@ -288,18 +268,8 @@ fn two_device_ble_exchange_persisted_ratchets_interoperate() {
     vb.create_identity("Bob").expect("bob identity");
     let mut bob = AppEngine::new(vb);
 
-    let alice_token = alice
-        .vauchi
-        .identity()
-        .expect("alice identity")
-        .signing_public_key()
-        .to_vec();
-    let bob_token = bob
-        .vauchi
-        .identity()
-        .expect("bob identity")
-        .signing_public_key()
-        .to_vec();
+    let alice_token = alice.ble_attempt_token().to_vec();
+    let bob_token = bob.ble_attempt_token().to_vec();
 
     alice.start_ble_handshake_on_discovery(&bob_token);
     bob.start_ble_handshake_on_discovery(&alice_token);
@@ -352,9 +322,11 @@ fn two_device_ble_exchange_persisted_ratchets_interoperate() {
         Some(vauchi_core::types::ExchangeTransport::Ble),
         "BLE persist stamps its transport"
     );
+    // The attempt token only schedules who dials (vauchi/private#726); the
+    // persisted flag follows the identities.
     assert_eq!(
         a_init,
-        alice_token < bob_token,
+        signing_key(&alice) < signing_key(&bob),
         "persisted role flag matches the canonical smaller-identity rule"
     );
 
@@ -631,7 +603,7 @@ fn a_glance_qr_opened_from_the_camera_continues_the_exchange() {
             mode: vauchi_core::exchange::mode::ExchangeMode::Glance
         }
     );
-    bob.handle_glance_discovery("alice-device", &signing_key(&alice));
+    bob.handle_glance_discovery("alice-device", &alice.ble_attempt_token());
     assert!(
         bob.ble_handshake_session_active(),
         "bob connects to the peer whose QR the camera scanned"
@@ -666,7 +638,7 @@ fn a_glance_link_opened_while_glance_is_showing_starts_the_radio_again() {
             .any(|c| matches!(c, vauchi_core::Command::BleStartScanning { .. })),
         "the link starts a BLE scan: {commands:?}"
     );
-    bob.handle_glance_discovery("alice-device", &signing_key(&alice));
+    bob.handle_glance_discovery("alice-device", &alice.ble_attempt_token());
     assert!(bob.ble_handshake_session_active());
 }
 
@@ -712,7 +684,7 @@ fn glance_orchestration_symmetric_happy_path_both_persist() {
 
     bob.apply_glance_scan(&alice_qr)
         .expect("bob scans alice's QR");
-    let alice_id = signing_key(&alice);
+    let alice_id = alice.ble_attempt_token();
     bob.handle_glance_discovery("alice-device", &alice_id);
     assert!(
         bob.ble_handshake_session_active(),
@@ -758,7 +730,7 @@ fn glance_orchestration_scanner_ignores_foreign_advertiser() {
     bob.apply_glance_scan(&alice_qr).expect("bob scans alice");
 
     let mallory = fresh_engine("Mallory");
-    let mallory_id = signing_key(&mallory);
+    let mallory_id = mallory.ble_attempt_token();
     bob.handle_glance_discovery("mallory-device", &mallory_id);
 
     assert!(
@@ -785,7 +757,7 @@ fn glance_scanner_connects_on_the_advertised_two_byte_prefix() {
     let alice_qr = alice.begin_glance_display().expect("alice QR");
     bob.apply_glance_scan(&alice_qr).expect("bob scans alice");
 
-    bob.handle_glance_discovery("alice-device", &signing_key(&alice)[..2]);
+    bob.handle_glance_discovery("alice-device", &alice.ble_attempt_token()[..2]);
 
     assert!(bob.ble_handshake_session_active());
     assert!(
@@ -812,7 +784,7 @@ fn glance_scanner_connects_to_a_peer_discovered_before_the_scan() {
     let mut alice = fresh_engine("Alice");
     let mut bob = fresh_engine("Bob");
     let alice_qr = alice.begin_glance_display().expect("alice QR");
-    bob.handle_glance_discovery("alice-device", &signing_key(&alice)[..2]);
+    bob.handle_glance_discovery("alice-device", &alice.ble_attempt_token()[..2]);
     assert!(!connects_to(&mut bob, "alice-device"), "not scanned yet");
 
     bob.apply_glance_scan(&alice_qr).expect("bob scans alice");
@@ -828,7 +800,7 @@ fn a_flood_of_pre_scan_advertisers_keeps_the_newest_peer() {
     let mut alice = fresh_engine("Alice");
     let mut bob = fresh_engine("Bob");
     let alice_qr = alice.begin_glance_display().expect("alice QR");
-    let alice_id = signing_key(&alice);
+    let alice_id = alice.ble_attempt_token();
     for i in 0..100u8 {
         bob.handle_glance_discovery(&format!("stranger-{i}"), &[alice_id[0] ^ 0xFF, i]);
     }
@@ -846,7 +818,7 @@ fn glance_scanner_ignores_a_different_two_byte_prefix() {
     let mut bob = fresh_engine("Bob");
     let alice_qr = alice.begin_glance_display().expect("alice QR");
     bob.apply_glance_scan(&alice_qr).expect("bob scans alice");
-    let alice_id = signing_key(&alice);
+    let alice_id = alice.ble_attempt_token();
 
     bob.handle_glance_discovery("other-device", &[alice_id[0] ^ 0xFF, alice_id[1]]);
 
@@ -907,7 +879,7 @@ fn glance_orchestration_identity_spoofing_advertiser_rejected_at_handshake() {
     let alice_qr = alice.begin_glance_display().expect("alice QR");
     bob.apply_glance_scan(&alice_qr).expect("bob scans alice");
 
-    let alice_id = signing_key(&alice);
+    let alice_id = alice.ble_attempt_token();
     bob.handle_glance_discovery("mallory-device", &alice_id);
     assert!(
         bob.ble_handshake_session_active(),
@@ -965,7 +937,7 @@ fn glance_scanner_dialing(alice: &mut AppEngine) -> AppEngine {
         mode: vauchi_core::exchange::mode::ExchangeMode::Glance,
     });
     bob.apply_glance_scan(&alice_qr).expect("bob scans alice");
-    bob.handle_glance_discovery("alice-device", &signing_key(alice)[..2]);
+    bob.handle_glance_discovery("alice-device", &alice.ble_attempt_token()[..2]);
     assert!(connects_to(&mut bob, "alice-device"), "first dial");
     bob
 }

@@ -47,6 +47,8 @@ impl AppEngine {
             )
         };
         self.glance_display_nonce = Some(qr.oob_nonce());
+        // The scanner expects the prefix the QR implies (vauchi/private#726).
+        self.ble_attempt_token = vauchi_core::exchange::attempt_token_from_oob(qr.token());
         Some(qr.to_qr_url())
     }
 
@@ -64,6 +66,7 @@ impl AppEngine {
             expected_exchange_key: Some(*qr.exchange_key()),
             oob_nonce_echo: Some(qr.oob_nonce()),
             required_oob_nonce: None,
+            expected_advert: Some(vauchi_core::exchange::attempt_token_from_oob(qr.token())),
         });
         // The scanned peer was most likely discovered before the scan and will
         // not be reported again; re-check what we saw through the same gate.
@@ -163,13 +166,15 @@ impl AppEngine {
             self.remember_pre_scan_discovery(device_id, adv_data);
             return; // not the scanner — this device waits to be connected to
         };
-        let Some(expected) = binding.expected_peer else {
-            tracing::info!("[Glance] discovery — scan binding has no pinned peer");
+        let Some(expected) = binding.expected_advert else {
+            tracing::info!("[Glance] discovery — scan binding has no expected advert");
             return;
         };
         // Phones advertise only a 2-byte prefix of the token (a 16-bit service
         // UUID), so match on the prefix; the handshake still pins the full
         // identity, exchange key and OOB nonce, so a prefix twin cannot finish.
+        // The token is the displayer's QR-derived attempt token, not its
+        // identity (vauchi/private#726).
         if adv_data.len() < MIN_ADVERTISED_PREFIX_BYTES || !expected.starts_with(adv_data) {
             tracing::info!(
                 "[Glance] discovery adv_len={} — not the scanned peer",

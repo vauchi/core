@@ -285,6 +285,11 @@ pub struct AppEngine {
     /// screen entry (never per-render — regenerating rotates the nonce and
     /// breaks the pin) and injected into the `BleExchangeEngine`'s screen.
     glance_display_qr: Option<String>,
+    /// The role-tiebreak token this device advertises on the BLE exchange
+    /// screen, fresh per screen entry so a bystander cannot re-recognise it
+    /// across sightings (vauchi/private#726); Glance derives it from the
+    /// displayed QR instead. Both tiebreak sites read this one value.
+    ble_attempt_token: [u8; 32],
     /// Core-owned responsive and active-surface state for the generic
     /// presentation protocol.
     presentation_coordinator: crate::ui::PresentationCoordinator,
@@ -491,6 +496,7 @@ impl AppEngine {
         let caps = DeviceCapabilities::default();
         let mut initial_render_context = crate::ui::RenderContext::default();
         initial_render_context.apply_saved_appearance(&vauchi);
+        let ble_attempt_token = vauchi_core::exchange::fresh_attempt_token();
         let engine = Self::create_engine(
             &vauchi,
             &screen,
@@ -500,6 +506,7 @@ impl AppEngine {
             &initial_render_context,
             &[],
             None,
+            &ble_attempt_token,
         );
         let field_catalog =
             vauchi_core::contact_card::FieldTypeCatalog::new(&crate::social::active_registry());
@@ -593,6 +600,7 @@ impl AppEngine {
             glance_pre_scan_discoveries: Vec::new(),
             glance_dial: None,
             glance_display_qr: None,
+            ble_attempt_token,
             presentation_coordinator,
             retained_detail_screen: None,
             surface_revision: 1,

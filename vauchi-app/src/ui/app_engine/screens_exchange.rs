@@ -106,6 +106,7 @@ impl AppEngine {
         transport_readiness: &vauchi_core::exchange::capability::TransportReadiness,
         pending_groups: &[String],
         glance_qr: Option<&str>,
+        ble_attempt_token: &[u8; 32],
         locale: crate::i18n::Locale,
     ) -> Box<dyn WorkflowEngine> {
         match screen {
@@ -205,19 +206,16 @@ impl AppEngine {
                 Box::new(crate::ui::LinkExchangeEngine::new().with_locale(locale))
             }
             AppScreen::BleExchange { mode } => {
-                // Role-tiebreak token: this device's stable signing public
-                // key. The engine advertises it; on discovery each peer
-                // compares its own token against the other's and exactly one
-                // initiates the connection (ADR-043 — core owns the tiebreak,
-                // retiring the Android `compareTokens` frontend logic).
-                let own_token = vauchi
-                    .identity()
-                    .map(|id| id.signing_public_key().to_vec())
-                    .unwrap_or_default();
+                // Role-tiebreak token: the per-screen attempt token (never
+                // the identity key — vauchi/private#726). The engine
+                // advertises it; on discovery each peer compares its own
+                // token against the other's and exactly one initiates the
+                // connection (ADR-043 — core owns the tiebreak, retiring the
+                // Android `compareTokens` frontend logic).
                 Box::new(crate::ui::BleExchangeEngine::new(
                     *mode,
                     device_capabilities.has_camera,
-                    own_token,
+                    ble_attempt_token.to_vec(),
                     vauchi.clock().clone(),
                     glance_qr.map(str::to_string),
                     locale,
@@ -369,6 +367,7 @@ impl AppEngine {
                 &self.render_context,
                 &self.pending_exchange_groups,
                 self.glance_display_qr.as_deref(),
+                &self.ble_attempt_token,
             );
         }
     }

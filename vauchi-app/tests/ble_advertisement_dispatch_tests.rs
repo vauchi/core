@@ -92,7 +92,7 @@ fn advertised_payload(engine: &mut AppEngine, mode: ExchangeMode) -> Vec<u8> {
 // A bystander must not re-recognise a user across two BLE exchange
 // sessions: the advertised token is fresh per session and is not the
 // identity signing key, whose prefix never changes (vauchi/private#726).
-// @scenario: contact_exchange.feature :: Discover nearby Vauchi users via BLE
+// @scenario: contact_exchange :: A BLE advertisement does not identify the user across sessions
 #[test]
 fn the_advertised_token_is_fresh_per_session_and_not_the_identity_key() {
     let mut vauchi = Vauchi::in_memory().unwrap();

@@ -75,3 +75,48 @@ fn unrelated_radio_observations_do_not_start_an_exchange() {
         "exchange_ble_discovering"
     );
 }
+
+fn advertised_payload(engine: &mut AppEngine, mode: ExchangeMode) -> Vec<u8> {
+    engine.navigate_to(AppScreen::Exchange);
+    let _ = engine.select_exchange_mode_for_testing(mode);
+    engine
+        .drain_pending_commands()
+        .into_iter()
+        .find_map(|command| match command {
+            Command::BleStartAdvertising { payload, .. } => Some(payload),
+            _ => None,
+        })
+        .expect("entering a BLE mode advertises")
+}
+
+// A bystander must not re-recognise a user across two BLE exchange
+// sessions: the advertised token is fresh per session and is not the
+// identity signing key, whose prefix never changes (vauchi/private#726).
+// @scenario: contact_exchange.feature :: Discover nearby Vauchi users via BLE
+#[test]
+fn the_advertised_token_is_fresh_per_session_and_not_the_identity_key() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi
+        .set_identity(Identity::from_device_link(
+            [0; 32],
+            "Alice".into(),
+            0,
+            "test".into(),
+            1,
+        ))
+        .unwrap();
+    let signing_key = vauchi.identity().unwrap().signing_public_key().to_vec();
+    let mut engine = AppEngine::new(vauchi);
+
+    let first = advertised_payload(&mut engine, ExchangeMode::Magic);
+    let second = advertised_payload(&mut engine, ExchangeMode::Magic);
+
+    assert_eq!(first.len(), 32);
+    assert_ne!(first, second, "two sessions advertised the same token");
+    assert_ne!(first, signing_key);
+    assert_ne!(
+        &first[..2],
+        &signing_key[..2],
+        "the signing key's prefix is on the air"
+    );
+}

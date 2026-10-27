@@ -8,6 +8,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.93.0] — 2026-10-27
+
+### Added
+
+- `vauchi-hardware` discovers BLE peers on Linux through BlueZ over D-Bus,
+  one bus connection per scan with a bounded signal queue. It reports raw
+  advertisement observations; Core decodes them (vauchi/private#770).
+- `host_discovery()` returns the discovery backend for the OS a host runs
+  on: BlueZ on Linux, and `HardwareUnavailable` on systems without a
+  backend yet, so CLI, TUI and GTK need no change when the macOS or Windows
+  backend lands (ADR-075).
+
 ## [0.92.0] — 2026-10-27
 
 ### Added

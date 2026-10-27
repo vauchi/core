@@ -4,7 +4,8 @@
 
 //! Fields the person adds to their own card, through the public API.
 
-use vauchi_core::api::{Vauchi, VauchiConfig};
+use crate::common::linked_peer::{LinkedPeer, link_contacts};
+use vauchi_core::api::{Vauchi, VauchiConfig, process_single_card_update};
 use vauchi_core::contact_card::field::MAX_VALUE_LENGTH;
 use vauchi_core::contact_card::{ContactField, FieldType, validate_social_username};
 use vauchi_core::crypto::SymmetricKey;
@@ -160,4 +161,63 @@ fn a_reordered_card_keeps_its_order_when_the_app_reopens() {
         .map(|(_, label, _)| label)
         .collect();
     assert_eq!(labels, ["Twitter", "Mobile", "Email"]);
+}
+
+/// Delivers every update `sender` has queued for `recipient` and returns the
+/// labels `recipient` then holds on the sender's card.
+fn deliver_owed(sender: &Vauchi, recipient: &Vauchi, linked: &LinkedPeer) -> Vec<String> {
+    sender.run_owed_repropagation().unwrap();
+    let pending = sender
+        .storage()
+        .pending()
+        .get_pending_updates(&linked.host_contact_id)
+        .unwrap();
+    for update in pending {
+        process_single_card_update(
+            recipient.identity().unwrap(),
+            recipient.storage(),
+            &linked.peer_contact_id,
+            &update.payload,
+        )
+        .unwrap();
+        sender
+            .storage()
+            .pending()
+            .mark_update_sent(&update.id)
+            .unwrap();
+    }
+    recipient
+        .get_contact(&linked.peer_contact_id)
+        .unwrap()
+        .unwrap()
+        .card()
+        .fields()
+        .iter()
+        .map(|f| f.label().to_string())
+        .collect()
+}
+
+// @scenario: contact_card_management :: Remove field updates contacts
+#[test]
+fn a_removed_field_disappears_from_the_card_a_contact_holds() {
+    let bob = alice();
+    let alice = alice();
+    let linked = link_contacts(&bob, &alice, "Alice");
+    alice
+        .add_own_field(ContactField::new(
+            FieldType::Phone,
+            "Mobile",
+            "+41 79 123 45 67",
+            0,
+        ))
+        .unwrap();
+    let mobile = alice.own_card().unwrap().unwrap().fields()[0]
+        .id()
+        .to_string();
+    alice.set_own_field_public(&mobile).unwrap();
+    assert_eq!(deliver_owed(&alice, &bob, &linked), ["Mobile"]);
+
+    assert!(alice.remove_own_field("Mobile").unwrap());
+
+    assert_eq!(deliver_owed(&alice, &bob, &linked), Vec::<String>::new());
 }

@@ -138,6 +138,24 @@ tamarin_diff_expect() {
     }
 }
 
+# One lemma per prover run under a heap cap: ble_handshake.spthy proved
+# as a whole exhausts memory (private#842).
+tamarin_lemma_expect() {
+    l_model=$1
+    l_lemma=$2
+    l_verdict=$3
+    l_flags=$4
+    l_out=$(tamarin-prover +RTS -M8G -RTS --prove="$l_lemma" $l_flags "$l_model" 2>&1) || {
+        printf '%s\n' "$l_out"
+        exit 1
+    }
+    echo "$l_model --prove=$l_lemma $l_flags:"
+    printf '%s\n' "$l_out" | grep -E "^  $l_lemma \((exists|all)-trace" || true
+    printf '%s\n' "$l_out" | grep -qE "^  $l_lemma \((exists|all)-traces?\): $l_verdict" || {
+        echo "FAIL: Tamarin lemma $l_lemma is not $l_verdict ($l_model --prove=$l_lemma $l_flags)" >&2
+        exit 1
+    }
+}
 models=vauchi-core/verification
 tamarin_expect "$models/qr_exchange.spthy" verified "" \
     executable session_key_secrecy no_misbinding
@@ -222,6 +240,12 @@ tamarin_expect "$models/link_exchange.spthy" falsified "" \
     contact_only_after_approval
 tamarin_expect "$models/link_exchange.spthy" verified "-DPIN_CONFIRMED" \
     executable contact_only_after_approval
+tamarin_lemma_expect "$models/ble_handshake.spthy" executable verified ""
+tamarin_lemma_expect "$models/ble_handshake.spthy" session_key_secrecy verified ""
+tamarin_lemma_expect "$models/ble_handshake.spthy" scanner_binds_the_displayer verified ""
+tamarin_lemma_expect "$models/ble_handshake.spthy" scanner_binds_the_displayer falsified "-DRADIO_ONLY"
+tamarin_lemma_expect "$models/ble_handshake.spthy" displayer_binds_the_scanner falsified ""
+tamarin_lemma_expect "$models/ble_handshake.spthy" displayer_binds_the_scanner falsified "-DQR_PRIVATE"
 
 # ── Quint ─────────────────────────────────────────────────────────────
 # The device-link host and joiner machines (#757, #808). `quint verify`

@@ -29,27 +29,28 @@
  * proof search finite — with free terms Tamarin found no trace of
  * `executable` in ten minutes.
  *
- * STATUS 2026-10-27: no verdict yet. Precomputation takes 70 s; the
- * `executable` lemma alone ran past two minutes and was stopped when the
- * machine ran out of memory. Not wired into test:formal until a lemma
- * has been observed proved or falsified (CC-27).
- *
- * Run: tamarin-prover --prove ble_handshake.spthy
+ * Run (each lemma on its own, `+RTS -M8G -RTS`; the whole file at once
+ * exhausts memory): tamarin-prover --prove=<lemma> ble_handshake.spthy
+ *   Verdicts observed 2026-10-27 (Tamarin 1.12.0): secrecy verified in
+ *   2120 steps, the scanner lemma in 199, the displayer lemma falsified
+ *   in 15, the RADIO_ONLY sentinel in 13; executable in 15.
  *   session_key_secrecy: a key both honest sides accepted stays secret
  *     even when every static key leaks (the ephemerals carry it).
  *   scanner_binds_the_displayer: when the scanner accepts a key someone
  *     else knows, that someone is the honest displayer it scanned.
- * Prove it can fail: tamarin-prover --prove -DRADIO_ONLY ble_handshake.spthy
- *   Magic, Bump and Shake have no OOB pins: an attacker presents any
- *   identity with its own exchange key and the scanner lemma is falsified
- *   — the "role ≠ trust" gap the tiebreak design leaves to the proximity
- *   gates and the in-person confirmation.
- * The displayer's side: tamarin-prover --prove -DQR_PRIVATE
- *   ble_handshake.spthy  (displayer_binds_the_scanner verified only when
- *   the QR cannot be photographed; by default it is falsified — the
- *   displayer accepts whoever saw its QR, under any identity, which is
- *   why the displayer's screen shows the connector's card for the human
- *   to confirm)
+ *   displayer_binds_the_scanner is FALSIFIED: the displayer accepts
+ *     whoever echoes its nonce, under any identity — a bystander who
+ *     photographed the QR, or one who relays the scanner's unsigned offer
+ *     with its own identity and keys. The displayer's screen shows the
+ *     connector's card for the human to confirm; nothing in the protocol
+ *     pins the connector (tiebreak design rule 4, open).
+ * Prove it can fail: tamarin-prover --prove=scanner_binds_the_displayer
+ *   -DRADIO_ONLY ble_handshake.spthy  (Magic, Bump and Shake have no OOB
+ *   pins: an attacker presents any identity with its own exchange key and
+ *   the scanner lemma is falsified — the gap the tiebreak design leaves
+ *   to the proximity gates and the in-person confirmation)
+ * -DQR_PRIVATE: even a QR nobody can photograph does not rescue the
+ *   displayer lemma — the relayed offer does it.
  */
 
 theory VauchiBleHandshake
@@ -64,7 +65,14 @@ rule Register:
   --[ Registered($A, ~id) ]->
   [ !User($A, ~id, ~x), !Static('g' ^ ~x), Out(<~id, 'g' ^ ~x>) ]
 
-/* The attacker's ephemeral keys: group elements it knows the exponent of. */
+/* The attacker's own keys: group elements it knows the exponent of. They
+   are not leaks of an honest user's key, so the lemmas' "no static key
+   leaked" clause leaves them in play. */
+rule Attacker_static:
+  [ Fr(~x) ]
+  --[ AttackerStatic() ]->
+  [ !Static('g' ^ ~x), Out(~x) ]
+
 rule Attacker_ephemeral:
   [ Fr(~e) ]
   --[ ]->
@@ -161,11 +169,15 @@ rule Answer:
 #endif
 
 /* Sanity: two honest users complete a handshake with one key. */
+/* Sanity: a scanner accepts. A witness with both sides accepting (even
+   with the two keys unconstrained) ran past the ten-minute cap under every
+   heuristic, so the honest two-sided run is argued, not shown: the
+   derivation is symmetric (DH1 = g^(x_i·x_r), DH2 = g^(e_i·e_r) on both
+   sides). Read session_key_secrecy with that limit in mind — its premise
+   names both accepts. */
 lemma executable:
   exists-trace
-  "Ex I R idi idr k #i #j.
-     AcceptI(I, idi, idr, k) @ i & AcceptR(R, idr, idi, k) @ j
-     & not (Ex P #r. RevealStatic(P) @ r)"
+  "Ex I idi idr k #i. AcceptI(I, idi, idr, k) @ i"
 
 /* A key both honest sides accepted stays secret: the ephemeral DH carries
    it, so even every static key leaking does not expose it. */

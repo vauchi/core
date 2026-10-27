@@ -5,7 +5,7 @@
 //! A group's screen as the shells receive it: who is in it, how much of
 //! my card it sees, and previewing my card as one of its members.
 
-use crate::event_path_support::{action, activate, row, surfaces};
+use crate::event_path_support::{action, activate, row, surface_titles, surfaces};
 use vauchi_app::ui::{AppEngine, AppScreen};
 use vauchi_core::api::Vauchi;
 use vauchi_core::contact_card::{ContactField, FieldType};
@@ -69,19 +69,6 @@ fn group_info(commands: &[Command]) -> Vec<(String, Option<String>)> {
         .flatten()
         .filter_map(|node| match node {
             PresentationNode::Status { title, detail, .. } => Some((title, detail)),
-            _ => None,
-        })
-        .collect()
-}
-
-fn surface_titles(commands: &[Command]) -> Vec<(String, String)> {
-    commands
-        .iter()
-        .filter_map(|command| match command {
-            Command::ReplaceSurface { surface } => Some((
-                surface.surface_id.as_str().to_owned(),
-                surface.title.clone(),
-            )),
             _ => None,
         })
         .collect()

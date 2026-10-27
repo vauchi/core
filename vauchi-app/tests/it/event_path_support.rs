@@ -122,3 +122,17 @@ pub fn confirmation(commands: &[Command]) -> Option<(SurfaceId, ActionSpec, Acti
             })
         })
 }
+
+/// Every replaced surface's id and title, in emission order.
+pub fn surface_titles(commands: &[Command]) -> Vec<(String, String)> {
+    commands
+        .iter()
+        .filter_map(|command| match command {
+            Command::ReplaceSurface { surface } => Some((
+                surface.surface_id.as_str().to_owned(),
+                surface.title.clone(),
+            )),
+            _ => None,
+        })
+        .collect()
+}

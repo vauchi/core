@@ -107,9 +107,14 @@ fn validation_errors(commands: &[Command]) -> Vec<String> {
         .collect()
 }
 
-// @scenario: contact_card_management :: Email validation
-#[test]
-fn an_invalid_email_on_the_add_entry_form_reaches_the_shell_as_the_input_error() {
+struct SavedForm {
+    engine: AppEngine,
+    saved: Vec<Command>,
+    value_input: (SurfaceId, BindingId),
+}
+
+/// Opens Add Entry > Email from My Card, types `value` and presses Save.
+fn save_email(value: &str) -> SavedForm {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi
@@ -129,23 +134,53 @@ fn an_invalid_email_on_the_add_entry_form_reaches_the_shell_as_the_input_error()
     let commands = activate(&mut engine, surface_id, &add);
     let (surface_id, email) = row(&commands, "Email");
     let form = activate(&mut engine, surface_id, &email);
-    let (surface_id, binding_id) = first_input(&form);
+    let value_input = first_input(&form);
     let typed = engine
         .dispatch(Event::ValueChanged {
-            surface_id,
-            binding_id,
-            value: InputValue::Text("notanemail".into()),
+            surface_id: value_input.0.clone(),
+            binding_id: value_input.1.clone(),
+            value: InputValue::Text(value.into()),
         })
         .unwrap();
     let (surface_id, save) = action(&typed, "Save")
         .or_else(|| action(&form, "Save"))
         .expect("Save");
-
     let saved = activate(&mut engine, surface_id, &save);
+    SavedForm {
+        engine,
+        saved,
+        value_input,
+    }
+}
+
+// @scenario: contact_card_management :: Email validation
+#[test]
+fn an_invalid_email_on_the_add_entry_form_reaches_the_shell_as_the_input_error() {
+    let SavedForm { saved, .. } = save_email("notanemail");
 
     assert_eq!(
         validation_errors(&saved),
         vec!["Please enter a valid email address".to_string()],
         "{saved:#?}"
     );
+}
+
+// @scenario: contact_card_management :: Email validation
+#[test]
+fn the_input_error_clears_once_the_value_is_typed_again() {
+    let SavedForm {
+        mut engine,
+        value_input: (surface_id, binding_id),
+        ..
+    } = save_email("notanemail");
+
+    let retyped = engine
+        .dispatch(Event::ValueChanged {
+            surface_id,
+            binding_id,
+            value: InputValue::Text("alice@work.example".into()),
+        })
+        .unwrap();
+
+    assert_eq!(validation_errors(&retyped), Vec::<String>::new());
 }

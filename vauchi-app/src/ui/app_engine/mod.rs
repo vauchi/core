@@ -144,6 +144,10 @@ pub struct AppEngine {
     update_status: AppUpdateStatus,
     /// Whether the user has dismissed the "update available" banner.
     update_dismissed: bool,
+    /// The last refused input (component id, message), shown until the
+    /// next action. Kept as state because the presentation path renders
+    /// `current_screen()`, not the result's screen (vauchi/private#845).
+    validation_error: Option<(String, String)>,
     /// Wall-clock of the previous poll while an exchange is live, and how many
     /// there have been — the pace at which a Hover QR can advance.
     last_poll_ms: Option<u64>,
@@ -566,6 +570,7 @@ impl AppEngine {
             render_context: initial_render_context,
             update_status: AppUpdateStatus::UpToDate,
             update_dismissed: false,
+            validation_error: None,
             last_poll_ms: None,
             poll_count: 0,
             event_rx,
@@ -747,11 +752,18 @@ impl WorkflowEngine for AppEngine {
         let screen = self.apply_sync_chrome_overlay(screen);
         let screen = self.apply_nav_chrome_overlay(screen);
         let screen = self.apply_demo_contact_overlay(screen);
+        let screen = match &self.validation_error {
+            Some((component_id, message)) => {
+                screen.with_validation_error(component_id, message.clone())
+            }
+            None => screen,
+        };
         self.apply_screen_id_metadata(self.apply_accessibility_overlay(screen))
     }
 
     #[tracing::instrument(level = "debug", skip_all, name = "app.handle_action")]
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
+        self.validation_error = None;
         let action = dispatch::normalize_inline_confirm_action(action);
         self.drain_events_to_log();
         // Global-chrome + top-level navigation guards (sync, backup
@@ -913,7 +925,7 @@ impl AppEngine {
     /// Convert `ValidationError` into `UpdateScreen` with the error injected
     /// into the matching component. This ensures frontends never receive
     /// `ValidationError` and never need to patch the `ScreenModel` themselves.
-    fn resolve_validation_error(&self, result: ActionResult) -> ActionResult {
+    fn resolve_validation_error(&mut self, result: ActionResult) -> ActionResult {
         match result {
             ActionResult::ValidationError {
                 component_id,
@@ -922,7 +934,8 @@ impl AppEngine {
                 let screen = self
                     .engine
                     .current_screen()
-                    .with_validation_error(&component_id, message);
+                    .with_validation_error(&component_id, message.clone());
+                self.validation_error = Some((component_id, message));
                 ActionResult::UpdateScreen(screen)
             }
             other => other,

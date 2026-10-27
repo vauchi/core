@@ -16,6 +16,7 @@ use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::sync::SyncItem;
 
 // @scenario: contacts_management :: A personal note saved in the app reaches linked devices
+// @scenario: navigation :: Add private note to a contact
 #[cfg(feature = "network-rustls")]
 // @internal
 #[test]

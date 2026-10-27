@@ -81,6 +81,14 @@ pub trait PlatformAppEngineTestHelpers {
     /// the `VauchiPlatform` copy).
     fn save_test_contact(&self, contact: &vauchi_core::Contact) -> Result<(), MobileError>;
 
+    /// Save a visibility group directly to storage.
+    ///
+    /// Used by integration tests that need a group state the domain
+    /// commands refuse to produce, such as a member id with no contact
+    /// behind it (a group synced from a sibling device ahead of the
+    /// contact itself).
+    fn save_test_group(&self, group: &vauchi_core::contact::Group) -> Result<(), MobileError>;
+
     /// Save a delivery record directly to storage.
     ///
     /// Used by integration tests that need delivery records of specific
@@ -212,6 +220,19 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
             .storage()
             .contacts()
             .save_contact(contact)
+            .map_err(|e| MobileError::StorageError {
+                detail: e.to_string(),
+            })
+    }
+
+    fn save_test_group(&self, group: &vauchi_core::contact::Group) -> Result<(), MobileError> {
+        let mut engine_slot = self.lock_engine()?;
+        let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
+        engine
+            .vauchi()
+            .storage()
+            .labels()
+            .save_group(group)
             .map_err(|e| MobileError::StorageError {
                 detail: e.to_string(),
             })

@@ -293,7 +293,7 @@ fn all_contacts_present_resolve_with_zero_stale_count() {
 
 // @internal
 #[test]
-fn deleted_contact_is_omitted_and_counted_as_stale() {
+fn deleted_contact_leaves_the_label_and_is_not_counted_as_stale() {
     let (engine, _dir) = setup();
     let bob_id = add_exchanged_contact(&engine, "Bob", 0x01);
     let carol_id = add_exchanged_contact(&engine, "Carol", 0x02);
@@ -303,7 +303,9 @@ fn deleted_contact_is_omitted_and_counted_as_stale() {
     add_contact_to_group(&engine, &label.id, &carol_id);
     add_contact_to_group(&engine, &label.id, &dave_id);
 
-    // Delete one of the contacts — the label still references the id.
+    // Deleting a contact takes its id out of every label (private#854):
+    // an exchanged id recurs on re-exchange, so a surviving membership
+    // would re-grant the label's fields.
     remove_contact(&engine, &carol_id);
 
     let detail = get_label(&engine, &label.id);
@@ -314,8 +316,12 @@ fn deleted_contact_is_omitted_and_counted_as_stale() {
         "two of three contacts remain after Carol's deletion"
     );
     assert_eq!(
-        detail.stale_reference_count, 1,
-        "exactly one stale reference (Carol) must be counted"
+        detail.stale_reference_count, 0,
+        "a deleted contact leaves no stale reference behind"
+    );
+    assert!(
+        !detail.contact_ids.contains(&carol_id),
+        "the label no longer lists the deleted id"
     );
     let resolved_ids: Vec<&str> = detail
         .label_contacts
@@ -323,8 +329,50 @@ fn deleted_contact_is_omitted_and_counted_as_stale() {
         .map(|r| r.id.as_str())
         .collect();
     assert!(
+        resolved_ids.contains(&bob_id.as_str()) && resolved_ids.contains(&dave_id.as_str()),
+        "the remaining contacts resolve to rows"
+    );
+    assert!(
         !resolved_ids.contains(&carol_id.as_str()),
         "deleted contact id must NOT appear in label_contacts (no raw-id leak)"
+    );
+}
+
+// @internal
+#[test]
+fn unknown_id_in_a_label_is_omitted_and_counted_as_stale() {
+    let (engine, _dir) = setup();
+    let bob_id = add_exchanged_contact(&engine, "Bob", 0x01);
+    let dave_id = add_exchanged_contact(&engine, "Dave", 0x03);
+    let label = create_label(&engine, "Inner Circle");
+    let mut synced_ahead_of_its_contact =
+        vauchi_core::contact::Group::new(label.id.clone(), "Inner Circle", 1);
+    for id in [bob_id.as_str(), dave_id.as_str(), "no-such-contact"] {
+        synced_ahead_of_its_contact.add_contact(id, 1);
+    }
+    engine
+        .save_test_group(&synced_ahead_of_its_contact)
+        .expect("save group with an unknown member");
+
+    let detail = get_label(&engine, &label.id);
+
+    assert_eq!(
+        detail.label_contacts.len(),
+        2,
+        "only the two present contacts resolve to rows"
+    );
+    assert_eq!(
+        detail.stale_reference_count, 1,
+        "exactly one stale reference must be counted"
+    );
+    let resolved_ids: Vec<&str> = detail
+        .label_contacts
+        .iter()
+        .map(|r| r.id.as_str())
+        .collect();
+    assert!(
+        !resolved_ids.contains(&"no-such-contact"),
+        "an unknown id must NOT appear in label_contacts (no raw-id leak)"
     );
 }
 

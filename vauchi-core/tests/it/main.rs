@@ -138,6 +138,7 @@ mod contact_tests;
 mod contact_visibility_engine_tests;
 mod contact_visibility_tests;
 mod contact_warnings_tests;
+mod contacts_management_api_tests;
 mod contract_cli_consumer_tests;
 mod contract_tests;
 mod contract_tui_desktop_consumer_tests;

@@ -96,6 +96,32 @@ impl AppEngine {
         self.ble_handshake_session = Some(BleHandshakeHolder { machine });
     }
 
+    /// The chrome's terminal screens end the attempt. A stall failure or
+    /// a peerless timeout must not leave the machine holding the link,
+    /// where a late `Completed` would persist a contact behind a failed
+    /// screen (vauchi/private#843; `ble_exchange_machine.qnt` names the
+    /// invariants).
+    pub(super) fn release_ble_session_behind_a_terminal_chrome(&mut self) {
+        if !matches!(self.screen, AppScreen::BleExchange { .. }) {
+            return;
+        }
+        let screen_id = self.engine.current_screen().screen_id;
+        if screen_id == "exchange_failed" || screen_id == "exchange_ble_nothing_found" {
+            self.cancel_ble_handshake_session();
+        }
+    }
+
+    /// A Retry on the failed chrome starts over: discovery builds nothing
+    /// while a session is held (vauchi/private#843).
+    pub(super) fn release_ble_session_on_retry(&mut self, action: &crate::ui::UserAction) {
+        if matches!(self.screen, AppScreen::BleExchange { .. })
+            && matches!(action, crate::ui::UserAction::ActionPressed { action_id }
+                if action_id == crate::ui::exchange::ble_engine::ACTION_RETRY)
+        {
+            self.cancel_ble_handshake_session();
+        }
+    }
+
     /// Cancel + drop the active machine. Drains the resulting
     /// `Command::BleDisconnect` (if any) into `pending_commands`.
     /// Idempotent.

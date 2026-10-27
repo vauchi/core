@@ -772,6 +772,7 @@ impl WorkflowEngine for AppEngine {
         self.validation_error = None;
         let action = dispatch::normalize_inline_confirm_action(action);
         self.drain_events_to_log();
+        self.release_ble_session_on_retry(&action);
         // Global-chrome + top-level navigation guards (sync, backup
         // reminder, update link, tab nav, system back, settings gear,
         // demo-contact dismiss). See `dispatch::intercept_global_chrome`.
@@ -926,6 +927,7 @@ impl AppEngine {
         if !tick_cmds.is_empty() {
             self.extend_pending_commands(tick_cmds);
         }
+        self.release_ble_session_behind_a_terminal_chrome();
     }
 
     /// Convert `ValidationError` into `UpdateScreen` with the error injected

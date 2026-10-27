@@ -29,7 +29,7 @@ fn progress(commands: &[Command]) -> Option<f64> {
         .into_iter()
         .flat_map(|(_, nodes)| nodes)
         .find_map(|node| match node {
-            PresentationNode::Progress { value, .. } => value.map(f64::from),
+            PresentationNode::Progress { value, .. } => value,
             _ => None,
         })
 }

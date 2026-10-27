@@ -410,7 +410,6 @@ impl AppEngine {
             return Some(self.import_contact_file(&bytes));
         }
         match self.screen {
-            AppScreen::Contacts => Some(self.import_contact_file(&bytes)),
             AppScreen::Backup => {
                 // The restore wizard's own file path. Paste cannot carry a
                 // real backup — a 10k-contact export is ~2.2 MB against a

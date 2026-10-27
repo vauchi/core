@@ -379,7 +379,10 @@ impl AppEngine {
         // The bytes return through `Event::FilePickedFromUser`.
         if matches!(action, UserAction::ActionPressed { action_id } if action_id == "import_contacts")
             && matches!(self.screen, AppScreen::Contacts)
+            && !self.session_locked
+            && !self.pending_contact_import
         {
+            self.pending_contact_import = true;
             return Some(ActionResult::Commands {
                 commands: vec![vauchi_core::Command::FilePickFromUser {
                     max_bytes: Some(vauchi_core::MAX_FILE_PICK_BYTES as u64),

@@ -6,7 +6,7 @@
 //! private-use language tags prove there is no built-in language allowlist.
 
 use vauchi_app::i18n::load_locale_from_bytes;
-use vauchi_app::ui::{AppEngine, AppScreen, RenderContext};
+use vauchi_app::ui::{AppEngine, AppScreen, RenderContext, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
 use vauchi_core::{Command, Event, PresentationNode};
 
@@ -45,6 +45,9 @@ fn engine(locale: &str, existing: &str) -> AppEngine {
 }
 
 fn pick(engine: &mut AppEngine, text: &str) -> Vec<Command> {
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "import_contacts".into(),
+    });
     engine
         .dispatch(Event::FilePickedFromUser {
             bytes: text.as_bytes().to_vec(),

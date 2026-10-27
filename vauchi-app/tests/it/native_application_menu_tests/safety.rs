@@ -61,6 +61,11 @@ fn native_import_preserves_an_unsaved_editor() {
 // @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
 #[test]
 fn locking_invalidates_import_even_after_unlocking() {
+    assert_lock_invalidates_import(AppScreen::Settings);
+    assert_lock_invalidates_import(AppScreen::Contacts);
+}
+
+fn assert_lock_invalidates_import(destination: AppScreen) {
     let mut engine = engine();
     engine.set_device_capabilities(
         vauchi_core::exchange::capability::types::DeviceCapabilities {
@@ -77,13 +82,28 @@ fn locking_invalidates_import_even_after_unlocking() {
     engine.navigate_to(AppScreen::Lock);
     engine.initial_commands().unwrap();
     engine.dispatch(Event::BiometricUnlockSucceeded).unwrap();
-    engine.navigate_to(AppScreen::Settings);
+    engine.navigate_to(destination.clone());
     let unlocked = menu(&engine.initial_commands().unwrap());
-    assert_eq!(unlocked["surface_id"], AppScreen::Settings.screen_id());
+    assert_eq!(unlocked["surface_id"], destination.screen_id());
     engine
         .dispatch(Event::FilePickedFromUser {
             bytes: VCARD.to_vec(),
             filename: "late.vcf".into(),
+        })
+        .unwrap();
+    assert_eq!(engine.vauchi().list_contacts().unwrap().len(), 0);
+}
+
+// @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
+#[test]
+fn contacts_does_not_import_without_an_outstanding_request() {
+    let mut engine = engine();
+    engine.navigate_to(AppScreen::Contacts);
+    engine.initial_commands().unwrap();
+    engine
+        .dispatch(Event::FilePickedFromUser {
+            bytes: VCARD.to_vec(),
+            filename: "unsolicited.vcf".into(),
         })
         .unwrap();
     assert_eq!(engine.vauchi().list_contacts().unwrap().len(), 0);

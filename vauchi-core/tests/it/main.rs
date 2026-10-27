@@ -396,6 +396,7 @@ mod nfc_handshake_tests;
 mod offline_catch_up_sync_tests;
 mod offline_catch_up_tests;
 mod offline_queue_tests;
+mod offline_update_queue_tests;
 mod ohttp_anchor_rollover_trust_tests;
 mod ohttp_key_cache_tests;
 mod ohttp_key_trust_tests;

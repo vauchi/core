@@ -56,6 +56,7 @@ fn create_delivery(storage: &Storage, msg_id: &str) {
 // === Tick Processing Tests ===
 
 // @scenario: message_delivery :: Automatic retry on transient failure
+// @scenario: relay_network :: No relays available
 #[test]
 fn test_tick_processes_due_retries_only() {
     let storage = test_storage();

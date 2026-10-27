@@ -1,0 +1,56 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Daily-rotating mailbox tokens (ADR-029; `network/mailbox_token.rs`
+ * `compute_mailbox_token`): a contact pair's token for a day is
+ * HKDF(shared key, info = domain ‖ recipient key ‖ day). The relay sees
+ * only tokens, never keys, and routes by them. ADR-029's claim is temporal
+ * unlinkability: the relay cannot tell that two days' tokens belong to one
+ * pair (vauchi/private#842).
+ *
+ * The relay is the attacker: it sees every token and knows every public
+ * key and the calendar. HKDF is the hash `h`.
+ *
+ * Run: tamarin-prover --prove --diff mailbox_token.spthy
+ *   left: one pair's tokens on two days; right: two pairs, one each day.
+ *   The relay must not tell them apart (Observational_equivalence
+ *   verified).
+ * Prove it can fail: tamarin-prover --prove --diff -DSTABLE_TOKEN
+ *   mailbox_token.spthy  (ADR-028's stable per-pair token: the left side
+ *   repeats a token and the right side does not — falsified)
+ */
+
+theory VauchiMailboxToken
+begin
+
+builtins: hashing
+
+/* Two contact pairs with their shared keys; the recipients' identity keys
+   are public, as is the calendar. */
+#ifdef STABLE_TOKEN
+rule Two_days:
+  let tok_ab_d1 = h(<'Vauchi_Mailbox_v1', ~kab, ~pkb>)
+      tok_ab_d2 = h(<'Vauchi_Mailbox_v1', ~kab, ~pkb>)
+      tok_cd_d2 = h(<'Vauchi_Mailbox_v1', ~kcd, ~pkd>)
+  in
+  [ Fr(~kab), Fr(~kcd), Fr(~pkb), Fr(~pkd) ]
+  --[ Routed() ]->
+  [ Out(~pkb), Out(~pkd), Out(tok_ab_d1), Out(diff(tok_ab_d2, tok_cd_d2)) ]
+#else
+rule Two_days:
+  let tok_ab_d1 = h(<'Vauchi_Mailbox_v1', ~kab, ~pkb, 'day1'>)
+      tok_ab_d2 = h(<'Vauchi_Mailbox_v1', ~kab, ~pkb, 'day2'>)
+      tok_cd_d2 = h(<'Vauchi_Mailbox_v1', ~kcd, ~pkd, 'day2'>)
+  in
+  [ Fr(~kab), Fr(~kcd), Fr(~pkb), Fr(~pkd) ]
+  --[ Routed() ]->
+  [ Out(~pkb), Out(~pkd), Out(tok_ab_d1), Out(diff(tok_ab_d2, tok_cd_d2)) ]
+#endif
+
+lemma executable:
+  exists-trace
+  "Ex #i. Routed() @ i"
+
+end

@@ -1,0 +1,107 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * The link exchange (ADR-050; `exchange/link_initiator.rs`,
+ * `link_responder.rs`): the sender shares a link carrying an ephemeral key
+ * and a nonce over a channel of their choosing; whoever opens it deposits
+ * their own ephemeral key in the relay's two-slot handshake gate, both
+ * sides derive the escrow keys and swap cards, and each becomes the
+ * other's contact. Nothing in the flow asks the sender who opened the
+ * link (vauchi/private#727).
+ *
+ * The attacker owns the network and whatever channel carried the link.
+ * The relay is the untrusted store the escrow slots live in. Cards and
+ * the escrow encryption are out of scope: what matters is who ends up as
+ * whose contact.
+ *
+ * Run: tamarin-prover --prove link_exchange.spthy
+ *   contact_only_after_approval must be FALSIFIED: the first opener,
+ *   here the attacker, becomes the sender's contact (#727 as it stands).
+ * Owner decision 2026-10-20: tamarin-prover --prove -DPIN_CONFIRMED
+ *   link_exchange.spthy  (the sender gives the intended person a PIN over
+ *   another channel and finalizes only on proof of it; the lemma must
+ *   then be verified — the target for #727's fix)
+ */
+
+theory VauchiLinkExchange
+begin
+
+builtins: diffie-hellman, hashing
+
+restriction Equality:
+  "All x y #i. Eq(x, y) @ i ==> x = y"
+
+rule Register:
+  [ Fr(~id) ]
+  --[ Registered($A, ~id) ]->
+  [ !User($A, ~id), Out(~id) ]
+
+/* The sender means the link for one person and tells them so out of
+   band; under the PIN design that word includes a PIN, which the attacker
+   on the link's channel never sees. */
+#ifdef PIN_CONFIRMED
+rule Share_link:
+  let link = <'link', 'g' ^ ~e, ~nonce>
+  in
+  [ !User($I, id_i), !User($P, id_p), Fr(~e), Fr(~nonce), Fr(~pin) ]
+  --[ Shared($I, $P), PinGiven($I, id_p, ~pin) ]->
+  [ Sender($I, ~e, ~nonce, ~pin), Told($P, ~nonce, ~pin), Out(link) ]
+#else
+rule Share_link:
+  let link = <'link', 'g' ^ ~e, ~nonce>
+  in
+  [ !User($I, id_i), !User($P, id_p), Fr(~e), Fr(~nonce) ]
+  --[ Shared($I, $P) ]->
+  [ Sender($I, ~e, ~nonce), Told($P, ~nonce), Out(link) ]
+#endif
+
+/* Whoever holds the link opens it: deposits an ephemeral key and, under
+   the PIN design, proof of the PIN bound to the opener's identity and key.
+   The first draft bound only the key, and Tamarin swapped the identity in
+   transit (7 steps): the proof must cover what the sender will store. An
+   honest opener is the person the sender told; the attacker opens from
+   the channel. */
+#ifdef PIN_CONFIRMED
+rule Open_link:
+  let deposit = <'claim', id_r, 'g' ^ ~f, h(<pin, id_r, 'g' ^ ~f, nonce>)>
+  in
+  [ !User($R, id_r), Told($R, nonce, pin), In(<'link', epk, nonce>), Fr(~f) ]
+  --[ Opened($R, nonce), ContactR($R, id_r, epk) ]->
+  [ Out(deposit) ]
+#else
+rule Open_link:
+  let deposit = <'claim', id_r, 'g' ^ ~f>
+  in
+  [ !User($R, id_r), In(<'link', epk, nonce>), Fr(~f) ]
+  --[ Opened($R, nonce), ContactR($R, id_r, epk) ]->
+  [ Out(deposit) ]
+#endif
+
+/* The sender retrieves the deposit and finalizes: the opener's identity
+   becomes a contact. */
+#ifdef PIN_CONFIRMED
+rule Finalize:
+  [ Sender($I, e, nonce, pin), !User($I, id_i), In(<'claim', id_r, fpk, proof>) ]
+  --[ Eq(proof, h(<pin, id_r, fpk, nonce>)), ContactAdded($I, id_i, id_r) ]->
+  [ ]
+#else
+rule Finalize:
+  [ Sender($I, e, nonce), !User($I, id_i), In(<'claim', id_r, fpk>) ]
+  --[ ContactAdded($I, id_i, id_r) ]->
+  [ ]
+#endif
+
+lemma executable:
+  exists-trace
+  "Ex I P idi idp #s #c #a.
+     Shared(I, P) @ s & Registered(P, idp) @ a & ContactAdded(I, idi, idp) @ c"
+
+/* The sender's new contact is the person the sender meant the link for. */
+lemma contact_only_after_approval:
+  "All I idi idr #c.
+     ContactAdded(I, idi, idr) @ c
+     ==> Ex P #s #r. Shared(I, P) @ s & Registered(P, idr) @ r"
+
+end

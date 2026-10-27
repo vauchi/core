@@ -216,6 +216,12 @@ tamarin_expect "$models/ble_advertisement.spthy" falsified "-DNO_SCAN_BINDING" \
     scanner_connects_to_the_displayer_it_scanned
 tamarin_diff_expect "$models/ble_advertisement.spthy" verified "-DUNLINKABILITY"
 tamarin_diff_expect "$models/ble_advertisement.spthy" falsified "-DUNLINKABILITY -DKEY_DERIVED_TOKEN"
+tamarin_diff_expect "$models/mailbox_token.spthy" verified ""
+tamarin_diff_expect "$models/mailbox_token.spthy" falsified "-DSTABLE_TOKEN"
+tamarin_expect "$models/link_exchange.spthy" falsified "" \
+    contact_only_after_approval
+tamarin_expect "$models/link_exchange.spthy" verified "-DPIN_CONFIRMED" \
+    executable contact_only_after_approval
 
 # ── Quint ─────────────────────────────────────────────────────────────
 # The device-link host and joiner machines (#757, #808). `quint verify`
@@ -251,10 +257,11 @@ mkdir -p "$quint_home"
 # quint_expect <main> <ok|violation> <run|verify> <invariant>: exhaustive
 # `verify` for the claims, the simulator for controls that must break.
 quint_expect() {
-    q_main=$1
-    q_verdict=$2
-    q_mode=$3
-    q_invariant=$4
+    q_model=$1
+    q_main=$2
+    q_verdict=$3
+    q_mode=$4
+    q_invariant=$5
     # Both violations the model found took 12 steps; 15 keeps a margin
     # without Apalache's cost at 25, which ran 33 minutes on CI. The
     # simulator's Rust evaluator needs glibc 2.39, newer than this image's.
@@ -264,8 +271,8 @@ quint_expect() {
         set -- run --backend=typescript --max-steps=40 --max-samples=20000 --seed=7
     fi
     q_out=$(HOME=$quint_home quint "$@" --main="$q_main" --invariant="$q_invariant" \
-        vauchi-app/verification/device_link_machines.qnt 2>&1) || true
-    echo "device_link_machines.qnt $q_main $q_mode $q_invariant:"
+        "vauchi-app/verification/$q_model" 2>&1) || true
+    echo "$q_model $q_main $q_mode $q_invariant:"
     printf '%s\n' "$q_out" | grep -E '^\[(ok|violation)\]' || true
     printf '%s\n' "$q_out" | grep -q "^\[$q_verdict\]" || {
         printf '%s\n' "$q_out" | tail -20
@@ -273,10 +280,22 @@ quint_expect() {
         exit 1
     }
 }
-quint_expect reliable_relay ok verify no_device_registered_for_a_failed_joiner
-quint_expect reliable_relay ok verify joiner_seed_implies_registered
+quint_expect device_link_machines.qnt reliable_relay ok verify no_device_registered_for_a_failed_joiner
+quint_expect device_link_machines.qnt reliable_relay ok verify joiner_seed_implies_registered
 # Without the host's expiry check the host registers a device whose
 # joiner gave up; a lost response still does, which #808 leaves open.
-quint_expect before_808 violation run no_device_registered_for_a_failed_joiner
-quint_expect lossy_relay violation run no_device_registered_for_a_failed_joiner
+quint_expect device_link_machines.qnt before_808 violation run no_device_registered_for_a_failed_joiner
+quint_expect device_link_machines.qnt lossy_relay violation run no_device_registered_for_a_failed_joiner
+# The BLE chrome's stall deadline leaves the handshake machine holding the
+# link (private#842): three violations today, none once a failure and a
+# Retry cancel the machine.
+for q_inv in no_live_machine_behind_a_failed_screen a_retry_starts_from_no_machine \
+    a_contact_is_persisted_only_on_a_live_screen; do
+    quint_expect ble_exchange_machine.qnt current_design violation run "$q_inv"
+    quint_expect ble_exchange_machine.qnt failure_cancels_the_machine ok verify "$q_inv"
+done
+# A multi-stage phase never outlives its budget; random simulation cannot
+# draw the 13 silent ticks the sentinel needs, so both run under Apalache.
+quint_expect multi_stage_machine.qnt main_today ok verify no_phase_outlives_its_budget
+quint_expect multi_stage_machine.qnt no_step_timeout violation verify no_phase_outlives_its_budget
 echo "formal verification OK"

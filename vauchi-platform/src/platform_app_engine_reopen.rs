@@ -60,7 +60,10 @@ impl PlatformAppEngine {
             .clone();
         match params.open()? {
             Opened::Engine(vauchi) => {
-                let mut engine = AppEngine::new(*vauchi);
+                let mut engine = crate::platform_app_engine_locked::engine_keeping_pick(
+                    *vauchi,
+                    &params.storage_path,
+                );
                 engine.set_render_context(render_context);
                 engine.set_device_capabilities(capabilities);
                 engine.set_network_online(online);

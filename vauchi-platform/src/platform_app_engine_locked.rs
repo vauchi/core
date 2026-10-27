@@ -103,7 +103,7 @@ pub(crate) struct LockedStart {
 impl LockedStart {
     pub(crate) fn new(reason: StorageLockReason, params: OpenParams) -> Self {
         Self {
-            presentation: StorageLockPresentation::new(reason, Locale::ENGLISH),
+            presentation: lock_keeping_pick(reason, &params.storage_path),
             params,
             pending: PendingSetup::default(),
         }
@@ -211,7 +211,7 @@ impl PlatformAppEngine {
         match start.params.open()? {
             Opened::Locked(reason) => Ok(start.presentation.show(reason)),
             Opened::Engine(vauchi) => {
-                let mut engine = AppEngine::new(*vauchi);
+                let mut engine = engine_keeping_pick(*vauchi, &start.params.storage_path);
                 let pending = std::mem::take(&mut start.pending);
                 if let Some(context) = pending.render_context {
                     engine.set_render_context(context);
@@ -256,4 +256,25 @@ impl PlatformAppEngine {
             }
         }
     }
+}
+
+/// Core keeps the language and theme pick beside the database, outside the
+/// vault, so the shell stores nothing for it (vauchi/private#814).
+pub(crate) fn engine_keeping_pick(vauchi: Vauchi, storage_path: &std::path::Path) -> AppEngine {
+    let mut engine = AppEngine::new(vauchi);
+    if let Some(data_dir) = storage_path.parent() {
+        engine.keep_restorable_state_in(data_dir);
+    }
+    engine
+}
+
+fn lock_keeping_pick(
+    reason: StorageLockReason,
+    storage_path: &std::path::Path,
+) -> StorageLockPresentation {
+    let mut presentation = StorageLockPresentation::new(reason, Locale::ENGLISH);
+    if let Some(data_dir) = storage_path.parent() {
+        presentation.keep_restorable_state_in(data_dir);
+    }
+    presentation
 }

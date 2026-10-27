@@ -8,6 +8,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.91.0] — 2026-10-27
+
 ### Added
 
 - `Event::RefreshRequested { surface_id }`: a shell reports the platform's
@@ -16,6 +18,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   outcome, as the sync chip does. Coming back online (`set_network_online(true)` after
   `false`) re-sends the heartbeat's `ScheduleWakeup` at once
   (vauchi/private#762).
+
+### Changed
+
+- Core keeps the language and theme pick itself, in a file in the data
+  directory it is opened with, outside the vault, so it applies before
+  storage opens and no shell stores it. The UniFFI and C ABI bindings do
+  this for every shell they open; a shell that drives `AppEngine`
+  directly calls `keep_restorable_state_in(data_dir)` (as for
+  `start_content_updates`). `Command::SaveRestorableState` is emitted only
+  for an engine without a data directory (vauchi/private#814, #267).
 
 ### Fixed
 

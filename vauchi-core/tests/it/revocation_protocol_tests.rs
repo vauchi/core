@@ -486,6 +486,7 @@ fn test_revocation_blob_decode_then_process_shreds_contact() {
 // sender→blob→recipient→shred chain the broadcast wiring delivers.
 // @scenario: privacy_compliance :: Deletion notifies contacts
 // @scenario: privacy_compliance :: Identity deletion notifies contacts end-to-end
+// @scenario: privacy_compliance :: Offline contact receives revocation on reconnect
 // @internal
 #[test]
 fn test_gdpr_deletion_revocation_shreds_at_recipient() {

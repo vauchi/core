@@ -8,8 +8,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.92.0] — 2026-10-27
+
+### Added
+
+- Native application menus and bounded file-picker requests prepared by Core.
+  Executors can opt into correlated file results, cancellation and localized
+  errors. Qt's native import migration requires this contract.
+
 ### Fixed
 
+- Cancelled file-picker results cannot satisfy a later request after an
+  executor opts into correlation. Native file errors use Core's localized copy.
+- BLE discovery advertises a fresh attempt token instead of an identity-key
+  prefix. Form dialogs include validation errors in their input presentation.
 - Finishing onboarding starts the "Vauchi Tips" demo contact in Core, so
   its banner shows on Contacts. The mobile shells' own start wrote a file
   the banner never reads; `DomainCommand::InitDemoContactIfNeeded` is no

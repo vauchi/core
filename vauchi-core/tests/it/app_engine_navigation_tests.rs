@@ -663,6 +663,7 @@ fn privacy_engine_text_changed_is_noop() {
 
 // ── default_screen tests (Phase 1: Navigation IA) ──────────────────
 
+// @scenario: navigation :: Dynamic default screen with no contacts
 // @internal
 #[test]
 fn default_screen_is_my_info_when_no_contacts() {

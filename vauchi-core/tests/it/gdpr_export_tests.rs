@@ -42,6 +42,8 @@ fn setup_storage_with_contacts() -> Storage {
     storage
 }
 
+// The export reads local storage only, so it needs no relay or network.
+// @scenario: privacy_compliance :: Export works offline
 // @scenario: privacy_compliance :: Export includes all data types
 // @internal
 #[test]

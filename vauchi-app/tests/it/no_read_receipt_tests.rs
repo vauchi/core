@@ -58,7 +58,7 @@ fn exchanged(bob: &Vauchi, alice: &Vauchi) -> (String, String) {
 #[test]
 fn opening_a_contact_after_their_update_sends_nothing_back() {
     let bob = person("Bob");
-    let mut alice = person("Alice");
+    let alice = person("Alice");
     let (alice_id, bob_id) = exchanged(&bob, &alice);
     alice
         .add_own_field(ContactField::new(

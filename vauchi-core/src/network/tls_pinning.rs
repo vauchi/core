@@ -318,7 +318,6 @@ mod tests {
         (sent, server.join().unwrap())
     }
 
-    // @scenario: certificate_pinning :: Connection rejected with mismatched certificate
     // @scenario: certificate_pinning :: Pin verification happens before sending data
     #[test]
     fn a_valid_chain_with_the_wrong_pin_is_refused_before_any_request_byte() {

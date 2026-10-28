@@ -437,6 +437,7 @@ mod preview_as_proptest;
 mod propagation_sync_item_variant_tests;
 mod property_tests;
 mod protocol_compatibility_tests;
+mod protocol_exchange_vectors_tests;
 mod protocol_test_vectors_tests;
 mod proximity_confidence_tests;
 mod qr_landing_url_tests;

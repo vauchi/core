@@ -9,7 +9,8 @@
 //! deterministic ones (key derivations, X3DH, chain steps, mailbox tokens)
 //! and decrypts the recorded ciphertexts (a ratchet message, a v3 backup,
 //! a v6 backup), so an independent implementation can check itself against
-//! the file.
+//! the file. The two exchange transcripts live in
+//! `protocol_exchange_vectors_tests.rs` and share this fixture.
 //!
 //! Regenerate with `VAUCHI_WRITE_TEST_VECTORS=1`, without the `test-kdf`
 //! feature: the backup vector must carry production Argon2id parameters.
@@ -34,6 +35,10 @@ use vauchi_core::network::mailbox_token::{
     compute_device_mailbox_token, compute_device_sync_token, compute_mailbox_token,
 };
 
+use super::protocol_exchange_vectors_tests::{
+    LinkExchangeVector, QrSymmetricVector, compute_link_exchange, compute_qr_symmetric,
+};
+
 const FIXTURE: &str = "tests/fixtures/test-vectors/vauchi-protocol-vectors-v1.json";
 
 /// Documented alongside the vectors so a reader can map each value to the
@@ -52,7 +57,7 @@ const BACKUP_INFO: &str = "vauchi-backup-v3";
 const BACKUP_V6_INFO: &str = "vauchi-backup-v6-state";
 
 #[derive(Serialize, Deserialize)]
-struct Vectors {
+pub(crate) struct Vectors {
     /// Why the file exists and how to read it; kept in the JSON so the
     /// published copy is self-describing.
     description: Vec<String>,
@@ -62,6 +67,8 @@ struct Vectors {
     mailbox_tokens: MailboxVector,
     backup: BackupVector,
     backup_v6: BackupV6Vector,
+    pub(crate) qr_symmetric: QrSymmetricVector,
+    pub(crate) link_exchange: LinkExchangeVector,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -189,7 +196,7 @@ fn writing() -> bool {
     std::env::var_os("VAUCHI_WRITE_TEST_VECTORS").is_some()
 }
 
-fn seed(byte: u8) -> [u8; 32] {
+pub(crate) fn seed(byte: u8) -> [u8; 32] {
     let mut out = [0u8; 32];
     for (i, b) in out.iter_mut().enumerate() {
         *b = byte.wrapping_add(i as u8);
@@ -197,11 +204,11 @@ fn seed(byte: u8) -> [u8; 32] {
     out
 }
 
-fn hex32(s: &str) -> [u8; 32] {
+pub(crate) fn hex32(s: &str) -> [u8; 32] {
     hex::decode(s).expect("hex").try_into().expect("32 bytes")
 }
 
-fn load() -> Vectors {
+pub(crate) fn load() -> Vectors {
     let text = std::fs::read_to_string(fixture_path()).expect("vector fixture present");
     serde_json::from_str(&text).expect("vector fixture parses")
 }
@@ -812,6 +819,22 @@ fn write_test_vectors_when_asked() {
              Argon2id(password, salt)), hkdf_info, 32). This is the format the app \
              exports today; the nonce is random, so only decryption is reproducible."
                 .into(),
+            "qr_symmetric: the mutual QR exchange. shared_key = HKDF(salt = none, ikm = \
+             X25519(eph_a, eph_b), info_prefix || min(id_a, id_b) || max(id_a, id_b) || \
+             min(eph_a, eph_b) || max(eph_a, eph_b)); each side's confirmation token = \
+             HKDF(DH, confirmation_info || its own identity key); the confirmation \
+             escrow gate and slots are hex(SHA-256(HKDF(DH, info))). The side with the \
+             smaller identity key is the initiator and owns the init slot."
+                .into(),
+            "link_exchange: the link carries the initiator's ephemeral X25519 key and a \
+             32-byte nonce, base64url without padding; handshake gate, presence slot \
+             and epk slot are hex(SHA-256(nonce || label)); escrow gate and slots are \
+             hex(SHA-256(HKDF(DH, info))) and the card key HKDF(DH, card_key_info) with \
+             DH = X25519(responder ephemeral, initiator ephemeral); the v2 payload is \
+             0x02 || JSON with an Ed25519 signature over bootstrap_domain || x3dh \
+             public key || relay_url; link_shared_key = HKDF(X25519(x3dh_i, x3dh_r), \
+             link_shared_key_info)."
+                .into(),
         ],
         identity: compute_identity(seed(0x01)),
         ratchet: compute_ratchet(&shared),
@@ -819,6 +842,8 @@ fn write_test_vectors_when_asked() {
         mailbox_tokens: compute_mailbox(),
         backup: compute_backup(),
         backup_v6: compute_backup_v6(),
+        qr_symmetric: compute_qr_symmetric(),
+        link_exchange: compute_link_exchange(),
     };
     let mut text = serde_json::to_string_pretty(&vectors).expect("serialize");
     text.push('\n');

@@ -62,6 +62,7 @@ fn exchanged(storage: &Storage, name: &str) -> String {
 }
 
 // @scenario: privacy_compliance :: Panic shred immediately destroys all data and notifies contacts
+// @scenario: pre_signed_operations :: Contacts verify the revocation a deletion sends
 #[test]
 fn a_panic_shred_revokes_each_contact_purges_the_relay_and_destroys_everything() {
     let dir = tempfile::tempdir().unwrap();

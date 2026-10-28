@@ -143,6 +143,7 @@ fn test_purge_token_rotation() {
 /// Test that token rotation maintains signature validity for each token.
 // @scenario: pre_signed_operations :: Refresh generates new purge token for replay prevention
 // @scenario: pre_signed_operations :: Pre-signed purge request has valid Ed25519 signature
+// @scenario: pre_signed_operations :: Tampered pre-signed message is rejected
 #[test]
 fn test_purge_token_rotation_maintains_signature_validity() {
     let identity = Identity::create("Dave", 0);

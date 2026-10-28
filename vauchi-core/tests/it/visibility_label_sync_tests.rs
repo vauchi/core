@@ -212,9 +212,7 @@ fn contact_override_removal_with_repropagation_is_journaled_for_linked_devices()
 /// Feature: visibility_labels.feature
 /// Scenarios:
 /// - Labels sync across my own devices only
-/// - Labels are not shared with contacts
 // @scenario: visibility_labels :: Labels sync across my own devices only
-// @scenario: visibility_labels :: Labels are not shared with contacts
 // @internal
 #[test]
 fn test_label_sync_across_devices() {

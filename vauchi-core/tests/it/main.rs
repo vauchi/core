@@ -297,6 +297,7 @@ mod genesis_card_per_device_floor_tests;
 mod genesis_envelope_crypto_tests;
 mod genesis_rate_limit_tests;
 mod group_detail_engine_tests;
+mod group_privacy_tests;
 mod group_tag_place_store_tests;
 mod group_transition_tests;
 mod groups_list_engine_tests;

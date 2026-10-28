@@ -568,6 +568,7 @@ mod vcard_tests;
 mod vcard_vauchi_marker_tests;
 mod version_tests;
 mod visibility_control_tests;
+mod visibility_delivery_tests;
 mod visibility_e2e_tests;
 mod visibility_effective_proptest;
 mod visibility_enforcement_tests;

@@ -50,6 +50,7 @@ fn sees(w: &World, contact: &str, field: &str) -> bool {
 }
 
 // @scenario: visibility_control :: New fields default to hidden for ungrouped contacts
+// @scenario: visibility_control :: New fields default to hidden for grouped contacts
 #[test]
 fn unruled_unassigned_field_is_hidden_from_every_contact() {
     let w = world();
@@ -64,6 +65,7 @@ fn unruled_unassigned_field_is_hidden_from_every_contact() {
 }
 
 // @scenario: visibility_control :: A Visible toggle reaches all contacts alike
+// @scenario: visibility_control :: A visible field outside every group reaches group members too
 #[test]
 fn visible_toggle_on_unassigned_field_reaches_all_contacts() {
     let w = world();

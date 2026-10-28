@@ -54,6 +54,7 @@ mod backup_restore_needs_empty_app_tests;
 mod backup_screen_tests;
 mod batch2_i18n_tests;
 mod batch3_i18n_tests;
+mod core_copy_locale_tests;
 // Uses the testing-feature hooks (vauchi/private#271).
 #[cfg(feature = "testing")]
 mod ble_exchange_app_engine_tests;

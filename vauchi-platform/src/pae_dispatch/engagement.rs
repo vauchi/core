@@ -189,7 +189,10 @@ impl PlatformAppEngine {
                 }
                 let contact = state.current_tip().map(|tip| {
                     let card = vauchi_core::generate_demo_contact_card(&tip);
-                    card.into()
+                    crate::types::MobileDemoContact::localized(
+                        card,
+                        engine.render_context().resolved_locale(),
+                    )
                 });
                 Ok(DomainCommandResult::DemoContactOpt { contact })
             }
@@ -198,7 +201,10 @@ impl PlatformAppEngine {
                 let contact = if state.is_active {
                     state.current_tip().map(|tip| {
                         let card = vauchi_core::generate_demo_contact_card(&tip);
-                        card.into()
+                        crate::types::MobileDemoContact::localized(
+                            card,
+                            engine.render_context().resolved_locale(),
+                        )
                     })
                 } else {
                     None
@@ -232,7 +238,10 @@ impl PlatformAppEngine {
                 {
                     self.save_demo_state_engine(&state)?;
                     let card = vauchi_core::generate_demo_contact_card(&tip);
-                    Some(card.into())
+                    Some(crate::types::MobileDemoContact::localized(
+                        card,
+                        engine.render_context().resolved_locale(),
+                    ))
                 } else {
                     None
                 };
@@ -261,7 +270,10 @@ impl PlatformAppEngine {
                 self.save_demo_state_engine(&state)?;
                 let contact = state.current_tip().map(|tip| {
                     let card = vauchi_core::generate_demo_contact_card(&tip);
-                    card.into()
+                    crate::types::MobileDemoContact::localized(
+                        card,
+                        engine.render_context().resolved_locale(),
+                    )
                 });
                 Ok(DomainCommandResult::DemoContactOpt { contact })
             }

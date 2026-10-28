@@ -137,14 +137,16 @@ pub struct MobileDemoContact {
     pub tip_category: String,
 }
 
-impl From<vauchi_core::DemoContactCard> for MobileDemoContact {
-    fn from(card: vauchi_core::DemoContactCard) -> Self {
+impl MobileDemoContact {
+    /// The card with its tip translated into `locale`: Core keeps only the
+    /// tip's locale keys (ADR-038).
+    pub fn localized(card: vauchi_core::DemoContactCard, locale: vauchi_app::i18n::Locale) -> Self {
         MobileDemoContact {
             id: card.id,
             display_name: card.display_name,
             is_demo: card.is_demo,
-            tip_title: card.tip_title,
-            tip_content: card.tip_content,
+            tip_title: vauchi_app::i18n::get_string(locale, &card.tip_title_key),
+            tip_content: vauchi_app::i18n::get_string(locale, &card.tip_content_key),
             tip_category: card.tip_category,
         }
     }

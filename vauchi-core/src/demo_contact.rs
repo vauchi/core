@@ -29,10 +29,10 @@ pub struct DemoTip {
     pub id: String,
     /// Category of the tip
     pub category: DemoTipCategory,
-    /// Short title
-    pub title: String,
-    /// Detailed content
-    pub content: String,
+    /// Locale key of the short title; the app layer translates it (ADR-038)
+    pub title_key: String,
+    /// Locale key of the detailed content
+    pub content_key: String,
 }
 
 /// Categories of demo tips
@@ -67,50 +67,50 @@ pub fn get_demo_tips() -> Vec<DemoTip> {
         DemoTip {
             id: "tip-share".to_string(),
             category: DemoTipCategory::GettingStarted,
-            title: "Share Your Card".to_string(),
-            content: "Tap the Exchange tab and show your QR code to share your contact card. The other person scans it, and you're connected!".to_string(),
+            title_key: "demo_tip.share.title".to_string(),
+            content_key: "demo_tip.share.content".to_string(),
         },
         DemoTip {
             id: "tip-privacy".to_string(),
             category: DemoTipCategory::Privacy,
-            title: "Your Privacy Matters".to_string(),
-            content: "Your data never touches our servers. Everything is encrypted end-to-end, and only people you've exchanged with can see your info.".to_string(),
+            title_key: "demo_tip.privacy.title".to_string(),
+            content_key: "demo_tip.privacy.content".to_string(),
         },
         DemoTip {
             id: "tip-updates".to_string(),
             category: DemoTipCategory::Updates,
-            title: "Automatic Updates".to_string(),
-            content: "When you update your card, everyone who has it sees the change automatically. No need to send it again!".to_string(),
+            title_key: "demo_tip.updates.title".to_string(),
+            content_key: "demo_tip.updates.content".to_string(),
         },
         DemoTip {
             id: "tip-recovery".to_string(),
             category: DemoTipCategory::Recovery,
-            title: "Social Recovery".to_string(),
-            content: "Lost your phone? Your contacts can vouch for you. Meet 3+ trusted contacts in person, and they'll help restore your identity.".to_string(),
+            title_key: "demo_tip.recovery.title".to_string(),
+            content_key: "demo_tip.recovery.content".to_string(),
         },
         DemoTip {
             id: "tip-visibility".to_string(),
             category: DemoTipCategory::Contacts,
-            title: "Control Who Sees What".to_string(),
-            content: "Use visibility labels to control what different groups see. Family might see your home address, while colleagues only see work info.".to_string(),
+            title_key: "demo_tip.visibility.title".to_string(),
+            content_key: "demo_tip.visibility.content".to_string(),
         },
         DemoTip {
             id: "tip-qr".to_string(),
             category: DemoTipCategory::GettingStarted,
-            title: "In-Person Exchange".to_string(),
-            content: "Vauchi requires you to be physically present to exchange. This prevents spam and ensures you only connect with real people you've met.".to_string(),
+            title_key: "demo_tip.qr.title".to_string(),
+            content_key: "demo_tip.qr.content".to_string(),
         },
         DemoTip {
             id: "tip-edit".to_string(),
             category: DemoTipCategory::Updates,
-            title: "Edit Anytime".to_string(),
-            content: "Changed your phone number? Just update it in your card. Everyone who has your card will see the new number automatically.".to_string(),
+            title_key: "demo_tip.edit.title".to_string(),
+            content_key: "demo_tip.edit.content".to_string(),
         },
         DemoTip {
             id: "tip-multi-device".to_string(),
             category: DemoTipCategory::Features,
-            title: "Multiple Devices".to_string(),
-            content: "Use Vauchi on your phone and tablet. Link devices in Settings and your data stays in sync across all of them.".to_string(),
+            title_key: "demo_tip.multi_device.title".to_string(),
+            content_key: "demo_tip.multi_device.content".to_string(),
         },
     ]
 }
@@ -212,8 +212,8 @@ pub fn generate_demo_contact_card(tip: &DemoTip) -> DemoContactCard {
         id: DEMO_CONTACT_ID.to_string(),
         display_name: DEMO_CONTACT_NAME.to_string(),
         is_demo: true,
-        tip_title: tip.title.clone(),
-        tip_content: tip.content.clone(),
+        tip_title_key: tip.title_key.clone(),
+        tip_content_key: tip.content_key.clone(),
         tip_category: format!("{:?}", tip.category),
     }
 }
@@ -227,10 +227,10 @@ pub struct DemoContactCard {
     pub display_name: String,
     /// Flag indicating this is a demo
     pub is_demo: bool,
-    /// Current tip title
-    pub tip_title: String,
-    /// Current tip content
-    pub tip_content: String,
+    /// Locale key of the current tip's title
+    pub tip_title_key: String,
+    /// Locale key of the current tip's content
+    pub tip_content_key: String,
     /// Tip category
     pub tip_category: String,
 }
@@ -450,15 +450,15 @@ mod tests {
         let tip = DemoTip {
             id: "x".to_string(),
             category: DemoTipCategory::Privacy,
-            title: "Title".to_string(),
-            content: "Content".to_string(),
+            title_key: "Title".to_string(),
+            content_key: "Content".to_string(),
         };
         let card = generate_demo_contact_card(&tip);
         assert_eq!(card.id, DEMO_CONTACT_ID);
         assert_eq!(card.display_name, DEMO_CONTACT_NAME);
         assert!(card.is_demo);
-        assert_eq!(card.tip_title, "Title");
-        assert_eq!(card.tip_content, "Content");
+        assert_eq!(card.tip_title_key, "Title");
+        assert_eq!(card.tip_content_key, "Content");
         assert_eq!(card.tip_category, "Privacy");
     }
 

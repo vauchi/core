@@ -477,7 +477,7 @@ fn test_vauchi_api_demo_contact_integration() {
     assert!(card.is_some(), "expected Some value");
     let card = card.unwrap();
     assert!(card.is_demo);
-    assert!(!card.tip_title.is_empty());
+    assert!(!card.tip_title_key.is_empty());
 
     let next_tip = wb.advance_demo_contact().unwrap();
     assert!(next_tip.is_some(), "expected Some value");

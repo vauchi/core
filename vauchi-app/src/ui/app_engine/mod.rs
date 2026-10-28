@@ -685,8 +685,7 @@ impl AppEngine {
                 let _ = self.vauchi.save_backup_reminder_state(&state);
             }
             Some(ActionResult::ShowToast {
-                message: "You haven't backed up in a while. Back up now to protect your identity."
-                    .into(),
+                message: self.t("backup.reminder_toast"),
                 undo_action_id: Some("backup_now".into()),
                 undo_label: Some(self.t("backup.wizard.create")),
             })

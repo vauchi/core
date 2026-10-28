@@ -28,12 +28,13 @@ fn highlight(
     }
 }
 
-fn faq(id: &str, question: &str, answer: &str, anchor: &str) -> HelpItem {
+/// A question whose copy lives under `faq.<key>.question` / `.answer`.
+fn faq(locale: Locale, id: &str, key: &str, anchor: &str) -> HelpItem {
     HelpItem {
         id: id.into(),
-        question: question.into(),
+        question: get_string(locale, &format!("faq.{key}.question")),
         subtitle: None,
-        answer: Some(answer.into()),
+        answer: Some(get_string(locale, &format!("faq.{key}.answer"))),
         answer_url: Some(format!("{FAQ_URL}#{anchor}")),
         category: SECTION_FAQ.into(),
     }
@@ -86,61 +87,19 @@ fn highlights(locale: Locale) -> Vec<HelpItem> {
     ]
 }
 
-fn more_questions() -> Vec<HelpItem> {
+fn more_questions(locale: Locale) -> Vec<HelpItem> {
     vec![
+        faq(locale, "add-contact", "add_contact", "contacts--exchange"),
         faq(
-            "add-contact",
-            "How do I add a contact?",
-            "Meet in person and go to Exchange. \
-             Show your QR code or use Bluetooth to share your contact card. \
-             Both parties must be present — Vauchi never exchanges contacts remotely.",
-            "contacts--exchange",
-        ),
-        faq(
+            locale,
             "e2e-encryption",
-            "What is end-to-end encryption?",
-            "End-to-end encryption means only you and your contact can read \
-             your shared data. The relay server sees only encrypted blobs — \
-             it cannot read names, fields, or any content. Keys are exchanged \
-             in person and never leave your device.",
+            "e2e_encryption",
             "privacy--security",
         ),
-        faq(
-            "create-backup",
-            "How do I create a backup?",
-            "Go to Settings > Backup. Choose Export to create an \
-             encrypted backup file. Store it safely — you will need your \
-             password to restore it. Backups include your identity, contacts, \
-             and all field data.",
-            "backup--restore",
-        ),
-        faq(
-            "recovery",
-            "How does social recovery work?",
-            "Social recovery lets trusted contacts help you regain access \
-             if you lose your device. You choose recovery trustees from your \
-             contacts. To recover, a threshold of trustees must confirm your \
-             identity in person.",
-            "identity--account",
-        ),
-        faq(
-            "exchange-qr",
-            "How do I exchange contact cards?",
-            "Go to Exchange to show your QR code. Your contact scans it \
-             with their Vauchi app (or vice versa). This establishes an \
-             encrypted channel so future updates sync automatically. \
-             Both parties must be physically present.",
-            "contacts--exchange",
-        ),
-        faq(
-            "ip-privacy",
-            "How is my IP address protected?",
-            "Vauchi uses a self-hosted OHTTP relay that strips your IP \
-             address before requests reach the relay server. For additional \
-             protection you can configure a SOCKS5 proxy in Settings. \
-             Timing obfuscation further prevents traffic correlation.",
-            "privacy--security",
-        ),
+        faq(locale, "create-backup", "create_backup", "backup--restore"),
+        faq(locale, "recovery", "social_recovery", "identity--account"),
+        faq(locale, "exchange-qr", "exchange_qr", "contacts--exchange"),
+        faq(locale, "ip-privacy", "ip_privacy", "privacy--security"),
     ]
 }
 
@@ -203,7 +162,7 @@ fn about_versions(locale: Locale) -> String {
 
 pub(super) fn default_help_items(locale: Locale) -> Vec<HelpItem> {
     let mut items = highlights(locale);
-    items.extend(more_questions());
+    items.extend(more_questions(locale));
     items.extend(more_rows(locale));
     items
 }

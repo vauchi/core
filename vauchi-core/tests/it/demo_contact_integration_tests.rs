@@ -77,8 +77,8 @@ fn test_demo_tips_exist() {
 
     for tip in &tips {
         assert!(!tip.id.is_empty(), "Tip should have ID");
-        assert!(!tip.title.is_empty(), "Tip should have title");
-        assert!(!tip.content.is_empty(), "Tip should have content");
+        assert!(!tip.title_key.is_empty(), "Tip should have title");
+        assert!(!tip.content_key.is_empty(), "Tip should have content");
     }
 }
 
@@ -285,8 +285,8 @@ fn test_demo_contact_local_only() {
     // Card contains all needed info locally
     assert!(!card.id.is_empty());
     assert!(!card.display_name.is_empty());
-    assert!(!card.tip_title.is_empty());
-    assert!(!card.tip_content.is_empty());
+    assert!(!card.tip_title_key.is_empty());
+    assert!(!card.tip_content_key.is_empty());
     assert!(!card.tip_category.is_empty());
 }
 
@@ -403,7 +403,7 @@ fn test_demo_contact_full_lifecycle() {
 
     // Step 2: User views initial tip
     let initial_tip = state.current_tip().unwrap();
-    assert!(!initial_tip.title.is_empty());
+    assert!(!initial_tip.title_key.is_empty());
 
     // Step 3: Time passes, updates come
     state.advance_to_next_tip(0);
@@ -442,8 +442,8 @@ fn test_demo_card_generation_all_tips() {
         assert!(card.is_demo);
         assert_eq!(card.id, DEMO_CONTACT_ID);
         assert_eq!(card.display_name, DEMO_CONTACT_NAME);
-        assert_eq!(card.tip_title, tip.title);
-        assert_eq!(card.tip_content, tip.content);
+        assert_eq!(card.tip_title_key, tip.title_key);
+        assert_eq!(card.tip_content_key, tip.content_key);
     }
 }
 

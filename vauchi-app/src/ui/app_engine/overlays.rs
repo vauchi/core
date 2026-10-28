@@ -310,8 +310,12 @@ impl AppEngine {
         screen.components.insert(
             0,
             Component::Banner {
-                text: format!("{}: {}", card.tip_title, card.tip_content),
-                action_label: "Dismiss".into(),
+                text: format!(
+                    "{}: {}",
+                    self.t(&card.tip_title_key),
+                    self.t(&card.tip_content_key)
+                ),
+                action_label: self.t("demo_tip.dismiss"),
                 action_id: ACTION_DISMISS_DEMO_CONTACT.into(),
                 a11y: None,
             },

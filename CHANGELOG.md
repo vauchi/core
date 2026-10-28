@@ -8,6 +8,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+
+- The demo tips, their Dismiss action, the backup reminder toast and six
+  help answers render in the active locale instead of English
+  (vauchi/private#878, #832, #863). `DemoTip` and `DemoContactCard` now
+  carry locale keys (`title_key`, `content_key`, `tip_title_key`,
+  `tip_content_key`). `MobileDemoContact` keeps translated `tip_title` and
+  `tip_content` fields. The privacy tip no longer says data never touches
+  a server: relays carry the encrypted messages.
+
 ## [0.93.0] — 2026-10-27
 
 ### Added

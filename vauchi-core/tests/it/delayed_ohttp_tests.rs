@@ -132,6 +132,64 @@ fn a_delayed_fetch_is_answered_through_its_ticket() {
     assert_eq!(mock.ohttp_actions(), vec!["fetch".to_string()]);
 }
 
+fn blob_on(id: &str, token: &str) -> FetchedBlob {
+    FetchedBlob {
+        mailbox_token: Some(token.to_string()),
+        ..blob(id)
+    }
+}
+
+/// Two registration batches, one per day epoch (private#890), post two
+/// delayed tickets; each answer is attributed to its own batch's token and
+/// both arrive on the next cycle, so the split loses nothing.
+// @scenario: sealed_mailbox :: Fetch requests never span two day epochs
+#[test]
+fn two_registration_batches_post_two_tickets_and_both_answers_are_collected() {
+    let mock = gateway_relay();
+    let yesterday = "ab".repeat(32);
+    let today = "cd".repeat(32);
+    mock.set_gateway_blobs(vec![blob_on("b1", &yesterday), blob_on("b2", &today)]);
+    let delayed = DelayedRequests::shared();
+    let register = |adapter: &mut HttpTransportAdapter| {
+        for tokens in [vec![yesterday.clone()], vec![today.clone()]] {
+            adapter
+                .send(&envelope(MessagePayload::RegisterMailbox(
+                    RegisterMailbox { tokens },
+                )))
+                .expect("register");
+        }
+    };
+
+    let mut first = HttpTransportAdapter::new(transport(&mock)).with_delayed(delayed.clone());
+    register(&mut first);
+    assert!(first.receive().expect("first cycle").is_none());
+    assert_eq!(
+        posts(&mock),
+        2,
+        "one ticket per batch: {:?}",
+        requests(&mock)
+    );
+
+    let mut second = HttpTransportAdapter::new(transport(&mock)).with_delayed(delayed.clone());
+    register(&mut second);
+    let mut arrived = Vec::new();
+    while let Some(envelope) = second.receive().expect("second cycle") {
+        let MessagePayload::EncryptedUpdate(update) = envelope.payload else {
+            panic!("expected a fetched update");
+        };
+        arrived.push((
+            envelope.message_id.to_string(),
+            update.recipient_id.as_str().to_string(),
+        ));
+    }
+    arrived.sort();
+    assert_eq!(
+        arrived,
+        vec![("b1".to_string(), yesterday), ("b2".to_string(), today)],
+        "each batch's answer carries exactly its own mailbox's blob"
+    );
+}
+
 // @internal
 #[test]
 fn each_delayed_request_carries_a_fresh_128_bit_ticket() {

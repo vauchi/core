@@ -566,3 +566,39 @@ fn ohttp_debug_output_names_the_type_and_hides_key_material() {
     );
     assert_eq!(format!("{decryptor:?}"), "ResponseDecryptor { .. }");
 }
+
+// @scenario: relay_transport_security :: Sensitive requests are OHTTP-encapsulated when configured
+#[test]
+#[cfg(feature = "testing")]
+fn send_fetch_ack_and_purge_reach_the_relay_only_sealed_through_the_outer_hop() {
+    let application_relay = MockRelay::start();
+    let outer_relay = MockRelay::start();
+    let (mut vauchi, _dir) = vauchi_with_split_relays(&application_relay, &outer_relay);
+    vauchi.set_ohttp_key_for_testing(make_test_ohttp_client());
+    let transport = vauchi.build_relay_transport(&application_relay.url(), 1_000);
+    let mailbox = "ab".repeat(32);
+
+    let _ = transport.send_update(&mailbox, "c2VjcmV0", None);
+    let _ = transport.fetch(std::slice::from_ref(&mailbox));
+    let _ = transport.acknowledge(&mailbox, "blob-1");
+    let _ = transport.purge(&mailbox, "pk", "token", "sig", 0);
+
+    assert!(application_relay.received().is_empty());
+    let sealed = outer_relay.received();
+    assert_eq!(
+        sealed
+            .iter()
+            .map(|request| request.path.as_str())
+            .collect::<Vec<_>>(),
+        vec!["/v2/ohttp"; 4]
+    );
+    for request in &sealed {
+        assert!(
+            !request
+                .body
+                .windows(mailbox.len())
+                .any(|window| window == mailbox.as_bytes()),
+            "the outer hop saw the mailbox in clear"
+        );
+    }
+}

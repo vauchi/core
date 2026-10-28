@@ -20,17 +20,18 @@ pub struct DuplicatePair {
     pub similarity: f64,
 }
 
+const DUPLICATE_THRESHOLD: f64 = 0.7;
+
 /// Finds potential duplicate contacts based on name and field similarity.
 ///
 /// Returns pairs of contacts that exceed the similarity threshold (0.7).
 pub fn find_duplicates(contacts: &[Contact]) -> Vec<DuplicatePair> {
-    let threshold = 0.7;
     let mut duplicates = Vec::new();
 
     for i in 0..contacts.len() {
         for j in (i + 1)..contacts.len() {
             let sim = compute_similarity(&contacts[i], &contacts[j]);
-            if sim >= threshold {
+            if sim >= DUPLICATE_THRESHOLD {
                 duplicates.push(DuplicatePair {
                     id1: contacts[i].id().to_string(),
                     id2: contacts[j].id().to_string(),
@@ -51,9 +52,40 @@ pub fn find_duplicates(contacts: &[Contact]) -> Vec<DuplicatePair> {
 /// Computes similarity between two contacts (0.0 to 1.0).
 ///
 /// Uses weighted comparison of display name (weight 2.0) and shared field
-/// types (weight 1.0 each). Public so the API layer can expose individual
-/// pair scoring.
+/// types (weight 1.0 each). A shared phone number or email address scores at
+/// least the duplicate threshold whatever the names, so a nickname or an
+/// import under another name is still caught. Public so the API layer can
+/// expose individual pair scoring.
 pub fn compute_similarity(a: &Contact, b: &Contact) -> f64 {
+    let weighted = weighted_similarity(a, b);
+    if shares_a_contact_point(a, b) {
+        weighted.max(DUPLICATE_THRESHOLD)
+    } else {
+        weighted
+    }
+}
+
+fn contact_point(field: &ContactField) -> Option<String> {
+    match field.field_type() {
+        FieldType::Phone => Some(normalize_phone(field.value())),
+        FieldType::Email => Some(field.value().trim().to_lowercase()),
+        _ => None,
+    }
+    .filter(|point| !point.is_empty())
+}
+
+fn shares_a_contact_point(a: &Contact, b: &Contact) -> bool {
+    a.card().fields().iter().any(|field_a| {
+        contact_point(field_a).is_some_and(|point| {
+            b.card().fields().iter().any(|field_b| {
+                field_b.field_type() == field_a.field_type()
+                    && contact_point(field_b).as_deref() == Some(point.as_str())
+            })
+        })
+    })
+}
+
+fn weighted_similarity(a: &Contact, b: &Contact) -> f64 {
     let mut score = 0.0;
     let mut max_score = 0.0;
 

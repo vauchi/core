@@ -1,0 +1,92 @@
+{
+  "description": [
+    "Vauchi known-answer vectors, produced by vauchi-core's shipped functions.",
+    "All byte strings are lower-case hex. KDF: HKDF-SHA256 (RFC 5869); AEAD: XChaCha20-Poly1305 in the 0x02/0x03 tagged format; curves: X25519 and Ed25519.",
+    "identity: Ed25519 key from the master seed; X25519 exchange key from HKDF(seed, info); per-device id and exchange key from HKDF(seed, info || index as little-endian u32).",
+    "x3dh: shared_key = HKDF(salt = none, ikm = DH1 || DH2, info) with DH1 = X25519(initiator static, responder static) and DH2 = X25519(initiator ephemeral, responder static), as X3DH::respond computes it.",
+    "ratchet: (root_key || send_chain_key_0) = HKDF(salt = x3dh_secret, ikm = DH(initiator dh, responder dh), root_info, 64 bytes); message_key_0 = HKDF(chain key, message_key_info); send_chain_key_1 = HKDF(chain key, chain_key_info). message.ciphertext encrypts pad(plaintext) with message_key_0 and the 44-byte header as associated data; the nonce and the padding bytes are random, so only decryption is reproducible.",
+    "mailbox_tokens: token = HKDF(ikm, info || recipient key [|| device id] || day_epoch as big-endian u64) with ikm the shared key (contact tokens) or the master seed (device-sync token).",
+    "backup: 0x03 || salt(16) || XChaCha20-Poly1305(key, zlib(json)); key = HKDF-expand(HKDF-extract(none, Argon2id(password, salt)), hkdf_info, 32)."
+  ],
+  "identity": {
+    "master_seed": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+    "signing_public_key": "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
+    "fingerprint": "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
+    "exchange_seed_info": "Vauchi_Exchange_Seed_v2",
+    "exchange_seed": "bc3fac05c9c6fb6441e63e04134459e85028e2d1d9efb1e25eabe038089907fc",
+    "exchange_public_key": "9e3dea985d96430780e78392d828eb539ed6fea7e68e7485e0e367d7817e5d66",
+    "device_index": 0,
+    "device_id_info": "Vauchi_Device_ID_v2",
+    "device_id": "52fcd8b6790915a81ce372ae09f81eeb4a87e89ea9d4783e8fb18c988f9e31d4",
+    "device_exchange_info": "Vauchi_Device_Exchange_v2",
+    "device_exchange_public_key": "a3c20b72d7e76d9ac29050dba7db5622b642d2b82dc6ac4c0c32820e7d2aaa50"
+  },
+  "x3dh": {
+    "info": "vauchi-x3dh-key-v2",
+    "initiator_static_secret": "101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
+    "initiator_static_public": "d89e3bad79437dbed9f843418304f460ff05c7fe81fe4a9577a804cb9367ff66",
+    "responder_static_secret": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+    "responder_static_public": "358072d6365880d1aeea329adf9121383851ed21a28e3b75e965d0d2cd166254",
+    "initiator_ephemeral_secret": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+    "initiator_ephemeral_public": "34e42d4af5ef94a07a3a84201b889d4cd1a743cb27b11b6a10438a8feb8e5847",
+    "dh1": "959fece8b6bd813770767a309fdd40565f9b385d50e2eba47182a1417af4b410",
+    "dh2": "b8b1ea743eeb69466cd0441b15ad0aa9ec9a7e8bb4d3cec2e66237d2aa50281e",
+    "shared_key": "f06a77300b7bb2680880c2a5646041455af1e1967011173c1bf0a8f613e2f8e7"
+  },
+  "ratchet": {
+    "root_info": "Vauchi_Root_Ratchet",
+    "chain_key_info": "Vauchi_Chain_Key",
+    "message_key_info": "Vauchi_Message_Key",
+    "x3dh_secret": "f06a77300b7bb2680880c2a5646041455af1e1967011173c1bf0a8f613e2f8e7",
+    "responder_dh_secret": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+    "responder_dh_public": "79a631eede1bf9c98f12032cdeadd0e7a079398fc786b88cc846ec89af85a51a",
+    "initiator_dh_secret": "505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f",
+    "initiator_dh_public": "392d174a38b3b1beafaf1fe824870841c5fa531bc6eafdb6402c124664488c1c",
+    "dh_output": "866f59f6a36a637a47270973e38ebe77f1b63e437b5b8691820312a93679aa26",
+    "root_key": "4cec1ad603d9bfff03f80165f7fb1410abc87c28868307b99e2cba0980698a99",
+    "send_chain_key_0": "0cd4dc7db21389dbe86dec2bd09f09263b6f1035c4ee326b62313ad85eb30b27",
+    "message_key_0": "f3ef8b19feb397c71c7c1cc3a3cbfb0f569f550acb405e6cc00508de25d88d91",
+    "send_chain_key_1": "a19ec7068ea53b31c037427360ab57d64bef0f8fadf11db7c5d152d7a6db3b7a",
+    "plaintext": "766175636869207465737420766563746f72",
+    "message": {
+      "dh_public": "392d174a38b3b1beafaf1fe824870841c5fa531bc6eafdb6402c124664488c1c",
+      "dh_generation": 0,
+      "message_index": 0,
+      "previous_chain_length": 0,
+      "associated_data": "392d174a38b3b1beafaf1fe824870841c5fa531bc6eafdb6402c124664488c1c000000000000000000000000",
+      "ciphertext": "036374077b28ca160ae7cbc1571a9ea780f07802b4a925b5b48fcb563ed5d2c757210fb11b93ab3f67f96c75f741f6e6224cc71cd62507ba2535f59ab2f78210ea4a367ab827385d4ce712936ccd5119bfead4bac29e93a18ac9b06fb717da2e62ca0348686f66ae9f371e9d1779eca819c1c05bcaac7de1c7cf601727fb8b90be8dca75e86907f91b28c3308fe2ec917bc07971cdd047004a37236ecfc2e8090cf6b62f96d96017933f37ae75a57464625e0dc35f919dab367158bd3704631724634c65b313bce27893f2aaa960f075c05233b9b23693fd4b9eed6b58c97a0683a4d87cd8207ab32a6555c4291f68b44cf2a6b3e329f67849218dcf2117a040d157ff2590b801834f9945f28f4b013f8caf193b9bdc65141b2e5be9eacf84124d0014dc3af650fb4e"
+    }
+  },
+  "mailbox_tokens": {
+    "contact_info": "Vauchi_Mailbox_v1",
+    "device_contact_info": "Vauchi_MailboxDevice_v1",
+    "device_sync_info": "Vauchi_DeviceSyncRecipient_v1",
+    "shared_key": "606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f",
+    "recipient_identity_key": "707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f",
+    "recipient_device_id": "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
+    "master_seed": "909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
+    "day_epoch": 20750,
+    "contact_token": "89fc8bcd355d0ef17f90e1f001058f32d0406373e9a8f8ca09730282c85a3e25",
+    "device_contact_token": "a7e7f5211421b6fce472062931535411fa78651369298ed3a11a0d5720b7b29e",
+    "device_sync_token": "8d7e89be5a881c5f976fb0bc72730706d876797fb03d1f9ef4d1dc67d559ea4b"
+  },
+  "backup": {
+    "password": "correct horse battery staple",
+    "argon2id": {
+      "memory_kib": 65536,
+      "iterations": 3,
+      "parallelism": 4,
+      "output_bytes": 32
+    },
+    "hkdf_info": "vauchi-backup-v3",
+    "display_name": "Vector",
+    "master_seed": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
+    "device_index": 0,
+    "device_name": "vector-device",
+    "created_at": 1793000000,
+    "salt": "1d02d998570b3c19a2722cdbaed90af7",
+    "argon2id_base_key": "f8d7bebcc7e933f796e0a77b2cf54850154b461bad605f04b7dbe9d67965666f",
+    "key": "3d1d3346512eb451dd5b33ed94e8608140f8db14696dd2497194633f7c7f9214",
+    "backup": "031d02d998570b3c19a2722cdbaed90af7028a8d8df47399628d3a43d995e84df9b6adadc2225f606529797a6731d5495ec7df1228edcf2ac86111be4b697f57ed02660a439c68f2c370e648a09b89edd61ae5227a4c798e874aeac6586797f16a083a69fe37b3a5b89e815d1133883326c4fff93e3a8ac38b91067d3aa243055923cf74c5d50908d4f94b766420c3386e2def0b48448aa4d809b458ace555313014ef0f1aba6d5a2e7354b3f4d1f4c692bd51ce53567b9e85adbad9b566908419be441cf9340ad241049fba754a0a2d57759ec1f07ff8f05e3326386c816af02dad4a7f19ed21"
+  }
+}

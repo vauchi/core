@@ -253,3 +253,120 @@ fn test_content_versions_require_exact_numeric_triplets() {
     assert_eq!(parse_exact_version("1.two.3"), None);
     assert_eq!(parse_exact_version("1.2.3-beta"), None);
 }
+
+fn signed_networks_manifest_requiring(
+    keypair: &SigningKeyPair,
+    version: &str,
+    min_app_version: &str,
+) -> ContentManifest {
+    let mut manifest = signed_networks_manifest(keypair, version);
+    if let Some(entry) = manifest.content.networks.as_mut() {
+        entry.min_app_version = min_app_version.to_string();
+    }
+    manifest.signature = None;
+    let canonical = serde_json::to_vec(&serde_json::to_value(&manifest).unwrap()).unwrap();
+    manifest.signature = Some(hex::encode(keypair.sign(&canonical).as_bytes()));
+    manifest
+}
+
+fn manager_at(temp: &TempDir, content_url: String, keypair: &SigningKeyPair) -> ContentManager {
+    let config = ContentConfig {
+        storage_path: temp.path().to_path_buf(),
+        content_url,
+        publisher_public_key: keypair.public_key(),
+        check_interval: std::time::Duration::ZERO,
+        ..Default::default()
+    };
+    ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap()
+}
+
+fn unreachable_url() -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    drop(listener);
+    format!("http://{address}")
+}
+
+// @scenario: remote_content :: Fetch content manifest on app launch
+#[test]
+fn a_first_check_fetches_the_manifest_and_caches_it() {
+    let temp = TempDir::new().unwrap();
+    let keypair = SigningKeyPair::generate();
+    let remote = signed_networks_manifest(&keypair, "1.1.0");
+    let manager = manager_at(
+        &temp,
+        serve_http(vec![
+            serde_json::to_vec(&remote).unwrap(),
+            serde_json::to_vec(&remote).unwrap(),
+            b"expected content".to_vec(),
+        ]),
+        &keypair,
+    );
+    assert!(manager.should_check_now(), "never checked before");
+
+    manager.run_update_cycle_blocking();
+
+    let cached = manager
+        .cache()
+        .get_manifest()
+        .expect("the manifest is cached");
+    assert_eq!(cached.content.networks.unwrap().version, "1.1.0");
+}
+
+// @scenario: remote_content :: Skip updates requiring newer app version
+#[test]
+fn content_needing_a_newer_app_is_not_offered() {
+    let keypair = SigningKeyPair::generate();
+    let status_for = |min_app_version: &str| {
+        let temp = TempDir::new().unwrap();
+        let remote = signed_networks_manifest_requiring(&keypair, "2.0.0", min_app_version);
+        let manager = manager_at(
+            &temp,
+            serve_http(vec![serde_json::to_vec(&remote).unwrap()]),
+            &keypair,
+        );
+        block_on(manager.check_for_updates())
+    };
+
+    assert!(matches!(status_for("99.0.0"), UpdateStatus::UpToDate));
+    assert!(matches!(
+        status_for("0.1.0"),
+        UpdateStatus::UpdatesAvailable(ref types) if types == &[ContentType::Networks]
+    ));
+}
+
+// @scenario: remote_content :: Use cached manifest when offline
+#[test]
+fn offline_the_cached_content_stays_and_a_failed_check_changes_nothing() {
+    let temp = TempDir::new().unwrap();
+    let keypair = SigningKeyPair::generate();
+    let remote = signed_networks_manifest(&keypair, "1.1.0");
+    manager_at(
+        &temp,
+        serve_http(vec![
+            serde_json::to_vec(&remote).unwrap(),
+            serde_json::to_vec(&remote).unwrap(),
+            b"expected content".to_vec(),
+        ]),
+        &keypair,
+    )
+    .run_update_cycle_blocking();
+    let offline = manager_at(&temp, unreachable_url(), &keypair);
+
+    let (status, applied) = offline.run_update_cycle_blocking();
+
+    assert!(matches!(status, UpdateStatus::CheckFailed(_)), "{status:?}");
+    assert!(applied.is_none());
+    let cached = offline
+        .cache()
+        .get_manifest()
+        .expect("the manifest is kept");
+    assert_eq!(cached.content.networks.unwrap().version, "1.1.0");
+    assert_eq!(
+        offline
+            .cache()
+            .get_content(ContentType::Networks, "networks.json")
+            .as_deref(),
+        Some(b"expected content".as_slice())
+    );
+}

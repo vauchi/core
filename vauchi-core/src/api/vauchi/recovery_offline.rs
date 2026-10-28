@@ -70,11 +70,11 @@ impl Vauchi {
     }
 
     /// Creates a recovery claim for the given old (lost) identity public
-    /// key (hex-encoded) and returns the base64-encoded claim ready to
-    /// share with trusted contacts. Mirrors the existing platform-layer
-    /// `create_recovery_claim` helper, but exposed at the Vauchi API
-    /// level so the app-layer UI engine can use it without reaching into
-    /// Identity directly.
+    /// key (hex-encoded), stores it as the recovery in progress, and returns
+    /// the base64-encoded claim ready to share with trusted contacts.
+    /// Mirrors the existing platform-layer `create_recovery_claim` helper,
+    /// but exposed at the Vauchi API level so the app-layer UI engine can
+    /// use it without reaching into Identity directly.
     ///
     /// Used by the Recover-tab UI on the recovering user's new device:
     /// the user pastes their previous identity's public key, this signs
@@ -87,22 +87,13 @@ impl Vauchi {
     /// no relay round-trip. Suitable for the offline initial-claim
     /// share-with-guardians flow.
     pub fn create_recovery_claim_hex_b64(&self, old_pk_hex: &str) -> VauchiResult<String> {
-        let identity = self
-            .identity
-            .as_ref()
-            .ok_or(VauchiError::IdentityNotInitialized)?;
-
         let old_pk_bytes = hex::decode(old_pk_hex.trim())
             .map_err(|e| VauchiError::Serialization(format!("invalid hex: {e}")))?;
         let old_pk: [u8; 32] = old_pk_bytes
             .try_into()
             .map_err(|_| VauchiError::Serialization("public key must be 32 bytes".into()))?;
 
-        let claim = RecoveryClaim::new(
-            old_pk,
-            identity.signing_public_key(),
-            self.clock.unix_seconds(),
-        );
+        let claim = self.start_recovery_claim(&old_pk)?;
         Ok(base64::engine::general_purpose::STANDARD.encode(claim.to_bytes()))
     }
 

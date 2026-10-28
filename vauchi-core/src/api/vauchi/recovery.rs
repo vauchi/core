@@ -112,25 +112,7 @@ impl Vauchi {
     /// old_pk is the identity we're trying to recover. Returns the claim
     /// and starts tracking recovery progress.
     pub fn create_recovery_claim(&self, old_pk: &[u8; 32]) -> VauchiResult<RecoveryClaim> {
-        let identity = self
-            .identity
-            .as_ref()
-            .ok_or(VauchiError::IdentityNotInitialized)?;
-
-        let now = self.clock.unix_seconds();
-        let claim = RecoveryClaim::new(old_pk, identity.signing_public_key(), now);
-
-        // Load recovery settings for threshold
-        let settings = self
-            .storage
-            .recovery()
-            .load_recovery_settings()?
-            .unwrap_or_default();
-
-        let progress = RecoveryProgress::new(claim.clone(), settings.recovery_threshold(), now);
-        self.storage.recovery().save_recovery_progress(&progress)?;
-
-        Ok(claim)
+        self.start_recovery_claim(old_pk)
     }
 
     /// Adds a voucher to the in-progress recovery proof.

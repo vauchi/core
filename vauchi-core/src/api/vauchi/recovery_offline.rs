@@ -13,11 +13,34 @@ use base64::Engine;
 
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::contact::Contact;
-use crate::recovery::{RecoveryClaim, RecoveryVoucher};
+use crate::recovery::{RecoveryClaim, RecoveryProgress, RecoveryVoucher};
 
 use super::Vauchi;
 
 impl Vauchi {
+    /// Creates a claim binding `old_pk` to this identity and stores it as
+    /// the recovery in progress, so vouchers have a claim to attach to.
+    pub(super) fn start_recovery_claim(&self, old_pk: &[u8; 32]) -> VauchiResult<RecoveryClaim> {
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+
+        let now = self.clock.unix_seconds();
+        let claim = RecoveryClaim::new(old_pk, identity.signing_public_key(), now);
+
+        let settings = self
+            .storage
+            .recovery()
+            .load_recovery_settings()?
+            .unwrap_or_default();
+
+        let progress = RecoveryProgress::new(claim.clone(), settings.recovery_threshold(), now);
+        self.storage.recovery().save_recovery_progress(&progress)?;
+
+        Ok(claim)
+    }
+
     /// Parses a base64-encoded recovery claim received from a contact who
     /// is recovering their identity.
     ///

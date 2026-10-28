@@ -9,20 +9,21 @@
 //
 // One tick is 10 s: the chrome fails a step after BLE_STEP_TIMEOUT_SECS =
 // 60 s with no progress (`tick` → `force_failure`). The machine has no
-// deadline of its own; `sync_ble_handshake_lifecycle` cancels it only when
-// the screen changes, and `start_ble_handshake_on_discovery` is a no-op
-// while a session is held. A peer's writes reach the machine over the
-// open link whatever the chrome shows, and `apply_ble_machine_event`
+// deadline of its own; before #843 `sync_ble_handshake_lifecycle` cancelled
+// it only when the screen changed, and `start_ble_handshake_on_discovery`
+// is a no-op while a session is held. A peer's writes reach the machine
+// over the open link whatever the chrome shows, and `apply_ble_machine_event`
 // persists the contact on `Completed`.
 //
 // Run:
-//   quint run --main=current_design --invariant=no_live_machine_behind_a_failed_screen
-//   quint run --main=current_design --invariant=a_retry_starts_from_no_machine
-//   quint run --main=current_design --invariant=a_contact_is_persisted_only_on_a_live_screen
+//   quint run --main=before_843 --invariant=no_live_machine_behind_a_failed_screen
+//   quint run --main=before_843 --invariant=a_retry_starts_from_no_machine
+//   quint run --main=before_843 --invariant=a_contact_is_persisted_only_on_a_live_screen
 //   quint verify --main=failure_cancels_the_machine --invariant=...
 
 module ble_exchange_machine {
-  // The candidate fix: a step failure and a Retry tear the machine down.
+  // On since #843 (core!2031): a step failure and a Retry tear the machine
+  // down. Off models the code before it.
   const CANCEL_ON_FAILURE: bool
 
   pure val STEP_TIMEOUT = 6
@@ -143,13 +144,14 @@ module ble_exchange_machine {
     s.contactPersisted implies s.screen == Success
 }
 
-// What main runs today: the stall deadline fails the chrome and leaves the
-// machine holding the link. Violates all three invariants.
-module current_design {
+// Before #843: the stall deadline failed the chrome and left the machine
+// holding the link. Violates all three invariants.
+module before_843 {
   import ble_exchange_machine(CANCEL_ON_FAILURE = false).*
 }
 
-// The fix: the chrome's failure and Retry cancel the machine.
+// What main runs since #843: the chrome's failure and Retry cancel the
+// machine.
 module failure_cancels_the_machine {
   import ble_exchange_machine(CANCEL_ON_FAILURE = true).*
 }

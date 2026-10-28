@@ -12,6 +12,8 @@
 //!
 //! Regenerate with `VAUCHI_WRITE_TEST_VECTORS=1`, without the `test-kdf`
 //! feature: the backup vector must carry production Argon2id parameters.
+//! The verify tests run in that mode too, against whichever copy of the
+//! file they open; after a derivation change, run once more to see green.
 
 use std::path::PathBuf;
 
@@ -204,9 +206,6 @@ fn compute_identity(master_seed: [u8; 32]) -> IdentityVector {
 // @internal
 #[test]
 fn identity_vector_matches_the_shipped_key_derivations() {
-    if writing() {
-        return;
-    }
     let v = load().identity;
     let got = compute_identity(hex32(&v.master_seed));
     assert_eq!(got.signing_public_key, v.signing_public_key);
@@ -255,9 +254,6 @@ fn compute_x3dh() -> (X3dhVector, SymmetricKey) {
 // @internal
 #[test]
 fn x3dh_vector_matches_the_responder_derivation_and_its_formula() {
-    if writing() {
-        return;
-    }
     let v = load().x3dh;
     let responder = X3DHKeyPair::from_bytes(hex32(&v.responder_static_secret));
     let shared = X3DH::respond(
@@ -363,9 +359,6 @@ fn associated_data(m: &RatchetMessage) -> [u8; 44] {
 // @internal
 #[test]
 fn ratchet_vector_matches_the_root_and_chain_steps() {
-    if writing() {
-        return;
-    }
     let v = load().ratchet;
     let x3dh_secret = hex32(&v.x3dh_secret);
     let (root_key, send_chain_key) = HKDF::derive_key_pair(
@@ -412,9 +405,6 @@ fn ratchet_vector_matches_the_root_and_chain_steps() {
 // @internal
 #[test]
 fn ratchet_vector_message_decrypts_on_a_fresh_responder() {
-    if writing() {
-        return;
-    }
     let v = load().ratchet;
     let message = RatchetMessage {
         dh_public: hex32(&v.message.dh_public),
@@ -475,9 +465,6 @@ fn compute_mailbox() -> MailboxVector {
 // @internal
 #[test]
 fn mailbox_token_vectors_match_the_three_derivations() {
-    if writing() {
-        return;
-    }
     let v = load().mailbox_tokens;
     let shared_key = hex32(&v.shared_key);
     let recipient = hex32(&v.recipient_identity_key);
@@ -553,9 +540,6 @@ fn compute_backup() -> BackupVector {
 // @internal
 #[test]
 fn backup_vector_decrypts_from_the_recorded_argon2id_output() {
-    if writing() {
-        return;
-    }
     let v = load().backup;
     let backup = hex::decode(&v.backup).expect("backup");
     assert_eq!(backup[0], 0x03, "v3 version byte");
@@ -594,9 +578,6 @@ fn backup_vector_decrypts_from_the_recorded_argon2id_output() {
 #[cfg(not(feature = "test-kdf"))]
 #[test]
 fn backup_vector_imports_with_production_argon2id() {
-    if writing() {
-        return;
-    }
     let v = load().backup;
     let backup = hex::decode(&v.backup).expect("backup");
     let salt: [u8; 16] = backup[1..17].try_into().expect("salt");
@@ -665,5 +646,9 @@ fn write_test_vectors_when_asked() {
     };
     let mut text = serde_json::to_string_pretty(&vectors).expect("serialize");
     text.push('\n');
-    std::fs::write(fixture_path(), text).expect("write fixture");
+    // Written beside and renamed over, so a verify test running at the
+    // same time never opens a half-written file.
+    let staged = fixture_path().with_extension("json.tmp");
+    std::fs::write(&staged, text).expect("write fixture");
+    std::fs::rename(&staged, fixture_path()).expect("rename fixture");
 }

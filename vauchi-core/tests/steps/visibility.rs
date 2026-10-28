@@ -730,6 +730,42 @@ fn email_still_shown(world: &mut VauchiWorld) {
 #[then("I should be prompted to assign shown fields to groups")]
 fn prompted_to_assign(_world: &mut VauchiWorld) {}
 
+/// The first group leaves the email entry outside every group, so its own
+/// Visible/Hidden toggle still decides who sees it.
+#[then("I should be told that entries outside every group keep their own Visible/Hidden toggle")]
+fn ungrouped_entry_keeps_its_toggle(world: &mut VauchiWorld) {
+    let fid = world.own_field_id("Email");
+    assert!(
+        !world
+            .vauchi
+            .list_groups()
+            .unwrap()
+            .iter()
+            .any(|g| g.is_field_visible(&fid)),
+        "no group grants the email entry"
+    );
+    let shown = |world: &VauchiWorld| {
+        world
+            .vauchi
+            .own_card()
+            .unwrap()
+            .unwrap()
+            .is_field_shown(&fid)
+    };
+    world.vauchi.set_field_shown(&fid, false).unwrap();
+    assert!(!shown(world), "the toggle hides it");
+    world.vauchi.set_field_shown(&fid, true).unwrap();
+    assert!(shown(world), "the toggle shows it again");
+}
+
+#[then(expr = "I should see an error naming {string} as taken")]
+fn error_names_the_taken_name(world: &mut VauchiWorld, name: String) {
+    let Err(error) = &world.last_result else {
+        panic!("expected the rename to be refused");
+    };
+    assert!(error.contains(&name), "{error}");
+}
+
 /// Complex setup: creates the group, adds a "Phone" field, and assigns it group-only.
 #[given(expr = "I have a group {string} with phone field visible")]
 fn have_group_with_phone_visible(world: &mut VauchiWorld, group_name: String) {

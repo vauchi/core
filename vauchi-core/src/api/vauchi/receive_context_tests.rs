@@ -9,6 +9,49 @@ use crate::network::mailbox_token::{
 };
 use proptest::prelude::*;
 
+// @internal: a registration batch carries one day's routes, so no fetch request
+// spans two days and the relay cannot chain a fetcher across days (private#890).
+#[test]
+fn registration_batches_carry_one_day_of_routes_each() {
+    let identity = Identity::create("Alice", 0);
+    let relay = RelayConfig::default();
+    let contacts: Vec<Contact> = (1..=3u8)
+        .map(|i| {
+            Contact::from_exchange(
+                [i; 32],
+                ContactCard::new("Peer"),
+                SymmetricKey::from_bytes([i + 10; 32]),
+                0,
+            )
+        })
+        .collect();
+    let days = [41u64, 42, 43];
+    let context = registered_mailboxes(&identity, &contacts, &relay, &days);
+    let batches = registration_batches(&crate::rng::OsSecureRng::new(), &context.routes);
+
+    let day_of = |token: &String| match context.routes.get(token) {
+        Some(MailboxRoute::Contact { day, .. }) | Some(MailboxRoute::DeviceSync { day }) => {
+            Some(*day)
+        }
+        None => None,
+    };
+    let mut days_seen = std::collections::BTreeSet::new();
+    let mut routed = 0;
+    for batch in &batches {
+        assert_eq!(batch.len(), 256, "every batch is padded");
+        let batch_days: std::collections::BTreeSet<u64> = batch.iter().filter_map(day_of).collect();
+        assert_eq!(batch_days.len(), 1, "a batch mixes days: {batch_days:?}");
+        routed += batch.iter().filter(|t| day_of(t).is_some()).count();
+        days_seen.extend(batch_days);
+    }
+    assert_eq!(
+        routed,
+        context.routes.len(),
+        "every route is registered once"
+    );
+    assert_eq!(days_seen.into_iter().collect::<Vec<_>>(), days.to_vec());
+}
+
 // @internal: Captured windows cannot cross identity, device, application-relay or OHTTP-relay scope.
 #[test]
 fn mismatched_scope_does_not_authorize_any_route() {

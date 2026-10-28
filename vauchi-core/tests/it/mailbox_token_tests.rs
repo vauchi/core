@@ -408,6 +408,76 @@ fn registration_covers_yesterday_and_pads_every_batch_to_256() {
     );
 }
 
+/// A registration batch holds the tokens of one day only. Two consecutive
+/// days' fetch sets would otherwise overlap in yesterday's tokens and let
+/// the relay chain one fetcher across days (private#890).
+// @scenario: sealed_mailbox :: Fetch requests never span two day epochs
+#[test]
+fn registration_batches_hold_the_tokens_of_one_day_each() {
+    let master_seed = [0xBBu8; 32];
+    let device_id = [0x11u8; 32];
+    let contacts: Vec<[u8; 32]> = (1..=3u8).map(|i| [i; 32]).collect();
+    let today = 19804u64;
+    let days_offline = 2;
+    let batches = batch_register_tokens_with_device_sync(
+        &vauchi_core::rng::OsSecureRng::new(),
+        &contacts,
+        &TEST_PUBKEY,
+        &master_seed,
+        &device_id,
+        today,
+        days_offline,
+    );
+
+    let mut day_of_token = std::collections::HashMap::new();
+    for day in (today - days_offline - 1)..=today {
+        for contact in &contacts {
+            day_of_token.insert(
+                token_hex(&compute_mailbox_token(contact, &TEST_PUBKEY, day)),
+                day,
+            );
+            day_of_token.insert(
+                token_hex(&compute_device_mailbox_token(
+                    contact,
+                    &TEST_PUBKEY,
+                    &device_id,
+                    day,
+                )),
+                day,
+            );
+        }
+        day_of_token.insert(
+            token_hex(&compute_device_sync_token(&master_seed, &device_id, day)),
+            day,
+        );
+    }
+
+    let mut days_seen = std::collections::BTreeSet::new();
+    let mut real_tokens_seen = 0;
+    for batch in &batches {
+        let days: std::collections::BTreeSet<u64> = batch
+            .iter()
+            .filter_map(|token| day_of_token.get(token).copied())
+            .collect();
+        assert_eq!(days.len(), 1, "a batch mixes days: {days:?}");
+        real_tokens_seen += batch
+            .iter()
+            .filter(|token| day_of_token.contains_key(*token))
+            .count();
+        days_seen.extend(days);
+    }
+    assert_eq!(
+        real_tokens_seen,
+        day_of_token.len(),
+        "every real token is registered once"
+    );
+    assert_eq!(
+        days_seen.len() as u64,
+        days_offline + 2,
+        "every day has its own batch"
+    );
+}
+
 // @internal
 #[test]
 fn the_day_epoch_counts_whole_utc_days() {

@@ -57,6 +57,58 @@ fn a_capped_fetch_page_is_reported_as_truncated() {
     }
 }
 
+/// Each registration batch holds one day's tokens; a fetch request that
+/// mixed two batches would hand the relay both days' tokens in one set and
+/// let it chain the fetcher across days (private#890).
+// @scenario: sealed_mailbox :: Fetch requests never span two day epochs
+#[test]
+fn a_fetch_request_never_spans_two_registration_batches() {
+    let relay = MockRelay::start();
+    relay.set_default(CannedResponse::ok_json(
+        r#"{"status":"ok","blobs":[],"truncated":false}"#,
+    ));
+    let mut adapter = adapter_with_tokens(&relay, 0);
+    let yesterday: Vec<String> = (0..3).map(|i| format!("{i:064x}")).collect();
+    let today: Vec<String> = (100..103).map(|i| format!("{i:064x}")).collect();
+    for batch in [&yesterday, &today] {
+        adapter
+            .send(&MessageEnvelope {
+                version: PROTOCOL_VERSION,
+                message_id: "reg".to_string().into(),
+                timestamp: 0,
+                payload: MessagePayload::RegisterMailbox(RegisterMailbox {
+                    tokens: batch.clone(),
+                }),
+            })
+            .unwrap();
+    }
+
+    assert!(adapter.receive().unwrap().is_none());
+
+    let requested: Vec<Vec<String>> = relay
+        .received()
+        .into_iter()
+        .filter(|request| request.path == "/v2/fetch")
+        .map(|request| {
+            let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap();
+            body["mailbox_tokens"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|token| token.as_str().unwrap().to_string())
+                .collect()
+        })
+        .collect();
+    assert_eq!(requested.len(), 2, "one request per batch: {requested:?}");
+    for tokens in &requested {
+        let within_one_batch = tokens.iter().all(|t| yesterday.contains(t))
+            || tokens.iter().all(|t| today.contains(t));
+        assert!(within_one_batch, "a request spans two batches: {tokens:?}");
+    }
+    let all: Vec<&String> = requested.iter().flatten().collect();
+    assert!(yesterday.iter().chain(&today).all(|t| all.contains(&t)));
+}
+
 const ONE_BLOB_PAGE: &str = r#"{"status":"ok","blobs":[{"blob_id":"b1","ciphertext":"AQID","created_at":7,"mailbox_token":"0000000000000000000000000000000000000000000000000000000000000000"}]}"#;
 
 // @internal

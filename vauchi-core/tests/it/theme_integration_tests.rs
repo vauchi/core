@@ -261,6 +261,28 @@ fn test_catppuccin_mocha_colors() {
     assert_eq!(theme.colors.accent, "#89b4fa");
 }
 
+// @scenario: theming :: Apply Catppuccin Macchiato (dark)
+#[test]
+fn catppuccin_macchiato_is_dark_with_its_palette() {
+    let theme = theme_by_id("catppuccin-macchiato").unwrap();
+
+    assert_eq!(theme.mode, ThemeMode::Dark);
+    assert_eq!(theme.colors.bg_primary, "#24273a");
+    assert_eq!(theme.colors.text_primary, "#cad3f5");
+    assert_eq!(theme.colors.accent, "#8aadf4");
+}
+
+// @scenario: theming :: Apply Catppuccin Frappé (dark)
+#[test]
+fn catppuccin_frappe_is_dark_with_its_palette() {
+    let theme = theme_by_id("catppuccin-frappe").unwrap();
+
+    assert_eq!(theme.mode, ThemeMode::Dark);
+    assert_eq!(theme.colors.bg_primary, "#303446");
+    assert_eq!(theme.colors.text_primary, "#c6d0f5");
+    assert_eq!(theme.colors.accent, "#8caaee");
+}
+
 /// Test: Catppuccin Latte has correct colors
 /// Feature: theming.feature @catppuccin @light
 // @scenario: theming :: Apply Catppuccin Latte (light)

@@ -518,6 +518,7 @@ fn test_ble_expired_rejection() {
 }
 
 // @scenario: ble_exchange :: Self-exchange is rejected via BLE
+// @scenario: contact_exchange :: BLE exchange prevents self-exchange
 #[test]
 fn test_ble_self_exchange() {
     let alice_identity = Identity::create("Alice", 0);

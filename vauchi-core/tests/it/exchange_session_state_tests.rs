@@ -75,7 +75,7 @@ fn the_proximity_check_s_confidence_is_reported_and_logged() {
     assert_eq!(bob.proximity_confidence(), ProximityConfidence::Medium);
 }
 
-// @internal
+// @scenario: contact_exchange :: Exchange timeout after interruption
 #[test]
 fn a_session_accepts_events_for_sixty_seconds_then_fails() {
     let clock = Arc::new(FakeMonotonicClock::new());

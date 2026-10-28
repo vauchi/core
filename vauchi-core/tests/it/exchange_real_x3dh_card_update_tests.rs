@@ -45,6 +45,7 @@ fn owned_identity_copy(wb: &Vauchi) -> Identity {
 }
 
 // @scenario: sync_updates :: A card update propagates after an in-person exchange
+// @scenario: contact_exchange :: Card update propagates after exchange
 #[test]
 fn in_person_exchange_card_update_round_trips() {
     let alice = create_vauchi_with_card("Alice", vec![(FieldType::Email, "work", "alice@old.com")]);

@@ -79,6 +79,7 @@ mod contact_list_faceted_tests;
 mod contact_list_i18n_tests;
 mod contact_list_intercepts_tests;
 mod contact_list_screen_tests;
+mod contact_list_search_tests;
 mod contact_merge_engine_tests;
 mod contact_trust_tests;
 mod contact_visibility_screen_tests;

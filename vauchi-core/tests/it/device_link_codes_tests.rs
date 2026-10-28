@@ -42,6 +42,22 @@ fn a_link_qr_expires_exactly_five_minutes_after_it_was_made() {
     assert!(qr.is_expired(T0 + 301));
 }
 
+/// Both devices count in Unix seconds, so where each one is never enters:
+/// the code a Tokyo phone shows expires for a Los Angeles phone exactly
+/// 300 seconds of real time later.
+// @scenario: device_management :: Linking code ignores timezone
+#[test]
+fn a_scanned_link_code_expires_after_five_minutes_of_absolute_time() {
+    let shown_in_tokyo = DeviceLinkQR::generate_with_timestamp(&Identity::create("Alice", 0), T0);
+
+    let scanned_in_los_angeles =
+        DeviceLinkQR::from_data_string(&shown_in_tokyo.to_data_string()).unwrap();
+
+    assert_eq!(scanned_in_los_angeles.timestamp(), T0);
+    assert!(!scanned_in_los_angeles.is_expired(T0 + 299));
+    assert!(scanned_in_los_angeles.is_expired(T0 + 301));
+}
+
 // @internal
 #[test]
 fn numeric_codes_are_ddd_ddd_across_the_full_range() {

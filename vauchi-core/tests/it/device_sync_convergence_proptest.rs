@@ -118,6 +118,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(120))]
 
     // @scenario: device_management :: Concurrent edits converge by last-write-wins
+    // @scenario: device_management :: Timezone change during sync
     #[test]
     fn two_devices_converge_to_latest_write(ops in prop::collection::vec(op_strategy(), 1..40)) {
         let storage_a = Storage::in_memory(SymmetricKey::generate()).unwrap();

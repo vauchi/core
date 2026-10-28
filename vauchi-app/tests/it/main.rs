@@ -95,6 +95,7 @@ mod deep_link_consent_engine_tests;
 mod delivery_screen_tests;
 mod demo_presentation_tests;
 mod device_link_bridge_tests;
+mod device_link_join_guard_tests;
 mod device_link_live_device_tests;
 mod device_link_local_hosting_tests;
 mod device_link_pin_tests;

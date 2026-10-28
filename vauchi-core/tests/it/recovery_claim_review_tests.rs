@@ -367,3 +367,72 @@ fn was_cancelled_after_reject() {
     });
     assert!(engine.was_cancelled(), "reject should mark as cancelled");
 }
+
+// ── ClaimContext::from_verified_proof ────────────────────────────────
+
+fn verified_proof_context(mutual: usize, threshold: u32) -> ClaimContext {
+    use vauchi_core::contact::Contact;
+    use vauchi_core::crypto::{SigningKeyPair, SymmetricKey};
+    use vauchi_core::recovery::{RecoveryProof, RecoverySettings};
+    use vauchi_core::{ContactCard, RecoveryVoucher};
+
+    let old = SigningKeyPair::generate();
+    let new = SigningKeyPair::generate();
+    let old_pk = *old.public_key().as_bytes();
+    let new_pk = *new.public_key().as_bytes();
+    let helpers: Vec<SigningKeyPair> = (0..3).map(|_| SigningKeyPair::generate()).collect();
+    let mut proof = RecoveryProof::new(old_pk, new_pk, 3, 0);
+    for helper in &helpers {
+        proof
+            .add_voucher(RecoveryVoucher::create(&old_pk, &new_pk, helper, None, 0))
+            .expect("voucher");
+    }
+    let my_contacts: Vec<Contact> = helpers
+        .iter()
+        .take(mutual)
+        .map(|h| {
+            Contact::from_exchange(
+                *h.public_key().as_bytes(),
+                ContactCard::new("Helper"),
+                SymmetricKey::generate(),
+                0,
+            )
+        })
+        .collect();
+    let settings = RecoverySettings::new(3, threshold).expect("settings");
+    let verdict = proof.verify_for_contact(&my_contacts, &settings);
+    let context = ClaimContext::from_verified_proof("Alice".into(), &proof, &verdict, threshold);
+    assert_eq!(context.new_pk_fingerprint, hex::encode(new_pk));
+    context
+}
+
+// @scenario: recovery :: Reviewing a recovery claim
+// @internal
+#[test]
+fn verified_proof_with_enough_mutual_vouchers_reviews_at_high_confidence() {
+    let context = verified_proof_context(2, 2);
+    assert_eq!(context.confidence, Confidence::High);
+    assert_eq!(context.mutual_voucher_count, 2);
+    assert_eq!(context.threshold, 2);
+    assert_eq!(context.contact_name, "Alice");
+}
+
+// @scenario: recovery :: Reviewing a recovery claim
+// @internal
+#[test]
+fn verified_proof_with_one_mutual_voucher_reviews_at_medium_confidence() {
+    let context = verified_proof_context(1, 2);
+    assert_eq!(context.confidence, Confidence::Medium);
+    assert_eq!(context.mutual_voucher_count, 1);
+}
+
+// @scenario: recovery :: Reviewing a recovery claim
+// @internal
+#[test]
+fn verified_proof_with_no_mutual_voucher_reviews_at_low_confidence() {
+    let context = verified_proof_context(0, 2);
+    assert_eq!(context.confidence, Confidence::Low);
+    assert_eq!(context.mutual_voucher_count, 0);
+    let screen = RecoveryClaimReviewEngine::new(ReviewMode::Acceptance, context).current_screen();
+    assert_eq!(screen.screen_id, "recovery_claim_review");
+}

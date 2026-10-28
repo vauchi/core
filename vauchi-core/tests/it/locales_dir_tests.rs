@@ -17,6 +17,7 @@ fn checkout_with_english() -> tempfile::TempDir {
     dir
 }
 
+// @internal
 #[test]
 #[should_panic(expected = "git clone git@gitlab.com:vauchi/locales.git")]
 fn a_missing_sibling_checkout_names_the_clone_command() {
@@ -25,6 +26,7 @@ fn a_missing_sibling_checkout_names_the_clone_command() {
     checked_locales_dir(None, empty.path().to_path_buf());
 }
 
+// @internal
 #[test]
 #[should_panic(expected = "VAUCHI_LOCALES_DIR")]
 fn a_locales_dir_variable_without_english_names_the_variable() {
@@ -37,6 +39,7 @@ fn a_locales_dir_variable_without_english_names_the_variable() {
     );
 }
 
+// @internal
 #[test]
 fn a_sibling_checkout_with_english_is_used() {
     let sibling = checkout_with_english();
@@ -47,6 +50,7 @@ fn a_sibling_checkout_with_english_is_used() {
     );
 }
 
+// @internal
 #[test]
 fn the_variable_wins_over_the_sibling_checkout() {
     let from_env = checkout_with_english();

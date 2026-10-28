@@ -67,7 +67,15 @@ fn a_refused_relay_url_is_not_persisted_for_the_next_launch() {
     let config = VauchiConfig::with_storage_path(&db_path).with_storage_key(storage_key);
     let vauchi = Vauchi::new(config).unwrap();
     assert_eq!(vauchi.config().relay.server_url, DEFAULT_RELAY);
-    assert_eq!(vauchi.config().relay.ohttp_trust_anchor(), None);
+    assert_eq!(
+        vauchi.config().relay.ohttp_trust_anchor(),
+        Vauchi::in_memory()
+            .unwrap()
+            .config()
+            .relay
+            .ohttp_trust_anchor(),
+        "the refused relay's anchor must not replace the default one"
+    );
 }
 
 // @scenario: relay_transport_security :: Relay URLs must use https

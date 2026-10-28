@@ -444,6 +444,8 @@ impl Vauchi {
                 "Relay URL cannot be empty".into(),
             ));
         }
+        crate::relay_url::validate_configured_relay_url(trimmed)
+            .map_err(|error| VauchiError::InvalidState(error.to_string()))?;
         if ohttp_anchor.is_none() && crate::api::RelayConfig::requires_ohttp_anchor(trimmed) {
             return Err(VauchiError::InvalidState(
                 "A custom relay needs its OHTTP anchor".into(),

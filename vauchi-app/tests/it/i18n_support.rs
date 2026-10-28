@@ -22,9 +22,14 @@ use vauchi_app::ui::{Component, ScreenModel};
 /// `.clone-locales` template places the checkout as a sibling of core,
 /// at the same relative path `build.rs` bundles English from.
 pub fn load_german() {
-    let bytes = std::fs::read(locales_dir().join("de.json"))
+    load_locale("de");
+}
+
+/// Loads the real locale `code` (e.g. `"fr"`) the same way as `load_german`.
+pub fn load_locale(code: &str) {
+    let bytes = std::fs::read(locales_dir().join(format!("{code}.json")))
         .expect("locales checkout present as sibling repo (CI: .clone-locales)");
-    load_locale_from_bytes("de", &bytes).expect("German locale parses");
+    load_locale_from_bytes(code, &bytes).unwrap_or_else(|e| panic!("{code} locale parses: {e:?}"));
 }
 
 pub fn action_label(screen: &ScreenModel, id: &str) -> String {

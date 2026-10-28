@@ -222,6 +222,32 @@ fn cross_kind_dedup_finds_phone_match() {
     );
 }
 
+// @scenario: contact_import :: Phone normalization detects duplicates across formatting
+#[test]
+fn bob_and_an_imported_robert_with_the_same_phone_are_flagged_as_duplicates() {
+    let bob = make_contact("Bob", &[(FieldType::Phone, "mobile", "+1 (555) 123-4567")]);
+    let robert = make_imported_contact("Robert", &[(FieldType::Phone, "mobile", "15551234567")]);
+
+    let pairs = find_duplicates(&[bob.clone(), robert.clone()]);
+
+    let ids: Vec<(&str, &str)> = pairs
+        .iter()
+        .map(|p| (p.id1.as_str(), p.id2.as_str()))
+        .collect();
+    assert_eq!(ids, vec![(bob.id(), robert.id())]);
+}
+
+// @internal
+#[test]
+fn the_same_email_flags_differently_named_contacts_as_duplicates() {
+    let bob = make_contact("Bob", &[(FieldType::Email, "home", "Bob@Example.com")]);
+    let robert = make_imported_contact("Robert", &[(FieldType::Email, "home", "bob@example.com")]);
+
+    let pairs = find_duplicates(&[bob, robert]);
+
+    assert_eq!(pairs.len(), 1);
+}
+
 // @internal
 #[test]
 fn different_phones_stay_below_threshold() {

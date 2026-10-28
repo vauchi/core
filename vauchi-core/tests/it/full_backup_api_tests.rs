@@ -172,6 +172,30 @@ fn full_backup_api_wrong_password() {
     assert!(result.is_err());
 }
 
+/// The full backup is the default level and carries every contact's shared
+/// key, so it must refuse the same weak password the identity-only export
+/// refuses, with the same error, and still accept a strong one (private#891).
+// @scenario: backup_format_versioning :: Full backup refuses a weak password
+#[test]
+fn full_backup_export_refuses_the_weak_password_the_identity_export_refuses() {
+    let v = setup_vauchi_with_data();
+    let weak_password = "password1";
+
+    let identity_only = v.export_backup(weak_password).unwrap_err();
+    let full = v.export_full_backup(weak_password).unwrap_err();
+
+    assert_eq!(full.to_string(), identity_only.to_string());
+    assert!(
+        full.to_string().contains("WeakPassword"),
+        "the refusal must name the weak password, got: {full}"
+    );
+    let strong = v.export_full_backup(BACKUP_PASSWORD).unwrap();
+    assert!(
+        strong.starts_with("06"),
+        "a strong password still exports a v6 file"
+    );
+}
+
 /// Full backup on uninitialized identity must fail.
 // @scenario: backup_format_versioning :: Full backup requires identity
 #[test]

@@ -67,7 +67,9 @@ pub const BUNDLED_EN_JSON: &str = "{}";
             escaped
         )
     } else {
-        eprintln!("cargo:warning=No locale file found, using minimal fallback");
+        eprintln!(
+            "cargo:warning=No locales checkout found (VAUCHI_LOCALES_DIR or ../locales beside core): bundling a two-string English fallback, so i18n tests will fail. Fix: git clone git@gitlab.com:vauchi/locales.git beside core, or run `just setup` (private#879)"
+        );
 
         r#"/// Minimal fallback when locales repo not available
 pub const BUNDLED_EN_JSON: &str = "{\"app.name\":\"Vauchi\",\"welcome.title\":\"Welcome to Vauchi\"}";

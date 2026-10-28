@@ -93,9 +93,21 @@ pub fn assert_all_translated(pairs: &[(&str, String, String)]) {
 /// CI and `just mutants-diff`) because cargo-mutants builds a temp copy where
 /// the relative sibling does not exist.
 pub fn locales_dir() -> std::path::PathBuf {
-    std::env::var_os("VAUCHI_LOCALES_DIR")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| {
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales")
-        })
+    let (dir, source) = match std::env::var_os("VAUCHI_LOCALES_DIR") {
+        Some(dir) => (std::path::PathBuf::from(dir), "VAUCHI_LOCALES_DIR"),
+        None => (
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales"),
+            "the sibling checkout beside core",
+        ),
+    };
+    // Same check and wording as vauchi-core's tests/it/common (private#879).
+    assert!(
+        dir.join("en.json").is_file(),
+        "no locales checkout at {dir} ({source}): en.json is missing.\n  \
+         Clone it: git clone git@gitlab.com:vauchi/locales.git {dir}\n  \
+         or run `just setup` from the workspace root, \
+         or set VAUCHI_LOCALES_DIR to a locales checkout",
+        dir = dir.display(),
+    );
+    dir
 }

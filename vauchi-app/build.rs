@@ -129,7 +129,9 @@ pub const BUNDLED_EN_JSON: &str = "{}";
             escaped
         )
     } else {
-        eprintln!("cargo:warning=No locale file found, using minimal fallback");
+        eprintln!(
+            "cargo:warning=No locales checkout found (VAUCHI_LOCALES_DIR or ../locales beside core): bundling a two-string English fallback, so i18n tests will fail. Fix: git clone git@gitlab.com:vauchi/locales.git beside core, or run `just setup` (private#879)"
+        );
 
         r#"/// Minimal fallback when locales repo not available
 pub const BUNDLED_EN_JSON: &str = "{\"app.name\":\"Vauchi\",\"welcome.title\":\"Welcome to Vauchi\"}";
@@ -153,8 +155,7 @@ pub const BUNDLED_LOCALES_REV: &str = "{locales_rev}";
     fs::write(&dest_path, generated).unwrap();
 
     // ── themes.json bundling (Phase 2a/A3a) ───────────────────────
-    // Mirror of vauchi-platform/build.rs. Materializes
-    // themes/generated/themes.json into OUT_DIR/themes.json so
+    // Materializes themes/generated/themes.json into OUT_DIR/themes.json so
     // theme::bundled_themes() can include_bytes! it.
     println!("cargo::rerun-if-env-changed=VAUCHI_THEMES_DIR");
 
@@ -191,7 +192,7 @@ pub const BUNDLED_LOCALES_REV: &str = "{locales_rev}";
         }
         None => {
             eprintln!(
-                "cargo:warning=themes.json not found via VAUCHI_THEMES_DIR or sibling-repo paths — using empty `[]` fallback (runtime default_theme() will be used)"
+                "cargo:warning=themes.json not found via VAUCHI_THEMES_DIR or sibling-repo paths — using empty `[]` fallback (runtime default_theme() will be used, and theme and fixture tests will fail). themes/generated/ is gitignored: run `python3 themes/scripts/generate.py` from the workspace root, or `just setup` (private#879)"
             );
             b"[]".to_vec()
         }

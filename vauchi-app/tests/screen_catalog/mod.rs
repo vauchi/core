@@ -48,13 +48,22 @@ pub fn init_fixture_i18n() {
         .ancestors()
         .map(|ancestor| ancestor.join("locales"))
         .find(|candidate| candidate.join("en.json").is_file())
-        .expect("fixture tests require the bundled English locale");
+        .expect(
+            "no locales checkout with en.json above core: \
+             git clone git@gitlab.com:vauchi/locales.git beside core, \
+             or run `just setup` from the workspace root (private#879)",
+        );
     vauchi_app::i18n::init(&locales_dir).expect("load production locale strings");
     let sibling_locales = std::env::var_os("VAUCHI_LOCALES_DIR")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| manifest_dir.join("../../locales"));
-    let german = std::fs::read(sibling_locales.join("de.json"))
-        .expect("locales checkout present as sibling repo (CI: .clone-locales)");
+    let german = std::fs::read(sibling_locales.join("de.json")).unwrap_or_else(|e| {
+        panic!(
+            "no de.json in {} ({e}): git clone git@gitlab.com:vauchi/locales.git \
+                 beside core, run `just setup`, or set VAUCHI_LOCALES_DIR (private#879)",
+            sibling_locales.display()
+        )
+    });
     vauchi_app::i18n::load_locale_from_bytes("de", &german).expect("German locale parses");
 }
 

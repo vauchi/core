@@ -179,7 +179,6 @@ fn test_send_emergency_broadcast_without_config_fails() {
     );
 }
 
-// @scenario: emergency_broadcast :: Send emergency broadcast from app
 // @scenario: emergency_broadcast :: Alert delivery to multiple contacts
 #[test]
 fn test_send_emergency_broadcast_queues_alerts() {
@@ -237,7 +236,7 @@ fn test_send_emergency_broadcast_returns_result() {
     assert_eq!(result.sent, 1, "sent should only count reachable contacts");
 }
 
-// @scenario: emergency_broadcast :: Send emergency broadcast from app
+// @internal
 #[test]
 fn test_broadcast_dispatches_event() {
     let (mut alice_wb, _bob_wb, secret, bob_id, _alice_id) = setup_alice_bob_exchange();

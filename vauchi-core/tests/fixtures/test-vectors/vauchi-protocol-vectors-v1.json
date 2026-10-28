@@ -6,7 +6,8 @@
     "x3dh: shared_key = HKDF(salt = none, ikm = DH1 || DH2, info) with DH1 = X25519(initiator static, responder static) and DH2 = X25519(initiator ephemeral, responder static), as X3DH::respond computes it.",
     "ratchet: (root_key || send_chain_key_0) = HKDF(salt = x3dh_secret, ikm = DH(initiator dh, responder dh), root_info, 64 bytes); message_key_0 = HKDF(chain key, message_key_info); send_chain_key_1 = HKDF(chain key, chain_key_info). message.ciphertext encrypts pad(plaintext) with message_key_0 and the 44-byte header as associated data; the nonce and the padding bytes are random, so only decryption is reproducible.",
     "mailbox_tokens: token = HKDF(ikm, info || recipient key [|| device id] || day_epoch as big-endian u64) with ikm the shared key (contact tokens) or the master seed (device-sync token).",
-    "backup: 0x03 || salt(16) || XChaCha20-Poly1305(key, zlib(json)); key = HKDF-expand(HKDF-extract(none, Argon2id(password, salt)), hkdf_info, 32)."
+    "backup: 0x03 || salt(16) || XChaCha20-Poly1305(key, zlib(json)); key = HKDF-expand(HKDF-extract(none, Argon2id(password, salt)), hkdf_info, 32). This is the legacy format the importer still accepts.",
+    "backup_v6: header = 0x06 || salt(16); file = header || XChaCha20-Poly1305(key, zlib(json), associated data = header) in the 0x03 tagged format; key = HKDF-expand(HKDF-extract(none, Argon2id(password, salt)), hkdf_info, 32). This is the format the app exports today; the nonce is random, so only decryption is reproducible."
   ],
   "identity": {
     "master_seed": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
@@ -88,5 +89,25 @@
     "argon2id_base_key": "f8d7bebcc7e933f796e0a77b2cf54850154b461bad605f04b7dbe9d67965666f",
     "key": "3d1d3346512eb451dd5b33ed94e8608140f8db14696dd2497194633f7c7f9214",
     "backup": "031d02d998570b3c19a2722cdbaed90af7028a8d8df47399628d3a43d995e84df9b6adadc2225f606529797a6731d5495ec7df1228edcf2ac86111be4b697f57ed02660a439c68f2c370e648a09b89edd61ae5227a4c798e874aeac6586797f16a083a69fe37b3a5b89e815d1133883326c4fff93e3a8ac38b91067d3aa243055923cf74c5d50908d4f94b766420c3386e2def0b48448aa4d809b458ace555313014ef0f1aba6d5a2e7354b3f4d1f4c692bd51ce53567b9e85adbad9b566908419be441cf9340ad241049fba754a0a2d57759ec1f07ff8f05e3326386c816af02dad4a7f19ed21"
+  },
+  "backup_v6": {
+    "password": "correct horse battery staple",
+    "argon2id": {
+      "memory_kib": 65536,
+      "iterations": 3,
+      "parallelism": 4,
+      "output_bytes": 32
+    },
+    "hkdf_info": "vauchi-backup-v6-state",
+    "display_name": "Vector",
+    "master_seed": "b0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecf",
+    "device_index": 0,
+    "device_name": "vector-device",
+    "created_at": 1793100000,
+    "salt": "8d77decc473d2292c637dde11b030e8f",
+    "argon2id_base_key": "28ec7581a8aa368f4302915c5fc64c94c9743aab41dab5c929cb018306853a4b",
+    "key": "6d9dab5d728c80f55391f6b00430be6c39fc2fb3d6f940e66e03a58a97df693a",
+    "header": "068d77decc473d2292c637dde11b030e8f",
+    "backup": "068d77decc473d2292c637dde11b030e8f032d362da71234edfeb5ea558ecbfda687f28a908ae0c9e7ac58ce8e3cbfe241d5f41345b5c5a4625c27bf584abfd9449e2e6f75938904eb1c4063beea67a2cd3721d147b910d0c73b5b93995db30603ebbfab8edfecb248b81f1d6875a7d9b5c718245887b7f3cf55084b9af4412abc036dbaa0fb1bfbcaaee9d5aaf875786373f2b5f409eab8f362b463474c0dfa74a2bb44c265c4e5782baed49226e7f734e0ff4c0fea42b86043c5cfb5fc5417850a172d6bef1390ec24d9b81b175d2891198a5cc35cdb87963bb6170687eb7dd2a0e3cccc3154710a632e0767a26291fc690a6ba8406c27b9ceb9509f90324e175b04ccf35acea507e22588093ad42574ba1ade1ec5ed80f52b25777c94c0f6d720ac831adc6819df5bdf32"
   }
 }

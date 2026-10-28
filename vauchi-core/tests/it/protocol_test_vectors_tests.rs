@@ -7,8 +7,9 @@
 //! `tests/fixtures/test-vectors/vauchi-protocol-vectors-v1.json` holds
 //! values the shipped functions produced once. Every run recomputes the
 //! deterministic ones (key derivations, X3DH, chain steps, mailbox tokens)
-//! and decrypts the recorded ciphertexts (a ratchet message, a backup),
-//! so an independent implementation can check itself against the file.
+//! and decrypts the recorded ciphertexts (a ratchet message, a v3 backup,
+//! a v6 backup), so an independent implementation can check itself against
+//! the file.
 //!
 //! Regenerate with `VAUCHI_WRITE_TEST_VECTORS=1`, without the `test-kdf`
 //! feature: the backup vector must carry production Argon2id parameters.
@@ -16,13 +17,16 @@
 //! file they open; after a derivation change, run once more to see green.
 
 use std::path::PathBuf;
+use std::time::{Duration, SystemTime};
 
 use serde::{Deserialize, Serialize};
+use vauchi_core::Vauchi;
 use vauchi_core::backup::{FullBackupIdentityData, export_full_backup, import_full_backup};
+use vauchi_core::clock::FakeClock;
 use vauchi_core::crypto::ratchet::SerializedRatchetState;
 use vauchi_core::crypto::{
     ChainKey, DoubleRatchetState, HKDF, RatchetMessage, SigningKeyPair, SymmetricKey, X3DHKeyPair,
-    decrypt,
+    decrypt, decrypt_with_ad,
 };
 use vauchi_core::exchange::X3DH;
 use vauchi_core::identity::device::DeviceInfo;
@@ -45,6 +49,7 @@ const MAILBOX_INFO: &str = "Vauchi_Mailbox_v1";
 const MAILBOX_DEVICE_INFO: &str = "Vauchi_MailboxDevice_v1";
 const DEVICE_SYNC_INFO: &str = "Vauchi_DeviceSyncRecipient_v1";
 const BACKUP_INFO: &str = "vauchi-backup-v3";
+const BACKUP_V6_INFO: &str = "vauchi-backup-v6-state";
 
 #[derive(Serialize, Deserialize)]
 struct Vectors {
@@ -56,6 +61,7 @@ struct Vectors {
     ratchet: RatchetVector,
     mailbox_tokens: MailboxVector,
     backup: BackupVector,
+    backup_v6: BackupV6Vector,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -144,6 +150,26 @@ struct BackupVector {
     salt: String,
     argon2id_base_key: String,
     key: String,
+    backup: String,
+}
+
+/// The password backup the app writes today: the clear 17-byte header is
+/// the AEAD's associated data, so a changed version byte or salt fails the
+/// tag instead of deriving a wrong key.
+#[derive(Serialize, Deserialize)]
+struct BackupV6Vector {
+    password: String,
+    argon2id: Argon2Params,
+    hkdf_info: String,
+    display_name: String,
+    master_seed: String,
+    device_index: u32,
+    device_name: String,
+    created_at: u64,
+    salt: String,
+    argon2id_base_key: String,
+    key: String,
+    header: String,
     backup: String,
 }
 
@@ -595,6 +621,148 @@ fn backup_vector_imports_with_production_argon2id() {
     assert_eq!(hex::encode(*seed), v.master_seed);
 }
 
+// ── backup v6 ─────────────────────────────────────────────────────────
+
+const V6_SEED_BYTE: u8 = 0xb0;
+const V6_PASSWORD: &str = "correct horse battery staple";
+const V6_CREATED_AT: u64 = 1_793_100_000;
+
+/// A `Vauchi` whose identity has a known seed and whose clock stands at
+/// `V6_CREATED_AT`: the only public way to a fixed seed is to restore one,
+/// so the v3 exporter seeds the v6 vector's identity.
+fn vauchi_with_vector_identity() -> Vauchi {
+    let identity = FullBackupIdentityData {
+        display_name: "Vector".to_string(),
+        master_seed: seed(V6_SEED_BYTE),
+        device_index: 0,
+        device_name: "vector-device".to_string(),
+    };
+    let legacy = export_full_backup(&identity, &[], None, &[], V6_PASSWORD, V6_CREATED_AT)
+        .expect("v3 export");
+    let clock = FakeClock::new(SystemTime::UNIX_EPOCH + Duration::from_secs(V6_CREATED_AT));
+    let mut vauchi = Vauchi::in_memory_with_clock(clock.shared()).expect("in-memory vauchi");
+    vauchi
+        .import_full_backup(&hex::encode(legacy), V6_PASSWORD)
+        .expect("v3 import");
+    vauchi
+}
+
+fn compute_backup_v6() -> BackupV6Vector {
+    let vauchi = vauchi_with_vector_identity();
+    let backup =
+        hex::decode(vauchi.export_full_backup(V6_PASSWORD).expect("v6 export")).expect("hex");
+    let salt: [u8; 16] = backup[1..17].try_into().expect("salt");
+    let base_key =
+        vauchi_core::crypto::derive_key_argon2id(V6_PASSWORD.as_bytes(), &salt).expect("argon2id");
+    let prk = HKDF::extract(None, base_key.as_bytes());
+    let key = HKDF::expand(&prk, BACKUP_V6_INFO.as_bytes(), 32).expect("expand");
+    BackupV6Vector {
+        password: V6_PASSWORD.to_string(),
+        argon2id: Argon2Params {
+            memory_kib: 65_536,
+            iterations: 3,
+            parallelism: 4,
+            output_bytes: 32,
+        },
+        hkdf_info: BACKUP_V6_INFO.to_string(),
+        display_name: "Vector".to_string(),
+        master_seed: hex::encode(seed(V6_SEED_BYTE)),
+        device_index: 0,
+        device_name: "vector-device".to_string(),
+        created_at: V6_CREATED_AT,
+        salt: hex::encode(salt),
+        argon2id_base_key: hex::encode(base_key.as_bytes()),
+        key: hex::encode(&key),
+        header: hex::encode(&backup[..17]),
+        backup: hex::encode(&backup),
+    }
+}
+
+/// Opens the recorded v6 backup from the recorded Argon2id output with the
+/// header as associated data, and shows the header is bound: the same key
+/// with one salt byte changed opens nothing.
+// @scenario: security :: Correct algorithms used
+// @internal
+#[test]
+fn backup_v6_vector_decrypts_under_its_header_and_not_under_a_changed_one() {
+    let v = load().backup_v6;
+    let backup = hex::decode(&v.backup).expect("backup");
+    let header = hex::decode(&v.header).expect("header");
+    assert_eq!(backup[0], 0x06, "v6 version byte");
+    assert_eq!(header.len(), 17);
+    assert_eq!(&backup[..17], header.as_slice());
+    assert_eq!(hex::encode(&backup[1..17]), v.salt);
+    assert_eq!(v.hkdf_info, BACKUP_V6_INFO);
+
+    let prk = HKDF::extract(None, &hex32(&v.argon2id_base_key));
+    let key = HKDF::expand(&prk, v.hkdf_info.as_bytes(), 32).expect("expand");
+    assert_eq!(hex::encode(&key), v.key);
+    let key = SymmetricKey::from_bytes(key.try_into().expect("32 bytes"));
+
+    let mut other_header = header.clone();
+    other_header[1] ^= 0x01;
+    assert!(
+        decrypt_with_ad(&key, &backup[17..], &other_header).is_err(),
+        "a changed salt in the associated data must fail the tag"
+    );
+
+    let compressed = decrypt_with_ad(&key, &backup[17..], &header).expect("decrypt");
+    assert_eq!(compressed[0], 0x78, "zlib stream");
+    let mut json = Vec::new();
+    std::io::Read::read_to_end(
+        &mut flate2::read::ZlibDecoder::new(compressed.as_slice()),
+        &mut json,
+    )
+    .expect("inflate");
+    let snapshot: serde_json::Value = serde_json::from_slice(&json).expect("json");
+    assert_eq!(snapshot["version"], 6);
+    assert_eq!(snapshot["created_at"], v.created_at);
+    assert_eq!(snapshot["identity"]["display_name"], v.display_name);
+    assert_eq!(snapshot["identity"]["device_name"], v.device_name);
+    assert_eq!(snapshot["identity"]["device_index"], v.device_index);
+    let seed_b64 = snapshot["identity"]["master_seed_b64"]
+        .as_str()
+        .expect("master_seed_b64");
+    let seed_bytes = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, seed_b64)
+        .expect("base64 seed");
+    assert_eq!(hex::encode(seed_bytes), v.master_seed);
+}
+
+/// The whole v6 import, password in, on a fresh installation; a wrong
+/// password restores nothing.
+// @scenario: security :: Correct algorithms used
+// @internal
+#[cfg(not(feature = "test-kdf"))]
+#[test]
+fn backup_v6_vector_imports_with_production_argon2id_and_refuses_a_wrong_password() {
+    let v = load().backup_v6;
+    let salt = hex::decode(&v.salt).expect("salt");
+    let base_key = vauchi_core::crypto::derive_key_argon2id(
+        v.password.as_bytes(),
+        salt.as_slice().try_into().expect("16 bytes"),
+    )
+    .expect("argon2id");
+    assert_eq!(hex::encode(base_key.as_bytes()), v.argon2id_base_key);
+
+    let mut wrong = Vauchi::in_memory().expect("in-memory vauchi");
+    assert!(
+        wrong
+            .import_full_backup(&v.backup, "incorrect horse battery staple")
+            .is_err(),
+        "a wrong password must not restore the identity"
+    );
+    assert!(wrong.identity().is_none());
+
+    let mut vauchi = Vauchi::in_memory().expect("in-memory vauchi");
+    vauchi
+        .import_full_backup(&v.backup, &v.password)
+        .expect("v6 import");
+    let identity = vauchi.identity().expect("restored identity");
+    assert_eq!(hex::encode(identity.master_seed()), v.master_seed);
+    assert_eq!(identity.display_name(), v.display_name);
+    assert_eq!(identity.device_index(), v.device_index);
+}
+
 // ── regeneration ──────────────────────────────────────────────────────
 
 /// `VAUCHI_WRITE_TEST_VECTORS=1 cargo test -p vauchi-core --features testing
@@ -635,7 +803,14 @@ fn write_test_vectors_when_asked() {
              the master seed (device-sync token)."
                 .into(),
             "backup: 0x03 || salt(16) || XChaCha20-Poly1305(key, zlib(json)); key = \
-             HKDF-expand(HKDF-extract(none, Argon2id(password, salt)), hkdf_info, 32)."
+             HKDF-expand(HKDF-extract(none, Argon2id(password, salt)), hkdf_info, 32). \
+             This is the legacy format the importer still accepts."
+                .into(),
+            "backup_v6: header = 0x06 || salt(16); file = header || \
+             XChaCha20-Poly1305(key, zlib(json), associated data = header) in the \
+             0x03 tagged format; key = HKDF-expand(HKDF-extract(none, \
+             Argon2id(password, salt)), hkdf_info, 32). This is the format the app \
+             exports today; the nonce is random, so only decryption is reproducible."
                 .into(),
         ],
         identity: compute_identity(seed(0x01)),
@@ -643,6 +818,7 @@ fn write_test_vectors_when_asked() {
         x3dh,
         mailbox_tokens: compute_mailbox(),
         backup: compute_backup(),
+        backup_v6: compute_backup_v6(),
     };
     let mut text = serde_json::to_string_pretty(&vectors).expect("serialize");
     text.push('\n');

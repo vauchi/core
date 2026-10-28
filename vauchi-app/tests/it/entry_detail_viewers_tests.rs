@@ -135,6 +135,67 @@ fn a_group_entry_lists_only_the_group_members() {
     );
 }
 
+fn group_toggles(screen: &ScreenModel) -> Vec<(String, bool)> {
+    screen
+        .components
+        .iter()
+        .filter_map(|c| match c {
+            Component::ToggleList { id, items, .. } if id == "group_visibility" => Some(items),
+            _ => None,
+        })
+        .flatten()
+        .map(|item| (item.label.clone(), item.selected))
+        .collect()
+}
+
+// @scenario: visibility_labels :: View which labels can see a field
+#[test]
+fn an_entry_names_the_groups_that_see_it_and_who_each_one_lets_in() {
+    let (vauchi, field_id, contacts) = world();
+    for (name, member, granted) in [
+        ("Family", Some(&contacts[0]), true),
+        ("Close Friends", Some(&contacts[1]), true),
+        ("Work", None, false),
+    ] {
+        let group = vauchi.create_group(name).expect("group");
+        if let Some(member) = member {
+            vauchi
+                .add_contact_to_group(group.id(), member)
+                .expect("member");
+        }
+        vauchi
+            .set_group_field_visibility(group.id(), &field_id, granted)
+            .expect("grant");
+    }
+
+    let (_, screen) = open_entry(vauchi, &field_id);
+
+    let mut toggles = group_toggles(&screen);
+    toggles.sort();
+    assert_eq!(
+        toggles,
+        vec![
+            ("Close Friends".to_string(), true),
+            ("Family".to_string(), true),
+            ("Work".to_string(), false),
+        ]
+    );
+    let mut rows = viewers(&screen);
+    rows.sort();
+    assert_eq!(
+        rows,
+        vec![
+            ("Alan".to_string(), Some("via Close Friends".to_string())),
+            ("Grace".to_string(), Some("via Family".to_string())),
+        ]
+    );
+    assert!(
+        texts(&screen).contains(&"Visible to 2 contacts".to_string()),
+        "{:?}",
+        texts(&screen)
+    );
+}
+
 // @internal
 #[test]
 fn sharing_with_all_contacts_refreshes_the_list_at_once() {

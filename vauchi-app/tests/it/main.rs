@@ -149,6 +149,7 @@ mod form_dialog_i18n_tests;
 mod gdpr_i18n_tests;
 mod group_delete_tests;
 mod group_detail_screen_tests;
+mod group_management_tests;
 mod group_members_preview_tests;
 mod groups_screen_tests;
 mod heirloom_privacy_tests;

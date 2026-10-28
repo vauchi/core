@@ -93,6 +93,7 @@ mod data_export_format_tests;
 mod data_export_presence_tests;
 mod data_export_verification_tests;
 mod deep_link_consent_engine_tests;
+mod deletion_grace_period_tests;
 mod delivery_screen_tests;
 mod demo_presentation_tests;
 mod device_link_bridge_tests;

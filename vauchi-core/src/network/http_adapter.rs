@@ -54,8 +54,11 @@ const MAX_FETCH_TOKENS: usize = 100;
 pub struct HttpTransportAdapter {
     http: HttpTransport,
     state: ConnectionState,
-    /// Mailbox tokens registered via `RegisterMailbox` messages.
-    registered_tokens: Vec<String>,
+    /// Mailbox tokens registered via `RegisterMailbox` messages, one inner
+    /// list per message. A fetch request never spans two lists: each list
+    /// holds one day's tokens, and a request mixing days would let the
+    /// relay chain this fetcher across days (private#890).
+    registered_batches: Vec<Vec<String>>,
     /// Buffered blobs fetched from the relay but not yet returned.
     pending_blobs: VecDeque<FetchedBlob>,
     /// Mailbox token each fetched blob arrived on, keyed by blob ID.
@@ -94,12 +97,23 @@ pub struct HttpTransportAdapter {
 }
 
 impl HttpTransportAdapter {
+    fn is_registered(&self, token: &str) -> bool {
+        self.registered_batches
+            .iter()
+            .any(|batch| batch.iter().any(|t| t == token))
+    }
+
+    #[cfg(test)]
+    fn registered_token_count(&self) -> usize {
+        self.registered_batches.iter().map(Vec::len).sum()
+    }
+
     /// Creates a new adapter wrapping an [`HttpTransport`].
     pub fn new(http: HttpTransport) -> Self {
         Self {
             http,
             state: ConnectionState::Disconnected,
-            registered_tokens: Vec::new(),
+            registered_batches: Vec::new(),
             pending_blobs: VecDeque::new(),
             fetched_blob_tokens: HashMap::new(),
             ack_queue: Vec::new(),
@@ -250,7 +264,7 @@ impl super::transport::Transport for HttpTransportAdapter {
 
     fn disconnect(&mut self) -> TransportResult<()> {
         self.state = ConnectionState::Disconnected;
-        self.registered_tokens.clear();
+        self.registered_batches.clear();
         self.pending_blobs.clear();
         self.fetched_blob_tokens.clear();
         self.fetched_contexts.clear();
@@ -276,16 +290,17 @@ impl super::transport::Transport for HttpTransportAdapter {
                 Ok(())
             }
             MessagePayload::RegisterMailbox(rm) => {
-                // Store tokens for polling in receive()
-                let mut added = false;
+                // Store tokens for polling in receive(), keeping this
+                // message's tokens as their own fetch unit.
+                let mut batch: Vec<String> = Vec::new();
                 for token in &rm.tokens {
-                    if !self.registered_tokens.contains(token) {
-                        self.registered_tokens.push(token.clone());
-                        added = true;
+                    if !self.is_registered(token) && !batch.contains(token) {
+                        batch.push(token.clone());
                     }
                 }
                 // New tokens registered — allow another fetch cycle
-                if added {
+                if !batch.is_empty() {
+                    self.registered_batches.push(batch);
                     self.has_fetched = false;
                 }
                 Ok(())
@@ -298,7 +313,7 @@ impl super::transport::Transport for HttpTransportAdapter {
                 if let Some(token) = self
                     .fetched_blob_tokens
                     .get(&blob_id)
-                    .or_else(|| self.registered_tokens.first())
+                    .or_else(|| self.registered_batches.first().and_then(|b| b.first()))
                 {
                     self.ack_queue.push((token.clone(), blob_id));
                 }
@@ -338,7 +353,7 @@ impl super::transport::Transport for HttpTransportAdapter {
         // adapter.receive()` refetch the same unACKed blobs on every iteration
         // because ACKs are queued (not sent inline), creating an infinite loop
         // that hangs until the process timeout.
-        if self.registered_tokens.is_empty() || self.has_fetched {
+        if self.registered_batches.is_empty() || self.has_fetched {
             return Ok(None);
         }
 
@@ -406,7 +421,8 @@ impl HttpTransportAdapter {
     /// On rate-limit errors, returns what was fetched so far rather than
     /// failing.
     fn fetch_now(&mut self) -> Result<(), NetworkError> {
-        for chunk in self.registered_tokens.chunks(MAX_FETCH_TOKENS) {
+        let chunks = fetch_chunks(self.registered_batches.iter().map(Vec::as_slice));
+        for chunk in chunks.iter().map(Vec::as_slice) {
             match self.http.fetch_page(chunk) {
                 Ok((blobs, truncated)) => {
                     self.last_truncated |= truncated;
@@ -486,13 +502,19 @@ impl HttpTransportAdapter {
                 }
             }
         }
-        let uncovered: Vec<String> = self
-            .registered_tokens
+        let uncovered: Vec<Vec<String>> = self
+            .registered_batches
             .iter()
-            .filter(|token| !pending_fetches.iter().any(|f| f.tokens.contains(token)))
-            .cloned()
+            .map(|batch| {
+                batch
+                    .iter()
+                    .filter(|token| !pending_fetches.iter().any(|f| f.tokens.contains(token)))
+                    .cloned()
+                    .collect()
+            })
             .collect();
-        for chunk in uncovered.chunks(MAX_FETCH_TOKENS) {
+        let chunks = fetch_chunks(uncovered.iter().map(Vec::as_slice));
+        for chunk in chunks.iter().map(Vec::as_slice) {
             match self.http.post_delayed_fetch(chunk) {
                 Ok(pending) => pending_fetches.push(PendingFetch {
                     tokens: chunk.to_vec(),
@@ -519,6 +541,14 @@ impl HttpTransportAdapter {
             _ => Ok(()),
         }
     }
+}
+
+/// Splits each registration batch into fetch-sized chunks without ever
+/// joining two batches in one chunk (private#890).
+fn fetch_chunks<'a>(batches: impl Iterator<Item = &'a [String]>) -> Vec<Vec<String>> {
+    batches
+        .flat_map(|batch| batch.chunks(MAX_FETCH_TOKENS).map(<[String]>::to_vec))
+        .collect()
 }
 
 fn buffer_fetch_response(
@@ -641,9 +671,9 @@ mod tests {
     #[test]
     fn test_disconnect_clears_state() {
         let mut adapter = make_adapter(true);
-        adapter.registered_tokens.push("token1".into());
+        adapter.registered_batches.push(vec!["token1".into()]);
         adapter.disconnect().unwrap();
-        assert!(adapter.registered_tokens.is_empty());
+        assert!(adapter.registered_batches.is_empty());
         assert_eq!(adapter.state(), ConnectionState::Disconnected);
     }
 
@@ -659,8 +689,8 @@ mod tests {
             }),
         };
         adapter.send(&envelope).unwrap();
-        assert_eq!(adapter.registered_tokens.len(), 2);
-        assert!(adapter.registered_tokens.contains(&"token_a".to_string()));
+        assert_eq!(adapter.registered_token_count(), 2);
+        assert!(adapter.is_registered("token_a"));
     }
 
     #[test]
@@ -676,7 +706,8 @@ mod tests {
         };
         adapter.send(&envelope).unwrap();
         adapter.send(&envelope).unwrap();
-        assert_eq!(adapter.registered_tokens.len(), 1);
+        assert_eq!(adapter.registered_token_count(), 1);
+        assert_eq!(adapter.registered_batches.len(), 1);
     }
 
     #[test]
@@ -689,7 +720,7 @@ mod tests {
     #[test]
     fn test_receive_with_tokens_fails_unreachable() {
         let mut adapter = make_adapter(true);
-        adapter.registered_tokens.push("token".into());
+        adapter.registered_batches.push(vec!["token".into()]);
         let result = adapter.receive();
         assert!(result.is_err(), "unreachable relay should error");
     }
@@ -698,7 +729,7 @@ mod tests {
     #[test]
     fn test_receive_does_not_refetch_after_first_poll() {
         let mut adapter = make_adapter(true);
-        adapter.registered_tokens.push("token".into());
+        adapter.registered_batches.push(vec!["token".into()]);
 
         // First receive: tries to fetch (fails — unreachable relay)
         let r1 = adapter.receive();
@@ -725,7 +756,7 @@ mod tests {
     #[test]
     fn test_register_new_tokens_resets_fetch_guard() {
         let mut adapter = make_adapter(true);
-        adapter.registered_tokens.push("token_a".into());
+        adapter.registered_batches.push(vec!["token_a".into()]);
 
         // Simulate a completed fetch cycle
         adapter.has_fetched = true;
@@ -750,7 +781,7 @@ mod tests {
     #[test]
     fn test_register_duplicate_tokens_does_not_reset_fetch_guard() {
         let mut adapter = make_adapter(true);
-        adapter.registered_tokens.push("token_a".into());
+        adapter.registered_batches.push(vec!["token_a".into()]);
         adapter.has_fetched = true;
 
         // Registering the same token should NOT reset the guard
@@ -827,7 +858,7 @@ mod tests {
         let blob_token = "b".repeat(64);
         let blob_id = "blob-on-second-token";
         let mut adapter = make_adapter(true);
-        adapter.registered_tokens = vec![first_token, blob_token.clone()];
+        adapter.registered_batches = vec![vec![first_token, blob_token.clone()]];
         adapter.pending_blobs.push_back(FetchedBlob {
             blob_id: blob_id.into(),
             ciphertext: base64::engine::general_purpose::STANDARD.encode(b"x"),

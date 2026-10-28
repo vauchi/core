@@ -17,6 +17,15 @@ pub(crate) enum MailboxRoute {
     },
 }
 
+impl MailboxRoute {
+    /// The day epoch this route's token was derived for.
+    pub(crate) fn day(&self) -> u64 {
+        match self {
+            MailboxRoute::Contact { day, .. } | MailboxRoute::DeviceSync { day } => *day,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct MailboxContext {
     pub(crate) identity: [u8; 32],

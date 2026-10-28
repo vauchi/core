@@ -191,63 +191,60 @@ pub fn batch_register_tokens(
     current_day: u64,
     days_offline: u64,
 ) -> Vec<Vec<String>> {
-    padded_registration_batches(
-        rng,
-        // Legacy path with no device context — identity-scoped receive tokens
-        // only. The device-scoped variant is registered via
-        // `batch_register_tokens_with_device_sync`, which carries the device id.
-        registration_tokens(contact_keys, own_pubkey, None, current_day, days_offline),
-    )
+    // Legacy path with no device context — identity-scoped receive tokens
+    // only. The device-scoped variant is registered via
+    // `batch_register_tokens_with_device_sync`, which carries the device id.
+    registration_tokens_by_day(contact_keys, own_pubkey, None, current_day, days_offline)
+        .into_iter()
+        .flat_map(|(_, tokens)| padded_registration_batches(rng, tokens))
+        .collect()
 }
 
-/// Build contact mailbox registration tokens.
-fn registration_tokens(
+/// The day epochs a registration covers: the offline window back from
+/// `current_day`, plus the day before it for rotation skew at the daily
+/// boundary. Day zero has no previous day.
+fn registration_days(current_day: u64, days_offline: u64) -> std::ops::RangeInclusive<u64> {
+    let start_day = current_day.saturating_sub(days_offline);
+    start_day.saturating_sub(1)..=current_day
+}
+
+/// Build contact mailbox registration tokens, one group per day epoch.
+///
+/// Groups stay separate all the way to the fetch request: a request that
+/// carried two days' tokens would let the relay chain one fetcher across
+/// days through the overlap (private#890).
+fn registration_tokens_by_day(
     contact_keys: &[[u8; 32]],
     own_pubkey: &[u8; 32],
     own_device_id: Option<&[u8; 32]>,
     current_day: u64,
     days_offline: u64,
-) -> Vec<String> {
-    let mut all_tokens = Vec::new();
-    let start_day = current_day.saturating_sub(days_offline);
-
-    for day in start_day..=current_day {
-        // Our own RECEIVE token per contact (keyed to our identity), so the
-        // relay routes the peer's sends to us without us also polling the token
-        // we send to (directional tokens, 2026-06-30).
-        for shared_key in contact_keys {
-            all_tokens.push(token_hex(&compute_mailbox_token(
-                shared_key, own_pubkey, day,
-            )));
-            if day > 0 {
-                all_tokens.push(token_hex(&compute_mailbox_token(
-                    shared_key,
-                    own_pubkey,
-                    day - 1,
+) -> Vec<(u64, Vec<String>)> {
+    registration_days(current_day, days_offline)
+        .map(|day| {
+            let mut tokens = Vec::new();
+            // Our own RECEIVE token per contact (keyed to our identity), so the
+            // relay routes the peer's sends to us without us also polling the
+            // token we send to (directional tokens, 2026-06-30).
+            for shared_key in contact_keys {
+                tokens.push(token_hex(&compute_mailbox_token(
+                    shared_key, own_pubkey, day,
                 )));
-            }
-            // F4: also register our DEVICE-scoped receive token per contact so
-            // a per-device fan-out copy reaches THIS device without a sibling
-            // draining it from a shared identity mailbox (ADR-064 Amendment
-            // 2026-07-25). Kept alongside the identity token, which still
-            // receives shared [0;32] and genesis-cold-start sends.
-            if let Some(device_id) = own_device_id {
-                all_tokens.push(token_hex(&compute_device_mailbox_token(
-                    shared_key, own_pubkey, device_id, day,
-                )));
-                if day > 0 {
-                    all_tokens.push(token_hex(&compute_device_mailbox_token(
-                        shared_key,
-                        own_pubkey,
-                        device_id,
-                        day - 1,
+                // F4: also register our DEVICE-scoped receive token per contact
+                // so a per-device fan-out copy reaches THIS device without a
+                // sibling draining it from a shared identity mailbox (ADR-064
+                // Amendment 2026-07-25). Kept alongside the identity token,
+                // which still receives shared [0;32] and genesis-cold-start
+                // sends.
+                if let Some(device_id) = own_device_id {
+                    tokens.push(token_hex(&compute_device_mailbox_token(
+                        shared_key, own_pubkey, device_id, day,
                     )));
                 }
             }
-        }
-    }
-
-    all_tokens
+            (day, tokens)
+        })
+        .collect()
 }
 
 /// Pad, split, and shuffle real registration tokens without revealing their
@@ -301,27 +298,21 @@ pub fn batch_register_tokens_with_device_sync(
     current_day: u64,
     days_offline: u64,
 ) -> Vec<Vec<String>> {
-    let start_day = current_day.saturating_sub(days_offline);
-    let mut tokens = registration_tokens(
+    registration_tokens_by_day(
         contact_keys,
         own_pubkey,
         Some(device_id),
         current_day,
         days_offline,
-    );
-    for day in start_day..=current_day {
+    )
+    .into_iter()
+    .flat_map(|(day, mut tokens)| {
         tokens.push(token_hex(&compute_device_sync_token(
             master_seed,
             device_id,
             day,
         )));
-        if day > 0 {
-            tokens.push(token_hex(&compute_device_sync_token(
-                master_seed,
-                device_id,
-                day - 1,
-            )));
-        }
-    }
-    padded_registration_batches(rng, tokens)
+        padded_registration_batches(rng, tokens)
+    })
+    .collect()
 }

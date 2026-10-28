@@ -70,15 +70,27 @@ pub(super) fn registered_mailboxes(
     }
 }
 
-/// The padded, shuffled registration batches for a set of routes.
+/// The padded, shuffled registration batches for a set of routes, one set
+/// of batches per day epoch.
+///
+/// A batch that mixed days would put today's and yesterday's tokens in one
+/// fetch request, so consecutive days' request sets would overlap and let
+/// the relay chain one fetcher across days (private#890).
 pub(super) fn registration_batches(
     rng: &dyn crate::rng::SecureRng,
     routes: &HashMap<String, MailboxRoute>,
 ) -> Vec<Vec<String>> {
-    crate::network::mailbox_token::padded_registration_batches(
-        rng,
-        routes.keys().cloned().collect(),
-    )
+    let mut tokens_by_day: std::collections::BTreeMap<u64, Vec<String>> = Default::default();
+    for (token, route) in routes {
+        tokens_by_day
+            .entry(route.day())
+            .or_default()
+            .push(token.clone());
+    }
+    tokens_by_day
+        .into_values()
+        .flat_map(|tokens| crate::network::mailbox_token::padded_registration_batches(rng, tokens))
+        .collect()
 }
 
 pub(super) struct ReceiveContext<'a> {

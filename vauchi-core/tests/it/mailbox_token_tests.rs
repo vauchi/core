@@ -119,18 +119,18 @@ fn test_device_sync_registration_preserves_legacy_and_own_receive_tokens() {
         0,
     );
 
-    assert_eq!(batches.len(), 1);
-    assert_eq!(batches[0].len(), 256);
-    assert!(batches[0].contains(&token_hex(&compute_device_sync_token(
-        &master_seed,
-        &device_id,
-        day,
-    ))));
-    assert!(batches[0].contains(&token_hex(&compute_device_sync_token(
+    // One padded batch per day epoch: yesterday's and today's device-sync
+    // tokens travel in separate batches (private#890).
+    assert_eq!(batches.len(), 2);
+    assert!(batches.iter().all(|b| b.len() == 256));
+    let yesterday = token_hex(&compute_device_sync_token(
         &master_seed,
         &device_id,
         day - 1,
-    ))));
+    ));
+    let today = token_hex(&compute_device_sync_token(&master_seed, &device_id, day));
+    assert!(batches[0].contains(&yesterday) && !batches[0].contains(&today));
+    assert!(batches[1].contains(&today) && !batches[1].contains(&yesterday));
 }
 
 // @scenario: multi_device_sync :: A per-device copy reaches only its own sibling
@@ -241,11 +241,11 @@ fn test_batch_tokens_no_duplicates() {
         19804,
         0,
     );
-    assert_eq!(batches.len(), 1);
-    let mut sorted = batches[0].clone();
+    assert_eq!(batches.len(), 2, "one batch per day: yesterday and today");
+    let mut sorted = batches.concat();
     sorted.sort();
     sorted.dedup();
-    assert!(sorted.len() >= 250);
+    assert_eq!(sorted.len(), 512, "no token repeats across the batches");
 }
 
 // @internal
@@ -317,8 +317,8 @@ fn test_batch_tokens_shuffled() {
         19804,
         0,
     );
-    assert_eq!(batches_a.len(), 1);
-    assert_eq!(batches_b.len(), 1);
+    assert_eq!(batches_a.len(), 2);
+    assert_eq!(batches_b.len(), 2);
     assert_eq!(batches_a[0].len(), 256);
     assert_eq!(batches_b[0].len(), 256);
     // Shuffled batches virtually never share the same ordering
@@ -330,7 +330,10 @@ fn test_batch_tokens_shuffled() {
 
 // @internal
 #[test]
-fn test_batch_tokens_no_contacts_returns_one_batch() {
+fn test_batch_tokens_no_contacts_returns_one_padding_batch_per_day() {
+    // An idle install sends the same number of batches as everyone else, one
+    // all-padding batch per day, so it looks like every other install
+    // (owner decision 2026-10-10, #574; per day since private#890).
     let batches = batch_register_tokens(
         &vauchi_core::rng::OsSecureRng::new(),
         &[],
@@ -338,8 +341,8 @@ fn test_batch_tokens_no_contacts_returns_one_batch() {
         19804,
         0,
     );
-    assert_eq!(batches.len(), 1);
-    assert_eq!(batches[0].len(), 256);
+    assert_eq!(batches.len(), 2);
+    assert!(batches.iter().all(|b| b.len() == 256));
 }
 
 proptest! {

@@ -20,6 +20,10 @@ impl Vauchi {
             .identity
             .as_ref()
             .ok_or(VauchiError::IdentityNotInitialized)?;
+        // The same gate as the identity-only export: this file holds every
+        // contact's shared key, so it must not be weaker (private#891).
+        crate::identity::password::validate_password(password)
+            .map_err(|e| VauchiError::Configuration(format!("Export failed: {:?}", e)))?;
         let snapshot = BackupSnapshot::capture(&self.storage, identity, self.clock.unix_seconds())
             .map_err(backup_error)?;
         snapshot.validate().map_err(backup_error)?;

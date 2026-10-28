@@ -15,6 +15,7 @@
 
 use crate::i18n::{Locale, get_string, get_string_with_args};
 use crate::ui::*;
+use vauchi_core::recovery::{RecoveryProof, VerificationResult};
 
 /// Whether the user is vouching or reviewing a completed proof.
 #[derive(Clone, Debug, PartialEq)]
@@ -54,6 +55,38 @@ pub struct ClaimContext {
 }
 
 /// Steps in the claim review workflow.
+impl ClaimContext {
+    /// The review context for a proof Core has verified against the
+    /// reviewer's own contacts (`Vauchi::verify_recovery_proof`): the
+    /// confidence and the mutual-voucher count come from the verdict, the
+    /// fingerprint from the proof's new key, never from the caller's
+    /// guess (vauchi/private#796, step 0).
+    pub fn from_verified_proof(
+        contact_name: String,
+        proof: &RecoveryProof,
+        verdict: &VerificationResult,
+        verification_threshold: u32,
+    ) -> Self {
+        let (confidence, mutual_voucher_count) = match verdict {
+            VerificationResult::HighConfidence {
+                mutual_vouchers, ..
+            } => (Confidence::High, mutual_vouchers.len()),
+            VerificationResult::MediumConfidence {
+                mutual_vouchers, ..
+            } => (Confidence::Medium, mutual_vouchers.len()),
+            // A verdict this build does not know reviews as low: fail closed.
+            VerificationResult::LowConfidence { .. } | _ => (Confidence::Low, 0),
+        };
+        Self {
+            contact_name,
+            new_pk_fingerprint: hex::encode(proof.new_pk().as_bytes()),
+            mutual_voucher_count,
+            threshold: verification_threshold as usize,
+            confidence,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 enum ReviewStep {
     /// Initial review screen — shows confidence and actions.

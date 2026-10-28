@@ -693,9 +693,10 @@ impl AppEngine {
                 )
             }
             AppScreen::RecoveryClaimReview => {
-                // Default: vouching mode with low confidence placeholder.
-                // In production, AppEngine populates context from the scanned
-                // claim data before navigating here.
+                // No inbound proof reaches a reviewer yet, so nothing can be
+                // reviewed here: the vouching path runs through RecoveryHelp.
+                // vauchi/private#796 step 5 builds this context with
+                // `ClaimContext::from_verified_proof` from the offer's proof.
                 Box::new(
                     RecoveryClaimReviewEngine::new(
                         ReviewMode::Vouching,

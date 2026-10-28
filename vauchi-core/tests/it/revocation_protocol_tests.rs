@@ -197,7 +197,7 @@ fn test_process_revocation_deletes_contact_and_records_tombstone() {
 }
 
 // @scenario: privacy_compliance :: Spoofed revocation signal is rejected
-// @internal
+// @scenario: sealed_mailbox :: AccountRevoked verified client-side
 #[test]
 fn test_process_revocation_rejects_invalid_signature() {
     let storage = test_storage();
@@ -451,6 +451,7 @@ fn test_process_revocation_reports_outcome() {
 }
 
 // @scenario: privacy_compliance :: A received revocation blob shreds the contact
+// @scenario: sealed_mailbox :: AccountRevoked verified client-side
 // @internal
 #[test]
 fn test_revocation_blob_decode_then_process_shreds_contact() {

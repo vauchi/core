@@ -6,7 +6,8 @@ use proptest::prelude::*;
 use vauchi_core::network::mailbox_token::{
     CATCH_UP_DAYS_PER_CYCLE, RETAINED_DAYS, batch_register_tokens,
     batch_register_tokens_with_device_sync, compute_device_mailbox_token,
-    compute_device_sync_token, compute_mailbox_token, plan_receive, receive_days, token_hex,
+    compute_device_sync_token, compute_mailbox_token, current_day_epoch, plan_receive,
+    receive_days, token_hex,
 };
 
 // Directional tokens are keyed to the recipient. These tests assert only
@@ -84,6 +85,7 @@ fn test_different_contacts_produce_different_tokens() {
 /// never poll the same opaque mailbox token or one can consume the other's
 /// encrypted envelope from the relay.
 // @scenario: sync_updates :: Linked-device updates reach every device
+// @scenario: sealed_mailbox :: Device sync routed by self-token
 #[test]
 fn test_device_sync_tokens_are_deterministic_and_recipient_specific() {
     let master_seed = [0xAAu8; 32];
@@ -103,7 +105,7 @@ fn test_device_sync_tokens_are_deterministic_and_recipient_specific() {
     );
 }
 
-// @internal
+// @scenario: sealed_mailbox :: Device sync routed by self-token
 #[test]
 fn test_device_sync_registration_preserves_legacy_and_own_receive_tokens() {
     let master_seed = [0xBBu8; 32];
@@ -362,7 +364,7 @@ proptest! {
 
 // Registration covers yesterday as well as today, for clock skew, and never
 // tomorrow; every batch is padded to 256 so its size reveals no count.
-// @internal
+// @scenario: sealed_mailbox :: Register mailbox tokens on connect
 #[test]
 fn registration_covers_yesterday_and_pads_every_batch_to_256() {
     let master_seed = [0xBBu8; 32];
@@ -609,5 +611,54 @@ proptest! {
         prop_assert!(plan.days.contains(&today.saturating_sub(1)));
         prop_assert!(plan.days.iter().all(|day| *day <= today && today - day <= RETAINED_DAYS));
         prop_assert!(plan.days.contains(&plan.checkpoint_after));
+    }
+}
+
+// @scenario: sealed_mailbox :: Contact mailbox token derived from shared key
+#[test]
+fn a_contact_token_is_hkdf_sha256_of_the_shared_key_domain_recipient_and_day() {
+    let shared_key = [0x42u8; 32];
+    let recipient = [0xAAu8; 32];
+    let now: u64 = 1_711_065_600 + 3_600;
+    let day = now / 86_400;
+    let mut info = b"Vauchi_Mailbox_v1".to_vec();
+    info.extend_from_slice(&recipient);
+    info.extend_from_slice(&day.to_be_bytes());
+    let mut expected = [0u8; 32];
+    hkdf::Hkdf::<sha2::Sha256>::new(None, &shared_key)
+        .expand(&info, &mut expected)
+        .unwrap();
+
+    let token = compute_mailbox_token(&shared_key, &recipient, current_day_epoch(now));
+
+    assert_eq!(token.as_bytes(), &expected);
+}
+
+// @scenario: sealed_mailbox :: Token set padded to hide contact count
+#[test]
+fn fifty_contacts_register_in_full_batches_of_tokens_that_look_alike() {
+    let contacts: Vec<[u8; 32]> = (0..50u8).map(|i| [i; 32]).collect();
+    let day = 19804u64;
+
+    let batches = batch_register_tokens_with_device_sync(
+        &vauchi_core::rng::OsSecureRng::new(),
+        &contacts,
+        &TEST_PUBKEY,
+        &[0xBBu8; 32],
+        &[0x11u8; 32],
+        day,
+        0,
+    );
+
+    assert!(batches.iter().all(|b| b.len() == 256));
+    let all: Vec<&String> = batches.iter().flatten().collect();
+    assert!(all.iter().all(|t| {
+        t.len() == 64
+            && t.bytes()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+    }));
+    for contact in &contacts {
+        let real = token_hex(&compute_mailbox_token(contact, &TEST_PUBKEY, day));
+        assert!(all.contains(&&real));
     }
 }

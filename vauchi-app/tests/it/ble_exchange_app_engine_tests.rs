@@ -270,7 +270,7 @@ fn fallback_qr_after_ble_failure_lands_on_glance_exchange_screen() {
 }
 
 // @scenario: exchange :: BLE failure falls back to Link instead of cancelling
-// @internal
+// @scenario: ble_exchange_modes :: Accepting relay fallback switches to Link mode
 #[test]
 fn fallback_relay_after_ble_failure_lands_on_link_screen() {
     let mut engine = failed_ble_engine();

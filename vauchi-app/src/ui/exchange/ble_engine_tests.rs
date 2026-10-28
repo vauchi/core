@@ -483,7 +483,7 @@ fn responder_backoff_dials_out_after_fallback_window() {
     );
 }
 
-// @internal
+// @scenario: ble_exchange_modes :: BLE failure offers relay fallback
 #[test]
 fn disconnect_transitions_to_failed_with_all_fallbacks() {
     let mut engine = BleExchangeEngine::new(
@@ -510,6 +510,12 @@ fn disconnect_transitions_to_failed_with_all_fallbacks() {
     assert!(ids.contains(&"fallback_qr")); // has_camera == true
     assert!(ids.contains(&"fallback_relay"));
     assert!(ids.contains(&"cancel"));
+    let relay = screen
+        .contextual_actions
+        .iter()
+        .find(|a| a.id == "fallback_relay")
+        .unwrap();
+    assert_eq!(relay.label, "Switch to encrypted relay");
 }
 
 // @internal

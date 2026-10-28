@@ -7,9 +7,28 @@
 # model also runs a control that must fail, or a weakened lemma or
 # invariant would pass unnoticed.
 #
-# Usage: ci/formal-verification.sh   (from the core repo root)
+# Usage: [FORMAL_SET=gate|extended|all] ci/formal-verification.sh
+#        (from the core repo root)
 # Tools are cached under $FORMAL_HOME (default: ./.formal).
+#
+# FORMAL_SET picks what runs. `gate` is the merge-request set: Kani, the
+# wipe tests, the Tamarin models that answer in minutes and the
+# device-link Quint verifies, about 45 minutes together. `extended` is
+# the rest: the Bluetooth handshake lemmas, one capped prover run each,
+# and the Apalache verifies of the Bluetooth and multi-stage machines,
+# which together pushed one job past its hour (private#842). `all`, the
+# default for a local run, is both.
 set -eu
+
+FORMAL_SET=${FORMAL_SET:-all}
+case "$FORMAL_SET" in
+    gate | extended | all) ;;
+    *)
+        echo "FAIL: FORMAL_SET must be gate, extended or all, not '$FORMAL_SET'" >&2
+        exit 2
+        ;;
+esac
+wants() { [ "$FORMAL_SET" = all ] || [ "$FORMAL_SET" = "$1" ]; }
 
 KANI_VERSION=0.68.0
 TAMARIN_VERSION=1.12.0
@@ -36,6 +55,7 @@ export RUSTC_WRAPPER
 # binaries and the toolchain `kani setup` downloads.
 KANI_HOME=$FORMAL_HOME/kani
 export KANI_HOME
+if wants gate; then
 if ! cargo kani --version 2>/dev/null | grep -q "$KANI_VERSION"; then
     cargo install --locked --root "$FORMAL_HOME" kani-verifier --version "$KANI_VERSION"
     cargo kani setup
@@ -56,11 +76,13 @@ for harness in \
     reconstruct_refuses_more_shares_than_guardians; do
     cargo kani -p vauchi-core -Z stubbing --harness "$harness"
 done
+fi # wants gate
 
 # ── Wipe on drop: Miri and release (#817) ─────────────────────────────
 # Kani cannot model zeroize's barrier; these tests read a dropped value's
 # storage back. Miri shows each read is defined behaviour; release shows the
 # optimizer keeps the wipe. Kani's own nightly carries Miri too.
+if wants gate; then
 MIRI_TOOLCHAIN=nightly-2026-08-21
 rustup toolchain install "$MIRI_TOOLCHAIN" --profile minimal --component miri,rust-src
 # The image has neither clang nor mold, the linker .cargo/config.toml names;
@@ -76,6 +98,7 @@ for wipe_test in wipe_on_drop_tests heap_wipe_on_drop_tests; do
         --test "$wipe_test"
     cargo test --release -p vauchi-core --features testing --test "$wipe_test"
 done
+fi # wants gate
 
 # ── Tamarin ───────────────────────────────────────────────────────────
 if [ ! -x "$FORMAL_HOME/bin/tamarin-prover" ]; then
@@ -157,6 +180,7 @@ tamarin_lemma_expect() {
     }
 }
 models=vauchi-core/verification
+if wants gate; then
 tamarin_expect "$models/qr_exchange.spthy" verified "" \
     executable session_key_secrecy no_misbinding
 # Without identity binding an attacker re-signs the peer's ephemeral key.
@@ -240,12 +264,16 @@ tamarin_expect "$models/link_exchange.spthy" falsified "" \
     contact_only_after_approval
 tamarin_expect "$models/link_exchange.spthy" verified "-DPIN_CONFIRMED" \
     executable contact_only_after_approval
+fi # wants gate
+# The six capped runs took 18 minutes on CI (job 17540297472): extended.
+if wants extended; then
 tamarin_lemma_expect "$models/ble_handshake.spthy" executable verified ""
 tamarin_lemma_expect "$models/ble_handshake.spthy" session_key_secrecy verified ""
 tamarin_lemma_expect "$models/ble_handshake.spthy" scanner_binds_the_displayer verified ""
 tamarin_lemma_expect "$models/ble_handshake.spthy" scanner_binds_the_displayer falsified "-DRADIO_ONLY"
 tamarin_lemma_expect "$models/ble_handshake.spthy" displayer_binds_the_scanner falsified ""
 tamarin_lemma_expect "$models/ble_handshake.spthy" displayer_binds_the_scanner falsified "-DQR_PRIVATE"
+fi # wants extended
 
 # ── Quint ─────────────────────────────────────────────────────────────
 # The device-link host and joiner machines (#757, #808). `quint verify`
@@ -304,12 +332,17 @@ quint_expect() {
         exit 1
     }
 }
+if wants gate; then
 quint_expect device_link_machines.qnt reliable_relay ok verify no_device_registered_for_a_failed_joiner
 quint_expect device_link_machines.qnt reliable_relay ok verify joiner_seed_implies_registered
 # Without the host's expiry check the host registers a device whose
 # joiner gave up; a lost response still does, which #808 leaves open.
 quint_expect device_link_machines.qnt before_808 violation run no_device_registered_for_a_failed_joiner
 quint_expect device_link_machines.qnt lossy_relay violation run no_device_registered_for_a_failed_joiner
+fi # wants gate
+# Each Apalache verify runs for about 80 s on CI; the eight below are the
+# extended set (private#842).
+if wants extended; then
 # The BLE chrome's stall deadline left the handshake machine holding the
 # link (private#842): three violations before #843, none now that a failure
 # and a Retry cancel the machine.
@@ -322,4 +355,5 @@ done
 # draw the 13 silent ticks the sentinel needs, so both run under Apalache.
 quint_expect multi_stage_machine.qnt main_today ok verify no_phase_outlives_its_budget
 quint_expect multi_stage_machine.qnt no_step_timeout violation verify no_phase_outlives_its_budget
-echo "formal verification OK"
+fi # wants extended
+echo "formal verification OK ($FORMAL_SET)"

@@ -863,8 +863,10 @@ test:core-32bit:
         compare_to: refs/heads/$CI_DEFAULT_BRANCH
         paths: [ci/tests/rust-cache.test.sh]
 
-# Kani proofs of the untrusted-byte parsers and the Tamarin model of the
-# in-person QR exchange (#757). Runs only when what they check changes.
+# Kani proofs of the untrusted-byte parsers, the Tamarin models and the
+# device-link Quint verifies (#757). Runs only when what they check changes.
+# This is the merge-request set, about 45 minutes; the slow models run in
+# test:formal-extended below (private#842).
 test:formal:
   extends: [.timeout-long]
   stage: test
@@ -882,7 +884,7 @@ test:formal:
     key: core-formal
     paths: [.formal/]
   script:
-    - sh ci/formal-verification.sh
+    - FORMAL_SET=gate sh ci/formal-verification.sh
   rules:
     - if: $CI_MERGE_REQUEST_IID
       changes:
@@ -894,6 +896,36 @@ test:formal:
           - vauchi-core/verification/**/*
           - ci/formal-verification.sh
           - Cargo.lock
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "schedule"
+
+# The Bluetooth handshake lemmas (six capped prover runs, 18 minutes) and
+# the Apalache verifies of the Bluetooth and multi-stage machines, which
+# pushed test:formal past its hour (private#842, job 17540297472). Nightly
+# on main; on a merge request that touches the models it is there to press.
+test:formal-extended:
+  extends: [.timeout-extended]
+  stage: test
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/rust:1.93.1-bookworm
+  tags: [docker]
+  needs: []
+  variables:
+    FORMAL_HOME: ${CI_PROJECT_DIR}/.formal
+    CARGO_HOME: /usr/local/cargo
+  cache:
+    key: core-formal
+    paths: [.formal/]
+  script:
+    - FORMAL_SET=extended sh ci/formal-verification.sh
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - vauchi-core/verification/**/*
+          - vauchi-app/verification/**/*
+          - ci/formal-verification.sh
+      when: manual
+      allow_failure: true
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "schedule"
 
 test:cucumber:

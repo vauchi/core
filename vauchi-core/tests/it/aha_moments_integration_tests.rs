@@ -143,7 +143,6 @@ fn test_subsequent_contacts_no_celebration() {
 /// Test: First update received triggers with context
 /// Feature: aha_moments.feature @first-update
 // @scenario: aha_moments :: First received update shows diff view
-// @scenario: demo_contact :: Demo update shows before/after diff
 // @internal
 #[test]
 fn test_first_update_received_with_context() {

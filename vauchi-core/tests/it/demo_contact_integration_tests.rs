@@ -66,7 +66,6 @@ fn test_demo_contact_visually_distinct() {
 
 /// Test: Demo tips exist and have content
 /// Feature: demo_contact.feature @demo-updates
-// @scenario: demo_contact :: Demo contact sends periodic updates
 // @internal
 #[test]
 fn test_demo_tips_exist() {
@@ -84,7 +83,6 @@ fn test_demo_tips_exist() {
 
 /// Test: Demo state tracks current tip
 /// Feature: demo_contact.feature @demo-updates
-// @scenario: demo_contact :: Demo contact sends periodic updates
 // @internal
 #[test]
 fn test_demo_state_tracks_tip() {
@@ -96,8 +94,6 @@ fn test_demo_state_tracks_tip() {
 
 /// Test: Tips advance over time
 /// Feature: demo_contact.feature @demo-updates
-// @scenario: demo_contact :: Demo contact sends periodic updates
-// @scenario: demo_contact :: Demo updates demonstrate the update flow
 // @internal
 #[test]
 fn test_demo_tips_advance() {
@@ -115,7 +111,6 @@ fn test_demo_tips_advance() {
 
 /// Test: Update due check respects interval
 /// Feature: demo_contact.feature @demo-updates
-// @scenario: demo_contact :: Demo contact sends periodic updates
 // @internal
 #[test]
 fn test_demo_update_due_check() {
@@ -179,8 +174,6 @@ fn test_all_tip_categories_exist() {
 /// Test: Tips rotate through all content
 /// Feature: demo_contact.feature @demo-content
 // @scenario: demo_contact :: Demo contact has rotating tips
-// @scenario: demo_contact :: Demo tips change over time
-// @scenario: demo_contact :: Demo updates demonstrate the update flow
 // @internal
 #[test]
 fn test_demo_tips_rotate() {
@@ -220,8 +213,6 @@ fn test_demo_contact_manual_dismiss() {
 
 /// Test: Auto-removal after first real exchange
 /// Feature: demo_contact.feature @demo-dismiss
-// @scenario: demo_contact :: Demo contact auto-removes after first real exchange
-// @scenario: demo_contact :: Demo contact does not appear if user has contacts
 // @internal
 #[test]
 fn test_demo_contact_auto_remove() {
@@ -462,4 +453,22 @@ fn test_shown_tip_tracking() {
     state.advance_to_next_tip(0);
 
     assert!(state.shown_tip_ids.len() >= initial_count);
+}
+
+// @scenario: demo_contact :: Demo contact does not count as real contact
+#[test]
+fn the_active_demo_contact_is_not_counted_or_listed_among_contacts() {
+    let vauchi = crate::common::helpers::create_vauchi_with_identity("Alice");
+
+    vauchi.initialize_demo_contact().unwrap();
+
+    assert!(vauchi.is_demo_contact_active().unwrap());
+    assert_eq!(vauchi.contact_count().unwrap(), 0);
+    assert!(vauchi.list_contacts().unwrap().is_empty());
+    assert!(
+        vauchi
+            .search_contacts(DEMO_CONTACT_NAME)
+            .unwrap()
+            .is_empty()
+    );
 }

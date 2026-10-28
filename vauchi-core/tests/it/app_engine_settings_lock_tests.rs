@@ -22,19 +22,19 @@ fn settings_toggle_persists_after_navigate_away_and_back() {
 
     let screen = engine.navigate_to(AppScreen::Settings);
     assert!(
-        find_settings_toggle(&screen, "privacy", "delivery_receipts"),
-        "delivery_receipts should default to enabled"
+        find_settings_toggle(&screen, "privacy", "card_update"),
+        "card_update should default to enabled"
     );
 
     let result = engine.handle_action(UserAction::SettingsToggled {
         component_id: "privacy".into(),
-        item_id: "delivery_receipts".into(),
+        item_id: "card_update".into(),
     });
     match &result {
         ActionResult::UpdateScreen(s) => {
             assert!(
-                !find_settings_toggle(s, "privacy", "delivery_receipts"),
-                "delivery_receipts should be disabled after toggle"
+                !find_settings_toggle(s, "privacy", "card_update"),
+                "card_update should be disabled after toggle"
             );
         }
         other => panic!("Expected UpdateScreen, got {other:?}"),
@@ -48,8 +48,8 @@ fn settings_toggle_persists_after_navigate_away_and_back() {
     // Navigate back to Settings — toggle should still be off
     let restored = engine.navigate_to(AppScreen::Settings);
     assert!(
-        !find_settings_toggle(&restored, "privacy", "delivery_receipts"),
-        "delivery_receipts toggle should persist after navigating away and back (even with cache invalidated)"
+        !find_settings_toggle(&restored, "privacy", "card_update"),
+        "card_update toggle should persist after navigating away and back (even with cache invalidated)"
     );
 }
 

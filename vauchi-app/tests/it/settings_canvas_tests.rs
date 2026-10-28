@@ -174,7 +174,6 @@ fn privacy_section_keeps_the_toggles_next_to_your_data() {
         ids(items),
         vec![
             "privacy",
-            "delivery_receipts",
             "new_field_default",
             "card_update",
             "contact_added",
@@ -189,12 +188,7 @@ fn privacy_section_keeps_the_toggles_next_to_your_data() {
     );
     assert_eq!(your_data.kind, SettingsItemKind::Link { detail: None });
 
-    for toggle in [
-        "delivery_receipts",
-        "new_field_default",
-        "card_update",
-        "contact_added",
-    ] {
+    for toggle in ["new_field_default", "card_update", "contact_added"] {
         assert!(
             matches!(row(items, toggle).kind, SettingsItemKind::Toggle { .. }),
             "{toggle} stays a toggle"

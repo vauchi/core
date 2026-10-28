@@ -25,7 +25,6 @@ fn settings_flags_persist_and_seed_config_on_reopen() {
         let vauchi = Vauchi::new(config).unwrap();
 
         let mut flags = vauchi.load_settings_flags().unwrap();
-        assert!(flags.delivery_receipts_enabled, "default is true");
         assert!(!flags.suppress_presence, "default is false");
         assert!(!flags.contact_added_notifications, "default is false");
 
@@ -47,10 +46,6 @@ fn settings_flags_persist_and_seed_config_on_reopen() {
         assert!(
             vauchi.config().contact_added_notifications,
             "contact_added_notifications seeded into config on reopen"
-        );
-        assert!(
-            vauchi.config().delivery_receipts_enabled,
-            "untouched delivery_receipts default (true) preserved"
         );
 
         let flags = vauchi.load_settings_flags().unwrap();
@@ -163,7 +158,6 @@ fn merging_config_toggles_takes_every_toggle_and_keeps_other_flags() {
     let mut flags = vauchi.load_settings_flags().unwrap();
     flags.first_group_education_shown = true;
     let mut config = VauchiConfig::default();
-    config.delivery_receipts_enabled = !config.delivery_receipts_enabled;
     config.suppress_presence = !config.suppress_presence;
     config.contact_added_notifications = !config.contact_added_notifications;
     config.card_update_notifications = !config.card_update_notifications;
@@ -176,7 +170,6 @@ fn merging_config_toggles_takes_every_toggle_and_keeps_other_flags() {
 
     assert_eq!(
         [
-            flags.delivery_receipts_enabled,
             flags.suppress_presence,
             flags.contact_added_notifications,
             flags.card_update_notifications,
@@ -186,7 +179,6 @@ fn merging_config_toggles_takes_every_toggle_and_keeps_other_flags() {
             flags.new_field_default_visible,
         ],
         [
-            config.delivery_receipts_enabled,
             config.suppress_presence,
             config.contact_added_notifications,
             config.card_update_notifications,
@@ -197,4 +189,20 @@ fn merging_config_toggles_takes_every_toggle_and_keeps_other_flags() {
         ]
     );
     assert!(flags.first_group_education_shown);
+}
+
+// Flags stored before the delivery receipts toggle was removed still carry
+// its key; they must load with the surviving toggles intact (private#882).
+// @internal
+#[test]
+fn flags_stored_with_the_retired_delivery_receipts_key_still_load() {
+    let stored = r#"{"delivery_receipts_enabled":false,"suppress_presence":true,"contact_added_notifications":true}"#;
+    let flags: vauchi_core::settings::SettingsFlags =
+        serde_json::from_str(stored).expect("old flags load");
+    assert!(flags.suppress_presence);
+    assert!(flags.contact_added_notifications);
+    assert!(
+        flags.card_update_notifications,
+        "unmentioned flag keeps its default"
+    );
 }

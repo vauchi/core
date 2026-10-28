@@ -396,29 +396,6 @@ fn test_send_purge_request_send_error() {
 // === Delivery Receipts Privacy Tests (SP-12b Phase 2) ===
 
 // @scenario: message_delivery :: Delivery receipts can be disabled by user
-// @scenario: message_delivery :: Delivery receipts are optional
-#[test]
-fn test_delivery_receipts_disabled_config() {
-    let config = RelayClientConfig {
-        delivery_receipts_enabled: false,
-        ..create_test_config()
-    };
-    let client = RelayClient::new(MockTransport::new(), config, "sender-id".into());
-    assert!(
-        !client.config().delivery_receipts_enabled,
-        "Delivery receipts should be disabled"
-    );
-}
-
-// @scenario: message_delivery :: Delivery receipts enabled by default
-#[test]
-fn test_delivery_receipts_enabled_by_default() {
-    let config = RelayClientConfig::default();
-    assert!(
-        config.delivery_receipts_enabled,
-        "Delivery receipts should be enabled by default"
-    );
-}
 
 // === Suppress Presence Privacy Tests (SP-12b Phase 2) ===
 

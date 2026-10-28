@@ -79,29 +79,21 @@ fn settings_shows_all_groups() {
 }
 
 // @internal
+// A privacy control that controls nothing misleads: no send or receive
+// path ever produced a delivery receipt, so the row is gone (private#882).
 // @internal
 #[test]
-fn settings_toggle_delivery_receipts() {
-    let mut engine = SettingsEngine::new(sample_config());
-
+fn the_privacy_group_offers_no_delivery_receipts_toggle() {
+    let engine = SettingsEngine::new(sample_config());
     let screen = engine.current_screen();
-    let receipts_enabled = find_toggle(&screen, "privacy", "delivery_receipts");
-    assert!(receipts_enabled, "delivery_receipts should start enabled");
-
-    let result = engine.handle_action(UserAction::SettingsToggled {
-        component_id: "privacy".into(),
-        item_id: "delivery_receipts".into(),
-    });
-    match result {
-        ActionResult::UpdateScreen(screen) => {
-            let toggled = find_toggle(&screen, "privacy", "delivery_receipts");
-            assert!(
-                !toggled,
-                "delivery_receipts should be disabled after toggle"
-            );
-        }
-        other => panic!("Expected UpdateScreen, got {other:?}"),
-    }
+    assert!(
+        !has_toggle(&screen, "privacy", "delivery_receipts"),
+        "the privacy group must not offer a delivery receipts toggle"
+    );
+    assert!(
+        find_toggle(&screen, "privacy", "card_update"),
+        "the card update toggle stays, default on"
+    );
 }
 
 // M4 S3a2: the card-update notification heartbeat has a real, default-on
@@ -618,6 +610,15 @@ fn find_settings_group<'a>(screen: &'a ScreenModel, group_id: &str) -> &'a [Sett
             _ => None,
         })
         .unwrap_or_else(|| panic!("SettingsGroup '{group_id}' not found"))
+}
+
+fn has_toggle(screen: &ScreenModel, group_id: &str, item_id: &str) -> bool {
+    screen.components.iter().any(|c| match c {
+        Component::SettingsGroup { id, items, .. } if id == group_id => items
+            .iter()
+            .any(|item| item.id == item_id && matches!(item.kind, SettingsItemKind::Toggle { .. })),
+        _ => false,
+    })
 }
 
 fn find_toggle(screen: &ScreenModel, group_id: &str, item_id: &str) -> bool {

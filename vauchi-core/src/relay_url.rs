@@ -45,7 +45,37 @@ pub enum RelayUrlError {
 /// - No fragment (#)
 /// - No null bytes
 pub fn validate_relay_url(url: &str) -> Result<(), RelayUrlError> {
-    // Length checks
+    let parsed = parse_bounded(url)?;
+
+    if parsed.scheme() != "https" {
+        return Err(RelayUrlError::InsecureScheme);
+    }
+
+    let host = checked_host(&parsed)?;
+    check_host_not_private(host)?;
+
+    Ok(())
+}
+
+/// Validates a relay URL the user configures for themselves.
+///
+/// Unlike [`validate_relay_url`], which guards URLs from untrusted peers
+/// against SSRF, a private host is allowed: the user may run a relay on
+/// their own network. TLS is not optional (ADR-037 addendum: no plaintext
+/// relay connections), except plain http to a loopback host, where local
+/// relays and the e2e suite run and the relay itself allows plaintext.
+pub fn validate_configured_relay_url(url: &str) -> Result<(), RelayUrlError> {
+    let parsed = parse_bounded(url)?;
+    let host = checked_host(&parsed)?;
+
+    match parsed.scheme() {
+        "https" => Ok(()),
+        "http" if is_loopback_host(&host) => Ok(()),
+        _ => Err(RelayUrlError::InsecureScheme),
+    }
+}
+
+fn parse_bounded(url: &str) -> Result<Url, RelayUrlError> {
     if url.is_empty() {
         return Err(RelayUrlError::Empty);
     }
@@ -63,78 +93,26 @@ pub fn validate_relay_url(url: &str) -> Result<(), RelayUrlError> {
         ));
     }
 
-    let parsed =
-        Url::parse(url).map_err(|error| RelayUrlError::InvalidFormat(error.to_string()))?;
-
-    if parsed.scheme() != "https" {
-        return Err(RelayUrlError::InsecureScheme);
-    }
-
-    if !parsed.username().is_empty() || parsed.password().is_some() {
-        return Err(RelayUrlError::InvalidFormat(
-            "URL must not contain userinfo".to_string(),
-        ));
-    }
-
-    if parsed.fragment().is_some() {
-        return Err(RelayUrlError::InvalidFormat(
-            "URL must not contain a fragment".to_string(),
-        ));
-    }
-
-    let host = parsed
-        .host()
-        .ok_or_else(|| RelayUrlError::InvalidFormat("URL has no host".to_string()))?;
-    check_host_not_private(host)?;
-
-    Ok(())
+    Url::parse(url).map_err(|error| RelayUrlError::InvalidFormat(error.to_string()))
 }
 
-/// Validates a relay URL the user configures for themselves.
-///
-/// Unlike [`validate_relay_url`], which guards URLs from untrusted peers
-/// against SSRF, a private host is allowed: the user may run a relay on
-/// their own network. TLS is not optional (ADR-037 addendum: no plaintext
-/// relay connections), except plain http to a loopback host, where local
-/// relays and the e2e suite run and the relay itself allows plaintext.
-pub fn validate_configured_relay_url(url: &str) -> Result<(), RelayUrlError> {
-    if url.is_empty() {
-        return Err(RelayUrlError::Empty);
-    }
-    if url.len() > MAX_URL_LENGTH {
-        return Err(RelayUrlError::TooLong {
-            max: MAX_URL_LENGTH,
-            actual: url.len(),
-        });
-    }
-    if url.contains('\0') {
-        return Err(RelayUrlError::InvalidFormat(
-            "URL contains null bytes".to_string(),
-        ));
-    }
-
-    let parsed =
-        Url::parse(url).map_err(|error| RelayUrlError::InvalidFormat(error.to_string()))?;
-
+/// The URL's host, once it carries no userinfo and no fragment.
+fn checked_host(parsed: &Url) -> Result<Host<&str>, RelayUrlError> {
     if !parsed.username().is_empty() || parsed.password().is_some() {
         return Err(RelayUrlError::InvalidFormat(
             "URL must not contain userinfo".to_string(),
         ));
     }
+
     if parsed.fragment().is_some() {
         return Err(RelayUrlError::InvalidFormat(
             "URL must not contain a fragment".to_string(),
         ));
     }
-    let host = parsed
-        .host()
-        .ok_or_else(|| RelayUrlError::InvalidFormat("URL has no host".to_string()))?;
 
-    match parsed.scheme() {
-        "https" => Ok(()),
-        "http" if is_loopback_host(&host) => Ok(()),
-        _ => Err(RelayUrlError::InsecureScheme),
-    }
+    parsed
+        .host()
+        .ok_or_else(|| RelayUrlError::InvalidFormat("URL has no host".to_string()))
 }
 
 fn is_loopback_host(host: &Host<&str>) -> bool {

@@ -406,7 +406,7 @@ fn verified_proof_context(mutual: usize, threshold: u32) -> ClaimContext {
     context
 }
 
-// @scenario: recovery :: Reviewing a recovery claim
+// @scenario: contact_recovery :: Reviewing a recovery claim
 // @internal
 #[test]
 fn verified_proof_with_enough_mutual_vouchers_reviews_at_high_confidence() {
@@ -417,7 +417,7 @@ fn verified_proof_with_enough_mutual_vouchers_reviews_at_high_confidence() {
     assert_eq!(context.contact_name, "Alice");
 }
 
-// @scenario: recovery :: Reviewing a recovery claim
+// @scenario: contact_recovery :: Reviewing a recovery claim
 // @internal
 #[test]
 fn verified_proof_with_one_mutual_voucher_reviews_at_medium_confidence() {
@@ -426,7 +426,7 @@ fn verified_proof_with_one_mutual_voucher_reviews_at_medium_confidence() {
     assert_eq!(context.mutual_voucher_count, 1);
 }
 
-// @scenario: recovery :: Reviewing a recovery claim
+// @scenario: contact_recovery :: Reviewing a recovery claim
 // @internal
 #[test]
 fn verified_proof_with_no_mutual_voucher_reviews_at_low_confidence() {

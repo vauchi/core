@@ -49,6 +49,7 @@ mod api_places_tests;
 mod api_prepare_card_update_tests;
 mod api_relay_exchange_tests;
 mod api_relay_url_persist_tests;
+mod api_relay_url_scheme_tests;
 mod api_search_tests;
 mod api_send_phase_tests;
 mod api_shard_edges_tests;

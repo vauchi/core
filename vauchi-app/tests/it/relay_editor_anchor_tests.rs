@@ -129,6 +129,26 @@ fn a_custom_relay_without_an_ohttp_relay_is_refused_inline() {
     assert_eq!(engine.vauchi().config().relay.server_url, DEFAULT_RELAY);
 }
 
+// Core refuses a relay that would skip TLS (#883); the form says so on the
+// URL input instead of an alert carrying the English error text (#898).
+// @internal
+#[test]
+fn a_relay_url_without_tls_is_refused_inline() {
+    for insecure in [
+        "http://relay.self-hosted.example",
+        "relay.self-hosted.example",
+    ] {
+        let mut engine = engine_with_ohttp_relay();
+        type_into(&mut engine, "relay_url", insecure);
+        type_into(&mut engine, "relay_anchor", &hex::encode_upper(ANCHOR));
+
+        let message = inline_validation_error(submit(&mut engine), "relay_url");
+
+        assert_eq!(message, "Enter a relay address that starts with https://");
+        assert_eq!(engine.vauchi().config().relay.server_url, DEFAULT_RELAY);
+    }
+}
+
 // @internal
 #[test]
 fn a_malformed_anchor_is_refused_inline() {

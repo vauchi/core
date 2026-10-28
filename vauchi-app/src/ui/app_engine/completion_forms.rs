@@ -70,6 +70,12 @@ impl AppEngine {
                 // Persist durably via core so the change survives a restart on
                 // every frontend (mobile had no Backend, so this was a no-op).
                 Some(FormInput::EditRelayUrl { url, anchor }) => {
+                    if vauchi_core::relay_url::validate_configured_relay_url(url.trim()).is_err() {
+                        return ActionResult::ValidationError {
+                            component_id: "relay_url".into(),
+                            message: self.t("validation.relay_url_https"),
+                        };
+                    }
                     match relay_anchor_input(&url, &anchor) {
                         Ok(_) if !self.vauchi.config().relay.has_ohttp_route(url.trim()) => {
                             ActionResult::ValidationError {

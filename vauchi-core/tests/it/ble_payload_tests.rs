@@ -72,10 +72,10 @@ fn test_ble_card_payload_empty_fields_and_no_avatar() {
     );
 }
 
-// @internal
+// @scenario: ble_exchange :: Large avatar roundtrips correctly
 #[test]
 fn test_ble_card_payload_large_avatar() {
-    let large_avatar = vec![0x42; 10 * 1024]; // 10KB
+    let large_avatar = vec![0x42; 16 * 1024];
 
     let original = BleCardPayload::new(
         [0xFF; 32],
@@ -88,7 +88,7 @@ fn test_ble_card_payload_large_avatar() {
     let bytes = original.to_bytes().expect("large avatar should serialize");
     let restored = BleCardPayload::from_bytes(&bytes).expect("should deserialize");
 
-    assert_eq!(restored.avatar.as_ref().map(|a| a.len()), Some(10 * 1024));
+    assert_eq!(restored.avatar.as_ref().map(|a| a.len()), Some(16 * 1024));
     assert_eq!(restored.avatar, Some(large_avatar));
     assert!(
         restored.verify_crc16(),

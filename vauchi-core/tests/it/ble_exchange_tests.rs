@@ -67,6 +67,7 @@ fn test_ble_payload_roundtrip() {
 }
 
 // @scenario: security :: Tampered exchange data is rejected
+// @scenario: ble_exchange :: BLE payload has valid signature
 #[test]
 fn test_ble_payload_signature() {
     let identity = Identity::create("Alice", 0);
@@ -81,6 +82,7 @@ fn test_ble_payload_signature() {
 }
 
 // @scenario: security :: Tampered exchange data is rejected
+// @scenario: ble_exchange :: Tampered BLE payload fails signature verification
 #[test]
 fn test_ble_payload_tamper() {
     let identity = Identity::create("Alice", 0);

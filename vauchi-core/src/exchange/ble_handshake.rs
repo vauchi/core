@@ -11,10 +11,12 @@
 //!
 //! ```text
 //! Phase 1 (Initiator → Responder): KeyOffer
-//!   [version(1)][identity_pub(32)][ephemeral_pub(32)][nonce(16)][timestamp(8)] = 89 bytes
+//!   [version(1)][identity_pub(32)][exchange_pub(32)][ephemeral_pub(32)]
+//!   [nonce(16)][timestamp(8)][oob_nonce_echo(16)] = 137 bytes
 //!
 //! Phase 2 (Responder → Initiator): KeyAck + commitment + encrypted card
-//!   [version(1)][identity_pub(32)][ephemeral_pub(32)][nonce(16)][commitment(32)] = 113 bytes
+//!   [version(1)][identity_pub(32)][exchange_pub(32)][ephemeral_pub(32)]
+//!   [nonce(16)][commitment(32)][sender_timestamp(8)] = 153 bytes
 //!   + encrypted card bytes (separate BLE data characteristic)
 //!
 //! Phase 3 (Initiator → Responder): commitment + encrypted card
@@ -23,7 +25,7 @@
 //! Phase 4 (Both sides): Reveal — verify commitments, decrypt
 //! ```
 //!
-//! ## Key Derivation (v2 — identity binding)
+//! ## Key Derivation (v4 wire; identity binding since v2)
 //!
 //! Two DH operations: identity binding (DH1) + forward secrecy (DH2):
 //! ```text
@@ -31,7 +33,7 @@
 //! dh2 = our_ephemeral.dh(their_ephemeral)            // forward secrecy
 //! ikm = dh1 || dh2  (64 bytes)
 //! salt = sorted(our_nonce, their_nonce)
-//! info = b"vauchi-ble-handshake-v2" || sorted(our_exchange_pub, their_exchange_pub)
+//! info = b"vauchi-ble-handshake-v4" || sorted(our_exchange_pub, their_exchange_pub)
 //! session_key = HKDF(salt, ikm, info)
 //! ```
 //!

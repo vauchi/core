@@ -21,9 +21,9 @@ pub enum ExchangeMode {
     /// Scan a one-sided QR code, then BLE transfers the card — a quick
     /// "glance" at one peer's QR to bootstrap a BLE connection (the other peer
     /// shows the QR). Config and dispatch follow this ritual since the G3
-    /// graduation. Open gap: the handshake pins peer identity on a 2-byte
-    /// advertisement prefix instead of the full QR-pinned identity — see
-    /// `designs/2026-07-24-exchange-mode-contracts-design.md` (private).
+    /// graduation. The scanner pins the displayer's identity, exchange key
+    /// and co-presence nonce from the QR (`vauchi-app` `glance.rs`,
+    /// ADR-053); the 2-byte advertisement prefix only selects whom to dial.
     Glance,
     /// Bidirectional multi-stage QR + ultrasonic audio proximity confirmation.
     Hover,

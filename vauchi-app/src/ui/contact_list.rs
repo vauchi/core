@@ -285,7 +285,9 @@ impl ContactListEngine {
         }
     }
 
-    fn filtered_contacts(&self) -> Vec<&Item> {
+    /// Each contact the list shows, with the field value that matched the
+    /// search when the name did not, so the row can say why it is listed.
+    fn filtered_contacts(&self) -> Vec<(&Item, Option<&str>)> {
         let faceted: Option<std::collections::HashSet<&str>> = self
             .faceted_ids
             .as_ref()
@@ -297,30 +299,28 @@ impl ContactListEngine {
 
         self.all_contacts
             .iter()
-            .filter(|c| {
+            .filter_map(|c| {
                 if let Some(group_id) = &self.group_filter {
                     let member_ids = self.group_memberships.get(group_id);
                     if !member_ids
                         .map(|ids| ids.contains(&c.item.id))
                         .unwrap_or(false)
                     {
-                        return false;
+                        return None;
                     }
                 }
                 if let Some(set) = &faceted {
-                    return set.contains(c.item.id.as_str());
+                    return set.contains(c.item.id.as_str()).then_some((&c.item, None));
                 }
-                if search_active {
-                    let name_match = c.item.name.to_lowercase().contains(&query_lower);
-                    let field_match = c
+                if search_active && !c.item.name.to_lowercase().contains(&query_lower) {
+                    let matched_field = c
                         .searchable
                         .iter()
-                        .any(|f| f.to_lowercase().contains(&query_lower));
-                    return name_match || field_match;
+                        .find(|f| f.to_lowercase().contains(&query_lower))?;
+                    return Some((&c.item, Some(matched_field.as_str())));
                 }
-                true
+                Some((&c.item, None))
             })
-            .map(|c| &c.item)
             .collect()
     }
 }
@@ -413,7 +413,16 @@ impl WorkflowEngine for ContactListEngine {
                 self.search_input(),
                 Component::List {
                     id: "contacts".into(),
-                    items: window_items.iter().map(|&i| i.clone()).collect(),
+                    items: window_items
+                        .iter()
+                        .map(|&(item, matched_field)| {
+                            let mut row = item.clone();
+                            if let Some(field) = matched_field {
+                                row.subtitle = Some(field.to_string());
+                            }
+                            row
+                        })
+                        .collect(),
                     searchable: true,
                     total_count,
                     offset,

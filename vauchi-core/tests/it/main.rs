@@ -519,6 +519,7 @@ mod storage_encryption_tests;
 mod storage_encryption_v14_tests;
 mod storage_encryption_v15_tests;
 mod storage_error_tests;
+mod storage_footprint_tests;
 mod storage_identity_tests;
 mod storage_key_check_tests;
 mod storage_pragma_tests;

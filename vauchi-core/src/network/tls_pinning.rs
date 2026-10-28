@@ -87,10 +87,17 @@ impl ServerCertVerifier for PinningVerifier {
 
 /// Build a `rustls::ClientConfig` with SPKI pin verification.
 fn build_pinned_tls_config(pins: &[PinnedCertificate]) -> Result<rustls::ClientConfig, Error> {
-    let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
+    pinned_tls_config_over(
+        rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned()),
+        pins,
+    )
+}
 
-    let root_store =
-        rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+fn pinned_tls_config_over(
+    root_store: rustls::RootCertStore,
+    pins: &[PinnedCertificate],
+) -> Result<rustls::ClientConfig, Error> {
+    let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
 
     let webpki_verifier =
         WebPkiServerVerifier::builder_with_provider(Arc::new(root_store), provider.clone())
@@ -246,4 +253,93 @@ pub fn build_pinned_agent(
         connector,
         DefaultResolver::default(),
     ))
+}
+
+// INLINE_TEST_REQUIRED: drives the private `pinned_tls_config_over` seam with
+// a test root; no public API accepts a root store.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rustls::pki_types::{PrivateKeyDer, PrivatePkcs8KeyDer};
+    use std::net::{TcpListener, TcpStream};
+    use std::time::Duration;
+
+    const CA: &[u8] = include_bytes!("../../tests/fixtures/tls-pinning/ca.der");
+    const SERVER: &[u8] = include_bytes!("../../tests/fixtures/tls-pinning/server.der");
+    const SERVER_KEY: &[u8] = include_bytes!("../../tests/fixtures/tls-pinning/server.key.der");
+    const REQUEST: &[u8] = b"POST /v2/fetch HTTP/1.1\r\nHost: localhost\r\n\r\n";
+
+    /// Serves one TLS connection and returns the application bytes it read.
+    fn serve_once(listener: TcpListener) -> std::thread::JoinHandle<Vec<u8>> {
+        let config = rustls::ServerConfig::builder_with_provider(Arc::new(
+            rustls::crypto::aws_lc_rs::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_no_client_auth()
+        .with_single_cert(
+            vec![CertificateDer::from(SERVER.to_vec())],
+            PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(SERVER_KEY.to_vec())),
+        )
+        .unwrap();
+        std::thread::spawn(move || {
+            let (tcp, _) = listener.accept().unwrap();
+            tcp.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            let connection = rustls::ServerConnection::new(Arc::new(config)).unwrap();
+            let mut tls = StreamOwned::new(connection, tcp);
+            let mut received = Vec::new();
+            let mut chunk = [0u8; 512];
+            while let Ok(n @ 1..) = tls.read(&mut chunk) {
+                received.extend_from_slice(&chunk[..n]);
+                if received.ends_with(b"\r\n\r\n") {
+                    break;
+                }
+            }
+            received
+        })
+    }
+
+    /// Sends one request to a server holding the test certificate, trusting
+    /// the test CA and pinning `pins`; returns the client outcome and what the
+    /// server read.
+    fn send_with_pins(pins: &[PinnedCertificate]) -> (std::io::Result<()>, Vec<u8>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = serve_once(listener);
+        let mut roots = rustls::RootCertStore::empty();
+        roots.add(CertificateDer::from(CA.to_vec())).unwrap();
+        let config = pinned_tls_config_over(roots, pins).unwrap();
+        let connection =
+            ClientConnection::new(Arc::new(config), ServerName::try_from("localhost").unwrap())
+                .unwrap();
+        let mut tls = StreamOwned::new(connection, TcpStream::connect(address).unwrap());
+        let sent = tls.write_all(REQUEST).and_then(|()| tls.flush());
+        drop(tls);
+        (sent, server.join().unwrap())
+    }
+
+    // @scenario: certificate_pinning :: Connection rejected with mismatched certificate
+    // @scenario: certificate_pinning :: Pin verification happens before sending data
+    #[test]
+    fn a_valid_chain_with_the_wrong_pin_is_refused_before_any_request_byte() {
+        let (sent, received) = send_with_pins(&[PinnedCertificate::new([0xAB; 32])]);
+
+        let refusal = sent.expect_err("the handshake is refused");
+        assert!(
+            refusal.to_string().contains("pin verification failed"),
+            "{refusal}"
+        );
+        assert!(received.is_empty(), "the server read {received:?}");
+    }
+
+    // @internal
+    #[test]
+    fn the_right_pin_lets_the_request_through() {
+        let pin = PinnedCertificate::from_cert_der(SERVER).unwrap();
+
+        let (sent, received) = send_with_pins(&[pin]);
+
+        sent.unwrap();
+        assert_eq!(received, REQUEST);
+    }
 }

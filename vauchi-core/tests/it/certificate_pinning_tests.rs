@@ -80,7 +80,28 @@ fn test_pin_format_spki_uses_sha256() {
     assert_eq!(pin.unwrap().sha256_fingerprint.len(), 32);
 }
 
-/// @scenario: certificate_pinning :: SPKI hash is deterministic
+// @scenario: certificate_pinning :: Pin is SHA-256 hash of the certificate's SPKI
+#[test]
+fn the_pin_is_sha256_over_the_spki_field_and_nothing_else() {
+    use sha2::{Digest, Sha256};
+    let key = b"spki-known-answer";
+    let cert = build_test_cert(key);
+    let mut spki_field = vec![0x30, key.len() as u8];
+    spki_field.extend_from_slice(key);
+
+    let pin = PinnedCertificate::from_cert_der(&cert).unwrap();
+
+    assert_eq!(
+        pin.sha256_fingerprint,
+        <[u8; 32]>::from(Sha256::digest(&spki_field))
+    );
+    assert_ne!(
+        pin.sha256_fingerprint,
+        <[u8; 32]>::from(Sha256::digest(&cert))
+    );
+}
+
+/// @scenario: certificate_pinning :: Pin computation is deterministic
 #[test]
 fn test_pin_format_deterministic() {
     let cert = build_test_cert(b"determinism-key");
@@ -315,7 +336,7 @@ fn test_pinned_certificate_debug() {
 // Integration: Full Rotation Lifecycle
 // =============================================================================
 
-/// @scenario: certificate_pinning :: Graceful certificate rotation (full lifecycle)
+/// @scenario: certificate_pinning :: Graceful certificate rotation
 #[test]
 fn test_integration_full_rotation_lifecycle() {
     let initial_cert = build_test_cert(b"production-key-v1");

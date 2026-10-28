@@ -743,6 +743,34 @@ test:core:
       junit: target/nextest/ci/junit.xml
     expire_in: 1 week
 
+# The known-answer vectors' end-to-end backup import needs production
+# Argon2id, which `test-kdf` above compiles out; this runs the vector tests
+# alone without it (vauchi/private#119).
+test:vectors:
+  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
+  stage: test
+  needs: []
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - !reference [.clone-locales, before_script]
+    - !reference [.clone-themes, before_script]
+  script:
+    - cargo nextest run --profile ci -p vauchi-core --features testing --test it -E 'test(protocol_test_vectors)'
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - vauchi-core/tests/it/protocol_test_vectors_tests.rs
+          - "vauchi-core/tests/fixtures/test-vectors/**"
+          - "vauchi-core/src/crypto/**"
+          - "vauchi-core/src/backup/**"
+          - "vauchi-core/src/identity/**"
+          - vauchi-core/src/exchange/x3dh.rs
+          - vauchi-core/src/network/mailbox_token.rs
+          - .gitlab-ci.yml
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
 # vauchi-protocol carries the shared relay/client wire types and their
 # contract tests (tests/it/contract_relay_consumer_tests.rs, which pin the
 # exact V2 request/response JSON). No other test job runs `-p

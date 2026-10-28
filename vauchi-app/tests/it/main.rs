@@ -133,6 +133,7 @@ mod exchange_group_selection_actions_tests;
 mod exchange_last_used_defaults_tests;
 mod exchange_location_capture_tests;
 mod exchange_tab_tests;
+mod no_read_receipt_tests;
 // Uses the testing-feature hooks (vauchi/private#271).
 mod deletion_recovery_choice_tests;
 #[cfg(feature = "testing")]

@@ -334,6 +334,7 @@ fn sync_now_action_pressed_does_not_panic() {
 // had been asked. Seen on two Android phones 2026-09-09: every tap on
 // Sync after an app start was a silent no-op.
 // @scenario: sync_chrome :: Sync now connects before syncing
+// @scenario: sync_updates :: Manual sync trigger
 #[cfg(feature = "network-http")]
 #[test]
 fn sync_now_without_a_session_attempts_to_connect_and_reports_failure() {

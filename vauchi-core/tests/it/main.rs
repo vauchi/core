@@ -233,6 +233,7 @@ mod edge_cases_tests;
 mod emergency_alert_fresh_responder_tests;
 mod emergency_broadcast_tests;
 mod emergency_shred_engine_tests;
+mod emergency_shred_scenario_tests;
 mod encryption_coverage_tests;
 mod error_handling_tests;
 mod escrow_client_tests;

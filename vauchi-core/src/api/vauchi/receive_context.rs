@@ -70,6 +70,17 @@ pub(super) fn registered_mailboxes(
     }
 }
 
+/// The padded, shuffled registration batches for a set of routes.
+pub(super) fn registration_batches(
+    rng: &dyn crate::rng::SecureRng,
+    routes: &HashMap<String, MailboxRoute>,
+) -> Vec<Vec<String>> {
+    crate::network::mailbox_token::padded_registration_batches(
+        rng,
+        routes.keys().cloned().collect(),
+    )
+}
+
 pub(super) struct ReceiveContext<'a> {
     identity: &'a Identity,
     contacts: HashMap<&'a str, &'a Contact>,

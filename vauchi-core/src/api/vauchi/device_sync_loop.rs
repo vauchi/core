@@ -29,7 +29,7 @@ use crate::api::send_phase::SendPhase;
 use crate::api::sync::DeviceSyncOrchestrator;
 use crate::contact::Contact;
 use crate::identity::Identity;
-use crate::network::mailbox_token::{current_day_epoch, padded_registration_batches};
+use crate::network::mailbox_token::current_day_epoch;
 use crate::network::{
     HttpTransportAdapter, MessagePayload, RegisterMailbox, Transport, create_envelope,
 };
@@ -55,10 +55,8 @@ impl Vauchi {
             &self.config.relay,
             &plan.days,
         ));
-        let batches = padded_registration_batches(
-            self.rng.as_ref(),
-            context.routes.keys().cloned().collect(),
-        );
+        let batches =
+            super::receive_context::registration_batches(self.rng.as_ref(), &context.routes);
         adapter.set_mailbox_context(context);
 
         // Register each batch with the adapter

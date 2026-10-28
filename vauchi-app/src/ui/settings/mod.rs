@@ -59,7 +59,6 @@ impl DelayedFetching {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct SettingsConfig {
     pub display_name: String,
-    pub delivery_receipts_enabled: bool,
     /// New contact-card entries start Visible (Decision 2,
     /// 2026-07-05-ungrouped-contacts-default-open). Default off = hidden.
     #[serde(default)]
@@ -245,9 +244,6 @@ impl SettingsEngine {
     fn flip_toggle(&mut self, component_id: &str, item_id: &str) {
         let config = &mut self.config;
         match (component_id, item_id) {
-            ("privacy", "delivery_receipts") => {
-                config.delivery_receipts_enabled = !config.delivery_receipts_enabled;
-            }
             ("privacy", "new_field_default") => {
                 config.new_field_default_visible = !config.new_field_default_visible;
             }

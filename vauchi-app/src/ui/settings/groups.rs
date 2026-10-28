@@ -159,13 +159,6 @@ impl SettingsEngine {
                     None,
                 ),
                 self.toggle_row(
-                    "delivery_receipts",
-                    "settings.delivery_receipts",
-                    self.config.delivery_receipts_enabled,
-                    self.t("settings.delivery_receipts_a11y"),
-                    "settings.delivery_receipts_hint",
-                ),
-                self.toggle_row(
                     "new_field_default",
                     "settings.new_field_default",
                     self.config.new_field_default_visible,

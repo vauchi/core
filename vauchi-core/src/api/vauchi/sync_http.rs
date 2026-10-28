@@ -785,10 +785,10 @@ impl Vauchi {
         let our_id = hex::encode(identity.signing_public_key());
 
         // Build RelayClient wrapping the adapter
-        let relay_config = self.config.relay.to_relay_client_config(
-            self.config.delivery_receipts_enabled,
-            self.config.suppress_presence,
-        );
+        let relay_config = self
+            .config
+            .relay
+            .to_relay_client_config(self.config.suppress_presence);
         let relay = RelayClient::new(adapter, relay_config, our_id).with_rng(self.rng.clone());
 
         let mut ctrl = SendPhase::new(

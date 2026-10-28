@@ -74,9 +74,6 @@ impl ContentUpdates {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub struct SettingsFlags {
-    /// Send read/delivery receipts. Defaults to true.
-    #[serde(default = "default_true")]
-    pub delivery_receipts_enabled: bool,
     /// Suppress presence announcements to the relay. Defaults to false.
     #[serde(default)]
     pub suppress_presence: bool,
@@ -139,7 +136,6 @@ pub struct AppearancePick {
 impl Default for SettingsFlags {
     fn default() -> Self {
         Self {
-            delivery_receipts_enabled: true,
             suppress_presence: false,
             contact_added_notifications: false,
             card_update_notifications: true,

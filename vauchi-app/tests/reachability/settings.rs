@@ -18,7 +18,6 @@ fn config() -> SettingsConfig {
         content_updates: Default::default(),
         content_updates_in_background: true,
         display_name: "Sample User".into(),
-        delivery_receipts_enabled: true,
         new_field_default_visible: false,
         contact_added_notifications: true,
         card_update_notifications: true,

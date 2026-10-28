@@ -1019,7 +1019,6 @@ fn test_send_update_with_shared_key_uses_anonymous_id() {
         max_pending_messages: 10,
         ack_timeout_ms: 100,
         max_retries: 3,
-        delivery_receipts_enabled: true,
         suppress_presence: false,
     };
     let mut client = RelayClient::new(transport, config, "real-sender-id".into());
@@ -1079,7 +1078,6 @@ fn test_send_update_without_shared_key_uses_real_identity() {
         max_pending_messages: 10,
         ack_timeout_ms: 100,
         max_retries: 3,
-        delivery_receipts_enabled: true,
         suppress_presence: false,
     };
     let mut client = RelayClient::new(transport, config, "real-sender-id".into());
@@ -1122,7 +1120,6 @@ fn test_send_update_anonymous_id_differs_per_contact() {
         max_pending_messages: 10,
         ack_timeout_ms: 100,
         max_retries: 3,
-        delivery_receipts_enabled: true,
         suppress_presence: false,
     };
     let mut client = RelayClient::new(transport, config, "sender".into());

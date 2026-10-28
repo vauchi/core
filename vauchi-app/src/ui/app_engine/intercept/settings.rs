@@ -67,9 +67,6 @@ impl AppEngine {
         {
             let config = self.vauchi.config_mut();
             match item_id.as_str() {
-                "delivery_receipts" => {
-                    config.delivery_receipts_enabled = !config.delivery_receipts_enabled;
-                }
                 "new_field_default" => {
                     config.new_field_default_visible = !config.new_field_default_visible;
                 }

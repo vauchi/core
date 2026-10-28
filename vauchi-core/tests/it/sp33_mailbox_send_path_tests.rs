@@ -24,7 +24,6 @@ fn create_test_config() -> RelayClientConfig {
         max_pending_messages: 100,
         ack_timeout_ms: 100,
         max_retries: 3,
-        delivery_receipts_enabled: true,
         suppress_presence: false,
     }
 }

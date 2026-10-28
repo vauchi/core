@@ -43,9 +43,6 @@ pub struct VauchiConfig {
     /// If None, a random key will be generated (not persistent across sessions).
     pub storage_key: Option<SymmetricKey>,
 
-    /// Whether to send delivery receipts for received messages.
-    pub delivery_receipts_enabled: bool,
-
     /// Whether to suppress presence (online/offline status) at the relay.
     /// When true, the relay will not notify contacts of this client's online status.
     pub suppress_presence: bool,
@@ -104,7 +101,6 @@ impl Default for VauchiConfig {
             sync: SyncConfig::default(),
             auto_save: true,
             storage_key: None,
-            delivery_receipts_enabled: true,
             suppress_presence: false,
             recovery: RecoveryConfig::default(),
             relay_list: None,
@@ -129,7 +125,6 @@ impl crate::settings::SettingsFlags {
     /// The single source of the config→flags mapping — callers (e.g. the
     /// humble `persist_settings_toggle`) load-merge-save through this.
     pub fn merge_config_toggles(&mut self, config: &VauchiConfig) {
-        self.delivery_receipts_enabled = config.delivery_receipts_enabled;
         self.suppress_presence = config.suppress_presence;
         self.contact_added_notifications = config.contact_added_notifications;
         self.card_update_notifications = config.card_update_notifications;
@@ -568,17 +563,12 @@ impl RelayConfig {
     }
 
     /// Converts to RelayClientConfig for the network layer.
-    pub fn to_relay_client_config(
-        &self,
-        delivery_receipts_enabled: bool,
-        suppress_presence: bool,
-    ) -> RelayClientConfig {
+    pub fn to_relay_client_config(&self, suppress_presence: bool) -> RelayClientConfig {
         RelayClientConfig {
             transport: self.to_transport_config(),
             max_pending_messages: self.max_pending_messages,
             ack_timeout_ms: self.ack_timeout_ms,
             max_retries: self.max_retries,
-            delivery_receipts_enabled,
             suppress_presence,
         }
     }

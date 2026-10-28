@@ -220,7 +220,6 @@ impl AppEngine {
                     .unwrap_or_else(|| "follow_system".to_string());
                 let config = SettingsConfig {
                     display_name,
-                    delivery_receipts_enabled: vauchi.config().delivery_receipts_enabled,
                     new_field_default_visible: vauchi.config().new_field_default_visible,
                     contact_added_notifications: vauchi.config().contact_added_notifications,
                     card_update_notifications: vauchi.config().card_update_notifications,

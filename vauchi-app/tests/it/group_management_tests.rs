@@ -44,8 +44,8 @@ fn cancelling_a_group_delete_keeps_the_group() {
         group_id: important.id().to_string(),
     });
 
-    press(&mut engine, "delete_group");
-    press(&mut engine, "cancel_delete_group");
+    let _ = press(&mut engine, "delete_group");
+    let _ = press(&mut engine, "cancel_delete_group");
 
     assert_eq!(group_names(&engine), ["Important"]);
 }
@@ -60,8 +60,8 @@ fn renaming_friends_to_family_is_refused_and_friends_keeps_its_name() {
         group_id: friends.id().to_string(),
     });
 
-    press(&mut engine, "rename");
-    engine.handle_action(UserAction::TextChanged {
+    let _ = press(&mut engine, "rename");
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "group_name".into(),
         value: "Family".into(),
     });

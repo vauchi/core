@@ -282,6 +282,7 @@ fn offers_turn_off(text: &str) -> bool {
 }
 
 // @scenario: duress_mode :: The duress setup is invisible in duress mode
+// @scenario: duress_mode :: Cannot disable duress mode from duress mode
 // ADR-032 / #462: a coercer who opens Settings → Security after a duress
 // unlock sees an app with no duress protection, and nothing to disable.
 #[test]
@@ -415,4 +416,25 @@ fn duress_mode_gdpr_export_holds_no_real_contacts() {
         "export holds a real fingerprint: {json}"
     );
     assert!(json.contains("Dora"), "decoy missing from export: {json}");
+}
+
+// @scenario: duress_mode :: Duress PIN requires an app password
+#[test]
+fn without_an_app_password_the_duress_pin_is_refused_and_says_why() {
+    let mut vauchi: Vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::DuressPin);
+    let _ = start_setup(&mut engine);
+    type_into(&mut engine, "pin", PIN);
+    let _ = press(&mut engine, "continue");
+    type_into(&mut engine, "confirm_pin", PIN);
+
+    let refused = press(&mut engine, "continue");
+
+    let ActionResult::ShowAlert { message, .. } = refused else {
+        panic!("expected a refusal, got {refused:?}");
+    };
+    assert!(message.contains("app password"), "{message}");
+    assert!(!engine.vauchi().is_duress_enabled().unwrap());
 }

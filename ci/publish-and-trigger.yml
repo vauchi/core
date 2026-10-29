@@ -708,6 +708,23 @@ bump:consumer-pins:
       bash scripts/bump-consumer-pins.sh "$CI_COMMIT_TAG" ci/consumer-pins.json \
         "$SCRIPTS_DIR/scripts/core-pins.py"
 
+# The spec (vauchi/spec) is a consumer of Core too, though not one
+# ci/consumer-pins.json can bump: its chapters pin the Core commit they
+# were read from and its tags map to Core releases. This opens the
+# re-verify issue on the spec project for every release, so spec tags
+# follow releases instead of one-off audits (vauchi/private#874). One
+# issue per tag; a red notification never gates the release.
+notify:spec:
+  extends: [.linux-runner, .timeout-standard]
+  stage: trigger
+  allow_failure: true
+  interruptible: false
+  needs: []
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  script:
+    - bash scripts/open-spec-reverify-issue.sh "$CI_COMMIT_TAG"
+
 # Trigger consumer apps directly (no intermediary repos)
 # Note: bridge jobs (trigger:) do not support timeout: — downstream jobs
 # have their own timeouts via .timeout-standard/.timeout-extended.

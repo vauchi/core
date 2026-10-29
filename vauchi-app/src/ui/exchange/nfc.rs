@@ -123,6 +123,10 @@ pub(super) struct NfcExchangeFlow {
     identity: Identity,
     /// (Responder only) collects chained EXCHANGE chunks off the raw wire.
     reassembler: ChainReassembler,
+    /// (Initiator only) responses still due for the frames last sent. A
+    /// reader reports one per frame; only the last carries the peer's
+    /// phase payload, the earlier ones (SELECT, chained chunks) a status.
+    responses_due: usize,
 }
 
 impl NfcExchangeFlow {
@@ -134,6 +138,7 @@ impl NfcExchangeFlow {
             is_initiator: true,
             identity,
             reassembler: ChainReassembler::new(),
+            responses_due: 0,
         }
     }
 
@@ -145,6 +150,7 @@ impl NfcExchangeFlow {
             is_initiator: false,
             identity,
             reassembler: ChainReassembler::new(),
+            responses_due: 0,
         }
     }
 
@@ -172,6 +178,7 @@ impl NfcExchangeFlow {
         } else {
             (Vec::new(), Vec::new())
         };
+        self.responses_due = apdus.len();
         self.step = NfcStep::AwaitingTap;
         Ok(vec![Command::NfcActivate { payload, apdus }])
     }
@@ -218,6 +225,16 @@ impl NfcExchangeFlow {
 
     fn handle_raw_apdu(&mut self, bytes: &[u8]) -> NfcHardwareOutcome {
         if self.is_initiator {
+            if self.responses_due > 1 {
+                self.responses_due -= 1;
+                return match nfc_apdu::decode_response(bytes) {
+                    Ok(_) => NfcHardwareOutcome::Consumed {
+                        commands: Vec::new(),
+                    },
+                    Err(e) => self.fail_with_fallback(e.to_string()),
+                };
+            }
+            self.responses_due = 0;
             return self.handle_reader_response(bytes);
         }
         match nfc_apdu::decode_command(bytes) {
@@ -288,6 +305,7 @@ impl NfcExchangeFlow {
                 };
             match nfc_apdu::frame_exchange(&our_encrypted_card) {
                 Ok(apdus) => {
+                    self.responses_due = apdus.len();
                     self.step = NfcStep::PayloadSent;
                     NfcHardwareOutcome::StepAdvanced {
                         commands: vec![Command::NfcSendApdu {

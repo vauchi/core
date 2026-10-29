@@ -209,11 +209,11 @@ fn main() {
     // investigate the binding, don't just lower the floor.
     // 133 since 2026-10-20: features deleted the two WhatNext reading
     // scenarios, whose options left the app 2026-05-21 (private#631).
-    // 128 since 2026-10-29: the pre-signed messages are retired (#911), and
+    // 129 since 2026-10-29: the pre-signed messages are retired (#911), and
     // with them the steps of their generation, inspection and storage
-    // scenarios. Features main still lists those (128 wired); its #911
-    // rewrite wires 129, so raise this to 129 once it merges.
-    const MIN_WIRED_SCENARIOS: usize = 128;
+    // scenarios; features !176 rewrote the spec to the purge signed at send
+    // time, whose steps wire 129.
+    const MIN_WIRED_SCENARIOS: usize = 129;
     if scenarios.passed < MIN_WIRED_SCENARIOS {
         eprintln!(
             "cucumber GATE failed: {} wired scenario(s) passed, expected at least \

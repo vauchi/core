@@ -594,6 +594,8 @@ impl WorkflowEngine for GdprEngine {
 mod deletion;
 #[path = "gdpr_export.rs"]
 mod export;
+#[path = "gdpr_leave.rs"]
+mod leave;
 #[cfg(feature = "network-rustls")]
 pub(crate) use export::SET_APP_PASSWORD_ACTION_ID;
 

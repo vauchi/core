@@ -76,7 +76,7 @@ impl Vauchi {
     }
 
     #[cfg(feature = "network-http")]
-    fn sync_once_outside_the_gate(&mut self) -> bool {
+    pub(super) fn sync_once_outside_the_gate(&mut self) -> bool {
         if !self.has_ohttp_key() && self.connect().is_err() {
             return false;
         }
@@ -88,7 +88,7 @@ impl Vauchi {
     }
 
     #[cfg(not(feature = "network-http"))]
-    fn sync_once_outside_the_gate(&mut self) -> bool {
+    pub(super) fn sync_once_outside_the_gate(&mut self) -> bool {
         false
     }
 }

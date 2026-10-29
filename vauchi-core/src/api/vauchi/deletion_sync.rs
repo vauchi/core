@@ -51,6 +51,24 @@ impl Vauchi {
         Ok(())
     }
 
+    /// When the scheduled deletion runs with the wipe choice (Leave
+    /// Vauchi, #916), tells every other active device to wipe and sends
+    /// that in one sync outside the timing gate, before the identity is
+    /// revoked and purged. Returns whether it was sent; unsent, it stays
+    /// queued for the next sync. Does nothing without the wipe choice.
+    pub fn tell_other_devices_to_wipe(&mut self) -> VauchiResult<bool> {
+        let wipe = DeletionManager::new(&self.storage)
+            .scheduled_wipes_other_devices()
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        if !wipe {
+            return Ok(false);
+        }
+        self.record_sync_item_or_cover(crate::sync::SyncItem::WipeThisDevice {
+            timestamp: self.now_timestamp(),
+        });
+        Ok(self.sync_once_outside_the_gate())
+    }
+
     /// Runs the emergency wipe when another of the identity's devices told
     /// this one to (#916); `sync` calls it once the received items are
     /// applied. Returns whether this device was wiped.

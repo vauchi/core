@@ -11,7 +11,12 @@ specification's page wins.
 ## Reporting a Vulnerability
 
 Write to **security@vauchi.app**. Do not open a public GitLab issue
-for a vulnerability. There is no PGP key; mail is plain.
+for a vulnerability. Encrypt to the project's PGP key,
+[pgp-key.txt](https://vauchi.app/.well-known/pgp-key.txt), fingerprint
+`4347 B1C6 57A3 97E5 206E 4709 A84E 1AAB D783 0274`; `security.txt`
+carries the same fingerprint, so you can check one against the other.
+Only the maintainer's hardware tokens can decrypt. If you cannot use
+PGP, write in clear and say so; the reply offers another channel.
 
 Send what you found, how to reproduce it, which security claim it
 breaks if it maps to one (the

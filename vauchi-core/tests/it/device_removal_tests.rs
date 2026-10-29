@@ -4,9 +4,9 @@
 
 //! Removing my identity from this device: the device revokes itself, sends
 //! that to my other devices in one sync outside the timing gate, then wipes
-//! (vauchi/private#915, maintainer decisions 2026-10-29). Offline it wipes
-//! anyway and says the others were not told; in duress mode it is the
-//! emergency wipe and sends nothing.
+//! (vauchi/private#915, maintainer decisions 2026-10-29). Offline it stops
+//! before wiping, so the user can try again or erase anyway; in duress
+//! mode it is the emergency wipe and sends nothing.
 
 use vauchi_core::api::{DeviceRemoval, Vauchi, VauchiConfig};
 use vauchi_core::crypto::SymmetricKey;
@@ -69,7 +69,10 @@ fn removing_my_identity_from_this_phone_sends_once_then_wipes() {
     let mut phone = phone_with_a_tablet(true);
     let before = phone.outer.received().len();
 
-    let removal = phone.vauchi.remove_identity_from_this_device().unwrap();
+    let removal = phone
+        .vauchi
+        .remove_identity_from_this_device(false)
+        .unwrap();
 
     assert_eq!(removal, DeviceRemoval::OtherDevicesTold);
     assert!(
@@ -81,13 +84,25 @@ fn removing_my_identity_from_this_phone_sends_once_then_wipes() {
 
 // @internal
 #[test]
-fn removing_my_identity_offline_still_wipes_and_says_the_others_were_not_told() {
+fn offline_the_removal_stops_before_wiping_until_told_to_erase_anyway() {
     let mut phone = phone_with_a_tablet(false);
 
-    let removal = phone.vauchi.remove_identity_from_this_device().unwrap();
+    let first = phone
+        .vauchi
+        .remove_identity_from_this_device(false)
+        .unwrap();
+    let kept = phone.vauchi.identity().is_some();
+    let anyway = phone.vauchi.remove_identity_from_this_device(true).unwrap();
 
-    assert_eq!(removal, DeviceRemoval::OtherDevicesNotTold);
-    assert!(phone.vauchi.identity().is_none(), "the phone is wiped");
+    assert_eq!(
+        (first, kept, anyway, phone.vauchi.identity().is_none()),
+        (
+            DeviceRemoval::OtherDevicesNotTold,
+            true,
+            DeviceRemoval::OtherDevicesNotTold,
+            true
+        )
+    );
 }
 
 // @internal
@@ -99,7 +114,10 @@ fn removing_my_identity_in_duress_mode_is_the_emergency_wipe_and_sends_nothing()
     phone.vauchi.authenticate("135790").unwrap();
     let before = phone.outer.received().len();
 
-    let removal = phone.vauchi.remove_identity_from_this_device().unwrap();
+    let removal = phone
+        .vauchi
+        .remove_identity_from_this_device(false)
+        .unwrap();
 
     assert_eq!(removal, DeviceRemoval::Wiped);
     assert_eq!(phone.outer.received().len(), before, "duress sends nothing");

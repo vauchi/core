@@ -417,6 +417,7 @@ mod oob_bootstrap_tests;
 mod own_card_device_sync_tests;
 mod own_card_field_tests;
 mod own_card_repropagate_tests;
+mod own_device_revocation_tests;
 mod own_field_label_resolution_tests;
 mod panic_widget_tests;
 mod parent_tab_tests;

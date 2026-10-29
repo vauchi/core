@@ -713,7 +713,10 @@ fn process_single_card_update_for_device_with_budget(
 
     match txn_result {
         Ok(removed_fields) => {
-            storage.commit()?;
+            if let Err(error) = storage.commit() {
+                storage.rollback();
+                return Err(error.into());
+            }
             cleanup_removed_field_notes(storage, sender_id, &removed_fields);
             Ok(ReceiveOutcome::CardDelta)
         }
@@ -1067,7 +1070,10 @@ fn receive_genesis_card_delta(
     })();
     match txn {
         Ok(removed_fields) => {
-            storage.commit()?;
+            if let Err(error) = storage.commit() {
+                storage.rollback();
+                return Err(error.into());
+            }
             cleanup_removed_field_notes(storage, sender_id, &removed_fields);
             Ok(ReceiveOutcome::CardDelta)
         }

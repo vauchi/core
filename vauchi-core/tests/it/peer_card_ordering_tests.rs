@@ -430,3 +430,66 @@ fn peer_card_ordering_write_failure_rolls_back_card_nonce_and_ratchet() {
         );
     }
 }
+
+// @claim: S2
+// @scenario: sync_updates :: Genesis card versions are floored per origin device
+#[test]
+fn peer_card_ordering_commit_failure_rolls_back_and_retry_succeeds() {
+    for ordinary in [false, true] {
+        let world = cold_start_world();
+        let mut changed = world.base_card.clone();
+        changed
+            .remove_field(world.base_card.fields()[0].id())
+            .unwrap();
+        let delta = CardDelta::compute(&world.base_card, &changed, 20);
+        let nonce = delta.nonce;
+        let ciphertext = blob(&world, &world.alice_a1, delta, ordinary);
+        world.bob.storage().arm_commit_fault();
+        let error = receive(&world, &world.alice_a1, &ciphertext, ordinary)
+            .expect_err("failed COMMIT must surface");
+        assert!(matches!(error, CardUpdateError::Storage(_)));
+        assert_eq!(
+            world
+                .bob
+                .get_contact(&world.alice_contact_id)
+                .unwrap()
+                .unwrap()
+                .card()
+                .fields(),
+            world.base_card.fields(),
+            "failed COMMIT must roll back the card"
+        );
+        assert!(
+            !world
+                .bob
+                .storage()
+                .replay()
+                .is_replay_nonce(&world.alice_contact_id, &nonce)
+                .unwrap()
+        );
+        assert!(
+            world
+                .bob
+                .storage()
+                .contacts()
+                .test_load_card_ordering(&world.alice_contact_id)
+                .unwrap()
+                .is_none()
+        );
+        receive(&world, &world.alice_a1, &ciphertext, ordinary)
+            .expect("failed COMMIT must not wedge or consume the ratchet");
+        assert!(
+            world
+                .bob
+                .get_contact(&world.alice_contact_id)
+                .unwrap()
+                .unwrap()
+                .card()
+                .fields()
+                .is_empty()
+        );
+    }
+}
+
+#[path = "peer_card_ordering_property_tests.rs"]
+mod peer_card_ordering_property_tests;

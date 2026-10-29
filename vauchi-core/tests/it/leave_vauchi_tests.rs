@@ -106,3 +106,36 @@ fn without_the_instruction_nothing_is_wiped() {
         (false, true, false)
     );
 }
+
+// @internal
+#[test]
+fn when_leaving_runs_with_the_wipe_choice_my_tablet_is_told_to_wipe() {
+    let mut wb = phone();
+    let (registry, tablet) = link_tablet(&wb, [43u8; 32]);
+    wb.schedule_identity_deletion(LEAVE_AND_WIPE).unwrap();
+
+    let sent = wb.tell_other_devices_to_wipe().unwrap();
+
+    let told = journal_for_tablet(&wb, registry, &tablet)
+        .iter()
+        .filter(|item| matches!(item, SyncItem::WipeThisDevice { .. }))
+        .count();
+    assert_eq!((sent, told), (false, 1), "offline: queued, not yet sent");
+}
+
+// @internal
+#[test]
+fn without_the_wipe_choice_no_device_is_told_to_wipe() {
+    let mut wb = phone();
+    let (registry, tablet) = link_tablet(&wb, [44u8; 32]);
+    wb.schedule_identity_deletion(DeletionChoice::default())
+        .unwrap();
+
+    let sent = wb.tell_other_devices_to_wipe().unwrap();
+
+    let told = journal_for_tablet(&wb, registry, &tablet)
+        .iter()
+        .filter(|item| matches!(item, SyncItem::WipeThisDevice { .. }))
+        .count();
+    assert_eq!((sent, told), (false, 0));
+}

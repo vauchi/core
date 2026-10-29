@@ -7,9 +7,7 @@
 //! fresh offer (vauchi/private#522).
 
 use vauchi_core::ExchangeError;
-use vauchi_core::exchange::{
-    BleCardPayload, BleHandshakeSession, BleHandshakeState, KEY_ACK_SIZE, X3DHKeyPair,
-};
+use vauchi_core::exchange::{BleCardPayload, BleHandshakeSession, BleHandshakeState, KEY_ACK_SIZE};
 use vauchi_core::identity::Identity;
 
 const T0: u64 = 1_700_000_000;
@@ -19,7 +17,7 @@ fn card(identity: &Identity, name: &str) -> BleCardPayload {
     BleCardPayload::new(
         *identity.signing_public_key(),
         name.to_string(),
-        *X3DHKeyPair::generate().public_key(),
+        *identity.x3dh_keypair().public_key(),
         vec![("email".into(), "test@example.com".into())],
         None,
     )

@@ -22,7 +22,7 @@ fn make_test_identity() -> Identity {
 }
 
 fn make_test_card(identity: &Identity, name: &str) -> BleCardPayload {
-    let exchange_keys = X3DHKeyPair::generate();
+    let exchange_keys = identity.x3dh_keypair();
     BleCardPayload::new(
         *identity.signing_public_key(),
         name.to_string(),

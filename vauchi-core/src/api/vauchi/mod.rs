@@ -9,6 +9,7 @@
 mod builder;
 mod contact_annotations;
 mod contacts;
+mod deletion_sync;
 #[cfg(feature = "network-http")]
 mod device_sync_loop;
 mod devices;

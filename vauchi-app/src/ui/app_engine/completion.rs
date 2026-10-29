@@ -430,10 +430,10 @@ impl AppEngine {
                 self.finish_export(result)
             }
             Some(choice @ (GdprChoice::Delete | GdprChoice::DeleteErasingEverything)) => {
-                match vauchi_core::api::DeletionManager::new(self.vauchi.storage())
-                    .schedule_deletion_erasing_guardian_set(
-                        choice == GdprChoice::DeleteErasingEverything,
-                    ) {
+                match self
+                    .vauchi
+                    .schedule_identity_deletion(choice == GdprChoice::DeleteErasingEverything)
+                {
                     Ok(_) => {
                         let _ = self.navigate_back();
                         // Rebuild Privacy fresh on revisit so it shows the
@@ -453,26 +453,22 @@ impl AppEngine {
                     },
                 }
             }
-            Some(GdprChoice::CancelDeletion) => {
-                match vauchi_core::api::DeletionManager::new(self.vauchi.storage())
-                    .cancel_deletion()
-                {
-                    Ok(_) => {
-                        let _ = self.navigate_back();
-                        self.engine_cache.remove(&AppScreen::Privacy);
-                        ActionResult::ShowToast {
-                            message: self.t("privacy.deletion_cancelled"),
-                            undo_action_id: None,
-                            undo_label: None,
-                        }
-                    }
-                    Err(_) => ActionResult::ShowToast {
-                        message: self.t("privacy.deletion_cancel_failed"),
+            Some(GdprChoice::CancelDeletion) => match self.vauchi.cancel_identity_deletion() {
+                Ok(_) => {
+                    let _ = self.navigate_back();
+                    self.engine_cache.remove(&AppScreen::Privacy);
+                    ActionResult::ShowToast {
+                        message: self.t("privacy.deletion_cancelled"),
                         undo_action_id: None,
                         undo_label: None,
-                    },
+                    }
                 }
-            }
+                Err(_) => ActionResult::ShowToast {
+                    message: self.t("privacy.deletion_cancel_failed"),
+                    undo_action_id: None,
+                    undo_label: None,
+                },
+            },
             Some(GdprChoice::Execute) => {
                 // Borrow `identity` only long enough to run the delete and
                 // capture the relay deliveries (signed pre-shred); then the

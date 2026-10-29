@@ -385,6 +385,7 @@ fn reject_category(e: &CardUpdateError) -> &'static str {
         CardUpdateError::FactConflict => "fact_conflict",
         CardUpdateError::StaleVersion { .. } => "stale",
         CardUpdateError::DeltaApplicationFailed => "delta_apply",
+        CardUpdateError::OrderingCapacityExceeded => "ordering_capacity",
         CardUpdateError::Storage(_) => "storage",
     }
 }

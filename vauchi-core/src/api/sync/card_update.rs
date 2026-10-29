@@ -17,6 +17,8 @@
 //! - Replay detection via storage nonces
 //! - Atomic transaction for all DB writes
 
+mod ordering;
+
 use crate::crypto::cek::ContentEncryptionKey;
 use crate::crypto::ratchet::RatchetMessage;
 use crate::identity::Identity;
@@ -68,6 +70,8 @@ pub enum CardUpdateError {
     StaleVersion { delta: u32, last: u32 },
     /// Delta application failed (invalid field changes).
     DeltaApplicationFailed,
+    /// Durable field ordering is full; accepting another key would lose replay protection.
+    OrderingCapacityExceeded,
     /// Storage error during transaction.
     Storage(StorageError),
 }
@@ -661,41 +665,6 @@ fn process_single_card_update_for_device_with_budget(
         });
     }
 
-    // 8. Apply delta to contact card.
-    let mut card = contact.card().clone();
-    // Heal any pre-upsert duplicate fields before applying, so a single
-    // `Removed` fully revokes (2026-06-14-delta-apply-duplicate-fields).
-    card.deduplicate_fields();
-    let received_at = storage.clock().unix_seconds();
-    delta
-        .apply(&mut card)
-        .map_err(|_| CardUpdateError::DeltaApplicationFailed)?;
-    contact.update_card(
-        card,
-        source_timestamp_or_received_at(delta.timestamp, received_at),
-    );
-
-    if let Some(cek) = new_cek {
-        contact.set_cek(cek);
-    }
-
-    // 8b. Clean up orphaned per-field notes for any removed fields.
-    //
-    // When a contact removes a field from their shared card, any private note
-    // the user wrote about that field becomes orphaned in `contact_field_notes`.
-    // Best-effort: if the note doesn't exist (or cleanup fails), the card update
-    // still proceeds successfully.
-    for change in &delta.changes {
-        if let FieldChange::Removed { field_id } = change {
-            // best-effort orphan cleanup: note may already be absent;
-            // either way, the card update below is the source of truth
-            #[allow(clippy::let_underscore_must_use)]
-            let _ = storage
-                .field_notes()
-                .delete_contact_field_note(sender_id, field_id);
-        }
-    }
-
     // 9. Atomic transaction: ratchet state + replay nonce + contact card (Tracker #159)
     //
     // Ratchet state is saved in the SAME transaction as the contact card update
@@ -703,7 +672,21 @@ fn process_single_card_update_for_device_with_budget(
     // the "ratchet advanced but message lost" crash scenario where the ratchet
     // state advances past a message that was never applied.
     storage.begin_transaction()?;
-    let txn_result = (|| -> Result<(), CardUpdateError> {
+    let txn_result = (|| -> Result<Vec<String>, CardUpdateError> {
+        let ordered = ordering::apply(
+            storage,
+            sender_id,
+            contact.card().clone(),
+            &delta,
+            peer_device_id,
+        )?;
+        contact.update_card(
+            ordered.card,
+            source_timestamp_or_received_at(delta.timestamp, storage.clock().unix_seconds()),
+        );
+        if let Some(cek) = new_cek {
+            contact.set_cek(cek);
+        }
         storage.ratchets().save_ratchet_state_for_device(
             sender_id,
             peer_device_id,
@@ -714,6 +697,9 @@ fn process_single_card_update_for_device_with_budget(
             .replay()
             .save_replay_nonce(sender_id, &delta.nonce, delta.timestamp)?;
         storage.contacts().save_contact(&contact)?;
+        storage
+            .contacts()
+            .save_card_ordering(sender_id, &ordered.state)?;
         // Track applied delta version so a later older delta is rejected (#42).
         if delta.version > 0 {
             storage.contacts().record_delta_version_for_device(
@@ -722,12 +708,13 @@ fn process_single_card_update_for_device_with_budget(
                 delta.version,
             )?;
         }
-        Ok(())
+        Ok(ordered.removed_fields)
     })();
 
     match txn_result {
-        Ok(()) => {
+        Ok(removed_fields) => {
             storage.commit()?;
+            cleanup_removed_field_notes(storage, sender_id, &removed_fields);
             Ok(ReceiveOutcome::CardDelta)
         }
         Err(e) => {
@@ -1031,23 +1018,23 @@ fn receive_genesis_card_delta(
         });
     }
 
-    let mut card = contact.card().clone();
-    card.deduplicate_fields();
-    let received_at = storage.clock().unix_seconds();
-    delta
-        .apply(&mut card)
-        .map_err(|_| CardUpdateError::DeltaApplicationFailed)?;
-    let mut updated = contact.clone();
-    updated.update_card(
-        card,
-        source_timestamp_or_received_at(delta.timestamp, received_at),
-    );
-    if let Some(cek) = new_cek {
-        updated.set_cek(cek);
-    }
-
     storage.begin_transaction()?;
-    let txn = (|| -> Result<(), CardUpdateError> {
+    let txn = (|| -> Result<Vec<String>, CardUpdateError> {
+        let ordered = ordering::apply(
+            storage,
+            sender_id,
+            contact.card().clone(),
+            &delta,
+            &opened.sender_device_id,
+        )?;
+        let mut updated = contact.clone();
+        updated.update_card(
+            ordered.card,
+            source_timestamp_or_received_at(delta.timestamp, storage.clock().unix_seconds()),
+        );
+        if let Some(cek) = new_cek {
+            updated.set_cek(cek);
+        }
         let cold_start = storage
             .ratchets()
             .load_ratchet_state_for_device(sender_id, &[0; 32])?
@@ -1066,6 +1053,9 @@ fn receive_genesis_card_delta(
             .replay()
             .save_replay_nonce(sender_id, &delta.nonce, delta.timestamp)?;
         storage.contacts().save_contact(&updated)?;
+        storage
+            .contacts()
+            .save_card_ordering(sender_id, &ordered.state)?;
         if delta.version > 0 {
             storage.contacts().record_delta_version_for_device(
                 sender_id,
@@ -1073,25 +1063,28 @@ fn receive_genesis_card_delta(
                 delta.version,
             )?;
         }
-        Ok(())
+        Ok(ordered.removed_fields)
     })();
     match txn {
-        Ok(()) => {
+        Ok(removed_fields) => {
             storage.commit()?;
-            for change in &delta.changes {
-                if let FieldChange::Removed { field_id } = change {
-                    #[allow(clippy::let_underscore_must_use)]
-                    let _ = storage
-                        .field_notes()
-                        .delete_contact_field_note(sender_id, field_id);
-                }
-            }
+            cleanup_removed_field_notes(storage, sender_id, &removed_fields);
             Ok(ReceiveOutcome::CardDelta)
         }
         Err(e) => {
             storage.rollback();
             Err(e)
         }
+    }
+}
+
+/// Remove notes only for accepted removals, after their card transaction commits.
+fn cleanup_removed_field_notes(storage: &Storage, sender_id: &str, removed_fields: &[String]) {
+    for field_id in removed_fields {
+        #[allow(clippy::let_underscore_must_use)]
+        let _ = storage
+            .field_notes()
+            .delete_contact_field_note(sender_id, field_id);
     }
 }
 

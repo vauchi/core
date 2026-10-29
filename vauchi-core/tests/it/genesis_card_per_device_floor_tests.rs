@@ -396,3 +396,118 @@ fn safety_alert_budget_does_not_block_device_scoped_genesis_card() {
         "the accepted card fallback must preserve the device session"
     );
 }
+
+fn seal_delta_for_world(
+    world: &ColdStartWorld,
+    sender: &Identity,
+    mut delta: CardDelta,
+) -> Vec<u8> {
+    let bob_pk = world.bob.identity().unwrap().signing_public_key();
+    delta.sign(sender, bob_pk);
+    let delta_bytes = serde_json::to_vec(&delta).unwrap();
+    let cek = ContentEncryptionKey::generate();
+    let wrapped = CekWrappedPayload {
+        cek: cek.to_bytes(),
+        cek_ciphertext: cek.encrypt(&delta_bytes).unwrap(),
+        signature: delta.signature,
+        nonce: delta.nonce,
+    };
+    let (message, _) = GenesisEnvelope::seal(
+        &world.shared_key,
+        sender,
+        bob_pk,
+        &world.registry,
+        current_day_epoch(delta.timestamp),
+        &VersionedPayload::encode_cek(&wrapped),
+    )
+    .unwrap();
+    serde_json::to_vec(&message).unwrap()
+}
+
+// @claim: S2
+// @scenario: sync_updates :: Genesis card versions are floored per origin device
+#[test]
+fn cross_device_old_delta_cannot_resurrect_a_removed_field() {
+    let world = cold_start_world();
+    let field_id = world.base_card.fields()[0].id();
+    let mut older_card = world.base_card.clone();
+    older_card
+        .update_field_value(field_id, "earlier@example.com", 10)
+        .unwrap();
+    let held = seal_delta_for_world(
+        &world,
+        &world.alice_a1,
+        CardDelta::compute(&world.base_card, &older_card, 10),
+    );
+    let mut removed_card = world.base_card.clone();
+    removed_card.remove_field(field_id).unwrap();
+    let removal = seal_delta_for_world(
+        &world,
+        &world.alice_a2,
+        CardDelta::compute(&world.base_card, &removed_card, 20),
+    );
+
+    for blob in [removal, held] {
+        let outcome = process_single_card_update(
+            world.bob.identity().unwrap(),
+            world.bob.storage(),
+            &world.alice_contact_id,
+            &blob,
+        )
+        .unwrap();
+        assert!(matches!(outcome, ReceiveOutcome::CardDelta));
+    }
+
+    let saved = world
+        .bob
+        .get_contact(&world.alice_contact_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        saved.card().fields(),
+        &[],
+        "a delayed sibling must not undo removal"
+    );
+}
+
+// @claim: S2
+// @scenario: sync_updates :: Genesis card versions are floored per origin device
+#[test]
+fn cross_device_old_delta_cannot_restore_an_older_display_name() {
+    let world = cold_start_world();
+    let mut earlier = world.base_card.clone();
+    earlier.set_display_name("Earlier").unwrap();
+    let held = seal_delta_for_world(
+        &world,
+        &world.alice_a1,
+        CardDelta::compute(&world.base_card, &earlier, 10),
+    );
+    let mut later = world.base_card.clone();
+    later.set_display_name("Latest").unwrap();
+    let rename = seal_delta_for_world(
+        &world,
+        &world.alice_a2,
+        CardDelta::compute(&world.base_card, &later, 20),
+    );
+
+    for blob in [rename, held] {
+        let outcome = process_single_card_update(
+            world.bob.identity().unwrap(),
+            world.bob.storage(),
+            &world.alice_contact_id,
+            &blob,
+        )
+        .unwrap();
+        assert!(matches!(outcome, ReceiveOutcome::CardDelta));
+    }
+
+    let saved = world
+        .bob
+        .get_contact(&world.alice_contact_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(saved.display_name(), "Latest");
+}
+
+#[path = "peer_card_ordering_tests.rs"]
+mod peer_card_ordering_tests;

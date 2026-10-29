@@ -11,6 +11,7 @@ mod contact_annotations;
 mod contacts;
 mod deletion_sync;
 #[cfg(feature = "network-http")]
+mod device_removal;
 mod device_sync_loop;
 mod devices;
 mod duress_concealment;
@@ -61,6 +62,7 @@ mod user_presence;
 mod visibility;
 
 pub use builder::VauchiBuilder;
+pub use device_removal::DeviceRemoval;
 pub use devices::{DeviceInfo, DeviceLinkResult};
 pub use exchange::ExchangeQrData;
 #[cfg(feature = "network-http")]

@@ -63,7 +63,7 @@ fn phone_with_a_tablet(online: bool) -> Phone {
     }
 }
 
-// @internal
+// @scenario: device_management :: Unlink current device
 #[test]
 fn removing_my_identity_from_this_phone_sends_once_then_wipes() {
     let mut phone = phone_with_a_tablet(true);
@@ -82,7 +82,7 @@ fn removing_my_identity_from_this_phone_sends_once_then_wipes() {
     assert!(phone.vauchi.identity().is_none(), "the phone is wiped");
 }
 
-// @internal
+// @scenario: device_management :: Removing a device while offline stops before wiping
 #[test]
 fn offline_the_removal_stops_before_wiping_until_told_to_erase_anyway() {
     let mut phone = phone_with_a_tablet(false);
@@ -105,7 +105,7 @@ fn offline_the_removal_stops_before_wiping_until_told_to_erase_anyway() {
     );
 }
 
-// @internal
+// @scenario: device_management :: Removing a device in duress mode is the emergency wipe
 #[test]
 fn removing_my_identity_in_duress_mode_is_the_emergency_wipe_and_sends_nothing() {
     let mut phone = phone_with_a_tablet(true);

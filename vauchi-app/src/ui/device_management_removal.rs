@@ -278,7 +278,7 @@ mod tests {
         assert_eq!(remove.style, ActionStyle::Serious);
     }
 
-    // @internal
+    // @scenario: device_management :: Unlink current device
     #[test]
     fn removing_asks_for_the_typed_word_before_it_hands_over() {
         let mut e = with_a_tablet();
@@ -314,7 +314,7 @@ mod tests {
         );
     }
 
-    // @internal
+    // @scenario: device_management :: Removing the only device offers identity deletion instead
     #[test]
     fn on_the_only_active_device_removing_explains_instead_and_cancel_returns() {
         let mut e = alone();
@@ -333,7 +333,7 @@ mod tests {
         );
     }
 
-    // @internal
+    // @scenario: device_management :: Removing a device while offline stops before wiping
     #[test]
     fn when_the_other_devices_were_not_told_it_offers_retry_or_erase_anyway() {
         let mut e = with_a_tablet();

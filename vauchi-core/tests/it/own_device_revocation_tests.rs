@@ -56,7 +56,7 @@ fn registries_sent_to(phone: &Vauchi, device_id: &[u8; 32]) -> Vec<DeviceRegistr
     .collect()
 }
 
-// @internal
+// @scenario: device_management :: Unlink a device remotely
 #[test]
 fn revoking_my_laptop_tells_my_tablet() {
     let (phone, tablet, laptop) = phone_with_tablet_and_laptop();
@@ -91,7 +91,7 @@ fn revoked_in_my_registry(phone: &Vauchi, device_id: &[u8; 32]) -> bool {
         .is_some_and(|d| d.revoked)
 }
 
-// @internal
+// @scenario: device_management :: Unlink current device
 #[test]
 fn removing_my_identity_from_this_phone_tells_my_tablet_and_laptop() {
     let (phone, tablet, laptop) = phone_with_tablet_and_laptop();
@@ -111,7 +111,7 @@ fn removing_my_identity_from_this_phone_tells_my_tablet_and_laptop() {
     assert_eq!(told, vec![vec![true], vec![true]]);
 }
 
-// @internal
+// @scenario: device_management :: Removing the only device offers identity deletion instead
 #[test]
 fn the_last_device_of_an_identity_cannot_revoke_itself() {
     let mut phone = Vauchi::in_memory().unwrap();
@@ -132,7 +132,7 @@ fn the_last_device_of_an_identity_cannot_revoke_itself() {
     );
 }
 
-// @internal
+// @scenario: device_management :: Removing a device in duress mode is the emergency wipe
 #[test]
 fn in_duress_mode_this_device_never_revokes_itself_in_the_real_registry() {
     let (mut phone, _tablet, _laptop) = phone_with_tablet_and_laptop();

@@ -103,6 +103,17 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             .sync()
             .load_field_timestamps()
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
+        // Earlier builds stamped schedule and cancellation separately even
+        // though they overwrite one state. Preserve both floors on upgrade.
+        for legacy in ["deletion:scheduled", "deletion:cancelled"] {
+            if let Some(stamp) = orchestrator.field_timestamps.remove(legacy) {
+                orchestrator
+                    .field_timestamps
+                    .entry("deletion:state".to_string())
+                    .and_modify(|current| *current = (*current).max(stamp))
+                    .or_insert(stamp);
+            }
+        }
 
         Ok(orchestrator)
     }
@@ -744,8 +755,9 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             SyncItem::ContactTrustChanged { contact_id, .. } => {
                 format!("trust:{}", contact_id)
             }
-            SyncItem::DeletionScheduled { .. } => "deletion:scheduled".to_string(),
-            SyncItem::DeletionCancelled { .. } => "deletion:cancelled".to_string(),
+            SyncItem::DeletionScheduled { .. } | SyncItem::DeletionCancelled { .. } => {
+                "deletion:state".to_string()
+            }
             SyncItem::WipeThisDevice { .. } => "deletion:wipe_this_device".to_string(),
             SyncItem::PersonalNoteChanged { contact_id, .. }
             | SyncItem::PersonalNoteRemoved { contact_id, .. } => {

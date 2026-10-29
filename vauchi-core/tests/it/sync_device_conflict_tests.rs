@@ -225,12 +225,10 @@ fn test_conflict_personal_note_tombstone_rejects_stale_write() {
 
 /// Test: Concurrent deletion schedule and cancel for the same identity (#193).
 ///
-/// DeletionScheduled and DeletionCancelled use different conflict keys,
-/// so both can coexist — this is the correct behavior since they represent
-/// different semantic operations.
+/// Scheduling and cancellation update one state: the later operation wins.
 // @scenario: device_management :: Conflict resolution between devices
 #[test]
-fn test_conflict_deletion_schedule_and_cancel_independent() {
+fn test_conflict_deletion_cancellation_supersedes_earlier_schedule() {
     let storage = create_test_storage();
     let master_seed = [0x42u8; 32];
 
@@ -252,16 +250,12 @@ fn test_conflict_deletion_schedule_and_cancel_independent() {
         .unwrap();
     assert_eq!(applied.len(), 1);
 
-    // Cancel deletion on another device (different conflict key)
+    // The later cancellation supersedes the scheduled state.
     let cancel = SyncItem::DeletionCancelled { timestamp: 2000 };
     let applied = orchestrator
         .process_incoming(vec![cancel], &[0x99u8; 32])
         .unwrap();
-    assert_eq!(
-        applied.len(),
-        1,
-        "Cancel uses a different key than schedule"
-    );
+    assert_eq!(applied.len(), 1, "The newer cancellation must apply");
 }
 
 // ============================================================

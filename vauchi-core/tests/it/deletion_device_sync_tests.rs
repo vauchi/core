@@ -62,3 +62,131 @@ fn cancelling_my_identitys_deletion_is_journaled_for_my_tablet() {
         .count();
     assert_eq!(cancelled, 1);
 }
+
+// @scenario: privacy_compliance :: Scheduling or cancelling my deletion reaches my other devices
+#[test]
+fn a_delayed_older_schedule_cannot_resurrect_a_cancelled_deletion() {
+    use vauchi_core::api::sync::DeviceSyncOrchestrator;
+    use vauchi_core::storage::DeletionState;
+
+    let wb = phone();
+    let identity = wb.identity().unwrap();
+    let (registry, tablet) = link_tablet(&wb, *identity.master_seed());
+    let cancel = SyncItem::DeletionCancelled { timestamp: 2000 };
+    let schedule = SyncItem::DeletionScheduled {
+        scheduled_at: 1000,
+        execute_at: 1000 + GRACE_SECS,
+        erase_guardian_set: false,
+        wipe_other_devices: false,
+        timestamp: 1000,
+    };
+
+    for item in [cancel, schedule] {
+        let mut receiver = DeviceSyncOrchestrator::load(
+            wb.storage(),
+            identity.create_device_info(0),
+            registry.clone(),
+        )
+        .unwrap();
+        let accepted = receiver.process_incoming(vec![item], &tablet).unwrap();
+        wb.apply_sync_items(accepted).unwrap();
+    }
+
+    assert_eq!(
+        wb.storage().consent().load_deletion_state().unwrap(),
+        DeletionState::None,
+        "a delayed schedule must not reverse a newer cancellation after receiver reload",
+    );
+}
+
+// @scenario: privacy_compliance :: Scheduling or cancelling my deletion reaches my other devices
+#[test]
+fn a_persisted_legacy_cancellation_rejects_an_older_schedule_after_upgrade() {
+    use std::collections::HashMap;
+    use vauchi_core::api::sync::DeviceSyncOrchestrator;
+    use vauchi_core::storage::DeletionState;
+    use vauchi_core::sync::FieldStamp;
+
+    let wb = phone();
+    let identity = wb.identity().unwrap();
+    let (registry, tablet) = link_tablet(&wb, *identity.master_seed());
+    let stamps = HashMap::from([
+        (
+            "deletion:scheduled".into(),
+            FieldStamp {
+                timestamp: 1000,
+                device_id: tablet,
+            },
+        ),
+        (
+            "deletion:cancelled".into(),
+            FieldStamp {
+                timestamp: 2000,
+                device_id: tablet,
+            },
+        ),
+    ]);
+    wb.storage().sync().save_field_timestamps(&stamps).unwrap();
+    let mut receiver =
+        DeviceSyncOrchestrator::load(wb.storage(), identity.create_device_info(0), registry)
+            .unwrap();
+
+    let accepted = receiver
+        .process_incoming(
+            vec![SyncItem::DeletionScheduled {
+                scheduled_at: 1500,
+                execute_at: 1500 + GRACE_SECS,
+                erase_guardian_set: false,
+                wipe_other_devices: false,
+                timestamp: 1500,
+            }],
+            &tablet,
+        )
+        .unwrap();
+    wb.apply_sync_items(accepted).unwrap();
+
+    assert_eq!(
+        wb.storage().consent().load_deletion_state().unwrap(),
+        DeletionState::None
+    );
+}
+
+// @scenario: privacy_compliance :: Scheduling or cancelling my deletion reaches my other devices
+#[test]
+fn a_newer_schedule_after_cancellation_still_applies() {
+    use vauchi_core::api::sync::DeviceSyncOrchestrator;
+    use vauchi_core::storage::DeletionState;
+
+    let wb = phone();
+    let identity = wb.identity().unwrap();
+    let (registry, tablet) = link_tablet(&wb, *identity.master_seed());
+    for item in [
+        SyncItem::DeletionCancelled { timestamp: 2000 },
+        SyncItem::DeletionScheduled {
+            scheduled_at: 3000,
+            execute_at: 3000 + GRACE_SECS,
+            erase_guardian_set: true,
+            wipe_other_devices: false,
+            timestamp: 3000,
+        },
+    ] {
+        let mut receiver = DeviceSyncOrchestrator::load(
+            wb.storage(),
+            identity.create_device_info(0),
+            registry.clone(),
+        )
+        .unwrap();
+        let accepted = receiver.process_incoming(vec![item], &tablet).unwrap();
+        wb.apply_sync_items(accepted).unwrap();
+    }
+
+    assert_eq!(
+        wb.storage().consent().load_deletion_state().unwrap(),
+        DeletionState::Scheduled {
+            scheduled_at: 3000,
+            execute_at: 3000 + GRACE_SECS,
+            erase_guardian_set: true,
+            wipe_other_devices: false,
+        },
+    );
+}

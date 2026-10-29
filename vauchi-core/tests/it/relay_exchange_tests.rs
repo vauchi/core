@@ -64,15 +64,14 @@ fn test_sas_order_independent() {
     assert_eq!(derive_sas(&s, &a, &b), derive_sas(&s, &b, &a));
 }
 
-// @scenario: relay_exchange :: SAS format is XXX-XXX
+// @scenario: relay_exchange :: authentication comparison preserves the full tag
 // @internal
 #[test]
 fn test_sas_format() {
-    let sas = derive_sas(&[42u8; 32], &[1u8; 32], &[2u8; 32]);
-    assert_eq!(sas.len(), 7);
-    assert_eq!(&sas[3..4], "-");
-    assert!(sas[..3].chars().all(|c| c.is_ascii_digit()));
-    assert!(sas[4..].chars().all(|c| c.is_ascii_digit()));
+    assert_eq!(
+        derive_sas(&[42u8; 32], &[1u8; 32], &[2u8; 32]),
+        "c88f706a-eee6ac37-d13913bc-0c7433e0-44f4bdcf-56e34a30-a671d6a4-afa31067",
+    );
 }
 
 // @scenario: relay_exchange :: different shared secrets produce different SAS
@@ -373,8 +372,7 @@ fn test_claim_exchange_with_identity_fails_at_network() {
     );
 }
 
-// The SAS both users compare is HMAC-SHA256(shared secret, domain || lower
-// identity || higher identity), its first four bytes taken mod 1_000_000.
+// The full comparison is the HMAC of the sorted identities (private#925).
 // @internal
 #[test]
 fn the_sas_is_the_hmac_of_the_identities_in_ascending_order() {
@@ -386,11 +384,45 @@ fn the_sas_is_the_hmac_of_the_identities_in_ascending_order() {
     mac.update(b"vauchi-relay-exchange-sas-v1");
     mac.update(&low);
     mac.update(&high);
-    let tag = mac.finalize().into_bytes();
-    let v = u32::from_be_bytes([tag[0], tag[1], tag[2], tag[3]]) % 1_000_000;
+    let expected = mac.finalize().into_bytes();
+    let actual = derive_sas(&secret, &high, &low).replace('-', "");
 
-    assert_eq!(
-        derive_sas(&secret, &high, &low),
-        format!("{:03}-{:03}", v / 1000, v % 1000)
+    assert_eq!(hex::decode(actual).unwrap(), expected.as_slice());
+}
+
+// @claim: S9
+// @scenario: relay_exchange :: adaptive relay transcripts remain distinguishable
+#[test]
+fn adaptive_relay_transcripts_do_not_share_an_authentication_string() {
+    use sha2::{Digest, Sha256};
+    use vauchi_core::exchange::{X3DH, X3DHKeyPair};
+
+    fn key(label: &str) -> X3DHKeyPair {
+        X3DHKeyPair::from_bytes(Sha256::digest(label.as_bytes()).into())
+    }
+
+    let offer = key("honest-offer");
+    let responder = key("honest-responder-static");
+    let ephemeral = key("honest-responder-ephemeral");
+    let fake_offer = key("fake-offer-2397");
+    let fake_response = key("fake-response-static");
+    let fake_ephemeral = key("fake-response-ephemeral-1158");
+    let identity_a: [u8; 32] = Sha256::digest(b"identity-a").into();
+    let identity_b: [u8; 32] = Sha256::digest(b"identity-b").into();
+
+    let responder_secret =
+        X3DH::respond(&fake_offer, responder.public_key(), ephemeral.public_key()).unwrap();
+    let initiator_secret = X3DH::respond(
+        &offer,
+        fake_response.public_key(),
+        fake_ephemeral.public_key(),
+    )
+    .unwrap();
+
+    assert_ne!(responder_secret.as_bytes(), initiator_secret.as_bytes());
+    assert_ne!(
+        derive_sas(responder_secret.as_bytes(), &identity_a, &identity_b),
+        derive_sas(initiator_secret.as_bytes(), &identity_a, &identity_b),
+        "a relay-selected transcript pair must not authenticate two different channels",
     );
 }

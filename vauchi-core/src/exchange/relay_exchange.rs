@@ -10,8 +10,11 @@ use sha2::Sha256;
 type HmacSha256 = Hmac<Sha256>;
 
 // @claim: S9
-/// Derive a 6-digit SAS verification code from the
-/// shared X3DH secret and both parties' identity keys.
+/// Derive a full authentication fingerprint from the shared X3DH secret
+/// and both identity keys. The public function name is retained for callers.
+///
+/// The relay can select both transcripts adaptively, so truncation to a
+/// short comparison code permits a birthday collision search (private#925).
 ///
 /// Uses HMAC-SHA256 with domain separation. Identity
 /// keys are sorted before hashing so both parties
@@ -30,7 +33,10 @@ pub fn derive_sas(
         mac.update(identity_b);
         mac.update(identity_a);
     }
-    let tag = mac.finalize().into_bytes();
-    let v = u32::from_be_bytes([tag[0], tag[1], tag[2], tag[3]]) % 1_000_000;
-    format!("{:03}-{:03}", v / 1000, v % 1000)
+    mac.finalize()
+        .into_bytes()
+        .chunks_exact(4)
+        .map(hex::encode)
+        .collect::<Vec<_>>()
+        .join("-")
 }

@@ -92,7 +92,7 @@ pub struct RelayExchangeResult {
     pub contact_id: String,
     /// The other party's display name.
     pub display_name: String,
-    /// Short Authentication String for verbal comparison ("XXX-XXX").
+    /// Full 256-bit authentication fingerprint, grouped for comparison.
     pub sas: String,
 }
 

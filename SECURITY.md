@@ -3,108 +3,24 @@
 
 # Security Policy
 
+The canonical disclosure policy is the protocol specification's
+[Disclosure Policy](https://gitlab.com/vauchi/spec/-/blob/main/src/disclosure.md)
+page. This file is a pointer to it; where the two differ, the
+specification's page wins.
+
 ## Reporting a Vulnerability
 
-The Vauchi team takes security seriously. We appreciate your efforts to
-responsibly disclose your findings.
+Write to **security@vauchi.app**. Do not open a public GitLab issue
+for a vulnerability. There is no PGP key; mail is plain.
 
-### How to Report
+Send what you found, how to reproduce it, which security claim it
+breaks if it maps to one (the
+[claims page](https://gitlab.com/vauchi/spec/-/blob/main/src/claims.md)
+numbers them S1 to S17), and whether you want to be named.
 
-**Do NOT report security vulnerabilities through public GitHub issues.**
+What to expect: an acknowledgment within 48 hours, an initial
+assessment within 7 days, and a fix credited if you wish. There is no
+bug bounty.
 
-Instead, please report them via email to:
-
-**<security@vauchi.app>**
-
-Include the following information:
-
-- Type of vulnerability (e.g., buffer overflow, cryptographic weakness, data
-exposure)
-- Full paths of source file(s) related to the vulnerability
-- Location of the affected source code (tag/branch/commit or direct URL)
-- Step-by-step instructions to reproduce the issue
-- Proof-of-concept or exploit code (if possible)
-- Impact assessment and potential attack scenarios
-
-### What to Expect
-
-| Timeline | Action                                         |
-| -------- | ---------------------------------------------- |
-| 24 hours | Acknowledgment of your report                  |
-| 72 hours | Initial assessment and severity classification |
-| 7 days   | Detailed response with remediation plan        |
-| 90 days  | Public disclosure (coordinated with reporter)  |
-
-We will keep you informed of our progress throughout the process.
-
-### Scope
-
-**In Scope:**
-
-- `vauchi-core` - Cryptographic implementation, key management, data storage
-- `vauchi-platform` - UniFFI bindings, mobile-specific security
-
-**Out of Scope:**
-
-- Third-party dependencies (report directly to maintainers, but let us know)
-- Social engineering attacks
-- Denial of service attacks that don't reveal design flaws
-- Issues in development/test environments only
-
-### Safe Harbor
-
-We consider security research conducted in accordance with this policy to be:
-
-- Authorized under the Computer Fraud and Abuse Act (CFAA)
-- Exempt from DMCA restrictions on circumvention
-- Lawful and helpful to the overall security of the project
-
-We will not pursue legal action against researchers who:
-
-- Act in good faith
-- Avoid privacy violations, data destruction, and service disruption
-- Report findings promptly and allow reasonable time for remediation
-- Do not exploit vulnerabilities beyond proof-of-concept
-
-### Recognition
-
-We recognize security researchers who help improve Vauchi:
-
-- Acknowledgment in release notes (with permission)
-- Listing in our Security Hall of Fame (optional)
-- Reference letters for researchers (upon request)
-
-We are a nonprofit and cannot offer monetary bounties at this time.
-
-## Security Design
-
-For details on Vauchi's security architecture, see:
-
-- Threat Analysis - `_private/docs/reference/threat-analysis.md` (internal)
-- Security Audit Checklist - `_private/docs/reference/security-audit.md` (internal)
-- [Architecture](https://vauchi.app/docs/developers/architecture/) - System design
-
-### Key Security Properties
-
-| Property              | Implementation                               |
-| --------------------- | -------------------------------------------- |
-| End-to-end encryption | XChaCha20-Poly1305 with per-contact keys     |
-| Forward secrecy       | Double Ratchet protocol (X3DH key agreement) |
-| Key derivation        | HKDF-SHA256 with domain separation           |
-| Password protection   | Argon2id + zxcvbn validation                 |
-| Key exchange          | X25519 (Diffie-Hellman) + Ed25519 (signatures)|
-| Key zeroing           | `zeroize` crate for memory cleanup           |
-| Cryptographic library | RustCrypto audited crates (primary), aws-lc-rs for TLS only |
-
-### Supported Versions
-
-| Version | Supported        |
-| ------- | ---------------- |
-| 1.x.x   | Yes              |
-| < 1.0   | No (pre-release) |
-
-## Contact
-
-- Security issues: <security@vauchi.app>
-- General questions: <hello@vauchi.app>
-- Project: <https://github.com/vauchi>
+Scope, safe harbour and what the design promises are on the
+specification's page and its claims page.

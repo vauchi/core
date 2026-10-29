@@ -18,8 +18,8 @@ use vauchi_core::api::Vauchi;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 
-const SHRED_NOTE: &str = "If someone forces you to use Emergency Shred while Vauchi is in \
-duress mode, it erases your real data, not only the decoys.";
+const SHRED_NOTE: &str = "If someone forces you to use Emergency Shred or Remove from This Device \
+while Vauchi is in duress mode, it erases your real data, not only the decoys.";
 
 fn engine(enabled: bool, decoys: usize) -> DuressPinEngine {
     DuressPinEngine::new(DuressConfig { enabled }, Locale::ENGLISH).with_decoy_count(decoys)
@@ -120,7 +120,7 @@ fn not_set_up_offers_set_up_only() {
 
 // @internal
 #[test]
-fn setup_says_what_emergency_shred_does_in_duress_mode() {
+fn setup_says_what_emergency_shred_and_removing_this_device_do_in_duress_mode() {
     let mut fresh = engine(false, 0);
     let _ = select(&mut fresh, "duress_actions", "set_up");
     let screen = fresh.current_screen();

@@ -56,7 +56,7 @@ fn shred_keeps_the_refusal_on_the_field_until_the_user_types_again() {
     assert!(engine.engine_output().is_none());
 }
 
-// @scenario: emergency_shred :: Panic shred destroys everything immediately
+// @scenario: emergency_shred :: Panic shred destroys this device's data and sends nothing
 // @internal
 #[test]
 fn shred_confirm_wipe_hands_the_wipe_to_the_app() {

@@ -19,7 +19,8 @@ use vauchi_protocol::ohttp_key::window_of;
 use crate::common::mock_relay::MockRelay;
 use crate::common::signed_gateway::{NOW, SignedGateway};
 
-// @internal
+// @scenario: privacy_compliance :: Panic shred destroys this device's data and tells no one
+// @scenario: emergency_shred :: Panic shred destroys this device's data and sends nothing
 #[test]
 fn an_emergency_wipe_with_contacts_sends_nothing_to_either_hop() {
     let outer = MockRelay::start();

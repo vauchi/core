@@ -45,8 +45,9 @@ const HOW_IT_WORKS_ACTION: &str = "how_it_works";
 /// A voucher collected during recovery (display-only).
 #[derive(Clone, Debug)]
 struct CollectedVoucher {
-    /// Display name of the guardian who vouched.
-    guardian_name: String,
+    /// How the signer is shown: a short key fingerprint, since a user who
+    /// lost every device has no contact names to show.
+    signer_label: String,
 }
 
 /// Engine that drives the outgoing social recovery flow.
@@ -163,9 +164,9 @@ impl RecoveryEngine {
     /// Adds a voucher for testing purposes. Production code uses
     /// `handle_hardware_event` with scanned voucher data.
     #[doc(hidden)]
-    pub fn add_voucher_for_testing(&mut self, guardian_name: &str) {
+    pub fn add_voucher_for_testing(&mut self, signer_label: &str) {
         self.collected_vouchers.push(CollectedVoucher {
-            guardian_name: guardian_name.into(),
+            signer_label: signer_label.into(),
         });
     }
 
@@ -596,10 +597,10 @@ impl RecoveryEngine {
                 .enumerate()
                 .map(|(i, v)| ActionListItem {
                     id: format!("voucher_{i}"),
-                    label: v.guardian_name.clone(),
+                    label: v.signer_label.clone(),
                     icon: Some("checkmark.circle".into()),
                     detail: Some(vouched_label.clone()),
-                    a11y: Some(A11y::labeled(v.guardian_name.clone())),
+                    a11y: Some(A11y::labeled(v.signer_label.clone())),
                     info_key: None,
                 })
                 .collect();
@@ -715,7 +716,7 @@ impl WorkflowEngine for RecoveryEngine {
             crate::ui::RecoveryUpdate::VouchersCollected { signers, threshold } => {
                 self.collected_vouchers = signers
                     .into_iter()
-                    .map(|guardian_name| CollectedVoucher { guardian_name })
+                    .map(|signer_label| CollectedVoucher { signer_label })
                     .collect();
                 self.quorum_threshold = threshold;
                 self.voucher_input.clear();

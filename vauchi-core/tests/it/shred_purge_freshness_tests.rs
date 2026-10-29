@@ -96,3 +96,19 @@ fn a_hard_shred_a_week_after_the_soft_shred_sends_a_purge_the_relay_accepts() {
     assert_eq!(relay.verdicts, vec![Ok(())]);
     assert!(report.relay_purge_sent);
 }
+
+// @internal
+#[test]
+fn a_soft_shred_stores_no_pre_signed_purge() {
+    let d = device();
+    let shred = ShredManager::new(&d.storage, &d.keys, &d.me, d.dir.path());
+
+    shred.soft_shred().unwrap();
+
+    let stored: Vec<String> = std::fs::read_dir(d.dir.path())
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|name| name.starts_with("pre_signed"))
+        .collect();
+    assert_eq!(stored, Vec::<String>::new());
+}

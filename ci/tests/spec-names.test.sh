@@ -59,6 +59,22 @@ for crate in vauchi-app vauchi-cabi vauchi-core vauchi-hardware vauchi-platform 
     fi
 done
 
+# The inverse link (spec!13): a claim must keep an annotated test, so an MR
+# that deletes the last one fails here and not in the next spec pipeline.
+annotations=$(printf '%s\n' "$block" | grep -n 'check-claim-annotations.sh /tmp/roots/spec-main/src/claims.md' | head -1 | cut -d: -f1)
+annotations_self=$(printf '%s\n' "$block" | grep -n 'check-claim-annotations.sh --self-test' | head -1 | cut -d: -f1)
+vectors=$(printf '%s\n' "$block" | grep -n 'cmp .*vauchi-protocol-vectors-v1.json' | head -1 | cut -d: -f1)
+if [ -n "$annotations" ] && [ -n "$annotations_self" ] && [ "$annotations_self" -lt "$annotations" ] &&
+    [ -n "$vectors" ] && [ "$annotations" -lt "$vectors" ]; then
+    echo "PASS: $job runs the spec's annotation check, self-test first, before the exit-3 vectors step"
+else
+    fail "$job must run check-claim-annotations.sh --self-test, then the check over claims.md, before the vectors comparison"
+fi
+for crate in vauchi-app vauchi-cabi vauchi-core vauchi-hardware vauchi-platform vauchi-protocol; do
+    printf '%s\n' "$block" | grep 'check-claim-annotations.sh /tmp/roots' | grep -q " $crate " ||
+        fail "$job's annotation check must search $crate of this checkout"
+done
+
 if printf '%s\n' "$block" | grep 'cmp .*vauchi-protocol-vectors-v1.json' | grep -q 'exit 3' &&
     printf '%s\n' "$block" | grep -q 'exit_codes: \[3\]'; then
     echo "PASS: a changed vectors fixture warns with exit 3 and does not fail $job"

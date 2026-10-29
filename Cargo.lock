@@ -4570,11 +4570,11 @@ name = "vauchi-hardware"
 version = "0.93.0"
 dependencies = [
  "futures-util",
- "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "uuid",
  "vauchi-core",
+ "vauchi-hardware",
  "zbus",
 ]
 

@@ -4,13 +4,18 @@
 //! A scripted `org.bluez` on a private dbus-daemon: the D-Bus conversation is
 //! real, only the radio is simulated. Simulated scans do not certify Bluetooth
 //! access; native acceptance does (private#770).
+//!
+//! Test support only, behind the `fake-bluez` feature: it panics on any
+//! unexpected bus traffic. Shared so that every host of `BlueZDiscovery` (this
+//! crate's tests, GTK, later Qt and the terminals) runs against one fake.
 
 use futures_util::StreamExt;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
+use std::os::unix::fs::DirBuilderExt;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use tempfile::TempDir;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use zbus::message::Type;
@@ -48,7 +53,7 @@ impl Default for Script {
 
 pub struct FakeBlueZ {
     daemon: Child,
-    directory: TempDir,
+    directory: BusDirectory,
     bluez: Connection,
     pub calls: mpsc::UnboundedReceiver<Call>,
     scanner: mpsc::UnboundedReceiver<String>,
@@ -58,8 +63,8 @@ pub struct FakeBlueZ {
 
 impl FakeBlueZ {
     pub async fn start(script: Script) -> Self {
-        let directory = tempfile::tempdir().unwrap();
-        let socket = directory.path().join("bus");
+        let directory = BusDirectory::create();
+        let socket = directory.0.join("bus");
         let mut daemon = Command::new("dbus-daemon")
             .args(["--session", "--nofork", "--print-address=1"])
             .arg(format!("--address=unix:path={}", socket.display()))
@@ -104,7 +109,7 @@ impl FakeBlueZ {
     }
 
     pub fn socket(&self) -> PathBuf {
-        self.directory.path().join("bus")
+        self.directory.0.join("bus")
     }
 
     pub async fn device_found(&self, address: &str, rssi: i16, uuids: &[&str]) {
@@ -172,6 +177,33 @@ impl Drop for FakeBlueZ {
         self.responder.abort();
         let _ = self.daemon.kill();
         let _ = self.daemon.wait();
+    }
+}
+
+/// The private bus's socket lives here, owner-only, removed with the fake.
+/// Plain `std` because the crate's dependencies are ratified one by one
+/// (VRS06), and a test helper is no reason to widen them.
+struct BusDirectory(PathBuf);
+
+impl BusDirectory {
+    fn create() -> Self {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "vauchi-fake-bluez-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&path)
+            .unwrap();
+        Self(path)
+    }
+}
+
+impl Drop for BusDirectory {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
     }
 }
 

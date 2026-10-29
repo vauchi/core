@@ -3,13 +3,11 @@
 
 #![cfg(target_os = "linux")]
 
-mod fake_bluez;
-
-use fake_bluez::{Call, FakeBlueZ, Script};
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use vauchi_core::platform::executor::InboxLimits;
 use vauchi_core::platform::{BleAdvertisementObservation, BleServiceUuid, Event};
+use vauchi_hardware::fake_bluez::{Call, FakeBlueZ, Script};
 use vauchi_hardware::{BleScanner, BlueZDiscovery};
 
 const SERVICE: &str = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";

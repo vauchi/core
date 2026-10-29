@@ -103,6 +103,7 @@
     "vauchi-hardware/ports": 1,
     "vauchi-hardware/worker": 2,
     "vauchi-hardware/bluez": 2,
+    "vauchi-hardware/fake_bluez": 2,
     "vauchi-hardware/discovery": 3,
     "vauchi-hardware/host": 3,
     "vauchi-hardware/lib": 4,

@@ -20,8 +20,13 @@ zbus = { version = "=6.0.0", default-features = false, features = ["tokio"] }
 uuid = { version = "1", default-features = false }
 tokio = { version = "1", features = ["net"] }
 
+[features]
+# Test support: the scripted BlueZ that hosts of `BlueZDiscovery` test
+# against (src/fake_bluez.rs).
+fake-bluez = []
+
 [dev-dependencies]
-tempfile = "3"
+vauchi-hardware = { path = ".", features = ["fake-bluez"] }
 
 [lints]
 workspace = true

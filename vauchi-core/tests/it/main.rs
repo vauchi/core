@@ -335,6 +335,7 @@ mod imported_contact_storage_tests;
 mod imported_contact_sync_tests;
 mod info_key_proptest;
 mod install_id_tests;
+mod leave_vauchi_tests;
 mod length_prefix_parsing_tests;
 mod link_exchange_api_tests;
 mod link_exchange_update_propagation_tests;

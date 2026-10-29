@@ -6,6 +6,72 @@
 //! they wipe too when the deletion runs (vauchi/private#916, maintainer
 //! decisions 2026-10-29: asked when scheduling, carried with the schedule).
 
+use super::*;
+
+impl GdprEngine {
+    /// The identity's other active devices, by name (#916).
+    pub fn with_other_device_names(mut self, names: Vec<String>) -> Self {
+        self.other_device_names = names;
+        self
+    }
+
+    pub(super) fn choose_wipe_other_devices(&mut self, action_id: &str) -> ActionResult {
+        self.wipe_other_devices = match action_id {
+            "wipe_other_devices" => Some(true),
+            "keep_other_devices" => Some(false),
+            _ => return ActionResult::UpdateScreen(self.build_screen()),
+        };
+        self.confirm_delete()
+    }
+
+    pub(super) fn build_choose_wipe_other_devices(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "leave_wipe_other_devices".into(),
+            title: self.t("privacy.leave.wipe_title"),
+            subtitle: Some(self.t("privacy.leave.wipe_body")),
+            components: vec![Component::InfoPanel {
+                id: "other_devices".into(),
+                icon: Some("devices".into()),
+                title: self.t("privacy.leave.wipe_devices_title"),
+                items: self
+                    .other_device_names
+                    .iter()
+                    .map(|name| InfoItem {
+                        icon: Some("device".into()),
+                        title: name.clone(),
+                        detail: String::new(),
+                    })
+                    .collect(),
+                a11y: None,
+            }],
+            contextual_actions: vec![
+                ScreenAction {
+                    id: "wipe_other_devices".into(),
+                    label: self.t("privacy.leave.wipe_other_devices"),
+                    style: ActionStyle::Destructive,
+                    enabled: true,
+                    a11y: Some(A11y::labeled(self.t("privacy.leave.wipe_other_devices"))),
+                },
+                ScreenAction {
+                    id: "keep_other_devices".into(),
+                    label: self.t("privacy.leave.keep_other_devices"),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: Some(A11y::labeled(self.t("privacy.leave.keep_other_devices"))),
+                },
+                ScreenAction {
+                    id: "cancel".into(),
+                    label: self.t("action.cancel"),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: Some(A11y::labeled(self.t("action.cancel"))),
+                },
+            ],
+            ..Default::default()
+        }
+    }
+}
+
 // INLINE_TEST_REQUIRED: Tests access the private GdprStep enum and engine state
 #[cfg(test)]
 mod tests {

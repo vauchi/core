@@ -152,7 +152,10 @@ fn gdpr_confirm_delete_without_trusted_contacts_erases_everything() {
     assert_eq!(result, ActionResult::Complete);
     assert_eq!(
         engine.engine_output(),
-        Some(EngineOutput::Gdpr(GdprChoice::DeleteErasingEverything))
+        Some(EngineOutput::Gdpr(GdprChoice::Delete {
+            erase_guardian_set: true,
+            wipe_other_devices: false,
+        }))
     );
 }
 

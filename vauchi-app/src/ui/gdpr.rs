@@ -75,6 +75,11 @@ pub struct GdprEngine {
     /// Someone is trusted for recovery, so deleting asks whether to keep
     /// the relay's list of them (#711).
     has_trusted_contacts: bool,
+    /// The identity's other active devices, named when leaving asks
+    /// whether they wipe too (#916).
+    other_device_names: Vec<String>,
+    /// Whether they wipe, once asked.
+    wipe_other_devices: Option<bool>,
     /// The export waiting on the PIN step: `"export"` or `"heirloom"`.
     pending_export: Option<&'static str>,
     entered_pin: EnteredPin,
@@ -114,6 +119,8 @@ enum GdprStep {
     ReadableExportWarning,
     /// Keep recovery possible or erase everything (#711).
     ChooseRecoveryKeep,
+    /// Leaving: do the other devices wipe too (#916)?
+    ChooseWipeOtherDevices,
 }
 
 impl GdprEngine {
@@ -130,6 +137,8 @@ impl GdprEngine {
             app_password_set: false,
             user_presence_available: false,
             has_trusted_contacts: false,
+            other_device_names: Vec::new(),
+            wipe_other_devices: None,
             pending_export: None,
             entered_pin: EnteredPin::default(),
             pin_error: None,
@@ -394,6 +403,7 @@ impl GdprEngine {
             GdprStep::ExportPassword => self.build_export_password(),
             GdprStep::ReadableExportWarning => self.build_readable_export_warning(),
             GdprStep::ChooseRecoveryKeep => self.build_recovery_choice(),
+            GdprStep::ChooseWipeOtherDevices => self.build_choose_wipe_other_devices(),
         }
     }
 }
@@ -483,6 +493,11 @@ impl WorkflowEngine for GdprEngine {
             {
                 self.choose_recovery(&action_id)
             }
+            (GdprStep::ChooseWipeOtherDevices, UserAction::ActionPressed { action_id })
+                if action_id != "cancel" =>
+            {
+                self.choose_wipe_other_devices(&action_id)
+            }
             // Execute confirmation: confirm triggers immediate execution
             (GdprStep::ConfirmExecute, UserAction::ActionPressed { action_id })
                 if action_id == "confirm_execute" =>
@@ -501,10 +516,12 @@ impl WorkflowEngine for GdprEngine {
                 | GdprStep::ChooseExportFormat
                 | GdprStep::ExportPassword
                 | GdprStep::ReadableExportWarning
-                | GdprStep::ChooseRecoveryKeep,
+                | GdprStep::ChooseRecoveryKeep
+                | GdprStep::ChooseWipeOtherDevices,
                 UserAction::ActionPressed { action_id },
             ) if action_id == "cancel" => {
                 self.abandon_export();
+                self.wipe_other_devices = None;
                 self.step = GdprStep::Overview;
                 ActionResult::NavigateTo(self.build_screen())
             }
@@ -571,8 +588,14 @@ impl WorkflowEngine for GdprEngine {
         }
         let choice = match self.last_action.as_deref() {
             Some("export") => GdprChoice::Export,
-            Some("delete") => GdprChoice::Delete,
-            Some("delete_erasing_everything") => GdprChoice::DeleteErasingEverything,
+            Some("delete") => GdprChoice::Delete {
+                erase_guardian_set: false,
+                wipe_other_devices: self.wipe_other_devices.unwrap_or(false),
+            },
+            Some("delete_erasing_everything") => GdprChoice::Delete {
+                erase_guardian_set: true,
+                wipe_other_devices: self.wipe_other_devices.unwrap_or(false),
+            },
             Some("cancel_deletion") => GdprChoice::CancelDeletion,
             Some("execute") => GdprChoice::Execute,
             Some("heirloom") => GdprChoice::Heirloom,
@@ -709,7 +732,10 @@ mod tests {
         assert_eq!(
             e.engine_output(),
             Some(crate::ui::EngineOutput::Gdpr(
-                crate::ui::GdprChoice::DeleteErasingEverything
+                crate::ui::GdprChoice::Delete {
+                    erase_guardian_set: true,
+                    wipe_other_devices: false,
+                }
             ))
         );
     }

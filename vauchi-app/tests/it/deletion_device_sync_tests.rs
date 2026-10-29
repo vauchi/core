@@ -68,6 +68,8 @@ fn scheduling_then_cancelling_from_the_privacy_screen_reaches_my_tablet() {
 
     let _ = press(&mut engine, "delete");
     let _ = press(&mut engine, "confirm_delete");
+    // With a tablet linked, leaving first asks whether it wipes too (#916).
+    let _ = press(&mut engine, "keep_other_devices");
     let after_schedule = journaled(&engine, &tablet);
     engine.navigate_to(AppScreen::Privacy);
     let _ = press(&mut engine, "cancel_deletion");
@@ -75,5 +77,21 @@ fn scheduling_then_cancelling_from_the_privacy_screen_reaches_my_tablet() {
     assert_eq!(
         (after_schedule, journaled(&engine, &tablet)),
         (vec!["scheduled"], vec!["scheduled", "cancelled"])
+    );
+}
+
+// @internal
+#[test]
+fn leaving_with_wipe_from_the_privacy_screen_stores_the_choice() {
+    let (mut engine, _tablet) = privacy_with_a_tablet();
+
+    let _ = press(&mut engine, "delete");
+    let _ = press(&mut engine, "confirm_delete");
+    let _ = press(&mut engine, "wipe_other_devices");
+
+    assert!(
+        vauchi_core::api::DeletionManager::new(engine.vauchi().storage())
+            .scheduled_wipes_other_devices()
+            .unwrap()
     );
 }

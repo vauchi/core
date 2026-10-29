@@ -458,12 +458,15 @@ impl AppEngine {
                 let result = self.export_as(choice);
                 self.finish_export(result)
             }
-            Some(choice @ (GdprChoice::Delete | GdprChoice::DeleteErasingEverything)) => {
+            Some(GdprChoice::Delete {
+                erase_guardian_set,
+                wipe_other_devices,
+            }) => {
                 match self
                     .vauchi
                     .schedule_identity_deletion(vauchi_core::api::DeletionChoice {
-                        erase_guardian_set: choice == GdprChoice::DeleteErasingEverything,
-                        wipe_other_devices: false,
+                        erase_guardian_set,
+                        wipe_other_devices,
                     }) {
                     Ok(_) => {
                         let _ = self.navigate_back();
@@ -501,6 +504,11 @@ impl AppEngine {
                 },
             },
             Some(GdprChoice::Execute) => {
+                // Leave Vauchi with the wipe choice tells the other devices
+                // before the identity is revoked and purged (#916).
+                if let Err(error) = self.vauchi.tell_other_devices_to_wipe() {
+                    tracing::error!(%error, "[Privacy] Failed: tell other devices to wipe");
+                }
                 // Borrow `identity` only long enough to run the delete and
                 // capture the relay deliveries (signed pre-shred); then the
                 // cache can be cleared (all data is gone).

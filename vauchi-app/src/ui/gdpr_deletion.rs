@@ -17,6 +17,10 @@ impl GdprEngine {
     }
 
     pub(super) fn confirm_delete(&mut self) -> ActionResult {
+        if !self.other_device_names.is_empty() && self.wipe_other_devices.is_none() {
+            self.step = GdprStep::ChooseWipeOtherDevices;
+            return ActionResult::NavigateTo(self.build_screen());
+        }
         if self.has_trusted_contacts {
             self.step = GdprStep::ChooseRecoveryKeep;
             return ActionResult::NavigateTo(self.build_screen());

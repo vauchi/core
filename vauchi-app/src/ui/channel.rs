@@ -532,10 +532,13 @@ impl std::fmt::Debug for DuressPinSetup {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GdprChoice {
     Export,
-    /// Schedule the deletion, keeping the relay's list of trusted contacts.
-    Delete,
-    /// Schedule the deletion; its purge also erases that list (#711).
-    DeleteErasingEverything,
+    /// Schedule Leave Vauchi with what it carries out when it runs: the
+    /// purge also erases the relay's list of trusted contacts (#711); the
+    /// identity's other devices wipe (#916).
+    Delete {
+        erase_guardian_set: bool,
+        wipe_other_devices: bool,
+    },
     CancelDeletion,
     Execute,
     Shred,

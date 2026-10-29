@@ -622,6 +622,19 @@ impl AppEngine {
                             && device_capabilities.biometric_type.is_none(),
                     )
                     .with_trusted_contacts(has_trusted_contacts)
+                    // Duress mode lists only this device (#469).
+                    .with_other_device_names(
+                        vauchi
+                            .list_devices()
+                            .map(|devices| {
+                                devices
+                                    .into_iter()
+                                    .filter(|d| !d.is_current && d.is_active)
+                                    .map(|d| d.device_name)
+                                    .collect()
+                            })
+                            .unwrap_or_default(),
+                    )
                     .with_deletion_scheduled(scheduled)
                     .with_deletion_executable(executable),
                 )

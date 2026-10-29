@@ -23,6 +23,10 @@ pub enum DeletionState {
         /// keeps social recovery possible until it expires (#711).
         #[serde(default)]
         erase_guardian_set: bool,
+        /// Whether the identity's other devices wipe when the deletion
+        /// runs — Leave Vauchi (#916).
+        #[serde(default)]
+        wipe_other_devices: bool,
     },
     /// Deletion has been executed.
     Executed {

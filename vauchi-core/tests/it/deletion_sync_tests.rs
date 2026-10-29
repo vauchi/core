@@ -18,6 +18,7 @@ fn test_deletion_scheduled_sync_item() {
         execute_at: 1700604800, // 7 days later
         timestamp: 1700000000,
         erase_guardian_set: false,
+        wipe_other_devices: false,
     };
 
     assert_eq!(item.timestamp(), 1700000000);

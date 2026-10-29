@@ -6,6 +6,7 @@
 //! devices, so each shows the countdown or its end (vauchi/private#723).
 
 use vauchi_core::Vauchi;
+use vauchi_core::api::DeletionChoice;
 use vauchi_core::sync::SyncItem;
 
 use crate::common::device_sync::{journal_for_tablet, link_tablet};
@@ -24,7 +25,11 @@ fn scheduling_my_identitys_deletion_is_journaled_for_my_tablet() {
     let wb = phone();
     let (registry, tablet) = link_tablet(&wb, [31u8; 32]);
 
-    wb.schedule_identity_deletion(true).unwrap();
+    wb.schedule_identity_deletion(DeletionChoice {
+        erase_guardian_set: true,
+        wipe_other_devices: false,
+    })
+    .unwrap();
 
     let scheduled: Vec<(u64, bool)> = journal_for_tablet(&wb, registry, &tablet)
         .iter()
@@ -45,7 +50,8 @@ fn scheduling_my_identitys_deletion_is_journaled_for_my_tablet() {
 #[test]
 fn cancelling_my_identitys_deletion_is_journaled_for_my_tablet() {
     let wb = phone();
-    wb.schedule_identity_deletion(false).unwrap();
+    wb.schedule_identity_deletion(DeletionChoice::default())
+        .unwrap();
     let (registry, tablet) = link_tablet(&wb, [32u8; 32]);
 
     wb.cancel_identity_deletion().unwrap();

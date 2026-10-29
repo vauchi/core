@@ -116,7 +116,9 @@ pub mod sync;
 mod sync;
 
 // Identity Deletion
-pub use deletion::{DeletionError, DeletionManager, DeletionResult, delete_identity_data};
+pub use deletion::{
+    DeletionChoice, DeletionError, DeletionManager, DeletionResult, delete_identity_data,
+};
 
 // Consent
 pub use consent::{ConsentManager, ConsentRecord, ConsentStatus, ConsentType};

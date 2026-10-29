@@ -30,6 +30,7 @@ fn execute_scheduled_deletion(erase_guardian_set: bool) -> (Vec<serde_json::Valu
             scheduled_at: 1,
             execute_at: 1,
             erase_guardian_set,
+            wipe_other_devices: false,
         })
         .unwrap();
     let mut engine = AppEngine::new(vauchi);

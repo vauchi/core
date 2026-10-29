@@ -46,6 +46,15 @@ pub fn delete_identity_data<P: AsRef<Path>>(db_path: P) -> Result<(), DeletionEr
     Ok(())
 }
 
+/// What the identity's deletion carries out when it runs (#711, #916).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct DeletionChoice {
+    /// The relay purge also erases the guardian set, ending social recovery.
+    pub erase_guardian_set: bool,
+    /// The identity's other devices are told to wipe themselves.
+    pub wipe_other_devices: bool,
+}
+
 /// Identity deletion errors.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -137,6 +146,15 @@ impl<'a> DeletionManager<'a> {
         &self,
         erase_guardian_set: bool,
     ) -> Result<(), DeletionError> {
+        self.schedule_deletion_with(DeletionChoice {
+            erase_guardian_set,
+            wipe_other_devices: false,
+        })
+    }
+
+    /// Schedules identity deletion with a 7-day grace period and the
+    /// choices it carries out when it runs.
+    pub fn schedule_deletion_with(&self, choice: DeletionChoice) -> Result<(), DeletionError> {
         let current = self.storage.consent().load_deletion_state()?;
         if matches!(current, DeletionState::Scheduled { .. }) {
             return Err(DeletionError::AlreadyScheduled);
@@ -147,7 +165,8 @@ impl<'a> DeletionManager<'a> {
         let state = DeletionState::Scheduled {
             scheduled_at: now,
             execute_at,
-            erase_guardian_set,
+            erase_guardian_set: choice.erase_guardian_set,
+            wipe_other_devices: choice.wipe_other_devices,
         };
         self.storage.consent().save_deletion_state(&state)?;
         Ok(())
@@ -163,6 +182,7 @@ impl<'a> DeletionManager<'a> {
             scheduled_at,
             execute_at,
             erase_guardian_set: false,
+            wipe_other_devices: false,
         };
         self.storage.consent().save_deletion_state(&state)?;
         Ok(())
@@ -175,6 +195,18 @@ impl<'a> DeletionManager<'a> {
             self.storage.consent().load_deletion_state()?,
             DeletionState::Scheduled {
                 erase_guardian_set: true,
+                ..
+            }
+        ))
+    }
+
+    /// Whether the scheduled deletion wipes the identity's other devices;
+    /// `false` when nothing is scheduled (#916).
+    pub fn scheduled_wipes_other_devices(&self) -> Result<bool, DeletionError> {
+        Ok(matches!(
+            self.storage.consent().load_deletion_state()?,
+            DeletionState::Scheduled {
+                wipe_other_devices: true,
                 ..
             }
         ))

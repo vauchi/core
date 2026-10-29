@@ -758,12 +758,14 @@ impl Vauchi {
                     scheduled_at,
                     execute_at,
                     erase_guardian_set,
+                    wipe_other_devices,
                     ..
                 } => {
                     let state = crate::storage::DeletionState::Scheduled {
                         scheduled_at,
                         execute_at,
                         erase_guardian_set,
+                        wipe_other_devices,
                     };
                     self.storage
                         .consent()

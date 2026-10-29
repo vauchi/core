@@ -62,6 +62,7 @@ fn apply_sync_deletion_scheduled_writes_state_to_storage() {
             execute_at,
             timestamp: scheduled_at,
             erase_guardian_set: false,
+            wipe_other_devices: false,
         }])
         .unwrap();
 
@@ -92,6 +93,7 @@ fn apply_sync_deletion_scheduled_keeps_the_guardian_set_choice() {
         execute_at: scheduled_at + 7 * 24 * 60 * 60,
         timestamp: scheduled_at,
         erase_guardian_set: true,
+        wipe_other_devices: false,
     }])
     .unwrap();
 
@@ -114,6 +116,7 @@ fn apply_sync_deletion_cancelled_clears_state() {
             scheduled_at: 100,
             execute_at: 200,
             erase_guardian_set: false,
+            wipe_other_devices: false,
         })
         .unwrap();
 
@@ -994,6 +997,7 @@ fn apply_sync_deletion_scheduled_dispatches_no_invalidation_event() {
         execute_at: now() + 1,
         timestamp: now(),
         erase_guardian_set: false,
+        wipe_other_devices: false,
     }])
     .unwrap();
 

@@ -86,6 +86,7 @@ fn a_schedule_from_before_the_choice_keeps_recovery() {
             scheduled_at: 10,
             execute_at: 20,
             erase_guardian_set: false,
+            wipe_other_devices: false,
         }
     );
 }

@@ -461,8 +461,10 @@ impl AppEngine {
             Some(choice @ (GdprChoice::Delete | GdprChoice::DeleteErasingEverything)) => {
                 match self
                     .vauchi
-                    .schedule_identity_deletion(choice == GdprChoice::DeleteErasingEverything)
-                {
+                    .schedule_identity_deletion(vauchi_core::api::DeletionChoice {
+                        erase_guardian_set: choice == GdprChoice::DeleteErasingEverything,
+                        wipe_other_devices: false,
+                    }) {
                     Ok(_) => {
                         let _ = self.navigate_back();
                         // Rebuild Privacy fresh on revisit so it shows the

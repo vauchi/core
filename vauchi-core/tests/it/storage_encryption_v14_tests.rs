@@ -498,6 +498,7 @@ fn test_deletion_state_encrypted_roundtrip() {
         scheduled_at: 1000,
         execute_at: 2000,
         erase_guardian_set: false,
+        wipe_other_devices: false,
     };
     storage.consent().save_deletion_state(&state).unwrap();
 
@@ -515,6 +516,7 @@ fn test_deletion_state_stored_encrypted() {
         scheduled_at: 1000,
         execute_at: 2000,
         erase_guardian_set: false,
+        wipe_other_devices: false,
     };
     storage.consent().save_deletion_state(&state).unwrap();
 
@@ -710,6 +712,7 @@ fn test_rekey_preserves_deletion_state() {
         scheduled_at: 1000,
         execute_at: 2000,
         erase_guardian_set: false,
+        wipe_other_devices: false,
     };
     storage.consent().save_deletion_state(&state).unwrap();
 

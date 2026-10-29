@@ -245,6 +245,7 @@ fn test_conflict_deletion_schedule_and_cancel_independent() {
         execute_at: 1000 + 7 * 86400,
         timestamp: 1000,
         erase_guardian_set: false,
+        wipe_other_devices: false,
     };
     let applied = orchestrator
         .process_incoming(vec![schedule], &[0x99u8; 32])

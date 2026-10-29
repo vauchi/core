@@ -273,6 +273,9 @@ pub enum SyncItem {
         /// from devices that predate the choice, which keep it.
         #[serde(default)]
         erase_guardian_set: bool,
+        /// Whether the other devices wipe when the deletion runs (#916).
+        #[serde(default)]
+        wipe_other_devices: bool,
         /// Timestamp of this sync event.
         timestamp: u64,
     },

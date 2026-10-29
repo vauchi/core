@@ -22,6 +22,7 @@ mod content_over_ohttp_tests;
 mod content_update_setting_tests;
 mod duress_vocabulary_persistence_tests;
 mod e2e;
+mod emergency_wipe_sends_nothing_tests;
 mod emergency_wipe_shred_tests;
 mod guardian_groups_exhaustive_tests;
 mod guardian_groups_tests;

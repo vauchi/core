@@ -57,6 +57,7 @@ fn a_capped_fetch_page_is_reported_as_truncated() {
     }
 }
 
+// @claim: S4
 /// Each registration batch holds one day's tokens; a fetch request that
 /// mixed two batches would hand the relay both days' tokens in one set and
 /// let it chain the fetcher across days (private#890).

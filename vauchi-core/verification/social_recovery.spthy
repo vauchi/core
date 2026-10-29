@@ -295,6 +295,7 @@ lemma executable:
    guardians' shards or Alice's new identity. */
 #ifdef GROUP_OF_TWO
 /* One member of each group: Bob's, and Carol's or Dave's. */
+// @claim: S17
 lemma backup_needs_both_guardians:
   "All bk #s.
      BackupKey(bk) @ s
@@ -305,6 +306,7 @@ lemma backup_needs_both_guardians:
 
 /* Dave can stand in for Carol: Alice restores with Bob and Dave while
    Carol never vouches. */
+// @claim: S17
 lemma a_group_mate_can_stand_in:
   exists-trace
   "Ex A J pkj k o n #i #j.
@@ -316,6 +318,7 @@ lemma a_group_mate_can_stand_in:
 
 #ifdef THREE_GROUPS
 /* One member of each of the three groups. */
+// @claim: S17
 lemma backup_needs_both_guardians:
   "All bk #s.
      BackupKey(bk) @ s
@@ -328,6 +331,7 @@ lemma backup_needs_both_guardians:
 
 /* Any member of each group will do: Bob, Dave and Grace restore the
    backup while Carol, Eve and Frank never vouch. */
+// @claim: S17
 lemma a_group_mate_can_stand_in:
   exists-trace
   "Ex A J pkj k o n o2 n2 #i #j #l.
@@ -341,6 +345,7 @@ lemma a_group_mate_can_stand_in:
 #endif
 
 #ifdef not GROUP_OF_TWO & not THREE_GROUPS
+// @claim: S17
 lemma backup_needs_both_guardians:
   "All bk #s.
      BackupKey(bk) @ s
@@ -352,6 +357,7 @@ lemma backup_needs_both_guardians:
 /* John rekeys only to the key Alice really recovered to, unless both
    helpers he counted were corrupted — although the thief holds the
    shared key that reaches John's mailbox. */
+// @claim: S17
 lemma john_rekeys_only_with_the_real_alice:
   "All J A n k #j.
      JohnRekeyed(J, A, n, k) @ j
@@ -360,6 +366,7 @@ lemma john_rekeys_only_with_the_real_alice:
 
 /* Alice rekeys only with the real John, unless John is corrupted —
    although the thief holds their old shared key. */
+// @claim: S17
 lemma alice_rekeys_only_with_the_real_john:
   "All A J pkj k #l.
      AliceRekeyed(A, J, pkj, k) @ l

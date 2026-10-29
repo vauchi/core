@@ -413,6 +413,7 @@ fn registration_covers_yesterday_and_pads_every_batch_to_256() {
     );
 }
 
+// @claim: S4
 /// A registration batch holds the tokens of one day only. Two consecutive
 /// days' fetch sets would otherwise overlap in yesterday's tokens and let
 /// the relay chain one fetcher across days (private#890).

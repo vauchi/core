@@ -112,6 +112,7 @@ lemma executable:
     & not (Ex x #r. RevealIdentity(x) @ r)
     & not (Ex x y #r. RevealChannel(x, y) @ r)"
 
+// @claim: S2
 // A leaked ratchet state lets the attacker deliver anything over that
 // channel, but an applied update was still signed by the sender for this
 // recipient. Without the recipient's key in the signature, an update meant
@@ -121,6 +122,7 @@ lemma update_comes_from_the_sender_for_this_recipient:
       (Ex #j. Sent(a, b, %v, c) @ j & #j < #i)
     | (Ex #r. RevealIdentity(a) @ r & #r < #i)"
 
+// @claim: S2
 // Even an attacker holding both channel keys cannot make an update apply
 // twice; the version floor alone accepts an equal version again. With the
 // sender's identity key it can sign anything, so that case is excluded.
@@ -129,6 +131,7 @@ lemma each_update_is_applied_once:
       ==> #i = #j | (Ex #r. RevealIdentity(a) @ r)"
 
 #ifdef NO_VERSION_FLOOR
+// @claim: S2
 // Without the floor the relay rolls a card back just by reordering.
 lemma no_rollback:
   "All b a %v1 %v2 c1 c2 #i #j.
@@ -136,6 +139,7 @@ lemma no_rollback:
       ==> not (%v2 << %v1)"
 #endif
 
+// @claim: S1
 lemma changes_stay_secret:
   "All a b %v c #i. Sent(a, b, %v, c) @ i ==>
       not (Ex #k. K(c) @ k) | (Ex #r. RevealChannel(a, b) @ r)"

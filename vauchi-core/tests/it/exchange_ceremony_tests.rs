@@ -381,6 +381,7 @@ fn test_encrypted_message_secret_matches_raw_x3dh() {
 // Transcript binding tests (SP-2, item 76)
 // ============================================================
 
+// @claim: S6
 /// Changing either identity key must produce a different shared secret.
 ///
 /// This verifies that identity keys are bound into the key derivation,
@@ -463,6 +464,7 @@ fn test_transcript_binding_includes_identity_keys() {
     );
 }
 
+// @claim: S6
 /// Changing either ephemeral key must produce a different shared secret,
 /// even when identity keys are identical.
 // @scenario: contact_exchange :: Mutual QR uses fresh ephemeral keys for forward secrecy

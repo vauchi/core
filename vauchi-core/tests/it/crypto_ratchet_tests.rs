@@ -59,6 +59,7 @@ fn test_dr_encrypt_decrypt_roundtrip() {
     assert_eq!(plaintext.as_slice(), decrypted.as_slice());
 }
 
+// @claim: S2
 // @scenario: security :: Failed authentication does not advance ratchet state
 #[test]
 fn test_crypto_hardening_ratchet_same_chain_auth_failure_rolls_back_state() {
@@ -113,6 +114,7 @@ fn test_crypto_hardening_ratchet_skipped_key_auth_failure_rolls_back_state() {
     assert_eq!(first_plaintext, b"first skipped message");
 }
 
+// @claim: S2
 // @scenario: security :: Failed authentication rolls back a DH ratchet step
 #[test]
 fn test_crypto_hardening_ratchet_new_dh_auth_failure_rolls_back_state() {
@@ -159,6 +161,7 @@ fn test_dr_bidirectional_communication() {
     assert_eq!(b"How are you?".as_slice(), dec3.as_slice());
 }
 
+// @claim: S11
 // @scenario: security :: Forward secrecy via Double Ratchet
 // @internal
 #[test]
@@ -188,6 +191,7 @@ fn test_dr_forward_secrecy() {
     assert_eq!(b"Message 2".as_slice(), dec2.as_slice());
 }
 
+// @claim: S11
 // @scenario: security :: Forward secrecy via Double Ratchet
 // @internal
 #[test]
@@ -300,6 +304,7 @@ fn test_dr_different_keys_per_message() {
     assert_eq!(msg2.message_index, 1);
 }
 
+// @claim: S11
 // @internal
 #[test]
 fn test_dr_skipped_message_limit() {

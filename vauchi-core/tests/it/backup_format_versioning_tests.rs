@@ -291,6 +291,7 @@ fn test_future_version_rejection() {
 // =============================================================================
 // =============================================================================
 
+// @claim: S13
 /// Tests wrong password detection for v2 backups.
 ///
 /// Feature: backup_format_versioning.feature
@@ -462,6 +463,7 @@ fn test_backup_import_creates_identical_signing_keys() {
 // =============================================================================
 // =============================================================================
 
+// @claim: S13
 /// Tests that an exported identity backup keeps its key material encrypted.
 ///
 /// The master seed is the whole secret: every keypair derives from it, so a

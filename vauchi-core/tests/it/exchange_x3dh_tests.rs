@@ -107,6 +107,7 @@ fn test_x3dh_respond_key_differs_from_raw_dh() {
 // Verifies that the shared secret is cryptographically tied to both
 // parties' long-term X25519 keys via DH1 (our_static × their_static).
 
+// @claim: S6
 /// Wrong identity key must produce a different shared secret.
 /// With full X3DH, DH1 binds the secret to both parties' identity keys.
 // @scenario: security :: Shared key derivation via X3DH
@@ -137,6 +138,7 @@ fn test_x3dh_identity_binding_wrong_key_fails() {
     );
 }
 
+// @claim: S6
 /// Zero identity key must be rejected (non-contributory DH output).
 // @scenario: security :: Shared key derivation via X3DH
 // @internal
@@ -170,6 +172,7 @@ fn test_x3dh_respond_zero_identity_rejected() {
     );
 }
 
+// @claim: S6
 /// Full bidirectional agreement: initiate with alice_keys + bob's public,
 /// respond with bob_keys + alice's public → same secret.
 // @scenario: contact_exchange :: X3DH key agreement during exchange

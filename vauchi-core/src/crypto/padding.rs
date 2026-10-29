@@ -121,6 +121,7 @@ fn select_bucket(size: usize) -> usize {
 mod tests {
     use super::*;
 
+    // @claim: S5
     #[test]
     fn test_pad_unpad_roundtrip_small() {
         let plaintext = b"hello";
@@ -157,6 +158,7 @@ mod tests {
         assert_eq!(recovered, plaintext);
     }
 
+    // @claim: S5
     #[test]
     fn test_pad_overflow_alignment() {
         let plaintext = vec![0xEF; 5000]; // Exceeds large bucket
@@ -167,6 +169,7 @@ mod tests {
         assert_eq!(recovered, plaintext);
     }
 
+    // @claim: S5
     #[test]
     fn test_pad_very_large_message() {
         let plaintext = vec![0xDE; 100_000]; // 100KB message

@@ -685,6 +685,7 @@ fn compute_backup_v6() -> BackupV6Vector {
     }
 }
 
+// @claim: S13
 /// Opens the recorded v6 backup from the recorded Argon2id output with the
 /// header as associated data, and shows the header is bound: the same key
 /// with one salt byte changed opens nothing.
@@ -735,6 +736,7 @@ fn backup_v6_vector_decrypts_under_its_header_and_not_under_a_changed_one() {
     assert_eq!(hex::encode(seed_bytes), v.master_seed);
 }
 
+// @claim: S13
 /// The whole v6 import, password in, on a fresh installation; a wrong
 /// password restores nothing.
 // @scenario: security :: Correct algorithms used

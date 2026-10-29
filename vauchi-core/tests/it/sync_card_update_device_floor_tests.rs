@@ -17,6 +17,7 @@ use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::X3DHKeyPair;
 
+// @claim: S2
 // A multi-device sender numbers deltas per device, from its own storage.
 // Keying the receiver's stale-version floor per CONTACT therefore breaks
 // convergence: device A1's applied v2 raises the floor to 2, and device A2's

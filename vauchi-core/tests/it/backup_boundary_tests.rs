@@ -54,6 +54,7 @@ fn a_full_backup_import_accepts_sizes_from_17_bytes_to_32_mib() {
     ));
 }
 
+// @claim: S13
 // Debug output can reach logs and crash reports.
 // @internal
 #[test]

@@ -136,6 +136,7 @@ fn stored_email_value(world: &ColdStartWorld) -> String {
         .to_string()
 }
 
+// @claim: S2
 // @scenario: sync_updates :: Genesis card versions are floored per origin device
 #[test]
 fn genesis_card_per_device_floor_accepts_each_device_and_rejects_its_own_stale_version() {

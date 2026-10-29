@@ -400,6 +400,7 @@ fn public_keys_are_equal_exactly_when_their_bytes_are() {
     assert_ne!(alice, bob);
 }
 
+// @claim: S5
 // @internal
 #[test]
 fn an_empty_message_unpads_from_a_bare_length_prefix() {

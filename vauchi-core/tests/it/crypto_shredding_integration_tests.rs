@@ -19,6 +19,7 @@ const SMK_KEY_NAME: &str = "smk";
 // SMK destruction renders SEK-encrypted data irrecoverable
 // ============================================================
 
+// @claim: S12
 /// After SMK is destroyed and re-derived from a different identity,
 /// all prior encrypted data is irrecoverable (different key material).
 // @scenario: privacy_compliance :: Crypto-shredding renders card unreadable without key
@@ -52,6 +53,7 @@ fn test_smk_destruction_makes_data_irrecoverable() {
 // ============================================================
 // ============================================================
 
+// @claim: S12
 /// FKEK encrypts file keys; after SMK destruction those file keys
 /// are irrecoverable.
 // @scenario: privacy_compliance :: Identity deletion destroys all content encryption keys
@@ -156,6 +158,7 @@ fn test_smk_secure_storage_lifecycle() {
 // Shredding isolation: destroying A's SMK leaves B intact
 // ============================================================
 
+// @claim: S12
 /// Two identities with separate key hierarchies. Shredding A's SMK must
 /// leave B's data intact and make A's irrecoverable.
 // @internal

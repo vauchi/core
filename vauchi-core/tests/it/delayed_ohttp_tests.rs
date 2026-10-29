@@ -139,6 +139,7 @@ fn blob_on(id: &str, token: &str) -> FetchedBlob {
     }
 }
 
+// @claim: S4
 /// Two registration batches, one per day epoch (private#890), post two
 /// delayed tickets; each answer is attributed to its own batch's token and
 /// both arrive on the next cycle, so the split loses nothing.

@@ -42,6 +42,7 @@ fn build_v2(v: &Vauchi, relay_url: &str) -> (Vec<u8>, X3DHKeyPair, [u8; 32]) {
     (payload, x3dh, identity_pubkey)
 }
 
+// @claim: S9
 // @internal
 #[test]
 fn v2_two_party_completes_to_a_live_exchanged_link_contact_with_symmetric_key() {

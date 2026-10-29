@@ -166,6 +166,7 @@ lemma executable:
    recovered to, unless both helpers he counted were compromised (their key
    corrupted or on a lost device). The recovering person's own lost device
    never counts as one of them (#797). */
+// @claim: S16
 lemma accept_needs_the_real_recovery:
   "All J A o n V1 V2 #a.
      Accept(J, A, o, n, V1, V2) @ a
@@ -176,6 +177,7 @@ lemma accept_needs_the_real_recovery:
 
 /* John's new key with the recovered contact stays secret unless both
    counted helpers or the contact's new identity are corrupted. */
+// @claim: S16
 lemma john_key_secrecy:
   "All J A n k #j.
      JohnRekeyed(J, A, n, k) @ j
@@ -189,6 +191,7 @@ lemma john_key_secrecy:
 
 #ifdef IN_PERSON
 /* Alice shares the key only with someone who accepted her recovery. */
+// @claim: S16
 lemma alice_rekeys_only_with_an_accepting_contact:
   "All A pkj k #l.
      AliceRekeyed(A, pkj, k) @ l
@@ -196,6 +199,7 @@ lemma alice_rekeys_only_with_an_accepting_contact:
 #else
 /* Limit: remotely, Alice cannot tell an old contact from a stranger: she
    lost every contact with her device, so any identity can answer her. */
+// @claim: S16
 lemma a_stranger_can_rekey_with_the_recovering_user:
   exists-trace
   "Ex A pkj k #l.

@@ -99,6 +99,7 @@ lemma executable:
      Shared(I, P) @ s & Registered(P, idp) @ a & ContactAdded(I, idi, idp) @ c"
 
 /* The sender's new contact is the person the sender meant the link for. */
+// @claim: S9
 lemma contact_only_after_approval:
   "All I idi idr #c.
      ContactAdded(I, idi, idr) @ c

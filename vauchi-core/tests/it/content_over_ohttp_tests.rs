@@ -120,6 +120,7 @@ fn an_encoded_answer_core_cannot_trust_is_an_error() {
     }
 }
 
+// @claim: S3
 // @internal
 #[test]
 fn content_is_never_fetched_without_ohttp() {

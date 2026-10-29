@@ -74,6 +74,7 @@ fn row_toggle(commands: &[Command], title_wanted: &str) -> (SurfaceId, BindingId
         .unwrap_or_else(|| panic!("no {title_wanted} toggle: {commands:#?}"))
 }
 
+// @claim: S10
 // @scenario: navigation :: Contact shows trust level badge
 #[test]
 fn the_trust_shown_follows_the_exchange_and_cannot_be_tapped() {

@@ -181,6 +181,7 @@ lemma executable:
 
 /* A key both honest sides accepted stays secret: the ephemeral DH carries
    it, so even every static key leaking does not expose it. */
+// @claim: S6
 lemma session_key_secrecy:
   "All I R idi idr k #i #j.
      AcceptI(I, idi, idr, k) @ i & AcceptR(R, idr, idi, k) @ j

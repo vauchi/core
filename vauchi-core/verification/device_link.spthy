@@ -171,6 +171,7 @@ lemma executable:
 
 /* The seed stays secret unless a link QR of that identity was
    photographed. */
+// @claim: S15
 lemma seed_secrecy:
   "All sid A s n #i.
      Release(sid, A, s, n) @ i
@@ -179,6 +180,7 @@ lemma seed_secrecy:
 
 /* The existing device sends the seed only for the request the scanning
    device made (6-digit caveat above). */
+// @claim: S15
 lemma initiator_agreement:
   "All sid A s n #i.
      Release(sid, A, s, n) @ i
@@ -187,6 +189,7 @@ lemma initiator_agreement:
 
 /* The new device ends up with the identity the QR named, sent by that
    identity's device in this session. */
+// @claim: S15
 lemma joiner_agreement:
   "All sid B pk_a s #i.
      Adopt(sid, B, pk_a, s) @ i
@@ -198,6 +201,7 @@ lemma joiner_agreement:
    away: the attacker's own request shows a code the user's new device
    does not, so the user never confirms it (6-digit caveat above: a
    1-in-a-million guess). Falsified with -DNO_CODE_CHECK. */
+// @claim: S15
 lemma photographed_qr_alone_keeps_the_seed:
   "All sid A s n #i.
      Release(sid, A, s, n) @ i ==> not (Ex #k. K(s) @ k)"
@@ -205,6 +209,7 @@ lemma photographed_qr_alone_keeps_the_seed:
 /* Limit: with a photographed QR, an attacker who sees the relay traffic
    reads the seed while both devices report a normal link with matching
    codes. The confirmation code does not stop it. */
+// @claim: S15
 lemma qr_leak_exposes_seed:
   exists-trace
   "Ex sid A B s n #i #j #k #l.
@@ -214,6 +219,7 @@ lemma qr_leak_exposes_seed:
 
 /* Limit: with a photographed QR, an attacker can hand the new device a
    seed of its own choosing, since nothing checks pk(seed) against the QR. */
+// @claim: S15
 lemma qr_leak_lets_attacker_choose_joiner_identity:
   exists-trace
   "Ex sid B pk_a s #i.

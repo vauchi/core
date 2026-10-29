@@ -9,6 +9,7 @@ use sha2::Sha256;
 
 type HmacSha256 = Hmac<Sha256>;
 
+// @claim: S9
 /// Derive a 6-digit SAS verification code from the
 /// shared X3DH secret and both parties' identity keys.
 ///

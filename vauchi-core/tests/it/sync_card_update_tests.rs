@@ -1073,6 +1073,7 @@ fn removed_field_fully_revokes_despite_stored_duplicate() {
     );
 }
 
+// @claim: S2
 // The shipping device receiver must reject a stale (downgraded) delta version
 // (#42) and record the version it applied. A withheld or reordered older delta
 // carries an unseen nonce, so it passes replay detection; without a version

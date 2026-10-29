@@ -179,10 +179,12 @@ module device_link_machines {
     joinerCancel,
   }
 
+  // @claim: S15
   // The joiner holds the seed only for a device the host registered.
   val joiner_seed_implies_registered: bool =
     s.joiner == JCompleted implies s.deviceRegistered
 
+  // @claim: S15
   // The host never lists a device whose joiner gave up.
   val no_device_registered_for_a_failed_joiner: bool =
     not(s.deviceRegistered and (s.joiner == JFailed or s.joiner == JCancelled))

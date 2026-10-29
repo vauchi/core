@@ -210,6 +210,7 @@ fn test_after_migration_old_key_cannot_decrypt() {
 
 // === SMK Destruction After Migration ===
 
+// @claim: S12
 // @internal
 #[test]
 fn test_smk_destruction_makes_data_irrecoverable() {

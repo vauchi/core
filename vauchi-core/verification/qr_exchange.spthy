@@ -100,6 +100,7 @@ lemma executable:
 /* Secrecy and forward secrecy: the key stays secret unless the peer's
    identity key leaked before the exchange; leaks afterwards do not
    matter, and our own key leaking never does. */
+// @claim: S6
 lemma session_key_secrecy:
   "All A B pka pkb k #i #r.
      Accept(A, pka, pkb, k) @ i & Identity(B, pkb) @ r
@@ -109,6 +110,7 @@ lemma session_key_secrecy:
 /* No misbinding: two sessions that hold the same key agree on whose key
    each holds — an attacker cannot make B believe it shares the key with
    someone other than A. */
+// @claim: S6
 lemma no_misbinding:
   "All A B pka pkb pkx k #i #j.
      Accept(A, pka, pkb, k) @ i & Accept(B, pkb, pkx, k) @ j

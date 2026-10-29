@@ -105,6 +105,7 @@ fn collect_answer(
     (first.receive().unwrap(), outer.ohttp_actions())
 }
 
+// @claim: S4
 // @internal: An immediate response cannot extend its request's token set.
 #[test]
 fn unsolicited_tokens_are_rejected_for_immediate_fetches() {
@@ -113,6 +114,7 @@ fn unsolicited_tokens_are_rejected_for_immediate_fetches() {
     assert!(!actions.iter().any(|action| action == "ack"));
 }
 
+// @claim: S4
 // @internal: A collected answer belongs to its original request, even when registrations change.
 #[test]
 fn unsolicited_tokens_are_rejected_for_delayed_fetches() {
@@ -121,6 +123,7 @@ fn unsolicited_tokens_are_rejected_for_delayed_fetches() {
     assert!(!actions.iter().any(|action| action == "ack"));
 }
 
+// @claim: S4
 // @internal: A response without attribution cannot be authorized by its request.
 #[test]
 fn unattributed_blobs_are_not_delivered_or_acknowledged() {

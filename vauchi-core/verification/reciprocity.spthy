@@ -107,6 +107,7 @@ lemma executable:
 
 /* Confirmed means the contact sent its confirmation for this exchange,
    unless the shared key leaked: never one's own message reflected. */
+// @claim: S7
 lemma confirmed_means_the_peer_confirmed:
   "All B A k #i.
      Confirmed(B, A, k) @ i
@@ -115,6 +116,7 @@ lemma confirmed_means_the_peer_confirmed:
 
 /* With the signature, a leaked shared key is not enough: the attacker
    also needs the contact's identity key. */
+// @claim: S7
 lemma a_leaked_shared_key_also_needs_the_identity_key:
   "All B A k #i.
      Confirmed(B, A, k) @ i

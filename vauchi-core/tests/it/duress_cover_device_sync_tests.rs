@@ -79,6 +79,7 @@ fn fill(buf: &mut [u8]) {
     buf.fill(0xa5);
 }
 
+// @claim: S14
 // @scenario: duress_mode :: Duress mode looks identical to normal mode
 #[test]
 fn a_cover_item_has_the_length_and_timestamp_of_the_item_it_stands_for() {
@@ -91,6 +92,7 @@ fn a_cover_item_has_the_length_and_timestamp_of_the_item_it_stands_for() {
     assert_eq!(cover.timestamp(), item.timestamp());
 }
 
+// @claim: S14
 // @scenario: duress_mode :: Duress mode looks identical to normal mode
 #[test]
 fn applying_a_cover_item_changes_nothing() {

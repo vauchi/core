@@ -14,6 +14,7 @@ use super::padding::unpad;
 const LENGTH_PREFIX_SIZE: usize = 4;
 const MAX_PROVEN_INPUT_LEN: usize = 12;
 
+// @claim: S5
 #[kani::proof]
 #[kani::unwind(14)]
 fn unpad_never_panics_and_only_accepts_a_prefixed_plaintext() {

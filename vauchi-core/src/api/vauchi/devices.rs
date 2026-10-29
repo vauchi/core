@@ -192,6 +192,42 @@ impl Vauchi {
         Ok(device_name)
     }
 
+    /// Revokes this device from the identity's device registry and queues
+    /// the signed registry for the other devices, so they drop it; contacts
+    /// and the relay are not told (vauchi/private#915). The caller wipes
+    /// the device afterwards, once device sync has sent the change.
+    ///
+    /// Errors if no identity is set, if this is the identity's last active
+    /// device (removing it would end the identity: that is Leave Vauchi),
+    /// or in duress mode, which never touches the real registry.
+    pub fn revoke_this_device(&self) -> VauchiResult<()> {
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        if self.in_duress_mode() {
+            return Err(VauchiError::InvalidState(
+                "Cannot revoke this device in duress mode".into(),
+            ));
+        }
+        let mut registry = self
+            .storage
+            .device()
+            .load_device_registry()?
+            .ok_or_else(|| VauchiError::InvalidState("No device registry found".into()))?;
+        let now = self.storage.now_secs();
+        registry
+            .revoke_device(identity.device_id(), identity.signing_keypair(), now)
+            .map_err(|e| VauchiError::InvalidState(format!("Revoke failed: {:?}", e)))?;
+        crate::api::sync::DeviceSyncOrchestrator::persist_device_registry_change(
+            &self.storage,
+            identity,
+            &registry,
+            now,
+        )
+        .map_err(|e| VauchiError::InvalidState(format!("Revoke failed: {e}")))
+    }
+
     /// Decommissions this device after a replacement handover.
     ///
     /// Wipes every contact ratchet session so this device can no longer

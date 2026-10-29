@@ -14,9 +14,7 @@ use crate::api::error::{VauchiError, VauchiResult};
 use crate::network::HttpTransport;
 use crate::recovery::guardian::GuardianToken;
 use crate::recovery::sealed_box;
-use crate::recovery::{
-    RecoveryClaim, RecoveryProgress, RecoveryProof, RecoveryVoucher, VerificationResult,
-};
+use crate::recovery::{RecoveryClaim, RecoveryProof, RecoveryVoucher, VerificationResult};
 use vauchi_protocol::v2::V2GuardianEntry;
 
 use super::Vauchi;
@@ -113,11 +111,6 @@ impl Vauchi {
     /// and starts tracking recovery progress.
     pub fn create_recovery_claim(&self, old_pk: &[u8; 32]) -> VauchiResult<RecoveryClaim> {
         self.start_recovery_claim(old_pk)
-    }
-
-    /// Returns current recovery progress, if any.
-    pub fn get_recovery_progress(&self) -> VauchiResult<Option<RecoveryProgress>> {
-        Ok(self.storage.recovery().load_recovery_progress()?)
     }
 
     /// Parses, validates, and scores an incoming recovery proof

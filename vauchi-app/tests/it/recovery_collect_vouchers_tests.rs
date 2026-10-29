@@ -9,8 +9,10 @@
 
 use vauchi_app::i18n::{Locale, get_string};
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, Component, UserAction, WorkflowEngine};
+#[cfg(feature = "testing")]
+use vauchi_core::VauchiConfig;
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::{Contact, Identity, SymmetricKey, Vauchi, VauchiConfig};
+use vauchi_core::{Contact, Identity, SymmetricKey, Vauchi};
 
 #[cfg(feature = "testing")]
 use crate::recording_relay::recording_relay;
@@ -74,6 +76,7 @@ fn claimant() -> Claimant {
 }
 
 /// A claimant whose relay is `relay_url`.
+#[cfg(feature = "testing")]
 fn claimant_with_relay(relay_url: &str) -> (Claimant, tempfile::TempDir) {
     let dir = tempfile::tempdir().unwrap();
     let mut config = VauchiConfig::default().with_relay_url(relay_url);

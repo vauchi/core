@@ -445,20 +445,8 @@ fn no_linked_devices_hides_hint() {
 // @scenario: contact_recovery :: Complete screen shows what is recovered
 #[test]
 fn complete_screen_explains_what_is_recovered() {
-    let mut engine = quorum_met();
-    engine.set_claim_data([0xAB; 32]);
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "start_recovery".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "wait_for_voucher".into(),
-    });
-    engine.add_voucher_for_testing("Alice");
-    engine.add_voucher_for_testing("Bob");
-    engine.add_voucher_for_testing("Carol");
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "submit_proof".into(),
-    });
+    let mut engine = collecting_at_threshold();
+    assert!(engine.apply_update(EngineUpdate::Recovery(RecoveryUpdate::ProofSubmitted)));
 
     let screen = engine.current_screen();
 

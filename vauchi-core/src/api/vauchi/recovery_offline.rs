@@ -147,6 +147,11 @@ impl Vauchi {
         Ok(progress)
     }
 
+    /// Returns current recovery progress, if any.
+    pub fn get_recovery_progress(&self) -> VauchiResult<Option<RecoveryProgress>> {
+        Ok(self.storage.recovery().load_recovery_progress()?)
+    }
+
     /// Adds a helper's base64 voucher, as [`Self::create_voucher_from_claim_b64`]
     /// returns it, to the recovery in progress: the recovering user's side
     /// of that exchange (vauchi/private#877). Returns the updated progress.

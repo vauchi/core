@@ -875,16 +875,12 @@ impl WorkflowEngine for RecoveryEngine {
                 ActionResult::UpdateScreen(self.build_screen())
             }
             (RecoveryStep::CollectVouchers, UserAction::ActionPressed { ref action_id })
-                if action_id == "submit_proof" && self.threshold_met() =>
-            {
-                self.step = RecoveryStep::Complete;
-                ActionResult::UpdateScreen(self.build_screen())
-            }
-            (RecoveryStep::CollectVouchers, UserAction::ActionPressed { ref action_id })
                 if action_id == "cancel" =>
             {
                 self.step = RecoveryStep::Status;
                 self.collected_vouchers.clear();
+                self.voucher_input.clear();
+                self.voucher_error = None;
                 ActionResult::UpdateScreen(self.build_screen())
             }
 

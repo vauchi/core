@@ -309,3 +309,160 @@ fn create_voucher_from_claim_b64_requires_identity() {
     let result = wb.create_voucher_from_claim_b64(&b64(&claim.to_bytes()));
     assert!(matches!(result, Err(VauchiError::IdentityNotInitialized)));
 }
+
+// ============================================================
+// add_recovery_voucher_b64 — the recovering user's side (#877)
+// ============================================================
+
+/// Alice lost every device: her new identity claims the old one, and each
+/// helper knows the old identity as a contact.
+struct Recovery {
+    alice: Vauchi,
+    claim_b64: String,
+    helpers: Vec<Vauchi>,
+}
+
+fn recovery_with_helpers(names: &[&str]) -> Recovery {
+    let alice_old = Identity::create("Alice-Old", 0);
+    let alice = vauchi_with_identity("Alice-New");
+    let claim_b64 = alice
+        .create_recovery_claim_hex_b64(&hex::encode(alice_old.signing_public_key()))
+        .unwrap();
+    let helpers = names
+        .iter()
+        .map(|name| {
+            let helper = vauchi_with_identity(name);
+            add_contact(&helper, &alice_old, "Alice");
+            helper
+        })
+        .collect();
+    Recovery {
+        alice,
+        claim_b64,
+        helpers,
+    }
+}
+
+impl Recovery {
+    fn voucher_from(&self, helper: usize) -> String {
+        self.helpers[helper]
+            .create_voucher_from_claim_b64(&self.claim_b64)
+            .unwrap()
+    }
+
+    fn stored_voucher_count(&self) -> usize {
+        self.alice
+            .get_recovery_progress()
+            .unwrap()
+            .expect("a recovery in progress")
+            .voucher_count()
+    }
+}
+
+// @internal
+#[test]
+fn add_recovery_voucher_b64_counts_each_helpers_voucher() {
+    let recovery = recovery_with_helpers(&["Bob", "Carol"]);
+
+    let first = recovery
+        .alice
+        .add_recovery_voucher_b64(&recovery.voucher_from(0))
+        .unwrap();
+    let second = recovery
+        .alice
+        .add_recovery_voucher_b64(&format!("\n {}\t", recovery.voucher_from(1)))
+        .unwrap();
+
+    assert_eq!(first.voucher_count(), 1);
+    assert_eq!(second.voucher_count(), 2);
+    let signers: Vec<[u8; 32]> = second
+        .vouchers()
+        .iter()
+        .map(|v| *v.voucher_pk().as_bytes())
+        .collect();
+    let helpers: Vec<[u8; 32]> = recovery
+        .helpers
+        .iter()
+        .map(|h| *h.identity().unwrap().signing_public_key())
+        .collect();
+    assert_eq!(signers, helpers);
+    assert_eq!(
+        recovery.stored_voucher_count(),
+        2,
+        "the vouchers are stored, not only returned"
+    );
+}
+
+// @scenario: contact_recovery :: Reject duplicate vouchers
+#[test]
+fn add_recovery_voucher_b64_refuses_a_second_voucher_from_the_same_helper() {
+    let recovery = recovery_with_helpers(&["Bob"]);
+    recovery
+        .alice
+        .add_recovery_voucher_b64(&recovery.voucher_from(0))
+        .unwrap();
+
+    let again = recovery
+        .alice
+        .add_recovery_voucher_b64(&recovery.voucher_from(0));
+
+    assert!(
+        matches!(again, Err(VauchiError::InvalidState(_))),
+        "{again:?}"
+    );
+    assert_eq!(recovery.stored_voucher_count(), 1);
+}
+
+// @internal
+#[test]
+fn add_recovery_voucher_b64_refuses_a_voucher_for_another_claim() {
+    let recovery = recovery_with_helpers(&["Bob"]);
+    let other = recovery_with_helpers(&["Dave"]);
+
+    let result = recovery
+        .alice
+        .add_recovery_voucher_b64(&other.voucher_from(0));
+
+    assert!(
+        matches!(result, Err(VauchiError::InvalidState(_))),
+        "{result:?}"
+    );
+    assert_eq!(recovery.stored_voucher_count(), 0);
+}
+
+// @internal
+#[test]
+fn add_recovery_voucher_b64_refuses_input_that_is_no_voucher() {
+    let recovery = recovery_with_helpers(&[]);
+
+    for not_a_voucher in [
+        String::new(),
+        "!!!not-base64!!!".to_string(),
+        b64(&[0xFF; 8]),
+        recovery.claim_b64.clone(),
+        b64(&vec![0u8; 64 * 1024]),
+    ] {
+        let result = recovery.alice.add_recovery_voucher_b64(&not_a_voucher);
+
+        assert!(
+            matches!(result, Err(VauchiError::Serialization(_))),
+            "{not_a_voucher:.20?}: {result:?}"
+        );
+    }
+    assert_eq!(recovery.stored_voucher_count(), 0);
+}
+
+// @internal
+#[test]
+fn add_recovery_voucher_b64_needs_a_recovery_in_progress() {
+    let recovery = recovery_with_helpers(&["Bob"]);
+    let voucher = recovery.voucher_from(0);
+    let bystander = vauchi_with_identity("Eve");
+
+    let result = bystander.add_recovery_voucher_b64(&voucher);
+
+    assert!(
+        matches!(result, Err(VauchiError::InvalidState(_))),
+        "{result:?}"
+    );
+}

@@ -209,6 +209,9 @@ check:vendor-locales:
 # chapters cite (e2e, both relays) come from their mains. The last step
 # compares the vectors fixture with the spec's copy and only warns (exit
 # 3): a changed fixture needs spec and docs MRs, which follow this one.
+# It also runs the spec's annotation check against this checkout: a claim
+# must keep a test annotated `@claim: S<n>`, so deleting the last one fails
+# here (spec!13).
 check:spec-names:
   stage: lint
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
@@ -222,6 +225,8 @@ check:spec-names:
     - for r in spec e2e relay ohttp-relay; do wget -qO "/tmp/$r.tar.gz" "https://gitlab.com/vauchi/$r/-/archive/main/$r-main.tar.gz" || exit 1; tar -xzf "/tmp/$r.tar.gz" -C /tmp/roots || exit 1; done
     - sh /tmp/roots/spec-main/ci/check-claim-names.sh --self-test
     - for f in /tmp/roots/spec-main/src/claims.md /tmp/roots/spec-main/src/protocols/*.md; do sh /tmp/roots/spec-main/ci/check-claim-names.sh "$f" vauchi-app vauchi-cabi vauchi-core vauchi-hardware vauchi-platform vauchi-protocol /tmp/roots/e2e-main /tmp/roots/relay-main /tmp/roots/ohttp-relay-main || exit 1; done
+    - sh /tmp/roots/spec-main/ci/check-claim-annotations.sh --self-test
+    - sh /tmp/roots/spec-main/ci/check-claim-annotations.sh /tmp/roots/spec-main/src/claims.md vauchi-app vauchi-cabi vauchi-core vauchi-hardware vauchi-platform vauchi-protocol /tmp/roots/e2e-main || exit 1
     - 'cmp vauchi-core/tests/fixtures/test-vectors/vauchi-protocol-vectors-v1.json /tmp/roots/spec-main/src/vectors/vauchi-protocol-vectors-v1.json || { echo "WARN: the vectors fixture differs from the copy in the spec. After this merges, open spec (src/vectors/) and docs (src/developers/test-vectors/) MRs with the new file."; exit 3; }'
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"

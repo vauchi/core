@@ -13,6 +13,7 @@
 //! `2026-06-09-storage-per-domain-store-boundaries`.
 
 mod activity_log;
+mod card_ordering;
 mod consent;
 mod contact;
 mod contact_display;

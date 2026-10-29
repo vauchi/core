@@ -139,6 +139,7 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("recovery_progress", "progress_encrypted"),
     // V48 device-sync LWW field timestamps
     ("sync_field_timestamps", "timestamps_json_encrypted"),
+    ("peer_card_ordering", "state_encrypted"),
     // V49 owner-private contact tags (ADR-051)
     ("tags", "name_encrypted"),
     // V50 owner-private named places (ADR-051)
@@ -229,7 +230,7 @@ impl Storage {
         self.wal_checkpoint()?;
 
         let old_key = &self.encryption_key;
-        const TOTAL_TABLES: u32 = 32;
+        const TOTAL_TABLES: u32 = 33;
         let mut completed: u32 = 0;
 
         let report = |completed: &mut u32, table: &str| {
@@ -292,6 +293,9 @@ impl Storage {
 
             self.rekey_field_timestamps(old_key, &new_key)?;
             report(&mut completed, "field_timestamps");
+
+            self.rekey_nullable_column(old_key, &new_key, "peer_card_ordering", "state_encrypted")?;
+            report(&mut completed, "peer_card_ordering");
 
             self.rekey_sync_timestamps(old_key, &new_key)?;
             report(&mut completed, "sync_timestamps");

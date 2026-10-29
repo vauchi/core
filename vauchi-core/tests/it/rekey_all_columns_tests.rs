@@ -1103,6 +1103,8 @@ fn rekey_is_idempotent_under_repeated_calls() {
 /// "every column" claim cannot silently go stale again (it had, for seven
 /// columns, until vauchi/private#522).
 const COVERED_ELSEWHERE: &[(&str, &str)] = &[
+    // peer_card_ordering_survives_storage_key_rotation in sync_store_tests.rs.
+    ("peer_card_ordering", "state_encrypted"),
     // the_vcard_uid_lookup_survives_a_rekey in
     // identifying_columns_at_rest_tests.rs (value and lookup hash).
     ("contacts", "original_uid_encrypted"),
@@ -1146,6 +1148,6 @@ fn rekey_reports_progress_one_table_at_a_time() {
     let seen = seen.into_inner().unwrap();
     assert!(!seen.is_empty());
     for (step, (done, total)) in seen.iter().enumerate() {
-        assert_eq!((*done, *total), (step as u32 + 1, 32));
+        assert_eq!((*done, *total), (step as u32 + 1, 33));
     }
 }

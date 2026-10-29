@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 90] = [
+const MIGRATIONS: [Migration; 91] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -722,7 +722,20 @@ const MIGRATIONS: [Migration; 90] = [
         name: "duress_vocabulary",
         action: MigrationAction::Sql(MIGRATION_V90_DURESS_VOCABULARY),
     },
+    Migration {
+        version: 91,
+        name: "peer_card_ordering",
+        action: MigrationAction::Sql(MIGRATION_V91_PEER_CARD_ORDERING),
+    },
 ];
+
+/// Persistent per-contact ordering survives removed fields and device restarts.
+const MIGRATION_V91_PEER_CARD_ORDERING: &str = "
+    CREATE TABLE peer_card_ordering (
+        contact_id TEXT PRIMARY KEY REFERENCES contacts(id) ON DELETE CASCADE,
+        state_encrypted BLOB NOT NULL
+    );
+";
 
 /// Migration v90: the duress session's persistent twins of the vocabulary
 /// tables — the shape of `visibility_labels`, `contact_visibility_overrides`,

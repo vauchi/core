@@ -258,9 +258,8 @@ fn threshold_met_enables_submit() {
     assert!(submit.enabled, "submit should be enabled at threshold");
 }
 
-// @scenario: contact_recovery :: Submit proof transitions to complete
-#[test]
-fn submit_proof_transitions_to_complete() {
+/// An engine at CollectVouchers with three vouchers, the default threshold.
+fn collecting_at_threshold() -> RecoveryEngine {
     let mut engine = quorum_met();
     engine.set_claim_data([0xAB; 32]);
     let _ = engine.handle_action(UserAction::ActionPressed {
@@ -272,45 +271,47 @@ fn submit_proof_transitions_to_complete() {
     engine.add_voucher_for_testing("Alice");
     engine.add_voucher_for_testing("Bob");
     engine.add_voucher_for_testing("Carol");
+    engine
+}
 
-    let result = engine.handle_action(UserAction::ActionPressed {
+fn shows_complete(screen: &ScreenModel) -> bool {
+    screen.components.iter().any(|c| {
+        matches!(
+            c,
+            Component::StatusIndicator { id, status, .. }
+                if id == "recovery_complete" && *status == Status::Success
+        )
+    })
+}
+
+// Only the relay taking the proof completes a recovery: the AppEngine
+// intercept uploads it and then applies ProofSubmitted. The engine alone
+// used to show Complete with nothing sent (private#877 review).
+// @scenario: contact_recovery :: Submit proof transitions to complete
+#[test]
+fn submit_proof_completes_only_once_the_proof_is_submitted() {
+    let mut engine = collecting_at_threshold();
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "submit_proof".into(),
     });
+    assert!(
+        !shows_complete(&engine.current_screen()),
+        "submit_proof alone must not show Complete"
+    );
 
-    match result {
-        ActionResult::UpdateScreen(screen) => {
-            let has_success = screen.components.iter().any(|c| {
-                matches!(
-                    c,
-                    Component::StatusIndicator { status, .. }
-                        if *status == Status::Success
-                )
-            });
-            assert!(has_success, "should show success status");
-            let has_done = screen.contextual_actions.iter().any(|a| a.id == "done");
-            assert!(has_done, "should have done action");
-        }
-        other => panic!("Expected UpdateScreen, got {other:?}"),
-    }
+    assert!(engine.apply_update(EngineUpdate::Recovery(RecoveryUpdate::ProofSubmitted)));
+
+    let screen = engine.current_screen();
+    assert!(shows_complete(&screen));
+    assert!(screen.contextual_actions.iter().any(|a| a.id == "done"));
 }
 
 // @scenario: contact_recovery :: Done from complete returns Complete
 #[test]
 fn done_from_complete_returns_complete() {
-    let mut engine = quorum_met();
-    engine.set_claim_data([0xAB; 32]);
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "start_recovery".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "wait_for_voucher".into(),
-    });
-    engine.add_voucher_for_testing("Alice");
-    engine.add_voucher_for_testing("Bob");
-    engine.add_voucher_for_testing("Carol");
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "submit_proof".into(),
-    });
+    let mut engine = collecting_at_threshold();
+    assert!(engine.apply_update(EngineUpdate::Recovery(RecoveryUpdate::ProofSubmitted)));
 
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "done".into(),
@@ -319,6 +320,44 @@ fn done_from_complete_returns_complete() {
         matches!(result, ActionResult::Complete),
         "done should return Complete"
     );
+}
+
+// A voucher pasted but not added, and the refusal shown for it, do not
+// come back when collecting starts again (private#877 review).
+// @internal
+#[test]
+fn cancel_while_collecting_drops_the_pasted_voucher_and_its_error() {
+    let mut engine = collecting_at_threshold();
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "voucher_input".into(),
+        value: "half a voucher".into(),
+    });
+    assert!(
+        engine.apply_update(EngineUpdate::Recovery(RecoveryUpdate::VoucherRefused(
+            "refused".into()
+        )))
+    );
+
+    for action_id in ["cancel", "start_recovery", "wait_for_voucher"] {
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: action_id.into(),
+        });
+    }
+
+    let input = engine
+        .current_screen()
+        .components
+        .into_iter()
+        .find_map(|c| match c {
+            Component::TextInput {
+                id,
+                value,
+                validation_error,
+                ..
+            } if id == "voucher_input" => Some((value, validation_error)),
+            _ => None,
+        });
+    assert_eq!(input, Some((String::new(), None)));
 }
 
 // @internal

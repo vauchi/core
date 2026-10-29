@@ -233,7 +233,10 @@ fn enough_vouchers_send_the_proof_to_the_relay() {
     );
 }
 
+// Gated like the success test: only there does the upload reach for the
+// closed port, so the failure has the cause this test names.
 // @internal
+#[cfg(feature = "testing")]
 #[test]
 fn a_proof_the_relay_cannot_take_keeps_the_vouchers() {
     // A closed port, so the upload fails by construction.

@@ -466,3 +466,73 @@ fn add_recovery_voucher_b64_needs_a_recovery_in_progress() {
         "{result:?}"
     );
 }
+
+// @internal
+#[test]
+fn add_recovery_voucher_b64_bounds_the_input_before_decoding_it() {
+    let recovery = recovery_with_helpers(&["Bob"]);
+    let padded_past_the_bound = format!("{}{}", recovery.voucher_from(0), " ".repeat(5000));
+
+    let too_long = recovery.alice.add_recovery_voucher_b64(&"A".repeat(4097));
+    let padded = recovery
+        .alice
+        .add_recovery_voucher_b64(&padded_past_the_bound);
+
+    assert!(
+        matches!(&too_long, Err(VauchiError::Serialization(m)) if m.contains("4097") && m.contains("4096")),
+        "{too_long:?}"
+    );
+    assert_eq!(
+        padded.map(|progress| progress.voucher_count()).ok(),
+        Some(1),
+        "surrounding whitespace is trimmed before the bound applies"
+    );
+}
+
+// @internal
+#[test]
+fn add_recovery_voucher_b64_refuses_the_recovering_identitys_own_voucher() {
+    let recovery = recovery_with_helpers(&[]);
+    let claim = recovery
+        .alice
+        .parse_recovery_claim_b64(&recovery.claim_b64)
+        .unwrap();
+    // create_from_claim refuses this at construction, so sign it directly:
+    // a validly signed voucher from the claim's own new key.
+    let own = RecoveryVoucher::create(
+        *claim.old_pk(),
+        *claim.new_pk(),
+        recovery.alice.identity().unwrap().signing_keypair(),
+        None,
+        now(),
+    );
+
+    let result = recovery
+        .alice
+        .add_recovery_voucher_b64(&b64(&own.to_bytes()));
+
+    assert!(
+        matches!(result, Err(VauchiError::InvalidState(_))),
+        "{result:?}"
+    );
+    assert_eq!(recovery.stored_voucher_count(), 0);
+}
+
+// @internal
+#[test]
+fn add_recovery_voucher_b64_refuses_a_truncated_voucher() {
+    let recovery = recovery_with_helpers(&["Bob"]);
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(recovery.voucher_from(0))
+        .unwrap();
+
+    let result = recovery
+        .alice
+        .add_recovery_voucher_b64(&b64(&bytes[..bytes.len() / 2]));
+
+    assert!(
+        matches!(result, Err(VauchiError::Serialization(_))),
+        "{result:?}"
+    );
+    assert_eq!(recovery.stored_voucher_count(), 0);
+}

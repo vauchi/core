@@ -286,6 +286,13 @@ pub enum SyncItem {
         timestamp: u64,
     },
 
+    /// The identity is leaving Vauchi and its owner chose to wipe this
+    /// device too (#916): the receiver runs the emergency wipe at once.
+    WipeThisDevice {
+        /// Timestamp of this sync event.
+        timestamp: u64,
+    },
+
     /// Personal note for a contact was created or updated.
     ///
     /// Notes are private ("your eyes only") — never shared with the contact.
@@ -483,6 +490,7 @@ impl SyncItem {
             SyncItem::ContactTrustChanged { timestamp, .. } => *timestamp,
             SyncItem::DeletionScheduled { timestamp, .. } => *timestamp,
             SyncItem::DeletionCancelled { timestamp, .. } => *timestamp,
+            SyncItem::WipeThisDevice { timestamp } => *timestamp,
             SyncItem::PersonalNoteChanged { timestamp, .. } => *timestamp,
             SyncItem::PersonalNoteRemoved { timestamp, .. } => *timestamp,
             SyncItem::ContactFieldNoteChanged { timestamp, .. } => *timestamp,

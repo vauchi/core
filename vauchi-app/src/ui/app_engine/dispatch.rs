@@ -60,6 +60,22 @@ impl AppEngine {
     /// chrome action and the `AppForegrounded` lifecycle event so core owns the
     /// "sync on resume" decision exactly once (ADR-021).
     pub(super) fn sync_and_rerender(&mut self) -> ActionResult {
+        let had_identity = self.vauchi.identity().is_some();
+        self.sync_with_relay();
+        // A sibling's Leave Vauchi told this device to wipe; core wiped it
+        // during the sync (or now), so the app returns to setup (#916).
+        if let Err(error) = self.vauchi.apply_pending_wipe() {
+            tracing::error!(%error, "[Sync] Failed: wipe requested by another device");
+        }
+        if had_identity && self.vauchi.was_wiped_by_another_device() {
+            self.engine_cache.clear();
+            self.mark_storage_shredded();
+            return ActionResult::WipeComplete;
+        }
+        ActionResult::UpdateScreen(self.current_screen())
+    }
+
+    fn sync_with_relay(&mut self) {
         #[cfg(feature = "network-http")]
         {
             use std::time::{SystemTime, UNIX_EPOCH};
@@ -67,7 +83,7 @@ impl AppEngine {
             // return `NotConnected` without touching the network.
             if !self.vauchi.has_ohttp_key() && self.vauchi.connect().is_err() {
                 self.sync_chrome_status = SyncChromeStatus::Failed;
-                return ActionResult::UpdateScreen(self.current_screen());
+                return;
             }
             let now_unix = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -80,7 +96,6 @@ impl AppEngine {
                 Err(_) => SyncChromeStatus::Failed,
             };
         }
-        ActionResult::UpdateScreen(self.current_screen())
     }
 
     /// Syncs with the relay when Core's gate says one is due, so a platform
@@ -96,9 +111,12 @@ impl AppEngine {
             && !self.link_session_active()
         {
             // The screen it returns is not needed: on_wakeup re-presents
-            // after the heartbeat whenever the screen changed.
-            #[allow(clippy::let_underscore_must_use)]
-            let _ = self.sync_and_rerender();
+            // after the heartbeat whenever the screen changed. A wipe on a
+            // sibling's instruction has no screen to re-present (#916).
+            if matches!(self.sync_and_rerender(), ActionResult::WipeComplete) {
+                self.pending_commands
+                    .push_back(vauchi_core::Command::ResetApplication);
+            }
         }
     }
 

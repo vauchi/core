@@ -772,6 +772,13 @@ impl Vauchi {
                         .save_deletion_state(&state)
                         .map_err(|e| e.into())
                 }
+                SyncItem::WipeThisDevice { .. } => {
+                    // The wipe needs `&mut self`; it runs once the items
+                    // are applied (`apply_pending_wipe`, #916).
+                    self.wipe_requested
+                        .store(true, std::sync::atomic::Ordering::SeqCst);
+                    Ok(())
+                }
                 SyncItem::DeletionCancelled { .. } => self
                     .storage
                     .consent()
@@ -1031,6 +1038,8 @@ fn sync_item_event(item: &crate::sync::device_sync::SyncItem) -> Option<VauchiEv
             contact_id: contact_id.clone(),
         }),
         // No mapped invalidation event (no affected_screens entry today).
-        SyncItem::DeletionScheduled { .. } | SyncItem::DeletionCancelled { .. } => None,
+        SyncItem::DeletionScheduled { .. }
+        | SyncItem::DeletionCancelled { .. }
+        | SyncItem::WipeThisDevice { .. } => None,
     }
 }

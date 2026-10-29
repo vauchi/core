@@ -217,6 +217,11 @@ const SMK_KEY_NAME: &str = "smk";
 /// is retained for call-site compatibility but does not invoke the factory —
 /// connection management will be handled separately.
 pub struct Vauchi {
+    /// Another of the identity's devices told this one to wipe (#916);
+    /// set while sync items are applied, acted on by `apply_pending_wipe`.
+    wipe_requested: std::sync::atomic::AtomicBool,
+    /// This device was wiped on another device's instruction (#916).
+    wiped_by_another_device: bool,
     config: VauchiConfig,
     identity: Option<Identity>,
     storage: Storage,
@@ -420,6 +425,8 @@ impl Vauchi {
             delayed_ohttp: crate::network::DelayedRequests::shared(),
             #[cfg(feature = "network-http")]
             next_sync_allowed: None,
+            wipe_requested: std::sync::atomic::AtomicBool::new(false),
+            wiped_by_another_device: false,
             #[cfg(feature = "network-http")]
             last_exchange_time: None,
             last_sync_unix_seconds: None,
@@ -606,6 +613,8 @@ impl Vauchi {
             delayed_ohttp: crate::network::DelayedRequests::shared(),
             #[cfg(feature = "network-http")]
             next_sync_allowed: None,
+            wipe_requested: std::sync::atomic::AtomicBool::new(false),
+            wiped_by_another_device: false,
             #[cfg(feature = "network-http")]
             last_exchange_time: None,
             last_sync_unix_seconds: None,

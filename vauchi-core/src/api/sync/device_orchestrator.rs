@@ -746,6 +746,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             }
             SyncItem::DeletionScheduled { .. } => "deletion:scheduled".to_string(),
             SyncItem::DeletionCancelled { .. } => "deletion:cancelled".to_string(),
+            SyncItem::WipeThisDevice { .. } => "deletion:wipe_this_device".to_string(),
             SyncItem::PersonalNoteChanged { contact_id, .. }
             | SyncItem::PersonalNoteRemoved { contact_id, .. } => {
                 format!("personal_note:{}", contact_id)

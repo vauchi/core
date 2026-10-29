@@ -50,4 +50,25 @@ impl Vauchi {
         });
         Ok(())
     }
+
+    /// Runs the emergency wipe when another of the identity's devices told
+    /// this one to (#916); `sync` calls it once the received items are
+    /// applied. Returns whether this device was wiped.
+    pub fn apply_pending_wipe(&mut self) -> VauchiResult<bool> {
+        if !self
+            .wipe_requested
+            .swap(false, std::sync::atomic::Ordering::SeqCst)
+        {
+            return Ok(false);
+        }
+        self.perform_emergency_wipe(true)?;
+        self.wiped_by_another_device = true;
+        Ok(true)
+    }
+
+    /// Whether this device was wiped on another device's instruction, so
+    /// the app can return to setup (#916).
+    pub fn was_wiped_by_another_device(&self) -> bool {
+        self.wiped_by_another_device
+    }
 }

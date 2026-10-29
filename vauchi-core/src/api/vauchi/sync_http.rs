@@ -67,6 +67,14 @@ impl Vauchi {
     /// 4. Return combined outcome.
     #[tracing::instrument(level = "info", skip_all, name = "vauchi.sync")]
     pub fn sync(&mut self) -> VauchiResult<VauchiSyncOutcome> {
+        let outcome = self.sync_gated();
+        // A received WipeThisDevice wipes this device now, whatever else
+        // the sync did (#916).
+        self.apply_pending_wipe()?;
+        outcome
+    }
+
+    fn sync_gated(&mut self) -> VauchiResult<VauchiSyncOutcome> {
         if self.identity.is_none() {
             return Ok(VauchiSyncOutcome::NoIdentity);
         }

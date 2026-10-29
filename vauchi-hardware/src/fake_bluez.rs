@@ -12,10 +12,8 @@
 use futures_util::StreamExt;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
-use std::os::unix::fs::DirBuilderExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use zbus::message::Type;
@@ -53,7 +51,7 @@ impl Default for Script {
 
 pub struct FakeBlueZ {
     daemon: Child,
-    directory: BusDirectory,
+    socket: PathBuf,
     bluez: Connection,
     pub calls: mpsc::UnboundedReceiver<Call>,
     scanner: mpsc::UnboundedReceiver<String>,
@@ -62,9 +60,13 @@ pub struct FakeBlueZ {
 }
 
 impl FakeBlueZ {
-    pub async fn start(script: Script) -> Self {
-        let directory = BusDirectory::create();
-        let socket = directory.0.join("bus");
+    /// Starts the private bus with its socket in `directory`, which the
+    /// caller owns and keeps until the fake is dropped: a fresh
+    /// `tempfile::tempdir()`, never a predictable path (semgrep
+    /// `vauchi-no-env-temp-dir`). Taking it keeps tempfile out of this
+    /// crate's dependencies (VRS06).
+    pub async fn start(script: Script, directory: &Path) -> Self {
+        let socket = directory.join("bus");
         let mut daemon = Command::new("dbus-daemon")
             .args(["--session", "--nofork", "--print-address=1"])
             .arg(format!("--address=unix:path={}", socket.display()))
@@ -99,7 +101,7 @@ impl FakeBlueZ {
         let responder = tokio::spawn(respond(bluez.clone(), script, calls_tx, scanner_tx));
         Self {
             daemon,
-            directory,
+            socket,
             bluez,
             calls,
             scanner,
@@ -109,7 +111,7 @@ impl FakeBlueZ {
     }
 
     pub fn socket(&self) -> PathBuf {
-        self.directory.0.join("bus")
+        self.socket.clone()
     }
 
     pub async fn device_found(&self, address: &str, rssi: i16, uuids: &[&str]) {
@@ -177,33 +179,6 @@ impl Drop for FakeBlueZ {
         self.responder.abort();
         let _ = self.daemon.kill();
         let _ = self.daemon.wait();
-    }
-}
-
-/// The private bus's socket lives here, owner-only, removed with the fake.
-/// Plain `std` because the crate's dependencies are ratified one by one
-/// (VRS06), and a test helper is no reason to widen them.
-struct BusDirectory(PathBuf);
-
-impl BusDirectory {
-    fn create() -> Self {
-        static NEXT: AtomicU64 = AtomicU64::new(0);
-        let path = std::env::temp_dir().join(format!(
-            "vauchi-fake-bluez-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        std::fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&path)
-            .unwrap();
-        Self(path)
-    }
-}
-
-impl Drop for BusDirectory {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
     }
 }
 

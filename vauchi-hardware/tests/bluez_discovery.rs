@@ -4,11 +4,42 @@
 #![cfg(target_os = "linux")]
 
 use std::num::NonZeroUsize;
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use tempfile::TempDir;
 use vauchi_core::platform::executor::InboxLimits;
 use vauchi_core::platform::{BleAdvertisementObservation, BleServiceUuid, Event};
 use vauchi_hardware::fake_bluez::{Call, FakeBlueZ, Script};
 use vauchi_hardware::{BleScanner, BlueZDiscovery};
+
+/// The fake with the directory its socket lives in; the fields drop in
+/// order, so the bus stops before its directory is removed.
+struct Bus {
+    bluez: FakeBlueZ,
+    _directory: TempDir,
+}
+
+impl Deref for Bus {
+    type Target = FakeBlueZ;
+    fn deref(&self) -> &FakeBlueZ {
+        &self.bluez
+    }
+}
+
+impl DerefMut for Bus {
+    fn deref_mut(&mut self) -> &mut FakeBlueZ {
+        &mut self.bluez
+    }
+}
+
+async fn start(script: Script) -> Bus {
+    let directory = tempfile::tempdir().unwrap();
+    let bluez = FakeBlueZ::start(script, directory.path()).await;
+    Bus {
+        bluez,
+        _directory: directory,
+    }
+}
 
 const SERVICE: &str = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
 const SERVICE_BYTES: [u8; 16] = [
@@ -54,8 +85,8 @@ fn hardware_error() -> Event {
     }
 }
 
-async fn scanning(script: Script) -> (FakeBlueZ, BleScanner) {
-    let mut bluez = FakeBlueZ::start(script).await;
+async fn scanning(script: Script) -> (Bus, BleScanner) {
+    let mut bluez = start(script).await;
     let mut scanner = scanner(&bluez);
     scanner.start(SERVICE.into()).unwrap();
     assert_eq!(
@@ -186,7 +217,7 @@ async fn a_lost_bus_connection_is_reported_as_a_failure_not_an_empty_scan() {
 }
 
 async fn failed_start(script: Script) -> Option<Event> {
-    let bluez = FakeBlueZ::start(script).await;
+    let bluez = start(script).await;
     let mut scanner = scanner(&bluez);
     scanner.start(SERVICE.into()).unwrap();
     let event = scanner.next_event().await;
@@ -252,7 +283,7 @@ async fn bluez_refusals_map_to_permission_unavailability_or_failure() {
 // @scenario: contact_exchange.feature :: Discover nearby Vauchi users via BLE
 #[tokio::test]
 async fn a_service_id_that_is_not_a_uuid_fails_before_touching_bluez() {
-    let mut bluez = FakeBlueZ::start(Script::default()).await;
+    let mut bluez = start(Script::default()).await;
     let mut scanner = scanner(&bluez);
     scanner.start("not-a-uuid".into()).unwrap();
     assert_eq!(scanner.next_event().await, Some(hardware_error()));

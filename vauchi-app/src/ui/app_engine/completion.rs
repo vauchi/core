@@ -391,6 +391,35 @@ impl AppEngine {
         }
     }
 
+    /// Removes the identity from this device (#915): wiped once the other
+    /// devices were told, or when the user erases anyway; otherwise the
+    /// Devices screen asks to retry or erase anyway, before anything is
+    /// wiped.
+    fn remove_from_this_device(&mut self, wipe_if_not_told: bool) -> ActionResult {
+        use vauchi_core::api::DeviceRemoval;
+        match self
+            .vauchi
+            .remove_identity_from_this_device(wipe_if_not_told)
+        {
+            Ok(DeviceRemoval::OtherDevicesNotTold) if !wipe_if_not_told => {
+                let _ = self
+                    .engine
+                    .apply_update(crate::ui::EngineUpdate::DeviceRemovalNotTold);
+                ActionResult::UpdateScreen(self.engine.current_screen())
+            }
+            Ok(_) => {
+                self.engine_cache.clear();
+                self.mark_storage_shredded();
+                ActionResult::WipeComplete
+            }
+            Err(_) => ActionResult::ShowToast {
+                message: self.t("privacy.remove_device.failed"),
+                undo_action_id: None,
+                undo_label: None,
+            },
+        }
+    }
+
     fn emergency_wipe(&mut self) -> ActionResult {
         match self.vauchi.perform_emergency_wipe(true) {
             Ok(_) => {
@@ -662,7 +691,12 @@ impl AppEngine {
         // Read the confirmed index from the engine before navigating away
         let revoke_index = match self.engine.engine_output() {
             Some(crate::ui::EngineOutput::DeviceManagement {
+                remove_this_device: Some(wipe_if_not_told),
+                ..
+            }) => return self.remove_from_this_device(wipe_if_not_told),
+            Some(crate::ui::EngineOutput::DeviceManagement {
                 confirmed_revoke_index,
+                ..
             }) => confirmed_revoke_index,
             other => {
                 tracing::warn!(

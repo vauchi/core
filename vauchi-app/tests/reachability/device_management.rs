@@ -28,7 +28,9 @@ use vauchi_app::ui::{DeviceListItem, DeviceManagementEngine, WorkflowEngine};
 /// Action ids the base `device_management` screen emits and
 /// `DeviceManagementEngine::handle_action` consumes —
 /// `core/vauchi-app/src/ui/device_management.rs`.
-const HANDLED: &[&str] = &["link_device", "revoke_device"];
+/// `remove_this_device` opens the removal steps (#915), whose own screens
+/// the inline tests in `device_management_removal.rs` cover.
+const HANDLED: &[&str] = &["link_device", "revoke_device", "remove_this_device"];
 
 fn engine() -> DeviceManagementEngine {
     // Current device + one revocable + one already-revoked: the

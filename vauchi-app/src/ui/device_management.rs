@@ -27,6 +27,12 @@ pub struct DeviceManagementEngine {
     pending_revoke_index: Option<u32>,
     /// Set after the user confirms revocation. Read by app engine in `handle_completion`.
     confirmed_revoke_index: Option<u32>,
+    /// The step of removing the identity from this device, if started (#915).
+    removal: Option<removal::RemovalStep>,
+    typed_confirmation: String,
+    confirmation_error: Option<String>,
+    /// Set when the removal is handed over: `Some(wipe_if_not_told)`.
+    remove_this_device: Option<bool>,
     locale: Locale,
 }
 
@@ -36,6 +42,10 @@ impl DeviceManagementEngine {
             devices,
             pending_revoke_index: None,
             confirmed_revoke_index: None,
+            removal: None,
+            typed_confirmation: String::new(),
+            confirmation_error: None,
+            remove_this_device: None,
             locale: Locale::ENGLISH,
         }
     }
@@ -57,6 +67,9 @@ impl DeviceManagementEngine {
     }
 
     fn build_screen(&self) -> ScreenModel {
+        if let Some(step) = self.removal {
+            return self.removal_screen(step);
+        }
         let mut components = Vec::new();
 
         let items: Vec<ActionListItem> = self
@@ -157,6 +170,13 @@ impl DeviceManagementEngine {
                     enabled: can_revoke,
                     a11y: None,
                 },
+                ScreenAction {
+                    id: "remove_this_device".into(),
+                    label: self.t("privacy.remove_device"),
+                    style: ActionStyle::Serious,
+                    enabled: true,
+                    a11y: Some(A11y::labeled(self.t("privacy.remove_device"))),
+                },
             ],
             progress: None,
             ..Default::default()
@@ -168,6 +188,7 @@ impl WorkflowEngine for DeviceManagementEngine {
     fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
         Some(crate::ui::EngineOutput::DeviceManagement {
             confirmed_revoke_index: self.confirmed_revoke_index(),
+            remove_this_device: self.remove_this_device,
         })
     }
 
@@ -175,8 +196,24 @@ impl WorkflowEngine for DeviceManagementEngine {
         self.build_screen()
     }
 
+    fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
+        match update {
+            crate::ui::EngineUpdate::DeviceRemovalNotTold => {
+                self.removal_not_told();
+                true
+            }
+            _ => false,
+        }
+    }
+
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
+        if self.removal.is_some() {
+            return self.handle_removal_action(action);
+        }
         match action {
+            UserAction::ActionPressed { ref action_id } if action_id == "remove_this_device" => {
+                self.start_removal()
+            }
             UserAction::ActionPressed { ref action_id } if action_id == "link_device" => {
                 ActionResult::StartDeviceLink {
                     role: DeviceLinkRole::Initiator,

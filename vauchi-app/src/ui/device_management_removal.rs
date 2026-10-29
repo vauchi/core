@@ -8,6 +8,195 @@
 //! guard). With no other active device it explains instead; when the
 //! other devices could not be told it offers a retry or erasing anyway.
 
+use super::*;
+
+/// The typed token stays the literal WIPE in every locale, as on the shred
+/// screen, whose label key this reuses.
+const CONFIRMATION_WORD: &str = "WIPE";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum RemovalStep {
+    Confirm,
+    OnlyDevice,
+    NotTold,
+}
+
+impl DeviceManagementEngine {
+    fn has_other_active_device(&self) -> bool {
+        self.devices.iter().any(|d| !d.is_current && d.is_active)
+    }
+
+    pub(super) fn start_removal(&mut self) -> ActionResult {
+        self.removal = Some(if self.has_other_active_device() {
+            RemovalStep::Confirm
+        } else {
+            RemovalStep::OnlyDevice
+        });
+        self.typed_confirmation.clear();
+        self.confirmation_error = None;
+        ActionResult::UpdateScreen(self.build_screen())
+    }
+
+    pub(super) fn removal_not_told(&mut self) {
+        self.removal = Some(RemovalStep::NotTold);
+        self.remove_this_device = None;
+    }
+
+    pub(super) fn handle_removal_action(&mut self, action: UserAction) -> ActionResult {
+        match action {
+            UserAction::ActionPressed { ref action_id }
+                if action_id == "cancel_remove_this_device" =>
+            {
+                self.removal = None;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            UserAction::TextChanged {
+                ref component_id,
+                value,
+            } if component_id == "confirmation" => {
+                self.typed_confirmation = value;
+                self.confirmation_error = None;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            UserAction::ActionPressed { ref action_id }
+                if action_id == "confirm_remove_this_device" =>
+            {
+                if self
+                    .typed_confirmation
+                    .trim()
+                    .eq_ignore_ascii_case(CONFIRMATION_WORD)
+                {
+                    self.remove_this_device = Some(false);
+                    ActionResult::Complete
+                } else {
+                    let message = self.t("shred.wipe.wrong_word");
+                    self.confirmation_error = Some(message.clone());
+                    ActionResult::ValidationError {
+                        component_id: "confirmation".into(),
+                        message,
+                    }
+                }
+            }
+            UserAction::ActionPressed { ref action_id }
+                if action_id == "retry_remove_this_device" =>
+            {
+                self.remove_this_device = Some(false);
+                ActionResult::Complete
+            }
+            UserAction::ActionPressed { ref action_id }
+                if action_id == "erase_anyway_this_device" =>
+            {
+                self.remove_this_device = Some(true);
+                ActionResult::Complete
+            }
+            _ => ActionResult::UpdateScreen(self.build_screen()),
+        }
+    }
+
+    fn removal_panel(&self, title_key: &str, detail_key: &str) -> Component {
+        Component::InfoPanel {
+            id: "remove_this_device_detail".into(),
+            icon: Some("warning".into()),
+            title: self.t(title_key),
+            items: vec![InfoItem {
+                icon: Some("warning".into()),
+                title: self.t("privacy.remove_device"),
+                detail: self.t(detail_key),
+            }],
+            a11y: None,
+        }
+    }
+
+    fn removal_action(&self, id: &str, label_key: &str, style: ActionStyle) -> ScreenAction {
+        ScreenAction {
+            id: id.into(),
+            label: self.t(label_key),
+            style,
+            enabled: true,
+            a11y: Some(A11y::labeled(self.t(label_key))),
+        }
+    }
+
+    pub(super) fn removal_screen(&self, step: RemovalStep) -> ScreenModel {
+        match step {
+            RemovalStep::Confirm => {
+                let label = self.t("shred.wipe.type_wipe");
+                ScreenModel {
+                    screen_id: "confirm_remove_this_device".into(),
+                    title: self.t("privacy.remove_device.title"),
+                    subtitle: None,
+                    components: vec![
+                        self.removal_panel(
+                            "privacy.remove_device.title",
+                            "privacy.remove_device.detail",
+                        ),
+                        Component::TextInput {
+                            id: "confirmation".into(),
+                            label: label.clone(),
+                            value: self.typed_confirmation.clone(),
+                            placeholder: None,
+                            max_length: None,
+                            validation_error: self.confirmation_error.clone(),
+                            input_type: InputType::Text,
+                            a11y: Some(A11y::labeled(label)),
+                            info_key: None,
+                        },
+                        Component::InlineConfirm {
+                            id: "remove_this_device".into(),
+                            warning: self.t("privacy.remove_device.detail"),
+                            confirm_text: self.t("privacy.remove_device.confirm"),
+                            cancel_text: self.t("action.cancel"),
+                            confirm_action_id: "confirm_remove_this_device".into(),
+                            cancel_action_id: "cancel_remove_this_device".into(),
+                            destructive: true,
+                            a11y: None,
+                        },
+                    ],
+                    contextual_actions: vec![],
+                    ..Default::default()
+                }
+            }
+            RemovalStep::OnlyDevice => ScreenModel {
+                screen_id: "remove_this_device_only".into(),
+                title: self.t("privacy.remove_device.only_title"),
+                subtitle: None,
+                components: vec![self.removal_panel(
+                    "privacy.remove_device.only_title",
+                    "privacy.remove_device.only_detail",
+                )],
+                contextual_actions: vec![self.removal_action(
+                    "cancel_remove_this_device",
+                    "action.cancel",
+                    ActionStyle::Secondary,
+                )],
+                ..Default::default()
+            },
+            RemovalStep::NotTold => ScreenModel {
+                screen_id: "remove_this_device_not_told".into(),
+                title: self.t("privacy.remove_device.not_told_title"),
+                subtitle: None,
+                components: vec![self.removal_panel(
+                    "privacy.remove_device.not_told_title",
+                    "privacy.remove_device.not_told_detail",
+                )],
+                contextual_actions: vec![
+                    self.removal_action(
+                        "retry_remove_this_device",
+                        "privacy.remove_device.retry",
+                        ActionStyle::Primary,
+                    ),
+                    self.removal_action(
+                        "erase_anyway_this_device",
+                        "privacy.remove_device.erase_anyway",
+                        ActionStyle::Destructive,
+                    ),
+                ],
+                ..Default::default()
+            },
+        }
+    }
+}
+
 // INLINE_TEST_REQUIRED: Tests access the engine's private removal state
 #[cfg(test)]
 mod tests {

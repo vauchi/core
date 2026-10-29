@@ -81,8 +81,13 @@ pub enum EngineOutput {
     ChangePassword { current: String, new: String },
     /// Duress-PIN setup (PIN redacted in `Debug`).
     DuressPin(DuressPinSetup),
-    /// Device-management screen: index confirmed for revocation, if any.
-    DeviceManagement { confirmed_revoke_index: Option<u32> },
+    /// Device-management screen: index confirmed for revocation, if any,
+    /// and a request to remove the identity from this device
+    /// (`Some(wipe_if_not_told)`, #915).
+    DeviceManagement {
+        confirmed_revoke_index: Option<u32>,
+        remove_this_device: Option<bool>,
+    },
     /// Avatar-editor result (`Debug` prints the byte length only).
     AvatarEditor {
         removed: bool,
@@ -179,6 +184,9 @@ pub enum EngineUpdate {
     /// The PIN typed at a session PIN step was not the session's (#777).
     SessionPinRejected,
     GdprExport(GdprExportUpdate),
+    /// Removing the identity from this device could not tell the other
+    /// devices; nothing is wiped yet (#915).
+    DeviceRemovalNotTold,
 }
 
 /// Cycle-thread bridge updates for the multi-stage exchange engine.
@@ -452,6 +460,7 @@ impl EngineUpdate {
             Self::DeviceCapabilities(_) => "DeviceCapabilities",
             Self::BiometricUnlockPassed => "BiometricUnlockPassed",
             Self::SessionPinRejected => "SessionPinRejected",
+            Self::DeviceRemovalNotTold => "DeviceRemovalNotTold",
             Self::GdprExport(u) => match u {
                 GdprExportUpdate::Verified => "GdprExport::Verified",
                 GdprExportUpdate::PinRejected => "GdprExport::PinRejected",
@@ -644,9 +653,11 @@ impl std::fmt::Debug for EngineOutput {
             Self::DuressPin(s) => f.debug_tuple("DuressPin").field(s).finish(),
             Self::DeviceManagement {
                 confirmed_revoke_index,
+                remove_this_device,
             } => f
                 .debug_struct("DeviceManagement")
                 .field("confirmed_revoke_index", confirmed_revoke_index)
+                .field("remove_this_device", remove_this_device)
                 .finish(),
             Self::AvatarEditor { removed, avatar } => f
                 .debug_struct("AvatarEditor")

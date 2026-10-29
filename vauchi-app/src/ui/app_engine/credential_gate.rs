@@ -107,12 +107,17 @@ impl AppEngine {
     }
 
     /// Whether the device-management screen completed on a confirmed
-    /// revoke rather than on leaving.
+    /// revoke, or on removing the identity from this device (#915), rather
+    /// than on leaving.
     pub(super) fn revoke_is_confirmed(&self) -> bool {
         matches!(
             self.engine.engine_output(),
             Some(EngineOutput::DeviceManagement {
-                confirmed_revoke_index: Some(_)
+                confirmed_revoke_index: Some(_),
+                ..
+            }) | Some(EngineOutput::DeviceManagement {
+                remove_this_device: Some(_),
+                ..
             })
         )
     }

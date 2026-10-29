@@ -7,13 +7,26 @@
 //! maintainer decisions 2026-10-29).
 
 use vauchi_core::Vauchi;
-use vauchi_core::api::{DeletionChoice, DeletionManager};
+use vauchi_core::api::{DeletionChoice, DeletionManager, VauchiConfig};
+use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::sync::SyncItem;
 
 use crate::common::device_sync::{journal_for_tablet, link_tablet};
 
 fn phone() -> Vauchi {
     let mut wb = Vauchi::in_memory().unwrap();
+    wb.create_identity("Alice").unwrap();
+    wb
+}
+
+/// A phone whose relay addresses lead nowhere, so a sync it runs fails
+/// without leaving this machine (the default relay is production).
+fn offline_phone(dir: &tempfile::TempDir) -> Vauchi {
+    let config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
+        .with_storage_key(SymmetricKey::generate())
+        .with_relay_url("http://127.0.0.1:9")
+        .with_ohttp_relay_url("http://127.0.0.1:9");
+    let mut wb = Vauchi::new(config).unwrap();
     wb.create_identity("Alice").unwrap();
     wb
 }
@@ -110,7 +123,8 @@ fn without_the_instruction_nothing_is_wiped() {
 // @internal
 #[test]
 fn when_leaving_runs_with_the_wipe_choice_my_tablet_is_told_to_wipe() {
-    let mut wb = phone();
+    let dir = tempfile::tempdir().unwrap();
+    let mut wb = offline_phone(&dir);
     let (registry, tablet) = link_tablet(&wb, [43u8; 32]);
     wb.schedule_identity_deletion(LEAVE_AND_WIPE).unwrap();
 
@@ -126,7 +140,8 @@ fn when_leaving_runs_with_the_wipe_choice_my_tablet_is_told_to_wipe() {
 // @internal
 #[test]
 fn without_the_wipe_choice_no_device_is_told_to_wipe() {
-    let mut wb = phone();
+    let dir = tempfile::tempdir().unwrap();
+    let mut wb = offline_phone(&dir);
     let (registry, tablet) = link_tablet(&wb, [44u8; 32]);
     wb.schedule_identity_deletion(DeletionChoice::default())
         .unwrap();

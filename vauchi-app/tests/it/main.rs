@@ -236,6 +236,7 @@ mod own_field_cancel_tests;
 mod own_field_note_tests;
 mod readable_text_tests;
 mod reciprocity_confirmer_tests;
+#[cfg(feature = "testing")]
 mod recording_relay;
 mod recovery_claim_review_i18n_tests;
 mod recovery_claim_storage_tests;

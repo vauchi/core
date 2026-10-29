@@ -12,6 +12,7 @@ use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, Component, UserAction, 
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::{Contact, Identity, SymmetricKey, Vauchi, VauchiConfig};
 
+#[cfg(feature = "testing")]
 use crate::recording_relay::recording_relay;
 
 /// The recovery threshold a fresh identity starts with.
@@ -204,7 +205,10 @@ fn a_voucher_that_does_not_fit_is_refused_inline() {
     assert_eq!(alice.stored_voucher_count(), Some(0));
 }
 
+// The loopback relay is reached directly, which core allows only in its
+// `testing` build (`build_relay_transport`); production goes over OHTTP.
 // @scenario: contact_recovery :: Upload recovery proof to relay
+#[cfg(feature = "testing")]
 #[test]
 fn enough_vouchers_send_the_proof_to_the_relay() {
     let (relay_url, received) = recording_relay();

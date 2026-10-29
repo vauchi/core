@@ -230,14 +230,26 @@ fn responder_decodes_exchange_apdu_and_replies_with_status_terminated_response()
     assert_eq!(reply_apdus, vec![data]);
 }
 
+/// A reader shell reports the response to every frame it transmitted, in
+/// order (`Command::NfcActivate` docs); only the last one carries the peer's
+/// phase payload, the earlier ones (SELECT, chained chunks) just succeed.
 // @internal
 #[test]
-fn initiator_decodes_raw_response_and_frames_its_card_send() {
+fn initiator_decodes_the_last_response_to_its_frames_and_frames_its_card_send() {
     let mut alice = NfcExchangeFlow::new_initiator(make_identity("Alice"), "Alice".into());
     let mut bob = NfcExchangeFlow::new_responder(make_identity("Bob"), "Bob".into());
     let (offer, _) = activation_of(&alice.activate().expect("alice activate"));
     let _ = bob.activate().expect("bob activate");
     let (bob_response, _) = send_of(bob.handle_event(&Event::NfcDataReceived { data: offer }));
+
+    let select_answered = alice.handle_event(&Event::NfcApduReceived {
+        bytes: SW_SUCCESS.to_vec(),
+    });
+    assert!(
+        matches!(&select_answered, NfcHardwareOutcome::Consumed { commands } if commands.is_empty()),
+        "SELECT's response must not end the exchange, got {select_answered:?}"
+    );
+    assert_eq!(*alice.step(), NfcStep::AwaitingTap);
 
     let (card, apdus) = send_of(alice.handle_event(&Event::NfcApduReceived {
         bytes: bob_response,

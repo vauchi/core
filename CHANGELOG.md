@@ -8,6 +8,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.94.0] — 2026-10-29
+
+### Added
+
+- `Command::DirectSend` carries a `DirectEndpoint`: the DNS-SD service
+  type, port, fallback host and the browse and I/O deadlines for the USB
+  cable / local TCP swap. Shells execute it instead of their own
+  constants; JSON without the field decodes to Core's defaults
+  (vauchi/private#764).
+- `vauchi-hardware` shares its scripted BlueZ for hosts' tests behind the
+  `fake-bluez` feature; `FakeBlueZ::start` takes the socket directory from
+  the caller (vauchi/private#770).
+
+### Fixed
+
+- An NFC reader that reports every response, as `NfcActivate` asks, no
+  longer ends the exchange on SELECT's bare `90 00`: the initiator waits
+  for the response to its last frame (vauchi/private#764).
+
 ### Changed
 
 - The demo tips, their Dismiss action, the backup reminder toast and six

@@ -468,3 +468,6 @@ mod tests {
             .find(|item| item.id == target_id)
     }
 }
+
+#[path = "device_management_removal.rs"]
+mod removal;

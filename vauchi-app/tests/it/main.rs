@@ -135,6 +135,7 @@ mod exchange_location_capture_tests;
 mod exchange_tab_tests;
 mod no_read_receipt_tests;
 // Uses the testing-feature hooks (vauchi/private#271).
+mod deletion_device_sync_tests;
 mod deletion_recovery_choice_tests;
 #[cfg(feature = "testing")]
 mod exchange_mode_pictogram_tests;

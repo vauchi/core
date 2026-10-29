@@ -598,6 +598,10 @@ fn test_sync_item_enum_variant_names() {
 const DIRECT_SEND_COMMAND_V1: &str =
     r#"{"DirectSend":{"payload":[86,88,67,72],"is_initiator":true}}"#;
 
+/// Core decides where and how long a shell looks for the peer (#764); a
+/// shell executes these values and invents none of its own.
+const DIRECT_SEND_COMMAND_V2: &str = r#"{"DirectSend":{"payload":[86,88,67,72],"is_initiator":true,"endpoint":{"service_type":"_vauchi-exchange._tcp.local.","port":19283,"fallback_host":"127.0.0.1","browse_timeout_ms":5000,"io_timeout_ms":10000}}}"#;
+
 /// The single opaque direct-transport event the shell reports after a swap.
 const DIRECT_PAYLOAD_RECEIVED_EVENT_V1: &str =
     r#"{"DirectPayloadReceived":{"data":[86,88,67,72]}}"#;
@@ -609,8 +613,8 @@ const LEGACY_DIRECT_CARD_RECEIVED_EVENT_V1: &str =
 
 // @internal
 #[test]
-fn test_direct_send_command_wire_spelling_v1() {
-    use vauchi_core::Command;
+fn test_direct_send_command_v1_without_endpoint_decodes_to_cores_endpoint() {
+    use vauchi_core::{Command, DirectEndpoint};
 
     let cmd: Command = serde_json::from_str(DIRECT_SEND_COMMAND_V1).expect("decode DirectSend");
     assert_eq!(
@@ -618,11 +622,28 @@ fn test_direct_send_command_wire_spelling_v1() {
         Command::DirectSend {
             payload: b"VXCH".to_vec(),
             is_initiator: true,
+            endpoint: DirectEndpoint::default(),
+        }
+    );
+}
+
+// @internal
+#[test]
+fn test_direct_send_command_wire_spelling_v2() {
+    use vauchi_core::{Command, DirectEndpoint};
+
+    let cmd: Command = serde_json::from_str(DIRECT_SEND_COMMAND_V2).expect("decode DirectSend");
+    assert_eq!(
+        cmd,
+        Command::DirectSend {
+            payload: b"VXCH".to_vec(),
+            is_initiator: true,
+            endpoint: DirectEndpoint::default(),
         }
     );
 
     let reserialized: serde_json::Value = serde_json::to_value(&cmd).unwrap();
-    let golden: serde_json::Value = serde_json::from_str(DIRECT_SEND_COMMAND_V1).unwrap();
+    let golden: serde_json::Value = serde_json::from_str(DIRECT_SEND_COMMAND_V2).unwrap();
     assert_eq!(reserialized, golden);
 }
 

@@ -14,8 +14,10 @@ use super::Vauchi;
 pub enum DeviceRemoval {
     /// The other devices were sent this device's revocation.
     OtherDevicesTold,
-    /// The revocation could not be sent (offline); remove this device
-    /// from one of the other devices.
+    /// The revocation could not be sent (offline). Without
+    /// `wipe_if_not_told` the device is not wiped yet, so the user can try
+    /// again or erase anyway; with it the device is wiped, and the user
+    /// removes it from one of the other devices.
     OtherDevicesNotTold,
     /// Duress mode: the emergency wipe ran and nothing was sent.
     Wiped,
@@ -24,7 +26,9 @@ pub enum DeviceRemoval {
 impl Vauchi {
     /// Revokes this device, sends that to the identity's other devices in
     /// one sync, then wipes this device; contacts and the relay are not
-    /// told. In duress mode it is the emergency wipe and sends nothing.
+    /// told. When the sync fails it wipes only with `wipe_if_not_told`; a
+    /// retry sends the revocation already made. In duress mode it is the
+    /// emergency wipe and sends nothing.
     ///
     /// The sync runs outside the timing gate (maintainer decision
     /// 2026-10-29): the revocation must leave before the wipe destroys the
@@ -32,19 +36,43 @@ impl Vauchi {
     ///
     /// Errors, before wiping anything, if no identity is set or this is the
     /// identity's last active device (that is Leave Vauchi, #916).
-    pub fn remove_identity_from_this_device(&mut self) -> VauchiResult<DeviceRemoval> {
+    pub fn remove_identity_from_this_device(
+        &mut self,
+        wipe_if_not_told: bool,
+    ) -> VauchiResult<DeviceRemoval> {
         if self.in_duress_mode() {
             self.perform_emergency_wipe(true)?;
             return Ok(DeviceRemoval::Wiped);
         }
-        self.revoke_this_device()?;
+        if !self.this_device_is_revoked()? {
+            self.revoke_this_device()?;
+        }
         let told = self.sync_once_outside_the_gate();
+        if !told && !wipe_if_not_told {
+            return Ok(DeviceRemoval::OtherDevicesNotTold);
+        }
         self.perform_emergency_wipe(true)?;
         Ok(if told {
             DeviceRemoval::OtherDevicesTold
         } else {
             DeviceRemoval::OtherDevicesNotTold
         })
+    }
+
+    fn this_device_is_revoked(&self) -> VauchiResult<bool> {
+        let Some(identity) = self.identity.as_ref() else {
+            return Ok(false);
+        };
+        Ok(self
+            .storage
+            .device()
+            .load_device_registry()?
+            .and_then(|registry| {
+                registry
+                    .find_device(identity.device_id())
+                    .map(|device| device.revoked)
+            })
+            .unwrap_or(false))
     }
 
     #[cfg(feature = "network-http")]

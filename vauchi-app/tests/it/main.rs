@@ -275,4 +275,5 @@ mod sync_chrome_overlay_tests;
 mod system_locale_tests;
 mod update_overlay_tests;
 mod wakeup_sync_tests;
+mod wiped_by_another_device_tests;
 mod wire_humble_keys_tests;

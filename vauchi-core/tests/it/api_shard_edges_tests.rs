@@ -3,12 +3,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Small API edges a mutation shard found untested: the pending update
-//! count across contacts, the pre-signed error texts and the time a
-//! revocation is stamped with (vauchi/private#522).
+//! count across contacts and the time a revocation is stamped with
+//! (vauchi/private#522).
 
 use super::common::device_sync::create_test_contact;
 use super::common::helpers::create_vauchi_with_identity;
-use vauchi_core::api::PreSignedError;
 use vauchi_core::storage::{PendingUpdate, UpdateStatus};
 
 fn pending(id: &str, contact_id: &str) -> PendingUpdate {
@@ -42,23 +41,6 @@ fn the_pending_count_adds_up_every_contacts_queue() {
     }
 
     assert_eq!(wb.pending_update_count().unwrap(), 3);
-}
-
-// @internal
-#[test]
-fn pre_signed_errors_name_what_failed() {
-    assert_eq!(
-        PreSignedError::SerializationFailed("x".into()).to_string(),
-        "Serialization failed: x"
-    );
-    assert_eq!(
-        PreSignedError::DeserializationFailed("y".into()).to_string(),
-        "Deserialization failed: y"
-    );
-    assert_eq!(
-        PreSignedError::IoError("z".into()).to_string(),
-        "I/O error: z"
-    );
 }
 
 // @internal

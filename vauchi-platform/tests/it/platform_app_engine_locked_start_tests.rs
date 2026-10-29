@@ -294,7 +294,7 @@ fn starting_over_removes_the_old_identity_files_too() {
     let (engine, _keychain, confirm) = at_start_over_confirmation(&dir);
     let identity = dir.path().join("identity.json");
     let keys = dir.path().join("keys");
-    let pre_signed = vauchi_core::api::PreSignedShredMessages::file_path(dir.path());
+    let pre_signed = vauchi_core::api::legacy_pre_signed_file(dir.path());
     std::fs::write(&identity, b"old identity").unwrap();
     std::fs::create_dir_all(&keys).unwrap();
     std::fs::write(keys.join("old.key"), b"old key").unwrap();

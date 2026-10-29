@@ -163,7 +163,7 @@ pub enum WidgetConfirmationMode {
 mod tests {
     use super::*;
     use crate::api::deletion::DeletionManager;
-    use crate::api::pre_signed::PreSignedShredMessages;
+    use crate::api::pre_signed::legacy_pre_signed_file;
     use crate::crypto::SymmetricKey;
     use crate::storage::Storage;
     use crate::storage::secure::{MemoryKeyStorage, SecureStorage};
@@ -205,18 +205,6 @@ mod tests {
             "Expected Scheduled state, got {:?}",
             state
         );
-    }
-
-    #[test]
-    fn test_soft_shred_refreshes_pre_signed() {
-        let (dir, storage, secure_storage, identity) = setup_test_env();
-        let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-
-        let _token = manager.soft_shred().unwrap();
-
-        // Pre-signed file should exist
-        let path = PreSignedShredMessages::file_path(dir.path());
-        assert!(path.exists(), "Pre-signed messages file should be created");
     }
 
     #[test]
@@ -307,32 +295,19 @@ mod tests {
         assert!(secure_storage.load_key(SMK_KEY_NAME).unwrap().is_none());
     }
 
+    // @scenario: pre_signed_operations :: A shred removes pre-signed messages an older version stored
     #[test]
-    fn test_panic_shred_loads_pre_signed_before_key_destruction() {
+    fn test_panic_shred_removes_a_pre_signed_file_an_older_install_left() {
         let (dir, storage, secure_storage, identity) = setup_test_env();
-
-        // Create pre-signed messages file
-        let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
-        msgs.save(dir.path()).unwrap();
+        let legacy = legacy_pre_signed_file(dir.path());
+        std::fs::write(&legacy, b"pre-signed purge from an older version").unwrap();
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
         let report = manager.panic_shred().unwrap();
 
-        // Should succeed — pre-signed messages were loaded before key destruction
-        assert!(report.smk_destroyed);
         assert!(report.pre_signed_deleted);
-    }
-
-    #[test]
-    fn test_panic_shred_fallback_without_pre_signed() {
-        let (dir, storage, secure_storage, identity) = setup_test_env();
-
-        // Do NOT create pre-signed file — panic shred should fall back to fresh signing
-        let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let report = manager.panic_shred().unwrap();
-
-        // Should succeed even without pre-signed file
-        assert!(report.smk_destroyed);
+        assert!(!legacy.exists());
+        assert!(manager.verify_shred().pre_signed_absent);
     }
 
     #[test]

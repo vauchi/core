@@ -15,7 +15,7 @@
 use std::path::PathBuf;
 
 use crate::api::deletion::{DeletionError, DeletionManager};
-use crate::api::pre_signed::{PreSignedPurgeRequest, PreSignedShredMessages};
+use crate::api::pre_signed::{PreSignedPurgeRequest, legacy_pre_signed_file};
 use crate::identity::Identity;
 use crate::storage::secure::SecureStorage;
 use crate::storage::{DeletionState, Storage};
@@ -56,12 +56,9 @@ impl<'a> ShredManager<'a> {
     /// Phase 1: Soft Shred — schedule deletion with 7-day grace period.
     ///
     /// Delegates to DeletionManager for grace period tracking.
-    /// Refreshes pre-signed messages for later use by panic/hard shred.
     pub fn soft_shred(&self) -> Result<ShredToken, ShredError> {
         let dm = DeletionManager::new(self.storage);
         dm.schedule_deletion()?;
-
-        let _ = self.refresh_pre_signed_messages();
 
         Ok(ShredToken::new(self.storage.clock().unix_seconds()))
     }
@@ -186,7 +183,7 @@ impl<'a> ShredManager<'a> {
             .unwrap_or(true);
         let database_absent = !self.data_dir.join("vauchi.db").exists();
         let data_dir_absent = !self.data_dir.exists();
-        let pre_signed_absent = !PreSignedShredMessages::file_path(&self.data_dir).exists();
+        let pre_signed_absent = !legacy_pre_signed_file(&self.data_dir).exists();
 
         let all_clear = smk_absent
             && bootstrap_key_absent
@@ -278,7 +275,7 @@ impl<'a> ShredManager<'a> {
     }
 
     fn delete_pre_signed_file(&self) -> bool {
-        let path = PreSignedShredMessages::file_path(&self.data_dir);
+        let path = legacy_pre_signed_file(&self.data_dir);
         if path.exists() {
             // Use secure overwrite instead of bare remove_file (#200a)
             secure_overwrite_file(&path).is_ok()
@@ -293,11 +290,5 @@ impl<'a> ShredManager<'a> {
         } else {
             true
         }
-    }
-
-    fn refresh_pre_signed_messages(&self) -> bool {
-        let msgs =
-            PreSignedShredMessages::refresh(self.identity, self.storage.clock().unix_seconds());
-        msgs.save(&self.data_dir).is_ok()
     }
 }

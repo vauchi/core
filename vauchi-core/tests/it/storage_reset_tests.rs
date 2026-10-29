@@ -8,7 +8,7 @@
 
 use std::path::Path;
 
-use vauchi_core::api::PreSignedShredMessages;
+use vauchi_core::api::legacy_pre_signed_file;
 use vauchi_core::api::storage_reset::delete_unreadable_data;
 use vauchi_core::storage::{MemoryKeyStorage, SecureStorage};
 
@@ -22,7 +22,7 @@ fn install(dir: &Path) -> MemoryKeyStorage {
     ] {
         std::fs::write(dir.join(name), b"old").unwrap();
     }
-    std::fs::write(PreSignedShredMessages::file_path(dir), b"old purge").unwrap();
+    std::fs::write(legacy_pre_signed_file(dir), b"old purge").unwrap();
     std::fs::create_dir_all(dir.join("keys")).unwrap();
     std::fs::write(dir.join("keys").join("old.key"), b"old").unwrap();
     let keys = MemoryKeyStorage::new();

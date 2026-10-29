@@ -2,44 +2,24 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Pre-signed Shred Messages
+//! The relay purge an identity deletion sends, signed when it is sent.
 //!
-//! At identity creation, generates and stores pre-signed messages for
-//! emergency (panic) shred. Per DP-3, these messages are **not secret** —
-//! stored as an unencrypted file so they remain accessible even after
-//! SMK destruction.
-//!
-//! File location: `{data_dir}/pre_signed_shred.bin`
+//! The relay accepts a purge only within 60 s of its timestamp, so a purge
+//! signed in advance and stored is refused (vauchi/private#899), and an
+//! emergency wipe sends nothing (#910). The pre-signed messages earlier
+//! versions stored in `{data_dir}/pre_signed_shred.bin` are retired
+//! (#911); every shred still removes a file an older install left.
 
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
 use crate::identity::Identity;
-use crate::network::{DeletionStage, IdentityDeletionNotice};
 
-/// Pre-signed messages for emergency (panic) shred.
-///
-/// These messages are signed at identity creation and periodically refreshed.
-/// They enable panic shred to notify the relay and contacts even after all
-/// key material has been destroyed (DP-2: sign-before-destroy).
-///
-/// Stored unencrypted per DP-3: contains only public keys, timestamps,
-/// and signatures — no secret material.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PreSignedShredMessages {
-    /// Pre-signed IdentityDeletionNotice(Confirmed) for contacts.
-    pub deletion_notice: IdentityDeletionNotice,
-    /// Pre-signed purge request fields for the relay.
-    pub purge_request: PreSignedPurgeRequest,
-    /// When these messages were last generated/refreshed (unix seconds).
-    pub refreshed_at: u64,
-}
-
-/// Pre-signed relay purge request fields.
-///
-/// Contains all v2 fields needed by the relay's authenticated purge handler.
-/// The relay will verify the signature over (public_key || purge_token || timestamp).
+/// A relay purge request: the v2 fields the relay's authenticated purge
+/// handler verifies, a signature over
+/// `public_key || purge_token || timestamp`. The name predates #911; the
+/// request is signed at send time.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PreSignedPurgeRequest {
     /// Signing public key (Ed25519, 32 bytes).
@@ -53,128 +33,24 @@ pub struct PreSignedPurgeRequest {
 }
 
 impl PreSignedPurgeRequest {
-    /// A purge signed at `now` with a fresh one-time token. The relay accepts
-    /// a purge only within 60 s of its clock, so a shred signs the purge it
-    /// sends instead of sending a stored one (vauchi/private#899).
-    pub(crate) fn sign_now(identity: &Identity, now: u64) -> Self {
+    /// A purge signed at `now` with a fresh one-time token.
+    pub fn sign_now(identity: &Identity, now: u64) -> Self {
+        let public_key = *identity.signing_public_key();
         let purge_token: [u8; 32] = crate::crypto::random_bytes();
-        PreSignedShredMessages::sign_purge_request(
-            identity,
-            *identity.signing_public_key(),
+        let message = purge_signing_message(&public_key, &purge_token, now, false);
+        Self {
+            public_key,
+            signature: identity.sign(&message).as_bytes().to_vec(),
             purge_token,
-            now,
-        )
+            timestamp: now,
+        }
     }
 }
 
-/// File name for the pre-signed shred messages.
-const PRE_SIGNED_FILE_NAME: &str = "pre_signed_shred.bin";
-
-impl PreSignedShredMessages {
-    /// Generates pre-signed shred messages from the given identity.
-    ///
-    /// Creates:
-    /// 1. An IdentityDeletionNotice(Confirmed) signed by the identity
-    /// 2. A relay PurgeRequest with a random purge_token signed by the identity
-    pub fn generate(identity: &Identity, now: u64) -> Self {
-        let public_key = *identity.signing_public_key();
-
-        // Generate deletion notice: sign(public_key || stage_byte || timestamp)
-        let deletion_notice = Self::sign_deletion_notice(identity, public_key, now);
-
-        // Generate purge request: sign(public_key || purge_token || timestamp)
-        let purge_token: [u8; 32] = crate::crypto::random_bytes();
-
-        let purge_request = Self::sign_purge_request(identity, public_key, purge_token, now);
-
-        Self {
-            deletion_notice,
-            purge_request,
-            refreshed_at: now,
-        }
-    }
-
-    /// Refreshes the pre-signed messages with new timestamps and tokens.
-    ///
-    /// Should be called on each sync cycle or weekly, whichever comes first.
-    /// Regenerates the purge_token for replay prevention.
-    pub fn refresh(identity: &Identity, now: u64) -> Self {
-        Self::generate(identity, now)
-    }
-
-    /// Returns the file path for the pre-signed shred messages.
-    pub fn file_path(data_dir: &Path) -> PathBuf {
-        data_dir.join(PRE_SIGNED_FILE_NAME)
-    }
-
-    /// Saves the pre-signed messages to disk (unencrypted per DP-3).
-    pub fn save(&self, data_dir: &Path) -> Result<(), PreSignedError> {
-        let path = Self::file_path(data_dir);
-        let data = postcard::to_allocvec(self)
-            .map_err(|e| PreSignedError::SerializationFailed(e.to_string()))?;
-        std::fs::write(&path, &data).map_err(|e| PreSignedError::IoError(e.to_string()))?;
-        Ok(())
-    }
-
-    /// Loads pre-signed messages from disk.
-    ///
-    /// This must work even after SMK destruction — the file is unencrypted.
-    pub fn load(data_dir: &Path) -> Result<Self, PreSignedError> {
-        let path = Self::file_path(data_dir);
-        let data = std::fs::read(&path).map_err(|e| PreSignedError::IoError(e.to_string()))?;
-        postcard::from_bytes(&data)
-            .map_err(|e| PreSignedError::DeserializationFailed(e.to_string()))
-    }
-
-    /// Signs an IdentityDeletionNotice(Confirmed).
-    ///
-    /// Signed message format: public_key || stage_byte || timestamp_be_bytes
-    fn sign_deletion_notice(
-        identity: &Identity,
-        public_key: [u8; 32],
-        timestamp: u64,
-    ) -> IdentityDeletionNotice {
-        let stage = DeletionStage::Confirmed;
-        let stage_byte = match stage {
-            DeletionStage::Pending => 0u8,
-            DeletionStage::Confirmed => 1u8,
-            DeletionStage::Cancelled => 2u8,
-        };
-
-        let mut message = Vec::with_capacity(32 + 1 + 8);
-        message.extend_from_slice(&public_key);
-        message.push(stage_byte);
-        message.extend_from_slice(&timestamp.to_be_bytes());
-
-        let signature = identity.sign(&message);
-
-        IdentityDeletionNotice {
-            stage,
-            public_key: crate::identifiers::IdentityKey::from(public_key),
-            timestamp,
-            signature: *signature.as_bytes(),
-        }
-    }
-
-    /// Signs a purge request.
-    ///
-    /// Signed message format: public_key || purge_token || timestamp_be_bytes
-    fn sign_purge_request(
-        identity: &Identity,
-        public_key: [u8; 32],
-        purge_token: [u8; 32],
-        timestamp: u64,
-    ) -> PreSignedPurgeRequest {
-        let message = purge_signing_message(&public_key, &purge_token, timestamp, false);
-        let signature = identity.sign(&message);
-
-        PreSignedPurgeRequest {
-            public_key,
-            signature: signature.as_bytes().to_vec(),
-            purge_token,
-            timestamp,
-        }
-    }
+/// Where versions before #911 stored their pre-signed messages; a shred
+/// removes the file, so nothing an older install left outlives it.
+pub fn legacy_pre_signed_file(data_dir: &Path) -> PathBuf {
+    data_dir.join("pre_signed_shred.bin")
 }
 
 /// Appended to a purge's signed message when it also erases the guardian
@@ -197,202 +73,4 @@ pub(crate) fn purge_signing_message(
         message.extend_from_slice(ERASE_GUARDIAN_SET_DOMAIN);
     }
     message
-}
-
-/// Errors from pre-signed message operations.
-#[derive(Debug)]
-#[non_exhaustive]
-pub enum PreSignedError {
-    /// Failed to serialize pre-signed messages.
-    SerializationFailed(String),
-    /// Failed to deserialize pre-signed messages.
-    DeserializationFailed(String),
-    /// File I/O error.
-    IoError(String),
-}
-
-impl std::fmt::Display for PreSignedError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::SerializationFailed(e) => write!(f, "Serialization failed: {}", e),
-            Self::DeserializationFailed(e) => write!(f, "Deserialization failed: {}", e),
-            Self::IoError(e) => write!(f, "I/O error: {}", e),
-        }
-    }
-}
-
-impl std::error::Error for PreSignedError {}
-
-// INLINE_TEST_REQUIRED: tests access private internals
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::crypto::signing::{PublicKey as CryptoPublicKey, Signature as CryptoSignature};
-
-    #[test]
-    fn test_generate_pre_signed_messages() {
-        let identity = Identity::create("Alice", 0);
-        let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
-
-        // Deletion notice should be Confirmed stage
-        assert_eq!(msgs.deletion_notice.stage, DeletionStage::Confirmed);
-        assert_eq!(
-            msgs.deletion_notice.public_key,
-            *identity.signing_public_key()
-        );
-        assert!(msgs.deletion_notice.timestamp > 0);
-
-        // Purge request should have matching public key
-        assert_eq!(
-            msgs.purge_request.public_key,
-            *identity.signing_public_key()
-        );
-        assert!(msgs.purge_request.timestamp > 0);
-        assert_eq!(msgs.purge_request.signature.len(), 64);
-    }
-
-    #[test]
-    fn test_deletion_notice_signature_valid() {
-        let identity = Identity::create("Bob", 0);
-        let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
-
-        let notice = &msgs.deletion_notice;
-
-        // Reconstruct the signed message
-        let stage_byte = 1u8; // Confirmed
-        let mut message = Vec::with_capacity(32 + 1 + 8);
-        message.extend_from_slice(notice.public_key.as_bytes());
-        message.push(stage_byte);
-        message.extend_from_slice(&notice.timestamp.to_be_bytes());
-
-        // Verify using ed25519-dalek via crypto module
-        let peer_key = CryptoPublicKey::from_bytes(notice.public_key.into_bytes());
-        let sig = CryptoSignature::from_bytes(notice.signature);
-        assert!(
-            peer_key.verify(&message, &sig),
-            "Deletion notice signature should be valid"
-        );
-    }
-
-    #[test]
-    fn test_purge_request_signature_valid() {
-        let identity = Identity::create("Charlie", 0);
-        let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
-
-        let purge = &msgs.purge_request;
-
-        // Reconstruct the signed message: public_key || purge_token || timestamp
-        let mut message = Vec::with_capacity(32 + 32 + 8);
-        message.extend_from_slice(&purge.public_key);
-        message.extend_from_slice(&purge.purge_token);
-        message.extend_from_slice(&purge.timestamp.to_be_bytes());
-
-        // Verify using ed25519-dalek via crypto module
-        let peer_key = CryptoPublicKey::from_bytes(purge.public_key);
-        let sig = CryptoSignature::from_bytes(
-            purge.signature.clone().try_into().expect("sig is 64 bytes"),
-        );
-        assert!(
-            peer_key.verify(&message, &sig),
-            "Purge request signature should be valid"
-        );
-    }
-
-    #[test]
-    fn test_save_and_load_roundtrip() {
-        let identity = Identity::create("Dave", 0);
-        let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
-
-        let dir = tempfile::tempdir().unwrap();
-        msgs.save(dir.path()).unwrap();
-
-        let loaded = PreSignedShredMessages::load(dir.path()).unwrap();
-        assert_eq!(
-            loaded.deletion_notice.public_key,
-            msgs.deletion_notice.public_key
-        );
-        assert_eq!(
-            loaded.deletion_notice.timestamp,
-            msgs.deletion_notice.timestamp
-        );
-        assert_eq!(
-            loaded.deletion_notice.signature,
-            msgs.deletion_notice.signature
-        );
-        assert_eq!(
-            loaded.purge_request.public_key,
-            msgs.purge_request.public_key
-        );
-        assert_eq!(
-            loaded.purge_request.purge_token,
-            msgs.purge_request.purge_token
-        );
-        assert_eq!(loaded.purge_request.signature, msgs.purge_request.signature);
-        assert_eq!(loaded.refreshed_at, msgs.refreshed_at);
-    }
-
-    #[test]
-    fn test_file_readable_without_encryption() {
-        let identity = Identity::create("Eve", 0);
-        let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
-
-        let dir = tempfile::tempdir().unwrap();
-        msgs.save(dir.path()).unwrap();
-
-        // File should exist and be readable as raw bytes
-        let path = PreSignedShredMessages::file_path(dir.path());
-        let raw = std::fs::read(&path).unwrap();
-        assert!(!raw.is_empty());
-
-        // Should deserialize from raw bytes
-        let loaded: PreSignedShredMessages = postcard::from_bytes(&raw).unwrap();
-        assert_eq!(loaded.deletion_notice.stage, DeletionStage::Confirmed);
-    }
-
-    #[test]
-    fn test_refresh_generates_new_purge_token() {
-        let identity = Identity::create("Frank", 0);
-        let msgs1 = PreSignedShredMessages::generate(&identity, 1_700_000_000);
-
-        // Small sleep to get different timestamp (if system clock is granular enough)
-        let msgs2 = PreSignedShredMessages::refresh(&identity, 1_700_000_000);
-
-        // Purge tokens should be different (random)
-        assert_ne!(
-            msgs1.purge_request.purge_token,
-            msgs2.purge_request.purge_token
-        );
-    }
-
-    #[test]
-    fn test_load_nonexistent_file_returns_error() {
-        let dir = tempfile::tempdir().unwrap();
-        let result = PreSignedShredMessages::load(dir.path());
-        result.expect_err("expected error");
-    }
-
-    #[test]
-    fn test_purge_request_compatible_with_relay_signature_format() {
-        // Verify the signature format matches what the relay expects:
-        // verify over (public_key || purge_token || timestamp_be_bytes)
-        let identity = Identity::create("Grace", 0);
-        let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
-
-        let purge = &msgs.purge_request;
-
-        // This is exactly how the relay's verify_purge_signature() constructs the message
-        let mut relay_message = Vec::with_capacity(32 + 32 + 8);
-        relay_message.extend_from_slice(&purge.public_key);
-        relay_message.extend_from_slice(&purge.purge_token);
-        relay_message.extend_from_slice(&purge.timestamp.to_be_bytes());
-
-        let peer_key = CryptoPublicKey::from_bytes(purge.public_key);
-        let sig = CryptoSignature::from_bytes(
-            purge.signature.clone().try_into().expect("sig is 64 bytes"),
-        );
-        assert!(
-            peer_key.verify(&relay_message, &sig),
-            "Signature must be verifiable using relay's message format"
-        );
-    }
 }

@@ -15,16 +15,15 @@
 //! It only requires a data directory path and a SecureStorage implementation.
 //! All tests use REAL crypto and REAL file operations — no mocking.
 
-use vauchi_core::api::{PreSignedShredMessages, WidgetConfirmationMode, widget_panic_shred};
+use vauchi_core::api::{WidgetConfirmationMode, legacy_pre_signed_file, widget_panic_shred};
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::identity::Identity;
 use vauchi_core::storage::Storage;
 use vauchi_core::storage::secure::{MemoryKeyStorage, SecureStorage};
 
 /// SMK key name used by the shred system.
 const SMK_KEY_NAME: &str = "smk";
 
-/// Helper: set up a realistic data directory with database, keys, identity, and pre-signed msgs.
+/// Helper: set up a realistic data directory with database, keys, identity file, and a legacy pre-signed file.
 fn setup_widget_test_env() -> (tempfile::TempDir, MemoryKeyStorage) {
     let dir = tempfile::tempdir().unwrap();
 
@@ -32,7 +31,6 @@ fn setup_widget_test_env() -> (tempfile::TempDir, MemoryKeyStorage) {
     let storage = Storage::open(&db_path, SymmetricKey::generate()).unwrap();
     drop(storage); // Close the connection
 
-    let identity = Identity::create("WidgetTestUser", 0);
     std::fs::write(
         dir.path().join("identity.json"),
         b"test identity data for widget",
@@ -45,8 +43,8 @@ fn setup_widget_test_env() -> (tempfile::TempDir, MemoryKeyStorage) {
     std::fs::write(keys_dir.join("key2"), b"secret key material 2").unwrap();
     std::fs::write(keys_dir.join("key3"), b"secret key material 3").unwrap();
 
-    let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
-    msgs.save(dir.path()).unwrap();
+    // An install from before #911 also left its pre-signed messages.
+    std::fs::write(legacy_pre_signed_file(dir.path()), b"pre-signed purge").unwrap();
 
     // Store SMK in secure storage
     let secure_storage = MemoryKeyStorage::new();
@@ -271,12 +269,12 @@ fn test_widget_panic_shred_destroys_smk() {
 
 /// A wipe removes a pre-signed file an older install left behind.
 // @scenario: emergency_shred :: Shred report tracks what was destroyed
-// @scenario: pre_signed_operations :: Pre-signed messages used during panic shred
+// @scenario: pre_signed_operations :: A shred removes pre-signed messages an older version stored
 #[test]
 fn test_widget_panic_shred_loads_pre_signed_before_destruction() {
     let (dir, secure_storage) = setup_widget_test_env();
 
-    let pre_signed_path = PreSignedShredMessages::file_path(dir.path());
+    let pre_signed_path = legacy_pre_signed_file(dir.path());
     assert!(
         pre_signed_path.exists(),
         "Pre-signed file should exist before shred"

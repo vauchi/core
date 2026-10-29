@@ -9,7 +9,7 @@
 
 use std::path::Path;
 
-use crate::api::pre_signed::PreSignedShredMessages;
+use crate::api::pre_signed::legacy_pre_signed_file;
 use crate::storage::secure::SecureStorage;
 
 use super::{BOOTSTRAP_KEY_NAME, SMK_KEY_NAME, ShredError, ShredReport};
@@ -71,29 +71,21 @@ pub(super) fn destroy_storage_keys(secure_storage: &dyn SecureStorage) -> bool {
 /// trigger a panic shred without opening the full app. It only requires
 /// the data directory path and a `SecureStorage` implementation.
 ///
-/// Follows the same 3-phase protocol as `ShredManager::panic_shred()`:
-///   1. Load pre-signed messages (if available, before destroying anything)
-///   2. Destroy all key material (SMK, identity, key files)
-///   3. Delete database, pre-signed file, and data directory
-///
-/// Network operations (relay purge, contact revocations) are NOT performed
-/// by the widget version — the widget has no network access. Pre-signed
-/// messages are loaded for future use by the relay cleanup daemon.
+/// Destroys what `ShredManager::panic_shred()` destroys, in the same order:
+/// key material (SMK, identity, key files) first, then the database, a
+/// pre-signed file an older install left, and the data directory. Like
+/// every emergency wipe it sends nothing (vauchi/private#910).
 pub fn widget_panic_shred(
     data_dir: &Path,
     secure_storage: &dyn SecureStorage,
 ) -> Result<ShredReport, ShredError> {
-    let mut report = ShredReport::default();
-
-    // ── Phase A: Load pre-signed messages while they exist ──
-    // We load these before destroying anything, per DP-2 (sign-before-destroy).
-    // The widget can't send them (no network), but loading confirms they exist.
-    let _pre_signed = PreSignedShredMessages::load(data_dir).ok();
-
-    // ── Phase B: Destroy all key material ──
+    // ── Phase A: Destroy all key material ──
 
     // 1. Destroy SMK from SecureStorage
-    report.smk_destroyed = destroy_storage_keys(secure_storage);
+    let mut report = ShredReport {
+        smk_destroyed: destroy_storage_keys(secure_storage),
+        ..ShredReport::default()
+    };
 
     // 2. Secure-delete identity backup file
     let identity_path = data_dir.join("identity.json");
@@ -123,7 +115,7 @@ pub fn widget_panic_shred(
         0
     };
 
-    // ── Phase C: Cleanup ──
+    // ── Phase B: Cleanup ──
 
     // 4. Secure-delete SQLite database + WAL/SHM
     let db_path = data_dir.join("vauchi.db");
@@ -141,7 +133,7 @@ pub fn widget_panic_shred(
     report.sqlite_destroyed = db_success;
 
     // 5. Delete pre-signed messages file (secure overwrite, #200a)
-    let pre_signed_path = PreSignedShredMessages::file_path(data_dir);
+    let pre_signed_path = legacy_pre_signed_file(data_dir);
     report.pre_signed_deleted = if pre_signed_path.exists() {
         secure_overwrite_file(&pre_signed_path).is_ok()
     } else {

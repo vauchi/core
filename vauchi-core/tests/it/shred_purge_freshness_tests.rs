@@ -82,7 +82,7 @@ fn device() -> Device {
     }
 }
 
-// @internal
+// @scenario: pre_signed_operations :: Identity deletion signs its purge when it sends it
 #[test]
 fn a_hard_shred_a_week_after_the_soft_shred_sends_a_purge_the_relay_accepts() {
     let d = device();
@@ -97,7 +97,7 @@ fn a_hard_shred_a_week_after_the_soft_shred_sends_a_purge_the_relay_accepts() {
     assert!(report.relay_purge_sent);
 }
 
-// @internal
+// @scenario: pre_signed_operations :: Scheduling a deletion stores no pre-signed messages
 #[test]
 fn a_soft_shred_stores_no_pre_signed_purge() {
     let d = device();

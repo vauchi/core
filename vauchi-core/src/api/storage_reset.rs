@@ -7,7 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::api::PreSignedShredMessages;
+use crate::api::legacy_pre_signed_file;
 use crate::storage::{SecureStorage, StorageError};
 
 /// Every secure-storage name that holds a key opening the database.
@@ -61,7 +61,7 @@ pub fn delete_unreadable_data(
     remove_file_if_present(storage_path)?;
     if let Some(dir) = storage_path.parent() {
         remove_file_if_present(&dir.join("identity.json"))?;
-        remove_file_if_present(&PreSignedShredMessages::file_path(dir))?;
+        remove_file_if_present(&legacy_pre_signed_file(dir))?;
         let keys = dir.join("keys");
         if keys.exists() {
             std::fs::remove_dir_all(&keys).map_err(remove_error)?;

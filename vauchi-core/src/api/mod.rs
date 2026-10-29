@@ -133,7 +133,7 @@ pub use heirloom::{
 };
 
 // Pre-signed shred messages
-pub use pre_signed::{PreSignedError, PreSignedPurgeRequest, PreSignedShredMessages};
+pub use pre_signed::{PreSignedPurgeRequest, legacy_pre_signed_file};
 
 // Shred Manager
 pub use shred::{

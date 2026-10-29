@@ -219,9 +219,12 @@ impl From<Command> for MobileCommand {
                 slot_hash,
             },
             Command::ShowShareSheet { url } => Self::ShowShareSheet { url },
+            // Mobile apps keep their own listener constants until their
+            // own migration (#762); the endpoint is for the dialling side.
             Command::DirectSend {
                 payload,
                 is_initiator,
+                ..
             } => Self::DirectSend {
                 payload,
                 is_initiator,

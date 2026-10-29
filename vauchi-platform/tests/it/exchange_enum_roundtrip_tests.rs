@@ -17,6 +17,7 @@ fn direct_send_roundtrips_through_mobile_enum() {
     let cmd = Command::DirectSend {
         payload: vec![1, 2, 3],
         is_initiator: true,
+        endpoint: vauchi_core::DirectEndpoint::default(),
     };
     let mobile: MobileCommand = cmd.into();
     match mobile {

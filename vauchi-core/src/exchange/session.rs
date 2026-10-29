@@ -1090,6 +1090,7 @@ impl ExchangeSession {
                 vec![Command::DirectSend {
                     payload: our_qr.to_data_string().into_bytes(),
                     is_initiator: self.usb_role == Some(UsbRole::Initiator),
+                    endpoint: crate::platform::DirectEndpoint::default(),
                 }]
             }
             _ => vec![],
@@ -1799,6 +1800,7 @@ impl ExchangeSession {
         Ok(Command::DirectSend {
             payload: ciphertext,
             is_initiator: self.usb_role == Some(UsbRole::Initiator),
+            endpoint: crate::platform::DirectEndpoint::default(),
         })
     }
 

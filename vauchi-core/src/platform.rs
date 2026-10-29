@@ -232,9 +232,14 @@ pub enum Command {
     ///
     /// The `is_initiator` flag determines send/recv ordering to avoid deadlock
     /// (initiator sends first, responder receives first).
+    ///
+    /// `endpoint` is where and how long to look for the peer; the shell
+    /// executes it and decides none of it (#764).
     DirectSend {
         payload: Vec<u8>,
         is_initiator: bool,
+        #[serde(default)]
+        endpoint: DirectEndpoint,
     },
 
     // ── Image picking (avatar editor, ADR-042) ─────────────────────
@@ -526,6 +531,36 @@ pub enum FilePickOutcome {
     Selected { bytes: Vec<u8>, filename: String },
     Cancelled,
     Failed { code: FilePickFailure },
+}
+
+/// Where a shell finds the peer of a direct (USB cable / local TCP) swap,
+/// and how long it may take. Core's policy, executed by every shell (#764).
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DirectEndpoint {
+    /// DNS-SD service type to browse for the peer's address.
+    pub service_type: String,
+    /// TCP port to reach the peer on when the browse finds nothing.
+    pub port: u16,
+    /// Host to reach the peer on when the browse finds nothing: the phone's
+    /// USB-forwarded listener on this machine.
+    pub fallback_host: String,
+    /// How long to browse before falling back; one browse per swap.
+    pub browse_timeout_ms: u32,
+    /// Deadline for connecting and for each read and write.
+    pub io_timeout_ms: u32,
+}
+
+impl Default for DirectEndpoint {
+    fn default() -> Self {
+        Self {
+            service_type: "_vauchi-exchange._tcp.local.".into(),
+            port: 19283,
+            fallback_host: "127.0.0.1".into(),
+            browse_timeout_ms: 5_000,
+            io_timeout_ms: 10_000,
+        }
+    }
 }
 
 /// A secret a shell sealed behind the platform's user-presence check:
@@ -1543,6 +1578,7 @@ mod tests {
             Command::DirectSend {
                 payload: vec![],
                 is_initiator: false,
+                endpoint: DirectEndpoint::default(),
             },
             Command::ImagePickFromLibrary,
             Command::ImageCaptureFromCamera,

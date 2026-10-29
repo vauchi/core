@@ -69,9 +69,9 @@ fn new_usb_session_emits_direct_send_command() {
 
     assert_eq!(commands.len(), 1, "should emit exactly one command");
     assert!(
-        matches!(&commands[0], Command::DirectSend { payload, is_initiator }
-            if !payload.is_empty() && *is_initiator),
-        "should emit DirectSend with non-empty payload"
+        matches!(&commands[0], Command::DirectSend { payload, is_initiator, endpoint }
+            if !payload.is_empty() && *is_initiator && *endpoint == vauchi_core::DirectEndpoint::default()),
+        "should emit DirectSend with non-empty payload and Core's endpoint"
     );
 }
 
@@ -370,6 +370,7 @@ fn full_usb_exchange_over_tcp_loopback() {
         Command::DirectSend {
             payload,
             is_initiator,
+            ..
         } => (payload.clone(), *is_initiator),
         other => panic!("expected DirectSend from alice, got {:?}", other),
     };
@@ -377,6 +378,7 @@ fn full_usb_exchange_over_tcp_loopback() {
         Command::DirectSend {
             payload,
             is_initiator,
+            ..
         } => (payload.clone(), *is_initiator),
         other => panic!("expected DirectSend from bob, got {:?}", other),
     };
@@ -731,8 +733,14 @@ fn usb_card_leg_emits_one_opaque_direct_send_without_a_card_leg_flag() {
     keys.sort_unstable();
     assert_eq!(
         keys,
-        vec!["is_initiator", "payload"],
+        vec!["endpoint", "is_initiator", "payload"],
         "no card-leg discriminator may reach the shell"
+    );
+    // The endpoint is the same on both legs, so it tells the shell nothing
+    // about which leg this is.
+    assert_eq!(
+        body["endpoint"],
+        serde_json::to_value(vauchi_core::DirectEndpoint::default()).expect("serialize")
     );
     assert_eq!(body["is_initiator"], serde_json::Value::Bool(true));
     assert!(

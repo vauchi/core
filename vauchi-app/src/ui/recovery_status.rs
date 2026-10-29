@@ -73,6 +73,11 @@ pub struct RecoveryEngine {
     /// Generated claim payload (base64), populated by the AppEngine
     /// intercept after `Vauchi::create_recovery_claim_hex_b64` succeeds.
     generated_claim_b64: Option<String>,
+    /// Voucher pasted on the CollectVouchers step, read by the AppEngine
+    /// intercept when the user presses "add_voucher".
+    voucher_input: String,
+    /// Why the last pasted voucher was refused.
+    voucher_error: Option<String>,
     locale: Locale,
 }
 
@@ -88,6 +93,8 @@ impl RecoveryEngine {
             old_key_input: String::new(),
             old_key_error: None,
             generated_claim_b64: None,
+            voucher_input: String::new(),
+            voucher_error: None,
             locale: Locale::ENGLISH,
         }
     }
@@ -380,9 +387,16 @@ impl RecoveryEngine {
                     a11y: Some(A11y::labeled(self.t("recovery.copy_claim_data"))),
                 },
                 ScreenAction {
+                    id: "collect_vouchers".into(),
+                    label: self.t("recovery.add_voucher"),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: Some(A11y::labeled(self.t("recovery.add_voucher"))),
+                },
+                ScreenAction {
                     id: "done".into(),
                     label: self.t("action.done"),
-                    style: ActionStyle::Primary,
+                    style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: Some(A11y::labeled(self.t("action.done"))),
                 },
@@ -561,6 +575,18 @@ impl RecoveryEngine {
             a11y: None,
         }];
 
+        components.push(Component::TextInput {
+            id: "voucher_input".into(),
+            label: self.t("recovery.paste_voucher_label"),
+            value: self.voucher_input.clone(),
+            placeholder: Some(self.t("recovery.paste_voucher_placeholder")),
+            max_length: None,
+            validation_error: self.voucher_error.clone(),
+            input_type: InputType::Text,
+            a11y: Some(A11y::labeled(self.t("recovery.paste_voucher_label"))),
+            info_key: None,
+        });
+
         // Show collected voucher names
         if !self.collected_vouchers.is_empty() {
             let vouched_label = self.t("recovery.vouched_label");
@@ -589,6 +615,13 @@ impl RecoveryEngine {
             subtitle: None,
             components,
             contextual_actions: vec![
+                ScreenAction {
+                    id: "add_voucher".into(),
+                    label: self.t("recovery.add_voucher"),
+                    style: ActionStyle::Secondary,
+                    enabled: !self.voucher_input.trim().is_empty(),
+                    a11y: Some(A11y::labeled(self.t("recovery.add_voucher"))),
+                },
                 ScreenAction {
                     id: "submit_proof".into(),
                     label: self.t("recovery.submit_proof_button"),
@@ -665,6 +698,8 @@ impl WorkflowEngine for RecoveryEngine {
     fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
         Some(crate::ui::EngineOutput::Recovery {
             old_key_input: self.old_key_input().to_string(),
+            voucher_input: (self.step == RecoveryStep::CollectVouchers)
+                .then(|| self.voucher_input.clone()),
         })
     }
 
@@ -677,6 +712,19 @@ impl WorkflowEngine for RecoveryEngine {
             crate::ui::RecoveryUpdate::ClaimCreateError(message) => {
                 self.set_create_claim_error(message)
             }
+            crate::ui::RecoveryUpdate::VouchersCollected { signers, threshold } => {
+                self.collected_vouchers = signers
+                    .into_iter()
+                    .map(|guardian_name| CollectedVoucher { guardian_name })
+                    .collect();
+                self.quorum_threshold = threshold;
+                self.voucher_input.clear();
+                self.voucher_error = None;
+            }
+            crate::ui::RecoveryUpdate::VoucherRefused(message) => {
+                self.voucher_error = Some(message);
+            }
+            crate::ui::RecoveryUpdate::ProofSubmitted => self.step = RecoveryStep::Complete,
         }
         true
     }
@@ -769,6 +817,12 @@ impl WorkflowEngine for RecoveryEngine {
                 ActionResult::UpdateScreen(self.build_screen())
             }
             (RecoveryStep::ShowGeneratedClaim, UserAction::ActionPressed { ref action_id })
+                if action_id == "collect_vouchers" =>
+            {
+                self.step = RecoveryStep::CollectVouchers;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            (RecoveryStep::ShowGeneratedClaim, UserAction::ActionPressed { ref action_id })
                 if action_id == "done" =>
             {
                 ActionResult::Complete
@@ -805,7 +859,20 @@ impl WorkflowEngine for RecoveryEngine {
                 ActionResult::UpdateScreen(self.build_screen())
             }
 
-            // CollectVouchers actions
+            // CollectVouchers: the pasted voucher; add_voucher and
+            // submit_proof go through the AppEngine intercept, which needs
+            // Vauchi to verify, store and upload.
+            (
+                RecoveryStep::CollectVouchers,
+                UserAction::TextChanged {
+                    ref component_id,
+                    ref value,
+                },
+            ) if component_id == "voucher_input" => {
+                self.voucher_input = value.clone();
+                self.voucher_error = None;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
             (RecoveryStep::CollectVouchers, UserAction::ActionPressed { ref action_id })
                 if action_id == "submit_proof" && self.threshold_met() =>
             {

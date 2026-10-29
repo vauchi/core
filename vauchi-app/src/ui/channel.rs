@@ -94,8 +94,12 @@ pub enum EngineOutput {
     DeepLinkConsent { granted: bool },
     /// Whether the active multi-stage exchange engine runs Hover mode.
     MultiStageExchange { hover_mode: bool },
-    /// The old-key input on the Recovery screen.
-    Recovery { old_key_input: String },
+    /// The Recovery screen's inputs: the old key, and the pasted voucher
+    /// while vouchers are being collected (`None` at every other step).
+    Recovery {
+        old_key_input: String,
+        voucher_input: Option<String>,
+    },
     /// The pasted claim input on the RecoveryHelp screen.
     RecoveryHelp { claim_input: String },
     /// Decoy-contacts form state.
@@ -298,6 +302,14 @@ pub enum ContactListUpdate {
 pub enum RecoveryUpdate {
     ClaimGenerated(String),
     ClaimCreateError(String),
+    /// The stored proof after a voucher was taken in: each signer's
+    /// short key fingerprint, and the threshold the proof needs.
+    VouchersCollected {
+        signers: Vec<String>,
+        threshold: usize,
+    },
+    VoucherRefused(String),
+    ProofSubmitted,
 }
 
 /// Results pushed back into the recovery-help engine.
@@ -421,6 +433,9 @@ impl EngineUpdate {
             Self::Recovery(u) => match u {
                 RecoveryUpdate::ClaimGenerated(_) => "Recovery::ClaimGenerated",
                 RecoveryUpdate::ClaimCreateError(_) => "Recovery::ClaimCreateError",
+                RecoveryUpdate::VouchersCollected { .. } => "Recovery::VouchersCollected",
+                RecoveryUpdate::VoucherRefused(_) => "Recovery::VoucherRefused",
+                RecoveryUpdate::ProofSubmitted => "Recovery::ProofSubmitted",
             },
             Self::RecoveryHelp(u) => match u {
                 RecoveryHelpUpdate::ParsedClaim(_) => "RecoveryHelp::ParsedClaim",
@@ -647,9 +662,16 @@ impl std::fmt::Debug for EngineOutput {
                 .debug_struct("MultiStageExchange")
                 .field("hover_mode", hover_mode)
                 .finish(),
-            Self::Recovery { old_key_input } => f
+            Self::Recovery {
+                old_key_input,
+                voucher_input,
+            } => f
                 .debug_struct("Recovery")
                 .field("old_key_input_len", &old_key_input.len())
+                .field(
+                    "voucher_input_len",
+                    &voucher_input.as_ref().map(String::len),
+                )
                 .finish(),
             Self::RecoveryHelp { claim_input } => f
                 .debug_struct("RecoveryHelp")

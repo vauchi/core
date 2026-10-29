@@ -115,28 +115,6 @@ impl Vauchi {
         self.start_recovery_claim(old_pk)
     }
 
-    /// Adds a voucher to the in-progress recovery proof.
-    ///
-    /// Returns updated progress. The voucher is typically scanned from
-    /// a guardian's QR code.
-    pub fn add_recovery_voucher(&self, voucher_bytes: &[u8]) -> VauchiResult<RecoveryProgress> {
-        let voucher = RecoveryVoucher::from_bytes(voucher_bytes)
-            .map_err(|e| VauchiError::Serialization(e.to_string()))?;
-
-        let mut progress = self
-            .storage
-            .recovery()
-            .load_recovery_progress()?
-            .ok_or_else(|| VauchiError::InvalidState("No recovery in progress".into()))?;
-
-        progress
-            .add_voucher(voucher)
-            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        self.storage.recovery().save_recovery_progress(&progress)?;
-
-        Ok(progress)
-    }
-
     /// Returns current recovery progress, if any.
     pub fn get_recovery_progress(&self) -> VauchiResult<Option<RecoveryProgress>> {
         Ok(self.storage.recovery().load_recovery_progress()?)

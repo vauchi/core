@@ -125,6 +125,28 @@ impl Vauchi {
         Ok(base64::engine::general_purpose::STANDARD.encode(voucher.to_bytes()))
     }
 
+    /// Adds a voucher to the in-progress recovery proof.
+    ///
+    /// Returns updated progress. The voucher is typically scanned from
+    /// a guardian's QR code.
+    pub fn add_recovery_voucher(&self, voucher_bytes: &[u8]) -> VauchiResult<RecoveryProgress> {
+        let voucher = RecoveryVoucher::from_bytes(voucher_bytes)
+            .map_err(|e| VauchiError::Serialization(e.to_string()))?;
+
+        let mut progress = self
+            .storage
+            .recovery()
+            .load_recovery_progress()?
+            .ok_or_else(|| VauchiError::InvalidState("No recovery in progress".into()))?;
+
+        progress
+            .add_voucher(voucher)
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        self.storage.recovery().save_recovery_progress(&progress)?;
+
+        Ok(progress)
+    }
+
     /// Adds a helper's base64 voucher, as [`Self::create_voucher_from_claim_b64`]
     /// returns it, to the recovery in progress: the recovering user's side
     /// of that exchange (vauchi/private#877). Returns the updated progress.

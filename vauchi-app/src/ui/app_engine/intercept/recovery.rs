@@ -23,7 +23,7 @@ impl AppEngine {
         &mut self,
     ) -> Option<ActionResult> {
         let old_key = match self.engine.engine_output() {
-            Some(crate::ui::EngineOutput::Recovery { old_key_input }) => {
+            Some(crate::ui::EngineOutput::Recovery { old_key_input, .. }) => {
                 old_key_input.trim().to_string()
             }
             _ => return None,
@@ -114,4 +114,85 @@ impl AppEngine {
             }),
         }
     }
+
+    /// Intercept "add_voucher" on the Recovery screen (CollectVouchers
+    /// step): takes the pasted voucher into the stored proof through
+    /// `Vauchi::add_recovery_voucher_b64`, whose checks decide (other
+    /// claim, self-vouching, signature, duplicate signer), and shows the
+    /// proof's signers or why the voucher was refused (private#877).
+    pub(in crate::ui::app_engine) fn intercept_add_voucher_action(
+        &mut self,
+    ) -> Option<ActionResult> {
+        let voucher = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::Recovery {
+                voucher_input: Some(voucher),
+                ..
+            }) => voucher,
+            _ => return None,
+        };
+
+        let update = match self.vauchi.add_recovery_voucher_b64(&voucher) {
+            Ok(progress) => crate::ui::RecoveryUpdate::VouchersCollected {
+                signers: progress
+                    .vouchers
+                    .iter()
+                    .map(|voucher| short_fingerprint(voucher.voucher_pk().as_bytes()))
+                    .collect(),
+                threshold: progress.threshold as usize,
+            },
+            Err(_) => {
+                crate::ui::RecoveryUpdate::VoucherRefused(self.t("recovery.voucher_not_accepted"))
+            }
+        };
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::Recovery(update))
+            .then(|| ActionResult::UpdateScreen(self.engine.current_screen()))
+    }
+
+    /// Intercept "submit_proof" on the Recovery screen (CollectVouchers
+    /// step): uploads the proof to the relay, and shows Complete only once
+    /// the relay took it. Until private#877 the engine showed Complete
+    /// and nothing was sent.
+    pub(in crate::ui::app_engine) fn intercept_submit_proof_action(
+        &mut self,
+    ) -> Option<ActionResult> {
+        if !matches!(
+            self.engine.engine_output(),
+            Some(crate::ui::EngineOutput::Recovery {
+                voucher_input: Some(_),
+                ..
+            })
+        ) {
+            return None;
+        }
+
+        #[cfg(feature = "network-http")]
+        let uploaded = self.vauchi.upload_recovery_proof();
+        // Without a relay transport there is nowhere to send the proof.
+        #[cfg(not(feature = "network-http"))]
+        let uploaded: Result<(), ()> = Err(());
+        match uploaded {
+            Ok(()) => self
+                .engine
+                .apply_update(crate::ui::EngineUpdate::Recovery(
+                    crate::ui::RecoveryUpdate::ProofSubmitted,
+                ))
+                .then(|| ActionResult::UpdateScreen(self.engine.current_screen())),
+            Err(_) => Some(ActionResult::ShowAlert {
+                title: self.t("error.title"),
+                message: self.t("recovery.proof_upload_failed"),
+            }),
+        }
+    }
+}
+
+/// The first four groups of a key's fingerprint, in the format of
+/// `Vauchi::own_fingerprint`: enough to tell helpers apart on screen.
+fn short_fingerprint(public_key: &[u8; 32]) -> String {
+    hex::encode_upper(&public_key[..8])
+        .as_bytes()
+        .chunks(4)
+        .map(|group| String::from_utf8_lossy(group).into_owned())
+        .collect::<Vec<_>>()
+        .join(" ")
 }

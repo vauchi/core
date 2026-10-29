@@ -15,7 +15,7 @@
 use std::path::PathBuf;
 
 use crate::api::deletion::{DeletionError, DeletionManager};
-use crate::api::pre_signed::PreSignedShredMessages;
+use crate::api::pre_signed::{PreSignedPurgeRequest, PreSignedShredMessages};
 use crate::identity::Identity;
 use crate::storage::secure::SecureStorage;
 use crate::storage::{DeletionState, Storage};
@@ -121,10 +121,9 @@ impl<'a> ShredManager<'a> {
 
         // Send relay purge if sender provided (before point-of-no-return)
         if let Some(sender) = purge_sender {
-            let msgs = self.pre_signed_messages();
-            report.relay_purge_sent = sender
-                .send_purge(&msgs.purge_request, self.storage.clock().unix_seconds())
-                .unwrap_or(false);
+            let now = self.storage.clock().unix_seconds();
+            let purge = PreSignedPurgeRequest::sign_now(self.identity, now);
+            report.relay_purge_sent = sender.send_purge(&purge, now).unwrap_or(false);
         }
 
         // ═══ POINT OF NO RETURN ═══
@@ -166,9 +165,11 @@ impl<'a> ShredManager<'a> {
 
         // ── Phase A: Prepare outbound messages while keys available ──
 
-        // 1. Pre-signed messages from file (unencrypted per DP-3), or signed
-        //    now while the keys are still available
-        let pre_signed = Some(self.pre_signed_messages());
+        // 1. Purge signed now, while the keys are still available (DP-2); a
+        //    stored pre-signed purge would be older than the relay's 60 s
+        //    window (vauchi/private#899)
+        let purge =
+            PreSignedPurgeRequest::sign_now(self.identity, self.storage.clock().unix_seconds());
 
         // Build revocation deliveries (token + blob) for each contact while
         // keys + shared secrets are still available — the relay actually
@@ -212,9 +213,9 @@ impl<'a> ShredManager<'a> {
 
         // ── Phase C: Best-effort network and cleanup ──
         // Send pre-signed purge after key destruction (best-effort)
-        if let (Some(sender), Some(msgs)) = (purge_sender, &pre_signed) {
+        if let Some(sender) = purge_sender {
             report.relay_purge_sent = sender
-                .send_purge(&msgs.purge_request, self.storage.clock().unix_seconds())
+                .send_purge(&purge, self.storage.clock().unix_seconds())
                 .unwrap_or(false);
         }
 
@@ -279,18 +280,6 @@ impl<'a> ShredManager<'a> {
     }
 
     // ── Internal helpers ──
-
-    /// The stored pre-signed messages if this identity signed them;
-    /// otherwise fresh ones signed now. A file left by an earlier identity
-    /// would purge that identity's relay data instead (vauchi/private#582).
-    fn pre_signed_messages(&self) -> PreSignedShredMessages {
-        PreSignedShredMessages::load(&self.data_dir)
-            .ok()
-            .filter(|msgs| msgs.purge_request.public_key == *self.identity.signing_public_key())
-            .unwrap_or_else(|| {
-                PreSignedShredMessages::generate(self.identity, self.storage.clock().unix_seconds())
-            })
-    }
 
     fn destroy_smk(&self) -> bool {
         destroy_storage_keys(self.secure_storage)

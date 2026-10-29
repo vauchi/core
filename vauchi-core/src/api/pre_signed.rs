@@ -52,6 +52,21 @@ pub struct PreSignedPurgeRequest {
     pub timestamp: u64,
 }
 
+impl PreSignedPurgeRequest {
+    /// A purge signed at `now` with a fresh one-time token. The relay accepts
+    /// a purge only within 60 s of its clock, so a shred signs the purge it
+    /// sends instead of sending a stored one (vauchi/private#899).
+    pub(crate) fn sign_now(identity: &Identity, now: u64) -> Self {
+        let purge_token: [u8; 32] = crate::crypto::random_bytes();
+        PreSignedShredMessages::sign_purge_request(
+            identity,
+            *identity.signing_public_key(),
+            purge_token,
+            now,
+        )
+    }
+}
+
 /// File name for the pre-signed shred messages.
 const PRE_SIGNED_FILE_NAME: &str = "pre_signed_shred.bin";
 

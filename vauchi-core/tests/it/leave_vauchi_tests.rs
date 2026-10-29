@@ -67,3 +67,42 @@ fn a_sibling_that_applies_the_schedule_keeps_the_wipe_choice() {
             .unwrap()
     );
 }
+
+// @internal
+#[test]
+fn a_device_told_to_wipe_wipes_itself_once_the_items_are_applied() {
+    let mut tablet = phone();
+
+    tablet
+        .apply_sync_items(vec![SyncItem::WipeThisDevice {
+            timestamp: 1_700_000_000,
+        }])
+        .unwrap();
+    let wiped = tablet.apply_pending_wipe().unwrap();
+
+    assert_eq!(
+        (
+            wiped,
+            tablet.identity().is_none(),
+            tablet.was_wiped_by_another_device()
+        ),
+        (true, true, true)
+    );
+}
+
+// @internal
+#[test]
+fn without_the_instruction_nothing_is_wiped() {
+    let mut tablet = phone();
+
+    let wiped = tablet.apply_pending_wipe().unwrap();
+
+    assert_eq!(
+        (
+            wiped,
+            tablet.identity().is_some(),
+            tablet.was_wiped_by_another_device()
+        ),
+        (false, true, false)
+    );
+}

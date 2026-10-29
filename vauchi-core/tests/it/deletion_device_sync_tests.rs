@@ -19,7 +19,7 @@ fn phone() -> Vauchi {
     wb
 }
 
-// @internal
+// @scenario: privacy_compliance :: Scheduling or cancelling my deletion reaches my other devices
 #[test]
 fn scheduling_my_identitys_deletion_is_journaled_for_my_tablet() {
     let wb = phone();
@@ -46,7 +46,7 @@ fn scheduling_my_identitys_deletion_is_journaled_for_my_tablet() {
     assert_eq!(scheduled, vec![(GRACE_SECS, true)]);
 }
 
-// @internal
+// @scenario: privacy_compliance :: Scheduling or cancelling my deletion reaches my other devices
 #[test]
 fn cancelling_my_identitys_deletion_is_journaled_for_my_tablet() {
     let wb = phone();

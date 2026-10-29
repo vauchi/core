@@ -106,7 +106,7 @@ mod tests {
         format!("{:?}", screen.components)
     }
 
-    // @internal
+    // @scenario: privacy_compliance :: Leaving Vauchi asks whether my other devices wipe too
     #[test]
     fn with_other_devices_leaving_asks_whether_they_wipe_and_names_them() {
         let mut e = engine(&["Laptop", "Tablet"], false);

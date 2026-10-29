@@ -11,7 +11,7 @@ use vauchi_core::api::VauchiConfig;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::sync::SyncItem;
 
-// @internal
+// @scenario: privacy_compliance :: When I leave with the wipe choice my other devices wipe
 #[test]
 fn a_device_told_to_wipe_resets_after_its_sync() {
     // Relay addresses that lead nowhere: the sync must not leave this

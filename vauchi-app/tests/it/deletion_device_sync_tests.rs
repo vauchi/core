@@ -61,7 +61,7 @@ fn journaled(engine: &AppEngine, tablet: &[u8; 32]) -> Vec<&'static str> {
     .collect()
 }
 
-// @internal
+// @scenario: privacy_compliance :: Scheduling or cancelling my deletion reaches my other devices
 #[test]
 fn scheduling_then_cancelling_from_the_privacy_screen_reaches_my_tablet() {
     let (mut engine, tablet) = privacy_with_a_tablet();
@@ -80,7 +80,7 @@ fn scheduling_then_cancelling_from_the_privacy_screen_reaches_my_tablet() {
     );
 }
 
-// @internal
+// @scenario: privacy_compliance :: Leaving Vauchi asks whether my other devices wipe too
 #[test]
 fn leaving_with_wipe_from_the_privacy_screen_stores_the_choice() {
     let (mut engine, _tablet) = privacy_with_a_tablet();

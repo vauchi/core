@@ -36,7 +36,7 @@ const LEAVE_AND_WIPE: DeletionChoice = DeletionChoice {
     wipe_other_devices: true,
 };
 
-// @internal
+// @scenario: privacy_compliance :: Leaving Vauchi asks whether my other devices wipe too
 #[test]
 fn leaving_with_wipe_records_the_choice_and_journals_it_for_my_tablet() {
     let wb = phone();
@@ -59,7 +59,7 @@ fn leaving_with_wipe_records_the_choice_and_journals_it_for_my_tablet() {
     assert_eq!((journaled, recorded), (vec![true], true));
 }
 
-// @internal
+// @scenario: privacy_compliance :: Leaving Vauchi asks whether my other devices wipe too
 #[test]
 fn a_sibling_that_applies_the_schedule_keeps_the_wipe_choice() {
     let tablet = phone();
@@ -81,7 +81,7 @@ fn a_sibling_that_applies_the_schedule_keeps_the_wipe_choice() {
     );
 }
 
-// @internal
+// @scenario: privacy_compliance :: When I leave with the wipe choice my other devices wipe
 #[test]
 fn a_device_told_to_wipe_wipes_itself_once_the_items_are_applied() {
     let mut tablet = phone();
@@ -120,7 +120,7 @@ fn without_the_instruction_nothing_is_wiped() {
     );
 }
 
-// @internal
+// @scenario: privacy_compliance :: When I leave with the wipe choice my other devices wipe
 #[test]
 fn when_leaving_runs_with_the_wipe_choice_my_tablet_is_told_to_wipe() {
     let dir = tempfile::tempdir().unwrap();

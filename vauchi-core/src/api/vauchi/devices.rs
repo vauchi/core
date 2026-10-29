@@ -175,14 +175,19 @@ impl Vauchi {
         }
 
         let device_name = device.device_name.clone();
+        let now = self.storage.now_secs();
         registry
-            .revoke_device(
-                &device.device_id,
-                identity.signing_keypair(),
-                self.storage.now_secs(),
-            )
+            .revoke_device(&device.device_id, identity.signing_keypair(), now)
             .map_err(|e| VauchiError::InvalidState(format!("Revoke failed: {:?}", e)))?;
-        self.storage.device().save_device_registry(&registry)?;
+        // Saved and queued for the other devices in one step, so they stop
+        // syncing to the revoked one (vauchi/private#917).
+        crate::api::sync::DeviceSyncOrchestrator::persist_device_registry_change(
+            &self.storage,
+            identity,
+            &registry,
+            now,
+        )
+        .map_err(|e| VauchiError::InvalidState(format!("Revoke failed: {e}")))?;
 
         Ok(device_name)
     }

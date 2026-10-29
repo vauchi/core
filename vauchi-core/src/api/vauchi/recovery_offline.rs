@@ -17,6 +17,8 @@ use crate::recovery::{RecoveryClaim, RecoveryProgress, RecoveryVoucher};
 
 use super::Vauchi;
 
+const MAX_VOUCHER_B64_LEN: usize = 4096;
+
 impl Vauchi {
     /// Creates a claim binding `old_pk` to this identity and stores it as
     /// the recovery in progress, so vouchers have a claim to attach to.
@@ -121,5 +123,24 @@ impl Vauchi {
         )
         .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         Ok(base64::engine::general_purpose::STANDARD.encode(voucher.to_bytes()))
+    }
+
+    /// Adds a helper's base64 voucher, as [`Self::create_voucher_from_claim_b64`]
+    /// returns it, to the recovery in progress: the recovering user's side
+    /// of that exchange (vauchi/private#877). Returns the updated progress.
+    pub fn add_recovery_voucher_b64(&self, voucher_b64: &str) -> VauchiResult<RecoveryProgress> {
+        let voucher_b64 = voucher_b64.trim();
+        // A voucher is a few hundred bytes, so a long paste is refused
+        // before it is decoded.
+        if voucher_b64.len() > MAX_VOUCHER_B64_LEN {
+            return Err(VauchiError::Serialization(format!(
+                "voucher is {} characters, more than {MAX_VOUCHER_B64_LEN}",
+                voucher_b64.len()
+            )));
+        }
+        let voucher_bytes = base64::engine::general_purpose::STANDARD
+            .decode(voucher_b64)
+            .map_err(|e| VauchiError::Serialization(format!("invalid base64: {e}")))?;
+        self.add_recovery_voucher(&voucher_bytes)
     }
 }

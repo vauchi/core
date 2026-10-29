@@ -376,7 +376,7 @@ fn add_recovery_voucher_b64_counts_each_helpers_voucher() {
     assert_eq!(first.voucher_count(), 1);
     assert_eq!(second.voucher_count(), 2);
     let signers: Vec<[u8; 32]> = second
-        .vouchers()
+        .vouchers
         .iter()
         .map(|v| *v.voucher_pk().as_bytes())
         .collect();

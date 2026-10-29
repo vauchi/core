@@ -128,3 +128,100 @@ fn an_ack_is_fresh_for_sixty_seconds_after_the_responder_stamped_it() {
         Err(ExchangeError::BleExpired)
     ));
 }
+
+// @internal
+#[rstest::rstest]
+#[case::initiator_identity(true, true)]
+#[case::initiator_allows_distinct_exchange_key(true, false)]
+#[case::responder_identity(false, true)]
+#[case::responder_allows_distinct_exchange_key(false, false)]
+fn payload_binding_ble_binds_identity_and_allows_authenticated_exchange_keys(
+    #[case] victim_is_initiator: bool,
+    #[case] substitute_identity: bool,
+) {
+    let honest = Identity::create("Honest", 0);
+    let malicious = Identity::create("Malicious", 0);
+    let unrelated = Identity::create("Unrelated", 0);
+    let honest_card = BleCardPayload::new(
+        *honest.signing_public_key(),
+        "Honest".into(),
+        *honest.x3dh_keypair().public_key(),
+        vec![],
+        None,
+    );
+    let claimed_identity = if substitute_identity {
+        *unrelated.signing_public_key()
+    } else {
+        *malicious.signing_public_key()
+    };
+    let claimed_exchange = if substitute_identity {
+        *malicious.x3dh_keypair().public_key()
+    } else {
+        *unrelated.x3dh_keypair().public_key()
+    };
+    let malicious_card = BleCardPayload::new(
+        claimed_identity,
+        "Forged card".into(),
+        claimed_exchange,
+        vec![],
+        None,
+    );
+    let (mut initiator, mut responder) = if victim_is_initiator {
+        (
+            BleHandshakeSession::new_initiator(&honest, honest_card, T0),
+            BleHandshakeSession::new_responder(&malicious, malicious_card, T0),
+        )
+    } else {
+        (
+            BleHandshakeSession::new_initiator(&malicious, malicious_card, T0),
+            BleHandshakeSession::new_responder(&honest, honest_card, T0),
+        )
+    };
+    let victim = if victim_is_initiator {
+        &mut initiator
+    } else {
+        &mut responder
+    };
+    victim.expect_peer(*malicious.signing_public_key());
+    victim.expect_exchange_key(*malicious.x3dh_keypair().public_key());
+    let offer = initiator.create_key_offer().unwrap();
+    let (ack, responder_card) = responder.process_key_offer(&offer, T0).unwrap();
+
+    if substitute_identity {
+        let error = if victim_is_initiator {
+            initiator
+                .process_key_ack(&ack, &responder_card, T0)
+                .expect_err("authenticated ciphertext must not rename its authenticated peer")
+        } else {
+            let (commitment, initiator_card) = initiator
+                .process_key_ack(&ack, &responder_card, T0)
+                .unwrap();
+            responder
+                .process_committed_payload(&commitment, &initiator_card)
+                .unwrap();
+            responder
+                .complete_exchange(&[])
+                .expect_err("authenticated ciphertext must not rename its authenticated peer")
+        };
+        assert!(
+            matches!(error, ExchangeError::IdentityMismatch),
+            "{error:?}"
+        );
+    } else {
+        let (commitment, initiator_card) = initiator
+            .process_key_ack(&ack, &responder_card, T0)
+            .expect("the authenticated peer can choose a distinct future channel key");
+        let reveal = responder
+            .process_committed_payload(&commitment, &initiator_card)
+            .unwrap();
+        let responder_result = responder.complete_exchange(&[]).unwrap();
+        let initiator_result = initiator.complete_exchange(&reveal).unwrap();
+        let received = if victim_is_initiator {
+            initiator_result.remote_card
+        } else {
+            responder_result.remote_card
+        };
+        assert_eq!(received.identity_key, *malicious.signing_public_key());
+        assert_eq!(received.exchange_key, claimed_exchange);
+    }
+}

@@ -68,6 +68,7 @@ pub struct NfcHandshakeSession {
     shared_key: Option<SymmetricKey>,
     their_card: Option<NfcCardPayload>,
     their_identity_key: Option<[u8; 32]>,
+    their_exchange_key: Option<[u8; 32]>,
     completed_cache: HashMap<[u8; 32], NfcExchangeResult>,
 }
 
@@ -82,6 +83,7 @@ impl NfcHandshakeSession {
             shared_key: None,
             their_card: None,
             their_identity_key: None,
+            their_exchange_key: None,
             completed_cache: HashMap::new(),
         }
     }
@@ -160,6 +162,7 @@ impl NfcHandshakeSession {
         }
         // Remember the initiator's identity so phase 3's decrypt can bind AAD.
         self.their_identity_key = Some(*their_nfc.identity_key());
+        self.their_exchange_key = Some(*their_nfc.exchange_key());
 
         let exchange_id = *their_nfc.token();
 
@@ -238,6 +241,7 @@ impl NfcHandshakeSession {
             &shared_key,
             their_encrypted_card,
             their_nfc.identity_key(),
+            their_nfc.exchange_key(),
             &self.our_identity_key,
             &exchange_id,
         )?;
@@ -282,11 +286,15 @@ impl NfcHandshakeSession {
         let their_identity = self
             .their_identity_key
             .ok_or_else(|| ExchangeError::InvalidState("No peer identity".into()))?;
+        let their_exchange = self
+            .their_exchange_key
+            .ok_or_else(|| ExchangeError::InvalidState("No peer exchange key".into()))?;
 
         let their_card = decrypt_and_validate_card(
             shared_key,
             their_encrypted_card,
             &their_identity,
+            &their_exchange,
             &self.our_identity_key,
             &exchange_id,
         )?;
@@ -482,6 +490,7 @@ fn decrypt_and_validate_card(
     key: &SymmetricKey,
     ciphertext: &[u8],
     sender_identity: &[u8; 32],
+    sender_exchange: &[u8; 32],
     receiver_identity: &[u8; 32],
     exchange_id: &[u8; 32],
 ) -> Result<NfcCardPayload, ExchangeError> {
@@ -493,6 +502,12 @@ fn decrypt_and_validate_card(
 
     if !card.verify_crc16() {
         return Err(ExchangeError::NfcCrcMismatch);
+    }
+    if card.identity_key != *sender_identity {
+        return Err(ExchangeError::IdentityMismatch);
+    }
+    if card.exchange_key != *sender_exchange {
+        return Err(ExchangeError::ExchangeKeyMismatch);
     }
 
     Ok(card)
@@ -599,11 +614,11 @@ mod tests {
 
         let ct = encrypt_card(&key, &sender, &receiver, &eid, "Alice", &eph).unwrap();
 
-        let card = decrypt_and_validate_card(&key, &ct, &sender, &receiver, &eid)
+        let card = decrypt_and_validate_card(&key, &ct, &sender, &eph, &receiver, &eid)
             .expect("matching AAD must decrypt");
         assert_eq!(card.identity_key, sender);
 
-        let wrong = decrypt_and_validate_card(&key, &ct, &receiver, &receiver, &eid);
+        let wrong = decrypt_and_validate_card(&key, &ct, &receiver, &eph, &receiver, &eid);
         assert!(
             matches!(wrong, Err(ExchangeError::NfcDecryptionFailed)),
             "mismatched sender identity in AAD must fail, got {:?}",

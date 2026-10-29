@@ -762,6 +762,7 @@ impl BleHandshakeSession {
         if !their_card.verify_crc16() {
             return Err(ExchangeError::BleDecryptionFailed);
         }
+        validate_card_identity(&their_card, &their_identity)?;
 
         let our_aad = build_aad(&self.our_identity_key, &their_identity, self.our_timestamp);
         let our_plaintext = self
@@ -913,6 +914,7 @@ impl BleHandshakeSession {
             if !card.verify_crc16() {
                 return Err(ExchangeError::BleDecryptionFailed);
             }
+            validate_card_identity(&card, &their_identity)?;
 
             self.their_card = Some(card);
         }
@@ -935,6 +937,13 @@ impl BleHandshakeSession {
 
         Ok(result)
     }
+}
+
+fn validate_card_identity(card: &BleCardPayload, identity: &[u8; 32]) -> Result<(), ExchangeError> {
+    if !bool::from(card.identity_key.ct_eq(identity)) {
+        return Err(ExchangeError::IdentityMismatch);
+    }
+    Ok(())
 }
 
 impl Drop for BleHandshakeSession {

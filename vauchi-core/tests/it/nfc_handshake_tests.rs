@@ -489,3 +489,89 @@ fn a_truncated_key_offer_is_refused() {
         Err(ExchangeError::InvalidNfcFormat)
     ));
 }
+
+// @internal
+#[rstest::rstest]
+#[case::initiator_identity(true, true)]
+#[case::initiator_exchange_key(true, false)]
+#[case::responder_identity(false, true)]
+#[case::responder_exchange_key(false, false)]
+fn payload_binding_nfc_rejects_card_keys_that_disagree_with_the_signed_offer(
+    #[case] victim_is_initiator: bool,
+    #[case] substitute_identity: bool,
+) {
+    let now = 1_700_000_000;
+    let honest = Identity::create("Honest", 0);
+    let malicious = Identity::create("Malicious", 0);
+    let unrelated = Identity::create("Unrelated", 0);
+    let mut victim = if victim_is_initiator {
+        NfcHandshakeSession::new_initiator(&honest, "Honest".into())
+    } else {
+        NfcHandshakeSession::new_responder(&honest, "Honest".into())
+    };
+    let mut peer = if victim_is_initiator {
+        NfcHandshakeSession::new_responder(&malicious, "Malicious".into())
+    } else {
+        NfcHandshakeSession::new_initiator(&malicious, "Malicious".into())
+    };
+    let (offer, ack) = if victim_is_initiator {
+        let offer = victim.create_key_offer(&honest, now).unwrap();
+        let (ack, _) = peer.process_key_offer(&malicious, &offer, now).unwrap();
+        (offer, ack)
+    } else {
+        let offer = peer.create_key_offer(&malicious, now).unwrap();
+        let (ack, honest_card) = victim.process_key_offer(&honest, &offer, now).unwrap();
+        peer.process_key_ack(&ack, &honest_card, now).unwrap();
+        (offer, ack)
+    };
+    let (exchange_id, session_key) = peer.enter_relay_fallback().unwrap();
+    let claimed_identity = if substitute_identity {
+        *unrelated.signing_public_key()
+    } else {
+        *malicious.signing_public_key()
+    };
+    let claimed_exchange = if substitute_identity {
+        *peer.our_exchange_key()
+    } else {
+        *unrelated.x3dh_keypair().public_key()
+    };
+    let payload = NfcCardPayload::new(claimed_identity, "Forged card".into(), claimed_exchange);
+    let aad = [
+        malicious.signing_public_key().as_slice(),
+        honest.signing_public_key().as_slice(),
+        exchange_id.as_slice(),
+    ]
+    .concat();
+    let ciphertext = vauchi_core::crypto::encryption::encrypt_with_ad(
+        &session_key,
+        &payload.to_bytes().unwrap(),
+        &aad,
+    )
+    .unwrap();
+
+    let error = if victim_is_initiator {
+        victim
+            .process_key_ack(&ack, &ciphertext, now)
+            .expect_err("encrypted card must identify the peer of the signed ack")
+    } else {
+        victim
+            .process_encrypted_card(&ciphertext)
+            .expect_err("encrypted card must identify the peer of the signed offer")
+    };
+
+    assert_eq!(
+        ExchangeNfc::from_bytes(&offer).unwrap().token(),
+        &exchange_id
+    );
+    if substitute_identity {
+        assert!(
+            matches!(error, ExchangeError::IdentityMismatch),
+            "{error:?}"
+        );
+    } else {
+        assert!(
+            matches!(error, ExchangeError::ExchangeKeyMismatch),
+            "{error:?}"
+        );
+    }
+}

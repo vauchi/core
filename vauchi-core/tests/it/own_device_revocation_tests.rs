@@ -79,3 +79,75 @@ fn revoking_my_laptop_tells_my_tablet() {
         .collect();
     assert_eq!(laptop_revoked, vec![true]);
 }
+
+fn revoked_in_my_registry(phone: &Vauchi, device_id: &[u8; 32]) -> bool {
+    phone
+        .storage()
+        .device()
+        .load_device_registry()
+        .unwrap()
+        .unwrap()
+        .find_device(device_id)
+        .is_some_and(|d| d.revoked)
+}
+
+// @internal
+#[test]
+fn removing_my_identity_from_this_phone_tells_my_tablet_and_laptop() {
+    let (phone, tablet, laptop) = phone_with_tablet_and_laptop();
+    let this_phone = *phone.identity().unwrap().device_id();
+
+    phone.revoke_this_device().unwrap();
+
+    let told: Vec<Vec<bool>> = [tablet, laptop]
+        .iter()
+        .map(|device| {
+            registries_sent_to(&phone, device)
+                .iter()
+                .map(|registry| registry.find_device(&this_phone).is_some_and(|d| d.revoked))
+                .collect()
+        })
+        .collect();
+    assert_eq!(told, vec![vec![true], vec![true]]);
+}
+
+// @internal
+#[test]
+fn the_last_device_of_an_identity_cannot_revoke_itself() {
+    let mut phone = Vauchi::in_memory().unwrap();
+    phone.create_identity("Alice").unwrap();
+    let this_phone = *phone.identity().unwrap().device_id();
+    let registry = phone.identity().unwrap().initial_device_registry();
+    phone
+        .storage()
+        .device()
+        .save_device_registry(&registry)
+        .unwrap();
+
+    let refused = phone.revoke_this_device().is_err();
+
+    assert_eq!(
+        (refused, revoked_in_my_registry(&phone, &this_phone)),
+        (true, false)
+    );
+}
+
+// @internal
+#[test]
+fn in_duress_mode_this_device_never_revokes_itself_in_the_real_registry() {
+    let (mut phone, _tablet, _laptop) = phone_with_tablet_and_laptop();
+    let this_phone = *phone.identity().unwrap().device_id();
+    phone.setup_app_password("app-pin-1234").unwrap();
+    phone.setup_duress_password("135790").unwrap();
+    assert_eq!(
+        phone.authenticate("135790").unwrap(),
+        vauchi_core::AuthMode::Duress
+    );
+
+    let refused = phone.revoke_this_device().is_err();
+
+    assert_eq!(
+        (refused, revoked_in_my_registry(&phone, &this_phone)),
+        (true, false)
+    );
+}

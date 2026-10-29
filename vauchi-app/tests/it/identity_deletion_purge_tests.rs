@@ -5,58 +5,11 @@
 //! The deletion the user runs from Privacy asks the relay to purge what it
 //! holds for the identity, before the app wipes itself (#711 step 4).
 
-use std::io::{BufRead, BufReader, Read, Write};
-use std::net::TcpListener;
-use std::sync::mpsc;
-
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
 use vauchi_core::storage::DeletionState;
 use vauchi_core::{Vauchi, VauchiConfig};
 
-/// A relay that answers every POST with `{"status":"ok"}` and reports the
-/// path and body of each one.
-fn recording_relay() -> (String, mpsc::Receiver<(String, String)>) {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let url = format!("http://{}", listener.local_addr().unwrap());
-    let (sent, received) = mpsc::channel();
-    std::thread::spawn(move || {
-        for stream in listener.incoming() {
-            let Ok(mut stream) = stream else { return };
-            let mut reader = BufReader::new(stream.try_clone().unwrap());
-            let mut request_line = String::new();
-            reader.read_line(&mut request_line).unwrap();
-            let mut content_length = 0;
-            loop {
-                let mut header = String::new();
-                reader.read_line(&mut header).unwrap();
-                if header.trim().is_empty() {
-                    break;
-                }
-                if let Some((name, value)) = header.split_once(':')
-                    && name.eq_ignore_ascii_case("content-length")
-                {
-                    content_length = value.trim().parse().unwrap();
-                }
-            }
-            let mut body = vec![0; content_length];
-            reader.read_exact(&mut body).unwrap();
-            let path = request_line
-                .split_whitespace()
-                .nth(1)
-                .unwrap_or("")
-                .to_string();
-            let _ = sent.send((path, String::from_utf8_lossy(&body).into_owned()));
-            let reply = br#"{"status":"ok","blobs_deleted":0}"#;
-            let _ = write!(
-                stream,
-                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                reply.len()
-            );
-            let _ = stream.write_all(reply);
-        }
-    });
-    (url, received)
-}
+use crate::recording_relay::recording_relay;
 
 /// Runs a deletion scheduled with `erase_guardian_set` and returns the
 /// purges the relay received and the identity's public key.

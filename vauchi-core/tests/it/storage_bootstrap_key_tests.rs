@@ -254,7 +254,7 @@ fn every_shred_deletes_the_bootstrap_key() {
     let shreds: [(&str, Shred); 2] = [
         ("panic", |storage, secure, identity, dir| {
             ShredManager::new(storage, secure, identity, dir)
-                .panic_shred(None, None)
+                .panic_shred()
                 .unwrap();
         }),
         ("widget", |_, secure, _, dir| {
@@ -291,7 +291,7 @@ fn a_shred_is_not_verified_clear_while_a_bootstrap_key_remains() {
     let secure = keys_with_leftover_bootstrap();
     let identity = Identity::create("Alice", 0);
     let manager = ShredManager::new(&storage, &secure, &identity, &data_dir);
-    manager.panic_shred(None, None).unwrap();
+    manager.panic_shred().unwrap();
     assert!(manager.verify_shred().all_clear);
 
     secure

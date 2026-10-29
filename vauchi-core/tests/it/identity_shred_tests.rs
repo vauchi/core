@@ -2,14 +2,19 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Shredding my identity: a panic shred tells every contact and the relay
-//! before it is gone, and any shred leaves nothing on the device.
+//! Shredding my identity: deleting it tells every contact and the relay
+//! before it is gone, and any shred leaves nothing on the device. A panic
+//! shred concerns this device only and tells nobody (#910).
+
+use std::sync::Arc;
+use std::time::{Duration, UNIX_EPOCH};
 
 use base64::Engine;
 use vauchi_core::api::{
     DeletionManager, PreSignedPurgeRequest, PurgeSender, RevocationSender, ShredError,
     ShredManager, ShredToken,
 };
+use vauchi_core::clock::FakeClock;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::{ShreddingMasterKey, SymmetricKey};
@@ -61,12 +66,17 @@ fn exchanged(storage: &Storage, name: &str) -> String {
     id
 }
 
-// @scenario: privacy_compliance :: Panic shred immediately destroys all data and notifies contacts
+// @scenario: privacy_compliance :: Execute deletion after grace period sends revocations and purge
 // @scenario: pre_signed_operations :: Contacts verify the revocation a deletion sends
 #[test]
-fn a_panic_shred_revokes_each_contact_purges_the_relay_and_destroys_everything() {
+fn deleting_my_identity_revokes_each_contact_purges_the_relay_and_destroys_everything() {
     let dir = tempfile::tempdir().unwrap();
-    let storage = Storage::open(&dir.path().join("vauchi.db"), SymmetricKey::generate()).unwrap();
+    let clock = Arc::new(FakeClock::new(
+        UNIX_EPOCH + Duration::from_secs(1_700_000_000),
+    ));
+    let storage = Storage::open(&dir.path().join("vauchi.db"), SymmetricKey::generate())
+        .unwrap()
+        .with_clock(clock.clone());
     let keys = MemoryKeyStorage::new();
     keys.save_key(
         SMK_KEY_NAME,
@@ -76,10 +86,12 @@ fn a_panic_shred_revokes_each_contact_purges_the_relay_and_destroys_everything()
     let me = Identity::create("Me", 0);
     let mut contacts = vec![exchanged(&storage, "Alice"), exchanged(&storage, "Bob")];
     let shred = ShredManager::new(&storage, &keys, &me, dir.path());
+    let token = shred.soft_shred().unwrap();
+    clock.advance(Duration::from_secs(7 * 24 * 60 * 60));
     let (mut relay, mut mailboxes) = (Relay::default(), Mailboxes::default());
 
     let report = shred
-        .panic_shred(Some(&mut relay), Some(&mut mailboxes))
+        .hard_shred(token, Some(&mut relay), Some(&mut mailboxes))
         .unwrap();
 
     let mut revoked: Vec<String> = mailboxes

@@ -301,7 +301,7 @@ mod tests {
             .expect("expected Some");
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let report = manager.panic_shred(None, None).unwrap();
+        let report = manager.panic_shred().unwrap();
 
         assert!(report.smk_destroyed);
         assert!(secure_storage.load_key(SMK_KEY_NAME).unwrap().is_none());
@@ -316,7 +316,7 @@ mod tests {
         msgs.save(dir.path()).unwrap();
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let report = manager.panic_shred(None, None).unwrap();
+        let report = manager.panic_shred().unwrap();
 
         // Should succeed — pre-signed messages were loaded before key destruction
         assert!(report.smk_destroyed);
@@ -329,7 +329,7 @@ mod tests {
 
         // Do NOT create pre-signed file — panic shred should fall back to fresh signing
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let report = manager.panic_shred(None, None).unwrap();
+        let report = manager.panic_shred().unwrap();
 
         // Should succeed even without pre-signed file
         assert!(report.smk_destroyed);
@@ -340,7 +340,7 @@ mod tests {
         let (dir, storage, secure_storage, identity) = setup_test_env();
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
 
-        manager.panic_shred(None, None).unwrap();
+        manager.panic_shred().unwrap();
 
         let verification = manager.verify_shred();
         assert!(verification.smk_absent, "SMK should be absent");
@@ -477,24 +477,6 @@ mod tests {
     }
 
     #[test]
-    fn test_panic_shred_sends_purge() {
-        let (dir, storage, secure_storage, identity) = setup_test_env();
-
-        // Create pre-signed messages file
-        let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
-        msgs.save(dir.path()).unwrap();
-
-        let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-
-        let mut sender = MockPurgeSender::new();
-        let report = manager.panic_shred(Some(&mut sender), None).unwrap();
-
-        assert!(sender.purge_sent, "Purge should have been sent");
-        assert!(report.relay_purge_sent, "Report should reflect purge sent");
-        assert!(report.smk_destroyed, "SMK should be destroyed");
-    }
-
-    #[test]
     fn test_shred_without_sender_still_works() {
         let (dir, storage, secure_storage, identity) = setup_test_env();
 
@@ -607,39 +589,6 @@ mod tests {
         let report = manager.hard_shred(token, None, Some(&mut sender)).unwrap();
 
         // Revocation failed but shred still succeeded
-        assert_eq!(report.contacts_notified, 0);
-        assert!(report.smk_destroyed, "SMK should still be destroyed");
-    }
-
-    #[test]
-    fn test_panic_shred_sends_revocations() {
-        let (dir, storage, secure_storage, identity) = setup_test_env();
-
-        add_test_contact(&storage, "contact_aaa");
-        add_test_contact(&storage, "contact_bbb");
-        add_test_contact(&storage, "contact_ccc");
-
-        let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-
-        let mut sender = MockRevocationSender::new();
-        let report = manager.panic_shred(None, Some(&mut sender)).unwrap();
-
-        assert_eq!(report.contacts_notified, 3);
-        assert_eq!(sender.sent_count(), 3);
-        assert!(report.smk_destroyed);
-    }
-
-    #[test]
-    fn test_panic_shred_revocation_failure_does_not_abort() {
-        let (dir, storage, secure_storage, identity) = setup_test_env();
-
-        add_test_contact(&storage, "contact_aaa");
-
-        let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-
-        let mut sender = MockRevocationSender::failing();
-        let report = manager.panic_shred(None, Some(&mut sender)).unwrap();
-
         assert_eq!(report.contacts_notified, 0);
         assert!(report.smk_destroyed, "SMK should still be destroyed");
     }

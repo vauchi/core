@@ -149,98 +149,23 @@ impl<'a> ShredManager<'a> {
         Ok(report)
     }
 
-    /// Panic Shred — immediate destruction, no grace period.
+    /// Panic Shred — immediate destruction of this device's data, no grace
+    /// period, and nothing sent.
     ///
-    /// Follows DP-2 (sign-before-destroy): loads pre-signed messages before
-    /// destroying any key material. Network operations happen after destruction.
-    ///
-    /// If `purge_sender` is provided, sends the pre-signed purge request to
-    /// the relay after key destruction (Phase C). Purge failure does not abort shred.
-    pub fn panic_shred(
-        &self,
-        purge_sender: Option<&mut dyn PurgeSender>,
-        revocation_sender: Option<&mut dyn RevocationSender>,
-    ) -> Result<ShredReport, ShredError> {
-        let mut report = ShredReport::default();
-
-        // ── Phase A: Prepare outbound messages while keys available ──
-
-        // 1. Purge signed now, while the keys are still available (DP-2); a
-        //    stored pre-signed purge would be older than the relay's 60 s
-        //    window (vauchi/private#899)
-        let purge =
-            PreSignedPurgeRequest::sign_now(self.identity, self.storage.clock().unix_seconds());
-
-        // Build revocation deliveries (token + blob) for each contact while
-        // keys + shared secrets are still available — the relay actually
-        // delivers these (an EncryptedUpdate), unlike a bare IdentityRevoked.
-        let deliveries: Vec<(String, String)> = {
-            use base64::Engine;
-            let now = self.storage.clock().unix_seconds();
-            let day_epoch = crate::network::mailbox_token::current_day_epoch(now);
-            let contacts = self.storage.contacts().list_contacts().unwrap_or_default();
-            let mut d = Vec::with_capacity(contacts.len());
-            for c in &contacts {
-                if let (Some(shared), Some(recipient_pk)) = (c.shared_key(), c.public_key()) {
-                    let rev = crate::network::IdentityRevoked::create(self.identity, c.id(), now);
-                    // Directional token: delivered to the contact's receive
-                    // mailbox (keyed to the contact's identity key).
-                    let token = crate::network::mailbox_token::token_hex(
-                        &crate::network::mailbox_token::compute_mailbox_token(
-                            shared.as_bytes(),
-                            recipient_pk,
-                            day_epoch,
-                        ),
-                    );
-                    let blob = base64::engine::general_purpose::STANDARD
-                        .encode(crate::network::revocation::encode_revocation_blob(&rev));
-                    d.push((token, blob));
-                }
-            }
-            d
+    /// An emergency wipe concerns one of the identity's devices: the others
+    /// keep working, so neither its contacts nor the relay are told
+    /// (vauchi/private#910, ADR-033 amendment 2026-10-29). Telling the whole
+    /// identity is identity deletion's job ([`Self::hard_shred`]).
+    pub fn panic_shred(&self) -> Result<ShredReport, ShredError> {
+        let mut report = ShredReport {
+            smk_destroyed: self.destroy_smk(),
+            ..ShredReport::default()
         };
-
-        // ── Phase B: Destroy all key material ──
-
-        // 3. Destroy SMK from all SecureStorage backends
-        report.smk_destroyed = self.destroy_smk();
-
-        // 4. Secure-delete identity backup file
         report.identity_file_destroyed = self.secure_delete_identity_file();
-
-        // 5. Delete all key files
         report.key_files_destroyed = self.delete_key_files();
-
-        // ── Phase C: Best-effort network and cleanup ──
-        // Send pre-signed purge after key destruction (best-effort)
-        if let Some(sender) = purge_sender {
-            report.relay_purge_sent = sender
-                .send_purge(&purge, self.storage.clock().unix_seconds())
-                .unwrap_or(false);
-        }
-
-        // Send revocation deliveries to contacts (best-effort, keys already
-        // destroyed; the blobs were signed in Phase A above).
-        if let Some(sender) = revocation_sender {
-            for (token, blob) in &deliveries {
-                if sender
-                    .send_revocation_delivery(token, blob, self.storage.clock().unix_seconds())
-                    .unwrap_or(false)
-                {
-                    report.contacts_notified += 1;
-                }
-            }
-        }
-
-        // 8. Secure-delete SQLite database
         report.sqlite_destroyed = self.secure_delete_database();
-
-        // 9. Delete pre-signed messages file
         report.pre_signed_deleted = self.delete_pre_signed_file();
-
-        // 10. Delete data directory
         report.data_dir_deleted = self.delete_data_directory();
-
         Ok(report)
     }
 

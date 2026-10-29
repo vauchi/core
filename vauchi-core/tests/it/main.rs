@@ -505,7 +505,6 @@ mod security_tests;
 mod send_phase_outcome_tests;
 mod settings_engine_tests;
 mod settings_flags_tests;
-mod shred_pre_signed_owner_tests;
 mod shred_purge_freshness_tests;
 mod six_device_convergence_tests;
 mod sleeper_tests;

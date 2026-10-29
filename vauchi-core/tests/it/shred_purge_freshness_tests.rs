@@ -2,18 +2,16 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! A shred's relay purge must be one the relay accepts when it arrives: the
-//! relay refuses a purge whose timestamp is more than 60 s from its clock
-//! (`relay/src/handler/verify.rs`, `TIMESTAMP_WINDOW`). A hard shred runs a
-//! week after the soft shred that stored the pre-signed purge, and a panic
-//! shred may find a stored purge of any age (vauchi/private#899).
+//! A hard shred's relay purge must be one the relay accepts when it arrives:
+//! the relay refuses a purge whose timestamp is more than 60 s from its clock
+//! (`relay/src/handler/verify.rs`, `TIMESTAMP_WINDOW`), and a hard shred runs
+//! a week after the soft shred that stored the pre-signed purge
+//! (vauchi/private#899). A panic shred sends nothing (#910).
 
 use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
 
-use vauchi_core::api::{
-    PreSignedPurgeRequest, PreSignedShredMessages, PurgeSender, ShredError, ShredManager,
-};
+use vauchi_core::api::{PreSignedPurgeRequest, PurgeSender, ShredError, ShredManager};
 use vauchi_core::clock::FakeClock;
 use vauchi_core::crypto::{PublicKey, Signature, SymmetricKey};
 use vauchi_core::identity::Identity;
@@ -94,24 +92,6 @@ fn a_hard_shred_a_week_after_the_soft_shred_sends_a_purge_the_relay_accepts() {
     let mut relay = Relay::default();
 
     let report = shred.hard_shred(token, Some(&mut relay), None).unwrap();
-
-    assert_eq!(relay.verdicts, vec![Ok(())]);
-    assert!(report.relay_purge_sent);
-}
-
-// @internal
-#[test]
-fn a_panic_shred_with_a_week_old_stored_purge_sends_one_the_relay_accepts() {
-    let d = device();
-    PreSignedShredMessages::generate(&d.me, START)
-        .save(d.dir.path())
-        .unwrap();
-    d.clock.advance(WEEK);
-    let mut relay = Relay::default();
-
-    let report = ShredManager::new(&d.storage, &d.keys, &d.me, d.dir.path())
-        .panic_shred(Some(&mut relay), None)
-        .unwrap();
 
     assert_eq!(relay.verdicts, vec![Ok(())]);
     assert!(report.relay_purge_sent);

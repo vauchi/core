@@ -211,19 +211,15 @@ impl PlatformAppEngine {
                     let identity = vauchi.identity().ok_or_else(|| MobileError::Other {
                         detail: "Identity not initialized".into(),
                     })?;
-                    let sender_id = identity.public_id();
-                    let (mut purge, mut rev) = self.shred_senders(vauchi, &sender_id);
                     let manager = vauchi_core::api::ShredManager::new(
                         vauchi.storage(),
                         &bridge,
                         identity,
                         data_dir,
                     );
-                    manager
-                        .panic_shred(Some(&mut purge), Some(&mut rev))
-                        .map_err(|e| MobileError::Other {
-                            detail: e.to_string(),
-                        })?
+                    manager.panic_shred().map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?
                 };
                 engine.invalidate_screen(&AppScreen::Settings);
                 engine.invalidate_screen(&AppScreen::Privacy);

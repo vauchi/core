@@ -4,7 +4,7 @@
 
 //! The shred phases as a user lives them: a soft shred waits out its week,
 //! a hard shred tells everyone while it still can and then destroys
-//! everything, and a panic shred without network still leaves nothing.
+//! everything, and a panic shred sends nothing and still leaves nothing.
 
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -205,17 +205,14 @@ fn a_hard_shred_with_the_network_down_records_the_failures_and_still_destroys() 
     assert!(shred.verify_shred().all_clear);
 }
 
-// @scenario: emergency_shred :: Panic shred when network is unavailable
+// @scenario: emergency_shred :: Panic shred destroys this device's data and sends nothing
 // @scenario: emergency_shred :: Shred verification audits completeness
 #[test]
-fn a_panic_shred_offline_destroys_everything_and_reports_no_notifications() {
+fn a_panic_shred_destroys_everything_on_this_device_and_reports_no_notifications() {
     let d = device();
     let shred = ShredManager::new(&d.storage, &d.keys, &d.me, d.dir.path());
-    let (mut relay, mut mailboxes) = (Network::new(&d.keys, false), Network::new(&d.keys, false));
 
-    let report = shred
-        .panic_shred(Some(&mut relay), Some(&mut mailboxes))
-        .unwrap();
+    let report = shred.panic_shred().unwrap();
 
     assert_eq!(
         (report.contacts_notified, report.relay_purge_sent),

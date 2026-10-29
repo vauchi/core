@@ -211,30 +211,20 @@ impl Vauchi {
         Ok(())
     }
 
-    /// Performs an emergency data wipe (panic shred).
+    /// Performs an emergency data wipe (panic shred) of this device.
     ///
     /// The crypto-shred (vauchi/private#599): every key that opens the data
     /// is deleted from secure storage, then the database and the data
     /// directory, through [`ShredManager::panic_shred`]; a copy of the data
-    /// taken before the wipe then has no key left that opens it. Requires
-    /// explicit confirmation, so a buggy caller cannot wipe by accident.
+    /// taken before the wipe then has no key left that opens it. It sends
+    /// nothing: the identity's other devices keep working, so its contacts
+    /// and the relay are not told (vauchi/private#910). Requires explicit
+    /// confirmation, so a buggy caller cannot wipe by accident.
     pub fn perform_emergency_wipe(&mut self, confirm: bool) -> VauchiResult<()> {
         if !confirm {
             return Err(VauchiError::InvalidState(
                 "emergency wipe requires explicit confirmation (confirm=true)".into(),
             ));
-        }
-
-        // Notify contacts that this identity is revoked, BEFORE destroying the
-        // shared keys + identity the signed deliveries depend on. Best-effort;
-        // network builds only (no relay transport without `network-http`).
-        #[cfg(feature = "network-http")]
-        if let Some(identity) = self.identity.as_ref() {
-            let now = self.clock.unix_seconds();
-            let contacts = self.storage.contacts().list_contacts()?;
-            let deliveries =
-                crate::api::deletion::build_revocation_deliveries(identity, &contacts, now);
-            let _ = self.broadcast_identity_revocations(&deliveries);
         }
 
         let data_dir = self
@@ -257,7 +247,7 @@ impl Vauchi {
         let secure: &dyn SecureStorage = self.secure_storage.as_deref().unwrap_or(&keyless);
         let report = match self.identity.as_ref() {
             Some(identity) => {
-                ShredManager::new(&self.storage, secure, identity, data_dir).panic_shred(None, None)
+                ShredManager::new(&self.storage, secure, identity, data_dir).panic_shred()
             }
             None => widget_panic_shred(data_dir, secure),
         }

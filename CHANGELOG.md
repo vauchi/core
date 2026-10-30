@@ -8,6 +8,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.94.1] — 2026-10-30
+
+### Fixed
+
+- A new identity's first sync reads its mailboxes for two days instead
+  of catching up the whole retained window: `create_identity` records a
+  receive checkpoint at today. Since 0.94.0's one-day fetch batches, the
+  catch-up sent about 100 OHTTP requests and tripped the outer relay's
+  per-address limit (vauchi/private#912). An identity set on a new
+  install still catches up.
+
+### Added
+
+- Requests to the outer OHTTP relay are paced: 25 go out at once, then
+  20 a second (`network::request_pacer`, on the client's injected clock
+  and sleeper; `Vauchi::with_ohttp_pacer` replaces it), so a long
+  catch-up stays under the relay's limit (vauchi/private#912).
+
 ## [0.94.0] — 2026-10-29
 
 ### Added

@@ -129,13 +129,17 @@ fn an_ack_is_fresh_for_sixty_seconds_after_the_responder_stamped_it() {
     ));
 }
 
+/// The card a peer sends over Bluetooth must name the identity and
+/// exchange keys the handshake used; otherwise the contact would be
+/// stored under keys this exchange never proved (vauchi/private#941,
+/// ship checklist SC-06).
 // @internal
 #[rstest::rstest]
-#[case::initiator_identity(true, true)]
-#[case::initiator_allows_distinct_exchange_key(true, false)]
-#[case::responder_identity(false, true)]
-#[case::responder_allows_distinct_exchange_key(false, false)]
-fn payload_binding_ble_binds_identity_and_allows_authenticated_exchange_keys(
+#[case::initiator_receives_a_foreign_identity(true, true)]
+#[case::initiator_receives_a_foreign_exchange_key(true, false)]
+#[case::responder_receives_a_foreign_identity(false, true)]
+#[case::responder_receives_a_foreign_exchange_key(false, false)]
+fn ble_card_with_a_foreign_identity_key_is_refused(
     #[case] victim_is_initiator: bool,
     #[case] substitute_identity: bool,
 ) {
@@ -149,15 +153,16 @@ fn payload_binding_ble_binds_identity_and_allows_authenticated_exchange_keys(
         vec![],
         None,
     );
-    let claimed_identity = if substitute_identity {
-        *unrelated.signing_public_key()
+    let (claimed_identity, claimed_exchange) = if substitute_identity {
+        (
+            *unrelated.signing_public_key(),
+            *malicious.x3dh_keypair().public_key(),
+        )
     } else {
-        *malicious.signing_public_key()
-    };
-    let claimed_exchange = if substitute_identity {
-        *malicious.x3dh_keypair().public_key()
-    } else {
-        *unrelated.x3dh_keypair().public_key()
+        (
+            *malicious.signing_public_key(),
+            *unrelated.x3dh_keypair().public_key(),
+        )
     };
     let malicious_card = BleCardPayload::new(
         claimed_identity,
@@ -177,51 +182,31 @@ fn payload_binding_ble_binds_identity_and_allows_authenticated_exchange_keys(
             BleHandshakeSession::new_responder(&honest, honest_card, T0),
         )
     };
-    let victim = if victim_is_initiator {
-        &mut initiator
-    } else {
-        &mut responder
-    };
-    victim.expect_peer(*malicious.signing_public_key());
-    victim.expect_exchange_key(*malicious.x3dh_keypair().public_key());
     let offer = initiator.create_key_offer().unwrap();
     let (ack, responder_card) = responder.process_key_offer(&offer, T0).unwrap();
 
-    if substitute_identity {
-        let error = if victim_is_initiator {
-            initiator
-                .process_key_ack(&ack, &responder_card, T0)
-                .expect_err("authenticated ciphertext must not rename its authenticated peer")
-        } else {
-            let (commitment, initiator_card) = initiator
-                .process_key_ack(&ack, &responder_card, T0)
-                .unwrap();
-            responder
-                .process_committed_payload(&commitment, &initiator_card)
-                .unwrap();
-            responder
-                .complete_exchange(&[])
-                .expect_err("authenticated ciphertext must not rename its authenticated peer")
-        };
-        assert!(
-            matches!(error, ExchangeError::IdentityMismatch),
-            "{error:?}"
-        );
+    let error = if victim_is_initiator {
+        initiator
+            .process_key_ack(&ack, &responder_card, T0)
+            .expect_err("a card naming keys the handshake did not use is refused")
     } else {
         let (commitment, initiator_card) = initiator
             .process_key_ack(&ack, &responder_card, T0)
-            .expect("the authenticated peer can choose a distinct future channel key");
-        let reveal = responder
+            .unwrap();
+        responder
             .process_committed_payload(&commitment, &initiator_card)
             .unwrap();
-        let responder_result = responder.complete_exchange(&[]).unwrap();
-        let initiator_result = initiator.complete_exchange(&reveal).unwrap();
-        let received = if victim_is_initiator {
-            initiator_result.remote_card
-        } else {
-            responder_result.remote_card
-        };
-        assert_eq!(received.identity_key, *malicious.signing_public_key());
-        assert_eq!(received.exchange_key, claimed_exchange);
-    }
+        responder
+            .complete_exchange(&[])
+            .expect_err("a card naming keys the handshake did not use is refused")
+    };
+
+    let expected_identity_refusal = substitute_identity;
+    assert!(
+        matches!(
+            (expected_identity_refusal, &error),
+            (true, ExchangeError::IdentityMismatch) | (false, ExchangeError::ExchangeKeyMismatch)
+        ),
+        "{error:?}"
+    );
 }

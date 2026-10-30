@@ -133,6 +133,13 @@ impl RecoveryEngine {
         self.step = RecoveryStep::ShowGeneratedClaim;
     }
 
+    /// Reopens a recovery stored on this device where it was left:
+    /// collecting vouchers for `claim_b64` (private#919).
+    pub fn resume_collecting(&mut self, claim_b64: impl Into<String>) {
+        self.generated_claim_b64 = Some(claim_b64.into());
+        self.step = RecoveryStep::CollectVouchers;
+    }
+
     /// Records a claim-creation failure and stays on the EnterOldKey
     /// step with an error attached to the input.
     pub fn set_create_claim_error(&mut self, message: impl Into<String>) {

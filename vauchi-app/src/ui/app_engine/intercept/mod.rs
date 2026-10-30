@@ -14,6 +14,8 @@ mod contact_lifecycle;
 mod recovery;
 mod settings;
 
+pub(super) use recovery::vouchers_collected;
+
 use super::AppEngine;
 use super::AppScreen;
 use crate::ui::action::{ActionResult, UserAction};

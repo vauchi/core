@@ -132,14 +132,7 @@ impl AppEngine {
         };
 
         let update = match self.vauchi.add_recovery_voucher_b64(&voucher) {
-            Ok(progress) => crate::ui::RecoveryUpdate::VouchersCollected {
-                signers: progress
-                    .vouchers
-                    .iter()
-                    .map(|voucher| short_fingerprint(voucher.voucher_pk().as_bytes()))
-                    .collect(),
-                threshold: progress.threshold as usize,
-            },
+            Ok(progress) => vouchers_collected(&progress),
             Err(_) => {
                 crate::ui::RecoveryUpdate::VoucherRefused(self.t("recovery.voucher_not_accepted"))
             }
@@ -188,6 +181,20 @@ impl AppEngine {
 
 /// The first four groups of a key's fingerprint, in the format of
 /// `Vauchi::own_fingerprint`: enough to tell helpers apart on screen.
+/// The proof's signers and threshold, as the recovery screen lists them.
+pub(in crate::ui::app_engine) fn vouchers_collected(
+    progress: &vauchi_core::RecoveryProgress,
+) -> crate::ui::RecoveryUpdate {
+    crate::ui::RecoveryUpdate::VouchersCollected {
+        signers: progress
+            .vouchers
+            .iter()
+            .map(|voucher| short_fingerprint(voucher.voucher_pk().as_bytes()))
+            .collect(),
+        threshold: progress.threshold as usize,
+    }
+}
+
 fn short_fingerprint(public_key: &[u8; 32]) -> String {
     hex::encode_upper(&public_key[..8])
         .as_bytes()

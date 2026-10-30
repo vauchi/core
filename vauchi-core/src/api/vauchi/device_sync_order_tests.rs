@@ -103,6 +103,7 @@ impl Pair {
     }
 }
 
+// @internal
 #[test]
 fn own_device_order_rejects_reordered_same_second_write_after_reload() {
     let pair = Pair::new();
@@ -114,6 +115,7 @@ fn own_device_order_rejects_reordered_same_second_write_after_reload() {
     assert_eq!(replayed, 0);
 }
 
+// @internal
 #[test]
 fn own_device_order_accepts_same_second_successor() {
     let pair = Pair::new();
@@ -124,6 +126,7 @@ fn own_device_order_accepts_same_second_successor() {
     assert_eq!(pair.value("Email"), "new@example.test");
 }
 
+// @internal
 #[test]
 fn own_device_order_keeps_independent_conflict_keys() {
     let pair = Pair::new();
@@ -163,6 +166,7 @@ impl Pair {
     }
 }
 
+// @internal
 #[test]
 fn own_device_order_queue_retry_reload_and_partial_ack_keep_positions() {
     let pair = Pair::new();

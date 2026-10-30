@@ -4,6 +4,7 @@
 
 use super::*;
 
+// @internal
 #[test]
 fn own_device_order_released_reader_skips_metadata_and_keeps_body() {
     let pair = Pair::new();
@@ -17,6 +18,7 @@ fn own_device_order_released_reader_skips_metadata_and_keeps_body() {
     );
 }
 
+// @internal
 #[test]
 fn own_device_order_rejects_bad_metadata_without_legacy_fallback() {
     use serde_json::json;
@@ -59,6 +61,7 @@ fn own_device_order_rejects_bad_metadata_without_legacy_fallback() {
     );
 }
 
+// @internal
 #[test]
 fn own_device_order_unknown_siblings_keep_sequence_positions_and_prevent_downgrade() {
     use serde_json::json;

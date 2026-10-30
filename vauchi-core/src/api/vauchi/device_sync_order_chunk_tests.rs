@@ -8,6 +8,7 @@ use crate::card::{ContactCard, ContactField, FieldType};
 use crate::network::{MockTransport, RelayClient, RelayClientConfig};
 use std::sync::Arc;
 
+// @internal
 #[test]
 fn own_device_order_actual_send_chunks_survive_reordering_retry_and_reload() {
     let pair = Pair::new();

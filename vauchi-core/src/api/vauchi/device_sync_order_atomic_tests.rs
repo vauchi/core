@@ -4,6 +4,7 @@
 
 use super::*;
 
+// @internal
 #[test]
 fn own_device_order_failed_apply_does_not_consume_floor_and_is_retryable() {
     let pair = Pair::new();
@@ -35,6 +36,7 @@ fn own_device_order_failed_apply_does_not_consume_floor_and_is_retryable() {
     assert_eq!(pair.apply(&blob), 0);
 }
 
+// @internal
 #[test]
 fn own_device_order_failed_commit_is_retryable_and_leaves_no_open_transaction() {
     let pair = Pair::new();
@@ -52,6 +54,7 @@ fn own_device_order_failed_commit_is_retryable_and_leaves_no_open_transaction() 
     assert_eq!(pair.apply(&blob), 0);
 }
 
+// @internal
 #[test]
 fn own_device_order_removed_contact_note_does_not_block_independent_field() {
     let pair = Pair::new();
@@ -87,6 +90,7 @@ fn own_device_order_removed_contact_note_does_not_block_independent_field() {
     assert_eq!(pair.apply(&envelope.ciphertext), 0);
 }
 
+// @internal
 #[test]
 fn own_device_order_missing_group_delete_does_not_block_independent_field() {
     let pair = Pair::new();
@@ -111,6 +115,7 @@ fn own_device_order_missing_group_delete_does_not_block_independent_field() {
     assert_eq!(pair.apply(&envelope.ciphertext), 0);
 }
 
+// @internal
 #[test]
 fn own_device_order_initial_floor_read_failure_is_retryable() {
     let pair = Pair::new();

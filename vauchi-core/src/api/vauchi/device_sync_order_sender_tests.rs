@@ -12,6 +12,7 @@ fn email(value: &str) -> SyncItem {
     }
 }
 
+// @internal
 #[test]
 fn own_device_order_sender_failed_commit_does_not_publish_uncommitted_sequence() {
     let pair = Pair::new();
@@ -42,6 +43,7 @@ fn own_device_order_sender_failed_commit_does_not_publish_uncommitted_sequence()
     assert_eq!(pair.value("Email"), "success@example.test");
 }
 
+// @internal
 #[test]
 fn own_device_order_cached_senders_do_not_reuse_durable_counter() {
     let pair = Pair::new();
@@ -66,6 +68,7 @@ fn own_device_order_cached_senders_do_not_reuse_durable_counter() {
     );
 }
 
+// @internal
 #[test]
 fn own_device_order_sender_stale_ack_preserves_newly_queued_successor() {
     let pair = Pair::new();
@@ -90,6 +93,7 @@ fn own_device_order_sender_stale_ack_preserves_newly_queued_successor() {
     );
 }
 
+// @internal
 #[test]
 fn own_device_order_sender_sequence_exhaustion_rejects_without_queuing_or_lock_leak() {
     let pair = Pair::new();

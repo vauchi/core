@@ -8,6 +8,7 @@ use proptest::prelude::*;
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(16))]
 
+    // @internal
     #[test]
     fn own_device_order_random_delivery_and_replay_preserves_latest_per_key(priorities in prop::collection::vec(any::<u64>(), 8)) {
         let pair = Pair::new();

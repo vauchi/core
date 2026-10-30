@@ -42,6 +42,7 @@ fn signed_peer_registry(pair: &Pair, retain_older: bool) -> (String, String, u64
     (contact_id, broadcast.to_json(), broadcast.version())
 }
 
+// @internal
 #[test]
 fn own_device_order_registry_storage_failure_is_retryable_without_consuming_sequence() {
     for retain_older in [false, true] {
@@ -115,6 +116,7 @@ fn own_device_order_registry_storage_failure_is_retryable_without_consuming_sequ
     }
 }
 
+// @internal
 #[test]
 fn own_device_order_invalid_signed_registry_does_not_block_independent_item() {
     let pair = Pair::new();

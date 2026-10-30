@@ -5,6 +5,7 @@
 use super::*;
 use crate::sync::InterDeviceSyncState;
 
+// @internal
 #[test]
 fn own_device_order_state_serde_legacy_resume_preserves_existing_pending_item() {
     let mut old = InterDeviceSyncState::new([7; 32]);
@@ -27,6 +28,7 @@ fn own_device_order_state_serde_legacy_resume_preserves_existing_pending_item() 
     );
 }
 
+// @internal
 #[test]
 fn own_device_order_state_tolerant_restore_zips_before_skipping_unknown_items() {
     let mut old = InterDeviceSyncState::new([7; 32]);

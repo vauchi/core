@@ -174,41 +174,33 @@ pub(crate) fn decode_rqrr(img: GrayImage) -> ScanResult {
     ScanResult::with_codes(codes, decode_start.elapsed().as_micros() as u64)
 }
 
-/// Decode the QR codes in the frame: rxing's single-code reader first, then
-/// its multi reader for any further code (the peer's, when the single
-/// reader found this phone's own reflection).
+/// Decode every QR code in the frame — the peer's and, facing it, this
+/// phone's own reflection — with rxing's port of the zxing-cpp detector.
 ///
-/// Both run because neither suffices alone. The multi reader alone read 9
-/// of 40 front-camera frames of a peer's Hover code at 13.5 cm, where the
-/// single reader read 30 (vauchi/private#450, 2026-10-29); the single reader
-/// alone reports one code per frame. `try_harder` adds sub-pixel refinement
-/// (V20+ support) at a higher cost.
+/// Not `QRCodeMultiReader`: that is rxing's port of the Java detector, which
+/// found the code in 10 of 40 front-camera frames of a peer's Hover code at
+/// 13.5 cm where this one found 30, and Hover failed (vauchi/private#450,
+/// post-mortem 2026-10-30). `try_harder` adds sub-pixel refinement (V20+
+/// support) at a higher cost.
 ///
 /// Takes owned `Vec<u8>` to avoid a second clone — rxing consumes the buffer.
 pub(crate) fn decode_rxing(luma: Vec<u8>, width: u32, height: u32, try_harder: bool) -> ScanResult {
     let decode_start = std::time::Instant::now();
 
-    let mut hints = rxing::DecodeHints {
+    let hints = rxing::DecodeHints {
         TryHarder: Some(try_harder),
+        PossibleFormats: Some(std::collections::HashSet::from([
+            rxing::BarcodeFormat::QR_CODE,
+        ])),
         ..Default::default()
     };
-    let mut codes: Vec<String> = rxing::helpers::detect_in_luma_with_hints(
-        luma.clone(),
-        width,
-        height,
-        Some(rxing::BarcodeFormat::QR_CODE),
-        &mut hints,
-    )
-    .map(|result| vec![result.getText().to_string()])
-    .unwrap_or_default();
     let mut bitmap = rxing::BinaryBitmap::new(rxing::common::HybridBinarizer::new(
         rxing::Luma8LuminanceSource::new(luma, width, height),
     ));
-    if let Ok(results) = rxing::multi::qrcode::QRCodeMultiReader::new()
+    let codes: Vec<String> = rxing::qrcode::cpp_port::QrReader
         .decode_multiple_with_hints(&mut bitmap, &hints)
-    {
-        codes.extend(results.iter().map(|r| r.getText().to_string()));
-    }
+        .map(|results| results.iter().map(|r| r.getText().to_string()).collect())
+        .unwrap_or_default();
 
     ScanResult::with_codes(codes, decode_start.elapsed().as_micros() as u64)
 }

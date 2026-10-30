@@ -113,3 +113,29 @@ fn the_input_error_survives_the_field_losing_focus() {
         "{unfocused:#?}"
     );
 }
+
+// iOS also re-sends the field's unchanged text right after Save; the same
+// value is not new input, so the error must stay (vauchi/private#845,
+// iPhone console 2026-10-30: ValueChanged 26 ms after the Save reply).
+// @scenario: contact_card_management :: Email validation
+#[test]
+fn the_input_error_survives_the_same_value_sent_again() {
+    let SavedForm {
+        mut engine, saved, ..
+    } = save_email("notanemail");
+    let (surface_id, binding_id) = first_input(&saved);
+
+    let resent = engine
+        .dispatch(Event::ValueChanged {
+            surface_id,
+            binding_id,
+            value: InputValue::Text("notanemail".into()),
+        })
+        .unwrap();
+
+    assert_eq!(
+        validation_errors(&resent),
+        vec!["Please enter a valid email address".to_string()],
+        "{resent:#?}"
+    );
+}

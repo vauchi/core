@@ -88,6 +88,9 @@ pub enum RecoveryError {
     #[error("Recovery claim has expired (older than 192 hours)")]
     ClaimExpired,
 
+    #[error("Recovery vouchers span more than 96 hours")]
+    VouchersOutsideWindow,
+
     #[error("Cannot vouch for your own recovery (self-vouching not allowed)")]
     SelfVouching,
 
@@ -576,6 +579,12 @@ impl RecoveryProof {
     /// Default proof expiration (90 days).
     const DEFAULT_EXPIRY_DAYS: u64 = 90;
 
+    /// The most a proof's voucher timestamps may span. Measured on the
+    /// vouchers because each helper signs its own timestamp, so neither
+    /// the recovering identity nor any single helper can move the window
+    /// (private#919).
+    pub const VOUCHER_WINDOW_SECS: u64 = 96 * 60 * 60;
+
     /// Creates a new recovery proof.
     pub fn new(
         old_pk: impl Into<IdentityKey>,
@@ -742,6 +751,13 @@ impl RecoveryProof {
             if voucher.old_pk != self.old_pk || voucher.new_pk != self.new_pk {
                 return Err(RecoveryError::MismatchedKeys);
             }
+        }
+
+        let timestamps = self.vouchers.iter().map(RecoveryVoucher::timestamp);
+        if let (Some(earliest), Some(latest)) = (timestamps.clone().min(), timestamps.max())
+            && latest - earliest > Self::VOUCHER_WINDOW_SECS
+        {
+            return Err(RecoveryError::VouchersOutsideWindow);
         }
 
         Ok(())

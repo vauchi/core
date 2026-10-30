@@ -13,8 +13,6 @@ use std::time::{Duration, Instant};
 
 use crate::monotonic::{MonotonicClock, SystemMonotonicClock};
 
-use super::ble_handshake::BleHandshakeSession;
-use super::ble_payload::BleCardPayload;
 use super::direct_transport::UsbRole;
 use super::nfc_handshake::NfcHandshakeSession;
 use super::trust_metrics::TrustMetrics;
@@ -28,7 +26,6 @@ use crate::crypto::kdf::HKDF;
 const USB_CARD_EXCHANGE_INFO: &[u8] = b"vauchi/usb-card-exchange/v1";
 use crate::diagnostic::exchange_debug::{ExchangeDebugEvent, ExchangeDebugLog};
 use crate::identity::Identity;
-use crate::platform::BleLinkDirection;
 use crate::{Command, Event};
 
 /// Session timeout duration (60 seconds for resumption).
@@ -70,8 +67,15 @@ pub enum ExchangeState {
     /// NFC: waiting for both devices to tap.
     AwaitingNfcTap,
     /// BLE: waiting for GATT connection and payload exchange.
+    ///
+    /// No `ExchangeSession` enters this state: BLE exchanges run in
+    /// `BleHandshakeSession` (private#893). Kept so matches in other crates
+    /// stay valid.
     AwaitingBleConnection,
     /// BLE: payloads exchanged, waiting for proximity verification.
+    ///
+    /// No `ExchangeSession` enters this state (private#893); kept for the
+    /// same compatibility reason as `AwaitingBleConnection`.
     AwaitingBleVerification {
         their_public_key: [u8; 32],
         their_exchange_key: [u8; 32],
@@ -103,14 +107,16 @@ pub enum ExchangeEvent {
     /// NFC tap completed; contains their payload bytes.
     NfcTapComplete { their_payload: Vec<u8> },
 
-    /// Start a BLE exchange (begin advertising/scanning).
+    /// Refused with `InvalidState`: BLE exchanges run in
+    /// `BleHandshakeSession` (private#893). The BLE variants stay so
+    /// existing callers keep compiling.
     StartBleExchange,
-    /// BLE payloads exchanged; contains their payload bytes and device ID.
+    /// Refused with `InvalidState`; see `StartBleExchange`.
     BlePayloadExchanged {
         their_payload: Vec<u8>,
         device_id: String,
     },
-    /// BLE proximity verified (challenge-response passed).
+    /// Refused with `InvalidState`; see `StartBleExchange`.
     BleProximityVerified,
 
     /// Proximity check completed with a confidence level.
@@ -125,7 +131,7 @@ pub enum ExchangeEvent {
 pub struct ExchangeSession {
     /// Current state
     state: ExchangeState,
-    /// Transport mechanism (QR, NFC, BLE)
+    /// Transport mechanism (QR, NFC, USB)
     transport: ExchangeTransport,
     /// Our identity
     identity: Identity,
@@ -158,26 +164,11 @@ pub struct ExchangeSession {
     their_display_name: Option<String>,
     /// NFC handshake session (only populated for NFC transport).
     nfc_handshake: Option<NfcHandshakeSession>,
-    /// BLE encrypted handshake session (only populated for BLE transport).
-    ble_handshake: Option<BleHandshakeSession>,
     /// Device hardware capabilities for transport fallback decisions.
     device_capabilities: Option<super::capability::types::DeviceCapabilities>,
     /// Role in a USB/TCP direct exchange (Initiator sends first, Responder receives first).
     /// `None` for non-USB transports.
     usb_role: Option<UsbRole>,
-    /// Whether we initiated the BLE connection (scanner role).
-    /// Set to `true` on `BleDeviceDiscovered`, determines who sends KeyOffer first.
-    ble_is_initiator: bool,
-    /// Peer device id of the BLE link this session talks over. Latched on
-    /// `BleDeviceDiscovered`/`BleConnected`; stamped onto every outgoing
-    /// BLE command so shells route writes to the right link under glare.
-    ble_link_device: Option<String>,
-    /// Physical direction of `ble_link_device`.
-    ble_link_direction: Option<BleLinkDirection>,
-    /// Buffered BLE handshake data (KeyAck or commitment) awaiting card data.
-    ble_pending_handshake: Option<Vec<u8>>,
-    /// Buffered BLE encrypted card data awaiting handshake data.
-    ble_pending_card: Option<Vec<u8>>,
     /// Our relay URL to include in QR code (for per-contact routing).
     our_relay_url: Option<String>,
     /// Their relay URL extracted from their QR code.
@@ -198,8 +189,8 @@ pub struct ExchangeSession {
     confirmation_our_slot: Option<String>,
     /// Their confirmation escrow slot hash.
     confirmation_their_slot: Option<String>,
-    /// Clock for stamping timestamps on peer-card field constructions
-    /// during BLE phase 4 and on every payload / QR / NFC generation.
+    /// Clock for stamping timestamps on every payload / QR / NFC
+    /// generation.
     /// Defaults to `crate::clock::SystemClock::shared()` in every
     /// `new_*` constructor; tests can override via `with_clock(...)`
     /// after construction. Phase 1 / Task 1.1 / Step 3b structural pass.
@@ -257,14 +248,8 @@ impl ExchangeSession {
             our_audio_challenge: None,
             their_display_name: None,
             nfc_handshake: None,
-            ble_handshake: None,
             device_capabilities: None,
             usb_role: None,
-            ble_is_initiator: false,
-            ble_link_device: None,
-            ble_link_direction: None,
-            ble_pending_handshake: None,
-            ble_pending_card: None,
             our_relay_url: None,
             their_relay_url: None,
             debug_log: None,
@@ -350,14 +335,8 @@ impl ExchangeSession {
             our_audio_challenge: None,
             their_display_name: None,
             nfc_handshake: None,
-            ble_handshake: None,
             device_capabilities: None,
             usb_role: None,
-            ble_is_initiator: false,
-            ble_link_device: None,
-            ble_link_direction: None,
-            ble_pending_handshake: None,
-            ble_pending_card: None,
             our_relay_url: None,
             their_relay_url: None,
             debug_log: None,
@@ -402,77 +381,8 @@ impl ExchangeSession {
             our_audio_challenge: None,
             their_display_name: None,
             nfc_handshake: Some(nfc_handshake),
-            ble_handshake: None,
             device_capabilities: None,
             usb_role: None,
-            ble_is_initiator: false,
-            ble_link_device: None,
-            ble_link_direction: None,
-            ble_pending_handshake: None,
-            ble_pending_card: None,
-            our_relay_url: None,
-            their_relay_url: None,
-            debug_log: None,
-            pending_commands: Vec::new(),
-            our_confirmation_token: None,
-            expected_their_token: None,
-            confirmation_gate_hash: None,
-            confirmation_our_slot: None,
-            confirmation_their_slot: None,
-            clock,
-            monotonic: SystemMonotonicClock::shared(),
-        }
-    }
-
-    /// Creates a new BLE exchange session.
-    ///
-    /// Uses GATT-based payload exchange with proximity verification.
-    /// Both sides use fresh ephemeral X25519 keys for full forward secrecy.
-    /// The session starts in `AwaitingBleConnection` — ready to receive a BLE event.
-    pub fn new_ble(
-        identity: Identity,
-        our_card: ContactCard,
-        proximity: impl ProximityVerifier + 'static,
-        clock: Arc<dyn crate::clock::Clock>,
-    ) -> Self {
-        let our_x3dh = X3DHKeyPair::generate();
-        let card = our_card.clone();
-        let ble_card = BleCardPayload::new(
-            *identity.signing_public_key(),
-            card.display_name().to_string(),
-            *our_x3dh.public_key(),
-            card.fields()
-                .iter()
-                .map(|f| (f.label().to_string(), f.value().to_string()))
-                .collect(),
-            card.avatar().map(|a| a.to_vec()),
-        );
-        let ble_handshake =
-            BleHandshakeSession::new_initiator(&identity, ble_card, clock.unix_seconds());
-        ExchangeSession {
-            state: ExchangeState::AwaitingBleConnection,
-            transport: ExchangeTransport::Ble,
-            identity,
-            our_card,
-            our_x3dh,
-            their_exchange_key: None,
-            proximity: Box::new(proximity),
-            proximity_confidence: ProximityConfidence::Unknown,
-            started_at: SystemMonotonicClock::new().now(),
-            interrupted: false,
-            used_qrs: HashSet::new(),
-            their_audio_challenge: None,
-            our_audio_challenge: None,
-            their_display_name: None,
-            nfc_handshake: None,
-            ble_handshake: Some(ble_handshake),
-            device_capabilities: None,
-            usb_role: None,
-            ble_is_initiator: false,
-            ble_link_device: None,
-            ble_link_direction: None,
-            ble_pending_handshake: None,
-            ble_pending_card: None,
             our_relay_url: None,
             their_relay_url: None,
             debug_log: None,
@@ -523,14 +433,8 @@ impl ExchangeSession {
             our_audio_challenge: Some(*our_qr.audio_challenge()),
             their_display_name: None,
             nfc_handshake: None,
-            ble_handshake: None,
             device_capabilities: None,
             usb_role: Some(role),
-            ble_is_initiator: false,
-            ble_link_device: None,
-            ble_link_direction: None,
-            ble_pending_handshake: None,
-            ble_pending_card: None,
             our_relay_url: None,
             their_relay_url: None,
             debug_log: None,
@@ -674,7 +578,7 @@ impl ExchangeSession {
     ///
     /// When a transport reports `HardwareUnavailable`, the session uses these
     /// capabilities to determine if a fallback transport is available (e.g.,
-    /// BLE → QR if `has_camera` is true).
+    /// NFC → QR if `has_camera` is true).
     pub fn set_device_capabilities(&mut self, caps: super::capability::types::DeviceCapabilities) {
         self.device_capabilities = Some(caps);
     }
@@ -696,11 +600,6 @@ impl ExchangeSession {
     /// expiry.
     pub fn qr_resume_secret(&self) -> Option<zeroize::Zeroizing<[u8; 32]>> {
         self.qr().map(|_| self.our_x3dh.secret_bytes())
-    }
-
-    /// Returns mutable access to the BLE encrypted handshake session.
-    pub fn ble_handshake_mut(&mut self) -> Option<&mut BleHandshakeSession> {
-        self.ble_handshake.as_mut()
     }
 
     /// Returns the peer's audio challenge if one has been stored from their QR code.
@@ -839,12 +738,11 @@ impl ExchangeSession {
             ExchangeEvent::NfcTapComplete { their_payload } => {
                 self.handle_nfc_tap_complete(their_payload)
             }
-            ExchangeEvent::StartBleExchange => self.handle_start_ble_exchange(),
-            ExchangeEvent::BlePayloadExchanged {
-                their_payload,
-                device_id,
-            } => self.handle_ble_payload_exchanged(their_payload, device_id),
-            ExchangeEvent::BleProximityVerified => self.handle_ble_proximity_verified(),
+            ExchangeEvent::StartBleExchange
+            | ExchangeEvent::BlePayloadExchanged { .. }
+            | ExchangeEvent::BleProximityVerified => Err(ExchangeError::InvalidState(
+                "BLE exchanges run in BleHandshakeSession (private#893)".into(),
+            )),
             ExchangeEvent::ProximityCheckCompleted { confidence } => {
                 self.proximity_confidence = confidence;
                 Ok(())
@@ -895,7 +793,7 @@ impl ExchangeSession {
     /// Processes a hardware event from the frontend and advances the state machine.
     ///
     /// This is the ADR-031 entry point. Frontends report hardware results
-    /// (QR scanned, BLE data received, etc.) and this method:
+    /// (QR scanned, NFC data received, etc.) and this method:
     /// 1. Converts the event to an internal `ExchangeEvent`
     /// 2. Calls `apply()` to advance the state machine
     /// 3. Emits response commands based on the new state
@@ -905,16 +803,6 @@ impl ExchangeSession {
         match event {
             Event::QrScanned { data } => self.handle_qr_scanned(data),
             Event::NfcDataReceived { data } => self.handle_nfc_data_received(data),
-            Event::BleConnected {
-                device_id,
-                direction,
-            } => self.handle_ble_connected(device_id, direction),
-            Event::BleCharacteristicRead { uuid, data, .. }
-            | Event::BleCharacteristicNotified { uuid, data, .. } => {
-                self.handle_ble_characteristic_data(uuid, data)
-            }
-            Event::BleDeviceDiscovered { id, .. } => self.handle_ble_device_discovered(id),
-            Event::BleDisconnected { reason, .. } => self.handle_ble_disconnected(reason),
             Event::HardwareError { transport, error } => {
                 self.handle_hardware_error(transport, error)
             }
@@ -951,26 +839,6 @@ impl ExchangeSession {
             self.emit_command(Command::NfcDeactivate);
         }
         result
-    }
-
-    /// Handles BLE peer discovery — stop scanning and initiate connection.
-    fn handle_ble_device_discovered(&mut self, id: String) -> Result<(), ExchangeError> {
-        self.ble_is_initiator = true;
-        self.ble_link_device = Some(id.clone());
-        self.emit_command(Command::BleStopScanning);
-        self.emit_command(Command::BleConnect { device_id: id });
-        Ok(())
-    }
-
-    /// Handles BLE disconnection. If we were awaiting connection, fail the exchange.
-    fn handle_ble_disconnected(&mut self, reason: String) -> Result<(), ExchangeError> {
-        if matches!(self.state, ExchangeState::AwaitingBleConnection) {
-            self.apply(ExchangeEvent::Fail(ExchangeError::BleConnectionLost))?;
-        }
-        self.debug_event(ExchangeDebugEvent::ExchangeFailed {
-            error: format!("BLE disconnected: {}", reason),
-        });
-        Ok(())
     }
 
     /// Handles a hardware error by failing the exchange.
@@ -1032,6 +900,13 @@ impl ExchangeSession {
             // BLE MTU negotiation is a transport-layer signal consumed by the binding's
             // GATT chunker. The core session has no opinion on it.
             Event::BleMtuNegotiated { .. } => {}
+            // BLE link events drive `BleHandshakeSession` through vauchi-app's
+            // `BleHandshakeMachine`, not this session (private#893).
+            Event::BleDeviceDiscovered { .. }
+            | Event::BleConnected { .. }
+            | Event::BleCharacteristicRead { .. }
+            | Event::BleCharacteristicNotified { .. }
+            | Event::BleDisconnected { .. } => {}
             // LocationResult is a contact annotation (ADR-051 "where we met"), not a
             // handshake event. The annotation layer captures it at exchange completion.
             Event::LocationResult { .. } => {}
@@ -1044,8 +919,8 @@ impl ExchangeSession {
     /// Emits initial commands for the current transport type.
     ///
     /// Call this after creating a new session to get the first set of
-    /// hardware commands (e.g., `QrDisplay` for QR sessions, `BleStartScanning`
-    /// for BLE sessions). Use `drain_commands()` to retrieve them.
+    /// hardware commands (e.g., `QrDisplay` for QR sessions, `NfcActivate`
+    /// for NFC sessions). Use `drain_commands()` to retrieve them.
     pub fn emit_initial_commands(&mut self) {
         // Build commands first to avoid borrowing conflicts with emit_command().
         let cmds: Vec<Command> = match (&self.state, self.transport) {
@@ -1074,17 +949,6 @@ impl ExchangeSession {
                     apdus: super::nfc_apdu::frame_command(&payload).unwrap_or_default(),
                     payload,
                 }]
-            }
-            (ExchangeState::AwaitingBleConnection, ExchangeTransport::Ble) => {
-                vec![
-                    Command::BleStartScanning {
-                        service_uuid: super::VAUCHI_BLE_SERVICE_UUID.to_string(),
-                    },
-                    Command::BleStartAdvertising {
-                        service_uuid: super::VAUCHI_BLE_SERVICE_UUID.to_string(),
-                        payload: Vec::new(),
-                    },
-                ]
             }
             (ExchangeState::AwaitingDirectPayload { our_qr }, ExchangeTransport::Usb) => {
                 vec![Command::DirectSend {
@@ -1157,7 +1021,7 @@ impl ExchangeSession {
     /// reports unavailable. Checks `device_capabilities` to find a supported
     /// fallback and emits initial commands for that transport.
     ///
-    /// Fallback priority: BLE/NFC → QR (camera required).
+    /// Fallback priority: NFC → QR (camera required).
     /// QR is the universal fallback since it requires only a camera.
     fn attempt_transport_fallback(&mut self, _failed_transport: &str) {
         let caps = match &self.device_capabilities {
@@ -1166,10 +1030,7 @@ impl ExchangeSession {
         };
 
         // Only fall back if we haven't progressed past the initial transport state
-        let can_fallback = matches!(
-            self.state,
-            ExchangeState::AwaitingBleConnection | ExchangeState::AwaitingNfcTap
-        );
+        let can_fallback = matches!(self.state, ExchangeState::AwaitingNfcTap);
         if !can_fallback {
             return;
         }
@@ -1184,255 +1045,6 @@ impl ExchangeSession {
                 self.emit_initial_commands();
             }
         }
-    }
-
-    // ── ADR-031: BLE command/event handlers ─────────────────────────────
-
-    /// Handles a BLE connection event.
-    ///
-    /// If we're the initiator (saw `BleDeviceDiscovered` first), creates a
-    /// `KeyOffer` and emits a `BleWriteCharacteristic` command to send it.
-    /// Responders do nothing here — they wait for the KeyOffer to arrive.
-    fn handle_ble_connected(
-        &mut self,
-        device_id: String,
-        direction: BleLinkDirection,
-    ) -> Result<(), ExchangeError> {
-        if self.transport != ExchangeTransport::Ble {
-            return Ok(());
-        }
-        self.ble_link_device = Some(device_id.clone());
-        self.ble_link_direction = Some(direction);
-        if !self.ble_is_initiator {
-            return Ok(()); // Responder waits for KeyOffer
-        }
-        let hs = match self.ble_handshake.as_mut() {
-            Some(hs) => hs,
-            None => return Ok(()),
-        };
-        let key_offer = hs.create_key_offer()?;
-        self.emit_command(Command::BleWriteCharacteristic {
-            device_id,
-            direction,
-            uuid: super::CHAR_HANDSHAKE_WRITE.to_string(),
-            data: key_offer,
-        });
-        Ok(())
-    }
-
-    /// Routes BLE characteristic data to the appropriate handshake phase.
-    ///
-    /// BLE handshake data arrives on two characteristics:
-    /// - `CHAR_HANDSHAKE_NOTIFY`: KeyAck (Phase 2), reveal (Phase 4)
-    /// - `CHAR_DATA_NOTIFY`: encrypted card data
-    ///
-    /// Phase 2 requires both a KeyAck and encrypted card. These may arrive
-    /// in either order, so we buffer whichever comes first and process when
-    /// both are available.
-    fn handle_ble_characteristic_data(
-        &mut self,
-        uuid: String,
-        data: Vec<u8>,
-    ) -> Result<(), ExchangeError> {
-        if self.transport != ExchangeTransport::Ble {
-            // Non-BLE session — fall back to legacy single-event handling
-            return self.apply(ExchangeEvent::BlePayloadExchanged {
-                their_payload: data,
-                device_id: String::new(),
-            });
-        }
-
-        let hs = match self.ble_handshake.as_ref() {
-            Some(hs) => hs,
-            None => return Ok(()),
-        };
-
-        // Route based on handshake state and characteristic UUID
-        use super::ble_handshake::BleHandshakeState;
-        match hs.state() {
-            BleHandshakeState::KeyOfferSent { .. } => {
-                // Initiator: waiting for KeyAck + encrypted card (Phase 2)
-                self.buffer_and_process_phase2(uuid, data)
-            }
-            BleHandshakeState::AwaitingPayload { .. } => {
-                // Responder: waiting for commitment + their encrypted card (Phase 3)
-                self.buffer_and_process_phase3(uuid, data)
-            }
-            BleHandshakeState::PayloadsExchanged { .. } => {
-                // Initiator: waiting for reveal (Phase 4)
-                if uuid == super::CHAR_HANDSHAKE_NOTIFY {
-                    self.process_ble_phase4(data)
-                } else {
-                    Ok(())
-                }
-            }
-            _ => Ok(()),
-        }
-    }
-
-    /// Buffers Phase 2 data (KeyAck + encrypted card) and processes when both arrive.
-    fn buffer_and_process_phase2(
-        &mut self,
-        uuid: String,
-        data: Vec<u8>,
-    ) -> Result<(), ExchangeError> {
-        if uuid == super::CHAR_HANDSHAKE_NOTIFY {
-            self.ble_pending_handshake = Some(data);
-        } else if uuid == super::CHAR_DATA_NOTIFY {
-            self.ble_pending_card = Some(data);
-        }
-
-        // Process when both arrive
-        if self.ble_pending_handshake.is_some() && self.ble_pending_card.is_some() {
-            let key_ack = self.ble_pending_handshake.take().expect("checked Some");
-            let their_card = self.ble_pending_card.take().expect("checked Some");
-            let hs = self.ble_handshake.as_mut().ok_or_else(|| {
-                ExchangeError::InvalidState("BLE handshake not initialized".into())
-            })?;
-            let (our_commitment, our_encrypted_card) =
-                hs.process_key_ack(&key_ack, &their_card, self.clock.unix_seconds())?;
-
-            let link = self.ble_link_device.clone().unwrap_or_default();
-            let direction = self
-                .ble_link_direction
-                .unwrap_or(BleLinkDirection::Outbound);
-            self.emit_command(Command::BleWriteCharacteristic {
-                device_id: link.clone(),
-                direction,
-                uuid: super::CHAR_HANDSHAKE_WRITE.to_string(),
-                data: our_commitment,
-            });
-            self.emit_command(Command::BleWriteCharacteristic {
-                device_id: link,
-                direction,
-                uuid: super::CHAR_DATA_WRITE.to_string(),
-                data: our_encrypted_card,
-            });
-        }
-        Ok(())
-    }
-
-    /// Buffers Phase 3 data (commitment + their encrypted card) and processes when both arrive.
-    fn buffer_and_process_phase3(
-        &mut self,
-        uuid: String,
-        data: Vec<u8>,
-    ) -> Result<(), ExchangeError> {
-        if uuid == super::CHAR_HANDSHAKE_WRITE {
-            self.ble_pending_handshake = Some(data);
-        } else if uuid == super::CHAR_DATA_WRITE {
-            self.ble_pending_card = Some(data);
-        }
-
-        // Process when both arrive (guard without consuming)
-        if self.ble_pending_handshake.is_some() && self.ble_pending_card.is_some() {
-            let their_commitment = self.ble_pending_handshake.take().expect("checked Some");
-            let their_card = self.ble_pending_card.take().expect("checked Some");
-            let hs = self.ble_handshake.as_mut().ok_or_else(|| {
-                ExchangeError::InvalidState("BLE handshake not initialized".into())
-            })?;
-            let reveal = hs.process_committed_payload(&their_commitment, &their_card)?;
-
-            // Send reveal back
-            let link = self.ble_link_device.clone().unwrap_or_default();
-            let direction = self.ble_link_direction.unwrap_or(BleLinkDirection::Inbound);
-            self.emit_command(Command::BleWriteCharacteristic {
-                device_id: link,
-                direction,
-                uuid: super::CHAR_HANDSHAKE_NOTIFY.to_string(),
-                data: reveal,
-            });
-        }
-        Ok(())
-    }
-
-    /// Processes Phase 4: verify reveal and complete the exchange.
-    fn process_ble_phase4(&mut self, reveal: Vec<u8>) -> Result<(), ExchangeError> {
-        let hs = self
-            .ble_handshake
-            .as_mut()
-            .ok_or_else(|| ExchangeError::InvalidState("No BLE handshake session".into()))?;
-
-        let result = hs.complete_exchange(&reveal)?;
-
-        // Build a ContactCard from the BLE payload fields
-        let remote = &result.remote_card;
-        let mut their_card = ContactCard::new(&remote.display_name);
-        for (label, value) in &remote.fields {
-            // BLE payload is parser-validated for length; add_field can
-            // still fail on MAX_FIELDS / Validation. ADR-042-shape lenient:
-            // keep the peer card, drop the failing field — but surface
-            // for operators (corrupt-payload rates from peers).
-            // PII-safe: ContactCardError variants carry no field value
-            // or label.
-            if let Err(e) = their_card.add_field(crate::card::ContactField::new(
-                crate::card::FieldType::Custom,
-                label,
-                value,
-                self.clock.unix_seconds(),
-            )) {
-                // ADR-042-shape lenient: keep the peer card, drop only the
-                // failing field. Log at debug level — the caller decides
-                // whether to surface warnings to the user.
-                tracing::debug!(
-                    error = %e,
-                    "ble exchange: dropping peer field that failed validation"
-                );
-            }
-        }
-        if let Some(ref avatar) = remote.avatar
-            && let Err(e) = their_card.set_avatar(avatar.clone())
-        {
-            // ADR-042: peer-supplied avatar bytes go through the same
-            // WebP normalization as local avatars. A failure here means
-            // the peer's payload didn't decode or didn't fit within the
-            // size cap. Lenient: keep the contact, drop only the avatar
-            // — but log so we see corrupt-payload rates from peers.
-            // PII-safe: ContactCardError variants do not include the
-            // avatar bytes or any peer identifier.
-            // Log at debug level — the caller decides whether to surface
-            // warnings to the user.
-            tracing::debug!(
-                error = %e,
-                "ble exchange: dropping peer avatar that failed normalization (ADR-042)"
-            );
-        }
-
-        // Derive a relay-use shared key from both parties' identity keys.
-        // This is deterministic — both sides compute the same key. Used for
-        // relay message encryption, NOT for BLE session encryption (that's
-        // handled by BleHandshakeSession's ephemeral DH).
-        let our_id = self.identity.signing_public_key();
-        let (id_lo, id_hi) =
-            super::key_order::sorted_pair(our_id.as_slice(), remote.identity_key.as_slice());
-        let mut relay_info = b"vauchi-ble-relay-key-v1".to_vec();
-        relay_info.extend_from_slice(id_lo);
-        relay_info.extend_from_slice(id_hi);
-        let dh_bytes = self.our_x3dh.diffie_hellman(&remote.exchange_key)?;
-        let relay_derived = HKDF::derive_key(None, &*dh_bytes, &relay_info);
-        let relay_key = crate::crypto::SymmetricKey::from_bytes(*relay_derived);
-
-        // Retain the peer's X25519 exchange key so the post-Complete ratchet
-        // setup keys off it (initiator side), consistent with the relay_key DH.
-        self.their_exchange_key = Some(remote.exchange_key);
-
-        let mut contact = Contact::from_exchange_full(
-            remote.identity_key,
-            their_card,
-            relay_key,
-            self.proximity_confidence,
-            self.transport,
-            0,
-        );
-        contact.set_relay_url(self.their_relay_url.take());
-
-        contact.set_trust_metrics(Some(self.build_trust_metrics()));
-
-        self.state = ExchangeState::Complete {
-            contact: Box::new(contact.clone()),
-        };
-        self.debug_event(ExchangeDebugEvent::ExchangeCompleted);
-        Ok(())
     }
 
     /// Runs a proximity check using the session's proximity verifier.
@@ -1859,92 +1471,6 @@ impl ExchangeSession {
         Ok(())
     }
 
-    fn handle_start_ble_exchange(&mut self) -> Result<(), ExchangeError> {
-        if self.transport != ExchangeTransport::Ble {
-            return Err(ExchangeError::InvalidState(
-                "StartBleExchange requires Ble transport".into(),
-            ));
-        }
-        if !matches!(
-            self.state,
-            ExchangeState::Idle | ExchangeState::AwaitingBleConnection
-        ) {
-            return Err(ExchangeError::InvalidState(
-                "Can only start BLE exchange from Idle or AwaitingBleConnection state".into(),
-            ));
-        }
-
-        self.state = ExchangeState::AwaitingBleConnection;
-        Ok(())
-    }
-
-    fn handle_ble_payload_exchanged(
-        &mut self,
-        their_payload: Vec<u8>,
-        device_id: String,
-    ) -> Result<(), ExchangeError> {
-        if self.transport != ExchangeTransport::Ble {
-            return Err(ExchangeError::InvalidState(
-                "BlePayloadExchanged requires Ble transport".into(),
-            ));
-        }
-        if !matches!(self.state, ExchangeState::AwaitingBleConnection) {
-            return Err(ExchangeError::InvalidState(
-                "Can only exchange BLE payload from AwaitingBleConnection state".into(),
-            ));
-        }
-
-        let parsed = super::ble::ExchangeBle::from_bytes(&their_payload)?;
-
-        if parsed.is_expired(self.clock.unix_seconds()) {
-            return Err(ExchangeError::BleExpired);
-        }
-        if !parsed.verify_signature() {
-            return Err(ExchangeError::InvalidSignature);
-        }
-
-        let their_public_key = *parsed.identity_key();
-        let their_exchange_key = *parsed.exchange_key();
-
-        if their_public_key == *self.identity.signing_public_key() {
-            return Err(ExchangeError::SelfExchange);
-        }
-
-        self.state = ExchangeState::AwaitingBleVerification {
-            their_public_key,
-            their_exchange_key,
-            device_id,
-        };
-        Ok(())
-    }
-
-    fn handle_ble_proximity_verified(&mut self) -> Result<(), ExchangeError> {
-        if self.transport != ExchangeTransport::Ble {
-            return Err(ExchangeError::InvalidState(
-                "BleProximityVerified requires Ble transport".into(),
-            ));
-        }
-
-        let (their_public_key, their_exchange_key) = match &self.state {
-            ExchangeState::AwaitingBleVerification {
-                their_public_key,
-                their_exchange_key,
-                ..
-            } => (*their_public_key, *their_exchange_key),
-            _ => {
-                return Err(ExchangeError::InvalidState(
-                    "Can only verify BLE proximity from AwaitingBleVerification state".into(),
-                ));
-            }
-        };
-
-        self.state = ExchangeState::AwaitingKeyAgreement {
-            their_public_key,
-            their_exchange_key,
-        };
-        Ok(())
-    }
-
     /// Returns our card (for sending to the other party).
     pub fn our_card(&self) -> &ContactCard {
         &self.our_card
@@ -1972,9 +1498,6 @@ impl ExchangeSession {
                 their_public_key, ..
             }
             | ExchangeState::AwaitingCardExchange {
-                their_public_key, ..
-            }
-            | ExchangeState::AwaitingBleVerification {
                 their_public_key, ..
             } => Some(their_public_key),
             _ => None,

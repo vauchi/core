@@ -2,12 +2,13 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Repeat (2nd-to-nth) in-person exchange — rekey + upsert.
+//! Repeat (2nd-to-nth) in-person exchange — upsert, no rekey.
 //!
 //! A 2nd in-person exchange between the SAME two parties re-exchanges fresh
-//! cards and a fresh shared secret. Per the 2026-06-27 repeat-exchange
-//! decision it must UPSERT the peer's (updated) card and REKEY the channel —
-//! never drop the new card. The BLE, QR, and multi-stage completion paths all
+//! cards. It must UPSERT the peer's (updated) card — never drop it — and
+//! keep the channel the first exchange keyed: an exchange never rekeys an
+//! existing contact (private#941, ship checklist SC-06, replacing the rekey
+//! of the 2026-06-27 repeat-exchange decision). The BLE, QR, and multi-stage completion paths all
 //! route through `Vauchi::save_exchanged_contact` so the three stay consistent
 //! (ADR-021/043: the reuse-vs-rekey logic lives in core, not per-transport in
 //! the humble frontends).
@@ -22,8 +23,8 @@ use vauchi_core::{
     Contact, ContactField, FieldType, SymmetricKey, api::process_single_card_update,
 };
 
-/// A 2nd exchange of the same pair updates the peer's card and rekeys, so a
-/// later card-update still round-trips under the new channel.
+/// A 2nd exchange of the same pair updates the peer's card and keeps the
+/// channel, so a later card-update still round-trips on it.
 ///
 /// RED before `save_exchanged_contact` upserts: the historical BLE/multistage
 /// path called `add_contact`, which rejects a duplicate id and returned BEFORE
@@ -32,7 +33,7 @@ use vauchi_core::{
 // @scenario: contact_exchange :: Repeat in-person exchange of the same pair
 // @scenario: sync_updates :: Update propagates after a re-exchange
 #[test]
-fn second_exchange_upserts_card_and_rekeys_so_sync_round_trips() {
+fn second_exchange_upserts_card_and_sync_round_trips_on_the_kept_channel() {
     let alice = create_vauchi_with_card("Alice", vec![(FieldType::Email, "work", "alice@old.com")]);
     let bob = create_vauchi_with_card("Bob", vec![(FieldType::Email, "personal", "bob@v1.com")]);
 
@@ -95,8 +96,8 @@ fn second_exchange_upserts_card_and_rekeys_so_sync_round_trips() {
         "a 2nd exchange of the same pair must UPDATE the peer's card, not drop it"
     );
 
-    // ASSERT 2 (the goal): a card-update prepared under the post-rekey ratchet
-    // round-trips to the peer — the re-exchange propagates as a sync update.
+    // ASSERT 2 (the goal): a later card-update round-trips to the peer on
+    // the channel the first exchange keyed.
     let alice_old = alice.own_card().unwrap().unwrap();
     let alice_email_id = alice_old
         .fields()
@@ -120,7 +121,7 @@ fn second_exchange_upserts_card_and_rekeys_so_sync_round_trips() {
         &alice_id,
         &encrypted,
     )
-    .expect("peer must decrypt the update under the rekeyed channel");
+    .expect("peer must decrypt the update on the kept channel");
 
     let alice_at_bob_final = bob.get_contact(&alice_id).unwrap().unwrap();
     let final_email = alice_at_bob_final
@@ -132,7 +133,7 @@ fn second_exchange_upserts_card_and_rekeys_so_sync_round_trips() {
     assert_eq!(
         final_email.value(),
         "alice@new.com",
-        "the post-rekey update must reflect at the peer"
+        "the later update must reflect at the peer"
     );
 }
 
@@ -200,19 +201,12 @@ fn first_exchange_inserts_contact_and_card_update_round_trips() {
     );
 }
 
-/// A card-update sent under the OLD ratchet, received AFTER a rekey, is
-/// gracefully skipped — it does not apply, does not corrupt the rekeyed
-/// channel, and a subsequent update under the new ratchet still delivers.
-///
-/// This pins the in-flight-undecryptable safety net for rekey+upsert: the
-/// stale message fails to decrypt (skipped + ACK-dropped by the receive
-/// phase), its content is superseded by the in-person re-exchange, and the
-/// atomic ratchet-save (only on success) means the failed decrypt never
-/// advances the stored ratchet ("ratchet advanced but message lost",
-/// Tracker #159). 2026-06-27-repeat-exchange-sync-propagation.
-// @scenario: sync_updates :: Stale pre-rekey update is skipped, channel survives
+/// A card-update in flight across a repeat exchange still applies: the
+/// repeat keeps the channel, so the update sealed before it decrypts after
+/// it, and a later update delivers too (private#941, SC-06).
+// @scenario: sync_updates :: An update in flight across a re-exchange still applies
 #[test]
-fn stale_pre_rekey_update_is_skipped_and_does_not_break_the_rekeyed_channel() {
+fn an_update_in_flight_across_a_repeat_exchange_still_applies() {
     let alice = create_vauchi_with_card("Alice", vec![(FieldType::Email, "work", "alice@old.com")]);
     let bob = create_vauchi_with_card("Bob", vec![(FieldType::Email, "personal", "bob@email.com")]);
 
@@ -250,7 +244,7 @@ fn stale_pre_rekey_update_is_skipped_and_does_not_break_the_rekeyed_channel() {
     let new1 = alice.own_card().unwrap().unwrap();
     let u1 = common::card_update::seal_update_default(&alice, &bob_id, &old1, &new1);
 
-    // ── Exchange #2 — both rekey to ratchet2 (the re-exchange supersedes U1).
+    // ── Exchange #2 — both keep ratchet1; ratchet2 is offered and not taken.
     let secret2 = SymmetricKey::generate();
     let (a_rat2, b_rat2) = setup_ratchets(&secret2);
     alice
@@ -267,11 +261,9 @@ fn stale_pre_rekey_update_is_skipped_and_does_not_break_the_rekeyed_channel() {
     )
     .unwrap();
 
-    // Bob receives the stale U1 (old ratchet) AFTER the rekey → skipped, not applied.
-    assert!(
-        process_single_card_update(bob.identity().unwrap(), bob.storage(), &alice_id, &u1).is_err(),
-        "a stale old-ratchet update after a rekey must fail to decrypt (skipped), not apply"
-    );
+    // Bob receives U1 after the repeat exchange; the kept channel opens it.
+    process_single_card_update(bob.identity().unwrap(), bob.storage(), &alice_id, &u1)
+        .expect("an update sealed before a repeat exchange still decrypts after it");
     let alice_at_bob_after = bob.get_contact(&alice_id).unwrap().unwrap();
     let work_after = alice_at_bob_after
         .card()
@@ -279,14 +271,8 @@ fn stale_pre_rekey_update_is_skipped_and_does_not_break_the_rekeyed_channel() {
         .iter()
         .find(|f| f.label() == "work")
         .expect("work field must exist");
-    assert_eq!(
-        work_after.value(),
-        "alice@old.com",
-        "the skipped stale update must NOT mutate the peer's card"
-    );
-
-    // The rekeyed channel still delivers: a NEW-ratchet update applies, proving
-    // the failed decrypt did not corrupt or advance the stored ratchet.
+    assert_eq!(work_after.value(), "alice@inflight.com");
+    // A later update on the same channel delivers too.
     let old2 = alice.own_card().unwrap().unwrap();
     alice
         .add_own_field(ContactField::new(
@@ -299,7 +285,7 @@ fn stale_pre_rekey_update_is_skipped_and_does_not_break_the_rekeyed_channel() {
     let new2 = alice.own_card().unwrap().unwrap();
     let u2 = common::card_update::seal_update_default(&alice, &bob_id, &old2, &new2);
     process_single_card_update(bob.identity().unwrap(), bob.storage(), &alice_id, &u2)
-        .expect("the rekeyed channel must still deliver after a stale message was skipped");
+        .expect("the kept channel delivers the next update");
     let final_at_bob = bob.get_contact(&alice_id).unwrap().unwrap();
     assert!(
         final_at_bob
@@ -307,7 +293,7 @@ fn stale_pre_rekey_update_is_skipped_and_does_not_break_the_rekeyed_channel() {
             .fields()
             .iter()
             .any(|f| f.label() == "blog"),
-        "the post-rekey update must apply at the peer"
+        "the later update must apply at the peer"
     );
 }
 

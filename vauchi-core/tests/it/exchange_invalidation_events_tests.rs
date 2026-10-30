@@ -254,3 +254,48 @@ fn repeat_exchange_with_unchanged_card_dispatches_no_contact_events() {
         "a pure rekey (unchanged card) must not invalidate the contacts list, got: {contact_evts:?}"
     );
 }
+
+fn stored_ratchet_bytes(vauchi: &Vauchi, contact_id: &str) -> Vec<u8> {
+    let (ratchet, _) = vauchi
+        .storage()
+        .ratchets()
+        .load_ratchet_state(contact_id)
+        .unwrap()
+        .expect("a stored ratchet");
+    serde_json::to_vec(&ratchet.serialize()).unwrap()
+}
+
+/// A repeat exchange refreshes the card but keeps the channel the first
+/// exchange established: an exchange never rekeys an existing contact
+/// (vauchi/private#941, ship checklist SC-06). The Bluetooth, multi-stage
+/// and QR completion paths all persist through `save_exchanged_contact`.
+// @internal
+#[test]
+fn a_ble_exchange_never_rekeys_an_existing_contact() {
+    let alice = create_vauchi_with_card("Alice", vec![(FieldType::Email, "work", "a@work.com")]);
+    let bob = create_vauchi_with_card("Bob", vec![(FieldType::Email, "personal", "bob@v1.com")]);
+    let bob_pk = *bob.identity().unwrap().signing_public_key();
+    let bob_card = bob.own_card().unwrap().unwrap();
+    let first_secret = SymmetricKey::generate();
+    let (first_ratchet, _) = setup_ratchets(&first_secret);
+    let first = Contact::from_exchange(bob_pk, bob_card.clone(), first_secret.clone(), 0);
+    let bob_id = first.id().to_string();
+    alice
+        .save_exchanged_contact(&first, &first_ratchet, true)
+        .unwrap();
+    let ratchet_after_first = stored_ratchet_bytes(&alice, &bob_id);
+
+    let second_secret = SymmetricKey::generate();
+    let (second_ratchet, _) = setup_ratchets(&second_secret);
+    let second = Contact::from_exchange(bob_pk, bob_card, second_secret, 2);
+    alice
+        .save_exchanged_contact(&second, &second_ratchet, true)
+        .unwrap();
+
+    let stored = alice.get_contact(&bob_id).unwrap().unwrap();
+    assert_eq!(
+        stored.shared_key().map(|k| *k.as_bytes()),
+        Some(*first_secret.as_bytes())
+    );
+    assert_eq!(stored_ratchet_bytes(&alice, &bob_id), ratchet_after_first);
+}

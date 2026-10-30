@@ -27,8 +27,9 @@ SPDX-License-Identifier = "AGPL-3.0-or-later"
 
 [[annotations]]
 # Grayscale frames from a phone's front camera looking at a test-only Hover
-# exchange (throwaway session, rig identities); image files cannot carry comments.
-path = ["vauchi-core/tests/fixtures/qr-camera-frames/**"]
+# exchange (throwaway session, rig identities), and what zbar read in each;
+# image files cannot carry comments.
+path = ["vauchi-core/tests/fixtures/qr-camera-corpus/**"]
 SPDX-FileCopyrightText = "2026 Mattia Egloff <mattia.egloff@pm.me>"
 SPDX-License-Identifier = "AGPL-3.0-or-later"
 

@@ -1,0 +1,23 @@
+# What zbar read in each frame: frame type, length, and the first 8 hex of
+# the SHA-256 of the code; the code itself carries the session's key material.
+# Add frames with: vauchi-gui-test.sh hover-bench <n> <label> --dump
+pixel3a-front-7cm/f0.png INI3:147:b915ff6f
+pixel3a-front-7cm/f12.png DAT4:145:6351dc39
+pixel3a-front-7cm/f26.png DAT4:145:2031a133
+pixel3a-front-7cm/f40.png DAT4:145:01e09ae1
+pixel3a-front-7cm/f52.png FIN3:132:b50db68f
+pixel3a-front-7cm/f65.png DAT4:145:cd320eab
+pixel3a-front-7cm/f79.png BTH3:36:2157fcbc
+pixel3a-front-7cm/f91.png INI3:147:876426da
+pixel3a-front-7cm/f103.png DON3:132:db37b212
+pixel3a-front-7cm/f122.png DAT4:145:45530b15
+pixel3a-front-13.5cm/f5.png DAT4:143:8fbca16d
+pixel3a-front-13.5cm/f10.png INI3:147:73a0b505
+pixel3a-front-13.5cm/f20.png DAT4:143:3dd8db29
+pixel3a-front-13.5cm/f60.png DAT4:143:fce5a931
+pixel3a-front-13.5cm/f75.png DAT4:99:8b3c969b
+pixel3a-front-13.5cm/f90.png DAT4:145:8f96004d
+pixel3a-front-13.5cm/f95.png INI3:147:83767682
+pixel3a-front-13.5cm/f125.png INI3:147:adbd22a2
+pixel3a-front-13.5cm/f150.png DAT4:145:ab7ddf13
+pixel3a-front-13.5cm/f175.png DAT4:145:8bf4147d

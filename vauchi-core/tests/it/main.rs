@@ -445,7 +445,7 @@ mod protocol_exchange_vectors_tests;
 mod protocol_test_vectors_tests;
 mod proximity_confidence_tests;
 mod purge_signing_tests;
-mod qr_decode_camera_frames_tests;
+mod qr_decode_camera_corpus_tests;
 mod qr_landing_url_tests;
 mod qr_scanner_pipeline_tests;
 mod qr_timestamp_overflow_tests;

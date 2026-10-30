@@ -223,6 +223,7 @@ fn test_batch_tokens_padded_to_256() {
         &vauchi_core::rng::OsSecureRng::new(),
         &contacts,
         &TEST_PUBKEY,
+        &[0xEEu8; 32],
         19804,
         0,
     );
@@ -240,6 +241,7 @@ fn test_batch_tokens_no_duplicates() {
         &vauchi_core::rng::OsSecureRng::new(),
         &contacts,
         &TEST_PUBKEY,
+        &[0xEEu8; 32],
         19804,
         0,
     );
@@ -258,6 +260,7 @@ fn test_batch_tokens_historical_catchup() {
         &vauchi_core::rng::OsSecureRng::new(),
         &contacts,
         &TEST_PUBKEY,
+        &[0xEEu8; 32],
         19804,
         3,
     );
@@ -284,6 +287,7 @@ fn test_batch_tokens_many_contacts_splits() {
         &vauchi_core::rng::OsSecureRng::new(),
         &contacts,
         &TEST_PUBKEY,
+        &[0xEEu8; 32],
         19804,
         0,
     );
@@ -309,6 +313,7 @@ fn test_batch_tokens_shuffled() {
         &vauchi_core::rng::OsSecureRng::new(),
         &contacts,
         &TEST_PUBKEY,
+        &[0xEEu8; 32],
         19804,
         0,
     );
@@ -316,6 +321,7 @@ fn test_batch_tokens_shuffled() {
         &vauchi_core::rng::OsSecureRng::new(),
         &contacts,
         &TEST_PUBKEY,
+        &[0xEEu8; 32],
         19804,
         0,
     );
@@ -340,6 +346,7 @@ fn test_batch_tokens_no_contacts_returns_one_padding_batch_per_day() {
         &vauchi_core::rng::OsSecureRng::new(),
         &[],
         &TEST_PUBKEY,
+        &[0xEEu8; 32],
         19804,
         0,
     );
@@ -444,14 +451,16 @@ fn padded_registration_batches_are_not_linkable_across_calls() {
 
     let first = register(today);
     let second = register(today);
-    let tomorrow = register(today + 1);
+    // A registration covers the day and the day before it, so two days on
+    // shares no day epoch with today's.
+    let two_days_on = register(today + 2);
 
     assert_eq!(
         first, second,
         "two registrations for one day must be the same set, padding included"
     );
     assert!(
-        first.is_disjoint(&tomorrow),
+        first.is_disjoint(&two_days_on),
         "padding must rotate with the day like the real tokens, or the relay links days through it"
     );
 }
@@ -547,6 +556,7 @@ fn registration_on_day_zero_has_no_previous_day() {
         &vauchi_core::rng::OsSecureRng::new(),
         &[contact],
         &TEST_PUBKEY,
+        &[0xEEu8; 32],
         0,
         0,
     )

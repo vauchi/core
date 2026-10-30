@@ -78,6 +78,7 @@ pub(super) fn registered_mailboxes(
 /// the relay chain one fetcher across days (private#890).
 pub(super) fn registration_batches(
     rng: &dyn crate::rng::SecureRng,
+    padding_secret: &[u8; 32],
     routes: &HashMap<String, MailboxRoute>,
 ) -> Vec<Vec<String>> {
     let mut tokens_by_day: std::collections::BTreeMap<u64, Vec<String>> = Default::default();
@@ -88,8 +89,15 @@ pub(super) fn registration_batches(
             .push(token.clone());
     }
     tokens_by_day
-        .into_values()
-        .flat_map(|tokens| crate::network::mailbox_token::padded_registration_batches(rng, tokens))
+        .into_iter()
+        .flat_map(|(day, tokens)| {
+            crate::network::mailbox_token::padded_registration_batches(
+                rng,
+                padding_secret,
+                day,
+                tokens,
+            )
+        })
         .collect()
 }
 

@@ -55,8 +55,11 @@ impl Vauchi {
             &self.config.relay,
             &plan.days,
         ));
-        let batches =
-            super::receive_context::registration_batches(self.rng.as_ref(), &context.routes);
+        let batches = super::receive_context::registration_batches(
+            self.rng.as_ref(),
+            identity.master_seed(),
+            &context.routes,
+        );
         adapter.set_mailbox_context(context);
 
         // Register each batch with the adapter

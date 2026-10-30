@@ -25,6 +25,11 @@ const CONTACT_DOMAIN: &[u8] = b"Vauchi_Mailbox_v1";
 /// 2026-07-25). Distinct domain so a device-scoped token can never collide
 /// with the identity-scoped `CONTACT_DOMAIN` token for the same inputs.
 const CONTACT_DEVICE_DOMAIN: &[u8] = b"Vauchi_MailboxDevice_v1";
+/// Padding tokens derive from a local secret, the day and an index, so two
+/// registrations for one day present the relay with one set; fresh random
+/// padding made the intersection of two fetches exactly the real tokens
+/// (private#946).
+const PADDING_DOMAIN: &[u8] = b"Vauchi_MailboxPadding_v1";
 const DEVICE_SYNC_RECIPIENT_DOMAIN: &[u8] = b"Vauchi_DeviceSyncRecipient_v1";
 
 /// Compute a 32-byte mailbox token for one **direction** of a contact channel.
@@ -188,6 +193,7 @@ pub fn batch_register_tokens(
     rng: &dyn crate::rng::SecureRng,
     contact_keys: &[[u8; 32]],
     own_pubkey: &[u8; 32],
+    master_seed: &[u8; 32],
     current_day: u64,
     days_offline: u64,
 ) -> Vec<Vec<String>> {
@@ -196,7 +202,7 @@ pub fn batch_register_tokens(
     // `batch_register_tokens_with_device_sync`, which carries the device id.
     registration_tokens_by_day(contact_keys, own_pubkey, None, current_day, days_offline)
         .into_iter()
-        .flat_map(|(_, tokens)| padded_registration_batches(rng, tokens))
+        .flat_map(|(day, tokens)| padded_registration_batches(rng, master_seed, day, tokens))
         .collect()
 }
 
@@ -247,10 +253,23 @@ fn registration_tokens_by_day(
         .collect()
 }
 
+/// The `index`-th padding token of `day`, a function of a local secret so
+/// that every registration of the day pads with the same tokens.
+fn padding_token(padding_secret: &[u8; 32], day: u64, index: u32) -> MailboxToken {
+    let mut info = Vec::with_capacity(PADDING_DOMAIN.len() + 8 + 4);
+    info.extend_from_slice(PADDING_DOMAIN);
+    info.extend_from_slice(&day.to_be_bytes());
+    info.extend_from_slice(&index.to_be_bytes());
+    MailboxToken::from_bytes(*HKDF::derive_key(None, padding_secret, &info))
+}
+
 /// Pad, split, and shuffle real registration tokens without revealing their
-/// count or stable position to the relay.
+/// count or stable position to the relay. Padding is deterministic per
+/// `(padding_secret, day)` and the shuffle stays random (private#946).
 pub(crate) fn padded_registration_batches(
     rng: &dyn crate::rng::SecureRng,
+    padding_secret: &[u8; 32],
+    day: u64,
     mut all_tokens: Vec<String>,
 ) -> Vec<Vec<String>> {
     all_tokens.sort_unstable();
@@ -266,13 +285,16 @@ pub(crate) fn padded_registration_batches(
         all_tokens.chunks(256).collect()
     };
 
+    let mut padding_index: u32 = 0;
     for chunk in chunks {
         let mut batch = chunk.to_vec();
-        // Pad to 256 with random tokens
         while batch.len() < 256 {
-            let mut random_token = [0u8; 32];
-            rng.fill_bytes(&mut random_token);
-            batch.push(token_hex(&MailboxToken::from_bytes(random_token)));
+            batch.push(token_hex(&padding_token(
+                padding_secret,
+                day,
+                padding_index,
+            )));
+            padding_index = padding_index.saturating_add(1);
         }
         // Shuffle to prevent positional leakage across sessions
         rng.shuffle(&mut batch);
@@ -312,7 +334,7 @@ pub fn batch_register_tokens_with_device_sync(
             device_id,
             day,
         )));
-        padded_registration_batches(rng, tokens)
+        padded_registration_batches(rng, master_seed, day, tokens)
     })
     .collect()
 }

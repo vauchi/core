@@ -139,6 +139,7 @@ fn test_register_mailbox_tokens_sends_256_tokens() {
         .register_mailbox_tokens(
             &contact_keys,
             &own_pubkey,
+            &[0x33u8; 32],
             0,
             0,
             &vauchi_core::rng::OsSecureRng::new(),
@@ -179,6 +180,7 @@ fn test_register_mailbox_tokens_with_no_contacts() {
         .register_mailbox_tokens(
             &[],
             &own_pubkey,
+            &[0x33u8; 32],
             0,
             0,
             &vauchi_core::rng::OsSecureRng::new(),

@@ -27,7 +27,11 @@ fn registration_batches_carry_one_day_of_routes_each() {
         .collect();
     let days = [41u64, 42, 43];
     let context = registered_mailboxes(&identity, &contacts, &relay, &days);
-    let batches = registration_batches(&crate::rng::OsSecureRng::new(), &context.routes);
+    let batches = registration_batches(
+        &crate::rng::OsSecureRng::new(),
+        identity.master_seed(),
+        &context.routes,
+    );
 
     let day_of = |token: &String| match context.routes.get(token) {
         Some(MailboxRoute::Contact { day, .. }) | Some(MailboxRoute::DeviceSync { day }) => {

@@ -459,6 +459,7 @@ mod reciprocity_confirm_receive_tests;
 mod reciprocity_sync_tests;
 mod reciprocity_tests;
 mod reciprocity_tokens_tests;
+mod recovery_after_revocation_tests;
 mod recovery_binding_tests;
 mod recovery_boundary_tests;
 mod recovery_claim_review_tests;

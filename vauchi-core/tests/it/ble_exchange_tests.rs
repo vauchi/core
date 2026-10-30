@@ -6,19 +6,19 @@
 //!
 //! Feature file: features/ble_exchange.feature @ble
 //!
-//! GATT-based payload exchange with proximity verification.
+//! The BLE payload format, GATT identifiers and BLE error variants.
 //! Both sides use fresh ephemeral X25519 keys for full forward secrecy.
 //!
-//! Hardware-transport flows use the ADR-031 events-in / commands-out
-//! pattern (`apply_hardware_event` + `drain_commands`), not the retired
-//! `BLETransport`/`MockBLETransport` mock traits.
+//! The BLE handshake itself runs in `BleHandshakeSession`
+//! (`ble_handshake_tests.rs`); `ExchangeSession` refuses BLE events
+//! (vauchi/private#893).
 
 use vauchi_core::exchange::{
     BLE_PAYLOAD_SIZE, CHAR_CARD_EXCHANGE, CHAR_CHALLENGE, CHAR_EXCHANGE_PAYLOAD, ExchangeBle,
-    ExchangeError, ExchangeEvent, ExchangeSession, ExchangeState, ExchangeTransport,
-    MockProximityVerifier, VAUCHI_BLE_SERVICE_UUID, X3DHKeyPair,
+    ExchangeError, ExchangeEvent, ExchangeSession, ExchangeState, MockProximityVerifier,
+    VAUCHI_BLE_SERVICE_UUID, X3DHKeyPair,
 };
-use vauchi_core::{Command, ContactCard, Event, Identity};
+use vauchi_core::{ContactCard, Identity};
 
 // ============================================================
 // ============================================================
@@ -182,294 +182,7 @@ fn test_gatt_service_uuid_match() {
 }
 
 // ============================================================
-// BLE hardware commands + events (ADR-031: events in, commands out)
 // ============================================================
-
-// @scenario: ble_exchange :: BLE transport can advertise
-// @scenario: ble_exchange :: BLE transport can scan
-#[test]
-fn ble_session_emits_scan_and_advertise_commands() {
-    let mut session = ExchangeSession::new_ble(
-        Identity::create("Alice", 0),
-        ContactCard::new("Alice"),
-        MockProximityVerifier::success(),
-        vauchi_core::clock::SystemClock::shared(),
-    );
-    session.emit_initial_commands();
-    let commands = session.drain_commands();
-
-    assert!(
-        commands
-            .iter()
-            .any(|c| matches!(c, Command::BleStartScanning { .. })),
-        "a BLE session must emit a start-scanning command, got {commands:?}"
-    );
-    assert!(
-        commands
-            .iter()
-            .any(|c| matches!(c, Command::BleStartAdvertising { .. })),
-        "a BLE session must emit a start-advertising command, got {commands:?}"
-    );
-}
-
-// @scenario: ble_exchange :: BLE transport connect, read, write, disconnect
-#[test]
-fn ble_session_connects_on_device_discovered() {
-    let mut session = ExchangeSession::new_ble(
-        Identity::create("Alice", 0),
-        ContactCard::new("Alice"),
-        MockProximityVerifier::success(),
-        vauchi_core::clock::SystemClock::shared(),
-    );
-    session.emit_initial_commands();
-    let _ = session.drain_commands(); // discard the initial scan/advertise
-
-    session
-        .apply_hardware_event(Event::BleDeviceDiscovered {
-            id: "peer-1".to_string(),
-            rssi: -42,
-            adv_data: Vec::new(),
-        })
-        .expect("discovery event is accepted");
-    let commands = session.drain_commands();
-
-    assert!(
-        commands
-            .iter()
-            .any(|c| matches!(c, Command::BleStopScanning)),
-        "discovering a peer must stop scanning, got {commands:?}"
-    );
-    assert!(
-        commands
-            .iter()
-            .any(|c| matches!(c, Command::BleConnect { device_id } if device_id == "peer-1")),
-        "discovering a peer must emit a connect command for it, got {commands:?}"
-    );
-}
-
-// @scenario: ble_exchange :: BLE transport in failure mode returns errors
-#[test]
-fn ble_session_fails_on_disconnect_with_connection_lost() {
-    let mut session = ExchangeSession::new_ble(
-        Identity::create("Alice", 0),
-        ContactCard::new("Alice"),
-        MockProximityVerifier::success(),
-        vauchi_core::clock::SystemClock::shared(),
-    );
-    assert!(matches!(
-        session.state(),
-        ExchangeState::AwaitingBleConnection
-    ));
-
-    session
-        .apply_hardware_event(Event::BleDisconnected {
-            device_id: "peer-1".to_string(),
-            direction: vauchi_core::BleLinkDirection::Outbound,
-            reason: "peer went away".to_string(),
-        })
-        .expect("a disconnect event is handled, not errored");
-
-    assert!(
-        matches!(
-            session.state(),
-            ExchangeState::Failed {
-                error: ExchangeError::BleConnectionLost
-            }
-        ),
-        "a disconnect while awaiting connection must fail with BleConnectionLost, got {:?}",
-        session.state()
-    );
-}
-
-// ============================================================
-// ============================================================
-
-// @scenario: ble_exchange :: New BLE session starts in AwaitingBleConnection
-#[test]
-fn test_ble_session_starts_awaiting_connection() {
-    let identity = Identity::create("Alice", 0);
-    let card = ContactCard::new("Alice");
-    let proximity = MockProximityVerifier::success();
-
-    let session = ExchangeSession::new_ble(
-        identity,
-        card,
-        proximity,
-        vauchi_core::clock::SystemClock::shared(),
-    );
-
-    assert!(
-        matches!(session.state(), ExchangeState::AwaitingBleConnection),
-        "BLE session should start in AwaitingBleConnection"
-    );
-    assert_eq!(session.transport(), ExchangeTransport::Ble);
-}
-
-// @scenario: ble_exchange :: Session transitions to AwaitingBleVerification after payload exchange
-#[test]
-fn test_ble_payload_exchanged_transitions() {
-    let alice_identity = Identity::create("Alice", 0);
-    let bob_identity = Identity::create("Bob", 0);
-
-    let alice_card = ContactCard::new("Alice");
-    let proximity = MockProximityVerifier::success();
-
-    let mut alice_session = ExchangeSession::new_ble(
-        alice_identity,
-        alice_card,
-        proximity,
-        vauchi_core::clock::SystemClock::shared(),
-    );
-
-    let bob_eph = X3DHKeyPair::generate();
-    let bob_payload = ExchangeBle::generate(
-        &bob_identity,
-        &bob_eph,
-        vauchi_core::clock::SystemClock::shared().unix_seconds(),
-    );
-
-    alice_session
-        .apply(ExchangeEvent::BlePayloadExchanged {
-            their_payload: bob_payload.to_bytes().to_vec(),
-            device_id: "bob-device-123".to_string(),
-        })
-        .expect("Should transition to AwaitingBleVerification");
-
-    assert!(
-        matches!(
-            alice_session.state(),
-            ExchangeState::AwaitingBleVerification { .. }
-        ),
-        "Should be in AwaitingBleVerification"
-    );
-}
-
-// @scenario: ble_exchange :: Session transitions to AwaitingKeyAgreement after proximity verification
-#[test]
-fn test_ble_proximity_verified_transitions() {
-    let alice_identity = Identity::create("Alice", 0);
-    let bob_identity = Identity::create("Bob", 0);
-
-    let alice_card = ContactCard::new("Alice");
-    let proximity = MockProximityVerifier::success();
-
-    let mut alice_session = ExchangeSession::new_ble(
-        alice_identity,
-        alice_card,
-        proximity,
-        vauchi_core::clock::SystemClock::shared(),
-    );
-
-    let bob_eph = X3DHKeyPair::generate();
-    let bob_payload = ExchangeBle::generate(
-        &bob_identity,
-        &bob_eph,
-        vauchi_core::clock::SystemClock::shared().unix_seconds(),
-    );
-    alice_session
-        .apply(ExchangeEvent::BlePayloadExchanged {
-            their_payload: bob_payload.to_bytes().to_vec(),
-            device_id: "bob-device".to_string(),
-        })
-        .unwrap();
-
-    alice_session
-        .apply(ExchangeEvent::BleProximityVerified)
-        .expect("Should transition to AwaitingKeyAgreement");
-
-    assert!(matches!(
-        alice_session.state(),
-        ExchangeState::AwaitingKeyAgreement { .. }
-    ));
-}
-
-// @scenario: ble_exchange :: Full BLE exchange lifecycle
-// @scenario: ble_exchange :: Symmetric DH produces identical shared keys
-#[test]
-fn test_ble_full_lifecycle() {
-    let alice_identity = Identity::create("Alice", 0);
-    let bob_identity = Identity::create("Bob", 0);
-
-    let alice_card = ContactCard::new("Alice");
-    let bob_card = ContactCard::new("Bob");
-
-    let mut alice_session = ExchangeSession::new_ble(
-        alice_identity,
-        alice_card.clone(),
-        MockProximityVerifier::success(),
-        vauchi_core::clock::SystemClock::shared(),
-    );
-    let mut bob_session = ExchangeSession::new_ble(
-        bob_identity,
-        bob_card.clone(),
-        MockProximityVerifier::success(),
-        vauchi_core::clock::SystemClock::shared(),
-    );
-
-    // Generate payloads (in real life, built from session's identity+ephemeral)
-    let alice_id2 = Identity::create("Alice", 0);
-    let bob_id2 = Identity::create("Bob", 0);
-    let alice_eph = X3DHKeyPair::generate();
-    let bob_eph = X3DHKeyPair::generate();
-
-    let alice_ble = ExchangeBle::generate(
-        &alice_id2,
-        &alice_eph,
-        vauchi_core::clock::SystemClock::shared().unix_seconds(),
-    );
-    let bob_ble = ExchangeBle::generate(
-        &bob_id2,
-        &bob_eph,
-        vauchi_core::clock::SystemClock::shared().unix_seconds(),
-    );
-
-    // Step 1: Payload exchange via GATT
-    alice_session
-        .apply(ExchangeEvent::BlePayloadExchanged {
-            their_payload: bob_ble.to_bytes().to_vec(),
-            device_id: "bob-device".to_string(),
-        })
-        .unwrap();
-    bob_session
-        .apply(ExchangeEvent::BlePayloadExchanged {
-            their_payload: alice_ble.to_bytes().to_vec(),
-            device_id: "alice-device".to_string(),
-        })
-        .unwrap();
-
-    // Step 2: Proximity verification (challenge-response)
-    alice_session
-        .apply(ExchangeEvent::BleProximityVerified)
-        .unwrap();
-    bob_session
-        .apply(ExchangeEvent::BleProximityVerified)
-        .unwrap();
-
-    // Step 3: Key agreement (symmetric DH)
-    alice_session
-        .apply(ExchangeEvent::PerformKeyAgreement)
-        .unwrap();
-    bob_session
-        .apply(ExchangeEvent::PerformKeyAgreement)
-        .unwrap();
-
-    // Step 4: Card exchange
-    alice_session
-        .apply(ExchangeEvent::CompleteExchange(bob_card))
-        .unwrap();
-    bob_session
-        .apply(ExchangeEvent::CompleteExchange(alice_card))
-        .unwrap();
-
-    assert!(matches!(
-        alice_session.state(),
-        ExchangeState::Complete { .. }
-    ));
-    assert!(matches!(
-        bob_session.state(),
-        ExchangeState::Complete { .. }
-    ));
-}
 
 // @scenario: ble_exchange :: Symmetric DH produces identical shared keys
 #[test]
@@ -483,184 +196,36 @@ fn test_ble_shared_keys_match() {
     assert_eq!(alice_shared, bob_shared, "BLE symmetric DH should match");
 }
 
-// @scenario: ble_exchange :: Expired BLE payload is rejected
-#[test]
-fn test_ble_expired_rejection() {
-    let alice_identity = Identity::create("Alice", 0);
-    let bob_identity = Identity::create("Bob", 0);
-
-    let alice_card = ContactCard::new("Alice");
-    let proximity = MockProximityVerifier::success();
-
-    let mut alice_session = ExchangeSession::new_ble(
-        alice_identity,
-        alice_card,
-        proximity,
-        vauchi_core::clock::SystemClock::shared(),
-    );
-
-    let bob_eph = X3DHKeyPair::generate();
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    let expired =
-        ExchangeBle::generate_with_timestamp(&bob_identity, &bob_eph, [0u8; 32], now - 120);
-
-    let result = alice_session.apply(ExchangeEvent::BlePayloadExchanged {
-        their_payload: expired.to_bytes().to_vec(),
-        device_id: "bob-device".to_string(),
-    });
-    assert!(
-        matches!(result, Err(ExchangeError::BleExpired)),
-        "Expired BLE payload should be rejected"
-    );
-}
-
-// @scenario: ble_exchange :: Self-exchange is rejected via BLE
-// @scenario: contact_exchange :: BLE exchange prevents self-exchange
-#[test]
-fn test_ble_self_exchange() {
-    let alice_identity = Identity::create("Alice", 0);
-
-    let eph = X3DHKeyPair::generate();
-    let self_payload = ExchangeBle::generate(
-        &alice_identity,
-        &eph,
-        vauchi_core::clock::SystemClock::shared().unix_seconds(),
-    );
-    let self_bytes = self_payload.to_bytes().to_vec();
-
-    let card = ContactCard::new("Alice");
-    let proximity = MockProximityVerifier::success();
-
-    let mut session = ExchangeSession::new_ble(
-        alice_identity,
-        card,
-        proximity,
-        vauchi_core::clock::SystemClock::shared(),
-    );
-
-    let result = session.apply(ExchangeEvent::BlePayloadExchanged {
-        their_payload: self_bytes,
-        device_id: "self-device".to_string(),
-    });
-    assert!(
-        matches!(result, Err(ExchangeError::SelfExchange)),
-        "BLE self-exchange should be rejected"
-    );
-}
-
-// @scenario: ble_exchange :: Invalid BLE payload is rejected
-#[test]
-fn test_ble_invalid_payload() {
-    let identity = Identity::create("Alice", 0);
-    let card = ContactCard::new("Alice");
-    let proximity = MockProximityVerifier::success();
-
-    let mut session = ExchangeSession::new_ble(
-        identity,
-        card,
-        proximity,
-        vauchi_core::clock::SystemClock::shared(),
-    );
-
-    let result = session.apply(ExchangeEvent::BlePayloadExchanged {
-        their_payload: vec![0u8; 174],
-        device_id: "device".to_string(),
-    });
-    assert!(
-        matches!(result, Err(ExchangeError::InvalidBleFormat)),
-        "Invalid BLE payload should be rejected"
-    );
-}
-
 // @scenario: ble_exchange :: BLE events rejected on non-BLE transport
 #[test]
 fn test_ble_rejects_wrong_transport() {
-    let identity = Identity::create("Alice", 0);
-    let card = ContactCard::new("Alice");
-    let proximity = MockProximityVerifier::success();
-
     let mut session = ExchangeSession::new_qr(
-        identity,
-        card,
-        proximity,
+        Identity::create("Alice", 0),
+        ContactCard::new("Alice"),
+        MockProximityVerifier::success(),
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    let result = session.apply(ExchangeEvent::BlePayloadExchanged {
-        their_payload: vec![],
-        device_id: "device".to_string(),
-    });
-    assert!(
-        result.is_err(),
-        "BLE events should be rejected on non-BLE transport"
-    );
-}
-
-// ============================================================
-// ============================================================
-
-// @scenario: ble_exchange :: Proximity verification requires AwaitingBleVerification state
-#[test]
-fn test_ble_proximity_requires_verification_state() {
-    let identity = Identity::create("Alice", 0);
-    let card = ContactCard::new("Alice");
-    let proximity = MockProximityVerifier::success();
-
-    let mut session = ExchangeSession::new_ble(
-        identity,
-        card,
-        proximity,
-        vauchi_core::clock::SystemClock::shared(),
-    );
-
-    let result = session.apply(ExchangeEvent::BleProximityVerified);
-    assert!(
-        result.is_err(),
-        "Should fail when not in AwaitingBleVerification state"
-    );
-}
-
-// @scenario: ble_exchange :: Key agreement blocked without proximity verification
-#[test]
-fn test_ble_challenge_response_blocks_on_failure() {
-    // If proximity verification fails, the exchange should not proceed.
-    // We verify this by checking state doesn't advance past AwaitingBleVerification
-    // if BleProximityVerified is not sent.
-    let alice_identity = Identity::create("Alice", 0);
-    let bob_identity = Identity::create("Bob", 0);
-
-    let alice_card = ContactCard::new("Alice");
-    let proximity = MockProximityVerifier::success();
-
-    let mut session = ExchangeSession::new_ble(
-        alice_identity,
-        alice_card,
-        proximity,
-        vauchi_core::clock::SystemClock::shared(),
-    );
-
-    let bob_eph = X3DHKeyPair::generate();
-    let bob_payload = ExchangeBle::generate(
-        &bob_identity,
-        &bob_eph,
-        vauchi_core::clock::SystemClock::shared().unix_seconds(),
-    );
-
-    session
-        .apply(ExchangeEvent::BlePayloadExchanged {
-            their_payload: bob_payload.to_bytes().to_vec(),
+    let ble_events = [
+        ExchangeEvent::StartBleExchange,
+        ExchangeEvent::BlePayloadExchanged {
+            their_payload: vec![],
             device_id: "device".to_string(),
-        })
-        .unwrap();
-
-    // In AwaitingBleVerification — cannot proceed to key agreement directly
-    let result = session.apply(ExchangeEvent::PerformKeyAgreement);
+        },
+        ExchangeEvent::BleProximityVerified,
+    ];
+    for event in ble_events {
+        let label = format!("{event:?}");
+        let result = session.apply(event);
+        assert!(
+            matches!(result, Err(ExchangeError::InvalidState(_))),
+            "{label} must be rejected on a QR session, got {result:?}"
+        );
+    }
     assert!(
-        result.is_err(),
-        "Should not be able to do key agreement without proximity verification"
+        matches!(session.state(), ExchangeState::Idle),
+        "rejected BLE events must leave the session untouched, got {:?}",
+        session.state()
     );
 }
 

@@ -312,6 +312,8 @@ fn tick_on_terminal_screen_is_inert() {
 }
 
 // @scenario: ble_exchange_modes :: Magic mode discovery emits BLE commands
+// @scenario: ble_exchange :: BLE transport can advertise
+// @scenario: ble_exchange :: BLE transport can scan
 // @internal
 #[test]
 fn screen_entered_emits_advertise_then_scan_once() {

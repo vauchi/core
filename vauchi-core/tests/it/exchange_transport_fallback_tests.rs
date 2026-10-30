@@ -13,11 +13,11 @@ use vauchi_core::exchange::{ExchangeSession, ManualConfirmationVerifier};
 use vauchi_core::identity::Identity;
 use vauchi_core::{Command, Event};
 
-fn ble_session_with_caps(name: &str, caps: DeviceCapabilities) -> ExchangeSession {
+fn nfc_session_with_caps(name: &str, caps: DeviceCapabilities) -> ExchangeSession {
     let identity = Identity::create(name, 0);
     let card = ContactCard::new(name);
     let proximity = ManualConfirmationVerifier::new();
-    let mut session = ExchangeSession::new_ble(
+    let mut session = ExchangeSession::new_nfc(
         identity,
         card,
         proximity,
@@ -27,32 +27,31 @@ fn ble_session_with_caps(name: &str, caps: DeviceCapabilities) -> ExchangeSessio
     session
 }
 
-// −− Fallback from BLE -> QR −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
+// −− Fallback from NFC -> QR −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
 // @internal
 #[test]
-fn ble_unavailable_with_camera_falls_back_to_qr() {
+fn nfc_unavailable_with_camera_falls_back_to_qr() {
     let caps = DeviceCapabilities {
-        has_ble: true,
+        has_nfc: true,
         has_camera: true,
         ..Default::default()
     };
-    let mut session = ble_session_with_caps("Alice", caps);
+    let mut session = nfc_session_with_caps("Alice", caps);
     session.emit_initial_commands();
-    let _ = session.drain_commands(); // drain initial BLE commands
+    let _ = session.drain_commands();
 
     session
         .apply_hardware_event(Event::HardwareUnavailable {
-            transport: "BLE".into(),
+            transport: "NFC".into(),
         })
         .unwrap();
 
-    // Should fall back to QR — emit QrDisplay command
     let cmds = session.drain_commands();
     let has_qr = cmds.iter().any(|c| matches!(c, Command::QrDisplay { .. }));
     assert!(
         has_qr,
-        "BLE unavailable with camera should fall back to QR, got {:?}",
+        "NFC unavailable with camera should fall back to QR, got {:?}",
         cmds
     );
 }
@@ -61,24 +60,23 @@ fn ble_unavailable_with_camera_falls_back_to_qr() {
 
 // @internal
 #[test]
-fn ble_unavailable_without_camera_does_not_fall_back() {
+fn nfc_unavailable_without_camera_does_not_fall_back() {
     let caps = DeviceCapabilities {
-        has_ble: true,
+        has_nfc: true,
         has_camera: false,
-        has_nfc: false,
+        has_ble: false,
         ..Default::default()
     };
-    let mut session = ble_session_with_caps("Alice", caps);
+    let mut session = nfc_session_with_caps("Alice", caps);
     session.emit_initial_commands();
     let _ = session.drain_commands();
 
     session
         .apply_hardware_event(Event::HardwareUnavailable {
-            transport: "BLE".into(),
+            transport: "NFC".into(),
         })
         .unwrap();
 
-    // No fallback — session should not emit new transport commands
     let cmds = session.drain_commands();
     assert!(
         cmds.is_empty(),
@@ -92,48 +90,38 @@ fn ble_unavailable_without_camera_does_not_fall_back() {
 // @internal
 #[test]
 fn set_device_capabilities_is_accessible() {
-    let identity = Identity::create("Alice", 0);
-    let card = ContactCard::new("Alice");
-    let proximity = ManualConfirmationVerifier::new();
-    let mut session = ExchangeSession::new_ble(
-        identity,
-        card,
-        proximity,
-        vauchi_core::clock::SystemClock::shared(),
-    );
-
     let caps = DeviceCapabilities {
-        has_ble: true,
+        has_nfc: true,
         has_camera: true,
-        has_nfc: false,
+        has_ble: false,
         ..Default::default()
     };
-    session.set_device_capabilities(caps);
+    let session = nfc_session_with_caps("Alice", caps);
     assert!(
         matches!(
             session.state(),
-            vauchi_core::exchange::ExchangeState::AwaitingBleConnection
+            vauchi_core::exchange::ExchangeState::AwaitingNfcTap
         ),
-        "session should remain in AwaitingBleConnection after setting capabilities"
+        "session should remain in AwaitingNfcTap after setting capabilities"
     );
 }
 
 // A denied permission leaves the transport as unusable as missing hardware.
 // @internal
 #[test]
-fn ble_permission_denied_with_camera_falls_back_to_qr() {
+fn nfc_permission_denied_with_camera_falls_back_to_qr() {
     let caps = DeviceCapabilities {
-        has_ble: true,
+        has_nfc: true,
         has_camera: true,
         ..Default::default()
     };
-    let mut session = ble_session_with_caps("Alice", caps);
+    let mut session = nfc_session_with_caps("Alice", caps);
     session.emit_initial_commands();
     let _ = session.drain_commands();
 
     session
         .apply_hardware_event(Event::PermissionDenied {
-            transport: "BLE".into(),
+            transport: "NFC".into(),
         })
         .unwrap();
 

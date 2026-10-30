@@ -73,27 +73,6 @@ fn enable_debug_log_nfc_records_transport() {
     ));
 }
 
-// @internal
-#[test]
-fn enable_debug_log_ble_records_transport() {
-    let identity = Identity::create("Alice", 0);
-    let card = ContactCard::new("Alice");
-    let mut session = ExchangeSession::new_ble(
-        identity,
-        card,
-        MockProximityVerifier::success(),
-        vauchi_core::clock::SystemClock::shared(),
-    );
-
-    session.enable_debug_log();
-
-    let log = session.exchange_debug_log().unwrap();
-    assert!(matches!(
-        &log.events()[0].event,
-        ExchangeDebugEvent::SessionStarted { transport } if transport == "ble"
-    ));
-}
-
 // ===== QR flow events =====
 
 // @internal

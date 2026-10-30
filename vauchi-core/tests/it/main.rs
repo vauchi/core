@@ -245,7 +245,6 @@ mod escrow_crypto_tests;
 mod escrow_exchange_tests;
 mod escrow_send_tests;
 mod exchange_audio_command_event_tests;
-mod exchange_ble_command_event_tests;
 mod exchange_ble_tests;
 mod exchange_ceremony_tests;
 mod exchange_command_event_integration_tests;

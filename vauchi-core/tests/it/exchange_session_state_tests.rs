@@ -106,34 +106,3 @@ fn a_timed_out_session_can_still_be_failed_explicitly() {
             .is_ok()
     );
 }
-
-fn ble_session() -> ExchangeSession {
-    ExchangeSession::new_ble(
-        Identity::create("Bob", 0),
-        ContactCard::new("Bob"),
-        ManualConfirmationVerifier::new(),
-        vauchi_core::clock::SystemClock::shared(),
-    )
-}
-
-// @internal
-#[test]
-fn a_ble_exchange_starts_only_on_a_ble_session_before_it_connects() {
-    let mut qr = bob_session();
-    assert!(matches!(
-        qr.apply(ExchangeEvent::StartBleExchange),
-        Err(ExchangeError::InvalidState(_))
-    ));
-
-    let mut ble = ble_session();
-    ble.apply(ExchangeEvent::StartBleExchange).unwrap();
-    assert!(matches!(ble.state(), ExchangeState::AwaitingBleConnection));
-    ble.apply(ExchangeEvent::StartBleExchange).unwrap();
-
-    ble.apply(ExchangeEvent::Fail(ExchangeError::SessionTimeout))
-        .unwrap();
-    assert!(matches!(
-        ble.apply(ExchangeEvent::StartBleExchange),
-        Err(ExchangeError::InvalidState(_))
-    ));
-}

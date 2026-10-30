@@ -21,9 +21,9 @@ use vauchi_core::identity::Identity;
 
 /// Helper to create a mock proximity verifier.
 ///
-/// Proximity verification is still used for audio/BLE transports but no
+/// Proximity verification is still used for audio transports but no
 /// longer drives any state transition in the QR flow. We pass a mock
-/// verifier because `ExchangeSession` is generic over `ProximityVerifier`.
+/// verifier because every `ExchangeSession` constructor requires one.
 fn mock_proximity() -> MockProximityVerifier {
     MockProximityVerifier::success()
 }
@@ -695,25 +695,6 @@ fn test_qr_events_rejected_on_nfc_transport() {
     assert!(
         matches!(result, Err(ExchangeError::InvalidState(_))),
         "StartQR should be rejected on NFC transport, got: {result:?}"
-    );
-}
-
-/// Scenario: QR events are rejected on BLE transport sessions
-// @internal
-#[test]
-fn test_qr_events_rejected_on_ble_transport() {
-    let alice = Identity::create("Alice", 0);
-    let mut ble_session = ExchangeSession::new_ble(
-        alice,
-        ContactCard::new("Alice"),
-        mock_proximity(),
-        vauchi_core::clock::SystemClock::shared(),
-    );
-
-    let result = ble_session.apply(ExchangeEvent::StartQR);
-    assert!(
-        matches!(result, Err(ExchangeError::InvalidState(_))),
-        "StartQR should be rejected on BLE transport, got: {result:?}"
     );
 }
 

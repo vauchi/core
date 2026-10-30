@@ -4,14 +4,14 @@
 
 //! Integration tests for the full ADR-031 command/event exchange protocol.
 //!
-//! These tests verify complete exchange flows (QR, BLE, NFC) using only
+//! These tests verify complete exchange flows (QR, NFC) using only
 //! `Command`s and `Event`s — no hardware traits,
 //! no mock transports, no blocking calls.
 
 use vauchi_core::ContactCard;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::{
-    ExchangeEvent, ExchangeSession, ExchangeState, ManualConfirmationVerifier,
+    ExchangeError, ExchangeEvent, ExchangeSession, ExchangeState, ManualConfirmationVerifier,
 };
 use vauchi_core::identity::Identity;
 use vauchi_core::platform::BleLinkDirection;
@@ -36,18 +36,6 @@ fn nfc_session(name: &str) -> ExchangeSession {
     let card = ContactCard::new(name);
     let proximity = ManualConfirmationVerifier::new();
     ExchangeSession::new_nfc(
-        identity,
-        card,
-        proximity,
-        vauchi_core::clock::SystemClock::shared(),
-    )
-}
-
-fn ble_session(name: &str) -> ExchangeSession {
-    let identity = Identity::create(name, 0);
-    let card = ContactCard::new(name);
-    let proximity = ManualConfirmationVerifier::new();
-    ExchangeSession::new_ble(
         identity,
         card,
         proximity,
@@ -180,23 +168,23 @@ fn nfc_full_round_trip_via_commands_and_events() {
     );
 }
 
-// −− BLE -> QR fallback −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
+// −− NFC -> QR fallback −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
 // @internal
 #[test]
-fn ble_to_qr_fallback_produces_working_qr_session() {
-    let mut session = ble_session("Alice");
+fn nfc_to_qr_fallback_produces_working_qr_session() {
+    let mut session = nfc_session("Alice");
     session.set_device_capabilities(DeviceCapabilities {
-        has_ble: true,
+        has_nfc: true,
         has_camera: true,
         ..Default::default()
     });
     session.emit_initial_commands();
-    let _ = session.drain_commands(); // drain BLE commands
+    let _ = session.drain_commands();
 
     session
         .apply_hardware_event(Event::HardwareUnavailable {
-            transport: "BLE".into(),
+            transport: "NFC".into(),
         })
         .unwrap();
 
@@ -207,7 +195,7 @@ fn ble_to_qr_fallback_produces_working_qr_session() {
     });
     assert!(
         qr_data.is_some(),
-        "BLE fallback should produce QrDisplay command"
+        "NFC fallback should produce QrDisplay command"
     );
 
     let qr_str = qr_data.unwrap();
@@ -220,6 +208,32 @@ fn ble_to_qr_fallback_produces_working_qr_session() {
     assert!(
         matches!(bob.state(), ExchangeState::PeerScanned { .. }),
         "Bob should be able to scan Alice's fallback QR"
+    );
+}
+
+// −− Hardware error -> fail −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
+
+// @internal
+#[test]
+fn hardware_error_fails_session() {
+    let mut session = nfc_session("Alice");
+
+    session
+        .apply_hardware_event(Event::HardwareError {
+            transport: "NFC".into(),
+            error: "adapter disabled".into(),
+        })
+        .unwrap();
+
+    assert!(
+        matches!(
+            session.state(),
+            ExchangeState::Failed {
+                error: ExchangeError::HardwareFailure { transport, error }
+            } if transport == "NFC" && error == "adapter disabled"
+        ),
+        "hardware error should fail the session with HardwareFailure, got {:?}",
+        session.state()
     );
 }
 

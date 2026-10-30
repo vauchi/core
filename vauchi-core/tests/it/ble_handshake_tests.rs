@@ -291,6 +291,7 @@ fn test_responder_rejects_invalid_version() {
 }
 
 // @scenario: ble_exchange :: Responder rejects truncated key offer
+// @scenario: ble_exchange :: Invalid BLE payload is rejected
 #[test]
 fn test_responder_rejects_truncated_offer() {
     let bob_id = make_test_identity();
@@ -486,6 +487,7 @@ fn test_commitment_mismatch_rejected() {
 // ============================================================
 
 // @scenario: ble_exchange :: Full 4-phase handshake happy path
+// @scenario: ble_exchange :: Full BLE exchange lifecycle
 #[test]
 fn test_full_handshake_happy_path() {
     let alice_id = make_test_identity();
@@ -639,6 +641,7 @@ fn test_full_handshake_round_trip_under_clock_drift() {
 // ============================================================
 
 // @scenario: ble_exchange :: Expired key offer is rejected
+// @scenario: ble_exchange :: Expired BLE payload is rejected
 #[test]
 fn test_expired_key_offer_rejected() {
     let bob_id = make_test_identity();
@@ -670,6 +673,8 @@ fn test_expired_key_offer_rejected() {
 // ============================================================
 
 // @scenario: ble_exchange :: Self-exchange rejected in handshake
+// @scenario: ble_exchange :: Self-exchange is rejected via BLE
+// @scenario: contact_exchange :: BLE exchange prevents self-exchange
 #[test]
 fn test_self_exchange_rejected() {
     let identity = make_test_identity();

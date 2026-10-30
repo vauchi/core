@@ -283,6 +283,7 @@ fn cancel_emits_ble_disconnect_once_and_is_absorbing() {
     assert_eq!(m.phase(), BleMachinePhase::Cancelled);
 }
 
+// @scenario: ble_exchange :: BLE transport in failure mode returns errors
 // @internal
 #[test]
 fn disconnected_fails_the_machine_with_reason() {

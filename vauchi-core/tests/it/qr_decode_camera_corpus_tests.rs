@@ -114,10 +114,42 @@ fn front_camera_frames_at_7_cm_are_read_at_least_as_well_as_before() {
 
 // @internal
 #[test]
+fn front_camera_frames_at_10_cm_are_read_at_least_as_well_as_before() {
+    const FLOOR: usize = 9;
+
+    let reading = read_placement("pixel3a-front-10cm");
+
+    assert!(
+        reading.read >= FLOOR,
+        "read {} of 10, floor {FLOOR}; missed {:?}",
+        reading.read,
+        reading.missed
+    );
+    assert_eq!(reading.misread, Vec::<String>::new());
+}
+
+// @internal
+#[test]
 fn front_camera_frames_at_13_5_cm_are_read_at_least_as_well_as_before() {
     const FLOOR: usize = 9;
 
     let reading = read_placement("pixel3a-front-13.5cm");
+
+    assert!(
+        reading.read >= FLOOR,
+        "read {} of 10, floor {FLOOR}; missed {:?}",
+        reading.read,
+        reading.missed
+    );
+    assert_eq!(reading.misread, Vec::<String>::new());
+}
+
+// @internal
+#[test]
+fn front_camera_frames_at_14_cm_are_read_at_least_as_well_as_before() {
+    const FLOOR: usize = 9;
+
+    let reading = read_placement("pixel3a-front-14cm");
 
     assert!(
         reading.read >= FLOOR,

@@ -204,7 +204,7 @@ fn first_exchange_inserts_contact_and_card_update_round_trips() {
 /// A card-update in flight across a repeat exchange still applies: the
 /// repeat keeps the channel, so the update sealed before it decrypts after
 /// it, and a later update delivers too (private#941, SC-06).
-// @scenario: sync_updates :: An update in flight across a re-exchange still applies
+// @internal
 #[test]
 fn an_update_in_flight_across_a_repeat_exchange_still_applies() {
     let alice = create_vauchi_with_card("Alice", vec![(FieldType::Email, "work", "alice@old.com")]);

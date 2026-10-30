@@ -335,3 +335,56 @@ fn test_proof_accepts_voucher_without_token() {
         "proof must contain exactly 1 voucher after successful add"
     );
 }
+
+// =============================================================================
+// The recovery window: a proof's vouchers span at most 96 h (#919)
+// =============================================================================
+
+fn proof_with_vouchers_at(timestamps: &[u64]) -> RecoveryProof {
+    let old = SigningKeyPair::generate();
+    let new = SigningKeyPair::generate();
+    let old_pk = *old.public_key().as_bytes();
+    let new_pk = *new.public_key().as_bytes();
+    let mut proof = RecoveryProof::new(&old_pk, &new_pk, timestamps.len() as u32, 0);
+    for &timestamp in timestamps {
+        let helper = SigningKeyPair::generate();
+        let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &helper, None, timestamp);
+        proof.add_voucher(voucher).unwrap();
+    }
+    proof
+}
+
+// @internal
+#[test]
+fn a_proof_whose_vouchers_span_exactly_the_window_validates() {
+    let start = 1_800_000_000;
+    let proof = proof_with_vouchers_at(&[
+        start,
+        start + 3600,
+        start + RecoveryProof::VOUCHER_WINDOW_SECS,
+    ]);
+
+    assert!(matches!(proof.validate(), Ok(())));
+}
+
+// @internal
+#[test]
+fn a_proof_whose_vouchers_span_more_than_the_window_is_refused() {
+    let start = 1_800_000_000;
+    let proof = proof_with_vouchers_at(&[
+        start + RecoveryProof::VOUCHER_WINDOW_SECS + 1,
+        start + 3600,
+        start,
+    ]);
+
+    assert!(matches!(
+        proof.validate(),
+        Err(RecoveryError::VouchersOutsideWindow)
+    ));
+}
+
+// @internal
+#[test]
+fn the_voucher_window_is_96_hours() {
+    assert_eq!(RecoveryProof::VOUCHER_WINDOW_SECS, 96 * 60 * 60);
+}

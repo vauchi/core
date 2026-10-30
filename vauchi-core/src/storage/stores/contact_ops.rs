@@ -11,6 +11,15 @@ use super::ContactStore;
 use crate::card::ContactCard;
 use crate::crypto::cek::ContentEncryptionKey;
 
+/// A revoked sender's tombstone. The key is the `sender_id`; the name stays
+/// so a recovery claim for that key can still be named (vauchi/private#935).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RevokedSender {
+    pub sender_id: String,
+    pub revoked_at: u64,
+    pub display_name: Option<String>,
+}
+
 impl ContactStore<'_> {
     /// Saves personal notes for a contact, encrypting at the storage layer.
     ///
@@ -373,6 +382,50 @@ impl ContactStore<'_> {
         )?;
         Ok(())
     }
+    /// Records a revoked contact's tombstone with its display name, so a
+    /// recovery claim for that key can still be named (vauchi/private#935).
+    pub fn record_revoked_contact(
+        &self,
+        sender_id: &str,
+        revoked_at: u64,
+        display_name: &str,
+    ) -> Result<(), StorageError> {
+        let encrypted = crate::crypto::encrypt(self.key, display_name.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        self.conn.execute(
+            "INSERT OR REPLACE INTO revoked_senders (sender_id, revoked_at, display_name_encrypted)
+             VALUES (?1, ?2, ?3)",
+            params![sender_id, revoked_at as i64, encrypted],
+        )?;
+        Ok(())
+    }
+
+    /// The tombstone of a revoked sender, if any.
+    pub fn revoked_sender(&self, sender_id: &str) -> Result<Option<RevokedSender>, StorageError> {
+        let row = self.conn.query_row(
+            "SELECT revoked_at, display_name_encrypted FROM revoked_senders WHERE sender_id = ?1",
+            params![sender_id],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<Vec<u8>>>(1)?)),
+        );
+        let (revoked_at, encrypted) = match row {
+            Ok(found) => found,
+            Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(None),
+            Err(e) => return Err(StorageError::Database(e)),
+        };
+        let display_name = encrypted
+            .map(|ciphertext| {
+                let plain = crate::crypto::decrypt(self.key, &ciphertext)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                String::from_utf8(plain).map_err(|e| StorageError::Serialization(e.to_string()))
+            })
+            .transpose()?;
+        Ok(Some(RevokedSender {
+            sender_id: sender_id.to_string(),
+            revoked_at: revoked_at as u64,
+            display_name,
+        }))
+    }
+
     /// Checks if a sender has been revoked.
     pub fn is_sender_revoked(&self, sender_id: &str) -> Result<bool, StorageError> {
         let result = self.conn.query_row(

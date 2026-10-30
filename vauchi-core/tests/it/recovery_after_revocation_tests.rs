@@ -17,6 +17,7 @@ use vauchi_core::identity::Identity;
 use vauchi_core::network::message::IdentityRevoked;
 use vauchi_core::network::revocation::process_revocation;
 use vauchi_core::recovery::{RecoveryClaim, RecoveryVoucher};
+use vauchi_core::storage::Storage;
 
 const EXCHANGED_AT: u64 = 1_700_000_000;
 
@@ -147,4 +148,31 @@ fn the_tombstone_keeps_the_name_encrypted_at_rest() {
         !stored.windows(5).any(|window| window == b"Alice"),
         "the name is not stored in the clear (ADR-015)"
     );
+}
+
+// @internal
+#[test]
+fn the_revoked_contacts_name_survives_a_key_rotation() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("rotation.db");
+    let old_key = SymmetricKey::generate();
+    let new_key = SymmetricKey::generate();
+    {
+        let mut storage = Storage::open(&database, old_key).unwrap();
+        storage
+            .contacts()
+            .record_revoked_contact("alice", EXCHANGED_AT, "Alice")
+            .unwrap();
+        storage.rekey(new_key.clone()).unwrap();
+    }
+
+    let reopened = Storage::open(&database, new_key).unwrap();
+    let tombstone = reopened
+        .contacts()
+        .revoked_sender("alice")
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(tombstone.display_name.as_deref(), Some("Alice"));
+    assert_eq!(tombstone.revoked_at, EXCHANGED_AT);
 }

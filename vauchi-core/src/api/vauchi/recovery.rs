@@ -224,13 +224,24 @@ impl Vauchi {
             .ok_or(VauchiError::IdentityNotInitialized)?;
 
         // The guardian checks the person against this contact, so the
-        // claim must be for the contact's key (vauchi/private#708).
-        let contact = self
-            .storage
-            .contacts()
-            .load_contact(contact_id)?
-            .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
-        if contact.public_key() != Some(claim.old_pk().as_bytes()) {
+        // claim must be for the contact's key (vauchi/private#708). A
+        // revoked contact's tombstone still names the key, so a thief's
+        // revocation does not silence the guardian (vauchi/private#935).
+        let key_matches = match self.storage.contacts().load_contact(contact_id)? {
+            Some(contact) => contact.public_key() == Some(claim.old_pk().as_bytes()),
+            None => {
+                if self
+                    .storage
+                    .contacts()
+                    .revoked_sender(contact_id)?
+                    .is_none()
+                {
+                    return Err(VauchiError::ContactNotFound(contact_id.to_string()));
+                }
+                contact_id == hex::encode(claim.old_pk())
+            }
+        };
+        if !key_matches {
             return Err(VauchiError::ContactNotFound(hex::encode(claim.old_pk())));
         }
 

@@ -267,7 +267,15 @@ fn recovery_claim_contact_names_the_contact_whose_key_the_claim_carries() {
     let contact = helper.recovery_claim_contact(&claim).unwrap();
 
     assert_eq!(contact.display_name(), "Alice");
-    assert_eq!(contact.public_key(), Some(alice_old.signing_public_key()));
+    assert_eq!(
+        contact.contact_id(),
+        hex::encode(alice_old.signing_public_key())
+    );
+    assert_eq!(
+        contact.revoked_at(),
+        None,
+        "a live contact, not a tombstone"
+    );
 }
 
 // @internal

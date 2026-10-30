@@ -43,6 +43,7 @@ mod reciprocity_send;
 #[cfg(feature = "network-http")]
 mod recovery;
 mod recovery_offline;
+pub use recovery_offline::RecoveryClaimContact;
 mod registry_push;
 mod registry_sibling_apply;
 #[cfg(feature = "network-http")]

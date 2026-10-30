@@ -50,6 +50,7 @@ pub use error::{
     UpdateStatus,
 };
 pub use secure::{FileKeyStorage, SecureStorage};
+pub use stores::RevokedSender;
 pub use stores::{
     ActivityLogStore, ConsentStore, ContactStore, DecoyStore, DeliveryStore, DeviceDeliveryStore,
     DeviceStore, EmergencyStore, FieldNoteStore, GENESIS_CONTACT_ATTEMPTS_PER_WINDOW,

@@ -42,7 +42,9 @@ pub fn canonical_revocation_bytes(
 /// 4. Verify Ed25519 signature against stored public key
 /// 5. Crypto-shred: delete CEK
 /// 6. Delete contact row
-/// 7. Record tombstone in revoked_senders
+/// 7. Record tombstone in revoked_senders, with the contact's name: the
+///    key must stay vouchable for the real owner's recovery after a
+///    thief's revocation (vauchi/private#935)
 pub fn process_revocation(
     revocation: &IdentityRevoked,
     storage: &Storage,
@@ -78,9 +80,11 @@ pub fn process_revocation(
     storage.delete_contact(revocation.sender_id.as_str())?;
 
     // Record tombstone (prevents future updates from revoked sender)
-    storage
-        .contacts()
-        .record_revoked_sender(revocation.sender_id.as_str(), revocation.timestamp)?;
+    storage.contacts().record_revoked_contact(
+        revocation.sender_id.as_str(),
+        revocation.timestamp,
+        contact.display_name(),
+    )?;
 
     Ok(true)
 }

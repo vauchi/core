@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 91] = [
+const MIGRATIONS: [Migration; 92] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -727,7 +727,36 @@ const MIGRATIONS: [Migration; 91] = [
         name: "peer_card_ordering",
         action: MigrationAction::Sql(MIGRATION_V91_PEER_CARD_ORDERING),
     },
+    Migration {
+        version: 92,
+        name: "revoked_sender_name",
+        action: MigrationAction::Callback(migrate_v92_revoked_sender_name),
+    },
 ];
+
+/// Migration v92: a revoked contact's name stays with its tombstone, so a
+/// helper can still name whom a recovery claim for that key belongs to
+/// after a thief's revocation (vauchi/private#935). Encrypted at rest
+/// (ADR-015); the key itself is the row's `sender_id`. A callback, not
+/// SQL, because SQLite has no `ADD COLUMN IF NOT EXISTS` and a database
+/// replayed from an earlier version row may already carry the column.
+fn migrate_v92_revoked_sender_name(
+    conn: &Connection,
+    _key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    let present: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('revoked_senders') WHERE name = 'display_name_encrypted'",
+        [],
+        |row| row.get(0),
+    )?;
+    if present == 0 {
+        conn.execute(
+            "ALTER TABLE revoked_senders ADD COLUMN display_name_encrypted BLOB",
+            [],
+        )?;
+    }
+    Ok(())
+}
 
 /// Persistent per-contact ordering survives removed fields and device restarts.
 const MIGRATION_V91_PEER_CARD_ORDERING: &str = "

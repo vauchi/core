@@ -12,10 +12,34 @@
 use base64::Engine;
 
 use crate::api::error::{VauchiError, VauchiResult};
-use crate::contact::Contact;
 use crate::recovery::{RecoveryClaim, RecoveryProgress, RecoveryVoucher};
 
 use super::Vauchi;
+
+/// Whom a recovery claim's old key belonged to
+/// ([`Vauchi::recovery_claim_contact`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecoveryClaimContact {
+    contact_id: String,
+    display_name: String,
+    revoked_at: Option<u64>,
+}
+
+impl RecoveryClaimContact {
+    pub fn contact_id(&self) -> &str {
+        &self.contact_id
+    }
+
+    pub fn display_name(&self) -> &str {
+        &self.display_name
+    }
+
+    /// When this device processed the key's revocation; `None` while the
+    /// contact is live.
+    pub fn revoked_at(&self) -> Option<u64> {
+        self.revoked_at
+    }
+}
 
 const MAX_VOUCHER_B64_LEN: usize = 4096;
 
@@ -68,18 +92,42 @@ impl Vauchi {
             .map_err(|e| VauchiError::Serialization(e.to_string()))
     }
 
-    /// The contact whose key a recovery claim says was lost. Vouching for
-    /// anyone else would sign for a key the helper never met, and the
-    /// helper checks the person in front of them against this contact
-    /// (vauchi/private#708).
-    pub fn recovery_claim_contact(&self, claim: &RecoveryClaim) -> VauchiResult<Contact> {
+    /// Whom a recovery claim's old key belonged to: a contact, or the
+    /// tombstone of one whose revocation this device processed. Vouching
+    /// for anyone else would sign for a key the helper never met, and the
+    /// helper checks the person in front of them against this name
+    /// (vauchi/private#708). The tombstone counts because a thief holding
+    /// the old device can revoke the identity at every contact, and the
+    /// real owner's recovery must still find helpers (vauchi/private#935).
+    pub fn recovery_claim_contact(
+        &self,
+        claim: &RecoveryClaim,
+    ) -> VauchiResult<RecoveryClaimContact> {
         let old_pk = claim.old_pk().as_bytes();
-        self.storage
+        if let Some(contact) = self
+            .storage
             .contacts()
             .list_contacts()?
             .into_iter()
             .find(|contact| contact.public_key() == Some(old_pk))
-            .ok_or_else(|| VauchiError::ContactNotFound(hex::encode(old_pk)))
+        {
+            return Ok(RecoveryClaimContact {
+                contact_id: contact.id().to_string(),
+                display_name: contact.display_name().to_string(),
+                revoked_at: None,
+            });
+        }
+        let old_id = hex::encode(old_pk);
+        match self.storage.contacts().revoked_sender(&old_id)? {
+            Some(tombstone) => Ok(RecoveryClaimContact {
+                display_name: tombstone
+                    .display_name
+                    .unwrap_or_else(|| format!("{}…", &old_id[..16])),
+                contact_id: old_id,
+                revoked_at: Some(tombstone.revoked_at),
+            }),
+            None => Err(VauchiError::ContactNotFound(old_id)),
+        }
     }
 
     /// Creates a recovery claim for the given old (lost) identity public

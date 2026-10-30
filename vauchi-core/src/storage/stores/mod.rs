@@ -46,6 +46,7 @@ mod ux;
 pub use activity_log::ActivityLogStore;
 pub use consent::ConsentStore;
 pub use contact::ContactStore;
+pub use contact_ops::RevokedSender;
 pub use decoy::DecoyStore;
 pub use delivery::DeliveryStore;
 pub use device::DeviceStore;

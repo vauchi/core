@@ -140,6 +140,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     // V48 device-sync LWW field timestamps
     ("sync_field_timestamps", "timestamps_json_encrypted"),
     ("peer_card_ordering", "state_encrypted"),
+    // V92 a revoked contact's name stays with its tombstone (#935)
+    ("revoked_senders", "display_name_encrypted"),
     // V49 owner-private contact tags (ADR-051)
     ("tags", "name_encrypted"),
     // V50 owner-private named places (ADR-051)
@@ -296,6 +298,14 @@ impl Storage {
 
             self.rekey_nullable_column(old_key, &new_key, "peer_card_ordering", "state_encrypted")?;
             report(&mut completed, "peer_card_ordering");
+
+            self.rekey_nullable_column(
+                old_key,
+                &new_key,
+                "revoked_senders",
+                "display_name_encrypted",
+            )?;
+            report(&mut completed, "revoked_senders");
 
             self.rekey_sync_timestamps(old_key, &new_key)?;
             report(&mut completed, "sync_timestamps");

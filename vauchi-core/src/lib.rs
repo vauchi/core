@@ -152,9 +152,9 @@ pub mod api;
 #[cfg(feature = "network-rustls")]
 pub use api::{
     AppPasswordConfig, AuthMode, AuthResult, BIOMETRIC_UNLOCK_MIN_DURATION, BroadcastResult,
-    ConsentStatus, DeviceSyncOrchestrator, GroupDraft, HandlerId, RecoveryReadiness, SearchFacets,
-    SetupProgress, SyncError, SyncManager, Vauchi, VauchiBuilder, VauchiConfig, VauchiError,
-    VauchiEvent, VauchiResult, VauchiSyncOutcome, validate_duress_pin,
+    ConsentStatus, DeviceSyncOrchestrator, GroupDraft, HandlerId, RecoveryClaimContact,
+    RecoveryReadiness, SearchFacets, SetupProgress, SyncError, SyncManager, Vauchi, VauchiBuilder,
+    VauchiConfig, VauchiError, VauchiEvent, VauchiResult, VauchiSyncOutcome, validate_duress_pin,
 };
 #[cfg(all(feature = "network-rustls", feature = "network-http"))]
 pub use api::{PERIODIC_SYNC_INTERVAL_SECONDS, PERIODIC_SYNC_MAX_RETRIES};

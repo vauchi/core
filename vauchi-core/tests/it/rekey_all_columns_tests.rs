@@ -1105,6 +1105,9 @@ fn rekey_is_idempotent_under_repeated_calls() {
 const COVERED_ELSEWHERE: &[(&str, &str)] = &[
     // peer_card_ordering_survives_storage_key_rotation in sync_store_tests.rs.
     ("peer_card_ordering", "state_encrypted"),
+    // the_revoked_contacts_name_survives_a_key_rotation in
+    // recovery_after_revocation_tests.rs.
+    ("revoked_senders", "display_name_encrypted"),
     // the_vcard_uid_lookup_survives_a_rekey in
     // identifying_columns_at_rest_tests.rs (value and lookup hash).
     ("contacts", "original_uid_encrypted"),

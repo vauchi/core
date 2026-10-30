@@ -52,6 +52,13 @@ mutation:baseline-check:
 mutation:nightly:
   extends: [.mutation-nightly, .linux-runner]
   timeout: 4h
+  # The template allows every failure. cargo-mutants exits 2 for missed
+  # mutants and 3 for timeouts, which stay advisory here; exit 4 means the
+  # unmutated baseline is red and nothing was tested, which hid three
+  # nights of zero mutants behind a green pipeline (private#974). Usage and
+  # internal errors (1, 5, 6, 70) are red for the same reason.
+  allow_failure:
+    exit_codes: [2, 3]
   # `.linux-runner` (via rust-base.yml) defaults to interruptible: true, so a
   # push to main auto-cancels this still-running scheduled job under GitLab's
   # auto-cancel-redundant-pipelines. core's 11k-mutant run takes hours, so an

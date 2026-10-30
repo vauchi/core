@@ -755,7 +755,7 @@ impl RecoveryProof {
 
         let timestamps = self.vouchers.iter().map(RecoveryVoucher::timestamp);
         if let (Some(earliest), Some(latest)) = (timestamps.clone().min(), timestamps.max())
-            && latest - earliest > Self::VOUCHER_WINDOW_SECS
+            && latest.saturating_sub(earliest) > Self::VOUCHER_WINDOW_SECS
         {
             return Err(RecoveryError::VouchersOutsideWindow);
         }

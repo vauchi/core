@@ -88,3 +88,28 @@ fn the_input_error_clears_once_the_value_is_typed_again() {
 
     assert_eq!(validation_errors(&retyped), Vec::<String>::new());
 }
+
+// iOS reports the field losing focus after Save re-renders the form; that
+// is not a new value, so the error must stay until the value is typed again
+// (vauchi/private#845, iPhone 2026-10-30: no message after an invalid Save).
+// @scenario: contact_card_management :: Email validation
+#[test]
+fn the_input_error_survives_the_field_losing_focus() {
+    let SavedForm {
+        mut engine, saved, ..
+    } = save_email("notanemail");
+    let (surface_id, binding_id) = first_input(&saved);
+
+    let unfocused = engine
+        .dispatch(Event::InputFocusEnded {
+            surface_id,
+            binding_id,
+        })
+        .unwrap();
+
+    assert_eq!(
+        validation_errors(&unfocused),
+        vec!["Please enter a valid email address".to_string()],
+        "{unfocused:#?}"
+    );
+}

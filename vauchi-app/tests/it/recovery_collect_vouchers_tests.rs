@@ -258,3 +258,35 @@ fn a_proof_the_relay_cannot_take_keeps_the_vouchers() {
     );
     assert_eq!(alice.stored_voucher_count(), Some(THRESHOLD));
 }
+
+// @internal
+#[test]
+fn a_restarted_app_resumes_collecting_with_the_vouchers_so_far() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = VauchiConfig::with_storage_path(dir.path().join("new-device.db"))
+        .with_storage_key(SymmetricKey::generate());
+    let mut alice = claimant_on(Vauchi::new(config.clone()).unwrap());
+    alice.collect_from(&["Bob", "Carol"]);
+    drop(alice.engine);
+
+    let mut vauchi = Vauchi::new(config).unwrap();
+    vauchi.refresh_identity_from_storage();
+    let mut restarted = AppEngine::new(vauchi);
+    restarted.navigate_to(AppScreen::Recovery);
+
+    let screen = restarted.current_screen();
+    assert_eq!(screen.title, en("recovery.collecting_vouchers_title"));
+    let progress = screen.progress.expect("progress toward the threshold");
+    assert_eq!(
+        (progress.current_step, progress.total_steps),
+        (2, THRESHOLD as u8)
+    );
+    let collected = screen
+        .components
+        .iter()
+        .find_map(|component| match component {
+            Component::ActionList { id, items } if id == "collected_vouchers" => Some(items.len()),
+            _ => None,
+        });
+    assert_eq!(collected, Some(2));
+}

@@ -251,18 +251,16 @@ impl Vauchi {
         identity: &Identity,
         ciphertext: &[u8],
     ) -> VauchiResult<usize> {
-        let registry = match self.storage.device().load_device_registry() {
-            Ok(Some(r)) if r.device_count() > 1 => r,
+        let registry = match self.storage.device().load_device_registry()? {
+            Some(r) if r.device_count() > 1 => r,
             _ => return Ok(0),
         };
 
         let device_info = identity.create_device_info(self.clock.unix_seconds());
         let current_id = *device_info.device_id();
         let mut orchestrator =
-            match DeviceSyncOrchestrator::load(&self.storage, device_info, registry.clone()) {
-                Ok(o) => o,
-                Err(_) => return Ok(0),
-            };
+            DeviceSyncOrchestrator::load(&self.storage, device_info, registry.clone())
+                .map_err(VauchiError::DeviceSync)?;
 
         for device in registry.active_devices() {
             if device.device_id == current_id {
@@ -273,27 +271,25 @@ impl Vauchi {
                     Ok(p) => p,
                     Err(_) => continue, // not from this device — try the next key
                 };
-            // Tolerant per-item decode: a newer sibling's unknown variant
-            // must not drop the known items sharing its batch (Release A,
-            // readers-before-writers).
-            let items: Vec<SyncItem> = match crate::sync::decode_sync_items_tolerantly(&plaintext) {
-                Ok(decoded) => decoded.known,
-                Err(_) => return Ok(0), // decrypted but not an item array — drop
+            let items = match orchestrator.decode_incoming_batch(&plaintext, &device.device_id) {
+                Ok(items) => items,
+                Err(_) => return Ok(0),
             };
-            // The decrypting device IS the sender — use its id for the
-            // ADR-020 tie-break (no wire field needed).
             let decoded = items.len();
             let applied = orchestrator
-                .process_incoming(items, &device.device_id)
+                .apply_incoming_batch(items, &device.device_id, |items| {
+                    self.apply_sync_items_retrying_storage(items)
+                        .map_err(|error| {
+                            crate::sync::DeviceSyncError::Serialization(error.to_string())
+                        })
+                })
                 .map_err(VauchiError::DeviceSync)?;
-            // Counts only: which side loses an owner-device change is
-            // otherwise invisible on a device (private#659).
             tracing::info!(
                 decoded,
-                accepted = applied.len(),
+                accepted = applied,
                 "[DeviceSync] received a batch from a linked device"
             );
-            return self.apply_sync_items(applied);
+            return Ok(applied);
         }
 
         Ok(0)
@@ -509,3 +505,7 @@ mod tests {
         assert_eq!(sent, 1);
     }
 }
+
+#[cfg(test)]
+#[path = "device_sync_order_tests.rs"]
+mod ordering_tests;

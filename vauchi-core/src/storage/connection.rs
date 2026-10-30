@@ -254,7 +254,7 @@ impl Storage {
     }
 
     /// Returns a reference to the underlying connection (testing only).
-    #[cfg(feature = "testing")]
+    #[cfg(any(test, feature = "testing"))]
     pub fn connection(&self) -> &Connection {
         &self.conn
     }

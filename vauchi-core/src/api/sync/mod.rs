@@ -38,6 +38,9 @@ pub use card_update::{
     process_single_card_update, process_single_card_update_for_device,
 };
 pub(crate) use card_update::{alert_event, process_single_card_update_for_authenticated_device};
+// INLINE_TEST_REQUIRED: sibling receive tests share the wire decoder without exposing it in production.
+#[cfg(test)]
+pub(crate) use device_orchestrator::SyncEnvelope;
 pub use device_orchestrator::{DeviceSyncOrchestrator, build_device_sync_envelopes};
 pub use manager::{SyncError, SyncManager};
 

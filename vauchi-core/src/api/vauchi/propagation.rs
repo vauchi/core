@@ -495,6 +495,21 @@ impl Vauchi {
         &self,
         items: Vec<crate::sync::device_sync::SyncItem>,
     ) -> VauchiResult<usize> {
+        self.apply_sync_items_mode(items, false)
+    }
+
+    pub(super) fn apply_sync_items_retrying_storage(
+        &self,
+        items: Vec<crate::sync::device_sync::SyncItem>,
+    ) -> VauchiResult<usize> {
+        self.apply_sync_items_mode(items, true)
+    }
+
+    fn apply_sync_items_mode(
+        &self,
+        items: Vec<crate::sync::device_sync::SyncItem>,
+        retry_storage_failures: bool,
+    ) -> VauchiResult<usize> {
         use crate::sync::device_sync::SyncItem;
 
         let mut applied = 0;
@@ -888,11 +903,18 @@ impl Vauchi {
                     }),
             };
 
-            if result.is_ok() {
-                applied += 1;
-                if let Some(event) = event {
-                    self.events.dispatch(event);
+            match result {
+                Ok(()) => {
+                    applied += 1;
+                    if let Some(event) = event {
+                        self.events.dispatch(event);
+                    }
                 }
+                Err(VauchiError::Storage(crate::storage::StorageError::NotFound(_))) => {}
+                Err(error @ VauchiError::Storage(_)) if retry_storage_failures => {
+                    return Err(error);
+                }
+                Err(_) => {}
             }
         }
 

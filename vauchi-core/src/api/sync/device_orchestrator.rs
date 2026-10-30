@@ -20,6 +20,8 @@ use crate::sync::device_sync::{
 };
 
 /// Domain separation for device-to-device encryption key derivation.
+mod ordering;
+
 const DEVICE_SYNC_INFO: &[u8] = b"Vauchi_DeviceSync";
 
 /// Orchestrates synchronization between devices of the same identity.
@@ -76,46 +78,53 @@ impl<'a> DeviceSyncOrchestrator<'a> {
     ) -> Result<Self, DeviceSyncError> {
         let mut orchestrator = Self::new(storage, current_device, registry);
 
+        orchestrator.refresh_persisted_state()?;
+        Ok(orchestrator)
+    }
+
+    fn refresh_persisted_state(&mut self) -> Result<(), DeviceSyncError> {
         // Load existing sync states from storage
-        let stored_states = storage
+        let stored_states = self
+            .storage
             .sync()
             .list_device_sync_states()
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
 
         for state in stored_states {
-            orchestrator.device_states.insert(*state.device_id(), state);
+            self.device_states.insert(*state.device_id(), state);
         }
 
         // Load version vector if exists
-        if let Some(vector) = storage
+        if let Some(vector) = self
+            .storage
             .sync()
             .load_version_vector()
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
         {
-            orchestrator.version_vector = vector;
+            self.version_vector = vector;
         }
 
         // Load conflict-resolution field timestamps so the LWW gate in
         // `process_incoming` survives across sync cycles (G3). Without this
         // a reloaded orchestrator starts empty and an older incoming change
         // would overwrite a newer local one.
-        orchestrator.field_timestamps = storage
+        self.field_timestamps = self
+            .storage
             .sync()
             .load_field_timestamps()
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
         // Earlier builds stamped schedule and cancellation separately even
         // though they overwrite one state. Preserve both floors on upgrade.
         for legacy in ["deletion:scheduled", "deletion:cancelled"] {
-            if let Some(stamp) = orchestrator.field_timestamps.remove(legacy) {
-                orchestrator
-                    .field_timestamps
+            if let Some(stamp) = self.field_timestamps.remove(legacy) {
+                self.field_timestamps
                     .entry("deletion:state".to_string())
                     .and_modify(|current| *current = (*current).max(stamp))
                     .or_insert(stamp);
             }
         }
 
-        Ok(orchestrator)
+        Ok(())
     }
 
     /// Records a local change to be synced to other devices.
@@ -123,26 +132,10 @@ impl<'a> DeviceSyncOrchestrator<'a> {
     /// Queues the SyncItem for all other linked devices and increments
     /// the local version vector.
     pub fn record_local_change(&mut self, item: SyncItem) -> Result<(), DeviceSyncError> {
-        self.stage_local_change(item);
-
-        // Persist device states + version vector atomically (#105).
-        // A transaction ensures either all state is saved or none, preventing
-        // inconsistency if the process crashes mid-write.
-        self.storage
-            .begin_transaction()
-            .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
-
-        let result = self.persist_staged_state();
-        match result {
-            Ok(()) => self
-                .storage
-                .commit()
-                .map_err(|e| DeviceSyncError::Serialization(e.to_string())),
-            Err(error) => {
-                self.storage.rollback();
-                Err(error)
-            }
-        }
+        self.state_transaction(|current| {
+            current.stage_local_change(item)?;
+            current.persist_staged_state()
+        })
     }
 
     /// Atomically persist an expanded signed owner registry and queue it for
@@ -182,30 +175,31 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             version: registry.version(),
         };
 
-        storage
-            .begin_transaction()
-            .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
-        let result = (|| {
+        orchestrator.state_transaction(|current| {
             storage
                 .device()
                 .save_device_registry(registry)
                 .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
-            orchestrator.stage_local_change(item);
-            orchestrator.persist_staged_state()
-        })();
-
-        match result {
-            Ok(()) => storage
-                .commit()
-                .map_err(|e| DeviceSyncError::Serialization(e.to_string())),
-            Err(error) => {
-                storage.rollback();
-                Err(error)
-            }
-        }
+            current.stage_local_change(item)?;
+            current.persist_staged_state()
+        })
     }
 
-    fn stage_local_change(&mut self, item: SyncItem) {
+    fn stage_local_change(&mut self, item: SyncItem) -> Result<(), DeviceSyncError> {
+        let sequence = self
+            .version_vector
+            .get(self.current_device.device_id())
+            .checked_add(1)
+            .ok_or_else(|| DeviceSyncError::Serialization("device sequence exhausted".into()))?;
+        if self
+            .device_states
+            .values()
+            .any(|state| state.pending_items().len() >= 10_000)
+        {
+            return Err(DeviceSyncError::Serialization(
+                "device pending queue limit exceeded".into(),
+            ));
+        }
         // Track the last-write stamp for conflict resolution: this device
         // originated the change, so stamp it with our device id (ADR-020).
         let key = Self::conflict_key(&item);
@@ -221,8 +215,9 @@ impl<'a> DeviceSyncOrchestrator<'a> {
 
         // Queue item for all other devices
         for state in self.device_states.values_mut() {
-            state.queue_item(item.clone());
+            state.queue_ordered_item(item.clone(), sequence);
         }
+        Ok(())
     }
 
     fn persist_staged_state(&self) -> Result<(), DeviceSyncError> {
@@ -270,14 +265,17 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         device_id: &[u8; 32],
         version: u64,
     ) -> Result<(), DeviceSyncError> {
-        if let Some(state) = self.device_states.get_mut(device_id) {
-            state.mark_synced(version);
-            self.storage
-                .sync()
-                .save_device_sync_state(state)
-                .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
-        }
-        Ok(())
+        self.state_transaction(|current| {
+            if let Some(state) = current.device_states.get_mut(device_id) {
+                state.mark_synced(version);
+                current
+                    .storage
+                    .sync()
+                    .save_device_sync_state(state)
+                    .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+            }
+            Ok(())
+        })
     }
 
     /// Creates a full sync payload for a newly linked device.
@@ -646,11 +644,11 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         Ok(SymmetricKey::from_bytes(*key_bytes))
     }
 
-    /// Processes incoming sync items from another device.
+    /// Processes legacy unsequenced sync items from another device.
     ///
     /// ## Conflict Resolution Strategy: Last-Write-Wins (LWW) (#193)
     ///
-    /// Each sync item carries a Unix millisecond timestamp set by the originating device.
+    /// Each sync item carries a Unix-seconds timestamp set by the originating device.
     /// Conflict is determined by the `conflict_key()` function, which maps items to a
     /// namespace:id string (e.g., `"field:email"`, `"contact:abc123"`).
     ///
@@ -658,7 +656,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
     /// - **Newer wins:** If incoming timestamp > local timestamp for the same key, apply it.
     /// - **Tie → higher device id wins (ADR-020):** If timestamps are equal, the
     ///   item from the lexicographically-higher device id wins — deterministic and
-    ///   identical on every device, so concurrent same-ms edits converge.
+    ///   identical on every device, so concurrent same-second edits converge.
     /// - **Independent fields coexist:** Items with different conflict keys never conflict.
     ///   E.g., updating email and phone simultaneously on two devices both succeed.
     /// - **Cross-type conflicts:** ContactAdded and ContactRemoved share the same
@@ -670,37 +668,10 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         items: Vec<SyncItem>,
         sender_device_id: &[u8; 32],
     ) -> Result<Vec<SyncItem>, DeviceSyncError> {
-        let mut applied = Vec::new();
-
-        for item in items {
-            let key = Self::conflict_key(&item);
-            // Every item in a batch was authored by the sending device, so
-            // the sender's id is the originating device id for the tie-break.
-            let incoming = FieldStamp {
-                timestamp: item.timestamp(),
-                device_id: *sender_device_id,
-            };
-
-            // LWW + device-id tie-break (ADR-020). An equal stamp can only
-            // come from the device that set it, whose queue is an ordered
-            // log: it is that device's next write in the same second, in this
-            // batch or a later one (private#659), so it applies. A redelivered
-            // item re-applies the content it already set.
-            let local = self.field_timestamps.get(&key).copied();
-            if local.is_none_or(|local| incoming >= local) {
-                self.field_timestamps.insert(key, incoming);
-                applied.push(item);
-            }
-        }
-
-        // Persist the updated timestamps so the LWW gate survives a reload
-        // (G3). Idempotent when nothing applied.
-        self.storage
-            .sync()
-            .save_field_timestamps(&self.field_timestamps)
-            .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
-
-        Ok(applied)
+        self.process_ordered_items(
+            items.into_iter().map(|item| (item, None)).collect(),
+            sender_device_id,
+        )
     }
 
     /// Generates a conflict key for a SyncItem.
@@ -904,27 +875,23 @@ impl<'a> DeviceSyncOrchestrator<'a> {
                     ))
                 })?;
 
-            // Serialize and encrypt payload
-            let payload_bytes = serde_json::to_vec(&sync_msg.items)
-                .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
-            let ciphertext =
-                self.encrypt_for_device(&device.exchange_public_key, &payload_bytes)?;
-
-            // Build a simple envelope struct (recipient_id = self-token)
-            let envelope = SyncEnvelope {
-                recipient_id: token_hex(&compute_device_sync_token(
-                    identity.master_seed(),
-                    device_id,
-                    day,
-                )),
-                ciphertext,
-                target_device_id: *device_id,
-                version: sync_msg.version,
-            };
-
-            let encoded = serde_json::to_vec(&envelope)
-                .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
-            envelopes.push(encoded);
+            for payload_bytes in self.pending_batches(device_id)? {
+                let ciphertext =
+                    self.encrypt_for_device(&device.exchange_public_key, &payload_bytes)?;
+                let envelope = SyncEnvelope {
+                    recipient_id: token_hex(&compute_device_sync_token(
+                        identity.master_seed(),
+                        device_id,
+                        day,
+                    )),
+                    ciphertext,
+                    target_device_id: *device_id,
+                    version: sync_msg.version,
+                };
+                let encoded = serde_json::to_vec(&envelope)
+                    .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+                envelopes.push(encoded);
+            }
         }
 
         Ok(envelopes)

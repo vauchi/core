@@ -48,9 +48,14 @@ impl Vauchi {
                     .load_contact_device_registry(contact_id)?;
                 match held {
                     Some(stored) if stored.version() >= broadcast.version() => Ok(()),
-                    _ => Err(VauchiError::InvalidState(format!(
-                        "relayed contact registry rejected: {save_error}"
-                    ))),
+                    _ => match save_error {
+                        crate::storage::StorageError::InvalidData(_) => {
+                            Err(VauchiError::InvalidState(format!(
+                                "relayed contact registry rejected: {save_error}"
+                            )))
+                        }
+                        error => Err(error.into()),
+                    },
                 }
             }
         }

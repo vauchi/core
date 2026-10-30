@@ -517,3 +517,49 @@ fn a_catch_up_that_started_behind_retention_ends_with_a_resync_request() {
         .unwrap();
     assert_eq!((state.day, state.resync_owed), (today, false));
 }
+
+/// Nothing can be addressed to an identity before it exists, so its first
+/// sync owes no catch-up: since #890 each owed day costs a padded batch
+/// and its fetches, and sixteen of them tripped the OHTTP relay's
+/// per-address limit on a fresh install (private#912).
+// @scenario: message_delivery :: Receive pending updates when coming online
+#[test]
+fn a_new_identity_starts_reading_its_mailboxes_from_the_day_it_was_created() {
+    let outer = MockRelay::start();
+    let application = MockRelay::start();
+    outer.enable_ohttp_gateway(&SignedGateway::new(0x63), window_of(NOW));
+    let clock = Arc::new(FakeClock::new(UNIX_EPOCH + Duration::from_secs(NOW)));
+
+    let (client, _install) = client(&outer, &application, clock, "Alice");
+
+    assert_eq!(
+        checkpoint(&client, &application),
+        Some(current_day_epoch(NOW))
+    );
+}
+
+/// An identity brought onto a new install may have mail waiting from
+/// before, so it keeps the full catch-up (private#691).
+// @scenario: message_delivery :: Receive pending updates when coming online
+#[test]
+fn an_existing_identity_on_a_new_install_still_catches_up() {
+    let outer = MockRelay::start();
+    let application = MockRelay::start();
+    outer.enable_ohttp_gateway(&SignedGateway::new(0x63), window_of(NOW));
+    let clock = Arc::new(FakeClock::new(UNIX_EPOCH + Duration::from_secs(NOW)));
+    let (original, _original_install) = client(&outer, &application, clock.clone(), "Alice");
+    let identity = vauchi_core::Identity::from_storage_bytes(
+        &original.identity().unwrap().to_storage_bytes(),
+        NOW,
+    )
+    .unwrap();
+    let install = Install {
+        dir: tempfile::tempdir().unwrap(),
+        key: SymmetricKey::generate(),
+    };
+    let mut restored = open(&install, &outer, &application, clock);
+
+    restored.set_identity(identity).unwrap();
+
+    assert_eq!(checkpoint(&restored, &application), None);
+}

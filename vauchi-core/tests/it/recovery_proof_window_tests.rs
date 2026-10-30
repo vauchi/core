@@ -9,7 +9,6 @@
 //! one proof span at most 96 hours (private#919). The windows are read
 //! from the signed voucher timestamps, never from the proof's own fields.
 
-use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use vauchi_core::clock::FakeClock;

@@ -314,12 +314,19 @@ fn vouch_for_claim_refuses_a_contact_whose_key_the_claim_does_not_carry() {
 // vauchi-platform's VerifyRecoveryProof dispatch arm)
 // ============================================================
 
-/// Proof for recovering `old_pk` into `new_pk`, vouched by `helpers`.
+/// Proof for recovering `old_pk` into `new_pk`, vouched by `helpers`, stamped
+/// at the verifying Vauchi's clock: a contact refuses a proof whose earliest
+/// voucher is older than 192 hours (private#926), so epoch-0 vouchers would
+/// be refused before the confidence rule under test is reached.
 fn build_proof(old_pk: [u8; 32], new_pk: &[u8; 32], helpers: &[&Identity]) -> RecoveryProof {
-    let claim = RecoveryClaim::new(&old_pk, new_pk, 0);
-    let mut proof = RecoveryProof::new(old_pk, *new_pk, helpers.len() as u32, 0);
+    let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
+    let claim = RecoveryClaim::new(&old_pk, new_pk, now);
+    let mut proof = RecoveryProof::new(old_pk, *new_pk, helpers.len() as u32, now);
     for helper in helpers {
-        proof.add_voucher(build_voucher(&claim, helper)).unwrap();
+        let voucher =
+            RecoveryVoucher::create_from_claim(&claim, helper.signing_keypair(), None, now)
+                .expect("fresh claim is not expired and helper != recovering identity");
+        proof.add_voucher(voucher).unwrap();
     }
     proof
 }

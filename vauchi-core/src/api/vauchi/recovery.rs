@@ -130,7 +130,7 @@ impl Vauchi {
         let proof = RecoveryProof::from_bytes(proof_bytes)
             .map_err(|e| VauchiError::Serialization(e.to_string()))?;
         proof
-            .validate()
+            .validate_at(self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
 
         let contacts = self.storage.contacts().list_contacts()?;
@@ -184,7 +184,7 @@ impl Vauchi {
                 .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         }
         proof
-            .validate()
+            .validate_at(self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         let proof_bytes = proof
             .to_bytes()

@@ -576,8 +576,12 @@ pub struct RecoveryProof {
 }
 
 impl RecoveryProof {
-    /// Default proof expiration (90 days).
-    const DEFAULT_EXPIRY_DAYS: u64 = 90;
+    /// How long a recovery stays valid, measured from its earliest voucher:
+    /// within this window the person collects vouchers, restores the backup
+    /// and tells contacts about the new key; rekeys may take longer (owner
+    /// decision 2026-10-30, private#959). The same bound a helper applies to
+    /// the claim ([`RecoveryClaim::MAX_AGE_SECS`]).
+    pub const EXPIRY_SECS: u64 = 192 * 60 * 60;
 
     /// The most a proof's voucher timestamps may span. Measured on the
     /// vouchers because each helper signs its own timestamp, so neither
@@ -592,7 +596,7 @@ impl RecoveryProof {
         threshold: u32,
         now: u64,
     ) -> Self {
-        let expires_at = now.saturating_add(Self::DEFAULT_EXPIRY_DAYS * SECONDS_PER_DAY);
+        let expires_at = now.saturating_add(Self::EXPIRY_SECS);
 
         Self {
             version: RECOVERY_PROOF_VERSION,
@@ -729,6 +733,30 @@ impl RecoveryProof {
             return Err(RecoveryError::UntrustedVoucher);
         }
         self.add_voucher(voucher)
+    }
+
+    /// Whether the recovery window has closed: the earliest voucher is older
+    /// than [`Self::EXPIRY_SECS`], or the proof's own `expires_at` has passed.
+    /// Read from the signed voucher timestamps first, because `expires_at` is
+    /// set by the recovering identity alone (Social Recovery B4).
+    pub fn is_expired(&self, now: u64) -> bool {
+        let earliest_voucher_too_old = self
+            .vouchers
+            .iter()
+            .map(RecoveryVoucher::timestamp)
+            .min()
+            .is_some_and(|earliest| now.saturating_sub(earliest) > Self::EXPIRY_SECS);
+        earliest_voucher_too_old || now > self.expires_at
+    }
+
+    /// [`Self::validate`], and the proof is still within its window at `now`.
+    /// This is what a contact runs before scoring the proof (private#926).
+    pub fn validate_at(&self, now: u64) -> Result<(), RecoveryError> {
+        self.validate()?;
+        if self.is_expired(now) {
+            return Err(RecoveryError::ProofExpired);
+        }
+        Ok(())
     }
 
     /// Validates the proof has sufficient valid vouchers.

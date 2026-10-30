@@ -10,9 +10,13 @@
 //! sign helpers — exercised through the AppEngine intercept layer in
 //! production, but with no direct Rust test coverage before now.
 
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
+
 use base64::Engine;
 use vauchi_core::Vauchi;
 use vauchi_core::VauchiError;
+use vauchi_core::clock::FakeClock;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::identity::Identity;
@@ -318,16 +322,19 @@ fn create_voucher_from_claim_b64_requires_identity() {
 /// helper knows the old identity as a contact.
 struct Recovery {
     alice: Vauchi,
+    old_pk_hex: String,
     claim_b64: String,
     helpers: Vec<Vauchi>,
 }
 
 fn recovery_with_helpers(names: &[&str]) -> Recovery {
+    recovery_on(vauchi_with_identity("Alice-New"), names)
+}
+
+fn recovery_on(alice: Vauchi, names: &[&str]) -> Recovery {
     let alice_old = Identity::create("Alice-Old", 0);
-    let alice = vauchi_with_identity("Alice-New");
-    let claim_b64 = alice
-        .create_recovery_claim_hex_b64(&hex::encode(alice_old.signing_public_key()))
-        .unwrap();
+    let old_pk_hex = hex::encode(alice_old.signing_public_key());
+    let claim_b64 = alice.create_recovery_claim_hex_b64(&old_pk_hex).unwrap();
     let helpers = names
         .iter()
         .map(|name| {
@@ -338,6 +345,7 @@ fn recovery_with_helpers(names: &[&str]) -> Recovery {
         .collect();
     Recovery {
         alice,
+        old_pk_hex,
         claim_b64,
         helpers,
     }
@@ -534,5 +542,57 @@ fn add_recovery_voucher_b64_refuses_a_truncated_voucher() {
         matches!(result, Err(VauchiError::Serialization(_))),
         "{result:?}"
     );
+    assert_eq!(recovery.stored_voucher_count(), 0);
+}
+
+// ============================================================
+// Re-entering the old key (#919)
+// ============================================================
+
+// @internal
+#[test]
+fn re_entering_the_old_key_keeps_the_claim_and_its_vouchers() {
+    let clock = Arc::new(FakeClock::new(SystemTime::now()));
+    let mut alice = Vauchi::in_memory_with_clock(clock.clone()).unwrap();
+    alice.create_identity("Alice-New").unwrap();
+    let recovery = recovery_on(alice, &["Bob", "Carol"]);
+    recovery
+        .alice
+        .add_recovery_voucher_b64(&recovery.voucher_from(0))
+        .unwrap();
+    recovery
+        .alice
+        .add_recovery_voucher_b64(&recovery.voucher_from(1))
+        .unwrap();
+    clock.advance(Duration::from_secs(60 * 60));
+
+    let claim_again = recovery
+        .alice
+        .create_recovery_claim_hex_b64(&recovery.old_pk_hex)
+        .unwrap();
+
+    assert_eq!(claim_again, recovery.claim_b64);
+    assert_eq!(recovery.stored_voucher_count(), 2);
+}
+
+// @internal
+#[test]
+fn re_entering_the_old_key_past_the_claim_window_starts_a_fresh_claim() {
+    let clock = Arc::new(FakeClock::new(SystemTime::now()));
+    let mut alice = Vauchi::in_memory_with_clock(clock.clone()).unwrap();
+    alice.create_identity("Alice-New").unwrap();
+    let recovery = recovery_on(alice, &["Bob"]);
+    recovery
+        .alice
+        .add_recovery_voucher_b64(&recovery.voucher_from(0))
+        .unwrap();
+    clock.advance(Duration::from_secs(RecoveryClaim::MAX_AGE_SECS + 1));
+
+    let fresh_claim = recovery
+        .alice
+        .create_recovery_claim_hex_b64(&recovery.old_pk_hex)
+        .unwrap();
+
+    assert_ne!(fresh_claim, recovery.claim_b64);
     assert_eq!(recovery.stored_voucher_count(), 0);
 }

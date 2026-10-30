@@ -354,9 +354,12 @@ impl DoubleRatchetState {
             .unwrap_or(true);
 
         if their_dh_changed {
-            // Skip any remaining messages in current receiving chain (previous DH generation)
+            // The rest of the current receiving chain is the sender's previous
+            // chain, whose messages carry the sender's generation minus one.
+            // Our own `dh_generation` counts our DH steps, not theirs, so keying
+            // by it lost every held-back message from a responder (private#943).
             if self.recv_chain.is_some() {
-                let prev_gen = self.dh_generation.saturating_sub(1);
+                let prev_gen = message.dh_generation.saturating_sub(1);
                 self.skip_messages_for_gen(message.previous_chain_length, prev_gen)?;
             }
 

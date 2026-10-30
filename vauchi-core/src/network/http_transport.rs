@@ -197,6 +197,9 @@ pub struct HttpTransport {
     /// Set when the relay has an OHTTP anchor (#288): a refetched key is
     /// then taken only from a signed record that chains to it.
     signed: Mutex<Option<SignedOhttp>>,
+    /// Spaces every request to the outer relay, which limits each address
+    /// (private#912).
+    pacer: Arc<crate::network::request_pacer::RequestPacer>,
 }
 
 /// What an anchored transport needs to accept the next signed key.
@@ -221,7 +224,15 @@ impl HttpTransport {
             delay_window_advert: Mutex::new(None),
             direct_fallback_count: AtomicU64::new(0),
             signed: Mutex::new(None),
+            pacer: Arc::new(crate::network::request_pacer::RequestPacer::ohttp()),
         }
+    }
+
+    /// Paces requests to the outer relay on the caller's clock and sleeper,
+    /// so a client with injected time never sleeps for real.
+    pub fn with_pacer(mut self, pacer: Arc<crate::network::request_pacer::RequestPacer>) -> Self {
+        self.pacer = pacer;
+        self
     }
 
     /// Number of requests that have fallen back to direct HTTP because
@@ -996,6 +1007,7 @@ impl HttpTransport {
         // POST encrypted blob
         let agent = self.get_agent()?;
         let ohttp_url = format!("{}/v2/ohttp", self.config.relay_url);
+        self.pacer.pace();
         let resp = agent
             .post(&ohttp_url)
             .header("X-App-Compat-Version", &APP_COMPAT_VERSION.to_string())

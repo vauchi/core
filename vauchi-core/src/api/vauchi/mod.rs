@@ -263,6 +263,10 @@ pub struct Vauchi {
     /// monotonic time deterministically. Diagnostic perf-timers are
     /// exempt (see `crate::monotonic` module docs).
     monotonic: Arc<dyn MonotonicClock>,
+    /// Shared by every transport this client builds, so the outer relay's
+    /// per-address limit holds across one sync's requests (private#912).
+    #[cfg(feature = "network-http")]
+    ohttp_pacer: Arc<crate::network::request_pacer::RequestPacer>,
     /// Cached OHTTP key (loaded from Storage on connect).
     #[cfg(feature = "network-http")]
     ohttp_key: Option<crate::network::OhttpClient>,
@@ -417,6 +421,11 @@ impl Vauchi {
             concealed_duress: Default::default(),
             clock,
             rng,
+            #[cfg(feature = "network-http")]
+            ohttp_pacer: Arc::new(crate::network::request_pacer::RequestPacer::ohttp_with(
+                monotonic.clone(),
+                sleeper.clone(),
+            )),
             sleeper,
             monotonic,
             #[cfg(feature = "network-http")]
@@ -486,6 +495,7 @@ impl Vauchi {
     #[must_use]
     pub fn with_sleeper(mut self, sleeper: Arc<dyn Sleeper>) -> Self {
         self.sleeper = sleeper;
+        self.rebuild_ohttp_pacer();
         self
     }
 
@@ -507,7 +517,29 @@ impl Vauchi {
     #[must_use]
     pub fn with_monotonic(mut self, monotonic: Arc<dyn MonotonicClock>) -> Self {
         self.monotonic = monotonic;
+        self.rebuild_ohttp_pacer();
         self
+    }
+
+    /// Replaces the pacing of requests to the outer relay; call after
+    /// `with_sleeper` and `with_monotonic`, which rebuild it.
+    #[cfg(feature = "network-http")]
+    pub fn with_ohttp_pacer(
+        mut self,
+        pacer: Arc<crate::network::request_pacer::RequestPacer>,
+    ) -> Self {
+        self.ohttp_pacer = pacer;
+        self
+    }
+
+    fn rebuild_ohttp_pacer(&mut self) {
+        #[cfg(feature = "network-http")]
+        {
+            self.ohttp_pacer = Arc::new(crate::network::request_pacer::RequestPacer::ohttp_with(
+                self.monotonic.clone(),
+                self.sleeper.clone(),
+            ));
+        }
     }
 
     /// Returns the current Unix timestamp in seconds.
@@ -607,6 +639,8 @@ impl Vauchi {
             rng,
             sleeper: SystemSleeper::shared(),
             monotonic: SystemMonotonicClock::shared(),
+            #[cfg(feature = "network-http")]
+            ohttp_pacer: Arc::new(crate::network::request_pacer::RequestPacer::ohttp()),
             #[cfg(feature = "network-http")]
             ohttp_key: None,
             #[cfg(feature = "network-http")]

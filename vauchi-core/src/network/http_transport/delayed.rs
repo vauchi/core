@@ -228,6 +228,7 @@ impl HttpTransport {
         crate::crypto::random_fill(&mut ticket_bytes);
         let ticket = hex::encode(ticket_bytes);
 
+        self.pacer.pace();
         let resp = self
             .get_agent()?
             .post(&format!("{}/v2/ohttp-async", self.config.relay_url))
@@ -255,6 +256,7 @@ impl HttpTransport {
             "{}/v2/ohttp-async/{}",
             self.config.relay_url, pending.ticket
         );
+        self.pacer.pace();
         let Ok(resp) = self.get_agent()?.get(&url).call() else {
             return Ok(still_pending(pending));
         };

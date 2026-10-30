@@ -590,3 +590,53 @@ fn an_existing_identity_on_a_new_install_still_catches_up() {
 
     assert_eq!(checkpoint(&restored, &application), None);
 }
+
+/// A catch-up longer than the burst is paced on the client's own clock and
+/// sleeper (private#912): every request past the burst waits its turn at
+/// the rate, so a reader weeks behind stays under the outer relay's
+/// per-address limit.
+// @scenario: message_delivery :: Receive pending updates when coming online
+#[test]
+fn a_long_catch_up_is_paced_after_the_burst() {
+    use vauchi_core::monotonic::{FakeMonotonicClock, MonotonicClock};
+    use vauchi_core::network::request_pacer::OHTTP_REQUESTS_PER_SECOND;
+
+    let outer = MockRelay::start();
+    let application = MockRelay::start();
+    outer.enable_ohttp_gateway(&SignedGateway::new(0x63), window_of(NOW));
+    let clock = Arc::new(FakeClock::new(UNIX_EPOCH + Duration::from_secs(NOW)));
+    let sleeper = Arc::new(FakeSleeper::new());
+    let monotonic = FakeMonotonicClock::new().shared();
+    let install = Install {
+        dir: tempfile::tempdir().unwrap(),
+        key: SymmetricKey::generate(),
+    };
+    let config = VauchiConfig::with_storage_path(install.dir.path().join("vauchi.db"))
+        .with_storage_key(install.key.clone())
+        .with_relay_url(application.url())
+        .with_ohttp_relay_url(outer.url());
+    let mut alice = Vauchi::new_with(config, clock, OsSecureRng::shared(), None)
+        .unwrap()
+        .with_monotonic(monotonic.clone())
+        .with_sleeper(sleeper.clone());
+    alice.set_ohttp_key_for_testing(OhttpClient::new(outer.ohttp_key_config()).unwrap());
+    alice.create_identity("Alice").unwrap();
+    as_if_never_synced(&alice, &application);
+
+    alice.set_next_sync_allowed(monotonic.now());
+    let result = alice.sync().unwrap();
+    assert!(
+        matches!(&result, VauchiSyncOutcome::Ok { errors, .. } if errors.is_empty()),
+        "{result:?}"
+    );
+
+    let waits = sleeper.calls();
+    assert!(
+        !waits.is_empty(),
+        "a catch-up from the horizon outgrows the burst"
+    );
+    let turns: Vec<Duration> = (1..=waits.len() as u32)
+        .map(|turn| Duration::from_secs_f64(f64::from(turn) / f64::from(OHTTP_REQUESTS_PER_SECOND)))
+        .collect();
+    assert_eq!(waits, turns);
+}

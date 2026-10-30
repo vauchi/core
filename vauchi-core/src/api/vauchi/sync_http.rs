@@ -1112,6 +1112,7 @@ impl Vauchi {
             allow_direct: true,
             pinned_certs,
         })
+        .with_pacer(self.ohttp_pacer.clone())
     }
 
     /// Pin set for a transport targeting `relay_url`.
@@ -1180,7 +1181,8 @@ impl Vauchi {
             return HttpTransport::new(HttpTransportConfig::for_testing(
                 self.config.relay.server_url.clone(),
                 timeout_ms,
-            ));
+            ))
+            .with_pacer(self.ohttp_pacer.clone());
         }
 
         let route = self.action_ohttp_route(application_relay_url);
@@ -1194,7 +1196,8 @@ impl Vauchi {
             proxy: self.config.relay.proxy.clone(),
             allow_direct: false,
             pinned_certs,
-        });
+        })
+        .with_pacer(self.ohttp_pacer.clone());
 
         if route_valid {
             match self.config.relay.ohttp_trust_anchor() {

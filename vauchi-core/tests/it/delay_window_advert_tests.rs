@@ -41,6 +41,19 @@ fn outer_relay() -> MockRelay {
 /// A client of `outer` storing in `db`, with delayed mode left to the
 /// advertisement (`RelayConfig::ohttp_delayed` off), its wall clock at
 /// [`NOW`].
+/// These tests count the delay window's sleeps. `FakeSleeper` lets no time
+/// pass, so a real pacer's bucket would never refill between the 30 s polls
+/// and its waits would mix into the count; pacing is tested on consistent
+/// fake time in `request_pacer_tests` and `a_long_catch_up_is_paced_after_the_burst`.
+fn unpaced() -> Arc<vauchi_core::network::request_pacer::RequestPacer> {
+    Arc::new(vauchi_core::network::request_pacer::RequestPacer::new(
+        u32::MAX,
+        u32::MAX,
+        vauchi_core::monotonic::SystemMonotonicClock::shared(),
+        vauchi_core::sleeper::SystemSleeper::shared(),
+    ))
+}
+
 fn client(outer: &MockRelay, application: &MockRelay, db: &Path, key: &SymmetricKey) -> Client {
     let config = VauchiConfig::with_storage_path(db)
         .with_storage_key(key.clone())
@@ -50,7 +63,8 @@ fn client(outer: &MockRelay, application: &MockRelay, db: &Path, key: &Symmetric
     let clock = FakeClock::new(std::time::UNIX_EPOCH + Duration::from_secs(NOW)).shared();
     let mut vauchi = Vauchi::new_with(config, clock, OsSecureRng::shared(), None)
         .expect("create Vauchi")
-        .with_sleeper(sleeper.clone());
+        .with_sleeper(sleeper.clone())
+        .with_ohttp_pacer(unpaced());
     if vauchi.identity().is_none() {
         vauchi.create_identity("Advertised").expect("identity");
     }

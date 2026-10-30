@@ -95,6 +95,7 @@ pub mod ohttp_key_trust;
 pub mod ohttp_probe;
 pub mod pinning;
 pub use crate::relay_url;
+pub mod request_pacer;
 pub mod revocation;
 #[cfg(feature = "network-http")]
 pub mod tls_pinning;

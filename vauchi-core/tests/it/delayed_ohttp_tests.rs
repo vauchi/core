@@ -453,6 +453,21 @@ fn vauchi_sleeping_on(
 }
 
 #[cfg(feature = "testing")]
+/// These tests count the delay window's sleeps. `FakeSleeper` lets no time
+/// pass, so a real pacer's bucket would never refill between the 30 s polls
+/// and its waits would mix into the count; pacing is tested on consistent
+/// fake time in `request_pacer_tests` and `a_long_catch_up_is_paced_after_the_burst`.
+#[cfg(feature = "testing")]
+fn unpaced() -> Arc<vauchi_core::network::request_pacer::RequestPacer> {
+    Arc::new(vauchi_core::network::request_pacer::RequestPacer::new(
+        u32::MAX,
+        u32::MAX,
+        vauchi_core::monotonic::SystemMonotonicClock::shared(),
+        vauchi_core::sleeper::SystemSleeper::shared(),
+    ))
+}
+
+#[cfg(feature = "testing")]
 fn vauchi_waiting_window(
     outer: &MockRelay,
     delayed: bool,
@@ -472,7 +487,8 @@ fn vauchi_waiting_window(
     }
     let mut vauchi = Vauchi::new(config)
         .expect("create Vauchi")
-        .with_sleeper(sleeper.clone());
+        .with_sleeper(sleeper.clone())
+        .with_ohttp_pacer(unpaced());
     vauchi.create_identity("Delayed").expect("identity");
     vauchi.set_ohttp_key_for_testing(OhttpClient::new(outer.ohttp_key_config()).expect("key"));
     (vauchi, dir)

@@ -414,6 +414,49 @@ fn registration_covers_yesterday_and_pads_every_batch_to_256() {
 }
 
 // @claim: S4
+/// Two registrations for the same day must present the relay with the same
+/// token set: padding drawn fresh from the RNG on every call makes the
+/// intersection of two fetches exactly the real tokens, which hands the relay
+/// the contact count and the real tokens (private#946). Padding therefore
+/// derives from a local secret and the day, and rotates with the day.
+// @scenario: sealed_mailbox :: Fetch padding does not reveal the real tokens
+#[test]
+fn padded_registration_batches_are_not_linkable_across_calls() {
+    let master_seed = [0xCCu8; 32];
+    let device_id = [0x22u8; 32];
+    let contacts: Vec<[u8; 32]> = (1..=3u8).map(|i| [i; 32]).collect();
+    let today = 19804u64;
+    let rng = vauchi_core::rng::OsSecureRng::new();
+    let register = |day: u64| -> std::collections::BTreeSet<String> {
+        batch_register_tokens_with_device_sync(
+            &rng,
+            &contacts,
+            &TEST_PUBKEY,
+            &master_seed,
+            &device_id,
+            day,
+            0,
+        )
+        .into_iter()
+        .flatten()
+        .collect()
+    };
+
+    let first = register(today);
+    let second = register(today);
+    let tomorrow = register(today + 1);
+
+    assert_eq!(
+        first, second,
+        "two registrations for one day must be the same set, padding included"
+    );
+    assert!(
+        first.is_disjoint(&tomorrow),
+        "padding must rotate with the day like the real tokens, or the relay links days through it"
+    );
+}
+
+// @claim: S4
 /// A registration batch holds the tokens of one day only. Two consecutive
 /// days' fetch sets would otherwise overlap in yesterday's tokens and let
 /// the relay chain one fetcher across days (private#890).

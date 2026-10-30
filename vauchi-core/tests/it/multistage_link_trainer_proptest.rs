@@ -4,7 +4,8 @@
 
 //! The link trainer under random sequences of reads, frames, holds and
 //! clock steps (CC-13, #450 plan 2.8). Each frame it draws must follow the
-//! rules the trainer promises: a held trainer stays put, a fresh echo puts
+//! rules the trainer promises: a held trainer stays put where the peer last
+//! read it (or where it was, if the peer never echoed), a fresh echo puts
 //! the code where the peer reads it most, and a sweep walks every layout in
 //! turn from the last one the peer echoed.
 
@@ -63,6 +64,8 @@ struct Seen {
     /// The last echo heard while adapting, and when.
     echo: Option<(Vec<u8>, Instant)>,
     held: bool,
+    /// The layouts a hold may settle on: the last echo's most-read ones.
+    held_within: Option<Vec<u8>>,
     held_at: Option<u8>,
     shown: Option<u8>,
     /// Layout of the previous frame when it was a sweep frame and no echo
@@ -89,8 +92,16 @@ fn check_frame(seen: &mut Seen, header: &TrainingHeader, start: u8, now: Instant
         .as_ref()
         .filter(|(_, at)| now.saturating_duration_since(*at) < ECHO_FRESH);
     if seen.held {
+        if seen.held_at.is_none()
+            && let Some(within) = &seen.held_within
+        {
+            assert!(
+                within.contains(&layout),
+                "a held trainer draws where the peer last read it most: {layout} not in {within:?}"
+            );
+        }
         let held_at = *seen.held_at.get_or_insert(layout);
-        assert_eq!(layout, held_at, "a held trainer draws where it was");
+        assert_eq!(layout, held_at, "a held trainer stays put");
     } else if let Some((most, _)) = fresh {
         assert!(
             most.contains(&layout),
@@ -145,7 +156,8 @@ proptest! {
                     trainer.hold();
                     if !seen.held {
                         seen.held = true;
-                        seen.held_at = seen.shown;
+                        seen.held_within = seen.echo.as_ref().map(|(most, _)| most.clone());
+                        seen.held_at = if seen.held_within.is_some() { None } else { seen.shown };
                     }
                 }
             }

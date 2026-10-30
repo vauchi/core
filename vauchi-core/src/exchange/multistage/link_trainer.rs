@@ -167,9 +167,20 @@ impl LinkTrainer {
         }
     }
 
-    /// Stop adapting: every later frame is drawn where the last one was.
-    /// Used once the exchange is saved, when no echo can arrive any more.
+    /// Stop adapting: every later frame is drawn at the layout the peer last
+    /// echoed, or where the last one was if it never echoed. Used once the
+    /// exchange is saved, when no echo can arrive any more.
+    ///
+    /// Not simply where the last frame was: a slow reader's echo goes stale
+    /// within `ECHO_FRESH`, so the last frame is often mid-sweep, at a layout
+    /// that peer cannot read, and it never gets the final frame
+    /// (vauchi/private#952; design D6: the code stays where it was last read).
     pub fn hold(&mut self) {
+        if !self.held
+            && let Some((layout, _)) = self.settled
+        {
+            self.shown = Some(layout);
+        }
         self.held = true;
     }
 

@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc b3bec6e5a11680c0cf4634df70539583102e3976e116f23d2cf762c4895e5a81 # shrinks to start = 0, steps = [Wait(0), ReadPeerFrame(TrainingHeader { layout: 0, echo: [Some(LayoutReads { layout: 1, count: 1 }), None, None], total_reads: 0 }), ShowFrame, ReadPeerFrame(TrainingHeader { layout: 0, echo: [Some(LayoutReads { layout: 0, count: 1 }), None, None], total_reads: 0 }), Hold, ShowFrame]

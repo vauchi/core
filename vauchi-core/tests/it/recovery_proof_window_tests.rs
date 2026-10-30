@@ -84,6 +84,7 @@ fn a_helper_refuses_a_claim_older_than_192_hours() {
     assert!(RecoveryVoucher::create_from_claim(&fresh_claim, &helper, None, NOW).is_ok());
 }
 
+// @scenario: contact_recovery :: Vouchers of one recovery are given within 96 hours
 #[test]
 fn vouchers_spanning_more_than_96_hours_are_refused() {
     let too_wide = proof_with_vouchers_at(NOW - 100 * HOUR, NOW - 3 * HOUR);

@@ -494,6 +494,7 @@ mod relay_url_validator_tests;
 mod repeat_exchange_rekey_tests;
 mod replay_detection_api_tests;
 mod replay_detection_tests;
+mod request_pacer_tests;
 mod responder_deferred_send_tests;
 mod resync_request_tests;
 mod retry_queue_tests;

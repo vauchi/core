@@ -735,3 +735,65 @@ fn test_set_label_display_name_override_nonexistent_label() {
     let result = wb.set_group_display_name_override("nonexistent-id", Some("Matt"));
     assert!(result.is_err(), "nonexistent label should fail");
 }
+
+// ============================================================
+// Emergency wipe status (restored; core d1b7bec50 deleted these three
+// without saying why while get_emergency_wipe_status and its fields
+// stayed — private#973, ship checklist SC-65)
+// ============================================================
+
+// @internal
+#[test]
+fn test_emergency_wipe_status_unconfigured() {
+    let wb = create_vauchi_with_identity("Alice");
+
+    let status = wb.get_emergency_wipe_status().unwrap();
+
+    assert!(!status.broadcast_configured);
+    assert!(!status.duress_configured);
+    assert!(!status.deletion_scheduled);
+    assert!(!status.deletion_executed);
+    assert!(!status.has_trusted_contacts);
+    assert_eq!(status.trusted_contact_count, 0);
+    assert!(!status.password_enabled);
+}
+
+// @internal
+#[test]
+fn test_emergency_wipe_status_with_emergency_config() {
+    let mut wb = create_vauchi_with_identity("Alice");
+    let contact = create_test_contact("Bob", [1u8; 32]);
+    let contact_id = contact.id().to_string();
+    wb.add_contact(contact).unwrap();
+
+    wb.configure_emergency_broadcast(vec![contact_id], "Help me!".to_string(), false)
+        .unwrap();
+
+    let status = wb.get_emergency_wipe_status().unwrap();
+    assert!(status.broadcast_configured);
+    assert!(!status.has_trusted_contacts);
+    assert_eq!(status.trusted_contact_count, 0);
+}
+
+// @internal
+#[test]
+fn test_emergency_wipe_status_with_trusted_contacts() {
+    let wb = create_vauchi_with_identity("Alice");
+    let mut contact = create_test_contact("Bob", [1u8; 32]);
+    contact.mark_fingerprint_verified().unwrap();
+    contact.trust_for_recovery().unwrap();
+    let contact_id = contact.id().to_string();
+    wb.add_contact(contact).unwrap();
+
+    let status = wb.get_emergency_wipe_status().unwrap();
+
+    assert!(status.has_trusted_contacts);
+    assert_eq!(status.trusted_contact_count, 1);
+    assert!(
+        wb.get_contact(&contact_id)
+            .unwrap()
+            .unwrap()
+            .is_recovery_trusted(),
+        "the trust flag must survive add_contact"
+    );
+}

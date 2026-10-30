@@ -83,8 +83,31 @@ impl Vauchi {
         self.storage
             .identity()
             .save_identity(&identity.to_storage_bytes())?;
+        self.start_receiving_today(&identity)?;
 
         self.identity = Some(identity);
+        Ok(())
+    }
+
+    /// A new identity has no mail older than itself, so it starts reading
+    /// at today: without a checkpoint its first pass would catch up the
+    /// whole retained window, a padded batch and its fetches per day
+    /// (private#890, private#912). Not called on restore: an identity
+    /// brought onto a new install may have mail waiting.
+    fn start_receiving_today(&self, identity: &Identity) -> VauchiResult<()> {
+        let scope = crate::storage::ReceiveScope::new(
+            &self.config.relay.server_url,
+            identity.signing_public_key(),
+            identity.device_id(),
+        );
+        let today = crate::network::mailbox_token::current_day_epoch(self.clock.unix_seconds());
+        self.storage.sync().save_receive_checkpoint(
+            &scope,
+            &crate::storage::ReceiveCheckpoint {
+                day: today,
+                resync_owed: false,
+            },
+        )?;
         Ok(())
     }
 

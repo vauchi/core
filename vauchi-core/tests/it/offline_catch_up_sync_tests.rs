@@ -95,6 +95,30 @@ fn checkpoint(client: &Vauchi, application: &MockRelay) -> Option<u64> {
         .map(|checkpoint| checkpoint.day)
 }
 
+/// A reader that has never read these mailboxes. New identities now start
+/// at their creation day (private#912), so the catch-up tests set this
+/// state themselves: a checkpoint at day 0 plans like none, clamped to
+/// the retention horizon and owing a resync.
+fn as_if_never_synced(client: &Vauchi, application: &MockRelay) {
+    let identity = client.identity().unwrap();
+    let scope = ReceiveScope::new(
+        &application.url(),
+        identity.signing_public_key(),
+        identity.device_id(),
+    );
+    client
+        .storage()
+        .sync()
+        .save_receive_checkpoint(
+            &scope,
+            &vauchi_core::storage::ReceiveCheckpoint {
+                day: 0,
+                resync_owed: false,
+            },
+        )
+        .unwrap();
+}
+
 // @scenario: message_delivery :: Receive pending updates when coming online
 #[test]
 fn a_client_offline_100_days_catches_up_in_bounded_steps() {
@@ -104,6 +128,7 @@ fn a_client_offline_100_days_catches_up_in_bounded_steps() {
     outer.enable_ohttp_gateway(&SignedGateway::new(0x63), window_of(NOW));
     outer.enable_gateway_mailboxes(clock.clone(), 2);
     let (mut alice, _alice_install) = client(&outer, &application, clock.clone(), "Alice");
+    as_if_never_synced(&alice, &application);
     let (mut bob, _bob_install) = client(&outer, &application, clock.clone(), "Bob");
     let linked = link_contacts(&alice, &bob, "Bob");
     let send_day = current_day_epoch(NOW);
@@ -124,7 +149,7 @@ fn a_client_offline_100_days_catches_up_in_bounded_steps() {
 
     clock.advance(Duration::from_secs(OFFLINE_DAYS * DAY));
     let today = send_day + OFFLINE_DAYS;
-    assert_eq!(checkpoint(&alice, &application), None);
+    assert_eq!(checkpoint(&alice, &application), Some(0));
 
     // Each sync takes a bounded chunk of the retained interval, oldest
     // first, and records how far it read; the update arrives in the cycle
@@ -201,6 +226,7 @@ fn a_revocation_sent_while_offline_lands_after_the_share_and_survives_a_restart(
     outer.enable_ohttp_gateway(&SignedGateway::new(0x64), window_of(NOW));
     outer.enable_gateway_mailboxes(clock.clone(), 2);
     let (alice, alice_install) = client(&outer, &application, clock.clone(), "Alice");
+    as_if_never_synced(&alice, &application);
     let (mut bob, _bob_install) = client(&outer, &application, clock.clone(), "Bob");
     let linked = link_contacts(&alice, &bob, "Bob");
     let share_day = current_day_epoch(NOW);
@@ -285,6 +311,7 @@ fn a_rate_limited_pass_does_not_move_the_checkpoint() {
     outer.enable_ohttp_gateway(&SignedGateway::new(0x65), window_of(NOW));
     outer.enable_gateway_mailboxes(clock.clone(), 2);
     let (mut alice, _alice_install) = client(&outer, &application, clock.clone(), "Alice");
+    as_if_never_synced(&alice, &application);
     // Three contacts: sixteen planned days times seven tokens is more than
     // one fetch chunk, so the second chunk can hit the limit.
     let (mut bob, _bob_install) = client(&outer, &application, clock.clone(), "Bob");
@@ -319,7 +346,7 @@ fn a_rate_limited_pass_does_not_move_the_checkpoint() {
         !matches!(&limited, Ok(VauchiSyncOutcome::Ok { errors, .. }) if errors.is_empty() && checkpoint(&alice, &application).is_some()),
         "a cut-short pass must not look complete: {limited:?}"
     );
-    assert_eq!(checkpoint(&alice, &application), None);
+    assert_eq!(checkpoint(&alice, &application), Some(0));
 
     outer.lift_gateway_fetch_limit();
     sync(&mut alice);

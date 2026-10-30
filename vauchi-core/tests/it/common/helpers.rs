@@ -12,16 +12,25 @@ use vauchi_core::{
     crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair,
 };
 
-/// The sibling themes checkout.
+/// The themes checkout: `VAUCHI_THEMES_DIR` when the host set it (CI, and
+/// cargo-mutants' relocated copy of the tree, where the manifest-relative
+/// path points nowhere), else the sibling checkout.
 fn themes_checkout_dir() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../themes")
+    match std::env::var_os("VAUCHI_THEMES_DIR") {
+        Some(dir) => std::path::PathBuf::from(dir),
+        None => std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../themes"),
+    }
 }
 
-/// Load the theme catalogue from `<dir>/generated/themes.json`.
+/// Load the theme catalogue from `<dir>/generated/themes.json`, or fall back
+/// to the catalogue bundled into vauchi-app at build time. The fallback is the
+/// whole bundle, not one default theme, so a lookup by id behaves the same
+/// with and without the checkout (private#974: the mutation baseline ran in a
+/// copy of the tree without the checkout and two palette tests panicked).
 pub fn themes_from_checkout_or_bundle(dir: &std::path::Path) -> Vec<Theme> {
     match std::fs::read(dir.join("generated/themes.json")) {
         Ok(data) => load_themes_from_json(&data).expect("generated/themes.json must be valid"),
-        Err(_) => vec![vauchi_app::default_theme()],
+        Err(_) => vauchi_app::theme::bundled_themes(),
     }
 }
 

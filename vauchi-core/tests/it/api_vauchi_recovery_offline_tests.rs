@@ -238,12 +238,12 @@ fn create_voucher_from_claim_b64_refuses_an_expired_claim() {
     let alice_old = Identity::create("Alice-Old", 0);
     let alice_new = Identity::create("Alice-New", 0);
     add_contact(&helper, &alice_old, "Alice");
-    let past_the_48_hour_window = now() - RecoveryClaim::MAX_AGE_SECS - 60;
+    let past_the_claim_window = now() - RecoveryClaim::MAX_AGE_SECS - 60;
 
     let result = helper.create_voucher_from_claim_b64(&claim_b64(
         &alice_old,
         &alice_new,
-        past_the_48_hour_window,
+        past_the_claim_window,
     ));
 
     assert!(matches!(result, Err(VauchiError::InvalidState(_))));

@@ -117,7 +117,7 @@ fn test_recovery_claim_roundtrip() {
     assert_eq!(restored.timestamp(), claim.timestamp());
 }
 
-/// Scenario: Recovery claim expiration (48 hours)
+/// Scenario: Recovery claim expiration (192 hours, private#919)
 // @scenario: contact_recovery :: Voucher timestamp validation
 #[test]
 fn test_recovery_claim_expiration() {
@@ -125,13 +125,13 @@ fn test_recovery_claim_expiration() {
     let new_pk = [0x02u8; 32];
 
     let now = 1_800_000_000;
-    let old_timestamp = now - (49 * 60 * 60); // 49 hours ago
+    let old_timestamp = now - (193 * 60 * 60); // 193 hours ago
 
     let claim = RecoveryClaim::new_with_timestamp(&old_pk, &new_pk, old_timestamp);
     assert!(claim.is_expired(now));
 
-    // Create claim with timestamp 47 hours ago (should not be expired)
-    let recent_timestamp = now - (47 * 60 * 60);
+    // Create claim with timestamp 191 hours ago (should not be expired)
+    let recent_timestamp = now - (191 * 60 * 60);
     let recent_claim = RecoveryClaim::new_with_timestamp(&old_pk, &new_pk, recent_timestamp);
     assert!(!recent_claim.is_expired(now));
 }
@@ -182,7 +182,7 @@ fn test_cannot_vouch_for_expired_claim() {
     let voucher_keypair = SigningKeyPair::generate();
 
     let now = 1_800_000_000;
-    let old_timestamp = now - (49 * 60 * 60); // 49 hours ago
+    let old_timestamp = now - (193 * 60 * 60); // 193 hours ago
 
     let expired_claim = RecoveryClaim::new_with_timestamp(&old_pk, &new_pk, old_timestamp);
     let result = vauchi_core::RecoveryVoucher::create_from_claim(
@@ -779,7 +779,7 @@ fn test_claim_expires_during_collection() {
     let new_pk = [0x02u8; 32];
 
     let now = 1_800_000_000;
-    let old_timestamp = now - (49 * 60 * 60);
+    let old_timestamp = now - (193 * 60 * 60);
 
     let expired_claim = RecoveryClaim::new_with_timestamp(&old_pk, &new_pk, old_timestamp);
     assert!(expired_claim.is_expired(now));

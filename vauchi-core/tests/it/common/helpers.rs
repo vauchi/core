@@ -12,23 +12,28 @@ use vauchi_core::{
     crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair,
 };
 
-/// Load all themes from generated/themes.json at runtime.
-/// Falls back to default theme if file not found (themes repo not checked out).
-pub fn all_themes() -> Vec<Theme> {
-    let path =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../themes/generated/themes.json");
-    match std::fs::read(&path) {
+/// The sibling themes checkout.
+fn themes_checkout_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../themes")
+}
+
+/// Load the theme catalogue from `<dir>/generated/themes.json`.
+pub fn themes_from_checkout_or_bundle(dir: &std::path::Path) -> Vec<Theme> {
+    match std::fs::read(dir.join("generated/themes.json")) {
         Ok(data) => load_themes_from_json(&data).expect("generated/themes.json must be valid"),
         Err(_) => vec![vauchi_app::default_theme()],
     }
 }
 
-/// Load themes from generated/themes.json.
-/// Returns None if file doesn't exist (themes repo not checked out / worktree).
+/// Load all themes from the checkout, else the bundled catalogue.
+pub fn all_themes() -> Vec<Theme> {
+    themes_from_checkout_or_bundle(&themes_checkout_dir())
+}
+
+/// Load themes from the checkout's generated/themes.json.
+/// Returns None if the file does not exist (themes repo not checked out / worktree).
 pub fn try_all_themes() -> Option<Vec<Theme>> {
-    let path =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../themes/generated/themes.json");
-    let data = std::fs::read(&path).ok()?;
+    let data = std::fs::read(themes_checkout_dir().join("generated/themes.json")).ok()?;
     Some(load_themes_from_json(&data).expect("generated/themes.json must be valid"))
 }
 

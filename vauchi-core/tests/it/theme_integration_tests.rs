@@ -272,6 +272,28 @@ fn catppuccin_macchiato_is_dark_with_its_palette() {
     assert_eq!(theme.colors.accent, "#8aadf4");
 }
 
+// @scenario: theming :: Apply Catppuccin Macchiato (dark)
+#[test]
+fn theme_lookup_without_the_themes_checkout_falls_back_to_the_bundled_catalogue() {
+    let themes = common::helpers::themes_from_checkout_or_bundle(std::path::Path::new(
+        "/nonexistent/themes-checkout",
+    ));
+
+    let ids: Vec<&str> = themes.iter().map(|t| t.id.as_str()).collect();
+    assert!(
+        ids.contains(&"catppuccin-macchiato"),
+        "bundle lacks macchiato: {ids:?}"
+    );
+    assert!(
+        ids.contains(&"catppuccin-frappe"),
+        "bundle lacks frappe: {ids:?}"
+    );
+    assert!(
+        themes.len() > 1,
+        "fell back to a single default theme: {ids:?}"
+    );
+}
+
 // @scenario: theming :: Apply Catppuccin Frappé (dark)
 #[test]
 fn catppuccin_frappe_is_dark_with_its_palette() {

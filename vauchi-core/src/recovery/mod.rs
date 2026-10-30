@@ -85,7 +85,7 @@ pub enum RecoveryError {
     #[error("Verification threshold cannot exceed recovery threshold")]
     VerificationThresholdTooHigh,
 
-    #[error("Recovery claim has expired (older than 48 hours)")]
+    #[error("Recovery claim has expired (older than 192 hours)")]
     ClaimExpired,
 
     #[error("Cannot vouch for your own recovery (self-vouching not allowed)")]
@@ -214,8 +214,10 @@ pub struct RecoveryClaim {
 }
 
 impl RecoveryClaim {
-    /// Maximum age for a recovery claim (48 hours in seconds).
-    pub const MAX_AGE_SECS: u64 = 48 * 60 * 60;
+    /// Maximum age of a claim a helper still vouches for: twice the 96 h a
+    /// proof's vouchers may span, because a helper sees only the claim,
+    /// never the vouchers already given (private#919).
+    pub const MAX_AGE_SECS: u64 = 192 * 60 * 60;
 
     /// Creates a new recovery claim.
     pub fn new(old_pk: impl Into<IdentityKey>, new_pk: impl Into<IdentityKey>, now: u64) -> Self {
@@ -243,7 +245,7 @@ impl RecoveryClaim {
         }
     }
 
-    /// Checks if this claim has expired (older than 48 hours).
+    /// Checks if this claim is older than [`Self::MAX_AGE_SECS`].
     pub fn is_expired(&self, now: u64) -> bool {
         now.saturating_sub(self.timestamp) > Self::MAX_AGE_SECS
     }
@@ -339,12 +341,12 @@ impl RecoveryVoucher {
     /// Creates a signed voucher from a recovery claim.
     ///
     /// Validates that:
-    /// - The claim is not expired (less than 48 hours old)
-    /// - The voucher is not self-vouching (voucher_pk != new_pk)
+    /// - The claim is not expired ([`RecoveryClaim::MAX_AGE_SECS`])
+    /// - The voucher is not self-vouching (voucher_pk is neither old_pk nor new_pk)
     ///
     /// # Errors
-    /// - `ClaimExpired` if the claim is older than 48 hours
-    /// - `SelfVouching` if the voucher's public key matches the new identity
+    /// - `ClaimExpired` if the claim is older than [`RecoveryClaim::MAX_AGE_SECS`]
+    /// - `SelfVouching` if the voucher's public key is the claim's old or new key
     pub fn create_from_claim(
         claim: &RecoveryClaim,
         voucher_keypair: &SigningKeyPair,

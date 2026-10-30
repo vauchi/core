@@ -103,23 +103,28 @@ impl Vauchi {
     }
 
     /// Persist a contact established (or re-established) via an in-person
-    /// exchange: upsert the card and (re)key the channel.
+    /// exchange.
     ///
-    /// A 2nd-to-nth exchange of the same pair re-exchanges fresh cards and a
-    /// fresh shared secret, so this UPSERTS the card — a repeat must never drop
+    /// A first exchange stores the contact and keys its channel. A 2nd-to-nth
+    /// exchange of the same pair UPSERTS the card — a repeat must never drop
     /// the peer's updated card (the historical BLE/multi-stage `add_contact`
-    /// reject-and-return bug) — and rekeys the ratchet. The BLE, multi-stage,
-    /// and legacy-QR completion paths all route through here (consolidation
-    /// Step 2c collapsed the last direct `update_contact` +
-    /// `save_exchange_ratchet` copy in `app_engine/completion.rs`), so the
-    /// reuse-vs-rekey policy lives in core, not per-transport in the humble
-    /// frontends (ADR-021/043). Repeat-exchange decision 2026-06-27.
+    /// reject-and-return bug) — but keeps the shared key and ratchet the
+    /// first exchange established: an exchange never rekeys an existing
+    /// contact (private#941, ship checklist SC-06; this replaces the rekey of
+    /// the repeat-exchange decision of 2026-06-27). The BLE, multi-stage and
+    /// legacy-QR completion paths all route through here, so the policy
+    /// lives in core, not per transport in the humble frontends
+    /// (ADR-021/043).
     pub fn save_exchanged_contact(
         &self,
         contact: &Contact,
         ratchet: &DoubleRatchetState,
         is_initiator: bool,
     ) -> VauchiResult<()> {
+        if let Some(mut stored) = self.storage.contacts().load_contact(contact.id())? {
+            stored.update_card(contact.card().clone(), self.clock.unix_seconds());
+            return self.save_exchanged_card(&stored);
+        }
         self.save_exchanged_card(contact)?;
         self.save_exchange_ratchet(contact.id(), ratchet, is_initiator)?;
         // Bootstrap card-update sync to the freshly-exchanged contact. The

@@ -9,7 +9,6 @@
 
 use vauchi_app::i18n::{Locale, get_string};
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, Component, UserAction, WorkflowEngine};
-#[cfg(feature = "testing")]
 use vauchi_core::VauchiConfig;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::{Contact, Identity, SymmetricKey, Vauchi};

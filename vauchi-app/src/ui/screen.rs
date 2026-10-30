@@ -220,6 +220,21 @@ impl ScreenModel {
         }
     }
 
+    /// The text the component `component_id` holds, if it is a text field.
+    pub fn text_value(&self, component_id: &str) -> Option<&str> {
+        self.components
+            .iter()
+            .find_map(|component| match component {
+                Component::TextInput { id, value, .. }
+                | Component::EditableText { id, value, .. }
+                    if id == component_id =>
+                {
+                    Some(value.as_str())
+                }
+                _ => None,
+            })
+    }
+
     /// Return a copy with `validation_error` set on the component matching
     /// `component_id`. Works for `TextInput`, `PinInput`, and `EditableText`.
     ///

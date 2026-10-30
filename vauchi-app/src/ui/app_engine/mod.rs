@@ -768,7 +768,21 @@ impl WorkflowEngine for AppEngine {
 
     #[tracing::instrument(level = "debug", skip_all, name = "app.handle_action")]
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
-        self.validation_error = None;
+        // Neither focus leaving a field nor its unchanged text sent again is
+        // new input. iOS sends both right after Save re-renders the form,
+        // which cleared a refused value's error before anyone saw it
+        // (vauchi/private#845).
+        let new_input = match &action {
+            UserAction::TextFocusEnded { .. } => false,
+            UserAction::TextChanged {
+                component_id,
+                value,
+            } => self.current_screen().text_value(component_id) != Some(value.as_str()),
+            _ => true,
+        };
+        if new_input {
+            self.validation_error = None;
+        }
         let action = dispatch::normalize_inline_confirm_action(action);
         self.drain_events_to_log();
         self.release_ble_session_on_retry(&action);

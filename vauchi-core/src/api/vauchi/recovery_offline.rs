@@ -22,6 +22,10 @@ const MAX_VOUCHER_B64_LEN: usize = 4096;
 impl Vauchi {
     /// Creates a claim binding `old_pk` to this identity and stores it as
     /// the recovery in progress, so vouchers have a claim to attach to.
+    ///
+    /// A claim already in progress for the same keys is resumed while
+    /// helpers still vouch for it, so entering the old key again after a
+    /// restart keeps the vouchers collected so far (private#919).
     pub(super) fn start_recovery_claim(&self, old_pk: &[u8; 32]) -> VauchiResult<RecoveryClaim> {
         let identity = self
             .identity
@@ -29,6 +33,13 @@ impl Vauchi {
             .ok_or(VauchiError::IdentityNotInitialized)?;
 
         let now = self.clock.unix_seconds();
+        if let Some(progress) = self.storage.recovery().load_recovery_progress()?
+            && progress.claim.old_pk().as_bytes() == old_pk
+            && progress.claim.new_pk().as_bytes() == identity.signing_public_key()
+            && !progress.claim.is_expired(now)
+        {
+            return Ok(progress.claim);
+        }
         let claim = RecoveryClaim::new(old_pk, identity.signing_public_key(), now);
 
         let settings = self

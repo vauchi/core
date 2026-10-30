@@ -376,6 +376,17 @@ check:mutation-nightly-budget:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
+check:coverage-features:
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
+  tags: [docker]
+  needs: []
+  script:
+    - sh ci/tests/coverage-features.test.sh
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
 # ============================================================
 # Lint Stage — Preflight Gate (MR only, change-based)
 # ============================================================
@@ -1332,7 +1343,10 @@ coverage:workspace:
   variables:
     COVERAGE_PACKAGE: ""
     COVERAGE_REPO_LABEL: "core"
-    COVERAGE_EXTRA_FLAGS: "--features test-kdf"
+    # The same features `just test core` enables (resolve-repo.sh,
+    # repo_test_features): without vauchi-core/testing the `it` target is
+    # not built and the figure describes a third of the suite (private#975).
+    COVERAGE_EXTRA_FLAGS: "--features vauchi-core/testing,vauchi-core/test-kdf,vauchi-app/testing"
 
 # Binary size tracking — builds release and pushes metrics to Grafana.
 # Runs on main merges and release tags (not per-MR — release build is slow).

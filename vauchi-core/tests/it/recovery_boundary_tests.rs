@@ -118,3 +118,24 @@ fn validate_version_rejects_future_version() {
         "a proof from a newer schema version must be rejected as InvalidProof"
     );
 }
+
+// =============================================================================
+// Wire prefix the relay reads
+// =============================================================================
+
+/// The relay binds a stored proof to its slot and its uploader by reading
+/// this prefix, so the layout is a contract (spec Social Recovery B3,
+/// vauchi/private#927).
+// @scenario: contact_recovery :: Relay refuses a recovery proof upload the new key did not sign
+#[test]
+fn a_serialized_proof_starts_with_its_version_then_its_old_and_new_keys() {
+    let old_pk = [0x0Au8; 32];
+    let new_pk = [0x0Bu8; 32];
+    let proof = RecoveryProof::new(&old_pk, &new_pk, 3, 1_700_000_000);
+
+    let bytes = proof.to_bytes().unwrap();
+
+    assert_eq!(bytes[0], RECOVERY_PROOF_VERSION);
+    assert_eq!(&bytes[1..33], &old_pk);
+    assert_eq!(&bytes[33..65], &new_pk);
+}

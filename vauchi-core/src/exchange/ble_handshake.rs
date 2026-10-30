@@ -180,6 +180,9 @@ pub struct BleHandshakeSession {
     session_key: Option<SymmetricKey>,
     their_card: Option<BleCardPayload>,
     their_identity_key: Option<[u8; 32]>,
+    /// The peer's handshake exchange key, which its card must repeat
+    /// (vauchi/private#941).
+    their_exchange_key: Option<[u8; 32]>,
     /// Reciprocity confirmation tokens (design spec §2), derived from the
     /// agreed session key once key agreement completes. `our_confirmation_token`
     /// is sent to prove our side persisted; `expected_their_token` is checked
@@ -322,6 +325,7 @@ impl BleHandshakeSession {
             session_key: None,
             their_card: None,
             their_identity_key: None,
+            their_exchange_key: None,
             our_confirmation_token: None,
             expected_their_token: None,
             our_encrypted_card: None,
@@ -474,6 +478,7 @@ impl BleHandshakeSession {
         self.session_key = None;
         self.their_card = None;
         self.their_identity_key = None;
+        self.their_exchange_key = None;
         self.our_confirmation_token = None;
         self.expected_their_token = None;
         self.our_encrypted_card = None;
@@ -611,6 +616,7 @@ impl BleHandshakeSession {
 
         self.session_key = Some(session_key);
         self.their_identity_key = Some(their_identity);
+        self.their_exchange_key = Some(their_exchange);
         self.store_confirmation_tokens();
         // Persist initiator's offer-timestamp for the reciprocal-decrypt
         // AAD reconstruction in `complete_exchange` (v3 AAD-asymmetry fix).
@@ -762,7 +768,7 @@ impl BleHandshakeSession {
         if !their_card.verify_crc16() {
             return Err(ExchangeError::BleDecryptionFailed);
         }
-        validate_card_identity(&their_card, &their_identity)?;
+        validate_card_keys(&their_card, &their_identity, &their_exchange)?;
 
         let our_aad = build_aad(&self.our_identity_key, &their_identity, self.our_timestamp);
         let our_plaintext = self
@@ -914,7 +920,10 @@ impl BleHandshakeSession {
             if !card.verify_crc16() {
                 return Err(ExchangeError::BleDecryptionFailed);
             }
-            validate_card_identity(&card, &their_identity)?;
+            let their_exchange = self
+                .their_exchange_key
+                .ok_or_else(|| ExchangeError::InvalidState("No peer exchange key".into()))?;
+            validate_card_keys(&card, &their_identity, &their_exchange)?;
 
             self.their_card = Some(card);
         }
@@ -939,9 +948,19 @@ impl BleHandshakeSession {
     }
 }
 
-fn validate_card_identity(card: &BleCardPayload, identity: &[u8; 32]) -> Result<(), ExchangeError> {
+/// The card's keys are the ones the handshake used: a card naming another
+/// identity or exchange key would be stored under keys this exchange never
+/// proved (vauchi/private#941, SC-06).
+fn validate_card_keys(
+    card: &BleCardPayload,
+    identity: &[u8; 32],
+    exchange_key: &[u8; 32],
+) -> Result<(), ExchangeError> {
     if !bool::from(card.identity_key.ct_eq(identity)) {
         return Err(ExchangeError::IdentityMismatch);
+    }
+    if !bool::from(card.exchange_key.ct_eq(exchange_key)) {
+        return Err(ExchangeError::ExchangeKeyMismatch);
     }
     Ok(())
 }

@@ -500,6 +500,48 @@ fn a_late_message_from_an_earlier_generation_still_decrypts() {
     assert_eq!(bob.decrypt(&held_back).unwrap(), b"held back");
 }
 
+// A relay that delivers the responder's messages out of order must not lose
+// one: the initiator stores the skipped key of the responder's previous
+// chain under the generation that chain's messages carried, not under its
+// own generation counter (private#943, claim S2).
+// @internal
+#[test]
+fn a_held_back_message_from_the_responder_still_decrypts() {
+    let (mut alice, mut bob) = create_test_pair();
+    let a0 = alice.encrypt(b"a0").unwrap();
+    bob.decrypt(&a0).unwrap();
+    let b1 = bob.encrypt(b"b1").unwrap();
+    let b2_held_back = bob.encrypt(b"b2").unwrap();
+    alice.decrypt(&b1).unwrap();
+    let a1 = alice.encrypt(b"a1").unwrap();
+    bob.decrypt(&a1).unwrap();
+    let b3 = bob.encrypt(b"b3").unwrap();
+    assert!(b3.dh_generation > b2_held_back.dh_generation);
+    assert_eq!(alice.decrypt(&b3).unwrap(), b"b3");
+
+    assert_eq!(alice.decrypt(&b2_held_back).unwrap(), b"b2");
+}
+
+// @internal
+#[test]
+fn skipped_keys_are_bounded() {
+    let (mut alice, mut bob) = create_test_pair();
+    let messages: Vec<_> = (0..1002).map(|_| alice.encrypt(b"m").unwrap()).collect();
+
+    let too_far = bob.decrypt(&messages[1001]);
+
+    assert!(
+        matches!(too_far, Err(RatchetError::TooManySkipped)),
+        "skipping 1001 messages must be refused, got {too_far:?}"
+    );
+    assert_eq!(bob.decrypt(&messages[1000]).unwrap(), b"m");
+    assert_eq!(
+        bob.serialize().skipped_keys.len(),
+        1000,
+        "the store holds at most 1000 skipped keys"
+    );
+}
+
 // @internal
 #[test]
 fn skipping_counts_only_the_messages_after_the_last_received() {

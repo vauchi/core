@@ -8,6 +8,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+
+- The relay purge body carries no `recipient_id`: the relay erases the
+  mailbox addressed by the signing key, and a body-chosen mailbox let
+  any key pair empty any mailbox whose token it held (vauchi/private#944).
+  `HttpTransport::purge` and `purge_scoped` lose the parameter; an old
+  client's field is read past.
+
 ## [0.94.1] — 2026-10-30
 
 ### Fixed

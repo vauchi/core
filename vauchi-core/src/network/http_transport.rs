@@ -550,33 +550,24 @@ impl HttpTransport {
         }
     }
 
-    /// Purges all blobs for a recipient.
+    /// Purges the mailbox addressed by `public_key`.
     ///
     /// Requires Ed25519 signature authentication (same as relay-side verification).
     /// Returns the number of blobs deleted by the relay, if reported.
     pub fn purge(
         &self,
-        recipient_id: &str,
         public_key: &str,
         purge_token: &str,
         signature: &str,
         timestamp: u64,
     ) -> Result<Option<usize>, NetworkError> {
-        self.purge_scoped(
-            recipient_id,
-            public_key,
-            purge_token,
-            signature,
-            timestamp,
-            false,
-        )
+        self.purge_scoped(public_key, purge_token, signature, timestamp, false)
     }
 
     /// Purges like [`Self::purge`], and with `erase_guardian_set` also the
     /// signer's guardian set; the signature must cover that choice (#711).
     pub fn purge_scoped(
         &self,
-        recipient_id: &str,
         public_key: &str,
         purge_token: &str,
         signature: &str,
@@ -584,7 +575,6 @@ impl HttpTransport {
         erase_guardian_set: bool,
     ) -> Result<Option<usize>, NetworkError> {
         let req = V2PurgeRequest {
-            recipient_id: recipient_id.to_string(),
             public_key: public_key.to_string(),
             purge_token: purge_token.to_string(),
             signature: signature.to_string(),

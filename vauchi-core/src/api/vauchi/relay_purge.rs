@@ -27,10 +27,8 @@ impl Vauchi {
         let message =
             purge_signing_message(&public_key, &purge_token, timestamp, erase_guardian_set);
         let signature = identity.sign(&message);
-        let public_key_hex = hex::encode(public_key);
         Ok(self.create_guardian_transport().purge_scoped(
-            &public_key_hex,
-            &public_key_hex,
+            &hex::encode(public_key),
             &hex::encode(purge_token),
             &hex::encode(signature.as_bytes()),
             timestamp,

@@ -543,14 +543,12 @@ pub struct V2RegisterRequest {
     pub mailbox_tokens: Vec<String>,
 }
 
-/// V2 purge request body.
-///
-/// Purge is destructive — requires Ed25519 signature over
-/// `public_key || purge_token || timestamp`.
+/// V2 purge request body: an Ed25519 signature over
+/// `public_key || purge_token || timestamp`. It names no mailbox; the relay
+/// erases the one addressed by `public_key`, since a body-chosen mailbox let
+/// any key pair empty any mailbox whose token it held (#944).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2PurgeRequest {
-    #[serde(deserialize_with = "deserialize_recipient_id")]
-    pub recipient_id: String,
     /// Hex-encoded Ed25519 public key (32 bytes).
     #[serde(deserialize_with = "deserialize_public_key")]
     pub public_key: String,

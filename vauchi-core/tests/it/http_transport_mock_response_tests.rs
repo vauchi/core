@@ -185,7 +185,7 @@ fn purge_returns_blobs_deleted_count() {
 
     let transport = transport_pointing_at(&mock);
     let count = transport
-        .purge("recipient-x", "pubkey", "token", "sig", 1_700_000_000)
+        .purge("pubkey", "token", "sig", 1_700_000_000)
         .unwrap();
 
     assert_eq!(count, Some(7));
@@ -207,7 +207,7 @@ fn purge_with_missing_count_returns_none() {
     mock.queue("purge", ok_response_with(|_| {}));
 
     let transport = transport_pointing_at(&mock);
-    let count = transport.purge("r", "p", "t", "s", 1).unwrap();
+    let count = transport.purge("p", "t", "s", 1).unwrap();
     assert_eq!(count, None);
 }
 

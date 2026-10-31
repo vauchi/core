@@ -45,7 +45,6 @@ fn acknowledge_constructs_request_and_fails_at_network() {
 fn purge_constructs_request_and_fails_at_network() {
     let t = unreachable_transport();
     let r = t.purge(
-        "recipient-1",
         "AAAA…public_key",
         "token-xyz",
         "sig-bytes-b64",

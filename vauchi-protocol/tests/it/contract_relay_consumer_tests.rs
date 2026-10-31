@@ -175,7 +175,6 @@ fn v2_send_request_roundtrip() {
 #[test]
 fn v2_purge_request_roundtrip() {
     let req = V2PurgeRequest {
-        recipient_id: "rid".into(),
         public_key: "aa".repeat(32),
         purge_token: "bb".repeat(32),
         signature: "cc".repeat(64),
@@ -184,7 +183,6 @@ fn v2_purge_request_roundtrip() {
     };
     let json = serde_json::to_string(&req).unwrap();
     let parsed: V2PurgeRequest = serde_json::from_str(&json).unwrap();
-    assert_eq!(parsed.recipient_id, "rid");
     assert_eq!(parsed.public_key, "aa".repeat(32));
     assert_eq!(parsed.purge_token, "bb".repeat(32));
     assert_eq!(parsed.signature, "cc".repeat(64));

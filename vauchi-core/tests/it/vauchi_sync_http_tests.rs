@@ -581,7 +581,7 @@ fn send_fetch_ack_and_purge_reach_the_relay_only_sealed_through_the_outer_hop() 
     let _ = transport.send_update(&mailbox, "c2VjcmV0", None);
     let _ = transport.fetch(std::slice::from_ref(&mailbox));
     let _ = transport.acknowledge(&mailbox, "blob-1");
-    let _ = transport.purge(&mailbox, "pk", "token", "sig", 0);
+    let _ = transport.purge("pk", "token", "sig", 0);
 
     assert!(application_relay.received().is_empty());
     let sealed = outer_relay.received();

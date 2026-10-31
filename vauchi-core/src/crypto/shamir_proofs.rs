@@ -20,6 +20,14 @@
 //! index values limited to 0–4; with fixed indices it verified in 38 s. The
 //! unit tests cover those checks.
 //!
+//! One byte through the real arithmetic, a degree-one polynomial with any
+//! coefficients evaluated at two distinct points and interpolated back with
+//! the real `gf_mul` and `gf_inv`, did not finish in 10 minutes on a
+//! 24-thread laptop (2026-10-31, private#937): the exhaustive `gf_mul`
+//! and `gf_inv` unit tests stay the evidence for the field arithmetic.
+//! `split` itself is out of reach either way: it draws its coefficients
+//! from the OS and wipes them through `zeroize`.
+//!
 //! `wipe_points` and the shares' wipe on drop are kept out: `zeroize`'s
 //! barrier is inline assembly Kani cannot model. The wipe changes no
 //! result; `wipe_points_clears_every_index_and_value` and

@@ -55,16 +55,17 @@ export RUSTC_WRAPPER
 # binaries and the toolchain `kani setup` downloads.
 KANI_HOME=$FORMAL_HOME/kani
 export KANI_HOME
-if wants gate; then
 if ! cargo kani --version 2>/dev/null | grep -q "$KANI_VERSION"; then
     cargo install --locked --root "$FORMAL_HOME" kani-verifier --version "$KANI_VERSION"
     cargo kani setup
 fi
+if wants gate; then
 for harness in \
     unpad_never_panics_and_only_accepts_a_prefixed_plaintext \
     parse_exchange_payload_never_panics_and_reads_each_field_at_its_offset \
     ble_advertisement_parse_never_panics_and_reads_each_field_at_its_offset \
-    recovery_claim_parse_never_panics_and_reads_each_field_at_its_offset; do
+    recovery_claim_parse_never_panics_and_reads_each_field_at_its_offset \
+    recovery_time_bounds_are_exact_and_never_overflow; do
     cargo kani -p vauchi-core --harness "$harness"
 done
 # These stub format! or gf_mul, which CBMC cannot finish within the limits;
@@ -77,6 +78,16 @@ for harness in \
     cargo kani -p vauchi-core -Z stubbing --harness "$harness"
 done
 fi # wants gate
+# The postcard token parser over 140 symbolic bytes verified in 54 minutes
+# on a 24-thread laptop, and the 171-byte voucher parser had not finished
+# after 40 (private#937): nightly, not on every merge request.
+if wants extended; then
+for harness in \
+    guardian_token_parse_accepts_exactly_one_token \
+    recovery_voucher_parse_accepts_exactly_a_contact_voucher; do
+    cargo kani -p vauchi-core --harness "$harness"
+done
+fi # wants extended
 
 # ── Wipe on drop: Miri and release (#817) ─────────────────────────────
 # Kani cannot model zeroize's barrier; these tests read a dropped value's

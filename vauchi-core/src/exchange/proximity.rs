@@ -182,12 +182,19 @@ impl ProximityVerifier for MockProximityVerifier {
         }
 
         if self.should_succeed {
-            // Return a valid response (echo the challenge with a marker)
+            // A well-formed success response in either order: a listener
+            // that has not emitted yet echoes a zero challenge, since the
+            // mock cannot stand in for the other device (private#948).
             let mut response = Vec::with_capacity(17);
             response.push(0x01); // Success marker
-            if let Some(challenge) = self.challenges.lock().expect("mutex poisoned").last() {
-                response.extend_from_slice(challenge);
-            }
+            let echoed = self
+                .challenges
+                .lock()
+                .expect("mutex poisoned")
+                .last()
+                .copied()
+                .unwrap_or([0u8; 16]);
+            response.extend_from_slice(&echoed);
             Ok(response)
         } else {
             Err(ProximityError::NoResponse)

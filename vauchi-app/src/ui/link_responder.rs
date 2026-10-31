@@ -376,3 +376,44 @@ mod success_summary_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod failure_detail_tests {
+    use super::*;
+    use vauchi_core::exchange::link_mode::{initiator_generate, parse_exchange_deep_link};
+
+    fn failed_detail(reason: &str) -> Option<String> {
+        let (init, _) = initiator_generate();
+        let payload = parse_exchange_deep_link(&init.url).expect("canonical URL parses");
+        let mut engine = LinkResponderEngine::new(payload);
+        engine.apply_update(crate::ui::EngineUpdate::LinkResponder(
+            crate::ui::LinkResponderUpdate::Failed(reason.into()),
+        ));
+        engine
+            .current_screen()
+            .components
+            .into_iter()
+            .find_map(|component| match component {
+                Component::StatusIndicator { detail, .. } => detail,
+                _ => None,
+            })
+    }
+
+    // A second person opening a link is told it was already used, not that
+    // something went wrong (#942).
+    // @internal
+    #[test]
+    fn a_used_link_says_it_was_already_opened() {
+        assert_eq!(
+            failed_detail("link_already_used"),
+            Some(get_string(
+                Locale::ENGLISH,
+                "link_responder.failure_link_already_used"
+            ))
+        );
+        assert_ne!(
+            failed_detail("link_already_used"),
+            failed_detail("no_such_reason"),
+        );
+    }
+}

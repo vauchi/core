@@ -16,7 +16,7 @@
 
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::X3DHKeyPair;
-use vauchi_core::exchange::link_mode::serialize_card_payload_v2;
+use vauchi_core::exchange::link_mode::{LinkExchangeBinding, serialize_link_card_payload};
 use vauchi_core::{ExchangeTransport, Vauchi, VauchiError};
 
 fn vauchi_with_identity(name: &str) -> Vauchi {
@@ -25,21 +25,38 @@ fn vauchi_with_identity(name: &str) -> Vauchi {
     v
 }
 
-/// Build the v2 bootstrap a side would deposit, returning the payload, the
-/// retained X3DH keypair (kept for completion), and the side's identity key.
+/// The link and escrow handshake both sides of these tests share.
+const EXCHANGE: LinkExchangeBinding = LinkExchangeBinding {
+    nonce: [0x11; 32],
+    initiator_epk: [0x22; 32],
+    responder_epk: [0x33; 32],
+};
+
+/// Build the bootstrap a side would deposit for [`EXCHANGE`], returning the
+/// payload, the retained X3DH keypair (kept for completion), and the side's
+/// identity key.
 fn build_v2(v: &Vauchi, relay_url: &str) -> (Vec<u8>, X3DHKeyPair, [u8; 32]) {
     let identity = v.identity().expect("identity exists");
     let identity_pubkey = *identity.signing_public_key();
     let x3dh = X3DHKeyPair::generate();
     let card = ContactCard::new(identity.display_name());
-    let payload = serialize_card_payload_v2(
-        &identity_pubkey,
+    let payload = serialize_link_card_payload(
         identity.signing_keypair(),
         x3dh.public_key(),
         relay_url,
         &card,
+        &EXCHANGE,
     );
     (payload, x3dh, identity_pubkey)
+}
+
+/// The payload with its card's display name rewritten and its signature
+/// left as it was: `[version][signature: 64][json body]`.
+fn with_card_renamed(payload: &[u8], name: &str) -> Vec<u8> {
+    let (head, body) = payload.split_at(65);
+    let mut body: serde_json::Value = serde_json::from_slice(body).expect("payload body json");
+    body["card"]["display_name"] = serde_json::json!(name);
+    [head, &serde_json::to_vec(&body).expect("body json")].concat()
 }
 
 // @claim: S9
@@ -54,10 +71,10 @@ fn v2_two_party_completes_to_a_live_exchanged_link_contact_with_symmetric_key() 
 
     // Each side completes the *peer's* bootstrap with its own retained key.
     let bob_contact_id = alice
-        .complete_link_exchange(&bob_payload, &alice_x3dh)
+        .complete_link_exchange(&bob_payload, &alice_x3dh, &EXCHANGE)
         .expect("alice completes bob's bootstrap");
     let alice_contact_id = bob
-        .complete_link_exchange(&alice_payload, &bob_x3dh)
+        .complete_link_exchange(&alice_payload, &bob_x3dh, &EXCHANGE)
         .expect("bob completes alice's bootstrap");
 
     // Both produced an Exchanged (live, updatable) contact over Link, with
@@ -164,7 +181,7 @@ fn v2_completion_is_idempotent_and_keeps_the_existing_channel() {
     let (_, alice_x3dh, _) = build_v2(&alice, "https://relay.alice.example");
 
     let id1 = alice
-        .complete_link_exchange(&bob_payload, &alice_x3dh)
+        .complete_link_exchange(&bob_payload, &alice_x3dh, &EXCHANGE)
         .expect("first completion");
     let ratchet_before = alice
         .get_ratchet_state(&id1)
@@ -174,7 +191,7 @@ fn v2_completion_is_idempotent_and_keeps_the_existing_channel() {
     // Re-receiving the same peer returns the existing contact and must NOT
     // re-key the channel (a fresh ratchet would desync an in-flight session).
     let id2 = alice
-        .complete_link_exchange(&bob_payload, &alice_x3dh)
+        .complete_link_exchange(&bob_payload, &alice_x3dh, &EXCHANGE)
         .expect("second completion");
     assert_eq!(id1, id2, "re-receiving the same peer returns the same id");
     assert_eq!(
@@ -203,7 +220,7 @@ fn v2_rejects_completing_our_own_bootstrap() {
     // Receiving our own signed bootstrap is degenerate (identity == ours);
     // it must be rejected, never written as a self-contact.
     let err = alice
-        .complete_link_exchange(&alice_payload, &alice_x3dh)
+        .complete_link_exchange(&alice_payload, &alice_x3dh, &EXCHANGE)
         .expect_err("completing our own bootstrap must fail");
     // The engine picks the user-facing consequence from the variant, so an
     // untyped rejection here becomes "the card could not be decrypted" — the
@@ -238,11 +255,82 @@ fn v2_completion_at_the_contact_limit_reports_the_limit() {
         .expect("set contact limit");
 
     let err = alice
-        .complete_link_exchange(&bob_payload, &alice_x3dh)
+        .complete_link_exchange(&bob_payload, &alice_x3dh, &EXCHANGE)
         .expect_err("completing past the contact limit must fail");
     assert!(
         matches!(err, VauchiError::ContactLimitReached(0)),
         "the limit must be typed so the user is told to free a slot rather \
          than to retry, got {err:?}"
     );
+}
+
+// @claim: S9
+// @internal
+#[test]
+fn link_bootstrap_signature_covers_the_card() {
+    let alice = vauchi_with_identity("Alice");
+    let bob = vauchi_with_identity("Bob");
+    let (bob_payload, _, bob_id) = build_v2(&bob, "https://relay.bob.example");
+    let (_, alice_x3dh, _) = build_v2(&alice, "https://relay.alice.example");
+
+    let err = alice
+        .complete_link_exchange(
+            &with_card_renamed(&bob_payload, "Mallory"),
+            &alice_x3dh,
+            &EXCHANGE,
+        )
+        .expect_err("a card rewritten after signing must fail verification");
+    assert!(
+        err.to_string().contains("signature"),
+        "expected a signature failure, got {err}"
+    );
+    assert_eq!(alice.list_contacts().expect("list").len(), 0);
+
+    let contact_id = alice
+        .complete_link_exchange(&bob_payload, &alice_x3dh, &EXCHANGE)
+        .expect("the untouched payload still completes");
+    assert_eq!(contact_id, hex::encode(bob_id));
+    let contact = alice.get_contact(&contact_id).unwrap().unwrap();
+    assert_eq!(contact.display_name(), "Bob");
+}
+
+// @claim: S9
+// @internal
+#[test]
+fn link_bootstrap_signature_is_bound_to_its_exchange() {
+    let bob = vauchi_with_identity("Bob");
+    let (bob_payload, _, _) = build_v2(&bob, "https://relay.bob.example");
+    let other_exchanges = [
+        LinkExchangeBinding {
+            nonce: [0x99; 32],
+            ..EXCHANGE
+        },
+        LinkExchangeBinding {
+            initiator_epk: [0x99; 32],
+            ..EXCHANGE
+        },
+        LinkExchangeBinding {
+            responder_epk: [0x99; 32],
+            ..EXCHANGE
+        },
+    ];
+
+    for other in other_exchanges {
+        let alice = vauchi_with_identity("Alice");
+        let (_, alice_x3dh, _) = build_v2(&alice, "https://relay.alice.example");
+        let err = alice
+            .complete_link_exchange(&bob_payload, &alice_x3dh, &other)
+            .expect_err("a payload signed for another exchange must fail");
+        assert!(
+            err.to_string().contains("signature"),
+            "{other:?}: expected a signature failure, got {err}"
+        );
+        assert_eq!(alice.list_contacts().expect("list").len(), 0);
+    }
+
+    let alice = vauchi_with_identity("Alice");
+    let (_, alice_x3dh, _) = build_v2(&alice, "https://relay.alice.example");
+    alice
+        .complete_link_exchange(&bob_payload, &alice_x3dh, &EXCHANGE)
+        .expect("the exchange the payload was signed for completes");
 }

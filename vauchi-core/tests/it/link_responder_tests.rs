@@ -24,11 +24,20 @@ const NOW: u64 = 1_700_000_000;
 /// Synthetic responder session — derives keys + commands the same way
 /// the production cycle thread will, but stays inside the test.
 fn make_session(deadline_unix: u64) -> LinkResponderSession {
+    make_session_for_link(deadline_unix).0
+}
+
+/// Like [`make_session`], also returning the link's handshake gate.
+fn make_session_for_link(deadline_unix: u64) -> (LinkResponderSession, Vec<u8>) {
     let (init, _) = initiator_generate();
     let parsed = parse_link_url(&init.url).unwrap();
     // `responder_respond` returns the keys + 2 RelayEscrowDeposit commands.
     let (keys, deposits) = responder_respond(&parsed, b"responder_card".to_vec()).unwrap();
-    LinkResponderSession::new(keys, deposits, deadline_unix)
+    let handshake = handshake_gate(&parsed.nonce);
+    (
+        LinkResponderSession::new(keys, handshake.clone(), deposits, deadline_unix),
+        handshake,
+    )
 }
 
 /// The relay authenticates a retrieval by the requester's *own* slot and
@@ -50,7 +59,8 @@ fn responder_retrieves_using_its_own_slot_so_the_relay_returns_the_peers_blob() 
     let our_slot = hex_bytes(&keys.our_slot);
     let their_slot = hex_bytes(&keys.their_slot);
 
-    let mut session = LinkResponderSession::new(keys, deposits, NOW + 300);
+    let mut session =
+        LinkResponderSession::new(keys, handshake_gate(&parsed.nonce), deposits, NOW + 300);
     let _ = session.drain_pending_commands();
 
     session.apply_hardware_event(Event::RelayEscrowReady {
@@ -274,6 +284,43 @@ fn relay_escrow_failed_on_our_gate_transitions_to_failed_deposit_rejected() {
         ),
         "RelayEscrowFailed on our gate must surface DepositRejected, got {:?}",
         session.current_state()
+    );
+}
+
+// Two people opened the link: the second one's epk deposit finds the slot
+// taken. It is told the link was used, not left to time out (#942).
+// @internal
+#[test]
+fn a_taken_epk_slot_fails_as_link_already_used() {
+    let (mut session, handshake) = make_session_for_link(NOW + 300);
+    let _ = session.drain_pending_commands();
+
+    session.apply_hardware_event(Event::RelayEscrowFailed {
+        gate_hash: handshake,
+        reason: "slot_taken".into(),
+    });
+
+    assert_eq!(
+        session.current_state(),
+        &LinkResponderState::Failed(LinkResponderFailureReason::LinkAlreadyUsed)
+    );
+    assert!(session.drain_pending_commands().is_empty());
+}
+
+// @internal
+#[test]
+fn any_other_epk_deposit_failure_is_a_rejected_deposit() {
+    let (mut session, handshake) = make_session_for_link(NOW + 300);
+    let _ = session.drain_pending_commands();
+
+    session.apply_hardware_event(Event::RelayEscrowFailed {
+        gate_hash: handshake,
+        reason: "blob_too_large".into(),
+    });
+
+    assert_eq!(
+        session.current_state(),
+        &LinkResponderState::Failed(LinkResponderFailureReason::DepositRejected)
     );
 }
 

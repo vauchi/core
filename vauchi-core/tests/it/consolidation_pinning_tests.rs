@@ -30,11 +30,20 @@ use vauchi_core::api::*;
 use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey};
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::exchange::key_order;
-use vauchi_core::exchange::link_mode::{derive_link_shared_key, serialize_card_payload_v2};
+use vauchi_core::exchange::link_mode::{
+    LinkExchangeBinding, derive_link_shared_key, serialize_link_card_payload,
+};
 use vauchi_core::exchange::ratchet_bootstrap::bootstrap_exchange_ratchet;
 use vauchi_core::network::{MockTransport, RelayClientConfig, TransportConfig};
 use vauchi_core::rng::OsSecureRng;
 use vauchi_core::*;
+
+/// The link and escrow handshake the link-exchange pin runs under.
+const EXCHANGE: LinkExchangeBinding = LinkExchangeBinding {
+    nonce: [0x11; 32],
+    initiator_epk: [0x22; 32],
+    responder_epk: [0x33; 32],
+};
 
 // ---------------------------------------------------------------------------
 // U3 — hand-rolled init recipe ≡ bootstrap_exchange_ratchet
@@ -159,17 +168,17 @@ fn link_persisted_ratchet_interoperates_with_helper_built_peer() {
     let bob_payload = {
         let identity = bob.identity().expect("bob identity");
         let card = vauchi_core::contact_card::ContactCard::new(identity.display_name());
-        serialize_card_payload_v2(
-            &bob_id,
+        serialize_link_card_payload(
             identity.signing_keypair(),
             bob_x3dh.public_key(),
             "https://relay.bob.example",
             &card,
+            &EXCHANGE,
         )
     };
 
     let contact_id = alice
-        .complete_link_exchange(&bob_payload, &alice_x3dh)
+        .complete_link_exchange(&bob_payload, &alice_x3dh, &EXCHANGE)
         .expect("alice completes bob's bootstrap");
 
     let (alice_ratchet, alice_is_initiator) = alice

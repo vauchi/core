@@ -13,7 +13,14 @@ use vauchi_core::Vauchi;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::exchange::key_order::is_initiator;
-use vauchi_core::exchange::link_mode::serialize_card_payload_v2;
+use vauchi_core::exchange::link_mode::{LinkExchangeBinding, serialize_link_card_payload};
+
+/// The link and escrow handshake both sides share.
+const EXCHANGE: LinkExchangeBinding = LinkExchangeBinding {
+    nonce: [0x11; 32],
+    initiator_epk: [0x22; 32],
+    responder_epk: [0x33; 32],
+};
 
 fn vauchi_with_identity(name: &str) -> Vauchi {
     let mut v = Vauchi::in_memory().expect("in-memory vauchi");
@@ -25,12 +32,12 @@ fn link_payload(v: &Vauchi) -> (Vec<u8>, X3DHKeyPair) {
     let identity = v.identity().expect("identity exists");
     let x3dh = X3DHKeyPair::generate();
     let card = ContactCard::new(identity.display_name());
-    let payload = serialize_card_payload_v2(
-        identity.signing_public_key(),
+    let payload = serialize_link_card_payload(
         identity.signing_keypair(),
         x3dh.public_key(),
         "https://relay.example",
         &card,
+        &EXCHANGE,
     );
     (payload, x3dh)
 }
@@ -47,10 +54,10 @@ fn linked_pair() -> (Vauchi, Vauchi, String, String) {
     let (a_payload, a_x3dh) = link_payload(&a);
     let (b_payload, b_x3dh) = link_payload(&b);
     let b_on_a = a
-        .complete_link_exchange(&b_payload, &a_x3dh)
+        .complete_link_exchange(&b_payload, &a_x3dh, &EXCHANGE)
         .expect("alice completes bob's bootstrap");
     let a_on_b = b
-        .complete_link_exchange(&a_payload, &b_x3dh)
+        .complete_link_exchange(&a_payload, &b_x3dh, &EXCHANGE)
         .expect("bob completes alice's bootstrap");
     if is_initiator(&signing_key(&a), &signing_key(&b)) {
         (a, b, b_on_a, a_on_b)

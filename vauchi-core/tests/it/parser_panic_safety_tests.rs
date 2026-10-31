@@ -79,13 +79,17 @@ proptest! {
     }
 
     /// Arbitrary byte buffers into the link-mode card-payload parser are
-    /// rejected (too short, bad version, or non-card JSON), never panic.
-    /// Exercises the `< 33` header guard and the `data[1..33]` / `data[33..]`
-    /// slices.
+    /// rejected (empty, bad version, shorter than the signature, non-card
+    /// JSON or a bad signature), never panic. Exercises the signature split.
     // @internal
     #[test]
-    fn parse_card_payload_versioned_rejects_arbitrary(bytes in prop::collection::vec(any::<u8>(), 0..256)) {
-        prop_assert!(link_mode::parse_card_payload_versioned(&bytes).is_err());
+    fn parse_link_card_payload_rejects_arbitrary(bytes in prop::collection::vec(any::<u8>(), 0..256)) {
+        let binding = link_mode::LinkExchangeBinding {
+            nonce: [1; 32],
+            initiator_epk: [2; 32],
+            responder_epk: [3; 32],
+        };
+        prop_assert!(link_mode::parse_link_card_payload(&bytes, &binding).is_err());
     }
 
     /// Arbitrary byte buffers into the relay message decoder are rejected

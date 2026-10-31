@@ -92,16 +92,19 @@ fn non_escrow_command_maps_to_none() {
 
 // ── escrow_outcome: EscrowResponse → EscrowOutcome ───────────────────
 
+// Every escrow flow deposits each slot once, so a slot that already holds
+// a blob was written by someone else: for a link, a second person opened it
+// (#942).
 // @internal
 #[test]
-fn stored_and_already_exists_are_deposited() {
+fn stored_is_deposited_and_a_taken_slot_fails() {
     assert_eq!(
         escrow_outcome(&EscrowResponse::Stored),
         EscrowOutcome::Deposited
     );
     assert_eq!(
         escrow_outcome(&EscrowResponse::AlreadyExists),
-        EscrowOutcome::Deposited
+        EscrowOutcome::Failed("slot_taken".to_string())
     );
 }
 

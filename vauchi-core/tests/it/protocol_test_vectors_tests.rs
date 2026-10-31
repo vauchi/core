@@ -950,9 +950,10 @@ fn write_test_vectors_when_asked() {
              32-byte nonce, base64url without padding; handshake gate, presence slot \
              and epk slot are hex(SHA-256(nonce || label)); escrow gate and slots are \
              hex(SHA-256(HKDF(DH, info))) and the card key HKDF(DH, card_key_info) with \
-             DH = X25519(responder ephemeral, initiator ephemeral); the v2 payload is \
-             0x02 || JSON with an Ed25519 signature over bootstrap_domain || x3dh \
-             public key || relay_url; link_shared_key = HKDF(X25519(x3dh_i, x3dh_r), \
+             DH = X25519(responder ephemeral, initiator ephemeral); the v3 payload is \
+             0x03 || signature(64) || JSON body, the Ed25519 signature over \
+             bootstrap_domain || nonce || initiator ephemeral || responder ephemeral \
+             || JSON body; link_shared_key = HKDF(X25519(x3dh_i, x3dh_r), \
              link_shared_key_info)."
                 .into(),
         ],

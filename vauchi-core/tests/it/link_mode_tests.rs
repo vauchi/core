@@ -686,9 +686,12 @@ fn responder_decrypts_a_card_encrypted_with_independently_derived_initiator_keys
     let (init, _) = initiator_generate();
     let parsed = parse_link_url(&init.url).expect("a freshly generated url must parse");
 
-    let (responder_keys, responder_commands) =
-        responder_respond_with_card_bytes(&parsed, b"bob serialized card")
-            .expect("responder_respond_with_card_bytes must succeed");
+    let LinkResponse {
+        keys: responder_keys,
+        commands: responder_commands,
+        ..
+    } = responder_respond_with_signed_card(&parsed, |_| b"bob serialized card".to_vec())
+        .expect("responder_respond_with_signed_card must succeed");
 
     // The responder's epk reaches the initiator through the handshake gate.
     let responder_epk = match &responder_commands[0] {
@@ -788,30 +791,51 @@ fn responder_complete_rejects_wrong_key() {
 }
 
 // ================================================================
-// Responder-side: responder_respond_with_card_bytes encrypt-helper
+// Responder-side: responder_respond_with_signed_card
 // ================================================================
 
-/// Production-ergonomic helper round-trips: caller supplies raw card
-/// bytes; helper internally derives keys + encrypts; the second
-/// deposit's blob can be decrypted back to the raw bytes via
-/// `responder_complete` using the same returned keys.
+/// The responder signs its card for this exchange: the binding handed to
+/// the signer is the link's nonce and key plus the responder's fresh epk,
+/// the same binding returned for verifying the initiator's card (#942).
+/// The signed bytes are what the second deposit encrypts.
 // @internal
 #[test]
-fn responder_respond_with_card_bytes_round_trips_via_responder_complete() {
+fn responder_signs_its_card_for_the_link_and_its_own_epk() {
     let (init, _) = initiator_generate();
     let parsed = parse_link_url(&init.url).unwrap();
 
     let raw = b"alice serialized card";
-    let (keys, commands) = responder_respond_with_card_bytes(&parsed, raw).unwrap();
+    let mut signed_for = None;
+    let response = responder_respond_with_signed_card(&parsed, |binding| {
+        signed_for = Some(*binding);
+        raw.to_vec()
+    })
+    .unwrap();
 
-    // The second command is the encrypted-card deposit. Pull the
-    // ciphertext out and round-trip it back through responder_complete.
-    let encrypted_blob = match &commands[1] {
+    let (epk_gate, epk) = match &response.commands[0] {
+        Command::RelayEscrowDeposit {
+            gate_hash,
+            encrypted_card,
+            ..
+        } => (gate_hash.clone(), encrypted_card.clone()),
+        other => panic!("expected the epk deposit at index 0, got {other:?}"),
+    };
+    let expected = LinkExchangeBinding {
+        nonce: parsed.nonce,
+        initiator_epk: parsed.initiator_public_key,
+        responder_epk: epk.try_into().expect("an epk is 32 bytes"),
+    };
+    assert_eq!(signed_for, Some(expected));
+    assert_eq!(response.binding, expected);
+    assert_eq!(response.handshake_gate, epk_gate);
+    assert_eq!(response.handshake_gate, handshake_gate(&parsed.nonce));
+
+    let encrypted_blob = match &response.commands[1] {
         Command::RelayEscrowDeposit { encrypted_card, .. } => encrypted_card.clone(),
         other => panic!("expected RelayEscrowDeposit at index 1, got {other:?}"),
     };
-
-    let recovered = responder_complete(&keys, &encrypted_blob).expect("decrypt round-trip");
+    let recovered =
+        responder_complete(&response.keys, &encrypted_blob).expect("decrypt round-trip");
     assert_eq!(recovered.as_slice(), raw);
 }
 

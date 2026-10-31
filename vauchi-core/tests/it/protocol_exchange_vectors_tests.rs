@@ -18,8 +18,8 @@ use vauchi_core::exchange::confirmation_escrow::ConfirmationEscrowKeys;
 use vauchi_core::exchange::escrow::{EscrowKeys, EscrowRole};
 use vauchi_core::exchange::key_order::is_initiator;
 use vauchi_core::exchange::link_mode::{
-    derive_link_shared_key, initiator_generate_named, parse_card_payload_versioned, parse_link_url,
-    serialize_card_payload_v2,
+    LinkExchangeBinding, derive_link_shared_key, initiator_generate_named, parse_link_card_payload,
+    parse_link_url, serialize_link_card_payload,
 };
 use vauchi_core::exchange::{ExchangeEvent, ExchangeSession, ExchangeState, MockProximityVerifier};
 use vauchi_core::identity::Identity;
@@ -35,7 +35,7 @@ const ESCROW_GATE_INFO: &str = "vauchi-escrow-gate-v1";
 const ESCROW_SLOT_INIT_INFO: &str = "vauchi-escrow-slot-init-v1";
 const ESCROW_SLOT_RESP_INFO: &str = "vauchi-escrow-slot-resp-v1";
 const ESCROW_CARD_KEY_INFO: &str = "vauchi-escrow-card-key-v1";
-const LINK_BOOTSTRAP_DOMAIN: &str = "vauchi-link-bootstrap-v2";
+const LINK_BOOTSTRAP_DOMAIN: &str = "vauchi-link-bootstrap-v3";
 const LINK_SHARED_KEY_INFO: &str = "vauchi-link-shared-key-v1";
 const VECTOR_NOW: u64 = 1_793_100_000;
 
@@ -103,7 +103,7 @@ pub(crate) struct LinkExchangeVector {
     relay_url: String,
     card_id: String,
     card_display_name: String,
-    initiator_payload_v2: String,
+    initiator_payload_v3: String,
     bootstrap_signature: String,
     link_shared_key_info: String,
     link_shared_key: String,
@@ -337,20 +337,19 @@ pub(crate) fn compute_link_exchange() -> LinkExchangeVector {
     let x3dh_r = X3DHKeyPair::from_bytes(seed(0x75));
     let relay_url = "https://relay.vauchi.app";
     let card = vector_card();
-    let payload = serialize_card_payload_v2(
-        identity.signing_public_key(),
+    let binding = LinkExchangeBinding {
+        nonce,
+        initiator_epk: *initiator.public_key(),
+        responder_epk: *responder.public_key(),
+    };
+    let payload = serialize_link_card_payload(
         identity.signing_keypair(),
         x3dh_i.public_key(),
         relay_url,
         &card,
+        &binding,
     );
-    let body: serde_json::Value = serde_json::from_slice(&payload[1..]).expect("payload json");
-    let signature: Vec<u8> = body["signature"]
-        .as_array()
-        .expect("signature array")
-        .iter()
-        .map(|b| b.as_u64().expect("byte") as u8)
-        .collect();
+    let signature = payload[1..65].to_vec();
     let link_shared_key = derive_link_shared_key(&x3dh_i, x3dh_r.public_key()).expect("shared");
 
     LinkExchangeVector {
@@ -382,7 +381,7 @@ pub(crate) fn compute_link_exchange() -> LinkExchangeVector {
         relay_url: relay_url.to_string(),
         card_id: card.id().to_string(),
         card_display_name: "Vector".to_string(),
-        initiator_payload_v2: hex::encode(&payload),
+        initiator_payload_v3: hex::encode(&payload),
         bootstrap_signature: hex::encode(signature),
         link_shared_key_info: LINK_SHARED_KEY_INFO.to_string(),
         link_shared_key: hex::encode(link_shared_key.as_bytes()),
@@ -448,23 +447,29 @@ fn link_exchange_vector_matches_the_url_slots_escrow_payload_and_shared_key() {
         v.card_key
     );
 
-    // The v2 payload is reproducible and parses with its signature verified.
+    // The payload is reproducible and parses with its signature verified
+    // for this link and its two escrow keys.
     let identity = vector_identity(0x73, "Vector Link");
     assert_eq!(
         hex::encode(identity.signing_public_key()),
         v.initiator_identity_public
     );
     let x3dh_i = X3DHKeyPair::from_bytes(hex32(&v.initiator_x3dh_secret));
-    let payload = serialize_card_payload_v2(
-        identity.signing_public_key(),
+    let binding = LinkExchangeBinding {
+        nonce,
+        initiator_epk: hex32(&v.initiator_public),
+        responder_epk: hex32(&v.responder_public),
+    };
+    let payload = serialize_link_card_payload(
         identity.signing_keypair(),
         x3dh_i.public_key(),
         &v.relay_url,
         &vector_card(),
+        &binding,
     );
-    assert_eq!(hex::encode(&payload), v.initiator_payload_v2);
-    assert_eq!(payload[0], 0x02);
-    let parsed_payload = parse_card_payload_versioned(&payload).expect("payload parses");
+    assert_eq!(hex::encode(&payload), v.initiator_payload_v3);
+    assert_eq!(payload[0], 0x03);
+    let parsed_payload = parse_link_card_payload(&payload, &binding).expect("payload parses");
     assert_eq!(
         hex::encode(parsed_payload.identity_pubkey),
         v.initiator_identity_public
@@ -475,10 +480,14 @@ fn link_exchange_vector_matches_the_url_slots_escrow_payload_and_shared_key() {
     );
     assert_eq!(parsed_payload.relay_url, v.relay_url);
     assert_eq!(parsed_payload.card.id(), v.card_id);
-    // The signature is Ed25519 over domain || x3dh public key || relay URL.
+    // The signature is Ed25519 over domain || nonce || initiator epk ||
+    // responder epk || the JSON body that follows it in the payload.
     let mut message = v.bootstrap_domain.as_bytes().to_vec();
-    message.extend_from_slice(x3dh_i.public_key());
-    message.extend_from_slice(v.relay_url.as_bytes());
+    message.extend_from_slice(&nonce);
+    message.extend_from_slice(&binding.initiator_epk);
+    message.extend_from_slice(&binding.responder_epk);
+    message.extend_from_slice(&payload[65..]);
+    assert_eq!(hex::encode(&payload[1..65]), v.bootstrap_signature);
     assert_eq!(
         hex::encode(identity.signing_keypair().sign(&message).as_bytes()),
         v.bootstrap_signature
@@ -486,7 +495,7 @@ fn link_exchange_vector_matches_the_url_slots_escrow_payload_and_shared_key() {
     let mut tampered = payload.clone();
     let last = tampered.len() - 1;
     tampered[last] ^= 1;
-    assert!(parse_card_payload_versioned(&tampered).is_err());
+    assert!(parse_link_card_payload(&tampered, &binding).is_err());
 
     // The shared key is symmetric and HKDF(X25519(x3dh_i, x3dh_r), info).
     let x3dh_r = X3DHKeyPair::from_bytes(hex32(&v.responder_x3dh_secret));

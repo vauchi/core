@@ -8,8 +8,9 @@
 //! pure-Rust state machine (no threads, no sleeps) drives the initiator
 //! side of link-mode contact exchange: it shares a URL, polls the
 //! handshake gate for the responder's ephemeral public key, performs
-//! ECDH, deposits its own encrypted card, then polls the escrow gate to
-//! retrieve + decrypt the responder's card.
+//! ECDH, waits for its own card signed for that exchange (#942), deposits
+//! it encrypted, then polls the escrow gate to retrieve + decrypt the
+//! responder's card.
 //!
 //! Inputs are `apply_hardware_event` (relay events) and `tick(now_unix)`
 //! (deadline checks); outputs are `drain_pending_commands` (commands the
@@ -32,9 +33,21 @@ const NOW: u64 = 1_700_000_000;
 fn make_session(deadline_unix: u64) -> (LinkInitiatorSession, String) {
     let (init, presence_commands) = initiator_generate();
     let url = init.url.clone();
-    let own_card = b"initiator card payload bytes".to_vec();
-    let session = LinkInitiatorSession::new(init, presence_commands, own_card, deadline_unix);
+    let session = LinkInitiatorSession::new(init, presence_commands, deadline_unix);
     (session, url)
+}
+
+/// Stands in for the initiator's card signed for the exchange; the session
+/// only encrypts and deposits it.
+const OWN_CARD: &[u8] = b"initiator card payload bytes";
+
+/// Feed the responder's epk and hand the session its signed card, as the
+/// engine does once the exchange binding is known.
+fn open(session: &mut LinkInitiatorSession, epk: Vec<u8>) {
+    session.apply_hardware_event(Event::LinkOpened {
+        peer_public_key: epk,
+    });
+    session.deposit_card(OWN_CARD);
 }
 
 /// Synthesize the responder side for `url`: returns the responder's
@@ -42,7 +55,9 @@ fn make_session(deadline_unix: u64) -> (LinkInitiatorSession, String) {
 /// encrypted card blob (for `RelayEscrowBlobReceived`).
 fn responder_side(url: &str, responder_card: &[u8]) -> (Vec<u8>, Vec<u8>) {
     let parsed = parse_link_url(url).unwrap();
-    let (_keys, commands) = responder_respond_with_card_bytes(&parsed, responder_card).unwrap();
+    let commands = responder_respond_with_signed_card(&parsed, |_| responder_card.to_vec())
+        .unwrap()
+        .commands;
     // commands[0] = epk deposit (encrypted_card holds the raw public key),
     // commands[1] = encrypted card deposit.
     let epk = match &commands[0] {
@@ -170,21 +185,50 @@ fn relay_escrow_ready_on_unrelated_gate_is_noop() {
 
 // @internal
 #[test]
-fn link_opened_derives_keys_deposits_card_and_polls_escrow() {
+fn link_opened_derives_keys_and_waits_for_the_card_signed_for_this_exchange() {
+    let (mut session, url) = make_session(NOW + 300);
+    let _ = session.drain_pending_commands();
+    let (epk, _card) = responder_side(&url, b"responder card");
+    let parsed = parse_link_url(&url).unwrap();
+
+    session.apply_hardware_event(Event::LinkOpened {
+        peer_public_key: epk.clone(),
+    });
+
+    assert!(
+        matches!(session.current_state(), LinkInitiatorState::AwaitingCard),
+        "LinkOpened must wait for the signed card, got {:?}",
+        session.current_state()
+    );
+    assert_eq!(
+        session.binding(),
+        Some(&LinkExchangeBinding {
+            nonce: parsed.nonce,
+            initiator_epk: parsed.initiator_public_key,
+            responder_epk: epk.try_into().unwrap(),
+        })
+    );
+    assert!(
+        session.drain_pending_commands().is_empty(),
+        "nothing is deposited before the card is signed"
+    );
+    assert!(session.escrow_gate_bytes().is_some());
+}
+
+// @internal
+#[test]
+fn the_signed_card_is_deposited_and_the_escrow_gate_polled() {
     let (mut session, url) = make_session(NOW + 300);
     let _ = session.drain_pending_commands();
     let (epk, _card) = responder_side(&url, b"responder card");
 
-    session.apply_hardware_event(Event::LinkOpened {
-        peer_public_key: epk,
-    });
+    open(&mut session, epk);
 
     assert!(
         matches!(session.current_state(), LinkInitiatorState::Retrieving),
-        "LinkOpened must move to Retrieving, got {:?}",
+        "the deposited card must move to Retrieving, got {:?}",
         session.current_state()
     );
-
     let cmds = session.drain_pending_commands();
     let deposits = cmds
         .iter()
@@ -196,10 +240,22 @@ fn link_opened_derives_keys_deposits_card_and_polls_escrow() {
         .count();
     assert_eq!(deposits, 1, "expected 1 card deposit, got {deposits}");
     assert_eq!(checks, 1, "expected 1 escrow check, got {checks}");
-    assert!(
-        session.escrow_gate_bytes().is_some(),
-        "escrow keys must be derived after LinkOpened"
-    );
+}
+
+// @internal
+#[test]
+fn a_card_before_the_link_is_opened_is_ignored() {
+    let (mut session, _url) = make_session(NOW + 300);
+    let _ = session.drain_pending_commands();
+
+    session.deposit_card(OWN_CARD);
+
+    assert!(matches!(
+        session.current_state(),
+        LinkInitiatorState::Polling
+    ));
+    assert!(session.binding().is_none());
+    assert!(session.drain_pending_commands().is_empty());
 }
 
 // @internal
@@ -243,10 +299,8 @@ fn full_round_trip_finalizes_with_responder_card() {
     });
     let _ = session.drain_pending_commands();
 
-    // LinkOpened → derive keys + deposit our card + poll escrow.
-    session.apply_hardware_event(Event::LinkOpened {
-        peer_public_key: epk,
-    });
+    // LinkOpened → derive keys; the signed card → deposit + poll escrow.
+    open(&mut session, epk);
     let _ = session.drain_pending_commands();
     let escrow_gate = session.escrow_gate_bytes().expect("escrow gate");
 
@@ -286,9 +340,7 @@ fn blob_with_garbage_ciphertext_fails_decrypt() {
     let _ = session.drain_pending_commands();
     let (epk, _card) = responder_side(&url, b"card");
 
-    session.apply_hardware_event(Event::LinkOpened {
-        peer_public_key: epk,
-    });
+    open(&mut session, epk);
     let _ = session.drain_pending_commands();
     let escrow_gate = session.escrow_gate_bytes().unwrap();
 
@@ -385,9 +437,7 @@ fn finalized_is_terminal() {
     let responder_card = b"y";
     let (epk, card_blob) = responder_side(&url, responder_card);
 
-    session.apply_hardware_event(Event::LinkOpened {
-        peer_public_key: epk,
-    });
+    open(&mut session, epk);
     let _ = session.drain_pending_commands();
     let escrow_gate = session.escrow_gate_bytes().unwrap();
     session.apply_hardware_event(Event::RelayEscrowBlobReceived {
@@ -456,9 +506,7 @@ proptest::proptest! {
         let _ = session.drain_pending_commands();
         let (epk, card_blob) = responder_side(&url, &responder_card);
 
-        session.apply_hardware_event(Event::LinkOpened {
-            peer_public_key: epk,
-        });
+        open(&mut session, epk);
         let _ = session.drain_pending_commands();
         let escrow_gate = session.escrow_gate_bytes().unwrap();
         session.apply_hardware_event(Event::RelayEscrowBlobReceived {
@@ -564,9 +612,7 @@ fn only_our_escrow_gate_triggers_the_card_retrieve() {
     assert_eq!(session.share_url(), url);
     let _ = session.drain_pending_commands();
     let (epk, _card) = responder_side(&url, b"responder card");
-    session.apply_hardware_event(Event::LinkOpened {
-        peer_public_key: epk,
-    });
+    open(&mut session, epk);
     let _ = session.drain_pending_commands();
     let escrow_gate = session.escrow_gate_bytes().unwrap().to_vec();
 

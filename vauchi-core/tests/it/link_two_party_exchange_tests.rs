@@ -20,8 +20,15 @@ use crate::common;
 use common::helpers::create_vauchi_with_card;
 use vauchi_core::contact::statistics::compute_statistics;
 use vauchi_core::exchange::X3DHKeyPair;
-use vauchi_core::exchange::link_mode::serialize_card_payload_v2;
+use vauchi_core::exchange::link_mode::{LinkExchangeBinding, serialize_link_card_payload};
 use vauchi_core::{ContactField, ExchangeTransport, FieldType, Vauchi};
+
+/// The link and escrow handshake both sides share.
+const EXCHANGE: LinkExchangeBinding = LinkExchangeBinding {
+    nonce: [0x11; 32],
+    initiator_epk: [0x22; 32],
+    responder_epk: [0x33; 32],
+};
 
 /// Build the v2 bootstrap a side deposits, embedding its real own card so a
 /// later update has a meaningful baseline. Returns the payload, the retained
@@ -31,12 +38,12 @@ fn deposit_v2(v: &Vauchi, relay_url: &str) -> (Vec<u8>, X3DHKeyPair, [u8; 32]) {
     let identity_pubkey = *identity.signing_public_key();
     let x3dh = X3DHKeyPair::generate();
     let card = v.own_card().expect("own_card ok").expect("own card exists");
-    let payload = serialize_card_payload_v2(
-        &identity_pubkey,
+    let payload = serialize_link_card_payload(
         identity.signing_keypair(),
         x3dh.public_key(),
         relay_url,
         &card,
+        &EXCHANGE,
     );
     (payload, x3dh, identity_pubkey)
 }
@@ -52,10 +59,10 @@ fn link_exchange_yields_live_updatable_contacts_on_both_sides() {
 
     // Each side completes the peer's bootstrap via the real T5b path.
     let bob_in_alice = alice
-        .complete_link_exchange(&bob_payload, &alice_x3dh)
+        .complete_link_exchange(&bob_payload, &alice_x3dh, &EXCHANGE)
         .expect("alice completes bob's bootstrap");
     let alice_in_bob = bob
-        .complete_link_exchange(&alice_payload, &bob_x3dh)
+        .complete_link_exchange(&alice_payload, &bob_x3dh, &EXCHANGE)
         .expect("bob completes alice's bootstrap");
 
     // relay routing — not a frozen import.

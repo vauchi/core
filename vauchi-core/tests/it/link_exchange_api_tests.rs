@@ -124,6 +124,36 @@ fn accepting_your_own_link_never_completes_an_exchange_with_yourself() {
     assert!(alice.get_contact(&contact_id(&alice)).unwrap().is_none());
 }
 
+// Whoever opens a link first becomes the contact (S9); a second opener is
+// told the link was used instead of waiting out the deadline (#942).
+// @claim: S9
+// @internal
+#[test]
+fn a_second_person_opening_a_used_link_is_told_it_was_used() {
+    let mock = MockRelay::start();
+    mock.enable_escrow_store();
+    let (alice, _a) = user_at(&mock, "Alice");
+    let (bob, _b) = user_at(&mock, "Bob");
+    let (carol, _c) = user_at(&mock, "Carol");
+    let (link, mut alice_exchange) = alice.start_link_exchange().expect("share");
+    let mut bob_exchange = bob.accept_link_exchange(&link).expect("bob accepts");
+    advance_until_done([(&alice, &mut alice_exchange), (&bob, &mut bob_exchange)]);
+
+    let mut carol_exchange = carol.accept_link_exchange(&link).expect("carol accepts");
+    let progress = carol
+        .advance_link_exchange(&mut carol_exchange)
+        .expect("advance");
+
+    assert_eq!(
+        progress,
+        LinkExchangeProgress::Failed {
+            reason: "link_already_used".to_string()
+        }
+    );
+    assert!(carol.list_contacts().unwrap().is_empty());
+    assert!(alice.get_contact(&contact_id(&carol)).unwrap().is_none());
+}
+
 // AppEngine holds a consented, parsed link rather than its text.
 // @internal
 #[test]

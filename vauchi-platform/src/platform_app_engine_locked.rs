@@ -154,6 +154,19 @@ impl PlatformAppEngine {
             .map(|start| start.presentation.initial_commands()))
     }
 
+    /// Commands queued for the hardware shell by the lock screen, or by the
+    /// engine a retry just opened (ADR-077).
+    pub(crate) fn drain_hardware_after_locked(&self) -> Result<Vec<Command>, MobileError> {
+        if let Some(start) = self.lock_locked_start()?.as_mut() {
+            return Ok(start.presentation.drain_hardware_commands());
+        }
+        let mut engine_slot = self.lock_engine()?;
+        Ok(engine_slot
+            .as_mut()
+            .map(|engine| engine.drain_hardware_commands())
+            .unwrap_or_default())
+    }
+
     /// Core's answer to undecodable event JSON while locked, or `None`.
     pub(crate) fn locked_reject_event_json(
         &self,
@@ -229,10 +242,19 @@ impl PlatformAppEngine {
                             detail: "Failed to apply the reported environment".into(),
                         })?;
                 }
-                let commands = engine.initial_commands().map_err(|e| MobileError::Other {
+                let mut commands = Vec::new();
+                if let Some(capabilities) = start.presentation.hardware_report().cloned() {
+                    commands.extend(
+                        engine
+                            .dispatch(Event::HardwareCapabilitiesReported { capabilities })
+                            .map_err(|_| MobileError::Other {
+                                detail: "Failed to attach the hardware shell".into(),
+                            })?,
+                    );
+                }
+                commands.extend(engine.initial_commands().map_err(|e| MobileError::Other {
                     detail: format!("Failed to compose initial presentation: {e}"),
-                })?;
-                let mut commands = commands;
+                })?);
                 if prompt_succeeded {
                     commands.extend(engine.dispatch(Event::BiometricUnlockSucceeded).map_err(
                         |_| MobileError::Other {
@@ -240,13 +262,12 @@ impl PlatformAppEngine {
                         },
                     )?);
                 }
-                commands.extend(
-                    start
-                        .params
-                        .release_handle
-                        .take()
-                        .map(|handle| Command::ForgetStoredSecret { handle }),
-                );
+                let release = start
+                    .params
+                    .release_handle
+                    .take()
+                    .map(|handle| Command::ForgetStoredSecret { handle });
+                commands.extend(engine.route_to_shells(release.into_iter().collect()));
                 *self.lock_engine()? = Some(engine);
                 *locked = None;
                 if let Some(listener) = pending.listener {

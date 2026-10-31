@@ -21,7 +21,11 @@ impl AppEngine {
         self.hardware_route.attach(capabilities);
     }
 
-    pub(super) fn route_to_shells(&mut self, commands: Vec<Command>) -> Vec<Command> {
+    /// Splits `commands` the way Core's own batches are split: once a hardware
+    /// shell is attached, hardware commands are queued for
+    /// [`Self::drain_hardware_commands`]. Bindings route commands they add to a
+    /// batch, such as a keychain release, through it.
+    pub fn route_to_shells(&mut self, commands: Vec<Command>) -> Vec<Command> {
         self.hardware_route.route(commands)
     }
 }

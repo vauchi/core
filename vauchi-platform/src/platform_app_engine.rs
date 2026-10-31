@@ -392,17 +392,21 @@ impl PlatformAppEngine {
     /// Return Core's complete initial presentation command batch.
     pub fn initial_commands_json(&self) -> Result<String, MobileError> {
         if let Some(commands) = self.locked_initial_commands()? {
-            return commands_envelope_to_json(&commands);
+            return crate::json_helpers::batch_to_json(
+                &commands,
+                &self.drain_hardware_after_locked()?,
+            );
         }
+        let release: Vec<_> = self.take_release()?.into_iter().collect();
         let mut engine_slot = self.lock_engine()?;
         let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
         self_heal_post_auth(engine);
         let mut commands = engine.initial_commands().map_err(|e| MobileError::Other {
             detail: format!("Failed to compose initial presentation: {e}"),
         })?;
+        commands.extend(engine.route_to_shells(release));
         let hardware = engine.drain_hardware_commands();
         drop(engine_slot);
-        commands.extend(self.take_release()?);
         crate::json_helpers::batch_to_json(&commands, &hardware)
     }
 
@@ -428,7 +432,10 @@ impl PlatformAppEngine {
             }
         };
         if let Some(commands) = self.locked_dispatch(event.clone())? {
-            return commands_envelope_to_json(&commands);
+            return crate::json_helpers::batch_to_json(
+                &commands,
+                &self.drain_hardware_after_locked()?,
+            );
         }
         let (commands, hardware, fire_invalidation, wanted_changed) = {
             let mut engine_slot = self.lock_engine()?;

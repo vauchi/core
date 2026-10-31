@@ -37,7 +37,8 @@
 # Include shared templates
 include:
   - project: 'vauchi/scripts'
-    # Pin the commit because tags are not protected.
+    # Pin the commit: ci-templates tags are protected and cut by the
+    # maintainer; a SHA needs none (private#994).
     ref: 782f67d05b33d1113b3f0c6cabf8faadb902b9d9
     file:
       - '/ci-templates/rust-base.yml'

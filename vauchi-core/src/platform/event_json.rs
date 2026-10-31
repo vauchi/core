@@ -20,6 +20,9 @@ const MAX_EVENT_ENVELOPE_BYTES: usize = 4 * 1024;
 pub const MAX_EVENT_JSON_NESTING_DEPTH: usize = 16;
 /// Maximum raw text or choice value accepted from a presented input.
 pub const MAX_EVENT_INPUT_VALUE_BYTES: usize = 4 * 1024;
+/// A hardware shell's device name becomes the default name of a device
+/// joining an identity; OS model names stay well inside this.
+const MAX_DEVICE_NAME_BYTES: usize = 256;
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum EventJsonError {
@@ -61,6 +64,14 @@ fn validate_event(event: &Event) -> Result<(), EventJsonError> {
         {
             return Err(EventJsonError::TooLarge);
         }
+    }
+    if let Event::HardwareCapabilitiesReported { capabilities } = event
+        && capabilities
+            .device_name
+            .as_ref()
+            .is_some_and(|name| name.len() > MAX_DEVICE_NAME_BYTES)
+    {
+        return Err(EventJsonError::Malformed);
     }
     if let Event::ValueChanged { value, .. } = event {
         let value_length = match value {

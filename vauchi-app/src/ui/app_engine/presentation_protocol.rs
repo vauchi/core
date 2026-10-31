@@ -139,7 +139,7 @@ impl AppEngine {
         let mut commands = self.surface_commands(&screen)?;
         commands.extend(self.reopened_overlay(&commands));
         commands.extend(self.drain_pending_commands());
-        Ok(commands)
+        Ok(self.route_to_shells(commands))
     }
 
     /// The overlay Core still records as open, re-presented on top of a
@@ -182,10 +182,15 @@ impl AppEngine {
             return Ok(self.drain_pending_commands());
         };
         let commands = self.dispatch_event(event)?;
-        Ok(self.correlate_file_commands(commands))
+        let commands = self.correlate_file_commands(commands);
+        Ok(self.route_to_shells(commands))
     }
 
     fn dispatch_event(&mut self, event: Event) -> Result<Vec<Command>, AppPresentationError> {
+        if let Event::HardwareCapabilitiesReported { capabilities } = event {
+            self.attach_hardware_shell(capabilities);
+            return Ok(self.drain_pending_commands());
+        }
         if let Event::ApplicationMenuAvailabilityChanged { available } = event {
             return self.set_application_menu_available(available);
         }

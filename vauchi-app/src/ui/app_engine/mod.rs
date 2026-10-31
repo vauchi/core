@@ -20,6 +20,7 @@ mod completion_forms;
 mod contact_visibility_view;
 mod glance;
 mod handover;
+mod hardware_routing;
 #[cfg(any(test, feature = "testing"))]
 mod test_hooks;
 mod wakeup;
@@ -187,6 +188,7 @@ pub struct AppEngine {
     /// (brightness, idle timer, future orientation lock, haptics).
     /// Phase 2b of `2026-05-04-exchange-command-screen-presentation`.
     pending_commands: std::collections::VecDeque<vauchi_core::Command>,
+    hardware_route: hardware_routing::HardwareRoute,
     /// Where Core keeps the pick, once a shell names its data directory.
     kept_state_file: Option<crate::ui::restorable_state::KeptStateFile>,
     /// Contact id awaiting an `Event::LocationResult` after an exchange
@@ -584,6 +586,7 @@ impl AppEngine {
             network_online: true,
             sync_chrome_status: SyncChromeStatus::Idle,
             pending_commands: std::collections::VecDeque::new(),
+            hardware_route: hardware_routing::HardwareRoute::default(),
             kept_state_file: None,
             pending_location_contact: None,
             legacy_exchange_persisted: None,
@@ -634,7 +637,8 @@ impl AppEngine {
     /// commands that core has emitted in response to screen transitions.
     pub fn drain_pending_commands(&mut self) -> Vec<vauchi_core::Command> {
         let commands = self.pending_commands.drain(..).collect();
-        self.correlate_file_commands(commands)
+        let commands = self.correlate_file_commands(commands);
+        self.route_to_shells(commands)
     }
 
     /// New themes took effect: the next batch asks the shell, once, to

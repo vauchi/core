@@ -115,17 +115,20 @@ fn after_the_report_hardware_commands_leave_the_display_batch() {
 fn after_the_report_the_initial_batch_holds_display_commands_only() {
     let mut engine = engine();
     attach(&mut engine);
-    wakeup(&mut engine);
-    engine.drain_hardware_commands();
+    engine.extend_pending_commands([Command::BleStopScanning, Command::ReloadTheme]);
 
     let initial = engine.initial_commands().unwrap();
 
-    assert!(!initial.is_empty());
+    assert!(initial.contains(&Command::ReloadTheme));
     assert!(
         targets(&initial)
             .iter()
             .all(|t| *t == CommandTarget::Display),
         "initial batch carried {initial:?}"
+    );
+    assert_eq!(
+        engine.drain_hardware_commands(),
+        vec![Command::BleStopScanning]
     );
 }
 

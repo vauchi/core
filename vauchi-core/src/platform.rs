@@ -1153,6 +1153,12 @@ pub enum Event {
         request_id: String,
         outcome: FilePickOutcome,
     },
+    /// The OS's hardware shell reports what the device can do (ADR-077).
+    /// Its report attaches it: Core then delivers hardware commands to the
+    /// hardware shell instead of the display shell.
+    HardwareCapabilitiesReported {
+        capabilities: crate::exchange_types::DeviceCapabilities,
+    },
 }
 
 // INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access

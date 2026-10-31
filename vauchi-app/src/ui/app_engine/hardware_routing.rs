@@ -16,6 +16,28 @@ impl AppEngine {
         self.hardware_route.drain()
     }
 
+    /// The display shell asks; the hardware shell shows no UI (ADR-077).
+    pub(super) fn permission_required(&mut self, transport: String) -> Vec<Command> {
+        self.pending_commands
+            .push_back(Command::RequestPermission { transport });
+        self.drain_pending_commands()
+    }
+
+    /// The person granted what [`Command::RequestPermission`] asked for: the
+    /// ledger re-learns it as the grant affordance does, and the current
+    /// screen is composed again so the transport is offered.
+    pub(super) fn permission_granted(
+        &mut self,
+        transport: &str,
+    ) -> Result<Vec<Command>, super::presentation_protocol::AppPresentationError> {
+        if let Some(requirement) = crate::ui::exchange::mode_selection::parse_requirement(transport)
+        {
+            self.transport_readiness.note_granted(requirement);
+            self.rebuild_exchange_engine();
+        }
+        self.initial_commands()
+    }
+
     pub(super) fn attach_hardware_shell(&mut self, capabilities: DeviceCapabilities) {
         self.set_device_capabilities(capabilities.clone());
         self.hardware_route.attach(capabilities);

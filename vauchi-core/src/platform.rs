@@ -514,6 +514,11 @@ pub enum Command {
     },
     /// Dismiss the picker and discard work for this opaque operation id.
     CancelFilePick { request_id: String },
+    /// Ask the person for the OS permission `transport` needs (ADR-077): the
+    /// hardware shell reported [`Event::PermissionRequired`], and a prompt is
+    /// display work. Answer [`Event::PermissionGranted`] or
+    /// [`Event::PermissionDenied`].
+    RequestPermission { transport: String },
 }
 
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -775,6 +780,7 @@ impl Command {
             Self::SetApplicationMenu { .. } => "SetApplicationMenu",
             Self::PickFile { .. } => "PickFile",
             Self::CancelFilePick { .. } => "CancelFilePick",
+            Self::RequestPermission { .. } => "RequestPermission",
             Self::SetNavigation { .. } => "SetNavigation",
             Self::PresentOverlay { .. } => "PresentOverlay",
             Self::DismissOverlay { .. } => "DismissOverlay",
@@ -1159,6 +1165,12 @@ pub enum Event {
     HardwareCapabilitiesReported {
         capabilities: crate::exchange_types::DeviceCapabilities,
     },
+    /// The hardware shell needs the person's OS permission for `transport`
+    /// before it can run a command (ADR-077); Core has the display shell ask.
+    PermissionRequired { transport: String },
+    /// The person granted the permission a [`Command::RequestPermission`]
+    /// asked for.
+    PermissionGranted { transport: String },
 }
 
 // INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access

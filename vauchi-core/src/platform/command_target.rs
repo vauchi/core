@@ -86,7 +86,8 @@ impl Command {
             | Self::ReloadTheme
             | Self::SetApplicationMenu { .. }
             | Self::PickFile { .. }
-            | Self::CancelFilePick { .. } => CommandTarget::Display,
+            | Self::CancelFilePick { .. }
+            | Self::RequestPermission { .. } => CommandTarget::Display,
         }
     }
 }

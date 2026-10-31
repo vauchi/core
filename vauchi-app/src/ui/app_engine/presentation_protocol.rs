@@ -191,6 +191,12 @@ impl AppEngine {
             self.attach_hardware_shell(capabilities);
             return Ok(self.drain_pending_commands());
         }
+        if let Event::PermissionRequired { transport } = event {
+            return Ok(self.permission_required(transport));
+        }
+        if let Event::PermissionGranted { transport } = &event {
+            return self.permission_granted(transport);
+        }
         if let Event::ApplicationMenuAvailabilityChanged { available } = event {
             return self.set_application_menu_available(available);
         }

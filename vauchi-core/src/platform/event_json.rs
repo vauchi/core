@@ -23,6 +23,8 @@ pub const MAX_EVENT_INPUT_VALUE_BYTES: usize = 4 * 1024;
 /// A hardware shell's device name becomes the default name of a device
 /// joining an identity; OS model names stay well inside this.
 const MAX_DEVICE_NAME_BYTES: usize = 256;
+/// Transport names are short tokens Core knows ("ble", "camera").
+const MAX_TRANSPORT_NAME_BYTES: usize = 64;
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum EventJsonError {
@@ -70,6 +72,11 @@ fn validate_event(event: &Event) -> Result<(), EventJsonError> {
             .device_name
             .as_ref()
             .is_some_and(|name| name.len() > MAX_DEVICE_NAME_BYTES)
+    {
+        return Err(EventJsonError::Malformed);
+    }
+    if let Event::PermissionRequired { transport } | Event::PermissionGranted { transport } = event
+        && transport.len() > MAX_TRANSPORT_NAME_BYTES
     {
         return Err(EventJsonError::Malformed);
     }

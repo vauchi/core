@@ -169,6 +169,9 @@ fn display_commands() -> Vec<Command> {
         Command::PerformNativeBack,
         Command::ResetApplication,
         Command::ReloadTheme,
+        Command::RequestPermission {
+            transport: "ble".into(),
+        },
     ]
 }
 

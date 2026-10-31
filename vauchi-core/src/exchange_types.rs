@@ -186,6 +186,7 @@ pub enum Platform {
 mod capability_tests {
     use super::*;
 
+    // @internal
     #[test]
     fn new_fields_default_to_false() {
         let caps = DeviceCapabilities::default();
@@ -196,6 +197,7 @@ mod capability_tests {
         assert!(!caps.has_internet, "has_internet should default to false");
     }
 
+    // @internal
     #[test]
     fn backward_compat_deserialize_without_new_fields() {
         // Old JSON that was serialized before these fields were added.
@@ -210,6 +212,7 @@ mod capability_tests {
         assert!(caps.has_nfc, "existing field must still be true");
     }
 
+    // @internal
     #[test]
     fn roundtrip_with_new_fields() {
         let caps = DeviceCapabilities {

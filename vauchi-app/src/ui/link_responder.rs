@@ -34,8 +34,8 @@ enum ResponderTerminal {
     /// The sender's card was retrieved and persisted by core.
     Completed,
     /// The flow failed. `reason` is the stable `LinkResponder` failure
-    /// id (`polling_timed_out` / `deposit_rejected` / `decrypt_error` /
-    /// `cancelled`).
+    /// id (`polling_timed_out` / `deposit_rejected` / `link_already_used` /
+    /// `decrypt_error` / `cancelled`).
     Failed { reason: String },
 }
 
@@ -227,6 +227,7 @@ fn failure_detail(reason: &str, locale: Locale) -> String {
     let key = match reason {
         "polling_timed_out" => "link_responder.failure_timed_out",
         "deposit_rejected" => "link_responder.failure_rejected",
+        "link_already_used" => "link_responder.failure_link_already_used",
         "decrypt_error" => "link_responder.failure_decrypt_error",
         "self_exchange" => "link_responder.failure_self_exchange",
         "contact_limit" => "link_responder.failure_contact_limit",

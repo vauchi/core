@@ -166,13 +166,15 @@ impl Vauchi {
     }
 
     /// Complete a link-mode exchange from a received card payload (ADR-050
-    /// Phase 2, T5b). For a **v2** symmetric bootstrap this establishes a
-    /// *live, updatable* `Exchanged` contact: it derives the symmetric link
+    /// Phase 2, T5b), which must be signed for `binding`, the exchange this
+    /// side took part in (#942). This establishes a *live, updatable*
+    /// `Exchanged` contact: it derives the symmetric link
     /// shared key from `our_x3dh` (the retained per-exchange keypair whose
     /// public half we deposited) and the peer's signed X3DH key, saves the
     /// contact with `ExchangeTransport::Link` + the peer's relay routing,
     /// and initializes the Double Ratchet with a deterministic role. A
-    /// **v1** payload is refused (vauchi/private#574).
+    /// retired payload version (v1, vauchi/private#574; v2, #942) is
+    /// refused.
     ///
     /// **Ratchet role:** the smaller identity key is the initiator — the
     /// same rule as in-person exchange
@@ -191,13 +193,14 @@ impl Vauchi {
         &self,
         card_bytes: &[u8],
         our_x3dh: &crate::exchange::X3DHKeyPair,
+        binding: &crate::exchange::link_mode::LinkExchangeBinding,
     ) -> VauchiResult<String> {
         use crate::exchange::ExchangeError;
         use crate::exchange::link_mode::{
-            LinkCardPayload, derive_link_shared_key, parse_card_payload_versioned,
+            LinkCardPayload, derive_link_shared_key, parse_link_card_payload,
         };
 
-        let payload = parse_card_payload_versioned(card_bytes)
+        let payload = parse_link_card_payload(card_bytes, binding)
             .map_err(|e| VauchiError::Exchange(ExchangeError::InvalidState(e.to_string())))?;
 
         let LinkCardPayload {

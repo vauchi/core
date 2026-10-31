@@ -22,7 +22,7 @@
 //! See `_private/docs/problems/2026-04-27-deep-link-responder-flow/`
 //! for the full design + risk register.
 
-use crate::exchange::escrow::EscrowKeys;
+use crate::exchange::escrow::{EscrowKeys, SLOT_TAKEN_REASON};
 use crate::exchange::link_mode::{LinkModeError, responder_complete};
 use crate::platform::{Command, Event};
 
@@ -53,6 +53,9 @@ pub enum LinkResponderFailureReason {
     /// was already written (the same user re-opened a link they had
     /// previously accepted).
     DepositRejected,
+    /// Our epk deposit found the link's epk slot taken: the link was opened
+    /// before, by someone else (who became the contact, S9) or by us.
+    LinkAlreadyUsed,
     /// User-initiated cancel via the Polling screen's Cancel action
     /// (or the engine's `Drop` impl on navigate-back).
     Cancelled,
@@ -88,6 +91,8 @@ pub struct LinkResponderSession {
     /// time, so per-event comparisons are O(32) byte equality rather
     /// than re-decoding the hex string.
     gate_hash_bytes: Vec<u8>,
+    /// The link's handshake gate, where our epk is deposited.
+    handshake_gate: Vec<u8>,
     /// Commands queued for `drain_pending_commands`. One-shot per call.
     pending: Vec<Command>,
 }
@@ -95,15 +100,20 @@ pub struct LinkResponderSession {
 impl LinkResponderSession {
     /// Construct a new responder session.
     ///
-    /// `keys` and `deposit_commands` come from `responder_respond`
-    /// (link_mode.rs). The session adds a `RelayEscrowCheck` so the
+    /// `keys`, `handshake_gate` and `deposit_commands` come from
+    /// `responder_respond_with_signed_card` (link_mode.rs). The session adds a `RelayEscrowCheck` so the
     /// relay starts watching the gate; the cycle thread drains all
     /// three commands on the first call to `drain_pending_commands`.
     ///
     /// `poll_deadline_unix` is the unix-seconds time after which the
     /// session transitions to `Failed(PollingTimedOut)` if no
     /// `RelayEscrowReady` event has arrived.
-    pub fn new(keys: EscrowKeys, deposit_commands: Vec<Command>, poll_deadline_unix: u64) -> Self {
+    pub fn new(
+        keys: EscrowKeys,
+        handshake_gate: Vec<u8>,
+        deposit_commands: Vec<Command>,
+        poll_deadline_unix: u64,
+    ) -> Self {
         let gate_hash_bytes =
             hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid");
 
@@ -120,6 +130,7 @@ impl LinkResponderSession {
             keys,
             poll_deadline_unix,
             gate_hash_bytes,
+            handshake_gate,
             pending,
         }
     }
@@ -152,11 +163,12 @@ impl LinkResponderSession {
                     self.transition_to_retrieving();
                 }
             }
-            Event::RelayEscrowFailed { gate_hash, .. } => {
-                if gate_hash != self.gate_hash_bytes {
-                    return;
+            Event::RelayEscrowFailed { gate_hash, reason } => {
+                if gate_hash == self.handshake_gate && reason == SLOT_TAKEN_REASON {
+                    self.fail(LinkResponderFailureReason::LinkAlreadyUsed);
+                } else if gate_hash == self.gate_hash_bytes || gate_hash == self.handshake_gate {
+                    self.fail(LinkResponderFailureReason::DepositRejected);
                 }
-                self.fail(LinkResponderFailureReason::DepositRejected);
             }
             Event::RelayEscrowBlobReceived { gate_hash, blob } => {
                 if gate_hash != self.gate_hash_bytes {

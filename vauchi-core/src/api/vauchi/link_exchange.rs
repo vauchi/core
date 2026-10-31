@@ -17,8 +17,8 @@ use crate::exchange::link_initiator::{
     LinkInitiatorFailureReason, LinkInitiatorSession, LinkInitiatorState,
 };
 use crate::exchange::link_mode::{
-    initiator_generate_named, parse_exchange_deep_link, responder_respond_with_card_bytes,
-    serialize_card_payload_v2,
+    LinkExchangeBinding, initiator_generate_named, parse_exchange_deep_link,
+    responder_respond_with_signed_card, serialize_link_card_payload,
 };
 use crate::exchange::link_responder::{
     LinkResponderFailureReason, LinkResponderSession, LinkResponderState,
@@ -35,12 +35,18 @@ pub struct LinkExchange {
     /// Fresh per exchange: its public half is signed into our bootstrap,
     /// its secret completes the exchange (ADR-050).
     x3dh: X3DHKeyPair,
+    /// Our card as it was when the exchange started; the initiator signs it
+    /// only once the responder's epk is known (#942).
+    card: ContactCard,
+    /// The responder's binding, known from the start; the initiator's comes
+    /// from its session.
+    responder_binding: Option<LinkExchangeBinding>,
     finished: Option<LinkExchangeProgress>,
 }
 
 enum Role {
-    Initiator(LinkInitiatorSession),
-    Responder(LinkResponderSession),
+    Initiator(Box<LinkInitiatorSession>),
+    Responder(Box<LinkResponderSession>),
 }
 
 /// Where a link-mode exchange stands after an advance.
@@ -78,7 +84,7 @@ impl Vauchi {
     /// and the exchange to advance.
     pub fn start_link_exchange(&self) -> VauchiResult<(String, LinkExchange)> {
         let x3dh = X3DHKeyPair::generate();
-        let card_bytes = self.link_card_bytes(x3dh.public_key())?;
+        let card = self.link_card()?;
         let display_name = self
             .identity()
             .map(|identity| identity.display_name().to_string())
@@ -86,12 +92,14 @@ impl Vauchi {
         let (initiation, presence) = initiator_generate_named(&display_name);
         let link = initiation.url.clone();
         let deadline = self.clock().unix_seconds() + LINK_EXCHANGE_DEADLINE_SECS;
-        let session = LinkInitiatorSession::new(initiation, presence, card_bytes, deadline);
+        let session = LinkInitiatorSession::new(initiation, presence, deadline);
         Ok((
             link,
             LinkExchange {
-                role: Role::Initiator(session),
+                role: Role::Initiator(Box::new(session)),
                 x3dh,
+                card,
+                responder_binding: None,
                 finished: None,
             },
         ))
@@ -110,13 +118,31 @@ impl Vauchi {
         payload: &crate::exchange::link_mode::DeepLinkPayload,
     ) -> VauchiResult<LinkExchange> {
         let x3dh = X3DHKeyPair::generate();
-        let card_bytes = self.link_card_bytes(x3dh.public_key())?;
-        let (keys, deposits) = responder_respond_with_card_bytes(payload.as_parsed(), &card_bytes)
-            .map_err(|e| VauchiError::InvalidState(format!("link exchange: {e}")))?;
+        let card = self.link_card()?;
+        let identity = self
+            .identity()
+            .ok_or_else(|| VauchiError::InvalidState("no identity".into()))?;
+        let response = responder_respond_with_signed_card(payload.as_parsed(), |binding| {
+            serialize_link_card_payload(
+                identity.signing_keypair(),
+                x3dh.public_key(),
+                self.relay_server_url(),
+                &card,
+                binding,
+            )
+        })
+        .map_err(|e| VauchiError::InvalidState(format!("link exchange: {e}")))?;
         let deadline = self.clock().unix_seconds() + LINK_EXCHANGE_DEADLINE_SECS;
         Ok(LinkExchange {
-            role: Role::Responder(LinkResponderSession::new(keys, deposits, deadline)),
+            role: Role::Responder(Box::new(LinkResponderSession::new(
+                response.keys,
+                response.handshake_gate,
+                response.commands,
+                deadline,
+            ))),
             x3dh,
+            card,
+            responder_binding: Some(response.binding),
             finished: None,
         })
     }
@@ -131,7 +157,7 @@ impl Vauchi {
         if let Some(done) = &exchange.finished {
             return Ok(done.clone());
         }
-        self.apply_and_follow(&mut exchange.role, event);
+        self.apply_and_follow(exchange, event);
         Ok(self.settle(exchange))
     }
 
@@ -149,13 +175,18 @@ impl Vauchi {
             Role::Responder(session) => session.drain_pending_commands(),
         };
         for command in queued {
-            self.run_and_feed(&mut exchange.role, &command);
+            // A failed deposit ends the exchange; the rest of the batch
+            // (our encrypted card) must not reach the relay after it.
+            if !matches!(outcome(&exchange.role), Outcome::Waiting) {
+                break;
+            }
+            self.run_and_feed(exchange, &command);
         }
         // The machines queue a Check only on a transition; poll the gate
         // they are watching once per advance.
         if let Some(gate_hash) = watched_gate(&exchange.role) {
             self.run_and_feed(
-                &mut exchange.role,
+                exchange,
                 &Command::RelayEscrowCheck {
                     gate_hash,
                     suggested_interval_ms: 0,
@@ -176,51 +207,51 @@ impl Vauchi {
     fn settle(&self, exchange: &mut LinkExchange) -> LinkExchangeProgress {
         let progress = match outcome(&exchange.role) {
             Outcome::Waiting => return LinkExchangeProgress::Waiting,
-            Outcome::Finalized(card_bytes) => {
-                match self.complete_link_exchange(&card_bytes, &exchange.x3dh) {
-                    Ok(contact_id) => LinkExchangeProgress::Completed { contact_id },
-                    Err(error) => LinkExchangeProgress::Failed {
-                        reason: completion_failure(&error),
-                    },
+            Outcome::Finalized(card_bytes) => match binding(exchange) {
+                Some(binding) => {
+                    match self.complete_link_exchange(&card_bytes, &exchange.x3dh, &binding) {
+                        Ok(contact_id) => LinkExchangeProgress::Completed { contact_id },
+                        Err(error) => LinkExchangeProgress::Failed {
+                            reason: completion_failure(&error),
+                        },
+                    }
                 }
-            }
+                None => LinkExchangeProgress::Failed {
+                    reason: "completion_failed".to_string(),
+                },
+            },
             Outcome::Failed(reason) => LinkExchangeProgress::Failed { reason },
         };
         exchange.finished = Some(progress.clone());
         progress
     }
 
-    /// Our signed v2 bootstrap (ADR-050): card, identity signature over the
-    /// exchange key, and our relay routing.
-    fn link_card_bytes(&self, x3dh_pubkey: &[u8; 32]) -> VauchiResult<Vec<u8>> {
+    /// The card our bootstrap carries: our own card, or a bare one with our
+    /// display name.
+    fn link_card(&self) -> VauchiResult<ContactCard> {
         let identity = self
             .identity()
             .ok_or_else(|| VauchiError::InvalidState("no identity".into()))?;
-        let card = match self.own_card()? {
+        Ok(match self.own_card()? {
             Some(card) => card,
             None => ContactCard::new(identity.display_name()),
-        };
-        Ok(serialize_card_payload_v2(
-            identity.signing_public_key(),
-            identity.signing_keypair(),
-            x3dh_pubkey,
-            self.relay_server_url(),
-            &card,
-        ))
+        })
     }
 
     /// Run one escrow command, feed its event to the machine, and run the
     /// follow-ups it queues. The initiator's handshake-gate blob is the
     /// responder's ephemeral key, which it takes as `LinkOpened`.
-    fn run_and_feed(&self, role: &mut Role, command: &Command) {
+    fn run_and_feed(&self, exchange: &mut LinkExchange, command: &Command) {
         if let Some(event) = self.run_escrow_command(command) {
-            self.apply_and_follow(role, event);
+            self.apply_and_follow(exchange, event);
         }
     }
 
-    /// Apply one event to the machine and run the follow-ups it queues.
-    fn apply_and_follow(&self, role: &mut Role, mut event: Event) {
-        let follow_ups = match role {
+    /// Apply one event to the machine and run the follow-ups it queues. An
+    /// initiator that has just learned the responder's epk gets our card
+    /// signed for the exchange binding (#942).
+    fn apply_and_follow(&self, exchange: &mut LinkExchange, mut event: Event) {
+        let follow_ups = match &mut exchange.role {
             Role::Initiator(session) => {
                 if let Event::RelayEscrowBlobReceived { gate_hash, blob } = &event
                     && *gate_hash == session.handshake_gate_bytes()
@@ -230,6 +261,22 @@ impl Vauchi {
                     };
                 }
                 session.apply_hardware_event(event);
+                if let Some(binding) = session.binding().copied()
+                    && matches!(session.current_state(), LinkInitiatorState::AwaitingCard)
+                {
+                    match self.identity() {
+                        Some(identity) => session.deposit_card(&serialize_link_card_payload(
+                            identity.signing_keypair(),
+                            exchange.x3dh.public_key(),
+                            self.relay_server_url(),
+                            &exchange.card,
+                            &binding,
+                        )),
+                        // The identity was removed mid-exchange: nothing can
+                        // sign our card, so the exchange ends here.
+                        None => session.cancel(),
+                    }
+                }
                 session.drain_pending_commands()
             }
             Role::Responder(session) => {
@@ -238,8 +285,16 @@ impl Vauchi {
             }
         };
         for command in follow_ups {
-            self.run_and_feed(role, &command);
+            self.run_and_feed(exchange, &command);
         }
+    }
+}
+
+/// The exchange both cards are signed for, once it is known.
+fn binding(exchange: &LinkExchange) -> Option<LinkExchangeBinding> {
+    match &exchange.role {
+        Role::Initiator(session) => session.binding().copied(),
+        Role::Responder(_) => exchange.responder_binding,
     }
 }
 
@@ -291,6 +346,7 @@ fn responder_failure(reason: &LinkResponderFailureReason) -> String {
     match reason {
         LinkResponderFailureReason::PollingTimedOut => "polling_timed_out",
         LinkResponderFailureReason::DepositRejected => "deposit_rejected",
+        LinkResponderFailureReason::LinkAlreadyUsed => "link_already_used",
         LinkResponderFailureReason::DecryptError { .. } => "decrypt_error",
         LinkResponderFailureReason::Cancelled => "cancelled",
     }

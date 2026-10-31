@@ -24,8 +24,10 @@
 //!    slots and [`crate::platform::Event::RelayEscrowReady`] fires for
 //!    the handshake gate; the session retrieves the responder's epk.
 //! 2. **Escrow gate.** On [`crate::platform::Event::LinkOpened`] (the
-//!    retrieved epk) the session performs ECDH, derives
-//!    [`EscrowKeys`], encrypts the initiator's card, deposits it, and
+//!    retrieved epk) the session performs ECDH, derives [`EscrowKeys`]
+//!    and the [`LinkExchangeBinding`], and waits for the engine to sign
+//!    the initiator's card for that binding (#942).
+//!    [`LinkInitiatorSession::deposit_card`] encrypts and deposits it and
 //!    starts polling the escrow gate. `RelayEscrowReady` for the escrow
 //!    gate triggers retrieval of the responder's card, and
 //!    [`crate::platform::Event::RelayEscrowBlobReceived`] decrypts it to
@@ -42,7 +44,7 @@
 //! See `_private/docs/problems/2026-05-11-link-exchange-engine-graduation/`.
 
 use crate::exchange::escrow::EscrowKeys;
-use crate::exchange::link_mode::{self, LinkInitiation, LinkModeError};
+use crate::exchange::link_mode::{self, LinkExchangeBinding, LinkInitiation, LinkModeError};
 use crate::platform::{Command, Event};
 
 /// Polling interval (ms) the initiator suggests to the relay for the
@@ -79,7 +81,10 @@ pub enum LinkInitiatorState {
     /// the link, deposit its epk, and for the handshake gate to be
     /// retrieved + ECDH to complete.
     Polling,
-    /// ECDH complete, our card deposited; waiting for the responder's
+    /// ECDH complete; waiting for our card signed for the exchange binding,
+    /// which needs the responder's epk and so cannot be signed earlier.
+    AwaitingCard,
+    /// Our card deposited; waiting for the responder's
     /// encrypted card on the escrow gate, then retrieving + decrypting.
     Retrieving,
     /// Responder's card retrieved + decrypted; carries the plaintext
@@ -94,12 +99,12 @@ pub struct LinkInitiatorSession {
     state: LinkInitiatorState,
     /// Initiation data (URL, ephemeral secret, handshake/presence slots).
     initiation: LinkInitiation,
-    /// The initiator's own framed card payload (`serialize_card_payload`
-    /// output) to encrypt + deposit once ECDH completes.
-    own_card_bytes: Vec<u8>,
     /// Escrow keys derived after ECDH with the responder. `None` until
     /// [`Event::LinkOpened`] is processed.
     escrow_keys: Option<EscrowKeys>,
+    /// The exchange both cards are signed for. `None` until
+    /// [`Event::LinkOpened`] is processed.
+    binding: Option<LinkExchangeBinding>,
     /// Decoded handshake-gate bytes, cached so per-event comparisons are
     /// O(32) byte equality.
     handshake_gate_bytes: Vec<u8>,
@@ -116,9 +121,8 @@ impl LinkInitiatorSession {
     /// `initiation` and `presence_commands` come from
     /// [`link_mode::initiator_generate`]; the presence deposit must
     /// reach the relay before the URL is shared, so the session queues
-    /// `presence_commands` as its initial drain. `own_card_bytes` is the
-    /// framed payload ([`link_mode::serialize_card_payload`]) the
-    /// initiator will encrypt and deposit once ECDH completes.
+    /// `presence_commands` as its initial drain. The initiator's card is
+    /// handed over later, through [`Self::deposit_card`].
     ///
     /// `poll_deadline_unix` is the unix-seconds time after which the
     /// session transitions to `Failed(PollingTimedOut)` if it has not
@@ -126,7 +130,6 @@ impl LinkInitiatorSession {
     pub fn new(
         initiation: LinkInitiation,
         presence_commands: Vec<Command>,
-        own_card_bytes: Vec<u8>,
         poll_deadline_unix: u64,
     ) -> Self {
         let handshake_gate_bytes =
@@ -135,8 +138,8 @@ impl LinkInitiatorSession {
         Self {
             state: LinkInitiatorState::Polling,
             initiation,
-            own_card_bytes,
             escrow_keys: None,
+            binding: None,
             handshake_gate_bytes,
             poll_deadline_unix,
             pending: presence_commands,
@@ -146,6 +149,43 @@ impl LinkInitiatorSession {
     /// Current state — read-only accessor for the engine + tests.
     pub fn current_state(&self) -> &LinkInitiatorState {
         &self.state
+    }
+
+    /// The exchange our card must be signed for, once the responder's epk
+    /// has arrived; also the binding the responder's card is verified
+    /// against.
+    pub fn binding(&self) -> Option<&LinkExchangeBinding> {
+        self.binding.as_ref()
+    }
+
+    /// Encrypt and deposit our card, signed for [`Self::binding`], and start
+    /// polling the escrow gate. Ignored unless the session is
+    /// [`LinkInitiatorState::AwaitingCard`].
+    pub fn deposit_card(&mut self, signed_card: &[u8]) {
+        if !matches!(self.state, LinkInitiatorState::AwaitingCard) {
+            return;
+        }
+        let Some(keys) = &self.escrow_keys else {
+            return;
+        };
+        match keys.encrypt_card(signed_card) {
+            Ok(encrypted) => {
+                let escrow_gate =
+                    hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid");
+                let mut commands = link_mode::build_initiator_deposit(keys, encrypted);
+                // Start polling the escrow gate (responder already
+                // deposited its card before sharing the epk).
+                commands.push(Command::RelayEscrowCheck {
+                    gate_hash: escrow_gate,
+                    suggested_interval_ms: ESCROW_POLL_INTERVAL_MS,
+                });
+                self.state = LinkInitiatorState::Retrieving;
+                self.pending.extend(commands);
+            }
+            Err(e) => self.fail(LinkInitiatorFailureReason::HandshakeFailed {
+                detail: e.to_string(),
+            }),
+        }
     }
 
     /// The URL to share. Surfaced so the engine can render the
@@ -300,7 +340,7 @@ impl LinkInitiatorSession {
     }
 
     fn handle_link_opened(&mut self, peer_public_key: &[u8]) {
-        let result = (|| -> Result<(EscrowKeys, Vec<Command>), LinkModeError> {
+        let result = (|| -> Result<([u8; 32], EscrowKeys), LinkModeError> {
             let epk: [u8; 32] =
                 peer_public_key
                     .try_into()
@@ -308,26 +348,18 @@ impl LinkInitiatorSession {
                         received: peer_public_key.len(),
                     })?;
             let keys = link_mode::initiator_derive_keys(&self.initiation.secret_key_bytes, &epk)?;
-            let encrypted = keys
-                .encrypt_card(&self.own_card_bytes)
-                .map_err(|e| LinkModeError::CardCryptoFailed(e.to_string()))?;
-            let commands = link_mode::build_initiator_deposit(&keys, encrypted);
-            Ok((keys, commands))
+            Ok((epk, keys))
         })();
 
         match result {
-            Ok((keys, mut commands)) => {
-                let escrow_gate =
-                    hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid");
-                // Start polling the escrow gate (responder already
-                // deposited its card before sharing the epk).
-                commands.push(Command::RelayEscrowCheck {
-                    gate_hash: escrow_gate,
-                    suggested_interval_ms: ESCROW_POLL_INTERVAL_MS,
+            Ok((responder_epk, keys)) => {
+                self.binding = Some(LinkExchangeBinding {
+                    nonce: self.initiation.nonce,
+                    initiator_epk: self.initiation.public_key,
+                    responder_epk,
                 });
                 self.escrow_keys = Some(keys);
-                self.state = LinkInitiatorState::Retrieving;
-                self.pending.extend(commands);
+                self.state = LinkInitiatorState::AwaitingCard;
             }
             Err(e) => {
                 self.fail(LinkInitiatorFailureReason::HandshakeFailed {

@@ -27,19 +27,24 @@ use crate::crypto::x3dh::X3DHKeyPair;
 use crate::exchange::escrow::{EscrowKeys, EscrowRole};
 use crate::platform::Command;
 
-/// Payload version for the symmetric, updatable exchange (ADR-050). In
-/// addition to the v1 `[identity_pubkey][card]`, a v2 payload carries the
-/// depositor's fresh X3DH exchange public key, its relay routing, and an
-/// identity signature over that bootstrap — so both sides derive the same
-/// `shared_key` and establish a live update channel, not a frozen import.
-const CARD_PAYLOAD_VERSION_V2: u8 = 2;
+/// Payload version for the symmetric, updatable exchange (ADR-050): the
+/// depositor's identity key, card, fresh X3DH exchange key and relay
+/// routing, signed by the identity key for this exchange — so both sides
+/// derive the same `shared_key` and establish a live update channel, not a
+/// frozen import. v2 signed only the exchange key and relay URL, so a
+/// rewritten card or a payload from another exchange still verified (#942).
+///
+/// Format: `[3][signature: 64][json body]`.
+const CARD_PAYLOAD_VERSION: u8 = 3;
 
 /// Domain-separation prefix for the link-mode bootstrap signature
-/// (ADR-002/007). Signed over `[domain][x3dh_pubkey][relay_url]` — the
-/// fixed-length `x3dh_pubkey` precedes the variable `relay_url` tail, and
-/// `relay_url` is the only variable field, so the layout is unambiguous
-/// without length prefixes.
-const LINK_BOOTSTRAP_DOMAIN: &[u8] = b"vauchi-link-bootstrap-v2";
+/// (ADR-002/007). Signed over `[domain][nonce][initiator_epk]
+/// [responder_epk][json body]`: the body is the only variable field and
+/// comes last, so the layout is unambiguous without length prefixes, and
+/// signing its exact bytes needs no canonical re-serialisation.
+const LINK_BOOTSTRAP_DOMAIN: &[u8] = b"vauchi-link-bootstrap-v3";
+
+const SIGNATURE_LEN: usize = 64;
 
 /// HKDF info string for the persistent link-mode shared communication key
 /// (ADR-007 domain separation).
@@ -82,6 +87,8 @@ pub enum LinkModeError {
 pub struct LinkInitiation {
     /// The URL to share (contains ephemeral public key + nonce).
     pub url: String,
+    /// The ephemeral public key the URL carries.
+    pub public_key: [u8; 32],
     /// Nonce (needed for handshake slot derivation on poll).
     pub nonce: [u8; 32],
     /// Ephemeral secret key bytes (zeroized on drop). Must be persisted
@@ -146,6 +153,7 @@ pub fn initiator_generate_named(display_name: &str) -> (LinkInitiation, Vec<Comm
 
     let initiation = LinkInitiation {
         url,
+        public_key: *public.as_bytes(),
         nonce,
         secret_key_bytes: secret_bytes,
         handshake_slot,
@@ -474,17 +482,26 @@ pub fn responder_respond(
     Ok((keys, commands))
 }
 
-/// Responder-side single-shot helper: ECDH, derive keys, encrypt the
-/// caller-supplied raw card bytes with the derived `card_key`, and
-/// produce the same two deposit commands as
-/// [`responder_respond`].
+/// What the responder deposits after opening a link, and what it needs to
+/// finish the exchange.
+pub struct LinkResponse {
+    /// Escrow keys derived from the ECDH with the link's key.
+    pub keys: EscrowKeys,
+    /// The exchange both bootstraps are signed for.
+    pub binding: LinkExchangeBinding,
+    /// The link's handshake gate, where the responder's epk is deposited.
+    pub handshake_gate: Vec<u8>,
+    /// The epk deposit, then the encrypted card deposit.
+    pub commands: Vec<Command>,
+}
+
+/// Responder side of a link: ECDH with a fresh ephemeral key, derive the
+/// escrow keys, have `sign_card` produce our card payload for this
+/// exchange's [`LinkExchangeBinding`], encrypt it, and produce the two
+/// deposit commands of [`responder_respond`].
 ///
-/// This is the production-ergonomic counterpart to [`responder_respond`],
-/// which takes pre-encrypted bytes — but the encryption depends on
-/// keys [`responder_respond`] derives internally, leaving callers with a
-/// chicken-and-egg problem. This helper closes the gap so frontends
-/// can pass their raw card serialization without exposing
-/// [`EscrowKeys::encrypt_card`] through the UniFFI surface.
+/// The card is signed here, not before, because the binding includes the
+/// ephemeral key this function generates (#942).
 ///
 /// # Errors
 ///
@@ -493,15 +510,10 @@ pub fn responder_respond(
 /// - [`LinkModeError::CardCryptoFailed`] if encryption fails (e.g.,
 ///   the AEAD nonce RNG fails — extremely rare but typed for the
 ///   cycle thread to surface as `on_failed(DecryptError)`).
-pub fn responder_respond_with_card_bytes(
+pub fn responder_respond_with_signed_card(
     parsed: &ParsedLinkUrl,
-    raw_card_bytes: &[u8],
-) -> Result<(EscrowKeys, Vec<Command>), LinkModeError> {
-    // ECDH + key derivation, identical to `responder_respond`. We
-    // duplicate rather than refactor so neither path's tests have to
-    // change shape — `responder_respond` stays a stable opaque-bytes
-    // entry point for tests and future direct callers, while this
-    // helper layers the encrypt step on top.
+    sign_card: impl FnOnce(&LinkExchangeBinding) -> Vec<u8>,
+) -> Result<LinkResponse, LinkModeError> {
     let secret = EphemeralSecret::random_from_rng(OsRng);
     let our_public = PublicKey::from(&secret);
     let their_public = PublicKey::from(parsed.initiator_public_key);
@@ -510,17 +522,22 @@ pub fn responder_respond_with_card_bytes(
         return Err(LinkModeError::NonContributoryDh);
     }
     let keys = EscrowKeys::derive(shared_secret.as_bytes(), EscrowRole::Responder);
+    let binding = LinkExchangeBinding {
+        nonce: parsed.nonce,
+        initiator_epk: parsed.initiator_public_key,
+        responder_epk: *our_public.as_bytes(),
+    };
 
     let encrypted = keys
-        .encrypt_card(raw_card_bytes)
+        .encrypt_card(&sign_card(&binding))
         .map_err(|e| LinkModeError::CardCryptoFailed(e.to_string()))?;
 
-    let handshake_slot = derive_handshake_slot(&parsed.nonce);
+    let handshake_gate = handshake_gate(&parsed.nonce);
     let epk_slot = derive_epk_slot(&parsed.nonce);
 
     let commands = vec![
         Command::RelayEscrowDeposit {
-            gate_hash: hex::decode(&handshake_slot).expect("hex from hex::encode is always valid"),
+            gate_hash: handshake_gate.clone(),
             slot_hash: hex::decode(&epk_slot).expect("hex from hex::encode is always valid"),
             encrypted_card: our_public.as_bytes().to_vec(),
             ttl_seconds: DEFAULT_TTL_SECONDS,
@@ -533,7 +550,12 @@ pub fn responder_respond_with_card_bytes(
         },
     ];
 
-    Ok((keys, commands))
+    Ok(LinkResponse {
+        keys,
+        binding,
+        handshake_gate,
+        commands,
+    })
 }
 
 /// Decrypt the initiator's encrypted card retrieved from escrow.
@@ -565,7 +587,21 @@ pub fn responder_complete(
         .map_err(|e| LinkModeError::CardCryptoFailed(e.to_string()))
 }
 
-/// A parsed link-mode card payload: the v2 symmetric-exchange bootstrap
+/// The exchange a link bootstrap is signed for: the link's nonce and the
+/// two ephemeral escrow keys. A payload signed for one exchange fails in any
+/// other, and when a link's key is swapped in transit the two sides hold
+/// different bindings, so neither accepts the other's relayed card (#942).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LinkExchangeBinding {
+    /// The link's nonce.
+    pub nonce: [u8; 32],
+    /// The ephemeral key the link carries.
+    pub initiator_epk: [u8; 32],
+    /// The ephemeral key the responder deposited in the handshake gate.
+    pub responder_epk: [u8; 32],
+}
+
+/// A parsed link-mode card payload: the symmetric-exchange bootstrap
 /// (ADR-050), carrying the peer's X3DH exchange key and relay routing for a
 /// live update channel. Its identity signature is verified on parse.
 #[derive(Debug, Clone)]
@@ -580,105 +616,99 @@ pub struct LinkCardPayload {
     pub card: ContactCard,
 }
 
-/// Serde body of a v2 payload (the bytes after the version byte).
+/// Serde body of a payload (the bytes after the signature).
 #[derive(Serialize, Deserialize)]
-struct CardPayloadV2Body {
+struct CardPayloadBody {
     identity_pubkey: [u8; 32],
     x3dh_pubkey: [u8; 32],
     relay_url: String,
-    signature: Vec<u8>,
     card: ContactCard,
 }
 
-/// Build the domain-separated message the v2 bootstrap signature covers.
-fn bootstrap_signing_message(x3dh_pubkey: &[u8; 32], relay_url: &str) -> Vec<u8> {
-    let mut message = Vec::with_capacity(LINK_BOOTSTRAP_DOMAIN.len() + 32 + relay_url.len());
-    message.extend_from_slice(LINK_BOOTSTRAP_DOMAIN);
-    message.extend_from_slice(x3dh_pubkey);
-    message.extend_from_slice(relay_url.as_bytes());
-    message
+/// Build the domain-separated message the bootstrap signature covers.
+fn bootstrap_signing_message(binding: &LinkExchangeBinding, body: &[u8]) -> Vec<u8> {
+    [
+        LINK_BOOTSTRAP_DOMAIN,
+        &binding.nonce,
+        &binding.initiator_epk,
+        &binding.responder_epk,
+        body,
+    ]
+    .concat()
 }
 
-/// Serialize a v2 link-mode card payload (ADR-050): identity key + card,
-/// plus the depositor's fresh X3DH exchange key and relay routing, signed
-/// by the identity key so the peer can verify the bootstrap.
+/// Serialize a link-mode card payload (ADR-050): identity key + card, plus
+/// the depositor's fresh X3DH exchange key and relay routing, signed by the
+/// identity key for `binding` so the peer can verify the bootstrap.
 ///
-/// Format: `[version: 2][json of CardPayloadV2Body]`.
-pub fn serialize_card_payload_v2(
-    identity_pubkey: &[u8; 32],
+/// Format: `[3][signature: 64][json of CardPayloadBody]`.
+pub fn serialize_link_card_payload(
     signing_keypair: &SigningKeyPair,
     x3dh_pubkey: &[u8; 32],
     relay_url: &str,
     card: &ContactCard,
+    binding: &LinkExchangeBinding,
 ) -> Vec<u8> {
-    // The embedded `identity_pubkey` is the verification key the parser
-    // checks the signature against; signing with a different keypair would
-    // silently emit a payload that fails its own signature on parse.
-    debug_assert_eq!(
-        signing_keypair.public_key().as_bytes(),
-        identity_pubkey,
-        "serialize_card_payload_v2: identity_pubkey must match the signing keypair"
-    );
-    let message = bootstrap_signing_message(x3dh_pubkey, relay_url);
-    let signature = signing_keypair.sign(&message);
-    let body = CardPayloadV2Body {
-        identity_pubkey: *identity_pubkey,
+    let body = CardPayloadBody {
+        identity_pubkey: *signing_keypair.public_key().as_bytes(),
         x3dh_pubkey: *x3dh_pubkey,
         relay_url: relay_url.to_string(),
-        signature: signature.as_bytes().to_vec(),
         card: card.clone(),
     };
-    let json = serde_json::to_vec(&body).expect("v2 card payload serialization should not fail");
-    let mut payload = Vec::with_capacity(1 + json.len());
-    payload.push(CARD_PAYLOAD_VERSION_V2);
-    payload.extend_from_slice(&json);
-    payload
+    let body = serde_json::to_vec(&body).expect("card payload serialization should not fail");
+    let signature = signing_keypair.sign(&bootstrap_signing_message(binding, &body));
+    [&[CARD_PAYLOAD_VERSION][..], signature.as_bytes(), &body].concat()
 }
 
-/// Parse a link-mode card payload; only the v2 bootstrap is accepted. For v2 the bootstrap signature is verified against
-/// the embedded identity key; a bad signature is rejected (fail-closed).
-pub fn parse_card_payload_versioned(data: &[u8]) -> Result<LinkCardPayload, LinkModeError> {
-    match data.first() {
-        Some(&CARD_PAYLOAD_VERSION_V2) => {
-            let body: CardPayloadV2Body = serde_json::from_slice(&data[1..])
-                .map_err(|e| LinkModeError::MalformedCardPayload(e.to_string()))?;
-            let sig_bytes: [u8; 64] = body.signature.as_slice().try_into().map_err(|_| {
-                LinkModeError::MalformedCardPayload(format!(
-                    "bootstrap signature must be 64 bytes, got {}",
-                    body.signature.len()
-                ))
-            })?;
-            let message = bootstrap_signing_message(&body.x3dh_pubkey, &body.relay_url);
-            if !verify_signature(
-                &body.identity_pubkey,
-                &message,
-                &Signature::from_bytes(sig_bytes),
-            ) {
-                return Err(LinkModeError::MalformedCardPayload(
-                    "bootstrap signature verification failed".to_string(),
-                ));
-            }
-            Ok(LinkCardPayload {
-                identity_pubkey: body.identity_pubkey,
-                x3dh_pubkey: body.x3dh_pubkey,
-                relay_url: body.relay_url,
-                card: body.card,
-            })
+/// Parse a link-mode card payload signed for `binding`. Only the current
+/// version is accepted, and its signature is verified against the embedded
+/// identity key; any failure is a rejection (fail-closed).
+pub fn parse_link_card_payload(
+    data: &[u8],
+    binding: &LinkExchangeBinding,
+) -> Result<LinkCardPayload, LinkModeError> {
+    let rest = match data.split_first() {
+        Some((&CARD_PAYLOAD_VERSION, rest)) => rest,
+        Some((other, _)) => {
+            return Err(LinkModeError::MalformedCardPayload(format!(
+                "unsupported version byte: {other}"
+            )));
         }
-        Some(&other) => Err(LinkModeError::MalformedCardPayload(format!(
-            "unsupported version byte: {other}"
-        ))),
-        None => Err(LinkModeError::MalformedCardPayload(
-            "empty payload".to_string(),
-        )),
+        None => {
+            return Err(LinkModeError::MalformedCardPayload(
+                "empty payload".to_string(),
+            ));
+        }
+    };
+    let Some((signature, body_bytes)) = rest.split_first_chunk::<SIGNATURE_LEN>() else {
+        return Err(LinkModeError::MalformedCardPayload(format!(
+            "payload shorter than its {SIGNATURE_LEN}-byte signature"
+        )));
+    };
+    let body: CardPayloadBody = serde_json::from_slice(body_bytes)
+        .map_err(|e| LinkModeError::MalformedCardPayload(e.to_string()))?;
+    if !verify_signature(
+        &body.identity_pubkey,
+        &bootstrap_signing_message(binding, body_bytes),
+        &Signature::from_bytes(*signature),
+    ) {
+        return Err(LinkModeError::MalformedCardPayload(
+            "bootstrap signature verification failed".to_string(),
+        ));
     }
+    Ok(LinkCardPayload {
+        identity_pubkey: body.identity_pubkey,
+        x3dh_pubkey: body.x3dh_pubkey,
+        relay_url: body.relay_url,
+        card: body.card,
+    })
 }
 
 /// Derive the persistent shared communication key for a link-mode exchange
 /// (ADR-050) from our fresh X3DH keypair and the peer's X3DH public key
-/// (carried in the v2 bootstrap). A single authenticated DH —
+/// (carried in the bootstrap). A single authenticated DH —
 /// *authenticated* because the peer's X3DH key is signed by their identity
-/// in the v2 payload, *forward-secure* because both keys are per-exchange.
+/// in the payload, *forward-secure* because both keys are per-exchange.
 /// Both sides derive the **same** key (X25519 DH is commutative), so the
 /// resulting `ExchangedData.shared_key` is symmetric.
 pub fn derive_link_shared_key(
@@ -690,6 +720,12 @@ pub fn derive_link_shared_key(
         .map_err(|e| LinkModeError::CardCryptoFailed(e.to_string()))?;
     let derived = HKDF::derive_key(None, &shared[..], LINK_SHARED_KEY_INFO);
     Ok(SymmetricKey::from_bytes(*derived))
+}
+
+/// The link's handshake gate: where the initiator's presence and the
+/// responder's epk are deposited.
+pub fn handshake_gate(nonce: &[u8; 32]) -> Vec<u8> {
+    hex::decode(derive_handshake_slot(nonce)).expect("hex from hex::encode is always valid")
 }
 
 /// Derive the handshake slot hash from the nonce.

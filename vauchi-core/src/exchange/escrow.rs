@@ -26,6 +26,10 @@ const DOMAIN_SLOT_INIT: &[u8] = b"vauchi-escrow-slot-init-v1";
 const DOMAIN_SLOT_RESP: &[u8] = b"vauchi-escrow-slot-resp-v1";
 const DOMAIN_CARD_KEY: &[u8] = b"vauchi-escrow-card-key-v1";
 
+/// `RelayEscrowFailed` reason for a deposit into a slot that already holds a
+/// blob. Each flow writes a slot once, so the blob is someone else's.
+pub const SLOT_TAKEN_REASON: &str = "slot_taken";
+
 /// Which role in the exchange (determines slot assignment).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EscrowRole {

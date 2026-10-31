@@ -26,6 +26,7 @@
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use vauchi_protocol::escrow::{EscrowMessage, EscrowResponse, MAX_SLOTS_PER_GATE};
 
+use crate::exchange::escrow::SLOT_TAKEN_REASON;
 use crate::platform::Command;
 
 /// The result of one escrow round-trip, independent of which gate it
@@ -33,7 +34,7 @@ use crate::platform::Command;
 /// the matching `Event::RelayEscrow*`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EscrowOutcome {
-    /// A `Put` was accepted — stored, or already present (idempotent).
+    /// A `Put` was stored.
     Deposited,
     /// The gate is not ready / the slot holds no blob yet — keep polling.
     Pending,
@@ -82,7 +83,11 @@ pub fn escrow_request(command: &Command) -> Option<EscrowMessage> {
 /// [`EscrowOutcome`].
 pub fn escrow_outcome(response: &EscrowResponse) -> EscrowOutcome {
     match response {
-        EscrowResponse::Stored | EscrowResponse::AlreadyExists => EscrowOutcome::Deposited,
+        EscrowResponse::Stored => EscrowOutcome::Deposited,
+        // A link's second opener lands here: counting it as stored left them
+        // waiting for a peer who had already exchanged with someone else
+        // (#942).
+        EscrowResponse::AlreadyExists => EscrowOutcome::Failed(SLOT_TAKEN_REASON.to_string()),
         EscrowResponse::Count { count } | EscrowResponse::NotReady { count } => {
             if *count >= MAX_SLOTS_PER_GATE {
                 EscrowOutcome::Ready

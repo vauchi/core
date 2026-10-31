@@ -91,25 +91,49 @@ fn a_truncated_claim_is_refused() {
     }
 }
 
-// The guardian-token tail is read only for version 2 and only when present.
+// A voucher is exactly its header, or its header and one token whose
+// declared length is the rest; nothing trails, and format 2 is gone
+// (private#930).
 // @internal
 #[test]
-fn a_voucher_reads_a_token_tail_only_when_version_two_carries_one() {
+fn a_voucher_is_exactly_its_header_or_its_header_and_one_token() {
     let v1 = voucher_for(&OLD, &NEW).to_bytes();
     assert_eq!((v1[0], v1.len()), (1, 169));
-
-    let mut v2_without_token = v1.clone();
-    v2_without_token[0] = 2;
-    let parsed = RecoveryVoucher::from_bytes(&v2_without_token).unwrap();
-    assert!(parsed.guardian_token().is_none());
+    assert!(
+        RecoveryVoucher::from_bytes(&v1)
+            .unwrap()
+            .guardian_token()
+            .is_none()
+    );
 
     let mut v1_with_trailing_bytes = v1.clone();
     v1_with_trailing_bytes.extend_from_slice(&[0xFF; 8]);
-    let parsed = RecoveryVoucher::from_bytes(&v1_with_trailing_bytes).unwrap();
-    assert!(parsed.guardian_token().is_none());
+    let mut unsigned_token_format = v1.clone();
+    unsigned_token_format[0] = 2;
+    let mut guardian_format_without_token = v1.clone();
+    guardian_format_without_token[0] = 3;
+    for (name, bytes) in [
+        (
+            "trailing bytes after a contact voucher",
+            v1_with_trailing_bytes,
+        ),
+        ("format 2", unsigned_token_format),
+        (
+            "a guardian voucher with no token",
+            guardian_format_without_token.clone(),
+        ),
+    ] {
+        assert!(
+            matches!(
+                RecoveryVoucher::from_bytes(&bytes),
+                Err(RecoveryError::InvalidFormat)
+            ),
+            "{name}"
+        );
+    }
 
     for extra in 1..=3 {
-        let mut short_prefix = v2_without_token.clone();
+        let mut short_prefix = guardian_format_without_token.clone();
         short_prefix.extend(std::iter::repeat_n(0, extra));
         assert!(
             matches!(
@@ -120,7 +144,15 @@ fn a_voucher_reads_a_token_tail_only_when_version_two_carries_one() {
         );
     }
 
-    let mut empty_token = v2_without_token;
+    let mut length_says_more_than_follows = guardian_format_without_token.clone();
+    length_says_more_than_follows.extend_from_slice(&9u32.to_le_bytes());
+    length_says_more_than_follows.extend_from_slice(&[0; 8]);
+    assert!(matches!(
+        RecoveryVoucher::from_bytes(&length_says_more_than_follows),
+        Err(RecoveryError::InvalidFormat)
+    ));
+
+    let mut empty_token = guardian_format_without_token;
     empty_token.extend_from_slice(&0u32.to_le_bytes());
     assert!(
         matches!(

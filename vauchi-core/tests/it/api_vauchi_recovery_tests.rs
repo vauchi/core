@@ -34,7 +34,7 @@ fn vauchi_with_identity(name: &str) -> Vauchi {
 /// `claim` is the recovering user's claim; `helper` is the guardian
 /// who is signing the voucher.
 fn build_voucher(claim: &RecoveryClaim, helper: &Identity) -> RecoveryVoucher {
-    RecoveryVoucher::create_from_claim(claim, helper.signing_keypair(), None, 0)
+    RecoveryVoucher::create_from_claim(claim, helper.signing_keypair(), None, claim.timestamp())
         .expect("fresh claim is not expired and helper != recovering identity")
 }
 

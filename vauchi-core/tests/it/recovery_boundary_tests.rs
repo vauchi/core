@@ -74,10 +74,9 @@ fn rate_limit_resets_at_one_hour_boundary() {
 // RecoveryProof::validate_version — version gate
 // =============================================================================
 
-/// A proof at the current schema version validates.
-///
-/// Pins the strict `>` in `version > RECOVERY_PROOF_VERSION`: a `>=` mutant
-/// would reject a proof at the current version.
+/// A proof at the current schema version validates; one of any other
+/// version is refused at the parser, so no version check downstream can
+/// be skipped (private#930).
 // @internal
 #[test]
 fn validate_version_accepts_current_version() {
@@ -92,11 +91,8 @@ fn validate_version_accepts_current_version() {
     );
 }
 
-/// A proof serialized by a newer schema version is rejected.
-///
 /// `version` is the first field in the postcard encoding, so flipping the
-/// first byte yields a proof one version ahead. Pins both the `Ok(())` stub
-/// and the comparison-operator mutants on the version check.
+/// first byte yields a proof one version ahead; the parser refuses it.
 // @internal
 #[test]
 fn validate_version_rejects_future_version() {
@@ -106,19 +102,13 @@ fn validate_version_rejects_future_version() {
 
     let mut bytes = proof.to_bytes().expect("proof must serialize");
     bytes[0] = RECOVERY_PROOF_VERSION + 1;
-    let future = RecoveryProof::from_bytes(&bytes).expect("bumped proof must deserialize");
 
-    assert_eq!(
-        future.version(),
-        RECOVERY_PROOF_VERSION + 1,
-        "byte flip must produce a proof one schema version ahead"
-    );
     assert!(
         matches!(
-            future.validate_version(),
+            RecoveryProof::from_bytes(&bytes),
             Err(RecoveryError::InvalidProof(_))
         ),
-        "a proof from a newer schema version must be rejected as InvalidProof"
+        "a proof from a newer schema version must be refused as InvalidProof"
     );
 }
 

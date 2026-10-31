@@ -118,7 +118,7 @@ fn test_voucher_v2_from_bytes_preserves_token() {
 // =============================================================================
 // =============================================================================
 
-// @scenario: contact_recovery :: Version byte is 2 for voucher with token and 1 without
+// @scenario: contact_recovery :: A guardian token travels under the voucher signature
 #[test]
 fn test_voucher_v2_version_byte() {
     let old_keypair = SigningKeyPair::generate();
@@ -133,8 +133,8 @@ fn test_voucher_v2_version_byte() {
     let v2 = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, Some(token), 0);
     let v2_bytes = v2.to_bytes();
     assert_eq!(
-        v2_bytes[0], 2,
-        "first byte of v2 voucher (with token) must be 2"
+        v2_bytes[0], 3,
+        "a guardian voucher is format 3: its token is under the signature (private#930)"
     );
 
     // v1: without guardian token
@@ -387,4 +387,148 @@ fn a_proof_whose_vouchers_span_more_than_the_window_is_refused() {
 #[test]
 fn the_voucher_window_is_96_hours() {
     assert_eq!(RecoveryProof::VOUCHER_WINDOW_SECS, 96 * 60 * 60);
+}
+
+// =============================================================================
+// The token is under the voucher signature (private#930)
+// =============================================================================
+
+struct GuardianVouching {
+    old: SigningKeyPair,
+    new: SigningKeyPair,
+    helper: SigningKeyPair,
+}
+
+impl GuardianVouching {
+    fn new() -> Self {
+        Self {
+            old: SigningKeyPair::generate(),
+            new: SigningKeyPair::generate(),
+            helper: SigningKeyPair::generate(),
+        }
+    }
+
+    fn token_at(&self, created_at: u64) -> GuardianToken {
+        GuardianToken::create(&self.old, self.helper.public_key(), created_at)
+    }
+
+    fn voucher_with(&self, token: GuardianToken) -> RecoveryVoucher {
+        RecoveryVoucher::create(
+            self.old.public_key().as_bytes(),
+            self.new.public_key().as_bytes(),
+            &self.helper,
+            Some(token),
+            1_700_000_000,
+        )
+    }
+
+    fn proof(&self) -> RecoveryProof {
+        RecoveryProof::new(
+            self.old.public_key().as_bytes(),
+            self.new.public_key().as_bytes(),
+            1,
+            1_700_000_000,
+        )
+    }
+}
+
+/// The voucher header: format, old_pk, new_pk, helper_pk, timestamp,
+/// signature, before any token.
+const VOUCHER_HEADER_LEN: usize = 1 + 32 + 32 + 32 + 8 + 64;
+
+// @scenario: contact_recovery :: A guardian token travels under the voucher signature
+#[test]
+fn an_unsigned_guardian_token_is_refused() {
+    let world = GuardianVouching::new();
+    let signed = world.voucher_with(world.token_at(1_700_000_000)).to_bytes();
+    let other_token = world.token_at(1_700_000_001).to_bytes();
+    let mut swapped_token = signed[..VOUCHER_HEADER_LEN + 4].to_vec();
+    swapped_token.extend_from_slice(&other_token);
+    let mut stripped_to_contact = signed[..VOUCHER_HEADER_LEN].to_vec();
+    stripped_to_contact[0] = 1;
+    let mut old_format_two = signed.clone();
+    old_format_two[0] = 2;
+    let mut guardian_format_without_token = signed[..VOUCHER_HEADER_LEN].to_vec();
+    guardian_format_without_token[0] = 3;
+
+    assert!(RecoveryVoucher::from_bytes(&signed).unwrap().verify());
+    for (name, bytes) in [
+        ("another token under the same signature", swapped_token),
+        (
+            "the token stripped and format set to contact",
+            stripped_to_contact,
+        ),
+    ] {
+        let voucher = RecoveryVoucher::from_bytes(&bytes).unwrap();
+        assert!(
+            !voucher.verify(),
+            "{name}: the signature no longer covers the bytes"
+        );
+        assert!(matches!(
+            world.proof().add_voucher(voucher),
+            Err(RecoveryError::InvalidSignature)
+        ));
+    }
+    for (name, bytes) in [
+        ("format 2, whose token was not signed", old_format_two),
+        ("format 3 without a token", guardian_format_without_token),
+    ] {
+        assert!(
+            matches!(
+                RecoveryVoucher::from_bytes(&bytes),
+                Err(RecoveryError::InvalidFormat)
+            ),
+            "{name} must not parse"
+        );
+    }
+}
+
+// @scenario: contact_recovery :: A guardian token travels under the voucher signature
+#[test]
+fn a_proof_carrying_a_voucher_with_a_forged_token_fails_validation() {
+    let world = GuardianVouching::new();
+    let mallory = SigningKeyPair::generate();
+    let forged_token = GuardianToken::create_with_claimed_pk(
+        &mallory,
+        world.old.public_key(),
+        world.helper.public_key(),
+        1_700_000_000,
+    );
+    let voucher = world.voucher_with(forged_token);
+    assert!(
+        voucher.verify(),
+        "the helper did sign this voucher, forged token and all"
+    );
+    let wire = WireProof {
+        version: 2,
+        old_pk: *world.old.public_key().as_bytes(),
+        new_pk: *world.new.public_key().as_bytes(),
+        threshold: 1,
+        vouchers: vec![voucher.clone()],
+        created_at: 1_700_000_000,
+        expires_at: 1_700_000_000 + 192 * 3600,
+    };
+    let proof = RecoveryProof::from_bytes(&postcard::to_allocvec(&wire).unwrap()).unwrap();
+
+    assert!(matches!(
+        world.proof().add_voucher(voucher),
+        Err(RecoveryError::InvalidSignature)
+    ));
+    assert!(
+        matches!(proof.validate(), Err(RecoveryError::InvalidSignature)),
+        "validate re-verifies the token, got {:?}",
+        proof.validate()
+    );
+}
+
+/// The proof's postcard shape, to carry a voucher `add_voucher` refuses.
+#[derive(serde::Serialize)]
+struct WireProof {
+    version: u8,
+    old_pk: [u8; 32],
+    new_pk: [u8; 32],
+    threshold: u32,
+    vouchers: Vec<RecoveryVoucher>,
+    created_at: u64,
+    expires_at: u64,
 }

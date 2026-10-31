@@ -161,8 +161,13 @@ fn test_create_voucher_from_claim() {
     let voucher_keypair = SigningKeyPair::generate();
 
     let claim = RecoveryClaim::new(&old_pk, &new_pk, 1_700_000_000);
-    let voucher =
-        vauchi_core::RecoveryVoucher::create_from_claim(&claim, &voucher_keypair, None, 0).unwrap();
+    let voucher = vauchi_core::RecoveryVoucher::create_from_claim(
+        &claim,
+        &voucher_keypair,
+        None,
+        1_700_000_000,
+    )
+    .unwrap();
 
     assert_eq!(voucher.old_pk(), &old_pk);
     assert_eq!(voucher.new_pk(), &new_pk);
@@ -205,7 +210,8 @@ fn test_cannot_self_vouch() {
 
     let claim = RecoveryClaim::new(&old_pk, &new_pk, 1_700_000_000);
 
-    let result = vauchi_core::RecoveryVoucher::create_from_claim(&claim, &new_keypair, None, 0);
+    let result =
+        vauchi_core::RecoveryVoucher::create_from_claim(&claim, &new_keypair, None, 1_700_000_000);
     assert!(matches!(result, Err(RecoveryError::SelfVouching)));
 }
 

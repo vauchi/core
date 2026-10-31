@@ -285,6 +285,7 @@ fn a_glance_displayer_refuses_an_offer_after_its_own_sixty_second_window() {
     );
 
     let mut plain_responder = BleHandshakeSession::new_responder(&bob, card(&bob, "Bob"), T0);
+    scanner.reset(late);
     assert!(
         plain_responder
             .process_key_offer(&scanner.create_key_offer().unwrap(), late)

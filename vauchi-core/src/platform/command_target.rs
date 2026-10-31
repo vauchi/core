@@ -59,7 +59,9 @@ impl Command {
             | Self::ForgetStoredSecret { .. }
             | Self::CreateUserPresenceSecret { .. }
             | Self::RevealUserPresenceSecret { .. }
-            | Self::SaveRestorableState { .. } => CommandTarget::Hardware,
+            | Self::SaveRestorableState { .. }
+            | Self::CameraCapture { .. }
+            | Self::CameraStop { .. } => CommandTarget::Hardware,
             Self::QrDisplay { .. }
             | Self::ShowShareSheet { .. }
             | Self::ImagePickFromLibrary
@@ -87,7 +89,8 @@ impl Command {
             | Self::SetApplicationMenu { .. }
             | Self::PickFile { .. }
             | Self::CancelFilePick { .. }
-            | Self::RequestPermission { .. } => CommandTarget::Display,
+            | Self::RequestPermission { .. }
+            | Self::CameraViewport { .. } => CommandTarget::Display,
         }
     }
 }

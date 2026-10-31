@@ -29,10 +29,12 @@
 use serde::{Deserialize, Serialize};
 
 mod ble_observation;
+mod camera;
 mod command_target;
 mod event_json;
 pub mod executor;
 pub use ble_observation::{BleAdvertisementObservation, BleObservationError, BleServiceUuid};
+pub use camera::CameraPurpose;
 pub use command_target::CommandTarget;
 mod presentation;
 
@@ -519,6 +521,17 @@ pub enum Command {
     /// display work. Answer [`Event::PermissionGranted`] or
     /// [`Event::PermissionDenied`].
     RequestPermission { transport: String },
+    /// Show the hardware shell's live camera preview for `preview_id` in the
+    /// camera area of the current surface (ADR-077).
+    CameraViewport { preview_id: String },
+    /// Start the camera for `purpose`, previewing into the display shell's
+    /// [`Command::CameraViewport`] with the same `preview_id`.
+    CameraCapture {
+        preview_id: String,
+        purpose: CameraPurpose,
+    },
+    /// Stop the capture `preview_id` and release the camera.
+    CameraStop { preview_id: String },
 }
 
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -781,6 +794,9 @@ impl Command {
             Self::PickFile { .. } => "PickFile",
             Self::CancelFilePick { .. } => "CancelFilePick",
             Self::RequestPermission { .. } => "RequestPermission",
+            Self::CameraViewport { .. } => "CameraViewport",
+            Self::CameraCapture { .. } => "CameraCapture",
+            Self::CameraStop { .. } => "CameraStop",
             Self::SetNavigation { .. } => "SetNavigation",
             Self::PresentOverlay { .. } => "PresentOverlay",
             Self::DismissOverlay { .. } => "DismissOverlay",

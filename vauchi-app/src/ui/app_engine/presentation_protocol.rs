@@ -191,6 +191,12 @@ impl AppEngine {
             self.attach_hardware_shell(capabilities);
             return Ok(self.drain_pending_commands());
         }
+        if matches!(
+            event,
+            Event::ImageReceived { .. } | Event::ImagePickCancelled
+        ) {
+            self.hardware_route.photo_answered();
+        }
         if let Event::PermissionRequired { transport } = event {
             return Ok(self.permission_required(transport));
         }

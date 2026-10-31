@@ -353,3 +353,54 @@ fn a_render_context_pushed_while_locked_reaches_the_opened_app() {
     drop(engine);
     destroy(app);
 }
+
+fn dispatch(app: *mut VauchiApp, event: serde_json::Value) -> serde_json::Value {
+    let event = CString::new(event.to_string()).unwrap();
+    // SAFETY: `app` is live and `event` is NUL-terminated.
+    let reply = take_string(unsafe { vauchi_app_dispatch(app, event.as_ptr()) });
+    serde_json::from_str(&reply).unwrap()
+}
+
+fn commands(batch: &serde_json::Value, field: &str) -> Vec<vauchi_core::Command> {
+    serde_json::from_value(batch[field].clone()).unwrap_or_default()
+}
+
+fn only_display(commands: &[vauchi_core::Command]) -> bool {
+    commands
+        .iter()
+        .all(|command| command.target() == vauchi_core::CommandTarget::Display)
+}
+
+// @internal — a hardware shell that reports before storage opens stays attached
+// to the app that opens afterwards (ADR-077).
+#[test]
+fn a_hardware_report_made_while_locked_reaches_the_opened_app() {
+    let dir = tempfile::tempdir().unwrap();
+    let keyring = SwitchableKeyring::new();
+    destroy(open(&dir, keyring.clone()));
+    keyring.reachable.store(false, Ordering::SeqCst);
+    let app = open(&dir, keyring.clone());
+    let locked = initial(app);
+    dispatch(
+        app,
+        serde_json::json!({"HardwareCapabilitiesReported": {"capabilities": {"has_ble": true}}}),
+    );
+
+    keyring.reachable.store(true, Ordering::SeqCst);
+    let opened = press_primary(app, &locked);
+    let wakeup = dispatch(app, serde_json::json!("WakeupFired"));
+
+    assert!(
+        !surface(&opened).starts_with("storage_lock"),
+        "expected the opened app, got {opened}"
+    );
+    assert!(only_display(&commands(&opened, "commands")), "got {opened}");
+    assert!(only_display(&commands(&wakeup, "commands")), "got {wakeup}");
+    assert!(
+        commands(&wakeup, "hardware")
+            .iter()
+            .any(|command| matches!(command, vauchi_core::Command::ScheduleWakeup { .. })),
+        "got {wakeup}"
+    );
+    destroy(app);
+}

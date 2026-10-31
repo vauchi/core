@@ -73,3 +73,22 @@ fn after_a_report_hardware_commands_arrive_in_the_hardware_field() {
         "got {wakeup}"
     );
 }
+
+// @internal — the legacy wakeup envelope splits the same way.
+#[test]
+fn after_a_report_the_legacy_wakeup_envelope_has_a_hardware_field() {
+    let (engine, _dir) = create_engine();
+    dispatch(&engine, report());
+
+    let envelope: serde_json::Value = serde_json::from_str(&engine.on_wakeup().unwrap()).unwrap();
+
+    let display = commands(&envelope, "commands");
+    assert!(
+        display.iter().all(|c| c.target() == CommandTarget::Display),
+        "got {envelope}"
+    );
+    assert!(
+        has_schedule(&commands(&envelope, "hardware")),
+        "got {envelope}"
+    );
+}

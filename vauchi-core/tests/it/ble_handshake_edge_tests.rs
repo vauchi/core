@@ -210,3 +210,52 @@ fn ble_card_with_a_foreign_identity_key_is_refused(
         "{error:?}"
     );
 }
+
+/// A Glance displayer requires the nonce its QR carried; the nonce is spent
+/// by the first accepted offer (ADR-053, vauchi/private#892).
+// @scenario: contact_exchange :: A Glance displayer accepts one KeyOffer per nonce
+#[test]
+fn a_second_key_offer_with_the_same_echo_is_refused() {
+    let nonce = [0x5Au8; 16];
+    let (mut alice, mut bob, _) = pair();
+    alice.set_oob_nonce(nonce);
+    bob.require_oob_nonce(nonce);
+    let offer = alice.create_key_offer().unwrap();
+    assert!(bob.process_key_offer(&offer, T0).is_ok());
+    bob.reset(T0 + 1);
+    let carol = Identity::create("Carol", 0);
+    let mut carol_scanned_the_same_qr =
+        BleHandshakeSession::new_initiator(&carol, card(&carol, "Carol"), T0 + 1);
+    carol_scanned_the_same_qr.set_oob_nonce(nonce);
+    let carols_offer = carol_scanned_the_same_qr.create_key_offer().unwrap();
+
+    assert!(
+        matches!(
+            bob.process_key_offer(&offer, T0 + 1),
+            Err(ExchangeError::OobNonceReplayed)
+        ),
+        "the same offer again, after the displayer reset, is a replay"
+    );
+    assert!(
+        matches!(
+            bob.process_key_offer(&carols_offer, T0 + 1),
+            Err(ExchangeError::OobNonceReplayed)
+        ),
+        "a second scanner of the same QR echoes a spent nonce"
+    );
+    assert!(matches!(bob.state(), BleHandshakeState::Idle));
+}
+
+// @scenario: contact_exchange :: A Glance displayer accepts one KeyOffer per nonce
+#[test]
+fn a_responder_without_a_required_nonce_takes_a_fresh_offer_after_a_reset() {
+    let (mut alice, mut bob, _) = pair();
+    let first = alice.create_key_offer().unwrap();
+    assert!(bob.process_key_offer(&first, T0).is_ok());
+    bob.reset(T0 + 1);
+    alice.reset(T0 + 1);
+
+    let second = alice.create_key_offer().unwrap();
+
+    assert!(bob.process_key_offer(&second, T0 + 1).is_ok());
+}

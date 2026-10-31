@@ -289,19 +289,23 @@ impl Vauchi {
                     VauchiError::Serialization("invalid base64 in guardian entry".into())
                 })?;
 
+            // An entry that opens but names other keys is not our
+            // designation for this claim (private#930).
             if let Ok(token_bytes) = sealed_box::open(&sealed_bytes, &our_x25519_secret)
                 && let Ok(token) = GuardianToken::from_bytes(&token_bytes)
                 && token.verify()
+                && token.designator_pk() == claim.old_pk().as_bytes()
+                && token.guardian_pk() == identity.signing_public_key()
             {
                 found_token = Some(token);
                 break;
             }
-            // Entry not for us — try next
         }
 
         let token = found_token.ok_or_else(|| {
             VauchiError::InvalidState(
-                "No guardian entry found for our key — we may not be a designated guardian".into(),
+                "No guardian entry names us for this key — we may not be a designated guardian"
+                    .into(),
             )
         })?;
 

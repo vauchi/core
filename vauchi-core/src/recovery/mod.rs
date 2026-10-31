@@ -76,7 +76,7 @@ pub enum RecoveryError {
     #[error("Recovery threshold must be at least 1")]
     ThresholdTooLow,
 
-    #[error("Recovery threshold cannot exceed 10")]
+    #[error("Recovery threshold cannot exceed 9")]
     ThresholdTooHigh,
 
     #[error("Verification threshold must be at least 1")]
@@ -87,6 +87,9 @@ pub enum RecoveryError {
 
     #[error("Recovery claim has expired (older than 192 hours)")]
     ClaimExpired,
+
+    #[error("Recovery timestamp is more than 10 minutes in the future")]
+    TimestampInFuture,
 
     #[error("Recovery vouchers span more than 96 hours")]
     VouchersOutsideWindow,
@@ -222,6 +225,18 @@ impl RecoveryClaim {
     /// never the vouchers already given (private#919).
     pub const MAX_AGE_SECS: u64 = 192 * 60 * 60;
 
+    /// How far ahead of the reader's clock a claim or voucher timestamp may
+    /// sit: ordinary phone drift. Further ahead it is a forgery that would
+    /// stretch every age bound, not a slow clock (owner decision 2026-10-31,
+    /// private#930).
+    pub const MAX_FUTURE_SKEW_SECS: u64 = 10 * 60;
+
+    /// Whether `timestamp` sits more than [`Self::MAX_FUTURE_SKEW_SECS`]
+    /// ahead of `now`.
+    pub fn is_from_the_future(timestamp: u64, now: u64) -> bool {
+        timestamp.saturating_sub(now) > Self::MAX_FUTURE_SKEW_SECS
+    }
+
     /// Creates a new recovery claim.
     pub fn new(old_pk: impl Into<IdentityKey>, new_pk: impl Into<IdentityKey>, now: u64) -> Self {
         Self {
@@ -279,12 +294,10 @@ impl RecoveryClaim {
         bytes
     }
 
-    /// Deserializes a claim from bytes.
+    /// Deserializes a claim from exactly its 73 bytes (DC-01, private#930).
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, RecoveryError> {
         // Version (1) + old_pk (32) + new_pk (32) + timestamp (8) = 73
-        let (header, _) = bytes
-            .split_first_chunk::<73>()
-            .ok_or(RecoveryError::InvalidFormat)?;
+        let header: &[u8; 73] = bytes.try_into().map_err(|_| RecoveryError::InvalidFormat)?;
 
         let version = header[0];
         if version != 1 {
@@ -321,8 +334,10 @@ const SECONDS_PER_DAY: u64 = 24 * 60 * 60;
 /// contact vouching uses it today (vauchi/private#574).
 pub const CONTACT_VOUCHER_FORMAT: u8 = 1;
 
-/// Serialized voucher from a designated guardian: carries a guardian token.
-pub const GUARDIAN_VOUCHER_FORMAT: u8 = 2;
+/// Serialized voucher from a designated guardian: carries a guardian token
+/// under the voucher signature. Format 2 carried the token unsigned and is
+/// refused (owner decision 2026-10-31, private#930).
+pub const GUARDIAN_VOUCHER_FORMAT: u8 = 3;
 
 /// Voucher created by a contact confirming the recovery claim.
 #[serde_as]
@@ -344,11 +359,13 @@ impl RecoveryVoucher {
     /// Creates a signed voucher from a recovery claim.
     ///
     /// Validates that:
-    /// - The claim is not expired ([`RecoveryClaim::MAX_AGE_SECS`])
+    /// - The claim is not expired ([`RecoveryClaim::MAX_AGE_SECS`]) and not
+    ///   from the future ([`RecoveryClaim::MAX_FUTURE_SKEW_SECS`])
     /// - The voucher is not self-vouching (voucher_pk is neither old_pk nor new_pk)
     ///
     /// # Errors
     /// - `ClaimExpired` if the claim is older than [`RecoveryClaim::MAX_AGE_SECS`]
+    /// - `TimestampInFuture` if the claim is stamped past the skew bound
     /// - `SelfVouching` if the voucher's public key is the claim's old or new key
     pub fn create_from_claim(
         claim: &RecoveryClaim,
@@ -358,6 +375,9 @@ impl RecoveryVoucher {
     ) -> Result<Self, RecoveryError> {
         if claim.is_expired(now) {
             return Err(RecoveryError::ClaimExpired);
+        }
+        if RecoveryClaim::is_from_the_future(claim.timestamp(), now) {
+            return Err(RecoveryError::TimestampInFuture);
         }
 
         let voucher_pk = voucher_keypair.public_key();
@@ -389,7 +409,13 @@ impl RecoveryVoucher {
         let new_pk = new_pk.into();
         let voucher_pk = IdentityKey::from_bytes(*voucher_keypair.public_key().as_bytes());
 
-        let data = Self::build_sign_data(&old_pk, &new_pk, &voucher_pk, timestamp);
+        let data = Self::build_sign_data(
+            &old_pk,
+            &new_pk,
+            &voucher_pk,
+            timestamp,
+            guardian_token.as_ref(),
+        );
         let signature = voucher_keypair.sign(&data);
 
         Self {
@@ -402,19 +428,27 @@ impl RecoveryVoucher {
         }
     }
 
-    /// Builds the data to be signed/verified.
+    /// Builds the data to be signed/verified. A guardian token goes under
+    /// the signature, so it cannot be stripped or swapped (private#930).
     fn build_sign_data(
         old_pk: &IdentityKey,
         new_pk: &IdentityKey,
         voucher_pk: &IdentityKey,
         timestamp: u64,
+        guardian_token: Option<&guardian::GuardianToken>,
     ) -> Vec<u8> {
-        let mut data = Vec::with_capacity(capacity(&[VOUCHER_DOMAIN.len(), 32, 32, 32, 8]));
+        let token_bytes = guardian_token.map(guardian::GuardianToken::to_bytes);
+        let token_len = token_bytes.as_ref().map_or(0, Vec::len);
+        let mut data =
+            Vec::with_capacity(capacity(&[VOUCHER_DOMAIN.len(), 32, 32, 32, 8, token_len]));
         data.extend_from_slice(VOUCHER_DOMAIN);
         data.extend_from_slice(old_pk.as_bytes());
         data.extend_from_slice(new_pk.as_bytes());
         data.extend_from_slice(voucher_pk.as_bytes());
         data.extend_from_slice(&timestamp.to_le_bytes());
+        if let Some(token_bytes) = token_bytes {
+            data.extend_from_slice(&token_bytes);
+        }
         data
     }
 
@@ -438,15 +472,20 @@ impl RecoveryVoucher {
         self.timestamp
     }
 
-    /// Returns the guardian token, if present (v2 vouchers).
+    /// Returns the guardian token, if present (guardian vouchers).
     pub fn guardian_token(&self) -> Option<&guardian::GuardianToken> {
         self.guardian_token.as_ref()
     }
 
     /// Verifies the voucher signature.
     pub fn verify(&self) -> bool {
-        let data =
-            Self::build_sign_data(&self.old_pk, &self.new_pk, &self.voucher_pk, self.timestamp);
+        let data = Self::build_sign_data(
+            &self.old_pk,
+            &self.new_pk,
+            &self.voucher_pk,
+            self.timestamp,
+            self.guardian_token.as_ref(),
+        );
         let public_key = PublicKey::from_bytes(*self.voucher_pk.as_bytes());
         let signature = Signature::from_bytes(self.signature);
         public_key.verify(&data, &signature)
@@ -479,9 +518,9 @@ impl RecoveryVoucher {
         bytes
     }
 
-    /// Deserializes a voucher from bytes.
-    ///
-    /// Accepts both current formats: contact and guardian vouchers.
+    /// Deserializes a voucher from exactly its bytes: a contact voucher is
+    /// its 169-byte header, a guardian voucher the header, a token length
+    /// and that many token bytes (DC-01, private#930).
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, RecoveryError> {
         // Version (1) + old_pk (32) + new_pk (32) + voucher_pk (32) + timestamp (8) + signature (64) = 169
         let (header, rest) = bytes
@@ -511,16 +550,19 @@ impl RecoveryVoucher {
             .try_into()
             .map_err(|_| RecoveryError::InvalidFormat)?;
 
-        let guardian_token = if version == GUARDIAN_VOUCHER_FORMAT && !rest.is_empty() {
+        let guardian_token = if version == GUARDIAN_VOUCHER_FORMAT {
             let (token_len, token) = rest
                 .split_first_chunk::<4>()
                 .ok_or(RecoveryError::InvalidFormat)?;
             let token_len = u32::from_le_bytes(*token_len) as usize;
-            let token_bytes = token.get(..token_len).ok_or(RecoveryError::InvalidFormat)?;
-            let token = guardian::GuardianToken::from_bytes(token_bytes)?;
-            Some(token)
-        } else {
+            if token.len() != token_len {
+                return Err(RecoveryError::InvalidFormat);
+            }
+            Some(guardian::GuardianToken::from_bytes(token)?)
+        } else if rest.is_empty() {
             None
+        } else {
+            return Err(RecoveryError::InvalidFormat);
         };
 
         Ok(Self {
@@ -636,14 +678,13 @@ impl RecoveryProof {
         self.version
     }
 
-    /// Validates that this proof's version is supported (#72).
-    ///
-    /// Returns `Err` if the proof was serialized by a newer version
-    /// of the software that we don't understand.
+    /// Validates that this proof's version is the one this code reads
+    /// (#72): there is no older schema to accept, and a newer one is not
+    /// understood (private#930).
     pub fn validate_version(&self) -> Result<(), RecoveryError> {
-        if self.version > RECOVERY_PROOF_VERSION {
+        if self.version != RECOVERY_PROOF_VERSION {
             return Err(RecoveryError::InvalidProof(format!(
-                "unsupported proof version {} (max supported: {})",
+                "unsupported proof version {} (this code reads {})",
                 self.version, RECOVERY_PROOF_VERSION
             )));
         }
@@ -711,20 +752,7 @@ impl RecoveryProof {
         if !voucher.verify() {
             return Err(RecoveryError::InvalidSignature);
         }
-
-        if let Some(ref token) = voucher.guardian_token {
-            if !token.verify() {
-                return Err(RecoveryError::InvalidSignature);
-            }
-            // Token's designator_pk must match the proof's old_pk (the recovering identity)
-            if token.designator_pk() != self.old_pk.as_bytes() {
-                return Err(RecoveryError::MismatchedKeys);
-            }
-            // Token's guardian_pk must match the voucher's signer
-            if token.guardian_pk() != voucher.voucher_pk().as_bytes() {
-                return Err(RecoveryError::MismatchedKeys);
-            }
-        }
+        self.check_guardian_token(&voucher)?;
 
         if self
             .vouchers
@@ -771,18 +799,53 @@ impl RecoveryProof {
         earliest_voucher_too_old || now > self.expires_at
     }
 
-    /// [`Self::validate`], and the proof is still within its window at `now`.
-    /// This is what a contact runs before scoring the proof (private#926).
+    /// [`Self::validate`], and the proof is still within its window at `now`
+    /// with no voucher stamped past the skew bound. This is what a contact
+    /// runs before scoring the proof (private#926, #930).
     pub fn validate_at(&self, now: u64) -> Result<(), RecoveryError> {
         self.validate()?;
+        if self
+            .vouchers
+            .iter()
+            .any(|v| RecoveryClaim::is_from_the_future(v.timestamp(), now))
+        {
+            return Err(RecoveryError::TimestampInFuture);
+        }
         if self.is_expired(now) {
             return Err(RecoveryError::ProofExpired);
         }
         Ok(())
     }
 
-    /// Validates the proof has sufficient valid vouchers.
+    /// A guardian token, when carried, verifies and names this proof's old
+    /// key as designator and the voucher's signer as guardian.
+    fn check_guardian_token(&self, voucher: &RecoveryVoucher) -> Result<(), RecoveryError> {
+        let Some(token) = voucher.guardian_token() else {
+            return Ok(());
+        };
+        if !token.verify() {
+            return Err(RecoveryError::InvalidSignature);
+        }
+        if token.designator_pk() != self.old_pk.as_bytes()
+            || token.guardian_pk() != voucher.voucher_pk().as_bytes()
+        {
+            return Err(RecoveryError::MismatchedKeys);
+        }
+        Ok(())
+    }
+
+    /// Validates the proof's shape and that it has sufficient valid
+    /// vouchers: a threshold within [`RecoverySettings`]' bounds, and every
+    /// voucher signed, from a third party, for these keys, with any guardian
+    /// token verified and naming the recovering identity and the signer
+    /// (private#930).
     pub fn validate(&self) -> Result<(), RecoveryError> {
+        if self.threshold < RecoverySettings::MIN_RECOVERY_THRESHOLD {
+            return Err(RecoveryError::ThresholdTooLow);
+        }
+        if self.threshold > RecoverySettings::MAX_RECOVERY_THRESHOLD {
+            return Err(RecoveryError::ThresholdTooHigh);
+        }
         if self.vouchers.len() < self.threshold as usize {
             return Err(RecoveryError::InsufficientVouchers(self.threshold));
         }
@@ -801,6 +864,7 @@ impl RecoveryProof {
             if voucher.old_pk != self.old_pk || voucher.new_pk != self.new_pk {
                 return Err(RecoveryError::MismatchedKeys);
             }
+            self.check_guardian_token(voucher)?;
         }
 
         let timestamps = self.vouchers.iter().map(RecoveryVoucher::timestamp);
@@ -878,9 +942,16 @@ impl RecoveryProof {
         postcard::to_allocvec(self).map_err(|e| RecoveryError::SerializationError(e.to_string()))
     }
 
-    /// Deserializes a proof from bytes.
+    /// Deserializes a proof from exactly its postcard bytes, at the version
+    /// this code reads (DC-01, private#930).
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, RecoveryError> {
-        postcard::from_bytes(bytes).map_err(|e| RecoveryError::SerializationError(e.to_string()))
+        let (proof, rest): (Self, &[u8]) = postcard::take_from_bytes(bytes)
+            .map_err(|e| RecoveryError::SerializationError(e.to_string()))?;
+        if !rest.is_empty() {
+            return Err(RecoveryError::InvalidFormat);
+        }
+        proof.validate_version()?;
+        Ok(proof)
     }
 
     /// The form the relay stores: `SEALED_RECOVERY_PROOF_VERSION || new_pk`
@@ -1247,13 +1318,17 @@ impl RecoveryProgress {
     /// Adds a voucher after validating it against the claim.
     ///
     /// Checks: key binding (old_pk/new_pk match claim), signature validity,
-    /// no self-vouching, no duplicates. Mirrors `RecoveryProof::add_voucher`.
+    /// no self-vouching by the new key or the old one, which may be a
+    /// thief's (private#797, #930), no duplicates. Mirrors
+    /// `RecoveryProof::add_voucher`.
     pub fn add_voucher(&mut self, voucher: RecoveryVoucher) -> Result<usize, RecoveryError> {
         if voucher.old_pk() != self.claim.old_pk() || voucher.new_pk() != self.claim.new_pk() {
             return Err(RecoveryError::MismatchedKeys);
         }
 
-        if voucher.voucher_pk() == self.claim.new_pk() {
+        if voucher.voucher_pk() == self.claim.new_pk()
+            || voucher.voucher_pk() == self.claim.old_pk()
+        {
             return Err(RecoveryError::SelfVouching);
         }
 

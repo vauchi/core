@@ -29,6 +29,8 @@ mod content_updates;
 mod content_updates_tests;
 mod design_tokens;
 mod exchange;
+#[cfg(test)]
+mod hardware_batch_tests;
 mod i18n;
 #[cfg(test)]
 mod kept_pick_tests;

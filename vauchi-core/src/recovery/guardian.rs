@@ -128,9 +128,15 @@ impl GuardianToken {
         postcard::to_allocvec(self).expect("GuardianToken serialization must not fail")
     }
 
-    /// Deserializes a token from postcard bytes.
+    /// Deserializes a token from exactly its postcard bytes (DC-01,
+    /// private#930).
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, RecoveryError> {
-        postcard::from_bytes(bytes).map_err(|e| RecoveryError::SerializationError(e.to_string()))
+        let (token, rest): (Self, &[u8]) = postcard::take_from_bytes(bytes)
+            .map_err(|e| RecoveryError::SerializationError(e.to_string()))?;
+        if !rest.is_empty() {
+            return Err(RecoveryError::InvalidFormat);
+        }
+        Ok(token)
     }
 
     /// Overwrites the embedded `guardian_pk` without re-signing.

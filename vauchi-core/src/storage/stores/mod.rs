@@ -26,7 +26,7 @@ mod device_delivery;
 mod emergency;
 mod field_notes;
 mod genesis_limit;
-mod identity;
+pub(super) mod identity;
 mod labels;
 mod ohttp_cache;
 mod own_card;

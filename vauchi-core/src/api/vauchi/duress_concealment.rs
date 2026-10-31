@@ -145,10 +145,20 @@ impl Vauchi {
     /// Starts the duress copy from the real card the first time a duress
     /// session needs it; later sessions keep what earlier ones edited.
     pub(super) fn seed_duress_own_card(&self) -> VauchiResult<()> {
+        let identity = self.storage.identity();
+        if !identity.duress_copy_in_use()? {
+            self.restart_duress_own_card()?;
+            identity.mark_duress_copy_in_use()?;
+        }
+        Ok(())
+    }
+
+    /// Makes the duress copy the real card again. Every identity with an app
+    /// password has the copy, so its row does not say whether a duress PIN
+    /// was ever set (ADR-032, vauchi/private#947).
+    pub(super) fn restart_duress_own_card(&self) -> VauchiResult<()> {
         let contacts = self.storage.contacts();
-        if contacts.duress_own_card().load()?.is_none()
-            && let Some(real) = contacts.own_card().load()?
-        {
+        if let Some(real) = contacts.own_card().load()? {
             contacts.duress_own_card().save(&real)?;
         }
         Ok(())

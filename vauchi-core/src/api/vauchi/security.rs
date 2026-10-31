@@ -250,6 +250,7 @@ impl Vauchi {
         self.storage
             .identity()
             .save_app_password(config.password_hash(), config.password_salt())?;
+        self.restart_duress_own_card()?;
 
         Ok(())
     }
@@ -381,6 +382,7 @@ impl Vauchi {
             return Ok(());
         }
         self.storage.identity().disable_duress()?;
+        self.restart_duress_own_card()?;
         Ok(())
     }
 

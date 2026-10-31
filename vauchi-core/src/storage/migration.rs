@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 92] = [
+const MIGRATIONS: [Migration; 93] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -732,7 +732,97 @@ const MIGRATIONS: [Migration; 92] = [
         name: "revoked_sender_name",
         action: MigrationAction::Callback(migrate_v92_revoked_sender_name),
     },
+    Migration {
+        version: 93,
+        name: "sealed_duress",
+        action: MigrationAction::Callback(migrate_v93_sealed_duress),
+    },
 ];
+
+/// Migration v93: whether a duress PIN exists is no longer readable without
+/// the storage key (ADR-032, vauchi/private#947). Every identity with an app
+/// password gets a duress seal, the PIN's hash or a random cover, and a
+/// duress own-card copy; the plain `duress_enabled` flag stays 0. A callback
+/// because the seal and the copy are encrypted.
+fn migrate_v93_sealed_duress(conn: &Connection, key: &SymmetricKey) -> Result<(), StorageError> {
+    use crate::crypto::{decrypt, encrypt};
+    use crate::storage::stores::identity::{DURESS_COPY_IN_USE, DURESS_PIN_SET, seal_duress};
+    use rusqlite::params;
+
+    let row = conn.query_row(
+        "SELECT password_hash_encrypted, duress_hash_encrypted, duress_enabled FROM identity WHERE id = 1",
+        [],
+        |row| {
+            Ok((
+                row.get::<_, Option<Vec<u8>>>(0)?,
+                row.get::<_, Option<Vec<u8>>>(1)?,
+                row.get::<_, i64>(2)?,
+            ))
+        },
+    );
+    let (duress_hash_encrypted, duress_enabled) = match row {
+        Ok((Some(_), duress_hash_encrypted, duress_enabled)) => {
+            (duress_hash_encrypted, duress_enabled)
+        }
+        Ok((None, _, _)) | Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(()),
+        Err(e) => return Err(StorageError::Database(e)),
+    };
+    let copy_exists: bool = conn.query_row(
+        "SELECT COUNT(*) > 0 FROM duress_own_card WHERE id = 1",
+        [],
+        |row| row.get(0),
+    )?;
+
+    let pin = match (duress_enabled, duress_hash_encrypted) {
+        (1, Some(sealed)) => {
+            let hash: [u8; 32] = decrypt(key, &sealed)
+                .map_err(|e| StorageError::Migration(format!("Decrypt duress_hash: {e}")))?
+                .try_into()
+                .map_err(|_| StorageError::Migration("duress hash has invalid length".into()))?;
+            Some(hash)
+        }
+        _ => None,
+    };
+    let sealed = match pin {
+        Some(hash) => {
+            let in_use = if copy_exists { DURESS_COPY_IN_USE } else { 0 };
+            seal_duress(key, DURESS_PIN_SET | in_use, &hash)?
+        }
+        None => seal_duress(key, 0, &crate::crypto::random_bytes())?,
+    };
+    if pin.is_some() {
+        conn.execute(
+            "UPDATE identity SET duress_hash_encrypted = ?1, duress_enabled = 0 WHERE id = 1",
+            params![sealed],
+        )?;
+    } else {
+        let salt: [u8; 16] = crate::crypto::random_bytes();
+        conn.execute(
+            "UPDATE identity SET duress_hash_encrypted = ?1, duress_salt = ?2, duress_enabled = 0 WHERE id = 1",
+            params![sealed, salt.as_slice()],
+        )?;
+    }
+
+    if !copy_exists {
+        let real = conn.query_row(
+            "SELECT card_json_encrypted, updated_at FROM own_card WHERE id = 1",
+            [],
+            |row| Ok((row.get::<_, Option<Vec<u8>>>(0)?, row.get::<_, i64>(1)?)),
+        );
+        if let Ok((Some(encrypted), updated_at)) = real {
+            let card = decrypt(key, &encrypted)
+                .map_err(|e| StorageError::Migration(format!("Decrypt own card: {e}")))?;
+            let copy = encrypt(key, &card)
+                .map_err(|e| StorageError::Migration(format!("Encrypt own card copy: {e}")))?;
+            conn.execute(
+                "INSERT INTO duress_own_card (id, card_json, card_json_encrypted, updated_at)
+                 VALUES (1, '', ?1, ?2)",
+                params![copy, updated_at],
+            )?;
+        }
+    }
+    Ok(())
+}
 
 /// Migration v92: a revoked contact's name stays with its tombstone, so a
 /// helper can still name whom a recovery claim for that key belongs to

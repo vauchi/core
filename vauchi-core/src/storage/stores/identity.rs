@@ -90,7 +90,10 @@ impl IdentityStore<'_> {
     }
     /// Saves the app password hash and salt to the identity table.
     ///
-    /// The hash is encrypted with the storage key before persisting.
+    /// The hash is encrypted with the storage key before persisting. The
+    /// first save also writes a duress cover, so the row has a duress salt
+    /// and seal whether or not a duress PIN is ever set (ADR-032,
+    /// vauchi/private#947).
     pub fn save_app_password(&self, hash: &[u8; 32], salt: &[u8; 16]) -> Result<(), StorageError> {
         let encrypted_hash = crate::crypto::encrypt(self.key, hash)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
@@ -99,26 +102,39 @@ impl IdentityStore<'_> {
             "UPDATE identity SET password_hash_encrypted = ?1, password_salt = ?2 WHERE id = 1",
             params![encrypted_hash, salt.as_slice()],
         )?;
+        if self.load_duress_seal()?.is_none() {
+            self.write_duress_cover()?;
+        }
 
         Ok(())
     }
     /// Saves the duress password hash and salt, and enables duress mode.
     ///
-    /// The hash is encrypted with the storage key before persisting.
+    /// The hash is sealed with the storage key together with the flags; a
+    /// duress session's hold on the own-card copy survives a new PIN.
     pub fn save_duress_password(
         &self,
         hash: &[u8; 32],
         salt: &[u8; 16],
     ) -> Result<(), StorageError> {
-        let encrypted_hash = crate::crypto::encrypt(self.key, hash)
-            .map_err(|e| StorageError::Encryption(e.to_string()))?;
-
-        self.conn.execute(
-            "UPDATE identity SET duress_hash_encrypted = ?1, duress_salt = ?2, duress_enabled = 1 WHERE id = 1",
-            params![encrypted_hash, salt.as_slice(), ],
-        )?;
-
-        Ok(())
+        let copy_in_use = self
+            .load_duress_seal()?
+            .map_or(0, |seal| seal.flags & DURESS_COPY_IN_USE);
+        self.write_duress_seal(DURESS_PIN_SET | copy_in_use, hash, salt)
+    }
+    /// Whether a duress session has taken the own-card copy over since the
+    /// PIN was set; until then the copy starts again from the real card.
+    pub fn duress_copy_in_use(&self) -> Result<bool, StorageError> {
+        Ok(self
+            .load_duress_seal()?
+            .is_some_and(|seal| seal.flags & DURESS_COPY_IN_USE != 0))
+    }
+    /// Records that a duress session has taken the own-card copy over.
+    pub fn mark_duress_copy_in_use(&self) -> Result<(), StorageError> {
+        let seal = self
+            .load_duress_seal()?
+            .ok_or_else(|| StorageError::InvalidData("no duress seal".into()))?;
+        self.write_duress_seal(seal.flags | DURESS_COPY_IN_USE, &seal.hash, &seal.salt)
     }
     /// Loads the password configuration from the identity table.
     ///
@@ -127,27 +143,18 @@ impl IdentityStore<'_> {
         &self,
     ) -> Result<Option<crate::identity::password_config::AppPasswordConfig>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT password_hash_encrypted, password_salt, duress_hash_encrypted, duress_salt, duress_enabled FROM identity WHERE id = 1",
+            "SELECT password_hash_encrypted, password_salt FROM identity WHERE id = 1",
             [],
             |row| {
                 Ok((
                     row.get::<_, Option<Vec<u8>>>(0)?,
                     row.get::<_, Option<Vec<u8>>>(1)?,
-                    row.get::<_, Option<Vec<u8>>>(2)?,
-                    row.get::<_, Option<Vec<u8>>>(3)?,
-                    row.get::<_, i32>(4)?,
                 ))
             },
         );
 
         match result {
-            Ok((
-                Some(hash_enc),
-                Some(salt_bytes),
-                duress_hash_enc,
-                duress_salt_bytes,
-                duress_enabled,
-            )) => {
+            Ok((Some(hash_enc), Some(salt_bytes))) => {
                 let hash_bytes = crate::crypto::decrypt(self.key, &hash_enc)
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
@@ -159,52 +166,32 @@ impl IdentityStore<'_> {
                     StorageError::InvalidData("password salt has invalid length".into())
                 })?;
 
-                let duress_hash = if let Some(enc) = duress_hash_enc {
-                    let bytes = crate::crypto::decrypt(self.key, &enc)
-                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
-                    let arr: [u8; 32] = bytes.try_into().map_err(|_| {
-                        StorageError::InvalidData("duress hash has invalid length".into())
-                    })?;
-                    Some(arr)
-                } else {
-                    None
-                };
-
-                let duress_salt = if let Some(bytes) = duress_salt_bytes {
-                    let arr: [u8; 16] = bytes.try_into().map_err(|_| {
-                        StorageError::InvalidData("duress salt has invalid length".into())
-                    })?;
-                    Some(arr)
-                } else {
-                    None
-                };
+                let duress = self
+                    .load_duress_seal()?
+                    .filter(|seal| seal.flags & DURESS_PIN_SET != 0);
 
                 Ok(Some(
                     crate::identity::password_config::AppPasswordConfig::from_stored(
                         password_hash,
                         password_salt,
-                        duress_hash,
-                        duress_salt,
-                        duress_enabled != 0,
+                        duress.as_ref().map(|seal| seal.hash),
+                        duress.as_ref().map(|seal| seal.salt),
+                        duress.is_some(),
                     ),
                 ))
             }
-            Ok((None, _, _, _, _)) | Ok((_, None, _, _, _)) => Ok(None),
+            Ok(_) => Ok(None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),
         }
     }
-    /// Disables duress mode and clears duress hash/salt.
+    /// Disables duress mode: the seal becomes a cover again, as for an
+    /// identity that never had a PIN.
     pub fn disable_duress(&self) -> Result<(), StorageError> {
-        self.conn.execute(
-            "UPDATE identity SET duress_hash_encrypted = NULL, duress_salt = NULL, duress_enabled = 0 WHERE id = 1",
-            [],
-        )?;
-        // The copy a duress session edited goes with the setup; a new one
-        // starts from the real card again (vauchi/private#811).
-        self.conn.execute("DELETE FROM duress_own_card", [])?;
+        self.write_duress_cover()?;
         // And so do the groups, tags and places its sessions made
-        // (vauchi/private#813).
+        // (vauchi/private#813). The own-card copy stays, as every identity
+        // has one; the caller starts it again from the real card.
         for table in [
             "duress_visibility_labels",
             "duress_contact_visibility_overrides",
@@ -216,4 +203,79 @@ impl IdentityStore<'_> {
 
         Ok(())
     }
+    fn load_duress_seal(&self) -> Result<Option<DuressSeal>, StorageError> {
+        let (sealed, salt) = match self.conn.query_row(
+            "SELECT duress_hash_encrypted, duress_salt FROM identity WHERE id = 1",
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, Option<Vec<u8>>>(0)?,
+                    row.get::<_, Option<Vec<u8>>>(1)?,
+                ))
+            },
+        ) {
+            Ok((Some(sealed), Some(salt))) => (sealed, salt),
+            Ok(_) | Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(None),
+            Err(e) => return Err(StorageError::Database(e)),
+        };
+        let opened = crate::crypto::decrypt(self.key, &sealed)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let Some((&flags, hash)) = opened.split_first() else {
+            return Err(StorageError::InvalidData("duress seal is empty".into()));
+        };
+        Ok(Some(DuressSeal {
+            flags,
+            hash: hash
+                .try_into()
+                .map_err(|_| StorageError::InvalidData("duress seal has invalid length".into()))?,
+            salt: salt
+                .try_into()
+                .map_err(|_| StorageError::InvalidData("duress salt has invalid length".into()))?,
+        }))
+    }
+    fn write_duress_seal(
+        &self,
+        flags: u8,
+        hash: &[u8; 32],
+        salt: &[u8; 16],
+    ) -> Result<(), StorageError> {
+        self.conn.execute(
+            "UPDATE identity SET duress_hash_encrypted = ?1, duress_salt = ?2, duress_enabled = 0 WHERE id = 1",
+            params![seal_duress(self.key, flags, hash)?, salt.as_slice()],
+        )?;
+        Ok(())
+    }
+    fn write_duress_cover(&self) -> Result<(), StorageError> {
+        self.write_duress_seal(
+            0,
+            &crate::crypto::random_bytes(),
+            &crate::crypto::random_bytes(),
+        )
+    }
+}
+
+/// Seal flag: a duress PIN is set.
+pub(crate) const DURESS_PIN_SET: u8 = 1;
+/// Seal flag: a duress session has taken the own-card copy over.
+pub(crate) const DURESS_COPY_IN_USE: u8 = 2;
+
+/// The duress hash with its flags, as sealed in `duress_hash_encrypted`.
+struct DuressSeal {
+    flags: u8,
+    hash: [u8; 32],
+    salt: [u8; 16],
+}
+
+/// `flags || hash` under the storage key. Every identity with an app password
+/// carries one, a random cover when no PIN is set, so the plain columns and
+/// the blob's length are the same either way (ADR-032, vauchi/private#947).
+pub(crate) fn seal_duress(
+    key: &SymmetricKey,
+    flags: u8,
+    hash: &[u8; 32],
+) -> Result<Vec<u8>, StorageError> {
+    let mut plain = [0u8; 33];
+    plain[0] = flags;
+    plain[1..].copy_from_slice(hash);
+    crate::crypto::encrypt(key, &plain).map_err(|e| StorageError::Encryption(e.to_string()))
 }

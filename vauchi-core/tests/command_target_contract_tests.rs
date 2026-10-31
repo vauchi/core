@@ -8,7 +8,9 @@
 
 use std::collections::BTreeSet;
 
-use vauchi_core::{BleLinkDirection, Command, CommandTarget, DirectEndpoint, FilePickPurpose};
+use vauchi_core::{
+    BleLinkDirection, CameraPurpose, Command, CommandTarget, DirectEndpoint, FilePickPurpose,
+};
 
 fn fixture_hardware_names() -> BTreeSet<String> {
     let fixture: serde_json::Value =
@@ -134,6 +136,13 @@ fn hardware_commands() -> Vec<Command> {
         Command::SaveRestorableState {
             state: "state".into(),
         },
+        Command::CameraCapture {
+            preview_id: "camera-1".into(),
+            purpose: CameraPurpose::QrScan,
+        },
+        Command::CameraStop {
+            preview_id: "camera-1".into(),
+        },
     ]
 }
 
@@ -171,6 +180,9 @@ fn display_commands() -> Vec<Command> {
         Command::ReloadTheme,
         Command::RequestPermission {
             transport: "ble".into(),
+        },
+        Command::CameraViewport {
+            preview_id: "camera-1".into(),
         },
     ]
 }

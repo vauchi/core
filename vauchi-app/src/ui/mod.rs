@@ -47,6 +47,7 @@ mod form_dialog;
 mod gdpr;
 pub mod group_detail;
 mod groups_list;
+pub(crate) mod hardware_route;
 mod help;
 pub mod info_content;
 #[cfg(feature = "network-rustls")]

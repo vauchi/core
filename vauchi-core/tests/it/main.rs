@@ -221,6 +221,7 @@ mod display_preference_stateful_proptest;
 mod dual_vauchi_repro_test;
 mod duplicate_detection_engine_tests;
 mod duress_alert_secondary_device_tests;
+mod duress_at_rest_tests;
 mod duress_contact_api_tests;
 mod duress_contact_reads_by_id_tests;
 mod duress_cover_device_sync_tests;

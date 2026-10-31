@@ -14,7 +14,9 @@ use crate::api::error::{VauchiError, VauchiResult};
 use crate::network::HttpTransport;
 use crate::recovery::guardian::GuardianToken;
 use crate::recovery::sealed_box;
-use crate::recovery::{RecoveryClaim, RecoveryProof, RecoveryVoucher, VerificationResult};
+use crate::recovery::{
+    RecoveryClaim, RecoveryError, RecoveryProof, RecoveryVoucher, VerificationResult,
+};
 use vauchi_protocol::v2::V2GuardianEntry;
 
 use super::Vauchi;
@@ -127,13 +129,29 @@ impl Vauchi {
         &self,
         proof_bytes: &[u8],
     ) -> VauchiResult<(RecoveryProof, VerificationResult)> {
-        let proof = RecoveryProof::from_bytes(proof_bytes)
-            .map_err(|e| VauchiError::Serialization(e.to_string()))?;
+        let contacts = self.storage.contacts().list_contacts()?;
+        let proof = if RecoveryProof::is_sealed(proof_bytes) {
+            // A proof fetched from the relay is sealed to the old key, which
+            // the reader holds only as one of their contacts (private#936).
+            match RecoveryProof::open_sealed_for_contacts(proof_bytes, &contacts) {
+                Ok(proof) => proof,
+                Err(RecoveryError::DecryptionFailed) => {
+                    return Err(VauchiError::ContactNotFound(
+                        "the recovery proof is sealed to an old key that is not one of your \
+                         contacts"
+                            .into(),
+                    ));
+                }
+                Err(e) => return Err(VauchiError::Serialization(e.to_string())),
+            }
+        } else {
+            RecoveryProof::from_bytes(proof_bytes)
+                .map_err(|e| VauchiError::Serialization(e.to_string()))?
+        };
         proof
             .validate_at(self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
 
-        let contacts = self.storage.contacts().list_contacts()?;
         let settings = self
             .storage
             .recovery()
@@ -187,7 +205,7 @@ impl Vauchi {
             .validate_at(self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         let proof_bytes = proof
-            .to_bytes()
+            .seal_for_relay()
             .map_err(|e| VauchiError::Serialization(e.to_string()))?;
 
         // Key: hash(old_pk) — same key contacts will query

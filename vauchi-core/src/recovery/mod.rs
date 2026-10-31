@@ -34,7 +34,7 @@ use serde_with::serde_as;
 use thiserror::Error;
 
 use crate::contact::Contact;
-use crate::crypto::{PublicKey, Signature, SigningKeyPair};
+use crate::crypto::{HKDF, PublicKey, Signature, SigningKeyPair, SymmetricKey};
 use crate::identifiers::IdentityKey;
 
 pub mod guardian;
@@ -543,6 +543,28 @@ impl RecoveryVoucher {
 /// Current serialization format version for recovery proofs (#72).
 pub const RECOVERY_PROOF_VERSION: u8 = 2;
 
+/// Version byte of the form the relay stores: the plain header, then the
+/// proof encrypted to the old key (spec Social Recovery B3, private#936).
+pub const SEALED_RECOVERY_PROOF_VERSION: u8 = 3;
+
+/// HKDF domain of the key that seals a stored proof to its old identity key.
+pub const SEALED_RECOVERY_PROOF_INFO: &[u8] = b"Vauchi_RecoveryProof_v3";
+
+/// The relay reads this much of a sealed proof: the version and `new_pk`.
+const SEALED_RECOVERY_PROOF_HEADER_LEN: usize = 1 + 32;
+
+/// What `crypto::encrypt_with_ad` adds to a plaintext: its algorithm tag,
+/// the XChaCha20 nonce and the Poly1305 tag. Only sizes a buffer.
+const SEALED_RECOVERY_PROOF_AEAD_OVERHEAD: usize = 1 + 24 + 16;
+
+/// Whoever holds the old identity key, and only they, opens a stored proof;
+/// the relay binds the slot to `new_pk` from the header and sees no helper
+/// (owner decision 2026-10-31, private#936).
+fn relay_sealing_key(old_pk: &IdentityKey) -> SymmetricKey {
+    let key = HKDF::derive_key(None, old_pk.as_bytes(), SEALED_RECOVERY_PROOF_INFO);
+    SymmetricKey::from_bytes(*key)
+}
+
 /// Hex-encoded length of an Ed25519 identity public key.
 ///
 /// 32 bytes × 2 hex characters per byte = 64 characters. Used by
@@ -859,6 +881,81 @@ impl RecoveryProof {
     /// Deserializes a proof from bytes.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, RecoveryError> {
         postcard::from_bytes(bytes).map_err(|e| RecoveryError::SerializationError(e.to_string()))
+    }
+
+    /// The form the relay stores: `SEALED_RECOVERY_PROOF_VERSION || new_pk`
+    /// in the clear, then the postcard proof encrypted under
+    /// `HKDF(old_pk, SEALED_RECOVERY_PROOF_INFO)` with that header as
+    /// associated data, so the relay learns the uploader's key and nothing
+    /// else, and a header moved onto another body fails the tag.
+    pub fn seal_for_relay(&self) -> Result<Vec<u8>, RecoveryError> {
+        let plain = self.to_bytes()?;
+        let mut sealed = Vec::with_capacity(capacity(&[
+            SEALED_RECOVERY_PROOF_HEADER_LEN,
+            plain.len(),
+            SEALED_RECOVERY_PROOF_AEAD_OVERHEAD,
+        ]));
+        sealed.push(SEALED_RECOVERY_PROOF_VERSION);
+        sealed.extend_from_slice(self.new_pk.as_bytes());
+        let body =
+            crate::crypto::encrypt_with_ad(&relay_sealing_key(&self.old_pk), &plain, &sealed)
+                .map_err(|_| RecoveryError::SerializationError("sealing failed".into()))?;
+        sealed.extend_from_slice(&body);
+        Ok(sealed)
+    }
+
+    /// Whether `bytes` are a proof in the form the relay stores, as opposed
+    /// to the plain postcard a person pastes or keeps in a file.
+    pub fn is_sealed(bytes: &[u8]) -> bool {
+        bytes.first() == Some(&SEALED_RECOVERY_PROOF_VERSION)
+    }
+
+    /// Opens a stored proof with the old identity key it was sealed to.
+    ///
+    /// Refuses a blob too short to hold a header, a header version this
+    /// reader does not know, a body another key sealed or that was changed
+    /// (`DecryptionFailed`), and a body whose keys disagree with the header
+    /// or the key used.
+    pub fn open_sealed(sealed: &[u8], old_pk: &IdentityKey) -> Result<Self, RecoveryError> {
+        let (header, body) = match sealed.split_at_checked(SEALED_RECOVERY_PROOF_HEADER_LEN) {
+            Some((header, body)) if !body.is_empty() => (header, body),
+            _ => return Err(RecoveryError::InvalidFormat),
+        };
+        let (&version, header_new_pk) = header.split_first().ok_or(RecoveryError::InvalidFormat)?;
+        if version != SEALED_RECOVERY_PROOF_VERSION {
+            return Err(RecoveryError::InvalidProof(format!(
+                "unsupported sealed proof version {version} (expected {SEALED_RECOVERY_PROOF_VERSION})"
+            )));
+        }
+        let plain = crate::crypto::decrypt_with_ad(&relay_sealing_key(old_pk), body, header)
+            .map_err(|_| RecoveryError::DecryptionFailed)?;
+        let proof = Self::from_bytes(&plain)?;
+        if proof.new_pk.as_bytes() != header_new_pk || &proof.old_pk != old_pk {
+            return Err(RecoveryError::InvalidProof(
+                "sealed proof header does not match its body".into(),
+            ));
+        }
+        Ok(proof)
+    }
+
+    /// Opens a stored proof with whichever of `contacts` it was sealed to,
+    /// which is how a contact reads a proof found under one of their
+    /// contacts' key hashes. `DecryptionFailed` when none of them opens it.
+    pub fn open_sealed_for_contacts(
+        sealed: &[u8],
+        contacts: &[Contact],
+    ) -> Result<Self, RecoveryError> {
+        let mut outcome = Err(RecoveryError::DecryptionFailed);
+        for old_pk in contacts.iter().filter_map(|c| c.public_key()) {
+            match Self::open_sealed(sealed, &IdentityKey::from_bytes(*old_pk)) {
+                Err(RecoveryError::DecryptionFailed) => continue,
+                other => {
+                    outcome = other;
+                    break;
+                }
+            }
+        }
+        outcome
     }
 }
 

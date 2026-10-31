@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Core's let_underscore_must_use allows, held by
+# scripts/check-ignored-results.sh (vauchi/private#747). Lower it in the
+# MR that removes allows; never raise it.
+85

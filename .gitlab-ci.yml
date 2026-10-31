@@ -245,6 +245,27 @@ check:spec-names:
         - .gitlab-ci.yml
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
+# Holds the let_underscore_must_use allows at .ignored-results-baseline:
+# each one lets a Result be dropped unseen, so a new one fails, and an MR
+# that removes some lowers the baseline with them (vauchi/private#747).
+check:ignored-results:
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
+  tags: [docker]
+  needs: []
+  script:
+    - sh ci/tests/ignored-results-ratchet.test.sh
+    - sh scripts/check-ignored-results.sh
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "vauchi-*/**/*.rs"
+        - .ignored-results-baseline
+        - scripts/check-ignored-results.sh
+        - ci/tests/ignored-results-ratchet.test.sh
+        - .gitlab-ci.yml
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
 check:auto-tag-order:
   stage: lint
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21

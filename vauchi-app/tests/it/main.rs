@@ -269,6 +269,7 @@ mod social_network_display_tests;
 mod social_rule_from_network_list_tests;
 mod stale_binding_event_tests;
 mod status_indicator_label_tests;
+mod storage_lock_hardware_routing_tests;
 mod storage_lock_presentation_tests;
 mod surface_colors_tests;
 mod sync_chrome_overlay_tests;

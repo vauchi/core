@@ -662,13 +662,14 @@ impl PlatformAppEngine {
     /// commands produced by the tick); the shell schedules it and calls this
     /// method again when it fires.
     pub fn on_wakeup(&self) -> Result<String, MobileError> {
-        let (items, pending_commands, invalidation_targets) = {
+        let (items, pending_commands, hardware, invalidation_targets) = {
             let mut engine_slot = self.lock_engine()?;
             let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
             let items = engine.on_wakeup();
             let invalidation_targets = self.poll_tick_invalidation_targets(engine);
             let pending_commands = engine.drain_pending_commands();
-            (items, pending_commands, invalidation_targets)
+            let hardware = engine.drain_hardware_commands();
+            (items, pending_commands, hardware, invalidation_targets)
         };
         if invalidation_targets.is_some() {
             self.fire_presentation_invalidated();
@@ -700,7 +701,7 @@ impl PlatformAppEngine {
                 os_category_options: n.os_category_options,
             })
             .collect();
-        wakeup_envelope_to_json(&mapped, &pending_commands)
+        wakeup_envelope_to_json(&mapped, &pending_commands, &hardware)
     }
 
     /// Report device hardware capabilities.

@@ -22,17 +22,23 @@ use crate::types::notification::MobilePendingNotification;
 struct WakeupEnvelope<'a> {
     notifications: &'a [MobilePendingNotification],
     commands: &'a [Command],
+    #[serde(skip_serializing_if = "<[Command]>::is_empty")]
+    hardware: &'a [Command],
 }
 
 /// Serialize the OS notifications + drained `Command`s from `on_wakeup` into
-/// the wakeup envelope JSON shape `{"notifications": [...], "commands": [...]}`.
+/// the wakeup envelope JSON shape `{"notifications": [...], "commands": [...]}`,
+/// with the hardware shell's commands under `hardware` once one has reported
+/// in (ADR-077).
 pub(crate) fn wakeup_envelope_to_json(
     notifications: &[MobilePendingNotification],
     commands: &[Command],
+    hardware: &[Command],
 ) -> Result<String, MobileError> {
     let envelope = WakeupEnvelope {
         notifications,
         commands,
+        hardware,
     };
     serde_json::to_string(&envelope).map_err(|e| MobileError::Other {
         detail: format!("Failed to serialize WakeupEnvelope: {e}"),

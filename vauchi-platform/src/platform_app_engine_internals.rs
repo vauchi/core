@@ -53,7 +53,9 @@ impl PlatformAppEngine {
                 .map_err(|e| MobileError::Other {
                     detail: e.to_string(),
                 })?;
-        crate::json_helpers::wakeup_envelope_to_json(&[], &[next_run])
+        let commands = engine.route_to_shells(vec![next_run]);
+        let hardware = engine.drain_hardware_commands();
+        crate::json_helpers::wakeup_envelope_to_json(&[], &commands, &hardware)
     }
 
     /// Build a `SecureStorage` bridge from the keychain the engine was

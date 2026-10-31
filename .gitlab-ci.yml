@@ -225,6 +225,9 @@ check:spec-names:
     - mkdir -p /tmp/roots
     - for r in spec e2e relay ohttp-relay; do wget -qO "/tmp/$r.tar.gz" "https://gitlab.com/vauchi/$r/-/archive/main/$r-main.tar.gz" || exit 1; tar -xzf "/tmp/$r.tar.gz" -C /tmp/roots || exit 1; done
     - sh /tmp/roots/spec-main/ci/check-claim-names.sh --self-test
+    # On a merge request the sources are this branch, so a name the spec
+    # lists as pending is landing here, not stale (private#937).
+    - if [ -n "${CI_MERGE_REQUEST_IID:-}" ]; then export CLAIM_NAMES_SOURCES_MAY_LAND=1; fi
     - for f in /tmp/roots/spec-main/src/claims.md /tmp/roots/spec-main/src/protocols/*.md; do sh /tmp/roots/spec-main/ci/check-claim-names.sh "$f" vauchi-app vauchi-cabi vauchi-core vauchi-hardware vauchi-platform vauchi-protocol /tmp/roots/e2e-main /tmp/roots/relay-main /tmp/roots/ohttp-relay-main || exit 1; done
     - sh /tmp/roots/spec-main/ci/check-claim-annotations.sh --self-test
     - sh /tmp/roots/spec-main/ci/check-claim-annotations.sh /tmp/roots/spec-main/src/claims.md vauchi-app vauchi-cabi vauchi-core vauchi-hardware vauchi-platform vauchi-protocol /tmp/roots/e2e-main || exit 1

@@ -1706,6 +1706,42 @@ mod tests {
         (alice, gate)
     }
 
+    /// The QR carries no card, only the peer's name: until their card
+    /// arrives over the relay the contact is a placeholder named after
+    /// the QR, never a copy of our own card (vauchi/private#948).
+    // @scenario: contact_exchange :: A QR contact is named after the peer's QR until their card arrives
+    #[test]
+    fn qr_auto_advance_names_the_contact_after_the_peer_qr() {
+        use vauchi_core::contact_card::ContactCard;
+        use vauchi_core::exchange::{ExchangeEvent, ExchangeSession, ManualConfirmationVerifier};
+        use vauchi_core::identity::Identity;
+        let clock = vauchi_core::clock::SystemClock::shared();
+        let mut alice = ExchangeSession::new_qr(
+            Identity::create("Alice", 0),
+            ContactCard::new("Alice"),
+            ManualConfirmationVerifier::new(),
+            clock.clone(),
+        );
+        let mut bob = ExchangeSession::new_qr(
+            Identity::create("Bob", 1),
+            ContactCard::new("Bob"),
+            ManualConfirmationVerifier::new(),
+            clock.clone(),
+        );
+        alice.apply(ExchangeEvent::StartQR).unwrap();
+        bob.apply(ExchangeEvent::StartQR).unwrap();
+        let bob_qr = bob.qr().unwrap().to_data_string();
+        let mut engine = ExchangeEngine::with_session(config_no_groups(), alice, clock);
+
+        let _ = engine.handle_hardware_event(vauchi_core::Event::QrScanned { data: bob_qr });
+
+        let contact = match engine.session.as_ref().unwrap().state() {
+            vauchi_core::exchange::ExchangeState::Complete { contact } => (**contact).clone(),
+            other => panic!("auto-advance must reach Complete, got {other:?}"),
+        };
+        assert_eq!(contact.display_name(), "Bob");
+    }
+
     // Regression: a Pending reciprocity outcome (transient relay hiccup)
     // must NOT route to the Failed screen. At Complete the peer's card is
     // fully received; Pending only means the peer's save is unconfirmed.

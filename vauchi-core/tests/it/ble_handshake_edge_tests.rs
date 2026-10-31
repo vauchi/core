@@ -259,3 +259,36 @@ fn a_responder_without_a_required_nonce_takes_a_fresh_offer_after_a_reset() {
 
     assert!(bob.process_key_offer(&second, T0 + 1).is_ok());
 }
+
+/// The QR's 60-second window is the displayer's too: a Glance displayer
+/// created with its QR refuses an offer once its own session is older than
+/// sixty seconds, whatever `t_S` the connector chose (vauchi/private#948).
+// @scenario: contact_exchange :: A Glance displayer closes its QR window after sixty seconds
+#[test]
+fn a_glance_displayer_refuses_an_offer_after_its_own_sixty_second_window() {
+    let nonce = [0x5Au8; 16];
+    let late = T0 + EXPIRY_SECS + 1;
+    let alice = Identity::create("Alice", 0);
+    let bob = Identity::create("Bob", 0);
+    let mut displayer = BleHandshakeSession::new_responder(&bob, card(&bob, "Bob"), T0);
+    displayer.require_oob_nonce(nonce);
+    let mut scanner = BleHandshakeSession::new_initiator(&alice, card(&alice, "Alice"), late);
+    scanner.set_oob_nonce(nonce);
+    let fresh_looking_offer = scanner.create_key_offer().unwrap();
+
+    assert!(
+        matches!(
+            displayer.process_key_offer(&fresh_looking_offer, late),
+            Err(ExchangeError::BleExpired)
+        ),
+        "the connector's own fresh timestamp does not reopen the displayer's window"
+    );
+
+    let mut plain_responder = BleHandshakeSession::new_responder(&bob, card(&bob, "Bob"), T0);
+    assert!(
+        plain_responder
+            .process_key_offer(&scanner.create_key_offer().unwrap(), late)
+            .is_ok(),
+        "a responder that required no nonce keeps waiting for an offer"
+    );
+}

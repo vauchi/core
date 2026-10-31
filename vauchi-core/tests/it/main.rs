@@ -250,6 +250,7 @@ mod exchange_audio_command_event_tests;
 mod exchange_ble_tests;
 mod exchange_ceremony_tests;
 mod exchange_command_event_integration_tests;
+mod exchange_completion_facts_tests;
 mod exchange_debug_log_tests;
 mod exchange_e2e_tests;
 mod exchange_edge_cases_tests;

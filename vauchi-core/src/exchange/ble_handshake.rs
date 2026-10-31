@@ -581,6 +581,13 @@ impl BleHandshakeSession {
         if now.saturating_sub(their_timestamp) > BLE_HANDSHAKE_EXPIRY_SECS {
             return Err(ExchangeError::BleExpired);
         }
+        // A Glance displayer's own age is its QR's window: the connector
+        // chooses `t_S` unsigned, so it cannot reopen it (private#948).
+        if self.required_oob_nonce.is_some()
+            && now.saturating_sub(self.our_timestamp) > BLE_HANDSHAKE_EXPIRY_SECS
+        {
+            return Err(ExchangeError::BleExpired);
+        }
 
         let exchange_id = compute_exchange_id(&their_identity, &their_ephemeral);
 

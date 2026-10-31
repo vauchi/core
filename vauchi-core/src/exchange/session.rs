@@ -128,6 +128,16 @@ pub enum ExchangeEvent {
 /// Stores the proximity verifier as `Box<dyn ProximityVerifier>`, eliminating
 /// the need for generic type parameters and enabling any verifier backend to be
 /// used directly without enum dispatch wrappers.
+/// Orders confidences so a check can only raise one: Unknown, Low, Medium, High.
+fn confidence_rank(confidence: ProximityConfidence) -> u8 {
+    match confidence {
+        ProximityConfidence::Unknown => 0,
+        ProximityConfidence::Low => 1,
+        ProximityConfidence::Medium => 2,
+        ProximityConfidence::High => 3,
+    }
+}
+
 pub struct ExchangeSession {
     /// Current state
     state: ExchangeState,
@@ -993,7 +1003,7 @@ impl ExchangeSession {
         // report AudioSamplesRecorded to upgrade confidence. Frontends that
         // don't support audio simply ignore them (confidence stays at baseline).
         if let Some(their) = self.their_audio_challenge {
-            let is_initiator = self.their_audio_challenge.is_some();
+            let is_initiator = self.audio_initiator();
             let modem_config = crate::exchange::audio_modem::AudioConfig::default();
             let modem_rate = modem_config.sample_rate;
             let samples = crate::exchange::audio_modem::generate_fsk_samples(&their, &modem_config);
@@ -1060,8 +1070,7 @@ impl ExchangeSession {
         let their_challenge = self.their_audio_challenge.unwrap_or([0u8; 16]);
         let our_challenge = self.our_audio_challenge.unwrap_or([0u8; 16]);
         let timeout = Duration::from_secs(5);
-        // Scanner (initiator) emits first; displayer (responder) listens first
-        let is_initiator = self.their_audio_challenge.is_some();
+        let is_initiator = self.audio_initiator();
 
         let confidence = match self.proximity.verify_proximity_two_way(
             &their_challenge,
@@ -1075,7 +1084,36 @@ impl ExchangeSession {
             Err(ProximityError::NotSupported) => ProximityConfidence::Unknown,
             Err(_) => ProximityConfidence::Low,
         };
-        self.proximity_confidence = confidence;
+        // A confidence the shell already confirmed (`ProximityCheckCompleted`)
+        // is not lowered by this automatic baseline (private#948).
+        if confidence_rank(confidence) > confidence_rank(self.proximity_confidence) {
+            self.proximity_confidence = confidence;
+        }
+    }
+
+    /// Who emits the audio challenge first. A one-way scanner, which alone
+    /// holds the peer's challenge, emits first; when both sides scanned each
+    /// other, the identity-key order decides, as it does for the escrow
+    /// role, so exactly one side emits first (private#948).
+    fn audio_initiator(&self) -> bool {
+        let their_public_key = match &self.state {
+            ExchangeState::PeerScanned {
+                their_public_key, ..
+            }
+            | ExchangeState::AwaitingKeyAgreement {
+                their_public_key, ..
+            }
+            | ExchangeState::AwaitingCardExchange {
+                their_public_key, ..
+            } => Some(*their_public_key),
+            _ => None,
+        };
+        match (self.our_audio_challenge, their_public_key) {
+            (Some(_), Some(theirs)) if self.their_audio_challenge.is_some() => {
+                super::key_order::is_initiator(self.identity.signing_public_key(), &theirs)
+            }
+            _ => self.their_audio_challenge.is_some(),
+        }
     }
 
     fn handle_perform_key_agreement(&mut self) -> Result<(), ExchangeError> {
@@ -1208,7 +1246,7 @@ impl ExchangeSession {
             shared_key,
             self.proximity_confidence,
             self.transport,
-            0,
+            self.clock.unix_seconds(),
         );
 
         // Set relay metadata learned from their QR code

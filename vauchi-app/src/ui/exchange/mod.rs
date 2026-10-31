@@ -960,7 +960,16 @@ impl WorkflowEngine for ExchangeEngine {
                     })
                 })
                 .and_then(|()| session.apply(ExchangeEvent::PerformKeyAgreement))
-                .and_then(|()| session.apply(ExchangeEvent::CompleteExchange(our_card)))
+                .and_then(|()| {
+                    // The QR carries no card, only the peer's name: a
+                    // placeholder named after it until their card arrives
+                    // over the relay, never a copy of our own (private#948).
+                    let placeholder = session
+                        .their_display_name()
+                        .map(vauchi_core::contact_card::ContactCard::new)
+                        .unwrap_or(our_card);
+                    session.apply(ExchangeEvent::CompleteExchange(placeholder))
+                })
             {
                 self.failure_detail = Some(e.user_message().to_string());
                 self.step = ExchangeStep::Failed;
@@ -1688,7 +1697,7 @@ mod tests {
             .unwrap();
         alice.apply(ExchangeEvent::PerformKeyAgreement).unwrap();
         alice
-            .apply(ExchangeEvent::CompleteExchange(ContactCard::new("Alice")))
+            .apply(ExchangeEvent::CompleteExchange(ContactCard::new("Bob")))
             .unwrap();
         assert!(
             matches!(

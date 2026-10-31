@@ -113,9 +113,9 @@ pub use exchange::{
 pub mod platform;
 pub use platform::{
     AccessibilitySpec, ActionSpec, ActionTone, AlertSpec, ApplicationMenuRole, ApplicationMenuSpec,
-    BindingId, BleLinkDirection, ChoiceOption, ColorScheme, Command, ContextBar, DirectEndpoint,
-    DocumentSpec, Event, EventJsonError, ExportFileSpec, FilePickFailure, FilePickOutcome,
-    FilePickPurpose, InputMode, InputValue, InteractionId, InvocationOutcome,
+    BindingId, BleLinkDirection, ChoiceOption, ColorScheme, Command, CommandTarget, ContextBar,
+    DirectEndpoint, DocumentSpec, Event, EventJsonError, ExportFileSpec, FilePickFailure,
+    FilePickOutcome, FilePickPurpose, InputMode, InputValue, InteractionId, InvocationOutcome,
     MAX_EVENT_INPUT_VALUE_BYTES, MAX_EVENT_JSON_BYTES, MAX_EVENT_JSON_NESTING_DEPTH,
     MAX_FILE_PICK_BYTES, MotionPreference, NavigationItem, NavigationSpec, NotificationSpec,
     NotificationUrgency, Orientation, OverlayKind, OverlaySpec, PaneLayout, PresentationAxis,

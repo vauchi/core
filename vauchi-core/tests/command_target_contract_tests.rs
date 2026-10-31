@@ -108,10 +108,11 @@ fn hardware_commands() -> Vec<Command> {
             is_initiator: true,
             endpoint: DirectEndpoint::default(),
         },
-        Command::DirectSendCard {
-            ciphertext: vec![1],
-            is_initiator: false,
-        },
+        // Deprecated (ADR-066), so built from its wire form, as a shell
+        // still receives it.
+        from_wire(serde_json::json!({"DirectSendCard": {
+            "ciphertext": [1], "is_initiator": false
+        }})),
         Command::ImageCaptureFromCamera,
         Command::SwitchCamera { use_front: true },
         Command::LocationRequest { timeout_ms: 5_000 },

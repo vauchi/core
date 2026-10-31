@@ -29,9 +29,11 @@
 use serde::{Deserialize, Serialize};
 
 mod ble_observation;
+mod command_target;
 mod event_json;
 pub mod executor;
 pub use ble_observation::{BleAdvertisementObservation, BleObservationError, BleServiceUuid};
+pub use command_target::CommandTarget;
 mod presentation;
 
 pub use event_json::{

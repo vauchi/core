@@ -54,6 +54,19 @@ fn a_purge_that_erases_the_guardian_set_says_so_on_the_wire() {
     assert!(parsed.erase_guardian_set);
 }
 
+// A purge names no mailbox: the relay erases the signing key's own, and an
+// old client's `recipient_id` is read past (#944).
+// @internal
+#[test]
+fn a_purge_carries_no_recipient_id_and_reads_past_an_old_clients() {
+    let req: V2PurgeRequest = serde_json::from_str(&purge_json("")).unwrap();
+
+    let json = serde_json::to_string(&req).unwrap();
+
+    assert!(!json.contains("recipient_id"), "{json}");
+    assert_eq!(req.public_key, "aa".repeat(32));
+}
+
 // An old relay sees exactly the purge it always did.
 // @internal
 #[test]

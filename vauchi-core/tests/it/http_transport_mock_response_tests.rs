@@ -191,7 +191,9 @@ fn purge_returns_blobs_deleted_count() {
     assert_eq!(count, Some(7));
     let req = mock.last_received();
     let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap();
-    assert_eq!(body["recipient_id"], "recipient-x");
+    // The relay erases the signing key's own mailbox; a body that named one
+    // let any key pair empty any mailbox whose token it held (#944).
+    assert_eq!(body.get("recipient_id"), None);
     assert_eq!(body["public_key"], "pubkey");
     assert_eq!(body["purge_token"], "token");
     assert_eq!(body["signature"], "sig");

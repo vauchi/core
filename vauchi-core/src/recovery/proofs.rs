@@ -11,6 +11,11 @@
 //! the host pointer width only, and is proved to never panic and to accept
 //! only that shape, reading each field at its offset (private#930).
 //!
+//! The claim and time-bound proofs run in `test:formal` (5 s and 3 s). The
+//! voucher and token proofs run by hand: the token proof verified in
+//! 54 minutes on a 24-thread laptop and the voucher proof had not finished
+//! after 40, past the CI job caps (2026-10-31, private#937).
+//!
 //! `RecoveryProof::from_bytes` has no harness: its postcard body nests a
 //! vector of vouchers, and a bound small enough for CBMC proves only that
 //! short inputs are refused, which `recovery_parsing_bounds_tests` already

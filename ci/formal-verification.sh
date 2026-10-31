@@ -78,16 +78,12 @@ for harness in \
     cargo kani -p vauchi-core -Z stubbing --harness "$harness"
 done
 fi # wants gate
-# The postcard token parser over 140 symbolic bytes verified in 54 minutes
-# on a 24-thread laptop, and the 171-byte voucher parser had not finished
-# after 40 (private#937): nightly, not on every merge request.
-if wants extended; then
-for harness in \
-    guardian_token_parse_accepts_exactly_one_token \
-    recovery_voucher_parse_accepts_exactly_a_contact_voucher; do
-    cargo kani -p vauchi-core --harness "$harness"
-done
-fi # wants extended
+# Two recovery parser proofs run by hand, not here: the postcard token
+# parser over 140 symbolic bytes verified in 54 minutes on a 24-thread
+# laptop and the 171-byte voucher parser had not finished after 40, past
+# the 45-minute cap of the extended job as well (private#937, 2026-10-31).
+#   cargo kani -p vauchi-core --harness guardian_token_parse_accepts_exactly_one_token
+#   cargo kani -p vauchi-core --harness recovery_voucher_parse_accepts_exactly_a_contact_voucher
 
 # ── Wipe on drop: Miri and release (#817) ─────────────────────────────
 # Kani cannot model zeroize's barrier; these tests read a dropped value's

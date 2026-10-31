@@ -45,7 +45,10 @@ pub unsafe extern "C" fn vauchi_app_initial_commands(handle: *mut VauchiApp) -> 
             }
             let app = &*handle;
             if let Some(commands) = app.locked_initial_commands() {
-                return to_c_string(&serde_json::json!({ "commands": commands }).to_string());
+                return to_c_string(&batch_json(
+                    serde_json::json!({ "commands": commands }),
+                    app.drain_hardware_after_locked(),
+                ));
             }
             match app
                 .lock_engine()
@@ -98,7 +101,10 @@ pub unsafe extern "C" fn vauchi_app_dispatch(
                 Err(error) => app.locked_reject_event_json(&error),
             };
             if let Some(commands) = locked_answer {
-                return to_c_string(&serde_json::json!({ "commands": commands }).to_string());
+                return to_c_string(&batch_json(
+                    serde_json::json!({ "commands": commands }),
+                    app.drain_hardware_after_locked(),
+                ));
             }
             let Ok(mut engine_slot) = app.lock_engine() else {
                 return to_c_string(r#"{"error":"lock poisoned"}"#);

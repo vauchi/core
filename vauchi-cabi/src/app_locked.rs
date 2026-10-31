@@ -263,6 +263,20 @@ impl VauchiApp {
             .map(|start| start.presentation.initial_commands())
     }
 
+    /// Commands queued for the hardware shell by the lock screen, or by the
+    /// engine a retry just opened (ADR-077).
+    pub(crate) fn drain_hardware_after_locked(&self) -> Vec<Command> {
+        if let Ok(mut locked) = self.locked.lock()
+            && let Some(start) = locked.as_mut()
+        {
+            return start.presentation.drain_hardware_commands();
+        }
+        self.lock_engine()
+            .ok()
+            .and_then(|mut slot| slot.as_mut().map(|engine| engine.drain_hardware_commands()))
+            .unwrap_or_default()
+    }
+
     /// Core's answer to undecodable event JSON while locked, or `None`.
     pub(crate) fn locked_reject_event_json(
         &self,
@@ -306,9 +320,19 @@ impl VauchiApp {
                 if let Some(context) = start.pending_render_context.take() {
                     engine.set_render_context(context);
                 }
-                let commands = engine
-                    .initial_commands()
-                    .unwrap_or_else(|_| start.presentation.failure());
+                let mut commands = Vec::new();
+                if let Some(capabilities) = start.presentation.hardware_report().cloned() {
+                    commands.extend(
+                        engine
+                            .dispatch(Event::HardwareCapabilitiesReported { capabilities })
+                            .unwrap_or_default(),
+                    );
+                }
+                commands.extend(
+                    engine
+                        .initial_commands()
+                        .unwrap_or_else(|_| start.presentation.failure()),
+                );
                 let pending_callback = start.pending_callback.take();
                 if let Ok(mut slot) = self.engine.lock() {
                     *slot = Some(engine);

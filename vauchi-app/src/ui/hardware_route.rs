@@ -21,6 +21,10 @@ impl HardwareRoute {
         self.report = Some(capabilities);
     }
 
+    pub(crate) fn report(&self) -> Option<&DeviceCapabilities> {
+        self.report.as_ref()
+    }
+
     /// Keeps hardware commands out of a display batch once a hardware shell
     /// is attached, queuing them for [`Self::drain`].
     pub(crate) fn route(&mut self, commands: Vec<Command>) -> Vec<Command> {

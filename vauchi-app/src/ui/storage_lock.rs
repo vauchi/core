@@ -68,6 +68,7 @@ pub struct StorageLockPresentation {
     /// Set once the shell reports its environment: a shell lays out only
     /// with a presentation profile.
     coordinator: Option<PresentationCoordinator>,
+    hardware_route: crate::ui::hardware_route::HardwareRoute,
 }
 
 impl StorageLockPresentation {
@@ -81,7 +82,19 @@ impl StorageLockPresentation {
             prompt_on_render: true,
             retry_from_tap: false,
             coordinator: None,
+            hardware_route: crate::ui::hardware_route::HardwareRoute::default(),
         }
+    }
+
+    /// The unlock prompt and any other hardware command, once a hardware
+    /// shell has reported in (ADR-077).
+    pub fn drain_hardware_commands(&mut self) -> Vec<Command> {
+        self.hardware_route.drain()
+    }
+
+    /// The hardware shell's report, for the engine that opens after unlock.
+    pub fn hardware_report(&self) -> Option<&vauchi_core::exchange_types::DeviceCapabilities> {
+        self.hardware_route.report()
     }
 
     /// The language of the next render (from the shell's render context).
@@ -115,18 +128,33 @@ impl StorageLockPresentation {
     }
 
     pub fn initial_commands(&mut self) -> Vec<Command> {
-        self.render()
+        let commands = self.render();
+        self.hardware_route.route(commands)
     }
 
     /// Shows `reason` after a retry did not open storage.
     pub fn show(&mut self, reason: StorageLockReason) -> Vec<Command> {
         self.screen = screen_for(reason);
         self.prompt_on_render = self.retry_from_tap;
-        self.render()
+        let commands = self.render();
+        self.hardware_route.route(commands)
     }
 
     pub fn dispatch(&mut self, event: Event) -> StorageLockStep {
+        match self.step(event) {
+            StorageLockStep::Commands(commands) => {
+                StorageLockStep::Commands(self.hardware_route.route(commands))
+            }
+            other => other,
+        }
+    }
+
+    fn step(&mut self, event: Event) -> StorageLockStep {
         match event {
+            Event::HardwareCapabilitiesReported { capabilities } => {
+                self.hardware_route.attach(capabilities);
+                StorageLockStep::Commands(Vec::new())
+            }
             Event::BiometricUnlockSucceeded if self.screen == Screen::Locked => {
                 self.retry_from_tap = false;
                 StorageLockStep::RetryOpen

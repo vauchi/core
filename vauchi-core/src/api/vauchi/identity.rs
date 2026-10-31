@@ -711,7 +711,17 @@ impl Vauchi {
         guardian_pks: &[[u8; 32]],
         threshold: u8,
     ) -> VauchiResult<(String, Vec<Vec<u8>>)> {
-        let config = crate::backup::KeyShardConfig::new(threshold, guardian_pks.len() as u8)
+        let count = u8::try_from(guardian_pks.len())
+            .ok()
+            .filter(|count| *count <= crate::backup::KeyShardConfig::MAX_COUNT)
+            .ok_or_else(|| {
+                VauchiError::InvalidState(format!(
+                    "{} guardians; a backup is split for at most {}",
+                    guardian_pks.len(),
+                    crate::backup::KeyShardConfig::MAX_COUNT
+                ))
+            })?;
+        let config = crate::backup::KeyShardConfig::new(threshold, count)
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         let (blob_hex, shards) = self.export_guardian_backup_shards(config)?;
 

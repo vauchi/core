@@ -4,6 +4,7 @@
 
 //! Contact and double ratchet operations.
 
+use crate::backup::GuardianGroups;
 use crate::contact::Contact;
 use crate::crypto::SymmetricKey;
 use crate::crypto::ratchet::DoubleRatchetState;
@@ -343,6 +344,19 @@ impl Vauchi {
 
         let new_state = !contact.is_recovery_trusted();
         if new_state {
+            let guardians = self
+                .storage
+                .contacts()
+                .list_contacts()?
+                .iter()
+                .filter(|c| c.is_recovery_trusted())
+                .count();
+            if guardians >= GuardianGroups::MAX_GUARDIANS {
+                return Err(VauchiError::InvalidState(format!(
+                    "At most {} contacts can be trusted for recovery; release one first",
+                    GuardianGroups::MAX_GUARDIANS
+                )));
+            }
             contact
                 .trust_for_recovery()
                 .map_err(|e| VauchiError::InvalidState(e.to_string()))?;

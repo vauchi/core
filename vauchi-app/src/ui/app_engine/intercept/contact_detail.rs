@@ -73,12 +73,15 @@ impl AppEngine {
             return None;
         }
 
-        // Toggle recovery trust via the canonical Vauchi API. Errors are
-        // swallowed here — the engine's optimistic flip will be reverted
-        // on the next AppScreen::ContactDetail engine read if storage
-        // didn't actually change.
-        #[allow(clippy::let_underscore_must_use)]
-        let _ = self.vauchi.toggle_recovery_trust(contact_id);
+        // A refused toggle (a tenth guardian, private#929) must not flip the
+        // switch on screen only to revert on the next read: the person
+        // reads why instead.
+        if let Err(refused) = self.vauchi.toggle_recovery_trust(contact_id) {
+            return Some(ActionResult::ValidationError {
+                component_id: component_id.clone(),
+                message: refused.to_string(),
+            });
+        }
 
         self.engine
             .apply_update(crate::ui::EngineUpdate::ContactDetail(

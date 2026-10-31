@@ -286,10 +286,10 @@ pub unsafe extern "C" fn vauchi_app_on_wakeup(app: *mut VauchiApp) -> *mut c_cha
             "commands": commands,
         });
 
-        match serde_json::to_string(&envelope) {
-            Ok(json) => to_c_string(&json),
-            Err(_) => std::ptr::null_mut(),
-        }
+        to_c_string(&crate::app_presentation::batch_json(
+            envelope,
+            engine.drain_hardware_commands(),
+        ))
     })) {
         Ok(result) => result,
         Err(_) => std::ptr::null_mut(),

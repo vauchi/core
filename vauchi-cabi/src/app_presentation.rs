@@ -9,6 +9,19 @@ use std::os::raw::c_char;
 
 use super::{VauchiApp, to_c_string};
 
+/// A command batch as C shells read it. The hardware shell's commands get
+/// their own field once one has reported in (ADR-077); the field is left
+/// out otherwise, so a shell that predates it reads the same batch.
+pub(crate) fn batch_json(
+    mut batch: serde_json::Value,
+    hardware: Vec<vauchi_core::Command>,
+) -> String {
+    if !hardware.is_empty() {
+        batch["hardware"] = serde_json::json!(hardware);
+    }
+    batch.to_string()
+}
+
 /// Return the versioned Core presentation contract corpus as canonical JSON.
 ///
 /// The returned string must be released with `vauchi_string_free`.
@@ -41,9 +54,10 @@ pub unsafe extern "C" fn vauchi_app_initial_commands(handle: *mut VauchiApp) -> 
                 .and_then(|slot| slot.as_mut())
             {
                 Some(engine) => match engine.initial_commands() {
-                    Ok(commands) => {
-                        to_c_string(&serde_json::json!({ "commands": commands }).to_string())
-                    }
+                    Ok(commands) => to_c_string(&batch_json(
+                        serde_json::json!({ "commands": commands }),
+                        engine.drain_hardware_commands(),
+                    )),
                     Err(error) => {
                         to_c_string(&serde_json::json!({ "error": error.to_string() }).to_string())
                     }
@@ -102,12 +116,16 @@ pub unsafe extern "C" fn vauchi_app_dispatch(
                     .unwrap_or_else(|rejection| engine.reject_dispatch(&rejection)),
                 Err(error) => engine.reject_event_json(&error),
             };
+            let hardware = engine.drain_hardware_commands();
             let wanted_changed = engine.take_wanted_locales_changed();
             drop(engine_slot);
             if wanted_changed {
                 app.request_content_cycle();
             }
-            to_c_string(&serde_json::json!({ "commands": commands }).to_string())
+            to_c_string(&batch_json(
+                serde_json::json!({ "commands": commands }),
+                hardware,
+            ))
         }))
         .unwrap_or(std::ptr::null_mut())
     }

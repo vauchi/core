@@ -7,6 +7,7 @@
 //! (vauchi/private#930, DC-01/DC-02).
 
 use vauchi_core::crypto::SigningKeyPair;
+use vauchi_core::recovery::guardian::GuardianToken;
 use vauchi_core::recovery::{
     RECOVERY_PROOF_VERSION, RecoveryClaim, RecoveryError, RecoveryProgress, RecoveryProof,
     RecoverySettings, RecoveryVoucher,
@@ -233,4 +234,19 @@ fn an_old_key_voucher_is_refused_while_collecting() {
         Err(RecoveryError::SelfVouching)
     ));
     assert_eq!(progress.add_voucher(by_helper).unwrap(), 1);
+}
+
+// @scenario: contact_recovery :: Recovery parsers take exactly their bytes
+#[test]
+fn a_guardian_token_with_trailing_bytes_is_refused() {
+    let (old, helper) = keys();
+    let exact = GuardianToken::create(&old, helper.public_key(), NOW).to_bytes();
+    let mut one_more = exact.clone();
+    one_more.push(0);
+
+    assert_eq!(GuardianToken::from_bytes(&exact).unwrap().created_at(), NOW);
+    assert!(matches!(
+        GuardianToken::from_bytes(&one_more),
+        Err(RecoveryError::InvalidFormat)
+    ));
 }

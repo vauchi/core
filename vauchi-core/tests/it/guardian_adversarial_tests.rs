@@ -82,26 +82,15 @@ fn test_guardian_token_from_bytes_127_zero_bytes() {
 // @scenario: contact_recovery :: Reject or invalidate one-megabyte zero buffer for GuardianToken
 #[test]
 fn test_guardian_token_from_bytes_one_megabyte_zeros() {
-    // postcard may successfully decode a 1 MB zero buffer into a GuardianToken
-    // (zero bytes map to zero-valued fields). Either the parse must fail, or the
-    // resulting token must not verify — an all-zero Ed25519 key/signature is
-    // cryptographically invalid and must never be accepted as authentic.
+    // Zero bytes decode to zero-valued fields, so postcard would read a
+    // token off the front; the parser takes exactly one token and refuses
+    // the rest (private#930).
     let input = vec![0u8; 1024 * 1024];
-    match GuardianToken::from_bytes(&input) {
-        Err(err) => {
-            assert!(
-                matches!(err, RecoveryError::SerializationError(_)),
-                "expected SerializationError for 1 MB zero buffer, got: {err:?}"
-            );
-        }
-        Ok(token) => {
-            assert!(
-                !token.verify(),
-                "a token decoded from 1 MB of zeros must not verify \
-                 (all-zero Ed25519 key/signature is cryptographically invalid)"
-            );
-        }
-    }
+
+    assert!(matches!(
+        GuardianToken::from_bytes(&input),
+        Err(RecoveryError::InvalidFormat)
+    ));
 }
 
 // @scenario: contact_recovery :: Reject or fail verification when last byte is flipped in GuardianToken

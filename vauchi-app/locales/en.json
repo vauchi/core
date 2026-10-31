@@ -1535,6 +1535,7 @@
   "link_responder.failure_contact_limit": "You've reached your contact limit. Remove a contact before adding another.",
   "link_responder.failure_decrypt_error": "The received card could not be decrypted. Please try again.",
   "link_responder.failure_generic": "Something went wrong receiving the contact card. Please try again.",
+  "link_responder.failure_link_already_used": "This link has already been used. Ask the sender to share a new one.",
   "link_responder.failure_rejected": "The relay rejected the exchange. Please try sharing the link again.",
   "link_responder.failure_self_exchange": "This link is your own. Ask the other person to share theirs instead.",
   "link_responder.failure_timed_out": "The other device did not respond in time. Ask them to share the link again.",

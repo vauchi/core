@@ -775,3 +775,73 @@ fn an_upgrade_whose_keychain_answers_keeps_everything_and_leaves_only_the_smk() 
     assert_eq!(contact_count(&engine), 1);
     assert_eq!(keychain.store.names(), ["smk"]);
 }
+
+fn report(engine: &PlatformAppEngine) -> Value {
+    let event = serde_json::json!({"HardwareCapabilitiesReported": {"capabilities": {
+        "has_biometrics": true, "has_ble": true
+    }}});
+    parse(engine.dispatch_json(event.to_string()).expect("dispatch"))
+}
+
+fn names_in(batch: &Value, field: &str) -> Vec<String> {
+    let commands: Vec<vauchi_core::Command> =
+        serde_json::from_value(batch[field].clone()).unwrap_or_default();
+    commands
+        .iter()
+        .map(|command| command.variant_name().to_owned())
+        .collect()
+}
+
+fn only_display(batch: &Value) -> bool {
+    let commands: Vec<vauchi_core::Command> =
+        serde_json::from_value(batch["commands"].clone()).unwrap_or_default();
+    commands
+        .iter()
+        .all(|command| command.target() == vauchi_core::CommandTarget::Display)
+}
+
+// @internal — ADR-077: a hardware shell that reports before storage opens
+// receives the unlock prompt.
+#[test]
+fn a_hardware_shell_that_reports_while_locked_receives_the_unlock_prompt() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = onboarded(&dir);
+    keychain.locked.store(true, Ordering::SeqCst);
+    let engine = open(&dir, &keychain);
+    report(&engine);
+
+    let batch = parse(engine.initial_commands_json().unwrap());
+
+    assert!(!asks_for_prompt(&batch), "display batch carried {batch}");
+    assert_eq!(names_in(&batch, "hardware"), vec!["RequestBiometricUnlock"]);
+}
+
+// @internal — ADR-077: the report reaches the engine that opens after unlock.
+#[test]
+fn a_hardware_report_made_while_locked_reaches_the_opened_engine() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = onboarded(&dir);
+    keychain.locked.store(true, Ordering::SeqCst);
+    let engine = open(&dir, &keychain);
+    engine.initial_commands_json().unwrap();
+    report(&engine);
+
+    keychain.locked.store(false, Ordering::SeqCst);
+    let opened = prompt_succeeded(&engine);
+    let wakeup = parse(
+        engine
+            .dispatch_json(r#""WakeupFired""#.into())
+            .expect("dispatch"),
+    );
+
+    assert!(
+        !surface(&opened).starts_with("storage_lock"),
+        "got {opened}"
+    );
+    assert!(only_display(&opened), "got {opened}");
+    assert!(only_display(&wakeup), "got {wakeup}");
+    assert!(
+        names_in(&wakeup, "hardware").contains(&"ScheduleWakeup".to_owned()),
+        "got {wakeup}"
+    );
+}

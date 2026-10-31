@@ -400,9 +400,10 @@ impl PlatformAppEngine {
         let mut commands = engine.initial_commands().map_err(|e| MobileError::Other {
             detail: format!("Failed to compose initial presentation: {e}"),
         })?;
+        let hardware = engine.drain_hardware_commands();
         drop(engine_slot);
         commands.extend(self.take_release()?);
-        commands_envelope_to_json(&commands)
+        crate::json_helpers::batch_to_json(&commands, &hardware)
     }
 
     /// Reduce one canonical event into the next ordered command batch.
@@ -429,7 +430,7 @@ impl PlatformAppEngine {
         if let Some(commands) = self.locked_dispatch(event.clone())? {
             return commands_envelope_to_json(&commands);
         }
-        let (commands, fire_invalidation, wanted_changed) = {
+        let (commands, hardware, fire_invalidation, wanted_changed) = {
             let mut engine_slot = self.lock_engine()?;
             let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;
             self_heal_post_auth(engine);
@@ -438,6 +439,7 @@ impl PlatformAppEngine {
                 .unwrap_or_else(|rejection| engine.reject_dispatch(&rejection));
             (
                 commands,
+                engine.drain_hardware_commands(),
                 engine.take_pending_presentation_invalidation(),
                 engine.take_wanted_locales_changed(),
             )
@@ -448,7 +450,7 @@ impl PlatformAppEngine {
         if wanted_changed {
             self.request_content_cycle();
         }
-        commands_envelope_to_json(&commands)
+        crate::json_helpers::batch_to_json(&commands, &hardware)
     }
 }
 

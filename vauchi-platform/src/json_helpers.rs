@@ -39,15 +39,30 @@ pub(crate) fn wakeup_envelope_to_json(
     })
 }
 
+/// The hardware shell's commands get their own field once one has reported
+/// in (ADR-077); it is left out otherwise, so a shell that predates it reads
+/// the same batch.
 #[derive(Serialize)]
 struct CommandsEnvelope<'a> {
     commands: &'a [Command],
+    #[serde(skip_serializing_if = "<[Command]>::is_empty")]
+    hardware: &'a [Command],
 }
 
 /// Serialize generic Core-owned presentation commands.
 pub(crate) fn commands_envelope_to_json(commands: &[Command]) -> Result<String, MobileError> {
-    serde_json::to_string(&CommandsEnvelope { commands }).map_err(|e| MobileError::Other {
-        detail: format!("Failed to serialize CommandsEnvelope: {e}"),
+    batch_to_json(commands, &[])
+}
+
+/// Serialize a batch with the commands Core queued for the hardware shell.
+pub(crate) fn batch_to_json(
+    commands: &[Command],
+    hardware: &[Command],
+) -> Result<String, MobileError> {
+    serde_json::to_string(&CommandsEnvelope { commands, hardware }).map_err(|e| {
+        MobileError::Other {
+            detail: format!("Failed to serialize CommandsEnvelope: {e}"),
+        }
     })
 }
 

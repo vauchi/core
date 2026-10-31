@@ -6,9 +6,11 @@
 
 use base64::{Engine, engine::general_purpose::STANDARD};
 use sha2::{Digest, Sha256};
-use vauchi_core::crypto::{PublicKey, Signature};
+use vauchi_core::contact::Contact;
+use vauchi_core::contact_card::ContactCard;
+use vauchi_core::crypto::{PublicKey, Signature, SymmetricKey};
 use vauchi_core::identity::Identity;
-use vauchi_core::recovery::{RecoveryVoucher, VerificationResult};
+use vauchi_core::recovery::{RecoveryProof, RecoveryVoucher, VerificationResult};
 use vauchi_core::{Vauchi, VauchiConfig, VauchiError};
 
 use crate::common::mock_relay::{CannedResponse, MockRelay};
@@ -46,6 +48,34 @@ fn replacement_ready_to_upload(relay: &MockRelay, old: &Identity) -> (Vauchi, te
     (replacement, dir)
 }
 
+/// A contact of Alice's old identity: the only kind of reader who holds the
+/// key a stored proof is sealed to.
+fn recipient_who_knows(old: &Identity) -> Vauchi {
+    let mut recipient = Vauchi::in_memory().unwrap();
+    recipient.create_identity("John").unwrap();
+    let contact = Contact::from_exchange(
+        *old.signing_public_key(),
+        ContactCard::new("Alice"),
+        SymmetricKey::generate(),
+        1_700_000_000,
+    );
+    recipient
+        .storage()
+        .contacts()
+        .save_contact(&contact)
+        .unwrap();
+    recipient
+}
+
+fn uploaded_proof_bytes(relay: &MockRelay) -> Vec<u8> {
+    let requests = relay.received();
+    assert_eq!(requests.len(), 1);
+    let request: serde_json::Value = serde_json::from_slice(&requests[0].body).unwrap();
+    STANDARD
+        .decode(request["proof_data"].as_str().unwrap())
+        .unwrap()
+}
+
 // @scenario: contact_recovery :: Upload recovery proof to relay
 #[test]
 fn recovery_upload_uses_the_recipient_proof_codec() {
@@ -53,13 +83,12 @@ fn recovery_upload_uses_the_recipient_proof_codec() {
     let old = Identity::create("Alice", 0);
     let (replacement, _dir) = replacement_ready_to_upload(&relay, &old);
     replacement.upload_recovery_proof().unwrap();
-    let requests = relay.received();
-    assert_eq!(requests.len(), 1);
-    let request: serde_json::Value = serde_json::from_slice(&requests[0].body).unwrap();
-    let bytes = STANDARD
-        .decode(request["proof_data"].as_str().unwrap())
-        .unwrap();
-    let recipient = Vauchi::in_memory().unwrap();
+    let bytes = uploaded_proof_bytes(&relay);
+    assert!(
+        RecoveryProof::is_sealed(&bytes),
+        "the relay stores the sealed form, not the plain proof"
+    );
+    let recipient = recipient_who_knows(&old);
     let (proof, verdict) = recipient.verify_recovery_proof(&bytes).unwrap();
     assert_eq!(proof.old_pk().as_bytes(), old.signing_public_key());
     assert_eq!(
@@ -73,6 +102,27 @@ fn recovery_upload_uses_the_recipient_proof_codec() {
         VerificationResult::LowConfidence { total_vouchers: 3 }
     ));
     assert!(replacement.get_recovery_progress().unwrap().is_none());
+}
+
+/// SC-17 (vauchi/private#936): the stored proof opens only for someone who
+/// holds the old key; a reader without that contact learns nothing from it.
+// @scenario: contact_recovery :: Relay stores recovery proof privately
+#[test]
+fn a_reader_without_the_old_key_cannot_open_an_uploaded_proof() {
+    let relay = MockRelay::start();
+    let old = Identity::create("Alice", 0);
+    let (replacement, _dir) = replacement_ready_to_upload(&relay, &old);
+    replacement.upload_recovery_proof().unwrap();
+    let bytes = uploaded_proof_bytes(&relay);
+
+    let mut stranger = Vauchi::in_memory().unwrap();
+    stranger.create_identity("Mallory").unwrap();
+    let refused = stranger.verify_recovery_proof(&bytes).unwrap_err();
+
+    assert!(
+        matches!(refused, VauchiError::ContactNotFound(_)),
+        "expected the sealed proof to be refused for lack of the old key, got {refused}"
+    );
 }
 
 // @internal

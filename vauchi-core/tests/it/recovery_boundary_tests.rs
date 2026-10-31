@@ -11,8 +11,11 @@
 //!
 //! Based on: features/contact_recovery.feature
 
+use vauchi_core::identifiers::IdentityKey;
+use vauchi_core::identity::Identity;
 use vauchi_core::recovery::{
-    RECOVERY_PROOF_VERSION, RecoveryError, RecoveryProof, RecoveryRateLimiter,
+    RECOVERY_PROOF_VERSION, RecoveryError, RecoveryProof, RecoveryRateLimiter, RecoveryVoucher,
+    SEALED_RECOVERY_PROOF_VERSION,
 };
 
 // =============================================================================
@@ -120,22 +123,120 @@ fn validate_version_rejects_future_version() {
 }
 
 // =============================================================================
-// Wire prefix the relay reads
+// The form the relay stores
 // =============================================================================
 
-/// The relay binds a stored proof to its slot and its uploader by reading
-/// this prefix, so the layout is a contract (spec Social Recovery B3,
-/// vauchi/private#927).
+const NOW: u64 = 1_700_000_000;
+
+fn contains(haystack: &[u8], needle: &[u8]) -> bool {
+    haystack.windows(needle.len()).any(|w| w == needle)
+}
+
+/// A complete proof from Alice's old key to her new one, vouched by three
+/// helpers whose identity keys are the social graph the relay must not see.
+fn proof_with_three_helpers() -> (RecoveryProof, Identity, Vec<IdentityKey>) {
+    let old = Identity::create("Alice", 0);
+    let new = Identity::create("Alice again", 0);
+    let mut proof = RecoveryProof::new(old.signing_public_key(), new.signing_public_key(), 3, NOW);
+    let mut helper_keys = Vec::new();
+    for name in ["Bob", "Carol", "Dave"] {
+        let helper = Identity::create(name, 0);
+        let voucher = RecoveryVoucher::create(
+            old.signing_public_key(),
+            new.signing_public_key(),
+            helper.signing_keypair(),
+            None,
+            NOW + 1,
+        );
+        proof.add_voucher(voucher).unwrap();
+        helper_keys.push(IdentityKey::from_bytes(*helper.signing_public_key()));
+    }
+    (proof, old, helper_keys)
+}
+
+/// The relay binds a stored proof to its uploader by reading this prefix and
+/// nothing else (spec Social Recovery B3, vauchi/private#927, #936).
 // @scenario: contact_recovery :: Relay refuses a recovery proof upload the new key did not sign
 #[test]
-fn a_serialized_proof_starts_with_its_version_then_its_old_and_new_keys() {
-    let old_pk = [0x0Au8; 32];
-    let new_pk = [0x0Bu8; 32];
-    let proof = RecoveryProof::new(&old_pk, &new_pk, 3, 1_700_000_000);
+fn a_sealed_proof_starts_with_its_version_then_its_new_key() {
+    let (proof, _old, _helpers) = proof_with_three_helpers();
 
-    let bytes = proof.to_bytes().unwrap();
+    let sealed = proof.seal_for_relay().unwrap();
 
-    assert_eq!(bytes[0], RECOVERY_PROOF_VERSION);
-    assert_eq!(&bytes[1..33], &old_pk);
-    assert_eq!(&bytes[33..65], &new_pk);
+    assert_eq!(sealed[0], SEALED_RECOVERY_PROOF_VERSION);
+    assert_eq!(&sealed[1..33], proof.new_pk().as_bytes());
+    assert!(RecoveryProof::is_sealed(&sealed));
+    assert!(!RecoveryProof::is_sealed(&proof.to_bytes().unwrap()));
+}
+
+/// SC-17: the stored proof shows the relay neither the old key nor any
+/// helper's identity key; only the holder of the old key opens it.
+// @scenario: contact_recovery :: Relay stores recovery proof privately
+#[test]
+fn a_stored_recovery_proof_contains_no_helper_identity_key() {
+    let (proof, old, helpers) = proof_with_three_helpers();
+    let old_pk = IdentityKey::from_bytes(*old.signing_public_key());
+
+    let sealed = proof.seal_for_relay().unwrap();
+
+    assert!(
+        !contains(&sealed, old.signing_public_key()),
+        "the old key must not appear in the stored bytes"
+    );
+    for helper in &helpers {
+        assert!(
+            !contains(&sealed, helper.as_bytes()),
+            "a helper's identity key must not appear in the stored bytes"
+        );
+    }
+    let opened = RecoveryProof::open_sealed(&sealed, &old_pk).unwrap();
+    assert_eq!(opened.old_pk(), proof.old_pk());
+    assert_eq!(opened.new_pk(), proof.new_pk());
+    assert_eq!(opened.voucher_count(), 3);
+    assert_eq!(
+        opened.vouchers()[1].voucher_pk(),
+        proof.vouchers()[1].voucher_pk()
+    );
+
+    let stranger = IdentityKey::from_bytes(*Identity::create("Mallory", 0).signing_public_key());
+    assert!(matches!(
+        RecoveryProof::open_sealed(&sealed, &stranger),
+        Err(RecoveryError::DecryptionFailed)
+    ));
+    let mut tampered = sealed.clone();
+    tampered[40] ^= 0x01;
+    assert!(matches!(
+        RecoveryProof::open_sealed(&tampered, &old_pk),
+        Err(RecoveryError::DecryptionFailed)
+    ));
+    let mut header_swapped = sealed.clone();
+    header_swapped[5] ^= 0x01;
+    assert!(
+        matches!(
+            RecoveryProof::open_sealed(&header_swapped, &old_pk),
+            Err(RecoveryError::DecryptionFailed)
+        ),
+        "the header is bound to the body, so a changed new key fails the tag"
+    );
+}
+
+/// A sealed proof from a schema the reader does not know is refused before
+/// any decryption, as the plain proof's version gate does.
+// @internal
+#[test]
+fn open_sealed_refuses_a_short_blob_and_an_unknown_version() {
+    let (proof, old, _helpers) = proof_with_three_helpers();
+    let old_pk = IdentityKey::from_bytes(*old.signing_public_key());
+    let sealed = proof.seal_for_relay().unwrap();
+
+    assert!(matches!(
+        RecoveryProof::open_sealed(&sealed[..33], &old_pk),
+        Err(RecoveryError::InvalidFormat)
+    ));
+    let mut future = sealed.clone();
+    future[0] = SEALED_RECOVERY_PROOF_VERSION + 1;
+    assert!(matches!(
+        RecoveryProof::open_sealed(&future, &old_pk),
+        Err(RecoveryError::InvalidProof(_))
+    ));
 }

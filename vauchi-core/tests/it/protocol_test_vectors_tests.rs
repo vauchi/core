@@ -30,9 +30,13 @@ use vauchi_core::crypto::{
     decrypt, decrypt_with_ad,
 };
 use vauchi_core::exchange::X3DH;
+use vauchi_core::identifiers::IdentityKey;
 use vauchi_core::identity::device::DeviceInfo;
 use vauchi_core::network::mailbox_token::{
     compute_device_mailbox_token, compute_device_sync_token, compute_mailbox_token,
+};
+use vauchi_core::recovery::{
+    RecoveryProof, RecoveryVoucher, SEALED_RECOVERY_PROOF_INFO, SEALED_RECOVERY_PROOF_VERSION,
 };
 
 use super::protocol_exchange_vectors_tests::{
@@ -69,6 +73,27 @@ pub(crate) struct Vectors {
     backup_v6: BackupV6Vector,
     pub(crate) qr_symmetric: QrSymmetricVector,
     pub(crate) link_exchange: LinkExchangeVector,
+    recovery_proof: RecoveryProofVector,
+}
+
+/// The recovery proof as the relay stores it (Social Recovery B3): a plain
+/// header of version byte and new key, then the postcard proof encrypted
+/// under `HKDF(old_pk, info)` with the header as associated data.
+#[derive(Serialize, Deserialize)]
+struct RecoveryProofVector {
+    info: String,
+    old_master_seed: String,
+    old_pk: String,
+    new_master_seed: String,
+    new_pk: String,
+    helper_master_seed: String,
+    helper_pk: String,
+    threshold: u32,
+    created_at: u64,
+    voucher_timestamp: u64,
+    sealing_key: String,
+    plain_proof: String,
+    sealed_proof: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -461,6 +486,52 @@ fn ratchet_vector_message_decrypts_on_a_fresh_responder() {
 
 // ── mailbox tokens ────────────────────────────────────────────────────
 
+fn compute_recovery_proof() -> RecoveryProofVector {
+    let old_master_seed = seed(0xA0);
+    let new_master_seed = seed(0xB0);
+    let helper_master_seed = seed(0xC0);
+    let old = SigningKeyPair::from_seed(&old_master_seed);
+    let new = SigningKeyPair::from_seed(&new_master_seed);
+    let helper = SigningKeyPair::from_seed(&helper_master_seed);
+    let created_at = 1_700_000_000;
+    let voucher_timestamp = created_at + 60;
+    let mut proof = RecoveryProof::new(
+        old.public_key().as_bytes(),
+        new.public_key().as_bytes(),
+        1,
+        created_at,
+    );
+    proof
+        .add_voucher(RecoveryVoucher::create(
+            old.public_key().as_bytes(),
+            new.public_key().as_bytes(),
+            &helper,
+            None,
+            voucher_timestamp,
+        ))
+        .expect("one helper voucher");
+    let sealing_key = HKDF::derive_key(
+        None,
+        old.public_key().as_bytes(),
+        SEALED_RECOVERY_PROOF_INFO,
+    );
+    RecoveryProofVector {
+        info: String::from_utf8(SEALED_RECOVERY_PROOF_INFO.to_vec()).unwrap(),
+        old_master_seed: hex::encode(old_master_seed),
+        old_pk: hex::encode(old.public_key().as_bytes()),
+        new_master_seed: hex::encode(new_master_seed),
+        new_pk: hex::encode(new.public_key().as_bytes()),
+        helper_master_seed: hex::encode(helper_master_seed),
+        helper_pk: hex::encode(helper.public_key().as_bytes()),
+        threshold: 1,
+        created_at,
+        voucher_timestamp,
+        sealing_key: hex::encode(*sealing_key),
+        plain_proof: hex::encode(proof.to_bytes().unwrap()),
+        sealed_proof: hex::encode(proof.seal_for_relay().unwrap()),
+    }
+}
+
 fn compute_mailbox() -> MailboxVector {
     let shared_key = seed(0x60);
     let recipient_identity_key = seed(0x70);
@@ -492,6 +563,53 @@ fn compute_mailbox() -> MailboxVector {
             compute_device_sync_token(&master_seed, &recipient_device_id, day_epoch).as_bytes(),
         ),
     }
+}
+
+/// The stored proof opens under the recorded old key and under no other,
+/// and the sealing key and header follow the stated formulas (SC-17,
+/// vauchi/private#936).
+// @scenario: contact_recovery :: Relay stores recovery proof privately
+#[test]
+fn recovery_proof_vector_opens_under_its_old_key_and_not_another() {
+    let v = load().recovery_proof;
+    let old_pk = IdentityKey::from_bytes(hex32(&v.old_pk));
+    let sealed = hex::decode(&v.sealed_proof).unwrap();
+
+    assert_eq!(sealed[0], SEALED_RECOVERY_PROOF_VERSION);
+    assert_eq!(hex::encode(&sealed[1..33]), v.new_pk);
+    assert_eq!(v.info.as_bytes(), SEALED_RECOVERY_PROOF_INFO);
+    assert_eq!(
+        hex::encode(*HKDF::derive_key(
+            None,
+            old_pk.as_bytes(),
+            v.info.as_bytes()
+        )),
+        v.sealing_key
+    );
+
+    let opened = RecoveryProof::open_sealed(&sealed, &old_pk).unwrap();
+    assert_eq!(hex::encode(opened.old_pk().as_bytes()), v.old_pk);
+    assert_eq!(hex::encode(opened.new_pk().as_bytes()), v.new_pk);
+    assert_eq!(opened.threshold(), v.threshold);
+    assert_eq!(opened.voucher_count(), 1);
+    assert_eq!(
+        hex::encode(opened.vouchers()[0].voucher_pk().as_bytes()),
+        v.helper_pk
+    );
+    assert_eq!(hex::encode(opened.to_bytes().unwrap()), v.plain_proof);
+
+    let by_hand = decrypt_with_ad(
+        &SymmetricKey::from_bytes(hex32(&v.sealing_key)),
+        &sealed[33..],
+        &sealed[..33],
+    )
+    .unwrap();
+    assert_eq!(hex::encode(by_hand), v.plain_proof);
+
+    let other = IdentityKey::from_bytes(hex32(&v.new_pk));
+    assert!(RecoveryProof::open_sealed(&sealed, &other).is_err());
+    let helper = SigningKeyPair::from_seed(&hex32(&v.helper_master_seed));
+    assert_eq!(hex::encode(helper.public_key().as_bytes()), v.helper_pk);
 }
 
 // @scenario: security :: Correct algorithms used
@@ -846,6 +964,7 @@ fn write_test_vectors_when_asked() {
         backup_v6: compute_backup_v6(),
         qr_symmetric: compute_qr_symmetric(),
         link_exchange: compute_link_exchange(),
+        recovery_proof: compute_recovery_proof(),
     };
     let mut text = serde_json::to_string_pretty(&vectors).expect("serialize");
     text.push('\n');

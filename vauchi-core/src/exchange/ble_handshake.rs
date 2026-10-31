@@ -205,6 +205,11 @@ pub struct BleHandshakeSession {
     expected_exchange_key: Option<[u8; 32]>,
     oob_nonce: Option<[u8; NONCE_SIZE]>,
     required_oob_nonce: Option<[u8; NONCE_SIZE]>,
+    /// The echo of the one KeyOffer this responder accepted: ADR-053 makes
+    /// the OOB nonce single-use, so a replay of that offer, or a second
+    /// scanner of the same QR, is refused for the life of the session,
+    /// across resets (vauchi/private#892).
+    spent_oob_echo: Option<[u8; NONCE_SIZE]>,
 }
 
 impl BleHandshakeSession {
@@ -337,6 +342,7 @@ impl BleHandshakeSession {
             expected_exchange_key: None,
             oob_nonce: None,
             required_oob_nonce: None,
+            spent_oob_echo: None,
         }
     }
 
@@ -565,6 +571,12 @@ impl BleHandshakeSession {
         {
             return Err(ExchangeError::OobNonceMismatch);
         }
+        if self.required_oob_nonce.is_some()
+            && let Some(spent) = self.spent_oob_echo
+            && bool::from(their_oob_echo.ct_eq(&spent))
+        {
+            return Err(ExchangeError::OobNonceReplayed);
+        }
 
         if now.saturating_sub(their_timestamp) > BLE_HANDSHAKE_EXPIRY_SECS {
             return Err(ExchangeError::BleExpired);
@@ -623,6 +635,9 @@ impl BleHandshakeSession {
         self.their_timestamp = Some(their_timestamp);
         self.our_encrypted_card = Some(encrypted_card.clone());
         self.our_commitment = Some(commitment);
+        if self.required_oob_nonce.is_some() {
+            self.spent_oob_echo = Some(their_oob_echo);
+        }
         self.state = BleHandshakeState::AwaitingPayload {
             exchange_id,
             local_commitment: commitment,

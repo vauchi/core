@@ -71,6 +71,9 @@ pub enum ExchangeError {
     #[error("OOB nonce echo missing or mismatched")]
     OobNonceMismatch,
 
+    #[error("OOB nonce already spent by an accepted KeyOffer")]
+    OobNonceReplayed,
+
     #[error("Exchange key mismatch: wire key does not match the OOB-pinned key")]
     ExchangeKeyMismatch,
 
@@ -247,6 +250,7 @@ impl ExchangeError {
             Self::InvalidSignature
             | Self::IdentityMismatch
             | Self::OobNonceMismatch
+            | Self::OobNonceReplayed
             | Self::ExchangeKeyMismatch
             | Self::KeyAgreementFailed(_)
             | Self::InvalidProtocolVersion

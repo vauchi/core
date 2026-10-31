@@ -27,6 +27,9 @@ pub(crate) struct HardwareRoute {
 #[derive(Debug)]
 struct Capture {
     preview_id: String,
+    // Read only by the engine's photo stop, which exists with network-rustls;
+    // the lock screen routes without it (VRS03 no-default build).
+    #[cfg_attr(not(feature = "network-rustls"), allow(dead_code))]
     purpose: CameraPurpose,
     /// `None` until the batch that started it has shown its surface.
     surface: Option<SurfaceId>,
@@ -74,6 +77,7 @@ impl HardwareRoute {
     }
 
     /// A photo is one shot: its answer ends the capture.
+    #[cfg(feature = "network-rustls")]
     pub(crate) fn photo_answered(&mut self) {
         if self
             .capture

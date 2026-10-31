@@ -71,11 +71,18 @@ impl ProximityVerifier for ChallengeCapturingVerifier {
 
     fn listen_for_response(&self, _timeout: Duration) -> Result<Vec<u8>, ProximityError> {
         if self.should_succeed {
+            // Well-formed in either order: a listener that has not emitted
+            // yet echoes a zero challenge (private#948).
             let mut response = Vec::with_capacity(17);
             response.push(0x01);
-            if let Some(challenge) = self.captured.lock().expect("mutex poisoned").last() {
-                response.extend_from_slice(challenge);
-            }
+            let echoed = self
+                .captured
+                .lock()
+                .expect("mutex poisoned")
+                .last()
+                .copied()
+                .unwrap_or([0u8; 16]);
+            response.extend_from_slice(&echoed);
             Ok(response)
         } else {
             Err(ProximityError::NoResponse)

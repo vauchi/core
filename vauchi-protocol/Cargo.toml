@@ -13,6 +13,13 @@ description = "Shared protocol message types for Vauchi relay communication"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2.0"
+# JSON Schema generation of the wire types (optional, behind schema-gen)
+schemars = { version = "0.8", optional = true }
 
 [dev-dependencies]
 proptest = "1.4"
+
+[features]
+# The published relay wire schema (private#119): derives JsonSchema on the
+# V2 types so `tests/it/wire_schema_tests.rs` can generate and check it.
+schema-gen = ["schemars"]

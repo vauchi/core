@@ -9,3 +9,5 @@ mod escrow_tests;
 mod ohttp_anchor_rollover_tests;
 mod ohttp_key_tests;
 mod purge_scope_and_proof_owner_tests;
+#[cfg(feature = "schema-gen")]
+mod wire_schema_tests;

@@ -4607,6 +4607,7 @@ name = "vauchi-protocol"
 version = "0.95.0"
 dependencies = [
  "proptest",
+ "schemars 0.8.22",
  "serde",
  "serde_json",
  "thiserror 2.0.18",

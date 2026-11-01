@@ -77,4 +77,6 @@ skip-tree = []
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-allow-git = []
+# The shell contract (ADR-078) is a git dependency by tag: there is no Cargo
+# registry, and Core's consumers pin Core the same way (ADR-026 amendment).
+allow-git = ["https://gitlab.com/vauchi/contract.git"]

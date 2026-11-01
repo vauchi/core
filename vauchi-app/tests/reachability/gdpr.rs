@@ -31,8 +31,9 @@
 //! `delete_recovery_choice` (`keep_recovery` / `erase_everything` /
 //! `cancel`) (#711).
 //!
-//! The `consent_actions` `ActionList` rows (`view_data` / `manage_consent`)
-//! are `ListItemSelected` pass-throughs and are not walked here.
+//! The `consent_actions` `ActionList` rows open `manage_consent` (`cancel`)
+//! and `my_data` (`open_security_review` / `cancel`, private#86), so every
+//! walk from the overview declares both.
 
 use vauchi_app::ui::testing::assert_reachability_across_screens;
 use vauchi_app::ui::{EngineUpdate, GdprEngine, GdprExportUpdate, UserAction, WorkflowEngine};
@@ -44,6 +45,7 @@ const HANDLED_DEFAULT: &[&str] = &[
     "set_app_password",
     "delete",
     "confirm_delete",
+    "open_security_review",
     "cancel",
 ];
 
@@ -54,6 +56,7 @@ const HANDLED_WITH_APP_PASSWORD: &[&str] = &[
     "confirm_pin",
     "delete",
     "confirm_delete",
+    "open_security_review",
     "cancel",
 ];
 
@@ -65,6 +68,7 @@ const HANDLED_SCHEDULED: &[&str] = &[
     "execute_deletion",
     "confirm_execute",
     "set_app_password",
+    "open_security_review",
     "cancel",
 ];
 
@@ -92,6 +96,7 @@ const HANDLED_FORMAT_CHOICE: &[&str] = &[
     "confirm_pin",
     "delete",
     "confirm_delete",
+    "open_security_review",
     "cancel",
 ];
 
@@ -163,6 +168,7 @@ const HANDLED_DEFAULT_PRESENCE: &[&str] = &[
     "confirm_heirloom",
     "delete",
     "confirm_delete",
+    "open_security_review",
     "cancel",
 ];
 
@@ -175,6 +181,7 @@ const HANDLED_WITH_TRUSTED_CONTACTS: &[&str] = &[
     "confirm_delete",
     "keep_recovery",
     "erase_everything",
+    "open_security_review",
     "cancel",
 ];
 

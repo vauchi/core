@@ -13,7 +13,7 @@
 use std::path::{Path, PathBuf};
 
 use vauchi_core::api::AuthMode;
-use vauchi_core::{AppPasswordConfig, SymmetricKey, Vauchi, VauchiConfig};
+use vauchi_core::{AppPasswordConfig, ContactCard, SymmetricKey, Vauchi, VauchiConfig};
 
 const APP_PASSWORD: &str = "my-pin-1234";
 const DURESS_PIN: &str = "654321";
@@ -199,4 +199,59 @@ fn a_database_from_before_v93_is_sealed_and_keeps_its_duress_pin() {
             "{table} of a migrated database without duress differs from a new one"
         );
     }
+}
+
+/// Row counts of every table, the first thing an imager reads.
+fn row_counts(path: &Path) -> Vec<(String, i64)> {
+    let conn = rusqlite::Connection::open(path).unwrap();
+    let mut stmt = conn
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+        .unwrap();
+    let tables: Vec<String> = stmt
+        .query_map([], |row| row.get(0))
+        .unwrap()
+        .map(Result::unwrap)
+        .collect();
+    tables
+        .into_iter()
+        .map(|table| {
+            let count = conn
+                .query_row(&format!("SELECT COUNT(*) FROM \"{table}\""), [], |row| {
+                    row.get(0)
+                })
+                .unwrap();
+            (table, count)
+        })
+        .collect()
+}
+
+// @internal
+#[test]
+fn a_duress_user_s_content_leaves_the_row_counts_as_without_a_duress_pin() {
+    let without = alice(false);
+    let with = alice(true);
+    {
+        let mut vauchi = with.open();
+        assert_eq!(vauchi.authenticate(APP_PASSWORD).unwrap(), AuthMode::Normal);
+        vauchi
+            .add_decoy_contact("decoy-1", "Sam", &ContactCard::new("Sam"))
+            .unwrap();
+    }
+    {
+        let mut vauchi = with.open();
+        assert_eq!(vauchi.authenticate(DURESS_PIN).unwrap(), AuthMode::Duress);
+        vauchi.create_tag("Work").unwrap();
+    }
+
+    let counts_without = row_counts(&without.path);
+    let differing: Vec<_> = row_counts(&with.path)
+        .into_iter()
+        .zip(&counts_without)
+        .filter(|(with, without)| with != *without)
+        .map(|((table, with), (_, without))| format!("{table}: {with} vs {without}"))
+        .collect();
+    assert!(
+        differing.is_empty(),
+        "row counts tell a duress user apart: {differing:?}"
+    );
 }

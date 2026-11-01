@@ -3,11 +3,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Feature operations: aha moments, demo contact, multi-relay, hide/unhide,
-//! block/unblock, consent, recovery readiness, and visibility re-propagation.
+//! consent, recovery readiness, and visibility re-propagation.
 
 use crate::aha_moments::AhaMoment;
 use crate::card::ContactCard;
-use crate::contact::{BlockReport, Contact};
+use crate::contact::Contact;
 use crate::demo_contact::{DemoContactCard, DemoTip, generate_demo_contact_card};
 use crate::network::MultiRelayConfig;
 use crate::onboarding::AhaMomentType;
@@ -294,88 +294,6 @@ impl Vauchi {
     }
 
     // === Block/Unblock Contacts ===
-
-    /// Blocks a contact.
-    ///
-    /// Blocked contacts will not receive card updates and their incoming
-    /// updates will be rejected.
-    pub fn block_contact(&self, id: &str) -> VauchiResult<()> {
-        self.block_contact_and_report(id, false).map(drop)
-    }
-
-    /// Blocks a contact the way ADR-056 decides it: silently, out of every
-    /// group (unblocking does not put them back), off the emergency trusted
-    /// list, and with at most one final update emptying my card on their
-    /// device when `wipe_their_copy` is confirmed. The wipe is sealed before
-    /// the flag is set, since nothing is sealed for a blocked contact; a
-    /// contact without a session cannot be wiped, and the report says so.
-    pub fn block_contact_and_report(
-        &self,
-        id: &str,
-        wipe_their_copy: bool,
-    ) -> VauchiResult<BlockReport> {
-        self.storage
-            .contacts()
-            .load_contact(id)?
-            .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))?;
-        let wipe_queued = wipe_their_copy
-            && !self.in_duress_mode()
-            && self.queue_final_empty_card_for_contact(id).is_ok();
-
-        let groups = self.get_groups_for_contact(id)?;
-        for group in &groups {
-            self.remove_contact_from_group(group.id(), id)?;
-        }
-
-        let mut contact = self
-            .storage
-            .contacts()
-            .load_contact(id)?
-            .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))?;
-        contact.block();
-        self.storage.contacts().save_contact(&contact)?;
-        self.events.dispatch(VauchiEvent::ContactBlocked {
-            contact_id: id.to_string(),
-        });
-        self.record_sync_item(crate::sync::SyncItem::ContactBlocked {
-            contact_id: id.to_string(),
-            timestamp: self.now_timestamp(),
-        });
-        let removed_from_emergency_contacts = self.remove_from_emergency_contacts(id)?;
-        Ok(BlockReport {
-            wipe_queued,
-            groups_left: groups.len(),
-            removed_from_emergency_contacts,
-        })
-    }
-
-    /// Unblocks a contact.
-    pub fn unblock_contact(&self, id: &str) -> VauchiResult<()> {
-        let mut contact = self
-            .storage
-            .contacts()
-            .load_contact(id)?
-            .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))?;
-        contact.unblock();
-        self.storage.contacts().save_contact(&contact)?;
-        self.events.dispatch(VauchiEvent::ContactUnblocked {
-            contact_id: id.to_string(),
-        });
-        self.record_sync_item(crate::sync::SyncItem::ContactUnblocked {
-            contact_id: id.to_string(),
-            timestamp: self.now_timestamp(),
-        });
-        Ok(())
-    }
-
-    /// Lists all blocked contacts.
-    pub fn list_blocked_contacts(&self) -> VauchiResult<Vec<Contact>> {
-        if self.auth_mode == super::AuthMode::Duress {
-            return Ok(Vec::new());
-        }
-        let contacts = self.storage.contacts().list_contacts()?;
-        Ok(contacts.into_iter().filter(|c| c.is_blocked()).collect())
-    }
 
     // === Consent Management ===
 

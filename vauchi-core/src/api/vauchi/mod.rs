@@ -6,6 +6,7 @@
 //!
 //! Main entry point for the Vauchi API.
 
+mod block;
 mod builder;
 mod contact_annotations;
 mod contacts;

@@ -254,8 +254,13 @@ impl Storage {
             }
         };
 
-        self.conn.execute_batch("BEGIN EXCLUSIVE TRANSACTION")?;
+        // The duress database begins first: if it cannot, no file
+        // transaction is left open.
         self.duress_db.execute_batch("BEGIN")?;
+        if let Err(e) = self.conn.execute_batch("BEGIN EXCLUSIVE TRANSACTION") {
+            self.duress_db.execute_batch("ROLLBACK")?;
+            return Err(e.into());
+        }
 
         let result = (|| -> Result<(), StorageError> {
             self.rekey_contacts(old_key, &new_key)?;

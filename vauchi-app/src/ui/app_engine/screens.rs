@@ -368,6 +368,9 @@ impl AppEngine {
                 ChangePasswordEngine::new(vauchi.is_password_enabled().unwrap_or(false))
                     .with_locale(render_context.resolved_locale()),
             ),
+            AppScreen::EmergencyBroadcast => {
+                Self::build_emergency_broadcast_engine(vauchi, render_context)
+            }
             AppScreen::EmergencyShred => {
                 Box::new(EmergencyShredEngine::new(render_context.resolved_locale()))
             }

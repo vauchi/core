@@ -229,6 +229,10 @@ impl AppEngine {
                     let screen = self.navigate_to(AppScreen::DecoyContacts);
                     return Some(ActionResult::NavigateTo(screen));
                 }
+                "emergency_broadcast" => {
+                    let screen = self.navigate_to(AppScreen::EmergencyBroadcast);
+                    return Some(ActionResult::NavigateTo(screen));
+                }
                 "relay_url" => {
                     let relay = &self.vauchi.config().relay;
                     let current_url = relay.server_url.clone();

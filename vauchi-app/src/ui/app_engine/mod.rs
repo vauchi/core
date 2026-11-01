@@ -851,6 +851,10 @@ impl WorkflowEngine for AppEngine {
             return result;
         }
 
+        if let Some(result) = self.intercept_emergency_broadcast_action(&action) {
+            return result;
+        }
+
         if let Some(result) = self.intercept_info_requested(&action) {
             return result;
         }

@@ -112,6 +112,14 @@ pub enum EngineOutput {
         new_name: String,
         pending_delete_id: Option<String>,
     },
+    /// The emergency broadcast form: who receives the alert, the message
+    /// and the location choice. `Debug` prints counts only: the recipient
+    /// list and the message are personal data.
+    EmergencyBroadcast {
+        trusted_contact_ids: Vec<String>,
+        message: String,
+        include_location: bool,
+    },
     /// Tag armed for deletion on the Tags management screen.
     Tags { pending_delete_id: Option<String> },
     /// Place armed for deletion on the Places management screen.
@@ -187,6 +195,12 @@ pub enum EngineUpdate {
     /// Removing the identity from this device could not tell the other
     /// devices; nothing is wiped yet (#915).
     DeviceRemovalNotTold,
+    /// An emergency broadcast went out: how many of the trusted contacts
+    /// got an alert queued (ADR-036 `BroadcastResult`).
+    EmergencyBroadcastSent {
+        sent: usize,
+        total: usize,
+    },
 }
 
 /// Cycle-thread bridge updates for the multi-stage exchange engine.
@@ -461,6 +475,7 @@ impl EngineUpdate {
             Self::BiometricUnlockPassed => "BiometricUnlockPassed",
             Self::SessionPinRejected => "SessionPinRejected",
             Self::DeviceRemovalNotTold => "DeviceRemovalNotTold",
+            Self::EmergencyBroadcastSent { .. } => "EmergencyBroadcastSent",
             Self::GdprExport(u) => match u {
                 GdprExportUpdate::Verified => "GdprExport::Verified",
                 GdprExportUpdate::PinRejected => "GdprExport::PinRejected",
@@ -698,6 +713,16 @@ impl std::fmt::Debug for EngineOutput {
                 .debug_struct("DecoyContacts")
                 .field("new_name", new_name)
                 .field("pending_delete_id", pending_delete_id)
+                .finish(),
+            Self::EmergencyBroadcast {
+                trusted_contact_ids,
+                message,
+                include_location,
+            } => f
+                .debug_struct("EmergencyBroadcast")
+                .field("trusted_contacts", &trusted_contact_ids.len())
+                .field("message_chars", &message.chars().count())
+                .field("include_location", include_location)
                 .finish(),
             Self::Tags { pending_delete_id } => f
                 .debug_struct("Tags")

@@ -11,6 +11,7 @@
 mod card;
 mod contact_detail;
 mod contact_lifecycle;
+mod emergency_broadcast;
 mod recovery;
 mod settings;
 

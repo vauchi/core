@@ -2362,7 +2362,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_e06453247709968c",
+                    "id": "field_fb928ce58b7d6153",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2374,7 +2374,14 @@
                         "fallback_text": null,
                         "selected": true,
                         "enabled": true,
-                        "activation": null,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.1",
+                          "label": "Call",
+                          "accessibility_label": "Call",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
@@ -2393,90 +2400,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:e06453247709968c",
+                    "id": "field_note:fb928ce58b7d6153",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:e06453247709968c",
-                          "content": "",
-                          "style": "body",
-                          "accessibility": {
-                            "label": "Private field note, editable",
-                            "description": "Double tap to edit"
-                          }
-                        }
-                      },
-                      {
-                        "Status": {
-                          "id": null,
-                          "title": "Edit",
-                          "detail": null,
-                          "icon_token": null,
-                          "badge": null,
-                          "tone": "neutral",
-                          "activation": {
-                            "interaction_id": "surface.1.interaction.1",
-                            "label": "Edit",
-                            "accessibility_label": "Edit",
-                            "icon_token": null,
-                            "enabled": true,
-                            "shortcut": null
-                          },
-                          "accessibility": {
-                            "label": "Edit",
-                            "description": null
-                          }
-                        }
-                      }
-                    ],
-                    "accessibility": {
-                      "label": "Private field note, editable",
-                      "description": "Double tap to edit"
-                    }
-                  }
-                },
-                {
-                  "List": {
-                    "id": "field_dc4c4234f472eef8",
-                    "label": "Contact fields",
-                    "rows": [
-                      {
-                        "title": "work",
-                        "subtitle": "grace.hopper@example.org",
-                        "detail": "Visible",
-                        "icon_token": "envelope",
-                        "image_data": null,
-                        "fallback_text": null,
-                        "selected": true,
-                        "enabled": true,
-                        "activation": null,
-                        "secondary_actions": [],
-                        "controls": [],
-                        "accessibility": {
-                          "label": "work",
-                          "description": null
-                        }
-                      }
-                    ],
-                    "searchable": false,
-                    "paging": null,
-                    "accessibility": {
-                      "label": "Contact fields",
-                      "description": null
-                    }
-                  }
-                },
-                {
-                  "Group": {
-                    "id": "field_note:dc4c4234f472eef8",
-                    "label": "Private note for this field",
-                    "axis": "vertical",
-                    "children": [
-                      {
-                        "Text": {
-                          "id": "field_note:dc4c4234f472eef8",
+                          "id": "field_note:fb928ce58b7d6153",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2516,7 +2446,91 @@
                 },
                 {
                   "List": {
-                    "id": "field_78fb94f224eadc6c",
+                    "id": "field_b29bb9638a5b92b5",
+                    "label": "Contact fields",
+                    "rows": [
+                      {
+                        "title": "work",
+                        "subtitle": "grace.hopper@example.org",
+                        "detail": "Visible",
+                        "icon_token": "envelope",
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": true,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.3",
+                          "label": "Send email",
+                          "accessibility_label": "Send email",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "work",
+                          "description": null
+                        }
+                      }
+                    ],
+                    "searchable": false,
+                    "paging": null,
+                    "accessibility": {
+                      "label": "Contact fields",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "Group": {
+                    "id": "field_note:b29bb9638a5b92b5",
+                    "label": "Private note for this field",
+                    "axis": "vertical",
+                    "children": [
+                      {
+                        "Text": {
+                          "id": "field_note:b29bb9638a5b92b5",
+                          "content": "",
+                          "style": "body",
+                          "accessibility": {
+                            "label": "Private field note, editable",
+                            "description": "Double tap to edit"
+                          }
+                        }
+                      },
+                      {
+                        "Status": {
+                          "id": null,
+                          "title": "Edit",
+                          "detail": null,
+                          "icon_token": null,
+                          "badge": null,
+                          "tone": "neutral",
+                          "activation": {
+                            "interaction_id": "surface.1.interaction.4",
+                            "label": "Edit",
+                            "accessibility_label": "Edit",
+                            "icon_token": null,
+                            "enabled": true,
+                            "shortcut": null
+                          },
+                          "accessibility": {
+                            "label": "Edit",
+                            "description": null
+                          }
+                        }
+                      }
+                    ],
+                    "accessibility": {
+                      "label": "Private field note, editable",
+                      "description": "Double tap to edit"
+                    }
+                  }
+                },
+                {
+                  "List": {
+                    "id": "field_2f6786865c979617",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2528,7 +2542,14 @@
                         "fallback_text": null,
                         "selected": true,
                         "enabled": true,
-                        "activation": null,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.5",
+                          "label": "Open website",
+                          "accessibility_label": "Open website",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
@@ -2547,13 +2568,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:78fb94f224eadc6c",
+                    "id": "field_note:2f6786865c979617",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:78fb94f224eadc6c",
+                          "id": "field_note:2f6786865c979617",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2571,7 +2592,7 @@
                           "badge": null,
                           "tone": "neutral",
                           "activation": {
-                            "interaction_id": "surface.1.interaction.3",
+                            "interaction_id": "surface.1.interaction.6",
                             "label": "Edit",
                             "accessibility_label": "Edit",
                             "icon_token": null,
@@ -2617,7 +2638,7 @@
                           "badge": null,
                           "tone": "neutral",
                           "activation": {
-                            "interaction_id": "surface.1.interaction.4",
+                            "interaction_id": "surface.1.interaction.7",
                             "label": "Edit",
                             "accessibility_label": "Edit",
                             "icon_token": null,
@@ -3681,55 +3702,6 @@
                   }
                 },
                 {
-                  "Group": {
-                    "id": "search_facets",
-                    "label": "Also search",
-                    "axis": "vertical",
-                    "children": [
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.0",
-                          "label": "Tags",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Tags, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      },
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.1",
-                          "label": "Notes",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Notes, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      },
-                      {
-                        "Toggle": {
-                          "binding_id": "surface.1.binding.2",
-                          "label": "Places",
-                          "value": false,
-                          "enabled": true,
-                          "accessibility": {
-                            "label": "Search Places, off",
-                            "description": "Double tap to toggle"
-                          }
-                        }
-                      }
-                    ],
-                    "accessibility": {
-                      "label": "Also search in",
-                      "description": "Choose which annotations the search matches."
-                    }
-                  }
-                },
-                {
                   "List": {
                     "id": "contacts",
                     "label": null,
@@ -3986,6 +3958,55 @@
                     "accessibility": {
                       "label": "",
                       "description": null
+                    }
+                  }
+                },
+                {
+                  "Group": {
+                    "id": "search_facets",
+                    "label": "Also search",
+                    "axis": "vertical",
+                    "children": [
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.0",
+                          "label": "Tags",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Tags, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.1",
+                          "label": "Notes",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Notes, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.2",
+                          "label": "Places",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Search Places, off",
+                            "description": "Double tap to toggle"
+                          }
+                        }
+                      }
+                    ],
+                    "accessibility": {
+                      "label": "Also search in",
+                      "description": "Choose which annotations the search matches."
                     }
                   }
                 }
@@ -4883,10 +4904,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "3477 32C2 63F9 0AAD E9E4 ED0B C6E3 9735 CAF3 D876 6FE5 A6F4 D6FB 8458 F00E E18A",
+                    "content": "8B64 C92A 5796 C3D7 8627 E4CA 5690 EAA4 AB7A 5C63 9FED 26F1 7B7D E1FF DDF5 BFB0",
                     "style": "body",
                     "accessibility": {
-                      "label": "3477 32C2 63F9 0AAD E9E4 ED0B C6E3 9735 CAF3 D876 6FE5 A6F4 D6FB 8458 F00E E18A",
+                      "label": "8B64 C92A 5796 C3D7 8627 E4CA 5690 EAA4 AB7A 5C63 9FED 26F1 7B7D E1FF DDF5 BFB0",
                       "description": null
                     }
                   }
@@ -4905,10 +4926,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "8055 6A6F 136F AFF2 808F 6495 8171 5132 4521 D431 B6A4 2975 1514 E1CE AE79 63BA",
+                    "content": "C0D3 11E0 D2D9 6B81 5DD3 6259 4B19 6494 A394 06E7 471B C5BA D953 22A9 3042 F1DA",
                     "style": "body",
                     "accessibility": {
-                      "label": "8055 6A6F 136F AFF2 808F 6495 8171 5132 4521 D431 B6A4 2975 1514 E1CE AE79 63BA",
+                      "label": "C0D3 11E0 D2D9 6B81 5DD3 6259 4B19 6494 A394 06E7 471B C5BA D953 22A9 3042 F1DA",
                       "description": null
                     }
                   }
@@ -5519,36 +5540,6 @@
                         }
                       },
                       {
-                        "title": "Delivery Receipts",
-                        "subtitle": "When enabled, notifies senders when their messages are delivered",
-                        "detail": null,
-                        "icon_token": null,
-                        "image_data": null,
-                        "fallback_text": null,
-                        "selected": false,
-                        "enabled": true,
-                        "activation": null,
-                        "secondary_actions": [],
-                        "controls": [
-                          {
-                            "Toggle": {
-                              "binding_id": "surface.1.binding.0",
-                              "label": "",
-                              "value": true,
-                              "enabled": true,
-                              "accessibility": {
-                                "label": "Delivery Receipts toggle",
-                                "description": "When enabled, notifies senders when their messages are delivered"
-                              }
-                            }
-                          }
-                        ],
-                        "accessibility": {
-                          "label": "Delivery Receipts toggle",
-                          "description": "When enabled, notifies senders when their messages are delivered"
-                        }
-                      },
-                      {
                         "title": "New Entries Start Visible",
                         "subtitle": "When on, new contact card entries are shared with all contacts. When off, they stay hidden until you share them.",
                         "detail": null,
@@ -5562,7 +5553,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.1",
+                              "binding_id": "surface.1.binding.0",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -5592,7 +5583,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.2",
+                              "binding_id": "surface.1.binding.1",
                               "label": "",
                               "value": true,
                               "enabled": true,
@@ -5622,7 +5613,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.3",
+                              "binding_id": "surface.1.binding.2",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -6066,36 +6057,6 @@
                         }
                       },
                       {
-                        "title": "Delivery Receipts",
-                        "subtitle": "When enabled, notifies senders when their messages are delivered",
-                        "detail": null,
-                        "icon_token": null,
-                        "image_data": null,
-                        "fallback_text": null,
-                        "selected": false,
-                        "enabled": true,
-                        "activation": null,
-                        "secondary_actions": [],
-                        "controls": [
-                          {
-                            "Toggle": {
-                              "binding_id": "surface.1.binding.0",
-                              "label": "",
-                              "value": true,
-                              "enabled": true,
-                              "accessibility": {
-                                "label": "Delivery Receipts toggle",
-                                "description": "When enabled, notifies senders when their messages are delivered"
-                              }
-                            }
-                          }
-                        ],
-                        "accessibility": {
-                          "label": "Delivery Receipts toggle",
-                          "description": "When enabled, notifies senders when their messages are delivered"
-                        }
-                      },
-                      {
                         "title": "New Entries Start Visible",
                         "subtitle": "When on, new contact card entries are shared with all contacts. When off, they stay hidden until you share them.",
                         "detail": null,
@@ -6109,7 +6070,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.1",
+                              "binding_id": "surface.1.binding.0",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -6139,7 +6100,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.2",
+                              "binding_id": "surface.1.binding.1",
                               "label": "",
                               "value": true,
                               "enabled": true,
@@ -6169,7 +6130,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.3",
+                              "binding_id": "surface.1.binding.2",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -6473,7 +6434,7 @@
                         }
                       },
                       {
-                        "title": "Set Up New Device",
+                        "title": "Emergency Broadcast",
                         "subtitle": null,
                         "detail": null,
                         "icon_token": null,
@@ -6483,6 +6444,30 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.5",
+                          "label": "Emergency Broadcast",
+                          "accessibility_label": "Emergency Broadcast",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Emergency Broadcast",
+                          "description": "Missing: settings.emergency_broadcast_hint"
+                        }
+                      },
+                      {
+                        "title": "Set Up New Device",
+                        "subtitle": null,
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.6",
                           "label": "Set Up New Device",
                           "accessibility_label": "Set Up New Device",
                           "icon_token": null,
@@ -6520,7 +6505,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.6",
+                          "interaction_id": "surface.1.interaction.7",
                           "label": "Backup reminders",
                           "accessibility_label": "Backup reminder frequency",
                           "icon_token": null,
@@ -6558,7 +6543,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.7",
+                          "interaction_id": "surface.1.interaction.8",
                           "label": "Relay URL",
                           "accessibility_label": "Relay URL",
                           "icon_token": null,
@@ -6570,6 +6555,30 @@
                         "accessibility": {
                           "label": "Relay URL",
                           "description": "The relay server used for message delivery"
+                        }
+                      },
+                      {
+                        "title": "Delayed fetching",
+                        "subtitle": null,
+                        "detail": "Off: your relay doesn't offer it",
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.9",
+                          "label": "Delayed fetching",
+                          "accessibility_label": "Delayed fetching",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Delayed fetching",
+                          "description": "Your relay passes on each fetch after a random wait, which makes its timing harder to link to you"
                         }
                       }
                     ],
@@ -6666,7 +6675,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.8",
+                          "interaction_id": "surface.1.interaction.10",
                           "label": "Pending Updates",
                           "accessibility_label": "Pending Updates",
                           "icon_token": null,
@@ -6690,7 +6699,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.9",
+                          "interaction_id": "surface.1.interaction.11",
                           "label": "Failed Deliveries",
                           "accessibility_label": "Failed Deliveries",
                           "icon_token": null,
@@ -6728,7 +6737,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.10",
+                          "interaction_id": "surface.1.interaction.12",
                           "label": "What is Vauchi?",
                           "accessibility_label": "What is Vauchi?",
                           "icon_token": null,
@@ -6752,7 +6761,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.11",
+                          "interaction_id": "surface.1.interaction.13",
                           "label": "Support Development",
                           "accessibility_label": "Support Development",
                           "icon_token": null,
@@ -6776,7 +6785,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.12",
+                          "interaction_id": "surface.1.interaction.14",
                           "label": "Support",
                           "accessibility_label": "Support",
                           "icon_token": null,
@@ -6793,14 +6802,14 @@
                       {
                         "title": "Version",
                         "subtitle": null,
-                        "detail": "0.86.0",
+                        "detail": "0.94.1",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": null,
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.13",
+                          "interaction_id": "surface.1.interaction.15",
                           "label": "Version",
                           "accessibility_label": "Version",
                           "icon_token": null,
@@ -6868,7 +6877,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.14",
+                          "interaction_id": "surface.1.interaction.16",
                           "label": "Emergency Wipe",
                           "accessibility_label": "Emergency Wipe",
                           "icon_token": null,
@@ -7261,36 +7270,6 @@
                         }
                       },
                       {
-                        "title": "Delivery Receipts",
-                        "subtitle": "When enabled, notifies senders when their messages are delivered",
-                        "detail": null,
-                        "icon_token": null,
-                        "image_data": null,
-                        "fallback_text": null,
-                        "selected": false,
-                        "enabled": true,
-                        "activation": null,
-                        "secondary_actions": [],
-                        "controls": [
-                          {
-                            "Toggle": {
-                              "binding_id": "surface.1.binding.0",
-                              "label": "",
-                              "value": true,
-                              "enabled": true,
-                              "accessibility": {
-                                "label": "Delivery Receipts toggle",
-                                "description": "When enabled, notifies senders when their messages are delivered"
-                              }
-                            }
-                          }
-                        ],
-                        "accessibility": {
-                          "label": "Delivery Receipts toggle",
-                          "description": "When enabled, notifies senders when their messages are delivered"
-                        }
-                      },
-                      {
                         "title": "New Entries Start Visible",
                         "subtitle": "When on, new contact card entries are shared with all contacts. When off, they stay hidden until you share them.",
                         "detail": null,
@@ -7304,7 +7283,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.1",
+                              "binding_id": "surface.1.binding.0",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -7334,7 +7313,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.2",
+                              "binding_id": "surface.1.binding.1",
                               "label": "",
                               "value": true,
                               "enabled": true,
@@ -7364,7 +7343,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.3",
+                              "binding_id": "surface.1.binding.2",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -8095,36 +8074,6 @@
                         }
                       },
                       {
-                        "title": "Delivery Receipts",
-                        "subtitle": "When enabled, notifies senders when their messages are delivered",
-                        "detail": null,
-                        "icon_token": null,
-                        "image_data": null,
-                        "fallback_text": null,
-                        "selected": false,
-                        "enabled": true,
-                        "activation": null,
-                        "secondary_actions": [],
-                        "controls": [
-                          {
-                            "Toggle": {
-                              "binding_id": "surface.1.binding.0",
-                              "label": "",
-                              "value": true,
-                              "enabled": true,
-                              "accessibility": {
-                                "label": "Delivery Receipts toggle",
-                                "description": "When enabled, notifies senders when their messages are delivered"
-                              }
-                            }
-                          }
-                        ],
-                        "accessibility": {
-                          "label": "Delivery Receipts toggle",
-                          "description": "When enabled, notifies senders when their messages are delivered"
-                        }
-                      },
-                      {
                         "title": "New Entries Start Visible",
                         "subtitle": "When on, new contact card entries are shared with all contacts. When off, they stay hidden until you share them.",
                         "detail": null,
@@ -8138,7 +8087,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.1",
+                              "binding_id": "surface.1.binding.0",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -8168,7 +8117,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.2",
+                              "binding_id": "surface.1.binding.1",
                               "label": "",
                               "value": true,
                               "enabled": true,
@@ -8198,7 +8147,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.3",
+                              "binding_id": "surface.1.binding.2",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -9054,7 +9003,7 @@
                             },
                             {
                               "title": "About",
-                              "subtitle": "Vauchi 0.81.0 · core 0.81.0",
+                              "subtitle": "Vauchi 0.94.1 · core 0.94.1",
                               "detail": null,
                               "icon_token": null,
                               "image_data": null,
@@ -10598,6 +10547,375 @@
                   "accessibility_label": "Settings",
                   "icon_token": "gearshape",
                   "selected": false,
+                  "badge_count": 0
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "code_id": "emergency_broadcast",
+      "title": "Emergency Broadcast",
+      "locale": "en",
+      "commands": [
+        {
+          "ReplaceSurface": {
+            "surface": {
+              "surface_id": "emergency_broadcast",
+              "revision": 1,
+              "title": "Emergency Broadcast",
+              "subtitle": "Send an alert to trusted contacts",
+              "accessibility_label": "Emergency Broadcast",
+              "layout": "scroll",
+              "tokens": {
+                "spacing_small": 8,
+                "spacing_medium": 16,
+                "spacing_large": 24,
+                "corner_radius": 12,
+                "minimum_target_size": 48,
+                "colors": {
+                  "background": "#1e1e2e",
+                  "surface": "#181825",
+                  "text": "#cdd6f4",
+                  "text_muted": "#a6adc8",
+                  "accent": "#89b4fa",
+                  "border": "#45475a",
+                  "success": "#a6e3a1",
+                  "warning": "#fab387",
+                  "error": "#f38ba8",
+                  "surface_input": "#28293a",
+                  "surface_muted": "#313244",
+                  "surface_elevated": "#303042",
+                  "text_on_accent": "#0A0A0A",
+                  "focus_ring": "#89b4fa"
+                }
+              },
+              "nodes": [
+                {
+                  "Status": {
+                    "id": "sync",
+                    "title": "Sync",
+                    "detail": null,
+                    "icon_token": null,
+                    "badge": null,
+                    "tone": "neutral",
+                    "activation": {
+                      "interaction_id": "surface.1.interaction.0",
+                      "label": "Sync",
+                      "accessibility_label": "Sync",
+                      "icon_token": null,
+                      "enabled": true,
+                      "shortcut": null
+                    },
+                    "accessibility": {
+                      "label": "Sync",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "Group": {
+                    "id": "what_is",
+                    "label": "What is an emergency broadcast?",
+                    "axis": "vertical",
+                    "children": [
+                      {
+                        "Status": {
+                          "id": null,
+                          "title": "Send an alert to trusted contacts",
+                          "detail": "Silently alert your trusted contacts that you may be in danger. The alert is disguised as a normal card update.",
+                          "icon_token": "shield",
+                          "badge": null,
+                          "tone": "neutral",
+                          "activation": null,
+                          "accessibility": {
+                            "label": "Send an alert to trusted contacts",
+                            "description": null
+                          }
+                        }
+                      }
+                    ],
+                    "accessibility": {
+                      "label": "What is an emergency broadcast?",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "Status": {
+                    "id": "status",
+                    "title": "Emergency broadcast not set up",
+                    "detail": null,
+                    "icon_token": null,
+                    "badge": "Pending",
+                    "tone": "neutral",
+                    "activation": null,
+                    "accessibility": {
+                      "label": "Emergency broadcast not set up",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "Group": {
+                    "id": "trusted_contacts",
+                    "label": "Trusted Contacts",
+                    "axis": "vertical",
+                    "children": [
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.0",
+                          "label": "Alan Turing",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Alan Turing",
+                            "description": null
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.1",
+                          "label": "Annabella Byron",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Annabella Byron",
+                            "description": null
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.2",
+                          "label": "Charles Babbage",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Charles Babbage",
+                            "description": null
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.3",
+                          "label": "Emmy Noether",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Emmy Noether",
+                            "description": null
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.4",
+                          "label": "Grace Hopper",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Grace Hopper",
+                            "description": null
+                          }
+                        }
+                      },
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.5",
+                          "label": "Mary Somerville",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Mary Somerville",
+                            "description": null
+                          }
+                        }
+                      }
+                    ],
+                    "accessibility": {
+                      "label": "Trusted Contacts",
+                      "description": "Maximum 10 trusted contacts"
+                    }
+                  }
+                },
+                {
+                  "Input": {
+                    "binding_id": "surface.1.message",
+                    "label": "Alert Message",
+                    "value": "I may be in danger. Please check on me.",
+                    "placeholder": "Message sent to your trusted contacts",
+                    "input_kind": "text",
+                    "max_length": 500,
+                    "validation_error": null,
+                    "enabled": true,
+                    "accessibility": {
+                      "label": "Alert message input",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "List": {
+                    "id": "options",
+                    "label": "Options",
+                    "rows": [
+                      {
+                        "title": "Include Location",
+                        "subtitle": "Share your location in the alert",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": null,
+                        "secondary_actions": [],
+                        "controls": [
+                          {
+                            "Toggle": {
+                              "binding_id": "surface.1.binding.6",
+                              "label": "",
+                              "value": false,
+                              "enabled": true,
+                              "accessibility": {
+                                "label": "Include Location",
+                                "description": "Share your location in the alert"
+                              }
+                            }
+                          }
+                        ],
+                        "accessibility": {
+                          "label": "Include Location",
+                          "description": "Share your location in the alert"
+                        }
+                      }
+                    ],
+                    "searchable": false,
+                    "paging": null,
+                    "accessibility": {
+                      "label": "Options",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "List": {
+                    "id": "config_actions",
+                    "label": null,
+                    "rows": [
+                      {
+                        "title": "Save",
+                        "subtitle": null,
+                        "detail": null,
+                        "icon_token": "checkmark",
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.1",
+                          "label": "Save",
+                          "accessibility_label": "Save",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Save",
+                          "description": null
+                        }
+                      }
+                    ],
+                    "searchable": false,
+                    "paging": null,
+                    "accessibility": {
+                      "label": "",
+                      "description": null
+                    },
+                    "style": "buttons"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "SetContextBar": {
+            "surface_id": "emergency_broadcast",
+            "revision": 1,
+            "bar": {
+              "back": {
+                "interaction_id": "surface.1.context.presentation.back",
+                "label": "Back",
+                "accessibility_label": "Back",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": "back"
+              },
+              "navigation": {
+                "interaction_id": "surface.1.context.presentation.navigation",
+                "label": "More",
+                "accessibility_label": "More",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": null
+              },
+              "primary": null,
+              "secondary": null
+            }
+          }
+        },
+        {
+          "SetNavigation": {
+            "surface_id": "emergency_broadcast",
+            "revision": 1,
+            "navigation": {
+              "items": [
+                {
+                  "interaction_id": "surface.1.context.presentation.navigation.contacts",
+                  "label": "Contacts",
+                  "accessibility_label": "Contacts",
+                  "icon_token": "person.2",
+                  "selected": false,
+                  "badge_count": 0
+                },
+                {
+                  "interaction_id": "surface.1.context.presentation.navigation.my_info",
+                  "label": "My Card",
+                  "accessibility_label": "My Card",
+                  "icon_token": "person.crop.rectangle",
+                  "selected": false,
+                  "badge_count": 0
+                },
+                {
+                  "interaction_id": "surface.1.context.presentation.navigation.exchange",
+                  "label": "Exchange",
+                  "accessibility_label": "Exchange",
+                  "icon_token": "qrcode",
+                  "selected": false,
+                  "badge_count": 0
+                },
+                {
+                  "interaction_id": "surface.1.context.presentation.navigation.device_management",
+                  "label": "Devices",
+                  "accessibility_label": "Devices",
+                  "icon_token": "laptopcomputer",
+                  "selected": false,
+                  "badge_count": 0
+                },
+                {
+                  "interaction_id": "surface.1.context.presentation.navigation.settings",
+                  "label": "Settings",
+                  "accessibility_label": "Settings",
+                  "icon_token": "gearshape",
+                  "selected": true,
                   "badge_count": 0
                 }
               ]
@@ -17580,7 +17898,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "https://vauchi.app/x#pk=wI2Xdz7K-ebGyI9NijK5R4VHRlJExXg4iHx7LVw742Q&n=grOR6lqsXmKmjYW9UmH00BC1dBOzY_0CO7sA2J3-2kI&nm=QWRhIExvdmVsYWNl",
+                    "content": "https://vauchi.app/x#pk=pm1cOi3-5w99Anrzib61Pea2Bix-5ijTyI0tMzuNXiI&n=sEJgBOXbt0uYSBDM0jv5epsJaXyKhW-Dq8kfSgs4TBI&nm=QWRhIExvdmVsYWNl",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -17700,11 +18018,11 @@
         },
         {
           "ScheduleWakeup": {
-            "earliest_secs": 1,
-            "deadline_secs": 1,
-            "min_interval_secs": 1,
+            "earliest_secs": 30,
+            "deadline_secs": 90,
+            "min_interval_secs": 30,
             "earliest_millis": null,
-            "delay_millis": 1000
+            "delay_millis": 30000
           }
         }
       ]
@@ -18136,8 +18454,15 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,80,65,115,100,111,65,82,84,85,107,119,121,113,106,74,97,51,86,57,112,80,107,47,118,88,119,56,114,116,111,104,53,75,69,110,47,118,117,52,120,118,119,117,56,90,97,108,118,109,43,85,90,99,43,48,118,110,84,82,114,99,90,82,54,113,85,66,48,53,56,101,118,113,73,82,119,81,50,113,52,85,115,106,83,111,53,103,74,52,107,55,51,77,79,118,100,86,48,84,74,110,115,57,105,101,83,55,73,115,47,71,50,66,111,82,119,119,121,90,116,114,47,117,71,116,78,89,90,76,43,74,48,65,66,54,100,68,112,77,121,68,106,99,67,47,53,43,85,120,75,65,65,65,65,65,71,114,79,101,90,69,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,65,68,116,122,65,108,107,51,67,107,85,105,115,56,85,84,51,114,114,43,99,70,106,84,118,99,69,104,73,66,84,80,97,98,47,115,113,75,77,121,69,103,67,89,53,83,100,106,114,56,66,100,117,101,118,122,68,57,78,104,98,81,71,117,51,55,75,120,107,51,111,105,51,87,47,105,79,81,67,55,114,69,88,97,107,75],
-            "is_initiator": true
+            "payload": [86,48,74,70,87,65,80,65,48,120,72,103,48,116,108,114,103,86,51,84,89,108,108,76,71,87,83,85,111,53,81,71,53,48,99,98,120,98,114,90,85,121,75,112,77,69,76,120,50,110,77,113,102,68,76,108,105,107,114,119,66,71,85,101,78,83,114,97,84,85,71,54,51,101,75,78,105,88,51,52,104,117,68,69,51,88,120,86,72,67,69,79,86,68,88,71,122,121,53,65,65,108,98,69,48,69,87,70,111,104,89,101,67,109,83,102,116,103,97,97,70,116,69,105,50,80,68,48,90,69,78,104,86,97,111,71,73,49,71,100,110,88,105,71,90,111,67,115,71,81,69,111,101,70,102,111,65,65,65,65,65,71,114,109,53,75,69,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,66,88,84,88,82,71,111,110,121,98,111,81,114,87,49,88,43,77,122,65,98,66,113,121,109,57,56,80,71,54,87,100,114,120,71,77,101,87,80,82,104,70,98,112,107,118,110,56,111,100,85,107,66,89,65,77,118,118,85,78,79,90,72,85,74,105,79,65,87,99,81,112,110,77,68,100,108,53,107,85,87,100,99,85,85,71],
+            "is_initiator": true,
+            "endpoint": {
+              "service_type": "_vauchi-exchange._tcp.local.",
+              "port": 19283,
+              "fallback_host": "127.0.0.1",
+              "browse_timeout_ms": 5000,
+              "io_timeout_ms": 10000
+            }
           }
         }
       ]
@@ -18212,7 +18537,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI30:0:0:00-S1/I7:54N-1TOSHZOY7VD3L/G6SISZS05JJ5N5/JN*A7QSA J43YMR+S1I7K$MHF88R9 5BLFJJ11LKC5UQ:/2OSTCY4Y2HSYGY51EGF993ECE.TC0/RO6A11Vauchi User00"
+                      "INI30:0:0:00F61GWV$DUC:LF-B%SVYI3$JNEXB6O7BCNELF6 B$JI9GPL0B*VG+GU9WPT-P+*AD LS%KMWE3EB6WGO72LFCAK2FSGJ*CCBF6ULOQI+IQGXS33RHTBX0LHQK11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -18418,8 +18743,8 @@
             "earliest_secs": 1,
             "deadline_secs": 1,
             "min_interval_secs": 1,
-            "earliest_millis": 86,
-            "delay_millis": 86
+            "earliest_millis": 103,
+            "delay_millis": 103
           }
         }
       ]
@@ -19159,7 +19484,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [192,177,218,0,69,53,36,195,42,163,37,173,213,246,147,228,254,245,240,242,187,104,135,146,132,159,251,238,227,27,240,187]
+            "payload": [160,231,94,23,170,119,140,23,8,45,27,245,119,136,119,241,142,55,43,119,71,88,235,228,82,116,128,252,248,147,236,185]
           }
         },
         {
@@ -19358,7 +19683,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [192,177,218,0,69,53,36,195,42,163,37,173,213,246,147,228,254,245,240,242,187,104,135,146,132,159,251,238,227,27,240,187]
+            "payload": [190,21,115,44,214,197,140,76,177,146,222,35,127,112,3,198,94,58,156,250,18,238,96,195,202,85,133,234,43,214,31,182]
           }
         },
         {
@@ -19557,7 +19882,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [192,177,218,0,69,53,36,195,42,163,37,173,213,246,147,228,254,245,240,242,187,104,135,146,132,159,251,238,227,27,240,187]
+            "payload": [100,83,238,201,43,168,1,215,0,215,125,84,140,40,221,96,209,103,129,31,52,81,121,240,81,23,191,228,40,94,252,119]
           }
         },
         {
@@ -22988,36 +23313,6 @@
                         }
                       },
                       {
-                        "title": "Zustellbestätigungen",
-                        "subtitle": "Wenn aktiviert, werden Absender benachrichtigt, wenn ihre Nachrichten zugestellt wurden",
-                        "detail": null,
-                        "icon_token": null,
-                        "image_data": null,
-                        "fallback_text": null,
-                        "selected": false,
-                        "enabled": true,
-                        "activation": null,
-                        "secondary_actions": [],
-                        "controls": [
-                          {
-                            "Toggle": {
-                              "binding_id": "surface.1.binding.0",
-                              "label": "",
-                              "value": true,
-                              "enabled": true,
-                              "accessibility": {
-                                "label": "Schalter für Zustellbestätigungen",
-                                "description": "Wenn aktiviert, werden Absender benachrichtigt, wenn ihre Nachrichten zugestellt wurden"
-                              }
-                            }
-                          }
-                        ],
-                        "accessibility": {
-                          "label": "Schalter für Zustellbestätigungen",
-                          "description": "Wenn aktiviert, werden Absender benachrichtigt, wenn ihre Nachrichten zugestellt wurden"
-                        }
-                      },
-                      {
                         "title": "Neue Einträge sind sichtbar",
                         "subtitle": "Wenn aktiviert, werden neue Einträge deiner Kontaktkarte mit allen Kontakten geteilt. Wenn deaktiviert, bleiben sie verborgen, bis du sie teilst.",
                         "detail": null,
@@ -23031,7 +23326,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.1",
+                              "binding_id": "surface.1.binding.0",
                               "label": "",
                               "value": false,
                               "enabled": true,
@@ -23061,7 +23356,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.2",
+                              "binding_id": "surface.1.binding.1",
                               "label": "",
                               "value": true,
                               "enabled": true,
@@ -23091,7 +23386,7 @@
                         "controls": [
                           {
                             "Toggle": {
-                              "binding_id": "surface.1.binding.3",
+                              "binding_id": "surface.1.binding.2",
                               "label": "",
                               "value": false,
                               "enabled": true,

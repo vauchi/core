@@ -384,6 +384,13 @@ impl SettingsEngine {
                     None,
                 ),
                 self.link_row(
+                    "emergency_broadcast",
+                    self.t("emergency.title"),
+                    Some(self.t("settings.emergency_broadcast_hint")),
+                    None,
+                    None,
+                ),
+                self.link_row(
                     "setup_new_device",
                     self.t("settings.setup_new_device"),
                     Some(self.t("settings.setup_new_device_hint")),

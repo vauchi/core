@@ -18,6 +18,9 @@ pub(super) enum CredentialChange {
     DuressPin,
     DeviceRevoke,
     RecoveryVoucher,
+    /// Who receives the emergency alerts, and the message (#781).
+    EmergencyBroadcastConfig,
+    EmergencyBroadcastDisable,
 }
 
 /// The change waiting on the PIN, and the engine of the screen that asked
@@ -42,6 +45,9 @@ impl CredentialChange {
                 "recovery.how_to_vouch",
                 "recovery_help.confirm_password_hint",
             ),
+            Self::EmergencyBroadcastConfig | Self::EmergencyBroadcastDisable => {
+                ("emergency.title", "emergency.confirm_password_hint")
+            }
         }
     }
 }
@@ -126,6 +132,12 @@ impl AppEngine {
         match change {
             CredentialChange::DuressPin => self.complete_duress_pin(),
             CredentialChange::DeviceRevoke => self.complete_device_management(),
+            CredentialChange::EmergencyBroadcastConfig => {
+                self.complete_emergency_broadcast_config()
+            }
+            CredentialChange::EmergencyBroadcastDisable => {
+                self.complete_emergency_broadcast_disable()
+            }
             CredentialChange::RecoveryVoucher => self
                 .intercept_create_voucher_action()
                 .unwrap_or_else(|| ActionResult::UpdateScreen(self.engine.current_screen())),

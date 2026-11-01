@@ -8,6 +8,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- The emergency broadcast (ADR-036) has a Core screen: Settings →
+  Security → Emergency Broadcast picks up to ten trusted contacts, the
+  message and the location choice, and sends the alert after a question
+  that closes by itself after five seconds. A repeat within a minute is
+  refused with the seconds left; who receives the alerts changes only
+  after the session PIN. `Vauchi::emergency_broadcast_cooldown_remaining_secs`
+  tells a screen how long to wait (vauchi/private#895).
+
 ### Changed
 
 - The relay purge body carries no `recipient_id`: the relay erases the

@@ -47,6 +47,8 @@ pub enum AppScreen {
     /// Change-app-password form (Settings → Change Password).
     ChangePassword,
     DecoyContacts,
+    /// Trusted contacts, message and Send for the emergency alert (ADR-036).
+    EmergencyBroadcast,
     EmergencyShred,
     DeliveryStatus,
     Recovery,
@@ -207,6 +209,7 @@ impl AppScreen {
             Self::DuressPin => "duress_pin",
             Self::ChangePassword => "change_password",
             Self::DecoyContacts => "decoy_contacts",
+            Self::EmergencyBroadcast => "emergency_broadcast",
             Self::EmergencyShred => "emergency_shred",
             Self::DeliveryStatus => "delivery_status",
             Self::Recovery => "recovery",
@@ -275,6 +278,7 @@ impl AppScreen {
             "duress_pin" => Self::DuressPin,
             "change_password" => Self::ChangePassword,
             "decoy_contacts" => Self::DecoyContacts,
+            "emergency_broadcast" => Self::EmergencyBroadcast,
             "emergency_shred" => Self::EmergencyShred,
             "delivery_status" => Self::DeliveryStatus,
             "recovery" => Self::Recovery,
@@ -395,6 +399,7 @@ impl AppScreen {
             | Self::DuressPin
             | Self::ChangePassword
             | Self::DecoyContacts
+            | Self::EmergencyBroadcast
             | Self::EmergencyShred
             | Self::DeliveryStatus
             | Self::Recovery

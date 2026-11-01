@@ -1191,7 +1191,7 @@
   "exchange.waiting_peer": "Waiting for peer...",
   "exchange.weak_signal": "Weak signal",
   "exchange.your_qr": "Your QR Code",
-  "faq.add_contact.answer": "Meet in person and go to Exchange. Show your QR code or use Bluetooth to share your contact card. Both parties must be present — Vauchi never exchanges contacts remotely.",
+  "faq.add_contact.answer": "Meet in person and go to Exchange. Show your QR code or use Bluetooth to share your contact card. Only if you can't meet, use Share Link, and send the link only to the person you mean: the first person to open it gets your card.",
   "faq.add_contact.question": "How do I add a contact?",
   "faq.block_contact": "How do I block a contact?",
   "faq.block_contact.answer": "Open the contact and tap Block Contact. Blocking stops sending them your updates and ignores any updates from them. They won't be notified. When you block, you can also choose to remove your info from their device.",

@@ -34,6 +34,9 @@ impl AppEngine {
         {
             self.transport_readiness.note_granted(requirement);
             self.rebuild_exchange_engine();
+            let _search_restarted = self
+                .engine
+                .apply_update(crate::ui::EngineUpdate::TransportPermissionGranted);
         }
         self.initial_commands()
     }

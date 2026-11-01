@@ -178,6 +178,11 @@ pub enum EngineUpdate {
     BleForceFailure {
         reason: Option<String>,
     },
+    /// The person granted a transport permission the shell asked the OS
+    /// for; a BLE search still looking for a peer restarts its discovery
+    /// budget, so the time the prompt was open does not count
+    /// (vauchi/private#1022).
+    TransportPermissionGranted,
     ContactDetail(ContactDetailUpdate),
     ContactList(ContactListUpdate),
     Recovery(RecoveryUpdate),
@@ -437,6 +442,7 @@ impl EngineUpdate {
             },
             Self::BleForceSuccess { .. } => "BleForceSuccess",
             Self::BleForceFailure { .. } => "BleForceFailure",
+            Self::TransportPermissionGranted => "TransportPermissionGranted",
             Self::ContactDetail(u) => match u {
                 ContactDetailUpdate::ToggleProposalTrusted => {
                     "ContactDetail::ToggleProposalTrusted"

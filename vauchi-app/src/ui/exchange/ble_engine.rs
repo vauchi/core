@@ -857,6 +857,13 @@ impl WorkflowEngine for BleExchangeEngine {
                 self.force_failure(reason);
                 true
             }
+            crate::ui::EngineUpdate::TransportPermissionGranted
+                if matches!(self.screen, BleScreen::Active)
+                    && matches!(self.flow.step(), BleStep::Discovering) =>
+            {
+                self.step_entered_unix = self.clock.unix_seconds();
+                true
+            }
             _ => false,
         }
     }

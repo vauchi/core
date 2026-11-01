@@ -9,41 +9,22 @@
 
 use proptest::prelude::*;
 use vauchi_core::api::{AuthMode, DeviceSyncOrchestrator};
-use vauchi_core::crypto::SigningKeyPair;
-use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
+use vauchi_core::identity::DeviceRegistry;
 use vauchi_core::sync::SyncItem;
 use vauchi_core::{ContactField, FieldType, Vauchi};
 
+use crate::common::device_sync::link_tablet;
 use crate::common::helpers::create_vauchi_with_identity;
 
 const APP_PASSWORD: &str = "my-pin-1234";
 const DURESS_PIN: &str = "654321";
-
-fn install_linked_registry(wb: &Vauchi) -> (DeviceRegistry, [u8; 32]) {
-    const SEED: [u8; 32] = [9u8; 32];
-    let signing = SigningKeyPair::from_seed(&SEED);
-    let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
-        &signing,
-    );
-    let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
-    let tablet_id = *tablet.device_id();
-    registry
-        .add_device_unsigned(tablet.to_registered(&SEED))
-        .unwrap();
-    wb.storage()
-        .device()
-        .save_device_registry(&registry)
-        .unwrap();
-    (registry, tablet_id)
-}
 
 /// Alice with a linked tablet, unlocked with `credential`.
 fn alice(credential: &str, expected_mode: AuthMode) -> (Vauchi, DeviceRegistry, [u8; 32]) {
     let mut wb = create_vauchi_with_identity("Alice");
     wb.setup_app_password(APP_PASSWORD).unwrap();
     wb.setup_duress_password(DURESS_PIN).unwrap();
-    let (registry, tablet_id) = install_linked_registry(&wb);
+    let (registry, tablet_id) = link_tablet(&wb, [9u8; 32]);
     assert_eq!(wb.authenticate(credential).unwrap(), expected_mode);
     (wb, registry, tablet_id)
 }

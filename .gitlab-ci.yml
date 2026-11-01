@@ -1261,9 +1261,9 @@ validate:schema:
           # exist, so this job never fired on a change to its own subject.
           - "vauchi-app/src/ui/**/*.rs"
           # Command and Event — the two shell-boundary envelopes asserted by
-          # domain_vocabulary_boundary_tests.
-          - "vauchi-core/src/platform.rs"
-          - "vauchi-core/src/platform/**/*.rs"
+          # domain_vocabulary_boundary_tests — come from the contract crate
+          # since ADR-078, so a change of its pin is a change of the subject.
+          - "Cargo.toml"
           - "vauchi-core/tests/domain_vocabulary_boundary_tests.rs"
           - "vauchi-core/Cargo.toml"
 

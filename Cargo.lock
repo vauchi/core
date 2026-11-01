@@ -4490,6 +4490,7 @@ dependencies = [
  "tokio",
  "tracing",
  "ureq",
+ "vauchi-contract",
  "vauchi-core",
  "zeroize",
 ]
@@ -4505,6 +4506,18 @@ dependencies = [
  "tracing-subscriber",
  "vauchi-app",
  "vauchi-core",
+ "zeroize",
+]
+
+[[package]]
+name = "vauchi-contract"
+version = "0.95.1"
+source = "git+https://gitlab.com/vauchi/contract.git?tag=v0.95.1#097757f7dcc0ee969bb3bdc57302614dc7248e1e"
+dependencies = [
+ "schemars 0.8.22",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
  "zeroize",
 ]
 
@@ -4559,6 +4572,7 @@ dependencies = [
  "url",
  "uuid",
  "vauchi-app",
+ "vauchi-contract",
  "vauchi-protocol",
  "webpki-roots",
  "x25519-dalek",

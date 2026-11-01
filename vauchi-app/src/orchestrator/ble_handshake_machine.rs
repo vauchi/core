@@ -467,10 +467,6 @@ impl BleHandshakeMachine {
             self.role = match direction {
                 BleLinkDirection::Outbound => BleRole::Initiator,
                 BleLinkDirection::Inbound => BleRole::Responder,
-                // `BleLinkDirection` is `#[non_exhaustive]` (cross-crate forward
-                // compat); fail closed to Responder (wait rather than initiate)
-                // for any variant added later that this match hasn't seen yet.
-                _ => BleRole::Responder,
             };
         }
         if self.role == BleRole::Responder {

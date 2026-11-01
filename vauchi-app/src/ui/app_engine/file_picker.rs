@@ -56,7 +56,6 @@ impl AppEngine {
                 FilePickPurpose::ImportContacts => self.t("menu.import_contacts"),
                 FilePickPurpose::ImportBackup => self.t("backup.import_title"),
                 FilePickPurpose::Other { label_key } => self.t(&label_key),
-                _ => self.t("menu.file"),
             };
             self.pending_file_pick = Some(PendingFilePick {
                 request_id: request_id.clone(),

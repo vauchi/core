@@ -291,10 +291,6 @@ impl From<vauchi_core::platform::BleLinkDirection> for MobileBleLinkDirection {
         match d {
             vauchi_core::platform::BleLinkDirection::Outbound => Self::Outbound,
             vauchi_core::platform::BleLinkDirection::Inbound => Self::Inbound,
-            // `#[non_exhaustive]` forward compat: an unknown future direction
-            // maps to Outbound — the shell drops the link it dialed, never a
-            // link it didn't know it had.
-            _ => Self::Outbound,
         }
     }
 }

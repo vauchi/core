@@ -10,5 +10,5 @@
 
 /// Return the version-1 presentation contract fixture as canonical JSON.
 pub fn presentation_contract_fixture_json() -> &'static str {
-    include_str!("../../fixtures/presentation_contract_v1.json")
+    vauchi_contract::fixtures::presentation_contract_v1_json()
 }

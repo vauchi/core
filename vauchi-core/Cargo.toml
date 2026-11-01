@@ -38,7 +38,7 @@ testing = []
 # MUST NOT be enabled in production builds — only for test/dev profiles.
 test-kdf = []
 # JSON Schema generation for UI types (dev tooling only)
-schema-gen = ["schemars", "vauchi-app/schema-gen"]
+schema-gen = ["schemars", "vauchi-app/schema-gen", "vauchi-contract/schema-gen"]
 # Diagnostic QR scanner benchmarking (rqrr decoder + image preprocessing)
 diagnostic-scanner = ["imageproc", "fast_image_resize"]
 # YOLO-based QR detector for diagnostic scanner (adds ~15MB ONNX runtime)
@@ -123,6 +123,7 @@ unicode-normalization = "0.1.25"
 
 # Shared relay/client protocol types
 vauchi-protocol.workspace = true
+vauchi-contract.workspace = true
 
 # Database storage (optional — not available on wasm32)
 rusqlite = { version = "0.32", features = ["bundled"], optional = true }

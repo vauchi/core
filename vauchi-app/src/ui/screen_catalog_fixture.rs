@@ -59,5 +59,5 @@ pub struct ScreenCatalogEntry {
 
 /// Return the version-1 screen catalog fixture as canonical JSON.
 pub fn screen_catalog_fixture_json() -> &'static str {
-    include_str!("../../fixtures/screen_catalog_v1.json")
+    vauchi_contract::fixtures::screen_catalog_v1_json()
 }

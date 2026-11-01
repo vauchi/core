@@ -23,16 +23,9 @@ pub enum ContentUpdates {
     Off,
 }
 
-/// What the current network costs, as the shell reports it.
-#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum NetworkCost {
-    Unmetered,
-    Metered,
-    #[default]
-    Unknown,
-}
+/// What the current network costs, as the shell reports it: a contract type
+/// since ADR-078, re-exported at its old path.
+pub use vauchi_contract::network_cost::NetworkCost;
 
 impl ContentUpdates {
     pub const ALL: [ContentUpdates; 3] = [Self::On, Self::WifiOnly, Self::Off];

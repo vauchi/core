@@ -253,6 +253,13 @@ impl Storage {
         }
     }
 
+    /// The connection the duress content lives on: decoy contacts and the
+    /// duress session's groups, tags and places (vauchi/private#813,
+    /// vauchi/private#1003).
+    pub(crate) fn duress_conn(&self) -> &Connection {
+        &self.conn
+    }
+
     /// Returns a reference to the underlying connection (testing only).
     #[cfg(any(test, feature = "testing"))]
     pub fn connection(&self) -> &Connection {

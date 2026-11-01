@@ -65,25 +65,31 @@ impl EncryptedLabelRow {
 impl Storage {
     /// Scoped persistence view for the visibility-label domain.
     pub fn labels(&self) -> LabelStore<'_> {
-        self.labels_in("visibility_labels", "contact_visibility_overrides")
+        self.labels_in(
+            &self.conn,
+            "visibility_labels",
+            "contact_visibility_overrides",
+        )
     }
 
     /// The duress session's groups and overrides: a persistent twin the
     /// real vocabulary never sees (vauchi/private#813).
     pub fn duress_labels(&self) -> LabelStore<'_> {
         self.labels_in(
+            self.duress_conn(),
             "duress_visibility_labels",
             "duress_contact_visibility_overrides",
         )
     }
 
-    fn labels_in(
-        &self,
+    fn labels_in<'a>(
+        &'a self,
+        conn: &'a Connection,
         labels_table: &'static str,
         overrides_table: &'static str,
-    ) -> LabelStore<'_> {
+    ) -> LabelStore<'a> {
         LabelStore {
-            conn: &self.conn,
+            conn,
             key: &self.encryption_key,
             clock: &self.clock,
             labels_table,

@@ -32,17 +32,17 @@ pub struct TagStore<'a> {
 impl Storage {
     /// Scoped persistence view for the tag domain.
     pub fn tags(&self) -> TagStore<'_> {
-        self.tags_in("tags")
+        self.tags_in(&self.conn, "tags")
     }
 
     /// The duress session's tags, persistent and never the real ones.
     pub fn duress_tags(&self) -> TagStore<'_> {
-        self.tags_in("duress_tags")
+        self.tags_in(self.duress_conn(), "duress_tags")
     }
 
-    fn tags_in(&self, table: &'static str) -> TagStore<'_> {
+    fn tags_in<'a>(&'a self, conn: &'a Connection, table: &'static str) -> TagStore<'a> {
         TagStore {
-            conn: &self.conn,
+            conn,
             key: &self.encryption_key,
             clock: &self.clock,
             table,

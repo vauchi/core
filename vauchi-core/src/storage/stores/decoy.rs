@@ -26,7 +26,7 @@ impl Storage {
     /// Scoped persistence view for the decoy domain.
     pub fn decoy(&self) -> DecoyStore<'_> {
         DecoyStore {
-            conn: &self.conn,
+            conn: self.duress_conn(),
             key: &self.encryption_key,
             clock: &self.clock,
         }

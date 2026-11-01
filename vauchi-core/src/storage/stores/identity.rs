@@ -17,6 +17,7 @@ use super::super::{Storage, StorageError};
 /// Scoped persistence view for the identity domain.
 pub struct IdentityStore<'a> {
     conn: &'a Connection,
+    duress_conn: &'a Connection,
     key: &'a SymmetricKey,
     clock: &'a Arc<dyn Clock>,
 }
@@ -26,6 +27,7 @@ impl Storage {
     pub fn identity(&self) -> IdentityStore<'_> {
         IdentityStore {
             conn: &self.conn,
+            duress_conn: self.duress_conn(),
             key: &self.encryption_key,
             clock: &self.clock,
         }
@@ -198,7 +200,8 @@ impl IdentityStore<'_> {
             "duress_tags",
             "duress_places",
         ] {
-            self.conn.execute(&format!("DELETE FROM {table}"), [])?;
+            self.duress_conn
+                .execute(&format!("DELETE FROM {table}"), [])?;
         }
 
         Ok(())

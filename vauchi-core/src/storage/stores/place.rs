@@ -32,17 +32,17 @@ pub struct PlaceStore<'a> {
 impl Storage {
     /// Scoped persistence view for the place domain.
     pub fn places(&self) -> PlaceStore<'_> {
-        self.places_in("places")
+        self.places_in(&self.conn, "places")
     }
 
     /// The duress session's places, persistent and never the real ones.
     pub fn duress_places(&self) -> PlaceStore<'_> {
-        self.places_in("duress_places")
+        self.places_in(self.duress_conn(), "duress_places")
     }
 
-    fn places_in(&self, table: &'static str) -> PlaceStore<'_> {
+    fn places_in<'a>(&'a self, conn: &'a Connection, table: &'static str) -> PlaceStore<'a> {
         PlaceStore {
-            conn: &self.conn,
+            conn,
             key: &self.encryption_key,
             clock: &self.clock,
             table,

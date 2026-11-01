@@ -110,6 +110,18 @@ impl Vauchi {
         Ok(BroadcastResult { sent, total })
     }
 
+    /// Seconds until [`Self::send_emergency_broadcast`] accepts another
+    /// alert: `0` when it would send now, [`BROADCAST_COOLDOWN_SECS`] right
+    /// after a send. A screen asks this before offering the Send button, so
+    /// a refusal is explained with the seconds left instead of an error.
+    pub fn emergency_broadcast_cooldown_remaining_secs(&self) -> u64 {
+        let Some(last) = self.last_emergency_broadcast_unix_seconds else {
+            return 0;
+        };
+        let elapsed = self.clock.unix_seconds().saturating_sub(last);
+        BROADCAST_COOLDOWN_SECS.saturating_sub(elapsed)
+    }
+
     /// Queue disguised emergency alerts to a set of recipient contacts.
     ///
     /// For each recipient, builds a signed [`SafetyAlertPayload`], encrypts it

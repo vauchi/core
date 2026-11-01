@@ -45,7 +45,7 @@ else
 fi
 
 # Every workspace member of Cargo.toml: a cited name may live in any crate.
-for crate in vauchi-app vauchi-cabi vauchi-core vauchi-hardware vauchi-platform vauchi-protocol; do
+for crate in vauchi-app vauchi-cabi vauchi-core vauchi-platform vauchi-protocol; do
     # shellcheck disable=SC2016 # matches the literal YAML text
     if printf '%s\n' "$block" | grep 'check-claim-names.sh "\$f"' | grep -q " $crate "; then
         echo "PASS: $job searches $crate of this checkout"
@@ -70,7 +70,7 @@ if [ -n "$annotations" ] && [ -n "$annotations_self" ] && [ "$annotations_self" 
 else
     fail "$job must run check-claim-annotations.sh --self-test, then the check over claims.md, before the vectors comparison"
 fi
-for crate in vauchi-app vauchi-cabi vauchi-core vauchi-hardware vauchi-platform vauchi-protocol; do
+for crate in vauchi-app vauchi-cabi vauchi-core vauchi-platform vauchi-protocol; do
     printf '%s\n' "$block" | grep 'check-claim-annotations.sh /tmp/roots' | grep -q " $crate " ||
         fail "$job's annotation check must search $crate of this checkout"
 done

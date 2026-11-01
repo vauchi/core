@@ -8,6 +8,7 @@
 
 use crate::clock::Clock;
 use crate::crypto::SymmetricKey;
+use crate::storage::duress_content::SealOnDrop;
 use rusqlite::Connection;
 use std::sync::Arc;
 
@@ -31,6 +32,9 @@ pub struct LabelStore<'a> {
     /// duress session's twin of it (vauchi/private#813).
     labels_table: &'static str,
     overrides_table: &'static str,
+    /// Re-seals the duress content after a write, for the duress twin
+    /// (vauchi/private#1003).
+    _seal: Option<SealOnDrop<'a>>,
 }
 
 const LABEL_COLUMNS: &str = "id, name_encrypted, contacts_json_encrypted, visible_fields_json_encrypted, display_name_override_encrypted, bio_override_encrypted, avatar_override_encrypted, created_at, modified_at";
@@ -69,6 +73,7 @@ impl Storage {
             &self.conn,
             "visibility_labels",
             "contact_visibility_overrides",
+            None,
         )
     }
 
@@ -79,6 +84,7 @@ impl Storage {
             self.duress_conn(),
             "duress_visibility_labels",
             "duress_contact_visibility_overrides",
+            Some(SealOnDrop::new(self)),
         )
     }
 
@@ -87,6 +93,7 @@ impl Storage {
         conn: &'a Connection,
         labels_table: &'static str,
         overrides_table: &'static str,
+        seal: Option<SealOnDrop<'a>>,
     ) -> LabelStore<'a> {
         LabelStore {
             conn,
@@ -94,6 +101,7 @@ impl Storage {
             clock: &self.clock,
             labels_table,
             overrides_table,
+            _seal: seal,
         }
     }
 }

@@ -159,6 +159,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("duress_visibility_labels", "avatar_override_encrypted"),
     ("duress_tags", "name_encrypted"),
     ("duress_places", "data_encrypted"),
+    // V94 the sealed duress content, re-sealed whole (vauchi/private#1003)
+    ("duress_content", "content_encrypted"),
     // V51 per-contact exchange location (ADR-051)
     ("contacts", "exchange_location_encrypted"),
 ];
@@ -198,6 +200,16 @@ fn rekey_or_heal(
 }
 
 impl Storage {
+    /// The connection `table` lives on: the duress tables are in the sealed
+    /// duress database (vauchi/private#1003), every other one in the file.
+    fn table_conn(&self, table: &str) -> &rusqlite::Connection {
+        if super::duress_content::DURESS_TABLES.contains(&table) {
+            &self.duress_db
+        } else {
+            &self.conn
+        }
+    }
+
     /// Re-encrypts all encrypted columns from the current key to a new key.
     ///
     /// This is used during SMK migration: the database was opened with the old
@@ -243,6 +255,7 @@ impl Storage {
         };
 
         self.conn.execute_batch("BEGIN EXCLUSIVE TRANSACTION")?;
+        self.duress_db.execute_batch("BEGIN")?;
 
         let result = (|| -> Result<(), StorageError> {
             self.rekey_contacts(old_key, &new_key)?;
@@ -394,21 +407,27 @@ impl Storage {
             self.rekey_contact_vcard_uids(old_key, &new_key)?;
             report(&mut completed, "exchange_location");
 
-            super::key_check::rewrite(&self.conn, &new_key)
+            super::key_check::rewrite(&self.conn, &new_key)?;
+            super::duress_content::write_sealed(&self.conn, &self.duress_db, &new_key)
         })()
         .and_then(|()| self.commit());
 
         match result {
             Ok(()) => {
+                self.duress_db.execute_batch("COMMIT")?;
                 self.encryption_key = new_key;
                 Ok(())
             }
             Err(e) => {
                 // best-effort: we're already in the error path; if ROLLBACK
                 // itself fails the transaction will be rolled back when the
-                // connection drops anyway
+                // connection drops anyway. `and` evaluates its argument
+                // first, so the duress database rolls back too.
                 #[allow(clippy::let_underscore_must_use)]
-                let _ = self.conn.execute_batch("ROLLBACK");
+                let _ = self
+                    .conn
+                    .execute_batch("ROLLBACK")
+                    .and(self.duress_db.execute_batch("ROLLBACK"));
                 Err(e)
             }
         }

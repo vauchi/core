@@ -18,6 +18,7 @@ use super::super::{Storage, StorageError};
 use crate::clock::Clock;
 use crate::contact::place::{PLACE_MATCH_RADIUS_M, Place, PlaceData};
 use crate::crypto::SymmetricKey;
+use crate::storage::duress_content::SealOnDrop;
 
 /// Scoped persistence view for named places.
 pub struct PlaceStore<'a> {
@@ -27,25 +28,38 @@ pub struct PlaceStore<'a> {
     /// The real `places` table, or the duress session's twin
     /// (vauchi/private#813).
     table: &'static str,
+    /// Re-seals the duress content after a write, for the duress twin
+    /// (vauchi/private#1003).
+    _seal: Option<SealOnDrop<'a>>,
 }
 
 impl Storage {
     /// Scoped persistence view for the place domain.
     pub fn places(&self) -> PlaceStore<'_> {
-        self.places_in(&self.conn, "places")
+        self.places_in(&self.conn, "places", None)
     }
 
     /// The duress session's places, persistent and never the real ones.
     pub fn duress_places(&self) -> PlaceStore<'_> {
-        self.places_in(self.duress_conn(), "duress_places")
+        self.places_in(
+            self.duress_conn(),
+            "duress_places",
+            Some(SealOnDrop::new(self)),
+        )
     }
 
-    fn places_in<'a>(&'a self, conn: &'a Connection, table: &'static str) -> PlaceStore<'a> {
+    fn places_in<'a>(
+        &'a self,
+        conn: &'a Connection,
+        table: &'static str,
+        seal: Option<SealOnDrop<'a>>,
+    ) -> PlaceStore<'a> {
         PlaceStore {
             conn,
             key: &self.encryption_key,
             clock: &self.clock,
             table,
+            _seal: seal,
         }
     }
 }

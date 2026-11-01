@@ -11,6 +11,7 @@
 mod backup_snapshot;
 mod connection;
 mod device;
+pub(crate) mod duress_content;
 mod key_check;
 mod lookup;
 
@@ -86,6 +87,9 @@ use rusqlite::Connection;
 /// open a fresh storage per call via `open_vauchi()`.
 pub struct Storage {
     conn: Connection,
+    /// Decoy contacts and the duress session's groups, tags and places,
+    /// sealed into the file's `duress_content` row (vauchi/private#1003).
+    duress_db: Connection,
     /// Encryption key derived from user's master key
     encryption_key: SymmetricKey,
     /// Database file path (None for in-memory databases).

@@ -30,32 +30,34 @@ fn open_storage() -> (tempfile::TempDir, Storage) {
 #[test]
 fn test_rekey_covers_all_encrypted_columns() {
     let (_dir, storage) = open_storage();
-    let conn = storage.connection();
 
-    // Step 1: Discover all tables in the schema
-    let mut tables: Vec<String> = Vec::new();
-    let mut stmt = conn
+    // Steps 1-2, on the file and on the sealed duress database
+    // (vauchi/private#1003): discover every table, then its columns ending
+    // in _encrypted or _hmac, or named encrypted_blob.
+    let mut schema_columns: BTreeSet<(String, String)> = BTreeSet::new();
+    for conn in [storage.connection(), storage.duress_connection()] {
+        let mut tables: Vec<String> = Vec::new();
+        let mut stmt = conn
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'schema_version'")
         .unwrap();
-    let rows = stmt.query_map([], |row| row.get::<_, String>(0)).unwrap();
-    for row in rows {
-        tables.push(row.unwrap());
-    }
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0)).unwrap();
+        for row in rows {
+            tables.push(row.unwrap());
+        }
 
-    // Step 2: For each table, discover columns ending in _encrypted, _hmac, or named encrypted_blob
-    let mut schema_columns: BTreeSet<(String, String)> = BTreeSet::new();
-    for table in &tables {
-        let mut stmt = conn
-            .prepare(&format!("PRAGMA table_info({})", table))
-            .unwrap();
-        let cols = stmt.query_map([], |row| row.get::<_, String>(1)).unwrap();
-        for col in cols {
-            let col_name = col.unwrap();
-            if col_name.ends_with("_encrypted")
-                || col_name.ends_with("_hmac")
-                || col_name == "encrypted_blob"
-            {
-                schema_columns.insert((table.clone(), col_name));
+        for table in &tables {
+            let mut stmt = conn
+                .prepare(&format!("PRAGMA table_info({})", table))
+                .unwrap();
+            let cols = stmt.query_map([], |row| row.get::<_, String>(1)).unwrap();
+            for col in cols {
+                let col_name = col.unwrap();
+                if col_name.ends_with("_encrypted")
+                    || col_name.ends_with("_hmac")
+                    || col_name == "encrypted_blob"
+                {
+                    schema_columns.insert((table.clone(), col_name));
+                }
             }
         }
     }
@@ -172,7 +174,7 @@ fn test_rekey_preserves_decoy_contacts() {
 
     let card_enc = vauchi_core::crypto::encrypt(&key1, b"{\"name\":\"Decoy\"}").unwrap();
     let name_enc = vauchi_core::crypto::encrypt(&key1, b"Decoy").unwrap();
-    storage.connection().execute(
+    storage.duress_connection().execute(
         "INSERT INTO decoy_contacts (id, display_name_encrypted, card_encrypted, created_at, updated_at) VALUES ('d1', ?1, ?2, 1000, 1000)",
         [&name_enc, &card_enc],
     ).unwrap();
@@ -181,7 +183,7 @@ fn test_rekey_preserves_decoy_contacts() {
     storage.rekey(key2.clone()).unwrap();
 
     let loaded: Vec<u8> = storage
-        .connection()
+        .duress_connection()
         .query_row(
             "SELECT card_encrypted FROM decoy_contacts WHERE id = 'd1'",
             [],
@@ -193,7 +195,7 @@ fn test_rekey_preserves_decoy_contacts() {
         b"{\"name\":\"Decoy\"}"
     );
     let loaded_name: Vec<u8> = storage
-        .connection()
+        .duress_connection()
         .query_row(
             "SELECT display_name_encrypted FROM decoy_contacts WHERE id = 'd1'",
             [],

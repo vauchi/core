@@ -653,39 +653,43 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
 
     // ── the duress twins (vauchi/private#813) ───────────────────
     let duress_label_name_plain = fx("duress_visibility_labels", "name_encrypted");
-    conn.execute(
-        "INSERT INTO duress_visibility_labels \
+    let duress = storage.duress_connection();
+    duress
+        .execute(
+            "INSERT INTO duress_visibility_labels \
          (id, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, \
           name_hmac, display_name_override_encrypted, bio_override_encrypted, \
           avatar_override_encrypted, created_at, modified_at) \
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-        params![
-            DURESS_LABEL_ID,
-            enc("duress_visibility_labels", "contacts_json_encrypted"),
-            enc("duress_visibility_labels", "visible_fields_json_encrypted"),
-            enc("duress_visibility_labels", "name_encrypted"),
-            label_hmac(key, &duress_label_name_plain),
-            enc(
-                "duress_visibility_labels",
-                "display_name_override_encrypted"
-            ),
-            enc("duress_visibility_labels", "bio_override_encrypted"),
-            enc("duress_visibility_labels", "avatar_override_encrypted"),
-            now,
-            now,
-        ],
-    )
-    .unwrap();
-    conn.execute(
-        "INSERT INTO duress_tags (id, name_encrypted, created_at) VALUES ('dt1', ?1, ?2)",
-        params![enc("duress_tags", "name_encrypted"), now],
-    )
-    .unwrap();
-    conn.execute(
-        "INSERT INTO duress_places (id, data_encrypted, created_at) VALUES ('dp1', ?1, ?2)",
-        params![enc("duress_places", "data_encrypted"), now],
-    )
-    .unwrap();
+            params![
+                DURESS_LABEL_ID,
+                enc("duress_visibility_labels", "contacts_json_encrypted"),
+                enc("duress_visibility_labels", "visible_fields_json_encrypted"),
+                enc("duress_visibility_labels", "name_encrypted"),
+                label_hmac(key, &duress_label_name_plain),
+                enc(
+                    "duress_visibility_labels",
+                    "display_name_override_encrypted"
+                ),
+                enc("duress_visibility_labels", "bio_override_encrypted"),
+                enc("duress_visibility_labels", "avatar_override_encrypted"),
+                now,
+                now,
+            ],
+        )
+        .unwrap();
+    duress
+        .execute(
+            "INSERT INTO duress_tags (id, name_encrypted, created_at) VALUES ('dt1', ?1, ?2)",
+            params![enc("duress_tags", "name_encrypted"), now],
+        )
+        .unwrap();
+    duress
+        .execute(
+            "INSERT INTO duress_places (id, data_encrypted, created_at) VALUES ('dp1', ?1, ?2)",
+            params![enc("duress_places", "data_encrypted"), now],
+        )
+        .unwrap();
 
     // ── audit_log ────────────────────────────────────────────
     conn.execute(
@@ -696,18 +700,19 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     .unwrap();
 
     // ── decoy_contacts ───────────────────────────────────────
-    conn.execute(
-        "INSERT INTO decoy_contacts \
+    duress
+        .execute(
+            "INSERT INTO decoy_contacts \
          (id, display_name_encrypted, card_encrypted, created_at, updated_at) \
          VALUES ('d1', ?1, ?2, ?3, ?4)",
-        params![
-            enc("decoy_contacts", "display_name_encrypted"),
-            enc("decoy_contacts", "card_encrypted"),
-            now,
-            now
-        ],
-    )
-    .unwrap();
+            params![
+                enc("decoy_contacts", "display_name_encrypted"),
+                enc("decoy_contacts", "card_encrypted"),
+                now,
+                now
+            ],
+        )
+        .unwrap();
 
     // ── emergency_config (singleton) ─────────────────────────
     conn.execute(
@@ -763,13 +768,29 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
 }
 
 #[allow(clippy::too_many_lines)]
+/// The duress tables live in the sealed duress database (vauchi/private#1003).
+const DURESS_TABLES: [&str; 5] = [
+    "decoy_contacts",
+    "duress_tags",
+    "duress_places",
+    "duress_visibility_labels",
+    "duress_contact_visibility_overrides",
+];
+
 fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
     let conn = storage.connection();
+    let conn_for = |table: &str| {
+        if DURESS_TABLES.contains(&table) {
+            storage.duress_connection()
+        } else {
+            conn
+        }
+    };
 
     let check_one =
         |table: &str, column: &str, where_clause: &str, params_: &[&dyn rusqlite::ToSql]| {
             let sql = format!("SELECT {} FROM {} WHERE {}", column, table, where_clause);
-            let blob: Vec<u8> = conn
+            let blob: Vec<u8> = conn_for(table)
                 .query_row(&sql, params_, |row| row.get(0))
                 .unwrap_or_else(|e| panic!("read {}.{}: {}", table, column, e));
             let plain = decrypt(new_key, &blob)
@@ -812,7 +833,8 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
     ] {
         check_one("duress_visibility_labels", col, "id = 'dl1'", id_eq_1);
     }
-    let duress_hmac: Vec<u8> = conn
+    let duress_hmac: Vec<u8> = storage
+        .duress_connection()
         .query_row(
             "SELECT name_hmac FROM duress_visibility_labels WHERE id = ?1",
             [&DURESS_LABEL_ID],
@@ -1120,6 +1142,9 @@ const COVERED_ELSEWHERE: &[(&str, &str)] = &[
     // this file through label_hmac rather than through the fixtures.
     ("visibility_labels", "name_hmac"),
     ("duress_visibility_labels", "name_hmac"),
+    // Re-sealed whole from the duress tables above;
+    // the_duress_content_survives_a_storage_rekey in duress_at_rest_tests.rs.
+    ("duress_content", "content_encrypted"),
 ];
 
 // @internal

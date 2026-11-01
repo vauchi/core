@@ -13,6 +13,7 @@
 use std::path::{Path, PathBuf};
 
 use vauchi_core::api::AuthMode;
+use vauchi_core::storage::Storage;
 use vauchi_core::{AppPasswordConfig, ContactCard, SymmetricKey, Vauchi, VauchiConfig};
 
 const APP_PASSWORD: &str = "my-pin-1234";
@@ -254,4 +255,248 @@ fn a_duress_user_s_content_leaves_the_row_counts_as_without_a_duress_pin() {
         differing.is_empty(),
         "row counts tell a duress user apart: {differing:?}"
     );
+}
+
+// @internal
+#[test]
+fn the_duress_content_survives_a_storage_rekey() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("vauchi.db");
+    let new_key = SymmetricKey::generate();
+    {
+        let mut storage = Storage::open(&path, SymmetricKey::generate()).unwrap();
+        storage
+            .decoy()
+            .save_decoy_contact("decoy-1", "Sam", &ContactCard::new("Sam"))
+            .unwrap();
+        storage.duress_tags().create_tag("Work").unwrap();
+        storage.rekey(new_key.clone()).unwrap();
+    }
+
+    let storage = Storage::open(&path, new_key).unwrap();
+
+    let decoys = storage.decoy().load_decoy_contacts().unwrap();
+    assert_eq!(
+        decoys
+            .iter()
+            .map(|(id, name, _)| (id.as_str(), name.as_str()))
+            .collect::<Vec<_>>(),
+        [("decoy-1", "Sam")]
+    );
+    let tags = storage.duress_tags().list_tags().unwrap();
+    assert_eq!(
+        tags.iter().map(|t| t.name.as_str()).collect::<Vec<_>>(),
+        ["Work"]
+    );
+    assert!(storage.tags().list_tags().unwrap().is_empty());
+}
+
+// @internal
+#[test]
+fn every_duress_store_s_writes_survive_a_reopen() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("vauchi.db");
+    let key = SymmetricKey::generate();
+    {
+        let storage = Storage::open(&path, key.clone()).unwrap();
+        storage
+            .decoy()
+            .save_decoy_contact("decoy-1", "Sam", &ContactCard::new("Sam"))
+            .unwrap();
+        storage.duress_tags().create_tag("Work").unwrap();
+        storage
+            .duress_places()
+            .create_place("Bern", 46.95, 7.45)
+            .unwrap();
+        storage.duress_labels().create_group("Family").unwrap();
+        storage
+            .duress_labels()
+            .save_contact_override("decoy-1", "phone", true)
+            .unwrap();
+    }
+
+    let storage = Storage::open(&path, key).unwrap();
+
+    assert_eq!(storage.decoy().load_decoy_contacts().unwrap().len(), 1);
+    let tags = storage.duress_tags().list_tags().unwrap();
+    assert_eq!(
+        tags.iter().map(|t| t.name.as_str()).collect::<Vec<_>>(),
+        ["Work"]
+    );
+    let places = storage.duress_places().list_places().unwrap();
+    assert_eq!(
+        places.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(),
+        ["Bern"]
+    );
+    let groups = storage.duress_labels().load_all_groups().unwrap();
+    assert_eq!(
+        groups.iter().map(|g| g.name()).collect::<Vec<_>>(),
+        ["Family"]
+    );
+    let overrides = storage
+        .duress_labels()
+        .load_contact_overrides("decoy-1")
+        .unwrap();
+    assert_eq!(overrides.get("phone"), Some(&true));
+    assert!(storage.tags().list_tags().unwrap().is_empty());
+    assert!(storage.places().list_places().unwrap().is_empty());
+}
+
+/// Puts Alice's file back to v93: the five duress tables in the file, with
+/// one row each, and no `duress_content`.
+fn store_duress_content_as_before_v94(disk: &OnDisk) {
+    let seal = |bytes: &[u8]| vauchi_core::crypto::encrypt(&disk.key, bytes).unwrap();
+    let conn = rusqlite::Connection::open(&disk.path).unwrap();
+    conn.execute_batch(
+        "DROP TABLE duress_content;
+         DELETE FROM schema_version WHERE version >= 94;
+         CREATE TABLE decoy_contacts (id TEXT PRIMARY KEY, card_encrypted BLOB NOT NULL,
+             created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, display_name_encrypted BLOB);
+         CREATE TABLE duress_tags (id TEXT PRIMARY KEY, name_encrypted BLOB NOT NULL,
+             contact_ids_json TEXT NOT NULL DEFAULT '[]', created_at INTEGER NOT NULL);
+         CREATE TABLE duress_places (id TEXT PRIMARY KEY, data_encrypted BLOB NOT NULL,
+             created_at INTEGER NOT NULL);
+         CREATE TABLE duress_visibility_labels (id TEXT PRIMARY KEY, name_encrypted BLOB,
+             name_hmac BLOB, contacts_json_encrypted BLOB, visible_fields_json_encrypted BLOB,
+             display_name_override_encrypted BLOB, bio_override_encrypted BLOB,
+             avatar_override_encrypted BLOB, created_at INTEGER NOT NULL, modified_at INTEGER NOT NULL);
+         CREATE TABLE duress_contact_visibility_overrides (contact_id TEXT NOT NULL,
+             field_id TEXT NOT NULL, is_visible INTEGER NOT NULL, PRIMARY KEY (contact_id, field_id));",
+    )
+    .unwrap();
+    let card = serde_json::to_vec(&ContactCard::new("Sam")).unwrap();
+    conn.execute(
+        "INSERT INTO decoy_contacts VALUES ('decoy-1', ?1, 1, 1, ?2)",
+        rusqlite::params![seal(&card), seal(b"Sam")],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO duress_tags (id, name_encrypted, created_at) VALUES ('t1', ?1, 1)",
+        [seal(b"Work")],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO duress_contact_visibility_overrides VALUES ('decoy-1', 'phone', 1)",
+        [],
+    )
+    .unwrap();
+}
+
+// @internal
+#[test]
+fn a_database_from_before_v94_keeps_its_duress_content_in_the_seal() {
+    let without = alice(false);
+    let legacy = alice(true);
+    store_duress_content_as_before_v94(&legacy);
+
+    let storage = Storage::open(&legacy.path, legacy.key.clone()).unwrap();
+    let decoys = storage.decoy().load_decoy_contacts().unwrap();
+    assert_eq!(
+        decoys
+            .iter()
+            .map(|(id, name, _)| (id.as_str(), name.as_str()))
+            .collect::<Vec<_>>(),
+        [("decoy-1", "Sam")]
+    );
+    let tags = storage.duress_tags().list_tags().unwrap();
+    assert_eq!(
+        tags.iter().map(|t| t.name.as_str()).collect::<Vec<_>>(),
+        ["Work"]
+    );
+    let overrides = storage
+        .duress_labels()
+        .load_contact_overrides("decoy-1")
+        .unwrap();
+    assert_eq!(overrides.get("phone"), Some(&true));
+    drop(storage);
+
+    assert_eq!(row_counts(&legacy.path), row_counts(&without.path));
+    assert_eq!(
+        row_shapes(&legacy.path, "duress_content"),
+        row_shapes(&without.path, "duress_content")
+    );
+}
+
+// @internal
+#[test]
+fn a_duress_content_seal_that_does_not_open_refuses_the_storage() {
+    let disk = alice(true);
+    let conn = rusqlite::Connection::open(&disk.path).unwrap();
+    let sealed: Vec<u8> = conn
+        .query_row("SELECT content_encrypted FROM duress_content", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    let mut tampered = sealed.clone();
+    let last = tampered.len() - 1;
+    tampered[last] ^= 0x01;
+    conn.execute(
+        "UPDATE duress_content SET content_encrypted = ?1",
+        [&tampered],
+    )
+    .unwrap();
+    drop(conn);
+
+    assert!(matches!(
+        Storage::open(&disk.path, disk.key.clone()),
+        Err(vauchi_core::storage::StorageError::Encryption(_))
+    ));
+    let conn = rusqlite::Connection::open(&disk.path).unwrap();
+    let after: Vec<u8> = conn
+        .query_row("SELECT content_encrypted FROM duress_content", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert_eq!(
+        after, tampered,
+        "a seal that does not open is left as it was"
+    );
+}
+
+fn sealed_len(storage: &Storage) -> usize {
+    storage
+        .connection()
+        .query_row(
+            "SELECT length(content_encrypted) FROM duress_content",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .unwrap() as usize
+}
+
+proptest::proptest! {
+    #![proptest_config(proptest::prelude::ProptestConfig::with_cases(24))]
+
+    // @internal
+    #[test]
+    fn the_seal_has_a_bucket_s_length_and_reopens_to_the_same_tags(
+        names in proptest::collection::vec("[a-z]{1,40}", 0..120),
+    ) {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("vauchi.db");
+        let key = SymmetricKey::generate();
+        let empty_len = sealed_len(&Storage::in_memory(key.clone()).unwrap());
+        let overhead = empty_len - 4096;
+        let mut written = Vec::new();
+        {
+            let storage = Storage::open(&path, key.clone()).unwrap();
+            for name in &names {
+                written.push(storage.duress_tags().create_tag(name).unwrap().name);
+            }
+            let bucket = sealed_len(&storage) - overhead;
+            proptest::prop_assert!(bucket >= 4096 && bucket.is_power_of_two(), "{bucket}");
+        }
+
+        let storage = Storage::open(&path, key).unwrap();
+        let mut reopened: Vec<String> = storage
+            .duress_tags()
+            .list_tags()
+            .unwrap()
+            .into_iter()
+            .map(|t| t.name)
+            .collect();
+        reopened.sort();
+        written.sort();
+        proptest::prop_assert_eq!(reopened, written);
+    }
 }

@@ -146,7 +146,7 @@ impl Storage {
         table: &str,
     ) -> Result<(), StorageError> {
         let mut stmt = self
-            .conn
+            .table_conn(table)
             .prepare(&format!("SELECT id, name_encrypted FROM {table}"))
             .map_err(|e| StorageError::Migration(format!("Read tags: {}", e)))?;
 
@@ -159,7 +159,7 @@ impl Storage {
         for (id, enc) in &rows {
             let new_enc = rekey_or_heal(new_key, old_key, enc)
                 .map_err(|e| StorageError::Migration(format!("Rekey tag {}: {}", id, e)))?;
-            self.conn
+            self.table_conn(table)
                 .execute(
                     &format!("UPDATE {table} SET name_encrypted = ?1 WHERE id = ?2"),
                     params![new_enc, id],
@@ -179,7 +179,7 @@ impl Storage {
         column: &str,
     ) -> Result<(), StorageError> {
         let rows: Vec<(i64, Vec<u8>)> = self
-            .conn
+            .table_conn(table)
             .prepare(&format!(
                 "SELECT rowid, {column} FROM {table} WHERE {column} IS NOT NULL"
             ))
@@ -191,7 +191,7 @@ impl Storage {
         for (rowid, enc) in &rows {
             let new_enc = rekey_or_heal(new_key, old_key, enc)
                 .map_err(|e| StorageError::Migration(format!("Rekey {table}.{column}: {e}")))?;
-            self.conn
+            self.table_conn(table)
                 .execute(
                     &format!("UPDATE {table} SET {column} = ?1 WHERE rowid = ?2"),
                     params![new_enc, rowid],
@@ -271,7 +271,7 @@ impl Storage {
         table: &str,
     ) -> Result<(), StorageError> {
         let mut stmt = self
-            .conn
+            .table_conn(table)
             .prepare(&format!("SELECT id, data_encrypted FROM {table}"))
             .map_err(|e| StorageError::Migration(format!("Read places: {}", e)))?;
         let rows: Vec<(String, Vec<u8>)> = stmt
@@ -282,7 +282,7 @@ impl Storage {
         for (id, enc) in &rows {
             let new_enc = rekey_or_heal(new_key, old_key, enc)
                 .map_err(|e| StorageError::Migration(format!("Rekey place {}: {}", id, e)))?;
-            self.conn
+            self.table_conn(table)
                 .execute(
                     &format!("UPDATE {table} SET data_encrypted = ?1 WHERE id = ?2"),
                     params![new_enc, id],
@@ -353,7 +353,7 @@ impl Storage {
         new_key: &SymmetricKey,
     ) -> Result<(), StorageError> {
         let mut stmt = self
-            .conn
+            .table_conn("decoy_contacts")
             .prepare("SELECT id, card_encrypted FROM decoy_contacts")
             .map_err(|e| StorageError::Migration(format!("Read decoys: {}", e)))?;
 
@@ -368,7 +368,7 @@ impl Storage {
                 .map_err(|e| StorageError::Migration(format!("Decrypt decoy: {}", e)))?;
             let new_enc = encrypt(new_key, &plain)
                 .map_err(|e| StorageError::Migration(format!("Encrypt decoy: {}", e)))?;
-            self.conn
+            self.table_conn("decoy_contacts")
                 .execute(
                     "UPDATE decoy_contacts SET card_encrypted = ?1 WHERE id = ?2",
                     params![new_enc, id],

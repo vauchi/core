@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 93] = [
+const MIGRATIONS: [Migration; 94] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -737,7 +737,43 @@ const MIGRATIONS: [Migration; 93] = [
         name: "sealed_duress",
         action: MigrationAction::Callback(migrate_v93_sealed_duress),
     },
+    Migration {
+        version: 94,
+        name: "sealed_duress_content",
+        action: MigrationAction::Callback(migrate_v94_sealed_duress_content),
+    },
 ];
+
+/// v94 (vauchi/private#1003): the five duress tables only a duress user
+/// fills move into one sealed `duress_content` row every database has.
+fn migrate_v94_sealed_duress_content(
+    conn: &Connection,
+    key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    use super::duress_content::{DURESS_TABLES, dump, load_dump, open_duress_db, write_sealed};
+
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS duress_content (
+             id INTEGER PRIMARY KEY CHECK (id = 1),
+             content_encrypted BLOB NOT NULL
+         );",
+    )?;
+    let tables_left: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'decoy_contacts'",
+        [],
+        |row| row.get(0),
+    )?;
+    if tables_left == 0 {
+        return Ok(());
+    }
+    let duress_db = open_duress_db()?;
+    load_dump(&duress_db, &dump(conn)?)?;
+    write_sealed(conn, &duress_db, key)?;
+    for table in DURESS_TABLES {
+        conn.execute_batch(&format!("DROP TABLE {table};"))?;
+    }
+    Ok(())
+}
 
 /// Migration v93: whether a duress PIN exists is no longer readable without
 /// the storage key (ADR-032, vauchi/private#947). Every identity with an app

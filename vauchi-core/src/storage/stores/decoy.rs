@@ -8,6 +8,7 @@
 
 use crate::clock::Clock;
 use crate::crypto::SymmetricKey;
+use crate::storage::duress_content::SealOnDrop;
 use rusqlite::{Connection, params};
 use std::sync::Arc;
 
@@ -20,6 +21,8 @@ pub struct DecoyStore<'a> {
     conn: &'a Connection,
     key: &'a SymmetricKey,
     clock: &'a Arc<dyn Clock>,
+    /// Re-seals the duress content after a write (vauchi/private#1003).
+    _seal: SealOnDrop<'a>,
 }
 
 impl Storage {
@@ -29,6 +32,7 @@ impl Storage {
             conn: self.duress_conn(),
             key: &self.encryption_key,
             clock: &self.clock,
+            _seal: SealOnDrop::new(self),
         }
     }
 }

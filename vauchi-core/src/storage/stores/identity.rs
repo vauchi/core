@@ -203,6 +203,7 @@ impl IdentityStore<'_> {
             self.duress_conn
                 .execute(&format!("DELETE FROM {table}"), [])?;
         }
+        crate::storage::duress_content::write_sealed(self.conn, self.duress_conn, self.key)?;
 
         Ok(())
     }

@@ -18,6 +18,7 @@ use super::super::{Storage, StorageError};
 use crate::clock::Clock;
 use crate::contact::Tag;
 use crate::crypto::SymmetricKey;
+use crate::storage::duress_content::SealOnDrop;
 
 /// Scoped persistence view for contact tags.
 pub struct TagStore<'a> {
@@ -27,25 +28,38 @@ pub struct TagStore<'a> {
     /// The real `tags` table, or the duress session's twin
     /// (vauchi/private#813).
     table: &'static str,
+    /// Re-seals the duress content after a write, for the duress twin
+    /// (vauchi/private#1003).
+    _seal: Option<SealOnDrop<'a>>,
 }
 
 impl Storage {
     /// Scoped persistence view for the tag domain.
     pub fn tags(&self) -> TagStore<'_> {
-        self.tags_in(&self.conn, "tags")
+        self.tags_in(&self.conn, "tags", None)
     }
 
     /// The duress session's tags, persistent and never the real ones.
     pub fn duress_tags(&self) -> TagStore<'_> {
-        self.tags_in(self.duress_conn(), "duress_tags")
+        self.tags_in(
+            self.duress_conn(),
+            "duress_tags",
+            Some(SealOnDrop::new(self)),
+        )
     }
 
-    fn tags_in<'a>(&'a self, conn: &'a Connection, table: &'static str) -> TagStore<'a> {
+    fn tags_in<'a>(
+        &'a self,
+        conn: &'a Connection,
+        table: &'static str,
+        seal: Option<SealOnDrop<'a>>,
+    ) -> TagStore<'a> {
         TagStore {
             conn,
             key: &self.encryption_key,
             clock: &self.clock,
             table,
+            _seal: seal,
         }
     }
 }

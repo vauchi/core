@@ -54,6 +54,47 @@ fn factory() -> ContactDetailEngine {
         .with_fingerprint("ABCD-1234-EFGH-5678".into())
 }
 
+/// An exchanged contact's footer: Archive instead of Delete, and Block
+/// (ADR-056, private#889). `confirm_block_contact` / `cancel_block_contact`
+/// live in the InlineConfirm second state the walker dedupes, like delete's.
+const HANDLED_EXCHANGED: &[&str] = &[
+    "edit",
+    "verify_fingerprint",
+    "toggle_hidden",
+    "ignore_contact",
+    "block_contact",
+    "archive_contact",
+];
+
+fn exchanged_factory() -> ContactDetailEngine {
+    let item = Item {
+        id: "c-bob".into(),
+        name: "Bob".into(),
+        subtitle: None,
+        initials: "B".into(),
+        status: None,
+        actions: vec![],
+        a11y: None,
+    };
+    ContactDetailEngine::new(item, Vec::new(), String::new())
+        .with_imported(false)
+        .with_verification(false, TrustLevel::Standard)
+        .with_fingerprint("ABCD-1234-EFGH-5678".into())
+}
+
+// @internal
+#[test]
+fn exchanged_contact_detail_screen_is_fully_reachable() {
+    assert_reachability_across_screens(exchanged_factory, HANDLED_EXCHANGED);
+}
+
+// @internal
+#[test]
+fn exchanged_contact_detail_has_no_orphans() {
+    let report = check_reachability(exchanged_factory, HANDLED_EXCHANGED);
+    assert!(report.is_reachable(), "unexpected orphans: {report:?}");
+}
+
 // @internal
 #[test]
 fn contact_detail_screen_is_fully_reachable() {

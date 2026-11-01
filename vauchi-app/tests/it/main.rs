@@ -65,6 +65,7 @@ mod cdn_language_options_tests;
 mod cdn_language_pick_tests;
 mod cdn_theme_options_tests;
 mod component_serialization_tests;
+mod contact_block_screen_tests;
 mod contact_detail_engine_tests;
 mod contact_detail_i18n_tests;
 mod contact_detail_intercepts_tests;

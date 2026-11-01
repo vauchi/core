@@ -513,3 +513,46 @@ fn a_decoy_contact_does_not_change_the_seal_s_length() {
 
     assert_eq!(sealed_len(&with_decoy), sealed_len(&empty));
 }
+
+fn refused_by_the_seal<T: std::fmt::Debug>(
+    result: Result<T, vauchi_core::storage::StorageError>,
+) -> bool {
+    matches!(result, Err(vauchi_core::storage::StorageError::Database(_)))
+}
+
+// @internal
+#[test]
+fn a_duress_write_whose_seal_fails_returns_the_error() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    storage
+        .connection()
+        .execute_batch(
+            "CREATE TRIGGER refuse_seal BEFORE UPDATE ON duress_content
+             BEGIN SELECT RAISE(ABORT, 'disk full'); END;",
+        )
+        .unwrap();
+
+    assert!(refused_by_the_seal(storage.decoy().save_decoy_contact(
+        "decoy-1",
+        "Sam",
+        &ContactCard::new("Sam")
+    )));
+    assert!(refused_by_the_seal(
+        storage.duress_tags().create_tag("Work")
+    ));
+    assert!(refused_by_the_seal(
+        storage.duress_places().create_place("Bern", 46.95, 7.45)
+    ));
+    assert!(refused_by_the_seal(
+        storage.duress_labels().create_group("Family")
+    ));
+    assert!(refused_by_the_seal(
+        storage
+            .duress_labels()
+            .save_contact_override("decoy-1", "phone", true)
+    ));
+    assert!(
+        storage.tags().create_tag("Work").is_ok(),
+        "real stores do not seal"
+    );
+}

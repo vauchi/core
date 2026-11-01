@@ -166,6 +166,36 @@ fn a_duress_session_never_journals_a_non_cover_item() {
     assert_eq!(lengths(&cover), lengths(&real));
 }
 
+fn edit_tags_and_groups(wb: &Vauchi) {
+    let tag = wb.create_tag("Work").unwrap();
+    assert!(wb.delete_tag(&tag.id).unwrap());
+    let group = wb.create_group("Family").unwrap();
+    wb.delete_group(group.id()).unwrap();
+}
+
+// @claim: S14
+// @scenario: duress_mode :: Duress mode looks identical to normal mode
+#[test]
+fn a_duress_tag_or_group_change_journals_cover_of_the_real_item_s_length() {
+    let (normal, normal_registry, tablet) = alice(APP_PASSWORD, AuthMode::Normal);
+    let (duress, duress_registry, _) = alice(DURESS_PIN, AuthMode::Duress);
+    edit_tags_and_groups(&normal);
+    edit_tags_and_groups(&duress);
+
+    let real = journaled_for_tablet(&normal, normal_registry, &tablet);
+    let cover = journaled_for_tablet(&duress, duress_registry, &tablet);
+
+    assert_eq!(real.len(), 4, "got {real:?}");
+    assert!(
+        cover
+            .iter()
+            .all(|item| matches!(item, SyncItem::Cover { .. })),
+        "got {cover:?}"
+    );
+    let lengths = |items: &[SyncItem]| items.iter().map(serialized_len).collect::<Vec<_>>();
+    assert_eq!(lengths(&cover), lengths(&real));
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(64))]
 

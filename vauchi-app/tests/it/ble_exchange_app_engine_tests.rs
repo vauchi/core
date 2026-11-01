@@ -362,6 +362,49 @@ fn a_peerless_ble_discovery_offers_nothing_found_via_poll_notifications() {
 
 /// A Magic screen on a fake clock, with a handshake session held.
 #[cfg(feature = "testing")]
+// @internal
+#[cfg(feature = "testing")]
+#[test]
+fn a_permission_granted_after_the_prompt_restarts_the_glance_search() {
+    // The shell raises the OS Bluetooth prompt itself when Glance starts the
+    // radio; the 15 s discovery budget must count from the grant, not from
+    // the screen opening, or a first-time user who reads the prompt lands
+    // on "Nothing found" (vauchi/private#1022, observed on both rig phones).
+    let fake = Arc::new(FakeClock::new(
+        SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
+    ));
+    let clock: Arc<dyn Clock> = fake.clone();
+    let mut vauchi = Vauchi::in_memory_with_clock(clock).expect("in-memory Vauchi");
+    vauchi.create_identity("Alice").expect("identity");
+    let mut engine = AppEngine::new(vauchi);
+    let _ = engine.navigate_to(AppScreen::Exchange);
+    let _ =
+        engine.select_exchange_mode_for_testing(vauchi_core::exchange::mode::ExchangeMode::Glance);
+    let searching = engine.current_screen().screen_id;
+
+    fake.advance(Duration::from_secs(10)); // the prompt is open
+    engine
+        .dispatch(Event::PermissionGranted {
+            transport: "ble".into(),
+        })
+        .expect("the grant is accepted");
+    fake.advance(Duration::from_secs(10)); // 20 s since the screen opened
+    let _ = engine.poll_notifications();
+    assert_eq!(
+        engine.current_screen().screen_id,
+        searching,
+        "10 s after the grant Glance must still be searching"
+    );
+
+    fake.advance(Duration::from_secs(6)); // 16 s since the grant
+    let _ = engine.poll_notifications();
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "exchange_ble_nothing_found",
+        "the budget still ends the search 15 s after the grant"
+    );
+}
+
 fn magic_with_a_session() -> (Arc<FakeClock>, AppEngine) {
     let fake = Arc::new(FakeClock::new(
         SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),

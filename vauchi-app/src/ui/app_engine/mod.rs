@@ -266,12 +266,9 @@ pub struct AppEngine {
     /// observers that are not rendering the current command batch
     /// (P5b, 2026-06-10), whichever envelope carried the event.
     pending_ble_terminal_invalidation: bool,
-    /// Set when an action met secure storage whose unlock lapsed mid-session
-    /// (Android allows Keystore use for 300 s after an unlock); `dispatch`
-    /// then holds the event and asks for the unlock prompt
-    /// (vauchi/private#1021, owner decision: ask again, then retry).
+    /// A mid-session lapsed unlock: `dispatch` holds the event for the
+    /// prompt to replay (vauchi/private#1021: ask again, then retry).
     needs_storage_unlock: bool,
-    /// The event to replay once the unlock prompt succeeds.
     held_for_unlock: Option<vauchi_core::Event>,
     /// Set when a shred deleted the storage this engine holds; the host
     /// reopens a fresh install (vauchi/private#599).

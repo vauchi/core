@@ -104,7 +104,7 @@ impl AppEngine {
         }
 
         let is_hidden = match self.engine.engine_output() {
-            Some(crate::ui::EngineOutput::ContactDetail { is_hidden }) => is_hidden,
+            Some(crate::ui::EngineOutput::ContactDetail { is_hidden, .. }) => is_hidden,
             other => {
                 tracing::warn!(?other, "hide toggle without ContactDetail output");
                 false

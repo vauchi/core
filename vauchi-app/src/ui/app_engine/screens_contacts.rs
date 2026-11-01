@@ -153,6 +153,7 @@ impl AppEngine {
                     let is_hidden = contact.is_hidden();
                     let is_imported = contact.is_imported();
                     let is_ignored = contact.is_ignored();
+                    let is_blocked = contact.is_blocked();
                     let is_verified = contact.is_fingerprint_verified();
                     let fingerprint = contact.fingerprint();
                     let is_recovery_trusted = contact.is_recovery_trusted();
@@ -239,6 +240,7 @@ impl AppEngine {
                             .with_hidden(is_hidden)
                             .with_imported(is_imported)
                             .with_ignored(is_ignored)
+                            .with_blocked(is_blocked)
                             .with_verification(is_verified, trust_level_enum)
                             .with_fingerprint(fingerprint)
                             .with_recovery_trusted(is_recovery_trusted)

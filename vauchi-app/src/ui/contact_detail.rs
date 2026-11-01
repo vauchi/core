@@ -98,6 +98,13 @@ pub struct ContactDetailEngine {
     is_imported: bool,
     /// Whether this contact is ignored (ADR-072: silent, reversible).
     is_ignored: bool,
+    /// Whether this contact is blocked (ADR-056: silent in both directions).
+    is_blocked: bool,
+    /// Whether the user has pressed "Block" and the question is showing.
+    pending_block: bool,
+    /// The wipe choice in the block question (ADR-056 point 4), off until
+    /// the user turns it on: the one irreversible-looking part of a block.
+    wipe_their_copy: bool,
     /// Card update delivery status for this contact (J1 MVP).
     delivery_summary: Option<DeliverySummary>,
     /// Whether the user has pressed "Delete" and the InlineConfirm is showing.
@@ -172,6 +179,10 @@ impl ContactDetailEngine {
     fn build_screen(&self) -> ScreenModel {
         let mut components = Vec::new();
 
+        if self.is_blocked {
+            components.push(self.blocked_status());
+        }
+
         // Perspective choice — only shown when shared info is available
         if self.shared_info.is_some() {
             components.push(self.perspective_choice());
@@ -185,6 +196,10 @@ impl ContactDetailEngine {
         // InlineConfirm for irrevocable delete (imported contacts only)
         if self.pending_delete {
             components.push(self.delete_confirm());
+        }
+        if self.pending_block {
+            components.push(self.block_options());
+            components.push(self.block_confirm());
         }
 
         let title = match self.view_mode {
@@ -548,6 +563,82 @@ impl ContactDetailEngine {
         }
     }
 
+    fn blocked_status(&self) -> Component {
+        Component::StatusIndicator {
+            id: "blocked_status".into(),
+            icon: None,
+            title: self.t("contact_detail.blocked_status"),
+            detail: Some(self.t("contact_detail.blocked_status_detail")),
+            status: Status::Warning,
+            status_label: self.t("contact_detail.blocked_status"),
+            a11y: None,
+        }
+    }
+
+    fn block_options(&self) -> Component {
+        let label = self.t("contact_detail.block_wipe_option");
+        Component::ToggleList {
+            id: "block_options".into(),
+            label: self.t("contact_detail.block_options_label"),
+            items: vec![ToggleItem {
+                id: "wipe_their_copy".into(),
+                label: label.clone(),
+                selected: self.wipe_their_copy,
+                subtitle: Some(self.t("contact_detail.block_wipe_option_hint")),
+                a11y: Some(A11y::labeled(label)),
+                info_key: None,
+            }],
+            a11y: None,
+        }
+    }
+
+    fn block_confirm(&self) -> Component {
+        Component::InlineConfirm {
+            id: "block_contact".into(),
+            warning: get_string_with_args(
+                self.locale,
+                "contact_detail.block_confirm_warning",
+                &[("name", &self.contact.name)],
+            ),
+            confirm_text: self.t("action.block"),
+            cancel_text: self.t("action.cancel"),
+            confirm_action_id: "confirm_block_contact".into(),
+            cancel_action_id: "cancel_block_contact".into(),
+            destructive: true,
+            a11y: Some(A11y {
+                label: Some(self.t("contact_detail.block_confirm_a11y")),
+                hint: Some(self.t("contact_detail.block_confirm_hint")),
+                role: Some(AccessibilityRole::Alert),
+            }),
+        }
+    }
+
+    /// Block or Unblock: only an exchanged contact has a wire relationship
+    /// to end (ADR-056); an imported one is deleted instead.
+    fn block_action(&self) -> Option<ScreenAction> {
+        if self.is_imported {
+            return None;
+        }
+        let (id, label) = if self.is_blocked {
+            (
+                "unblock_contact",
+                self.t("contact_detail.unblock_contact_button"),
+            )
+        } else {
+            (
+                "block_contact",
+                self.t("contact_detail.block_contact_button"),
+            )
+        };
+        Some(ScreenAction {
+            id: id.into(),
+            label: label.clone(),
+            style: ActionStyle::Serious,
+            enabled: true,
+            a11y: Some(A11y::labeled(label)),
+        })
+    }
+
     fn build_actions(&self) -> Vec<ScreenAction> {
         let mut actions: Vec<ScreenAction> = Vec::new();
         let edit_label = self.t("action.edit");
@@ -598,6 +689,7 @@ impl ContactDetailEngine {
             enabled: true,
             a11y: Some(A11y::labeled(ignore_label)),
         });
+        actions.extend(self.block_action());
         let footer_label = if self.is_imported {
             self.t("contact_detail.delete_contact_button")
         } else {
@@ -626,6 +718,7 @@ impl WorkflowEngine for ContactDetailEngine {
     fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
         Some(crate::ui::EngineOutput::ContactDetail {
             is_hidden: self.is_hidden(),
+            wipe_their_copy: self.wipe_their_copy,
         })
     }
 
@@ -639,6 +732,11 @@ impl WorkflowEngine for ContactDetailEngine {
             U::ToggleRecoveryTrusted => self.toggle_recovery_trusted(),
             U::ToggleHidden => self.toggle_hidden(),
             U::ToggleIgnored => self.toggle_ignored(),
+            U::SetBlocked(is_blocked) => {
+                self.is_blocked = is_blocked;
+                self.pending_block = false;
+                self.wipe_their_copy = false;
+            }
             U::TagQuery { query, suggestions } => self.set_tag_query(query, suggestions),
             U::TagAdded(tag) => self.add_tag_row(tag),
             U::TagRemoved(tag_id) => self.remove_tag_row(&tag_id),
@@ -778,6 +876,26 @@ impl WorkflowEngine for ContactDetailEngine {
             }
             UserAction::ActionPressed { action_id } if action_id == "cancel_delete_contact" => {
                 self.pending_delete = false;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            UserAction::ActionPressed { action_id } if action_id == "block_contact" => {
+                self.pending_block = true;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            // The AppEngine intercepts the confirm first and blocks through
+            // Vauchi; here it only closes the question when nothing did.
+            UserAction::ActionPressed { action_id }
+                if action_id == "confirm_block_contact" || action_id == "cancel_block_contact" =>
+            {
+                self.pending_block = false;
+                self.wipe_their_copy = false;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            UserAction::ItemToggled {
+                component_id,
+                item_id,
+            } if component_id == "block_options" && item_id == "wipe_their_copy" => {
+                self.wipe_their_copy = !self.wipe_their_copy;
                 ActionResult::UpdateScreen(self.build_screen())
             }
             UserAction::ActionPressed { action_id } if action_id == "archive_contact" => {

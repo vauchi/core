@@ -331,6 +331,9 @@ impl AppEngine {
             if let Some(result) = self.intercept_ignore_toggle(&contact_id, action) {
                 return Some(result);
             }
+            if let Some(result) = self.intercept_block_contact(&contact_id, action) {
+                return Some(result);
+            }
             if let Some(result) = self.intercept_contact_delete_archive(&contact_id, action) {
                 return Some(result);
             }

@@ -9,6 +9,7 @@
 //! annotations); all are dispatched from `dispatch.rs`/`mod.rs`.
 
 mod card;
+mod contact_block;
 mod contact_detail;
 mod contact_lifecycle;
 mod emergency_broadcast;

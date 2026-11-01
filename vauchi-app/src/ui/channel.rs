@@ -137,7 +137,11 @@ pub enum EngineOutput {
         groups: Vec<(String, String, bool)>,
     },
     /// Contact-detail hidden flag (hide/unhide toggle interception).
-    ContactDetail { is_hidden: bool },
+    ContactDetail {
+        is_hidden: bool,
+        /// The wipe choice in the block question (ADR-056 point 4).
+        wipe_their_copy: bool,
+    },
     /// Contact-list faceted-search state: live query + facet opt-ins
     /// (`(tags, comment, place)`).
     ContactList {
@@ -299,6 +303,8 @@ pub enum ContactDetailUpdate {
     ToggleRecoveryTrusted,
     ToggleHidden,
     ToggleIgnored,
+    /// Storage changed the block flag (ADR-056); the question closes.
+    SetBlocked(bool),
     TagQuery {
         query: String,
         suggestions: Vec<String>,
@@ -440,6 +446,7 @@ impl EngineUpdate {
                 }
                 ContactDetailUpdate::ToggleHidden => "ContactDetail::ToggleHidden",
                 ContactDetailUpdate::ToggleIgnored => "ContactDetail::ToggleIgnored",
+                ContactDetailUpdate::SetBlocked(_) => "ContactDetail::SetBlocked",
                 ContactDetailUpdate::TagQuery { .. } => "ContactDetail::TagQuery",
                 ContactDetailUpdate::TagAdded(_) => "ContactDetail::TagAdded",
                 ContactDetailUpdate::TagRemoved(_) => "ContactDetail::TagRemoved",
@@ -747,9 +754,13 @@ impl std::fmt::Debug for EngineOutput {
                 .field("label", label)
                 .field("groups", &groups.len())
                 .finish(),
-            Self::ContactDetail { is_hidden } => f
+            Self::ContactDetail {
+                is_hidden,
+                wipe_their_copy,
+            } => f
                 .debug_struct("ContactDetail")
                 .field("is_hidden", is_hidden)
+                .field("wipe_their_copy", wipe_their_copy)
                 .finish(),
             Self::ContactList {
                 query,

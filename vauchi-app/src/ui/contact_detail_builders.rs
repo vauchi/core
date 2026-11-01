@@ -30,6 +30,9 @@ impl ContactDetailEngine {
             is_hidden: false,
             is_imported: false,
             is_ignored: false,
+            is_blocked: false,
+            pending_block: false,
+            wipe_their_copy: false,
             delivery_summary: None,
             pending_delete: false,
             avatar_data: None,
@@ -70,6 +73,9 @@ impl ContactDetailEngine {
             is_hidden: false,
             is_imported: false,
             is_ignored: false,
+            is_blocked: false,
+            pending_block: false,
+            wipe_their_copy: false,
             delivery_summary: None,
             pending_delete: false,
             avatar_data: None,
@@ -204,6 +210,12 @@ impl ContactDetailEngine {
     /// Attach ignored state (ADR-072).
     pub fn with_ignored(mut self, is_ignored: bool) -> Self {
         self.is_ignored = is_ignored;
+        self
+    }
+
+    /// Attach blocked state (ADR-056).
+    pub fn with_blocked(mut self, is_blocked: bool) -> Self {
+        self.is_blocked = is_blocked;
         self
     }
 

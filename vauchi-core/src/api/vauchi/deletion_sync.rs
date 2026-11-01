@@ -29,7 +29,7 @@ impl Vauchi {
             .deletion_state()
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?
         {
-            self.record_sync_item_or_cover(crate::sync::SyncItem::DeletionScheduled {
+            self.record_sync_item(crate::sync::SyncItem::DeletionScheduled {
                 scheduled_at,
                 execute_at,
                 erase_guardian_set,
@@ -45,7 +45,7 @@ impl Vauchi {
         DeletionManager::new(&self.storage)
             .cancel_deletion()
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        self.record_sync_item_or_cover(crate::sync::SyncItem::DeletionCancelled {
+        self.record_sync_item(crate::sync::SyncItem::DeletionCancelled {
             timestamp: self.now_timestamp(),
         });
         Ok(())
@@ -63,7 +63,7 @@ impl Vauchi {
         if !wipe {
             return Ok(false);
         }
-        self.record_sync_item_or_cover(crate::sync::SyncItem::WipeThisDevice {
+        self.record_sync_item(crate::sync::SyncItem::WipeThisDevice {
             timestamp: self.now_timestamp(),
         });
         Ok(self.sync_once_outside_the_gate())

@@ -555,17 +555,15 @@ impl Vauchi {
         self.clock.unix_seconds()
     }
 
-    /// Records a sync item for inter-device synchronization.
+    /// Journals `item` for the owner's other devices; under duress the
+    /// caller goes through [`Vauchi::record_sync_item`], which journals
+    /// cover instead.
     ///
     /// Silently succeeds if:
     /// - No identity is loaded
     /// - No device registry exists
     /// - Only one device is registered (nothing to sync to)
-    ///
-    /// This is called automatically by mutation methods (card updates,
-    /// contact deletions, visibility changes, etc.) so that all frontends
-    /// — CLI, TUI, mobile — get sync recording for free.
-    pub(crate) fn record_sync_item(&self, item: crate::sync::SyncItem) {
+    pub(super) fn journal_sync_item(&self, item: crate::sync::SyncItem) {
         let identity = match &self.identity {
             Some(id) => id,
             None => return,

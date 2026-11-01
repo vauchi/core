@@ -500,3 +500,16 @@ proptest::proptest! {
         proptest::prop_assert_eq!(reopened, written);
     }
 }
+
+// @internal
+#[test]
+fn a_decoy_contact_does_not_change_the_seal_s_length() {
+    let empty = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let with_decoy = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    with_decoy
+        .decoy()
+        .save_decoy_contact("decoy-1", "Sam", &ContactCard::new("Sam"))
+        .unwrap();
+
+    assert_eq!(sealed_len(&with_decoy), sealed_len(&empty));
+}

@@ -128,3 +128,36 @@ fn a_second_alert_within_a_minute_is_refused_and_allowed_after() {
     assert!(refusal.to_string().contains("cooldown"), "{refusal}");
     assert_eq!(allowed.unwrap().sent, 1);
 }
+
+// @scenario: emergency_broadcast :: Rate limiting emergency broadcasts
+#[test]
+fn the_cooldown_remaining_counts_down_from_a_minute_to_zero() {
+    use vauchi_core::api::emergency::BROADCAST_COOLDOWN_SECS;
+
+    let clock = Arc::new(FakeClock::new(
+        UNIX_EPOCH + Duration::from_secs(1_700_000_000),
+    ));
+    let mut alice = Vauchi::in_memory_with_clock(clock.clone()).unwrap();
+    alice.create_identity("Alice").unwrap();
+    let bob = create_vauchi_with_identity("Bob");
+    let to_bob = link_contacts(&bob, &alice, "Alice");
+    alice
+        .configure_emergency_broadcast(vec![to_bob.host_contact_id], ALERT.into(), false)
+        .unwrap();
+
+    assert_eq!(
+        alice.emergency_broadcast_cooldown_remaining_secs(),
+        0,
+        "nothing was sent yet, so nothing is refused"
+    );
+    alice.send_emergency_broadcast().unwrap();
+    assert_eq!(
+        alice.emergency_broadcast_cooldown_remaining_secs(),
+        BROADCAST_COOLDOWN_SECS
+    );
+    clock.advance(Duration::from_secs(BROADCAST_COOLDOWN_SECS - 1));
+    assert_eq!(alice.emergency_broadcast_cooldown_remaining_secs(), 1);
+    clock.advance(Duration::from_secs(1));
+    assert_eq!(alice.emergency_broadcast_cooldown_remaining_secs(), 0);
+    assert_eq!(alice.send_emergency_broadcast().unwrap().sent, 1);
+}

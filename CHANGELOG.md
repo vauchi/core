@@ -8,6 +8,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- The relay wire has a published schema: `vauchi-protocol/schemas/`
+  holds a JSON Schema of every `/v2` request and response type and one
+  example per type, generated from the types behind the `schema-gen`
+  feature with the parser's length and item bounds written in.
+  `wire_schema_tests` proves each bound against the parser and fails
+  when the committed files drift from the code; the specification
+  mirrors and validates them (vauchi/private#119).
+
 ## [0.95.0] — 2026-11-01
 
 ### Added

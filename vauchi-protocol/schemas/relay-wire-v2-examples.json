@@ -1,0 +1,120 @@
+{
+  "FetchedBlob": {
+    "blob_id": "abababababababababababababababababababababababababababababababab",
+    "ciphertext": "U2VhbGVkIGVudmVsb3Bl",
+    "created_at": 1761955200,
+    "mailbox_token": "abababababababababababababababababababababababababababababababab",
+    "origin_hint": "b3JpZ2lu"
+  },
+  "V2AckRequest": {
+    "blob_id": "abababababababababababababababababababababababababababababababab",
+    "recipient_id": "abababababababababababababababababababababababababababababababab"
+  },
+  "V2ExchangeClaimRequest": {
+    "code": "ABCD-EFGH",
+    "response": "cmVzcG9uc2U="
+  },
+  "V2ExchangeCompleteRequest": {
+    "code": "ABCD-EFGH"
+  },
+  "V2ExchangeOfferRequest": {
+    "expires_secs": 600,
+    "payload": "b2ZmZXI="
+  },
+  "V2FetchRequest": {
+    "mailbox_tokens": [
+      "abababababababababababababababababababababababababababababababab",
+      "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef"
+    ]
+  },
+  "V2GuardianDeleteRequest": {
+    "designator_pk": "abababababababababababababababababababababababababababababababab",
+    "guardian_hash": "abababababababababababababababababababababababababababababababab",
+    "signature": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+    "timestamp": 1761955200
+  },
+  "V2GuardianEntry": {
+    "data": "Z3VhcmRpYW4="
+  },
+  "V2GuardianQueryRequest": {
+    "guardian_hash": "abababababababababababababababababababababababababababababababab"
+  },
+  "V2GuardianStoreRequest": {
+    "designator_pk": "abababababababababababababababababababababababababababababababab",
+    "entries": [
+      {
+        "data": "Z3VhcmRpYW4="
+      }
+    ],
+    "guardian_hash": "abababababababababababababababababababababababababababababababab",
+    "signature": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+    "timestamp": 1761955200
+  },
+  "V2PurgeRequest": {
+    "erase_guardian_set": true,
+    "public_key": "abababababababababababababababababababababababababababababababab",
+    "purge_token": "abababababababababababababababababababababababababababababababab",
+    "signature": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+    "timestamp": 1761955200
+  },
+  "V2RecoveryProof": {
+    "created_at": 1761955200,
+    "expires_at": 1764547200,
+    "key_hash": "abababababababababababababababababababababababababababababababab",
+    "proof_data": "cHJvb2Y="
+  },
+  "V2RecoveryQueryRequest": {
+    "key_hashes": [
+      "abababababababababababababababababababababababababababababababab"
+    ]
+  },
+  "V2RecoveryStoreRequest": {
+    "key_hash": "abababababababababababababababababababababababababababababababab",
+    "owner_pk": "abababababababababababababababababababababababababababababababab",
+    "proof_data": "cHJvb2Y=",
+    "signature": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+    "timestamp": 1761955200
+  },
+  "V2RegisterRequest": {
+    "mailbox_tokens": [
+      "abababababababababababababababababababababababababababababababab"
+    ]
+  },
+  "V2Response": {
+    "acknowledged": true,
+    "blob_id": "abababababababababababababababababababababababababababababababab",
+    "blobs": [
+      {
+        "blob_id": "abababababababababababababababababababababababababababababababab",
+        "ciphertext": "U2VhbGVkIGVudmVsb3Bl",
+        "created_at": 1761955200,
+        "mailbox_token": "abababababababababababababababababababababababababababababababab",
+        "origin_hint": "b3JpZ2lu"
+      }
+    ],
+    "blobs_deleted": 2,
+    "code": "ABCD-EFGH",
+    "guardians": [
+      {
+        "data": "Z3VhcmRpYW4="
+      }
+    ],
+    "payload": "b2ZmZXI=",
+    "proofs": [
+      {
+        "created_at": 1761955200,
+        "expires_at": 1764547200,
+        "key_hash": "abababababababababababababababababababababababababababababababab",
+        "proof_data": "cHJvb2Y="
+      }
+    ],
+    "response": "cmVzcG9uc2U=",
+    "status": "ok",
+    "truncated": false
+  },
+  "V2SendRequest": {
+    "ciphertext": "U2VhbGVkIGVudmVsb3Bl",
+    "origin_hint": "b3JpZ2lu",
+    "recipient_id": "abababababababababababababababababababababababababababababababab"
+  }
+}

@@ -1,0 +1,523 @@
+{
+  "$id": "https://spec.vauchi.app/schemas/relay-wire-v2.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "FetchedBlob": {
+      "description": "A fetched blob from the relay.",
+      "properties": {
+        "blob_id": {
+          "maxLength": 64,
+          "type": "string"
+        },
+        "ciphertext": {
+          "description": "Base64-encoded ciphertext.",
+          "maxLength": 262144,
+          "type": "string"
+        },
+        "created_at": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "mailbox_token": {
+          "description": "Mailbox token the blob arrived for. Returned to the recipient (who already knows token→contact via local registration) so the receive loop can route in O(1) instead of brute-forcing every contact's ratchet. Privacy-neutral: the relay already has the token, the recipient computed it locally.\n\n`None` for older relays that have not deployed this field; clients fall back to brute-force routing.",
+          "maxLength": 64,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "origin_hint": {
+          "description": "Base64-encoded opaque origin-device hint the sender attached (see [`V2SendRequest::origin_hint`]). Returned verbatim so the receiver can resolve the sender device before decrypting. `None` for blobs sent by older clients or relayed by older relays.",
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "blob_id",
+        "ciphertext",
+        "created_at"
+      ],
+      "type": "object"
+    },
+    "V2AckRequest": {
+      "description": "V2 acknowledge request body.",
+      "properties": {
+        "blob_id": {
+          "maxLength": 64,
+          "type": "string"
+        },
+        "recipient_id": {
+          "maxLength": 64,
+          "type": "string"
+        }
+      },
+      "required": [
+        "blob_id",
+        "recipient_id"
+      ],
+      "type": "object"
+    },
+    "V2ExchangeClaimRequest": {
+      "description": "V2 exchange claim request body.",
+      "properties": {
+        "code": {
+          "maxLength": 1048576,
+          "type": "string"
+        },
+        "response": {
+          "maxLength": 262144,
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "response"
+      ],
+      "type": "object"
+    },
+    "V2ExchangeCompleteRequest": {
+      "description": "V2 exchange complete request body.",
+      "properties": {
+        "code": {
+          "maxLength": 1048576,
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "type": "object"
+    },
+    "V2ExchangeOfferRequest": {
+      "description": "V2 exchange offer request body.",
+      "properties": {
+        "expires_secs": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "payload": {
+          "maxLength": 262144,
+          "type": "string"
+        }
+      },
+      "required": [
+        "payload"
+      ],
+      "type": "object"
+    },
+    "V2FetchRequest": {
+      "description": "V2 fetch request body.",
+      "properties": {
+        "mailbox_tokens": {
+          "items": {
+            "maxLength": 64,
+            "type": "string"
+          },
+          "maxItems": 1900,
+          "type": "array"
+        }
+      },
+      "required": [
+        "mailbox_tokens"
+      ],
+      "type": "object"
+    },
+    "V2GuardianDeleteRequest": {
+      "description": "V2 guardian delete request body.\n\nDeletes all guardian entries for a hash (identity purge).",
+      "properties": {
+        "designator_pk": {
+          "description": "Hex-encoded Ed25519 designator public key (64 hex chars). The relay requires `SHA-256(designator_pk || \"guardians\") == guardian_hash`, proving the caller owns the identity the hash derives from.",
+          "maxLength": 64,
+          "type": "string"
+        },
+        "guardian_hash": {
+          "description": "Hex-encoded guardian hash to delete (64 hex chars = 32 bytes).",
+          "maxLength": 64,
+          "type": "string"
+        },
+        "signature": {
+          "description": "Hex-encoded Ed25519 signature (128 hex chars) over `domain || designator_pk || guardian_hash || timestamp_be`.",
+          "maxLength": 128,
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Unix seconds; the relay rejects requests outside ±60s.",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "designator_pk",
+        "guardian_hash",
+        "signature",
+        "timestamp"
+      ],
+      "type": "object"
+    },
+    "V2GuardianEntry": {
+      "description": "A single encrypted guardian entry (opaque to the relay).\n\nEach entry is a sealed-box encrypted guardian token. The relay cannot read contents, identify guardians, or learn anything beyond the entry count.",
+      "properties": {
+        "data": {
+          "description": "Base64-encoded encrypted blob (sealed-box: ephemeral X25519 + XChaCha20-Poly1305).",
+          "maxLength": 512,
+          "type": "string"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "type": "object"
+    },
+    "V2GuardianQueryRequest": {
+      "description": "V2 guardian query request body.",
+      "properties": {
+        "guardian_hash": {
+          "description": "Hex-encoded guardian hash to look up (64 hex chars = 32 bytes).",
+          "maxLength": 64,
+          "type": "string"
+        }
+      },
+      "required": [
+        "guardian_hash"
+      ],
+      "type": "object"
+    },
+    "V2GuardianStoreRequest": {
+      "description": "V2 guardian store request body.\n\nAtomically replaces all guardian entries for a given hash. Removing a guardian = re-upload without their entry.",
+      "properties": {
+        "designator_pk": {
+          "description": "Hex-encoded Ed25519 designator public key (64 hex chars). The relay requires `SHA-256(designator_pk || \"guardians\") == guardian_hash`, proving the caller owns the identity the hash derives from.",
+          "maxLength": 64,
+          "type": "string"
+        },
+        "entries": {
+          "description": "Encrypted entries (one per guardian, max 10).",
+          "items": {
+            "$ref": "#/definitions/V2GuardianEntry"
+          },
+          "maxItems": 10,
+          "type": "array"
+        },
+        "guardian_hash": {
+          "description": "Hex-encoded hash of `designator_pk || \"guardians\"` (64 hex chars = 32 bytes).",
+          "maxLength": 64,
+          "type": "string"
+        },
+        "signature": {
+          "description": "Hex-encoded Ed25519 signature (128 hex chars) over `domain || designator_pk || guardian_hash || timestamp_be`.",
+          "maxLength": 128,
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Unix seconds; the relay rejects requests outside ±60s.",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "designator_pk",
+        "entries",
+        "guardian_hash",
+        "signature",
+        "timestamp"
+      ],
+      "type": "object"
+    },
+    "V2PurgeRequest": {
+      "description": "V2 purge request body: an Ed25519 signature over `public_key || purge_token || timestamp`. It names no mailbox; the relay erases the one addressed by `public_key`, since a body-chosen mailbox let any key pair empty any mailbox whose token it held (#944).",
+      "properties": {
+        "erase_guardian_set": {
+          "description": "Also erase the guardian set at `SHA-256(public_key || \"guardians\")`. Covered by the signature; absent means keep it, which is all an old client could ask for.",
+          "type": "boolean"
+        },
+        "public_key": {
+          "description": "Hex-encoded Ed25519 public key (32 bytes).",
+          "maxLength": 64,
+          "type": "string"
+        },
+        "purge_token": {
+          "description": "Hex-encoded purge token (32 bytes).",
+          "maxLength": 64,
+          "type": "string"
+        },
+        "signature": {
+          "description": "Hex-encoded Ed25519 signature (64 bytes).",
+          "maxLength": 128,
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Unix timestamp (must be within 60s of server time).",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "public_key",
+        "purge_token",
+        "signature",
+        "timestamp"
+      ],
+      "type": "object"
+    },
+    "V2RecoveryProof": {
+      "description": "A single recovery proof entry in a query response.",
+      "properties": {
+        "created_at": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "expires_at": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "key_hash": {
+          "maxLength": 64,
+          "type": "string"
+        },
+        "proof_data": {
+          "description": "Base64-encoded proof data.",
+          "maxLength": 8192,
+          "type": "string"
+        }
+      },
+      "required": [
+        "created_at",
+        "expires_at",
+        "key_hash",
+        "proof_data"
+      ],
+      "type": "object"
+    },
+    "V2RecoveryQueryRequest": {
+      "description": "V2 recovery proof query request body.",
+      "properties": {
+        "key_hashes": {
+          "description": "Hex-encoded key hashes to look up (max 50).",
+          "items": {
+            "maxLength": 64,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "type": "array"
+        }
+      },
+      "required": [
+        "key_hashes"
+      ],
+      "type": "object"
+    },
+    "V2RecoveryStoreRequest": {
+      "description": "V2 recovery proof store request body.",
+      "properties": {
+        "key_hash": {
+          "description": "Hex-encoded hash of the old public key (32 bytes = 64 hex chars).",
+          "maxLength": 64,
+          "type": "string"
+        },
+        "owner_pk": {
+          "description": "Hex-encoded Ed25519 public key of the identity uploading the proof, so its purge can erase the proof. Proofs without an owner expire.",
+          "maxLength": 64,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "proof_data": {
+          "description": "Base64-encoded recovery proof data (opaque to relay, max 4 KiB).",
+          "maxLength": 8192,
+          "type": "string"
+        },
+        "signature": {
+          "description": "Hex-encoded Ed25519 signature by `owner_pk` over the upload.",
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timestamp": {
+          "description": "Unix seconds, signed with the owner key.",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "key_hash",
+        "proof_data"
+      ],
+      "type": "object"
+    },
+    "V2RegisterRequest": {
+      "description": "V2 register mailbox tokens request body.",
+      "properties": {
+        "mailbox_tokens": {
+          "items": {
+            "maxLength": 64,
+            "type": "string"
+          },
+          "maxItems": 1900,
+          "type": "array"
+        }
+      },
+      "required": [
+        "mailbox_tokens"
+      ],
+      "type": "object"
+    },
+    "V2Response": {
+      "description": "Standard V2 response envelope.",
+      "properties": {
+        "acknowledged": {
+          "default": null,
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "blob_id": {
+          "default": null,
+          "maxLength": 64,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "blobs": {
+          "default": null,
+          "items": {
+            "$ref": "#/definitions/FetchedBlob"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "blobs_deleted": {
+          "default": null,
+          "description": "Number of blobs deleted by a purge request.",
+          "format": "uint",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "code": {
+          "default": null,
+          "maxLength": 1048576,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "error": {
+          "default": null,
+          "maxLength": 1048576,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "guardians": {
+          "default": null,
+          "description": "Guardian entries returned by a query.",
+          "items": {
+            "$ref": "#/definitions/V2GuardianEntry"
+          },
+          "maxItems": 10,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "payload": {
+          "default": null,
+          "maxLength": 262144,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "proofs": {
+          "default": null,
+          "description": "Recovery proofs returned by a query.",
+          "items": {
+            "$ref": "#/definitions/V2RecoveryProof"
+          },
+          "maxItems": 50,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "response": {
+          "default": null,
+          "maxLength": 262144,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "maxLength": 1048576,
+          "type": "string"
+        },
+        "truncated": {
+          "default": false,
+          "description": "`true` when `/v2/fetch` capped this page under the OHTTP forward limit and more blobs remain; the client re-fetches after ACK-removing this page. Absent/false on responses that returned everything.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "type": "object"
+    },
+    "V2SendRequest": {
+      "description": "V2 send request body.",
+      "properties": {
+        "ciphertext": {
+          "description": "Base64-encoded ciphertext.",
+          "maxLength": 262144,
+          "type": "string"
+        },
+        "origin_hint": {
+          "description": "Base64-encoded opaque origin-device hint (`nonce || AEAD(sender_device_id)`, encrypted to the recipient). Lets the receiver select the sender's device-pair ratchet without the transport learning the sender edge.\n\n`None` for older clients that predate this field; the receiver then falls back to the legacy `[0;32]` sender-device path. The relay stores and returns it verbatim, never inspecting it.",
+          "maxLength": 128,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "recipient_id": {
+          "maxLength": 64,
+          "type": "string"
+        }
+      },
+      "required": [
+        "ciphertext",
+        "recipient_id"
+      ],
+      "type": "object"
+    }
+  },
+  "description": "The JSON bodies of the relay's /v2 requests and responses, generated from vauchi-protocol's types by its wire_schema_tests. Length and item bounds are the parser's; a longer value is refused before any handler runs. Fields not listed are accepted and ignored, as the parser does. Charsets (hex, base64) are documented, not enforced at the parse boundary.",
+  "title": "Vauchi relay wire, version 2"
+}

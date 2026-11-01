@@ -16,6 +16,7 @@
 use serde::{Deserialize, Serialize};
 
 mod bounded;
+pub mod bounds;
 
 // =========================================================================
 // Size limits
@@ -68,6 +69,7 @@ const MAX_GUARDIANS_LEN: usize = 10;
 // =========================================================================
 
 /// V2 send request body.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2SendRequest {
     #[serde(deserialize_with = "bounded::deserialize_recipient_id")]
@@ -91,6 +93,7 @@ pub struct V2SendRequest {
 }
 
 /// V2 fetch request body.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2FetchRequest {
     #[serde(deserialize_with = "bounded::deserialize_mailbox_tokens")]
@@ -98,6 +101,7 @@ pub struct V2FetchRequest {
 }
 
 /// V2 acknowledge request body.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2AckRequest {
     #[serde(deserialize_with = "bounded::deserialize_recipient_id")]
@@ -107,6 +111,7 @@ pub struct V2AckRequest {
 }
 
 /// V2 register mailbox tokens request body.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2RegisterRequest {
     #[serde(deserialize_with = "bounded::deserialize_mailbox_tokens")]
@@ -117,6 +122,7 @@ pub struct V2RegisterRequest {
 /// `public_key || purge_token || timestamp`. It names no mailbox; the relay
 /// erases the one addressed by `public_key`, since a body-chosen mailbox let
 /// any key pair empty any mailbox whose token it held (#944).
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2PurgeRequest {
     /// Hex-encoded Ed25519 public key (32 bytes).
@@ -138,6 +144,7 @@ pub struct V2PurgeRequest {
 }
 
 /// V2 exchange offer request body.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2ExchangeOfferRequest {
     #[serde(deserialize_with = "bounded::deserialize_exchange_payload")]
@@ -146,6 +153,7 @@ pub struct V2ExchangeOfferRequest {
 }
 
 /// V2 exchange claim request body.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2ExchangeClaimRequest {
     #[serde(deserialize_with = "bounded::deserialize_exchange_code")]
@@ -155,6 +163,7 @@ pub struct V2ExchangeClaimRequest {
 }
 
 /// V2 exchange complete request body.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2ExchangeCompleteRequest {
     #[serde(deserialize_with = "bounded::deserialize_exchange_code")]
@@ -162,6 +171,7 @@ pub struct V2ExchangeCompleteRequest {
 }
 
 /// A fetched blob from the relay.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FetchedBlob {
     #[serde(deserialize_with = "bounded::deserialize_blob_id")]
@@ -197,6 +207,7 @@ pub struct FetchedBlob {
 }
 
 /// V2 recovery proof store request body.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2RecoveryStoreRequest {
     /// Hex-encoded hash of the old public key (32 bytes = 64 hex chars).
@@ -226,6 +237,7 @@ pub struct V2RecoveryStoreRequest {
 }
 
 /// V2 recovery proof query request body.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2RecoveryQueryRequest {
     /// Hex-encoded key hashes to look up (max 50).
@@ -234,6 +246,7 @@ pub struct V2RecoveryQueryRequest {
 }
 
 /// A single recovery proof entry in a query response.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2RecoveryProof {
     #[serde(deserialize_with = "bounded::deserialize_hex_hash")]
@@ -251,6 +264,7 @@ pub struct V2RecoveryProof {
 ///
 /// Each entry is a sealed-box encrypted guardian token. The relay cannot
 /// read contents, identify guardians, or learn anything beyond the entry count.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2GuardianEntry {
     /// Base64-encoded encrypted blob (sealed-box: ephemeral X25519 + XChaCha20-Poly1305).
@@ -262,6 +276,7 @@ pub struct V2GuardianEntry {
 ///
 /// Atomically replaces all guardian entries for a given hash.
 /// Removing a guardian = re-upload without their entry.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2GuardianStoreRequest {
     /// Hex-encoded hash of `designator_pk || "guardians"` (64 hex chars = 32 bytes).
@@ -284,6 +299,7 @@ pub struct V2GuardianStoreRequest {
 }
 
 /// V2 guardian query request body.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2GuardianQueryRequest {
     /// Hex-encoded guardian hash to look up (64 hex chars = 32 bytes).
@@ -294,6 +310,7 @@ pub struct V2GuardianQueryRequest {
 /// V2 guardian delete request body.
 ///
 /// Deletes all guardian entries for a hash (identity purge).
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2GuardianDeleteRequest {
     /// Hex-encoded guardian hash to delete (64 hex chars = 32 bytes).
@@ -313,6 +330,7 @@ pub struct V2GuardianDeleteRequest {
 }
 
 /// Standard V2 response envelope.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct V2Response {

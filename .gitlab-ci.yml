@@ -926,7 +926,7 @@ test:protocol:
   before_script:
     - !reference [.self-hosted, before_script]
   script:
-    - cargo nextest run --profile ci -p vauchi-protocol
+    - cargo nextest run --profile ci -p vauchi-protocol --features schema-gen
   artifacts:
     when: always
     reports:

@@ -30,7 +30,7 @@ pub struct PlaceStore<'a> {
     table: &'static str,
     /// Re-seals the duress content after a write, for the duress twin
     /// (vauchi/private#1003).
-    _seal: Option<SealOnDrop<'a>>,
+    seal: Option<SealOnDrop<'a>>,
 }
 
 impl Storage {
@@ -59,12 +59,23 @@ impl Storage {
             key: &self.encryption_key,
             clock: &self.clock,
             table,
-            _seal: seal,
+            seal,
         }
     }
 }
 
 impl PlaceStore<'_> {
+    /// Runs one write. On the duress twin it then seals the duress content
+    /// and returns a failed seal, so the write is not reported done while
+    /// it would be lost on restart (vauchi/private#1003).
+    fn execute<P: rusqlite::Params>(&self, sql: &str, params: P) -> Result<usize, StorageError> {
+        let changed = self.conn.execute(sql, params)?;
+        if let Some(seal) = &self.seal {
+            seal.seal_now()?;
+        }
+        Ok(changed)
+    }
+
     /// Creates and persists a new named place at the given coordinates.
     pub fn create_place(
         &self,
@@ -132,13 +143,10 @@ impl PlaceStore<'_> {
 
     /// Deletes a place by id. Returns `true` if it existed.
     pub fn delete_place(&self, id: &str) -> Result<bool, StorageError> {
-        let rows = self
-            .conn
-            .execute(
-                &format!("DELETE FROM {} WHERE id = ?1", self.table),
-                rusqlite::params![id],
-            )
-            .map_err(StorageError::from)?;
+        let rows = self.execute(
+            &format!("DELETE FROM {} WHERE id = ?1", self.table),
+            rusqlite::params![id],
+        )?;
         Ok(rows > 0)
     }
 
@@ -171,16 +179,14 @@ impl PlaceStore<'_> {
             serde_json::to_vec(&data).map_err(|e| StorageError::Serialization(e.to_string()))?;
         let data_encrypted = crate::crypto::encrypt(self.key, &json)
             .map_err(|e| StorageError::Encryption(format!("Encrypt place: {e}")))?;
-        self.conn
-            .execute(
-                &format!(
-                    "INSERT OR REPLACE INTO {} (id, data_encrypted, created_at)
+        self.execute(
+            &format!(
+                "INSERT OR REPLACE INTO {} (id, data_encrypted, created_at)
                  VALUES (?1, ?2, ?3)",
-                    self.table
-                ),
-                rusqlite::params![place.id, data_encrypted, place.created_at],
-            )
-            .map_err(StorageError::from)?;
+                self.table
+            ),
+            rusqlite::params![place.id, data_encrypted, place.created_at],
+        )?;
         Ok(())
     }
 

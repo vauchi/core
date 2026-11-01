@@ -22,7 +22,7 @@ pub struct DecoyStore<'a> {
     key: &'a SymmetricKey,
     clock: &'a Arc<dyn Clock>,
     /// Re-seals the duress content after a write (vauchi/private#1003).
-    _seal: SealOnDrop<'a>,
+    seal: Option<SealOnDrop<'a>>,
 }
 
 impl Storage {
@@ -32,12 +32,23 @@ impl Storage {
             conn: self.duress_conn(),
             key: &self.encryption_key,
             clock: &self.clock,
-            _seal: SealOnDrop::new(self),
+            seal: Some(SealOnDrop::new(self)),
         }
     }
 }
 
 impl DecoyStore<'_> {
+    /// Runs one write. On the duress twin it then seals the duress content
+    /// and returns a failed seal, so the write is not reported done while
+    /// it would be lost on restart (vauchi/private#1003).
+    fn execute<P: rusqlite::Params>(&self, sql: &str, params: P) -> Result<usize, StorageError> {
+        let changed = self.conn.execute(sql, params)?;
+        if let Some(seal) = &self.seal {
+            seal.seal_now()?;
+        }
+        Ok(changed)
+    }
+
     fn now_secs(&self) -> u64 {
         self.clock.unix_seconds()
     }
@@ -62,7 +73,7 @@ impl DecoyStore<'_> {
         let now = self.now_secs();
         let (created_at, updated_at) = decoy_timestamps(id, now);
 
-        self.conn.execute(
+        self.execute(
             "INSERT OR REPLACE INTO decoy_contacts (id, display_name_encrypted, card_encrypted, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)",
             params![id, name_encrypted, encrypted, created_at as i64, updated_at as i64],
         )?;
@@ -103,14 +114,13 @@ impl DecoyStore<'_> {
     }
     /// Deletes a single decoy contact by ID.
     pub fn delete_decoy_contact(&self, id: &str) -> Result<(), StorageError> {
-        self.conn
-            .execute("DELETE FROM decoy_contacts WHERE id = ?1", params![id])?;
+        self.execute("DELETE FROM decoy_contacts WHERE id = ?1", params![id])?;
 
         Ok(())
     }
     /// Deletes all decoy contacts.
     pub fn clear_all_decoy_contacts(&self) -> Result<(), StorageError> {
-        self.conn.execute("DELETE FROM decoy_contacts", [])?;
+        self.execute("DELETE FROM decoy_contacts", [])?;
 
         Ok(())
     }

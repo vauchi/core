@@ -34,7 +34,7 @@ pub struct LabelStore<'a> {
     overrides_table: &'static str,
     /// Re-seals the duress content after a write, for the duress twin
     /// (vauchi/private#1003).
-    _seal: Option<SealOnDrop<'a>>,
+    seal: Option<SealOnDrop<'a>>,
 }
 
 const LABEL_COLUMNS: &str = "id, name_encrypted, contacts_json_encrypted, visible_fields_json_encrypted, display_name_override_encrypted, bio_override_encrypted, avatar_override_encrypted, created_at, modified_at";
@@ -101,12 +101,23 @@ impl Storage {
             clock: &self.clock,
             labels_table,
             overrides_table,
-            _seal: seal,
+            seal,
         }
     }
 }
 
 impl LabelStore<'_> {
+    /// Runs one write. On the duress twin it then seals the duress content
+    /// and returns a failed seal, so the write is not reported done while
+    /// it would be lost on restart (vauchi/private#1003).
+    fn execute<P: rusqlite::Params>(&self, sql: &str, params: P) -> Result<usize, StorageError> {
+        let changed = self.conn.execute(sql, params)?;
+        if let Some(seal) = &self.seal {
+            seal.seal_now()?;
+        }
+        Ok(changed)
+    }
+
     fn now_secs(&self) -> u64 {
         self.clock.unix_seconds()
     }
@@ -153,7 +164,7 @@ impl LabelStore<'_> {
             None => None,
         };
 
-        self.conn.execute(
+        self.execute(
             &format!("INSERT OR REPLACE INTO {}
              (id, name_encrypted, name_hmac, contacts_json_encrypted, visible_fields_json_encrypted, created_at, modified_at, display_name_override_encrypted, bio_override_encrypted, avatar_override_encrypted)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)", self.labels_table),
@@ -276,7 +287,7 @@ impl LabelStore<'_> {
     }
     /// Deletes a visibility label.
     pub fn delete_group(&self, label_id: &str) -> Result<(), StorageError> {
-        let changes = self.conn.execute(
+        let changes = self.execute(
             &format!("DELETE FROM {} WHERE id = ?1", self.labels_table),
             [label_id],
         )?;
@@ -294,7 +305,7 @@ impl LabelStore<'_> {
         field_id: &str,
         is_visible: bool,
     ) -> Result<(), StorageError> {
-        self.conn.execute(
+        self.execute(
             &format!(
                 "INSERT OR REPLACE INTO {}
              (contact_id, field_id, is_visible)
@@ -312,7 +323,7 @@ impl LabelStore<'_> {
         contact_id: &str,
         field_id: &str,
     ) -> Result<(), StorageError> {
-        self.conn.execute(
+        self.execute(
             &format!(
                 "DELETE FROM {}
              WHERE contact_id = ?1 AND field_id = ?2",
@@ -377,7 +388,7 @@ impl LabelStore<'_> {
     }
     /// Deletes all per-contact overrides for a contact.
     pub fn delete_all_contact_overrides(&self, contact_id: &str) -> Result<(), StorageError> {
-        self.conn.execute(
+        self.execute(
             &format!("DELETE FROM {} WHERE contact_id = ?1", self.overrides_table),
             [contact_id],
         )?;
@@ -507,7 +518,7 @@ impl LabelStore<'_> {
 
         let now = self.now_secs();
 
-        let changes = self.conn.execute(
+        let changes = self.execute(
             &format!(
                 "UPDATE {} SET name_encrypted = ?1, name_hmac = ?2, modified_at = ?3 WHERE id = ?4",
                 self.labels_table

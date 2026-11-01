@@ -242,7 +242,7 @@ pub(crate) struct SealOnDrop<'a> {
     conn: &'a Connection,
     duress_db: &'a Connection,
     key: &'a SymmetricKey,
-    changes_before: u64,
+    changes_before: std::cell::Cell<u64>,
 }
 
 impl<'a> SealOnDrop<'a> {
@@ -251,14 +251,24 @@ impl<'a> SealOnDrop<'a> {
             conn: &storage.conn,
             duress_db: &storage.duress_db,
             key: &storage.encryption_key,
-            changes_before: storage.duress_db.total_changes(),
+            changes_before: std::cell::Cell::new(storage.duress_db.total_changes()),
         }
     }
 }
 
+impl SealOnDrop<'_> {
+    /// Seals now and returns the error, for a store's write paths.
+    pub(crate) fn seal_now(&self) -> Result<(), StorageError> {
+        write_sealed(self.conn, self.duress_db, self.key)?;
+        self.changes_before.set(self.duress_db.total_changes());
+        Ok(())
+    }
+}
+
+/// A backstop for a write that did not seal through [`SealOnDrop::seal_now`].
 impl Drop for SealOnDrop<'_> {
     fn drop(&mut self) {
-        if self.duress_db.total_changes() == self.changes_before {
+        if self.duress_db.total_changes() == self.changes_before.get() {
             return;
         }
         if let Err(error) = write_sealed(self.conn, self.duress_db, self.key) {

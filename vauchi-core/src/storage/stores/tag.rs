@@ -30,7 +30,7 @@ pub struct TagStore<'a> {
     table: &'static str,
     /// Re-seals the duress content after a write, for the duress twin
     /// (vauchi/private#1003).
-    _seal: Option<SealOnDrop<'a>>,
+    seal: Option<SealOnDrop<'a>>,
 }
 
 impl Storage {
@@ -59,12 +59,23 @@ impl Storage {
             key: &self.encryption_key,
             clock: &self.clock,
             table,
-            _seal: seal,
+            seal,
         }
     }
 }
 
 impl TagStore<'_> {
+    /// Runs one write. On the duress twin it then seals the duress content
+    /// and returns a failed seal, so the write is not reported done while
+    /// it would be lost on restart (vauchi/private#1003).
+    fn execute<P: rusqlite::Params>(&self, sql: &str, params: P) -> Result<usize, StorageError> {
+        let changed = self.conn.execute(sql, params)?;
+        if let Some(seal) = &self.seal {
+            seal.seal_now()?;
+        }
+        Ok(changed)
+    }
+
     /// Creates and persists a new tag with the given name.
     pub fn create_tag(&self, name: &str) -> Result<Tag, StorageError> {
         let id = uuid::Uuid::new_v4().to_string();
@@ -74,16 +85,14 @@ impl TagStore<'_> {
         let contact_ids_json = serde_json::to_string(&Vec::<String>::new())
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
-        self.conn
-            .execute(
-                &format!(
-                    "INSERT INTO {} (id, name_encrypted, contact_ids_json, created_at)
+        self.execute(
+            &format!(
+                "INSERT INTO {} (id, name_encrypted, contact_ids_json, created_at)
                  VALUES (?1, ?2, ?3, ?4)",
-                    self.table
-                ),
-                rusqlite::params![tag.id, name_encrypted, contact_ids_json, tag.created_at],
-            )
-            .map_err(StorageError::from)?;
+                self.table
+            ),
+            rusqlite::params![tag.id, name_encrypted, contact_ids_json, tag.created_at],
+        )?;
 
         Ok(tag)
     }
@@ -100,16 +109,14 @@ impl TagStore<'_> {
         let contact_ids_json =
             serde_json::to_string(&ids).map_err(|e| StorageError::Serialization(e.to_string()))?;
 
-        self.conn
-            .execute(
-                &format!(
-                    "INSERT OR REPLACE INTO {} (id, name_encrypted, contact_ids_json, created_at)
+        self.execute(
+            &format!(
+                "INSERT OR REPLACE INTO {} (id, name_encrypted, contact_ids_json, created_at)
                  VALUES (?1, ?2, ?3, ?4)",
-                    self.table
-                ),
-                rusqlite::params![tag.id, name_encrypted, contact_ids_json, tag.created_at],
-            )
-            .map_err(StorageError::from)?;
+                self.table
+            ),
+            rusqlite::params![tag.id, name_encrypted, contact_ids_json, tag.created_at],
+        )?;
         Ok(())
     }
 
@@ -168,13 +175,10 @@ impl TagStore<'_> {
 
     /// Deletes a tag by ID. Returns `true` if the tag existed.
     pub fn delete_tag(&self, id: &str) -> Result<bool, StorageError> {
-        let rows = self
-            .conn
-            .execute(
-                &format!("DELETE FROM {} WHERE id = ?1", self.table),
-                rusqlite::params![id],
-            )
-            .map_err(StorageError::from)?;
+        let rows = self.execute(
+            &format!("DELETE FROM {} WHERE id = ?1", self.table),
+            rusqlite::params![id],
+        )?;
         Ok(rows > 0)
     }
 
@@ -246,15 +250,13 @@ impl TagStore<'_> {
         let updated_json = serde_json::to_string(&ids_sorted)
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
-        self.conn
-            .execute(
-                &format!(
-                    "UPDATE {} SET contact_ids_json = ?1 WHERE id = ?2",
-                    self.table
-                ),
-                rusqlite::params![updated_json, tag_id],
-            )
-            .map_err(StorageError::from)?;
+        self.execute(
+            &format!(
+                "UPDATE {} SET contact_ids_json = ?1 WHERE id = ?2",
+                self.table
+            ),
+            rusqlite::params![updated_json, tag_id],
+        )?;
 
         Ok(())
     }

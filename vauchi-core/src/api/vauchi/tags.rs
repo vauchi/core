@@ -25,9 +25,6 @@ fn normalise_name(name: &str) -> &str {
 
 impl Vauchi {
     fn record_tag_change(&self, tag: &Tag) {
-        if self.in_duress_mode() {
-            return;
-        }
         self.record_sync_item(crate::sync::SyncItem::TagChanged {
             tag_data: crate::sync::device_sync::TagSyncData::from_tag(tag),
             timestamp: self.clock.unix_seconds(),
@@ -35,9 +32,6 @@ impl Vauchi {
     }
 
     fn record_tag_deletion(&self, tag_id: &str) {
-        if self.in_duress_mode() {
-            return;
-        }
         self.record_sync_item(crate::sync::SyncItem::TagDeleted {
             tag_id: tag_id.to_string(),
             timestamp: self.clock.unix_seconds(),

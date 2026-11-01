@@ -9,9 +9,6 @@ use super::Vauchi;
 
 impl Vauchi {
     pub(crate) fn record_group_change(&self, group: &crate::contact::Group) {
-        if self.in_duress_mode() {
-            return;
-        }
         self.record_sync_item(crate::sync::SyncItem::GroupChanged {
             group_data: crate::sync::GroupSyncData::from_group(group),
             timestamp: group.modified_at(),
@@ -29,9 +26,6 @@ impl Vauchi {
     }
 
     pub(crate) fn record_group_deletion(&self, group_id: &str) {
-        if self.in_duress_mode() {
-            return;
-        }
         self.record_sync_item(crate::sync::SyncItem::GroupDeleted {
             group_id: group_id.to_string(),
             timestamp: self.clock.unix_seconds(),

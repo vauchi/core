@@ -219,13 +219,19 @@ fuzz:nightly:
       # identical static aiOff tables in bundled sqlite3.c, which the
       # optimiser folds to one address (private#787). The runs above
       # keep ASan.
+      # libFuzzer prints "Running:" and "Executed" for every file it
+      # replays, and the cached corpus grows each night; those lines
+      # alone passed GitLab's 4 MiB trace cap on 2026-11-01 and killed
+      # the job, so the replay writes to a per-target log kept as an
+      # artifact and only a failure shows its tail here (private#1005).
       COVERAGE_FAILED=0
       TARGET_TRIPLE=$(rustc +nightly -vV | awk '/^host:/ { print $2 }')
       NIGHTLY_SYSROOT=$(rustc +nightly --print sysroot)
       LLVM_COV="$NIGHTLY_SYSROOT/lib/rustlib/$TARGET_TRIPLE/bin/llvm-cov"
       for t in $TARGETS; do
         echo "COVERAGE: ${t}"
-        if cargo +nightly fuzz coverage -s none "$t"; then
+        REPLAY_LOG="$COVERAGE_REPORT_DIR/${t}.replay.log"
+        if cargo +nightly fuzz coverage -s none "$t" >"$REPLAY_LOG" 2>&1; then
           COVERAGE_BINARY=$(find target -type f \
             -path "*/coverage/*/release/${t}" | head -n 1)
           COVERAGE_PROFILE="coverage/${t}/coverage.profdata"
@@ -243,6 +249,7 @@ fuzz:nightly:
           fi
         else
           echo "COVERAGE-REPLAY-FAILED:${t}"
+          tail -n 20 "$REPLAY_LOG"
           COVERAGE_FAILED=$((COVERAGE_FAILED + 1))
         fi
       done

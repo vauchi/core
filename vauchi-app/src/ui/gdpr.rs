@@ -78,6 +78,8 @@ pub struct GdprEngine {
     /// The identity's other active devices, named when leaving asks
     /// whether they wipe too (#916).
     other_device_names: Vec<String>,
+    /// What this device holds, counted when the screen opens (private#86).
+    inventory: DataInventory,
     /// Whether they wipe, once asked.
     wipe_other_devices: Option<bool>,
     /// The export waiting on the PIN step: `"export"` or `"heirloom"`.
@@ -103,6 +105,8 @@ enum GdprStep {
     ConfirmDelete,
     /// Consent-management screen — per-type grant toggles.
     ManageConsent,
+    /// What this device and the relay hold (private#86).
+    MyData,
     /// Confirm executing a scheduled deletion now (grace elapsed).
     ConfirmExecute,
     /// The session PIN, asked immediately before each export (#712).
@@ -138,6 +142,7 @@ impl GdprEngine {
             user_presence_available: false,
             has_trusted_contacts: false,
             other_device_names: Vec::new(),
+            inventory: DataInventory::default(),
             wipe_other_devices: None,
             pending_export: None,
             entered_pin: EnteredPin::default(),
@@ -394,6 +399,7 @@ impl GdprEngine {
             GdprStep::Overview => self.build_overview(),
             GdprStep::ConfirmDelete => self.build_confirm_delete(),
             GdprStep::ManageConsent => self.build_consent(),
+            GdprStep::MyData => self.build_my_data(),
             GdprStep::ConfirmExecute => self.build_confirm_execute(),
             GdprStep::ConfirmHeirloom => self.build_confirm_heirloom(),
             GdprStep::ConfirmExportPin => self.build_confirm_export_pin(),
@@ -429,6 +435,9 @@ impl WorkflowEngine for GdprEngine {
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         if let Some(result) = self.handle_export_step(&action) {
+            return result;
+        }
+        if let Some(result) = self.handle_my_data(&action) {
             return result;
         }
         match (&self.step, action) {
@@ -619,8 +628,11 @@ mod deletion;
 mod export;
 #[path = "gdpr_leave.rs"]
 mod leave;
+#[path = "gdpr_my_data.rs"]
+mod my_data;
 #[cfg(feature = "network-rustls")]
 pub(crate) use export::SET_APP_PASSWORD_ACTION_ID;
+pub use my_data::DataInventory;
 
 // INLINE_TEST_REQUIRED: Tests access private GdprStep enum and internal engine state
 #[cfg(test)]

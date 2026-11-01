@@ -166,7 +166,7 @@ pub use exchange::nfc_engine::{
 pub use exchange::{ExchangeConfig, ExchangeEngine};
 pub use fingerprint_verify::{FingerprintVerifyEngine, VerifyAction};
 pub use form_dialog::{FormDialogEngine, FormDialogType};
-pub use gdpr::{DeletionSummary, GdprEngine};
+pub use gdpr::{DataInventory, DeletionSummary, GdprEngine};
 pub use group_detail::{GroupDetailEngine, GroupFieldVisibility};
 pub use groups_list::{GroupInfo, GroupsEngine};
 pub use help::{HelpEngine, HelpItem};

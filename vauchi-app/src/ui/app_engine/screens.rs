@@ -639,7 +639,8 @@ impl AppEngine {
                             .unwrap_or_default(),
                     )
                     .with_deletion_scheduled(scheduled)
-                    .with_deletion_executable(executable),
+                    .with_deletion_executable(executable)
+                    .with_data_inventory(crate::ui::DataInventory::collect(vauchi)),
                 )
             }
             AppScreen::Support => {

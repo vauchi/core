@@ -10,6 +10,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- Settings → Privacy & Data → View My Data opens the "what we store"
+  screen: what this device holds, counted when it opens (card fields,
+  contacts, devices, queued updates, the database's size), what the
+  relay holds and who runs it during the alpha (ADR-037 addendum), that
+  everything is end-to-end encrypted, and a link to the public security
+  review. The row existed and did nothing (vauchi/private#86).
 - The emergency broadcast (ADR-036) has a Core screen: Settings →
   Security → Emergency Broadcast picks up to ten trusted contacts, the
   message and the location choice, and sends the alert after a question

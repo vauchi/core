@@ -13,7 +13,7 @@ use vauchi_core::identity::DeviceRegistry;
 use vauchi_core::sync::SyncItem;
 use vauchi_core::{ContactField, FieldType, Vauchi};
 
-use crate::common::device_sync::link_tablet;
+use crate::common::device_sync::{create_test_contact, link_tablet};
 use crate::common::helpers::create_vauchi_with_identity;
 
 const APP_PASSWORD: &str = "my-pin-1234";
@@ -126,6 +126,41 @@ fn a_duress_edit_journals_cover_of_the_real_item_s_length_for_the_other_device()
             [SyncItem::Cover { .. }, SyncItem::Cover { .. }]
         ),
         "got {cover:?}"
+    );
+    let lengths = |items: &[SyncItem]| items.iter().map(serialized_len).collect::<Vec<_>>();
+    assert_eq!(lengths(&cover), lengths(&real));
+}
+
+fn add_and_annotate_bob(wb: &Vauchi) {
+    let bob = create_test_contact("Bob");
+    let bob_id = bob.id().to_string();
+    wb.add_contact(bob).unwrap();
+    wb.block_contact(&bob_id).unwrap();
+    wb.archive_contact(&bob_id).unwrap();
+    wb.ignore_contact(&bob_id).unwrap();
+    wb.add_personal_note(&bob_id, "met at the station").unwrap();
+}
+
+// @claim: S14
+// @scenario: duress_mode :: Duress mode looks identical to normal mode
+#[test]
+fn a_duress_session_never_journals_a_non_cover_item() {
+    let (normal, normal_registry, tablet) = alice(APP_PASSWORD, AuthMode::Normal);
+    let (duress, duress_registry, _) = alice(DURESS_PIN, AuthMode::Duress);
+    add_and_annotate_bob(&normal);
+    add_and_annotate_bob(&duress);
+
+    let real = journaled_for_tablet(&normal, normal_registry, &tablet);
+    let cover = journaled_for_tablet(&duress, duress_registry, &tablet);
+
+    assert_eq!(real.len(), 5, "got {real:?}");
+    let non_cover: Vec<_> = cover
+        .iter()
+        .filter(|item| !matches!(item, SyncItem::Cover { .. }))
+        .collect();
+    assert!(
+        non_cover.is_empty(),
+        "journaled for the tablet: {non_cover:?}"
     );
     let lengths = |items: &[SyncItem]| items.iter().map(serialized_len).collect::<Vec<_>>();
     assert_eq!(lengths(&cover), lengths(&real));

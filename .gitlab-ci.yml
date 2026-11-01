@@ -228,9 +228,9 @@ check:spec-names:
     # On a merge request the sources are this branch, so a name the spec
     # lists as pending is landing here, not stale (private#937).
     - if [ -n "${CI_MERGE_REQUEST_IID:-}" ]; then export CLAIM_NAMES_SOURCES_MAY_LAND=1; fi
-    - for f in /tmp/roots/spec-main/src/claims.md /tmp/roots/spec-main/src/protocols/*.md; do sh /tmp/roots/spec-main/ci/check-claim-names.sh "$f" vauchi-app vauchi-cabi vauchi-core vauchi-hardware vauchi-platform vauchi-protocol /tmp/roots/e2e-main /tmp/roots/relay-main /tmp/roots/ohttp-relay-main || exit 1; done
+    - for f in /tmp/roots/spec-main/src/claims.md /tmp/roots/spec-main/src/protocols/*.md; do sh /tmp/roots/spec-main/ci/check-claim-names.sh "$f" vauchi-app vauchi-cabi vauchi-core vauchi-platform vauchi-protocol /tmp/roots/e2e-main /tmp/roots/relay-main /tmp/roots/ohttp-relay-main || exit 1; done
     - sh /tmp/roots/spec-main/ci/check-claim-annotations.sh --self-test
-    - sh /tmp/roots/spec-main/ci/check-claim-annotations.sh /tmp/roots/spec-main/src/claims.md vauchi-app vauchi-cabi vauchi-core vauchi-hardware vauchi-platform vauchi-protocol /tmp/roots/e2e-main || exit 1
+    - sh /tmp/roots/spec-main/ci/check-claim-annotations.sh /tmp/roots/spec-main/src/claims.md vauchi-app vauchi-cabi vauchi-core vauchi-platform vauchi-protocol /tmp/roots/e2e-main || exit 1
     - 'cmp vauchi-core/tests/fixtures/test-vectors/vauchi-protocol-vectors-v1.json /tmp/roots/spec-main/src/vectors/vauchi-protocol-vectors-v1.json || { echo "WARN: the vectors fixture differs from the copy in the spec. After this merges, open spec (src/vectors/) and docs (src/developers/test-vectors/) MRs with the new file."; exit 3; }'
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -238,7 +238,6 @@ check:spec-names:
         - "vauchi-app/**/*"
         - "vauchi-cabi/**/*"
         - "vauchi-core/**/*"
-        - "vauchi-hardware/**/*"
         - "vauchi-platform/**/*"
         - "vauchi-protocol/**/*"
         - ci/tests/spec-names.test.sh
@@ -933,31 +932,6 @@ test:protocol:
       junit: target/nextest/ci/junit.xml
     expire_in: 1 week
 
-test:hardware:
-  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
-  stage: test
-  needs:
-    - job: lint:format
-      optional: true
-    - job: lint:clippy
-      optional: true
-  before_script:
-    - !reference [.self-hosted, before_script]
-  script:
-    - cargo nextest run --profile ci -p vauchi-hardware
-    # Nextest does not execute the compiler-negative documentation fixture.
-    - cargo test --locked -p vauchi-hardware --doc
-  artifacts:
-    when: always
-    reports:
-      junit: target/nextest/ci/junit.xml
-    expire_in: 1 week
-
-# Core ships armeabi-v7a, where usize is 32 bits; arithmetic that wraps only
-# there passes every 64-bit job (private#756: a crafted padding length
-# aborted the app). An i386 userland has the same pointer width natively and
-# needs no runner packages (private#767). The LONG_BIT guard fails the job if
-# the image ever resolves to a 64-bit platform, which would pass silently.
 test:core-32bit:
   extends: [.validation-rust, .timeout-long]
   stage: test

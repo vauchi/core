@@ -13,10 +13,9 @@
 //! layer alongside relay validation. Transport-level body limits remain
 //! responsible for bounding input buffering.
 
-use serde::de::{self, Deserializer, Error as DeError, Visitor};
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::marker::PhantomData;
+
+mod bounded;
 
 // =========================================================================
 // Size limits
@@ -65,445 +64,16 @@ const MAX_RECOVERY_PROOFS_LEN: usize = 50;
 const MAX_GUARDIANS_LEN: usize = 10;
 
 // =========================================================================
-// Bounded deserialization helpers
-// =========================================================================
-
-fn deserialize_bounded_string<'de, D>(deserializer: D, max_len: usize) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct BoundedStringVisitor(usize);
-
-    impl<'de> Visitor<'de> for BoundedStringVisitor {
-        type Value = String;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            write!(formatter, "a string of at most {} bytes", self.0)
-        }
-
-        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            if v.len() > self.0 {
-                return Err(E::custom(format!(
-                    "string too long: {} bytes (max {})",
-                    v.len(),
-                    self.0
-                )));
-            }
-            Ok(v.to_owned())
-        }
-
-        fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            if v.len() > self.0 {
-                return Err(E::custom(format!(
-                    "string too long: {} bytes (max {})",
-                    v.len(),
-                    self.0
-                )));
-            }
-            Ok(v)
-        }
-    }
-
-    deserializer.deserialize_str(BoundedStringVisitor(max_len))
-}
-
-fn deserialize_bounded_vec_string<'de, D>(
-    deserializer: D,
-    max_items: usize,
-    max_len: usize,
-) -> Result<Vec<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct BoundedVecStringVisitor {
-        max_items: usize,
-        max_len: usize,
-    }
-
-    impl<'de> Visitor<'de> for BoundedVecStringVisitor {
-        type Value = Vec<String>;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            write!(
-                formatter,
-                "a list of at most {} strings, each at most {} bytes",
-                self.max_items, self.max_len
-            )
-        }
-
-        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-        where
-            A: de::SeqAccess<'de>,
-        {
-            let mut vec = Vec::with_capacity(seq.size_hint().unwrap_or(0).min(self.max_items));
-            while let Some(value) = seq.next_element::<String>()? {
-                if value.len() > self.max_len {
-                    return Err(A::Error::custom(format!(
-                        "string too long: {} bytes (max {})",
-                        value.len(),
-                        self.max_len
-                    )));
-                }
-                if vec.len() >= self.max_items {
-                    return Err(A::Error::custom(format!(
-                        "too many items (max {})",
-                        self.max_items
-                    )));
-                }
-                vec.push(value);
-            }
-            Ok(vec)
-        }
-    }
-
-    deserializer.deserialize_seq(BoundedVecStringVisitor { max_items, max_len })
-}
-
-fn deserialize_bounded_vec<'de, D, T>(deserializer: D, max_items: usize) -> Result<Vec<T>, D::Error>
-where
-    D: Deserializer<'de>,
-    T: Deserialize<'de>,
-{
-    struct BoundedVecVisitor<T> {
-        max_items: usize,
-        marker: PhantomData<T>,
-    }
-
-    impl<'de, T> Visitor<'de> for BoundedVecVisitor<T>
-    where
-        T: Deserialize<'de>,
-    {
-        type Value = Vec<T>;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            write!(formatter, "a list of at most {} items", self.max_items)
-        }
-
-        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-        where
-            A: de::SeqAccess<'de>,
-        {
-            let mut vec = Vec::with_capacity(seq.size_hint().unwrap_or(0).min(self.max_items));
-            while let Some(value) = seq.next_element::<T>()? {
-                if vec.len() >= self.max_items {
-                    return Err(A::Error::custom(format!(
-                        "too many items (max {})",
-                        self.max_items
-                    )));
-                }
-                vec.push(value);
-            }
-            Ok(vec)
-        }
-    }
-
-    deserializer.deserialize_seq(BoundedVecVisitor {
-        max_items,
-        marker: PhantomData,
-    })
-}
-
-fn deserialize_option_bounded_vec<'de, D, T>(
-    deserializer: D,
-    max_items: usize,
-) -> Result<Option<Vec<T>>, D::Error>
-where
-    D: Deserializer<'de>,
-    T: Deserialize<'de>,
-{
-    struct OptionBoundedVecVisitor<T> {
-        max_items: usize,
-        marker: PhantomData<T>,
-    }
-
-    impl<'de, T> Visitor<'de> for OptionBoundedVecVisitor<T>
-    where
-        T: Deserialize<'de>,
-    {
-        type Value = Option<Vec<T>>;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            write!(
-                formatter,
-                "null or a list of at most {} items",
-                self.max_items
-            )
-        }
-
-        fn visit_none<E>(self) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            Ok(None)
-        }
-
-        fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            deserialize_bounded_vec(deserializer, self.max_items).map(Some)
-        }
-    }
-
-    deserializer.deserialize_option(OptionBoundedVecVisitor {
-        max_items,
-        marker: PhantomData,
-    })
-}
-
-// Per-field wrappers (required by serde's `deserialize_with` attribute).
-
-fn deserialize_recipient_id<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_bounded_string(deserializer, MAX_ID_HEX_LEN)
-}
-
-fn deserialize_blob_id<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_bounded_string(deserializer, MAX_ID_HEX_LEN)
-}
-
-fn deserialize_ciphertext<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_bounded_string(deserializer, MAX_CIPHERTEXT_B64_LEN)
-}
-
-fn deserialize_mailbox_tokens<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_bounded_vec_string(deserializer, MAX_MAILBOX_TOKENS, MAX_ID_HEX_LEN)
-}
-
-fn deserialize_hex_hash<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_bounded_string(deserializer, MAX_ID_HEX_LEN)
-}
-
-fn deserialize_public_key<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_bounded_string(deserializer, MAX_ID_HEX_LEN)
-}
-
-fn deserialize_purge_token<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_bounded_string(deserializer, MAX_ID_HEX_LEN)
-}
-
-fn deserialize_signature<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_bounded_string(deserializer, MAX_SIGNATURE_HEX_LEN)
-}
-
-fn deserialize_exchange_payload<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_bounded_string(deserializer, MAX_CIPHERTEXT_B64_LEN)
-}
-
-fn deserialize_exchange_code<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_bounded_string(deserializer, MAX_STRING_LEN)
-}
-
-fn deserialize_exchange_response<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_bounded_string(deserializer, MAX_CIPHERTEXT_B64_LEN)
-}
-
-fn deserialize_proof_data<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_bounded_string(deserializer, MAX_PROOF_DATA_B64_LEN)
-}
-
-fn deserialize_key_hashes<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_bounded_vec_string(deserializer, MAX_RECOVERY_QUERY_HASHES, MAX_ID_HEX_LEN)
-}
-
-fn deserialize_guardian_entries<'de, D>(deserializer: D) -> Result<Vec<V2GuardianEntry>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_bounded_vec(deserializer, MAX_GUARDIAN_ENTRIES)
-}
-
-fn deserialize_guardian_entry_data<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_bounded_string(deserializer, MAX_GUARDIAN_ENTRY_B64_LEN)
-}
-
-fn deserialize_designator_pk<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_bounded_string(deserializer, MAX_ID_HEX_LEN)
-}
-
-fn deserialize_status<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_bounded_string(deserializer, MAX_STRING_LEN)
-}
-
-fn deserialize_optional_bounded_string<'de, D>(
-    deserializer: D,
-    max_len: usize,
-) -> Result<Option<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct OptionalBoundedStringVisitor(usize);
-
-    impl<'de> Visitor<'de> for OptionalBoundedStringVisitor {
-        type Value = Option<String>;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            write!(formatter, "null or a string of at most {} bytes", self.0)
-        }
-
-        fn visit_none<E>(self) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            Ok(None)
-        }
-
-        fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            deserialize_bounded_string(deserializer, self.0).map(Some)
-        }
-    }
-
-    deserializer.deserialize_option(OptionalBoundedStringVisitor(max_len))
-}
-
-fn deserialize_optional_error<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_optional_bounded_string(deserializer, MAX_STRING_LEN)
-}
-
-fn deserialize_optional_blob_id<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_optional_bounded_string(deserializer, MAX_ID_HEX_LEN)
-}
-
-fn deserialize_optional_code<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_optional_bounded_string(deserializer, MAX_STRING_LEN)
-}
-
-fn deserialize_optional_payload<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_optional_bounded_string(deserializer, MAX_CIPHERTEXT_B64_LEN)
-}
-
-fn deserialize_optional_response<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_optional_bounded_string(deserializer, MAX_CIPHERTEXT_B64_LEN)
-}
-
-fn deserialize_optional_mailbox_token<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_optional_bounded_string(deserializer, MAX_ID_HEX_LEN)
-}
-
-fn deserialize_optional_public_key<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_optional_bounded_string(deserializer, MAX_ID_HEX_LEN)
-}
-
-fn deserialize_optional_signature<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_optional_bounded_string(deserializer, MAX_SIGNATURE_HEX_LEN)
-}
-
-fn is_false(value: &bool) -> bool {
-    !*value
-}
-
-fn deserialize_optional_origin_hint<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_optional_bounded_string(deserializer, MAX_ORIGIN_HINT_B64_LEN)
-}
-
-fn deserialize_proofs<'de, D>(deserializer: D) -> Result<Option<Vec<V2RecoveryProof>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_option_bounded_vec(deserializer, MAX_RECOVERY_PROOFS_LEN)
-}
-
-fn deserialize_guardians<'de, D>(deserializer: D) -> Result<Option<Vec<V2GuardianEntry>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize_option_bounded_vec(deserializer, MAX_GUARDIANS_LEN)
-}
-
-// =========================================================================
 // Request / response types
 // =========================================================================
 
 /// V2 send request body.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2SendRequest {
-    #[serde(deserialize_with = "deserialize_recipient_id")]
+    #[serde(deserialize_with = "bounded::deserialize_recipient_id")]
     pub recipient_id: String,
     /// Base64-encoded ciphertext.
-    #[serde(deserialize_with = "deserialize_ciphertext")]
+    #[serde(deserialize_with = "bounded::deserialize_ciphertext")]
     pub ciphertext: String,
     /// Base64-encoded opaque origin-device hint (`nonce || AEAD(sender_device_id)`,
     /// encrypted to the recipient). Lets the receiver select the sender's
@@ -515,7 +85,7 @@ pub struct V2SendRequest {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_optional_origin_hint"
+        deserialize_with = "bounded::deserialize_optional_origin_hint"
     )]
     pub origin_hint: Option<String>,
 }
@@ -523,23 +93,23 @@ pub struct V2SendRequest {
 /// V2 fetch request body.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2FetchRequest {
-    #[serde(deserialize_with = "deserialize_mailbox_tokens")]
+    #[serde(deserialize_with = "bounded::deserialize_mailbox_tokens")]
     pub mailbox_tokens: Vec<String>,
 }
 
 /// V2 acknowledge request body.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2AckRequest {
-    #[serde(deserialize_with = "deserialize_recipient_id")]
+    #[serde(deserialize_with = "bounded::deserialize_recipient_id")]
     pub recipient_id: String,
-    #[serde(deserialize_with = "deserialize_blob_id")]
+    #[serde(deserialize_with = "bounded::deserialize_blob_id")]
     pub blob_id: String,
 }
 
 /// V2 register mailbox tokens request body.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2RegisterRequest {
-    #[serde(deserialize_with = "deserialize_mailbox_tokens")]
+    #[serde(deserialize_with = "bounded::deserialize_mailbox_tokens")]
     pub mailbox_tokens: Vec<String>,
 }
 
@@ -550,27 +120,27 @@ pub struct V2RegisterRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2PurgeRequest {
     /// Hex-encoded Ed25519 public key (32 bytes).
-    #[serde(deserialize_with = "deserialize_public_key")]
+    #[serde(deserialize_with = "bounded::deserialize_public_key")]
     pub public_key: String,
     /// Hex-encoded purge token (32 bytes).
-    #[serde(deserialize_with = "deserialize_purge_token")]
+    #[serde(deserialize_with = "bounded::deserialize_purge_token")]
     pub purge_token: String,
     /// Hex-encoded Ed25519 signature (64 bytes).
-    #[serde(deserialize_with = "deserialize_signature")]
+    #[serde(deserialize_with = "bounded::deserialize_signature")]
     pub signature: String,
     /// Unix timestamp (must be within 60s of server time).
     pub timestamp: u64,
     /// Also erase the guardian set at `SHA-256(public_key || "guardians")`.
     /// Covered by the signature; absent means keep it, which is all an old
     /// client could ask for.
-    #[serde(default, skip_serializing_if = "is_false")]
+    #[serde(default, skip_serializing_if = "bounded::is_false")]
     pub erase_guardian_set: bool,
 }
 
 /// V2 exchange offer request body.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2ExchangeOfferRequest {
-    #[serde(deserialize_with = "deserialize_exchange_payload")]
+    #[serde(deserialize_with = "bounded::deserialize_exchange_payload")]
     pub payload: String,
     pub expires_secs: Option<u64>,
 }
@@ -578,26 +148,26 @@ pub struct V2ExchangeOfferRequest {
 /// V2 exchange claim request body.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2ExchangeClaimRequest {
-    #[serde(deserialize_with = "deserialize_exchange_code")]
+    #[serde(deserialize_with = "bounded::deserialize_exchange_code")]
     pub code: String,
-    #[serde(deserialize_with = "deserialize_exchange_response")]
+    #[serde(deserialize_with = "bounded::deserialize_exchange_response")]
     pub response: String,
 }
 
 /// V2 exchange complete request body.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2ExchangeCompleteRequest {
-    #[serde(deserialize_with = "deserialize_exchange_code")]
+    #[serde(deserialize_with = "bounded::deserialize_exchange_code")]
     pub code: String,
 }
 
 /// A fetched blob from the relay.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FetchedBlob {
-    #[serde(deserialize_with = "deserialize_blob_id")]
+    #[serde(deserialize_with = "bounded::deserialize_blob_id")]
     pub blob_id: String,
     /// Base64-encoded ciphertext.
-    #[serde(deserialize_with = "deserialize_ciphertext")]
+    #[serde(deserialize_with = "bounded::deserialize_ciphertext")]
     pub ciphertext: String,
     pub created_at: u64,
     /// Mailbox token the blob arrived for. Returned to the recipient
@@ -611,7 +181,7 @@ pub struct FetchedBlob {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_optional_mailbox_token"
+        deserialize_with = "bounded::deserialize_optional_mailbox_token"
     )]
     pub mailbox_token: Option<String>,
     /// Base64-encoded opaque origin-device hint the sender attached (see
@@ -621,7 +191,7 @@ pub struct FetchedBlob {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_optional_origin_hint"
+        deserialize_with = "bounded::deserialize_optional_origin_hint"
     )]
     pub origin_hint: Option<String>,
 }
@@ -630,17 +200,17 @@ pub struct FetchedBlob {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2RecoveryStoreRequest {
     /// Hex-encoded hash of the old public key (32 bytes = 64 hex chars).
-    #[serde(deserialize_with = "deserialize_hex_hash")]
+    #[serde(deserialize_with = "bounded::deserialize_hex_hash")]
     pub key_hash: String,
     /// Base64-encoded recovery proof data (opaque to relay, max 4 KiB).
-    #[serde(deserialize_with = "deserialize_proof_data")]
+    #[serde(deserialize_with = "bounded::deserialize_proof_data")]
     pub proof_data: String,
     /// Hex-encoded Ed25519 public key of the identity uploading the proof,
     /// so its purge can erase the proof. Proofs without an owner expire.
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_optional_public_key"
+        deserialize_with = "bounded::deserialize_optional_public_key"
     )]
     pub owner_pk: Option<String>,
     /// Unix seconds, signed with the owner key.
@@ -650,7 +220,7 @@ pub struct V2RecoveryStoreRequest {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_optional_signature"
+        deserialize_with = "bounded::deserialize_optional_signature"
     )]
     pub signature: Option<String>,
 }
@@ -659,17 +229,17 @@ pub struct V2RecoveryStoreRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2RecoveryQueryRequest {
     /// Hex-encoded key hashes to look up (max 50).
-    #[serde(deserialize_with = "deserialize_key_hashes")]
+    #[serde(deserialize_with = "bounded::deserialize_key_hashes")]
     pub key_hashes: Vec<String>,
 }
 
 /// A single recovery proof entry in a query response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2RecoveryProof {
-    #[serde(deserialize_with = "deserialize_hex_hash")]
+    #[serde(deserialize_with = "bounded::deserialize_hex_hash")]
     pub key_hash: String,
     /// Base64-encoded proof data.
-    #[serde(deserialize_with = "deserialize_proof_data")]
+    #[serde(deserialize_with = "bounded::deserialize_proof_data")]
     pub proof_data: String,
     pub created_at: u64,
     pub expires_at: u64,
@@ -684,7 +254,7 @@ pub struct V2RecoveryProof {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2GuardianEntry {
     /// Base64-encoded encrypted blob (sealed-box: ephemeral X25519 + XChaCha20-Poly1305).
-    #[serde(deserialize_with = "deserialize_guardian_entry_data")]
+    #[serde(deserialize_with = "bounded::deserialize_guardian_entry_data")]
     pub data: String,
 }
 
@@ -695,21 +265,21 @@ pub struct V2GuardianEntry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2GuardianStoreRequest {
     /// Hex-encoded hash of `designator_pk || "guardians"` (64 hex chars = 32 bytes).
-    #[serde(deserialize_with = "deserialize_hex_hash")]
+    #[serde(deserialize_with = "bounded::deserialize_hex_hash")]
     pub guardian_hash: String,
     /// Encrypted entries (one per guardian, max 10).
-    #[serde(deserialize_with = "deserialize_guardian_entries")]
+    #[serde(deserialize_with = "bounded::deserialize_guardian_entries")]
     pub entries: Vec<V2GuardianEntry>,
     /// Hex-encoded Ed25519 designator public key (64 hex chars). The relay
     /// requires `SHA-256(designator_pk || "guardians") == guardian_hash`,
     /// proving the caller owns the identity the hash derives from.
-    #[serde(deserialize_with = "deserialize_designator_pk")]
+    #[serde(deserialize_with = "bounded::deserialize_designator_pk")]
     pub designator_pk: String,
     /// Unix seconds; the relay rejects requests outside ±60s.
     pub timestamp: u64,
     /// Hex-encoded Ed25519 signature (128 hex chars) over
     /// `domain || designator_pk || guardian_hash || timestamp_be`.
-    #[serde(deserialize_with = "deserialize_signature")]
+    #[serde(deserialize_with = "bounded::deserialize_signature")]
     pub signature: String,
 }
 
@@ -717,7 +287,7 @@ pub struct V2GuardianStoreRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2GuardianQueryRequest {
     /// Hex-encoded guardian hash to look up (64 hex chars = 32 bytes).
-    #[serde(deserialize_with = "deserialize_hex_hash")]
+    #[serde(deserialize_with = "bounded::deserialize_hex_hash")]
     pub guardian_hash: String,
 }
 
@@ -727,18 +297,18 @@ pub struct V2GuardianQueryRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2GuardianDeleteRequest {
     /// Hex-encoded guardian hash to delete (64 hex chars = 32 bytes).
-    #[serde(deserialize_with = "deserialize_hex_hash")]
+    #[serde(deserialize_with = "bounded::deserialize_hex_hash")]
     pub guardian_hash: String,
     /// Hex-encoded Ed25519 designator public key (64 hex chars). The relay
     /// requires `SHA-256(designator_pk || "guardians") == guardian_hash`,
     /// proving the caller owns the identity the hash derives from.
-    #[serde(deserialize_with = "deserialize_designator_pk")]
+    #[serde(deserialize_with = "bounded::deserialize_designator_pk")]
     pub designator_pk: String,
     /// Unix seconds; the relay rejects requests outside ±60s.
     pub timestamp: u64,
     /// Hex-encoded Ed25519 signature (128 hex chars) over
     /// `domain || designator_pk || guardian_hash || timestamp_be`.
-    #[serde(deserialize_with = "deserialize_signature")]
+    #[serde(deserialize_with = "bounded::deserialize_signature")]
     pub signature: String,
 }
 
@@ -746,11 +316,11 @@ pub struct V2GuardianDeleteRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct V2Response {
-    #[serde(deserialize_with = "deserialize_status")]
+    #[serde(deserialize_with = "bounded::deserialize_status")]
     pub status: String,
-    #[serde(default, deserialize_with = "deserialize_optional_error")]
+    #[serde(default, deserialize_with = "bounded::deserialize_optional_error")]
     pub error: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_optional_blob_id")]
+    #[serde(default, deserialize_with = "bounded::deserialize_optional_blob_id")]
     pub blob_id: Option<String>,
     #[serde(default)]
     pub blobs: Option<Vec<FetchedBlob>>,
@@ -761,20 +331,20 @@ pub struct V2Response {
     pub truncated: bool,
     #[serde(default)]
     pub acknowledged: Option<bool>,
-    #[serde(default, deserialize_with = "deserialize_optional_code")]
+    #[serde(default, deserialize_with = "bounded::deserialize_optional_code")]
     pub code: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_optional_payload")]
+    #[serde(default, deserialize_with = "bounded::deserialize_optional_payload")]
     pub payload: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_optional_response")]
+    #[serde(default, deserialize_with = "bounded::deserialize_optional_response")]
     pub response: Option<String>,
     /// Number of blobs deleted by a purge request.
     #[serde(default)]
     pub blobs_deleted: Option<usize>,
     /// Recovery proofs returned by a query.
-    #[serde(default, deserialize_with = "deserialize_proofs")]
+    #[serde(default, deserialize_with = "bounded::deserialize_proofs")]
     pub proofs: Option<Vec<V2RecoveryProof>>,
     /// Guardian entries returned by a query.
-    #[serde(default, deserialize_with = "deserialize_guardians")]
+    #[serde(default, deserialize_with = "bounded::deserialize_guardians")]
     pub guardians: Option<Vec<V2GuardianEntry>>,
 }
 
@@ -807,192 +377,4 @@ impl V2Response {
 // module. Moving them to tests/ would require making the helpers pub or
 // adding a test-only facade, which adds unnecessary public surface area.
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    // @internal
-    #[test]
-    fn v2_send_request_accepts_valid_input() {
-        let json = r#"{"recipient_id":"aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899","ciphertext":"SGVsbG8="}"#;
-        let req: V2SendRequest = serde_json::from_str(json).expect("valid send request");
-        assert_eq!(req.recipient_id.len(), 64);
-        assert_eq!(req.ciphertext, "SGVsbG8=");
-    }
-
-    // @internal
-    #[test]
-    fn v2_send_request_rejects_oversized_ciphertext() {
-        let json = format!(
-            "{{\"recipient_id\":\"{}\",\"ciphertext\":\"{}\"}}",
-            "a".repeat(64),
-            "A".repeat(MAX_CIPHERTEXT_B64_LEN + 1)
-        );
-        let err = serde_json::from_str::<V2SendRequest>(&json).unwrap_err();
-        assert!(err.to_string().contains("too long"));
-    }
-
-    // @internal
-    #[test]
-    fn v2_send_request_accepts_origin_hint() {
-        let json = r#"{"recipient_id":"aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899","ciphertext":"SGVsbG8=","origin_hint":"bm9uY2VfcGx1c19jaXBoZXJ0ZXh0"}"#;
-        let req: V2SendRequest = serde_json::from_str(json).expect("valid send request with hint");
-        assert_eq!(
-            req.origin_hint.as_deref(),
-            Some("bm9uY2VfcGx1c19jaXBoZXJ0ZXh0")
-        );
-    }
-
-    // @internal
-    #[test]
-    fn v2_send_request_defaults_origin_hint_to_none() {
-        let json = r#"{"recipient_id":"aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899","ciphertext":"SGVsbG8="}"#;
-        let req: V2SendRequest = serde_json::from_str(json).expect("valid legacy send request");
-        assert_eq!(req.origin_hint, None);
-    }
-
-    // @internal
-    #[test]
-    fn v2_send_request_rejects_oversized_origin_hint() {
-        let json = format!(
-            "{{\"recipient_id\":\"{}\",\"ciphertext\":\"SGVsbG8=\",\"origin_hint\":\"{}\"}}",
-            "a".repeat(64),
-            "A".repeat(MAX_ORIGIN_HINT_B64_LEN + 1)
-        );
-        let err = serde_json::from_str::<V2SendRequest>(&json).unwrap_err();
-        assert!(err.to_string().contains("too long"));
-    }
-
-    // @internal
-    #[test]
-    fn v2_send_request_omits_origin_hint_when_none() {
-        let req = V2SendRequest {
-            recipient_id: "a".repeat(64),
-            ciphertext: "SGVsbG8=".to_string(),
-            origin_hint: None,
-        };
-        let json = serde_json::to_string(&req).expect("serialize send request");
-        assert!(
-            !json.contains("origin_hint"),
-            "a None hint must not emit the field: {json}"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn fetched_blob_roundtrips_origin_hint() {
-        let blob = FetchedBlob {
-            blob_id: "b".repeat(64),
-            ciphertext: "SGVsbG8=".to_string(),
-            created_at: 42,
-            mailbox_token: None,
-            origin_hint: Some("aGludA==".to_string()),
-        };
-        let json = serde_json::to_string(&blob).expect("serialize blob");
-        let back: FetchedBlob = serde_json::from_str(&json).expect("deserialize blob");
-        assert_eq!(back.origin_hint.as_deref(), Some("aGludA=="));
-    }
-
-    // @internal
-    #[test]
-    fn v2_fetch_request_rejects_too_many_tokens() {
-        let tokens: Vec<String> = (0..MAX_MAILBOX_TOKENS + 1)
-            .map(|i| format!("{:064x}", i))
-            .collect();
-        let json = format!(
-            "{{\"mailbox_tokens\":{}}}",
-            serde_json::to_string(&tokens).unwrap()
-        );
-        let err = serde_json::from_str::<V2FetchRequest>(&json).unwrap_err();
-        assert!(err.to_string().contains("too many items"));
-    }
-
-    // @internal
-    #[test]
-    fn v2_fetch_request_rejects_oversized_token() {
-        let json = format!(
-            "{{\"mailbox_tokens\":[\"{}\"]}}",
-            "a".repeat(MAX_ID_HEX_LEN + 1)
-        );
-        let err = serde_json::from_str::<V2FetchRequest>(&json).unwrap_err();
-        assert!(err.to_string().contains("too long"));
-    }
-
-    // @internal
-    #[test]
-    fn v2_recovery_store_request_limits_proof_data() {
-        let json = format!(
-            "{{\"key_hash\":\"{}\",\"proof_data\":\"{}\"}}",
-            "a".repeat(64),
-            "A".repeat(MAX_PROOF_DATA_B64_LEN + 1)
-        );
-        let err = serde_json::from_str::<V2RecoveryStoreRequest>(&json).unwrap_err();
-        assert!(err.to_string().contains("too long"));
-    }
-
-    // @internal
-    #[test]
-    fn v2_recovery_query_request_limits_key_hashes() {
-        let hashes: Vec<String> = (0..MAX_RECOVERY_QUERY_HASHES + 1)
-            .map(|i| format!("{:064x}", i))
-            .collect();
-        let json = format!(
-            "{{\"key_hashes\":{}}}",
-            serde_json::to_string(&hashes).unwrap()
-        );
-        let err = serde_json::from_str::<V2RecoveryQueryRequest>(&json).unwrap_err();
-        assert!(err.to_string().contains("too many items"));
-    }
-
-    // @internal
-    #[test]
-    fn v2_guardian_store_request_limits_entries() {
-        let entries: Vec<V2GuardianEntry> = (0..MAX_GUARDIAN_ENTRIES + 1)
-            .map(|_| V2GuardianEntry {
-                data: "SGVsbG8=".to_string(),
-            })
-            .collect();
-        let req = V2GuardianStoreRequest {
-            guardian_hash: "a".repeat(64),
-            entries,
-            designator_pk: "b".repeat(64),
-            timestamp: 0,
-            signature: "c".repeat(128),
-        };
-        let json = serde_json::to_string(&req).unwrap();
-        let err = serde_json::from_str::<V2GuardianStoreRequest>(&json).unwrap_err();
-        assert!(err.to_string().contains("too many items"));
-    }
-
-    // @internal
-    #[test]
-    fn v2_guardian_entry_limits_data() {
-        let json = format!(
-            "{{\"data\":\"{}\"}}",
-            "A".repeat(MAX_GUARDIAN_ENTRY_B64_LEN + 1)
-        );
-        let err = serde_json::from_str::<V2GuardianEntry>(&json).unwrap_err();
-        assert!(err.to_string().contains("too long"));
-    }
-
-    // @internal
-    #[test]
-    fn v2_response_accepts_null_vectors() {
-        // Legacy relays/clients may explicitly send null for optional vectors.
-        let json = r#"{"status":"ok","blobs":null,"proofs":null,"guardians":null}"#;
-        let resp: V2Response = serde_json::from_str(json).expect("null vectors accepted");
-        assert!(resp.blobs.is_none());
-        assert!(resp.proofs.is_none());
-        assert!(resp.guardians.is_none());
-    }
-
-    // @internal
-    #[test]
-    fn v2_response_limits_optional_strings() {
-        let json = format!(
-            "{{\"status\":\"ok\",\"error\":\"{}\"}}",
-            "x".repeat(MAX_STRING_LEN + 1)
-        );
-        let err = serde_json::from_str::<V2Response>(&json).unwrap_err();
-        assert!(err.to_string().contains("too long"));
-    }
-}
+mod tests;

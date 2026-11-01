@@ -12,6 +12,7 @@
 
 use super::{AppEngine, AppScreen, EntryFlow};
 use crate::ui::action::{ActionResult, UserAction};
+use crate::ui::engine::WorkflowEngine;
 use vauchi_core::api::AuthMode;
 use vauchi_core::contact_card::FieldType;
 use zeroize::Zeroize;
@@ -132,6 +133,12 @@ impl AppEngine {
                 let target = AppScreen::MyInfo;
                 let screen = self.navigate_to_internal(target);
                 ActionResult::NavigateTo(screen)
+            }
+            Err(vauchi_core::VauchiError::Storage(
+                vauchi_core::StorageError::SecureStorageLocked,
+            )) => {
+                self.needs_storage_unlock = true;
+                ActionResult::UpdateScreen(self.current_screen())
             }
             Err(e) => ActionResult::ShowAlert {
                 title: self.t("error.title"),

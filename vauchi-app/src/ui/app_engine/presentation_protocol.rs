@@ -181,7 +181,11 @@ impl AppEngine {
         let Some(event) = self.correlate_file_event(event) else {
             return Ok(self.drain_pending_commands());
         };
-        let commands = self.dispatch_event(event)?;
+        let mut commands = self.dispatch_event(event.clone())?;
+        if std::mem::take(&mut self.needs_storage_unlock) {
+            self.held_for_unlock = Some(event);
+            commands.push(Command::RequestBiometricUnlock);
+        }
         let commands = self.correlate_file_commands(commands);
         Ok(self.route_to_shells(commands))
     }
@@ -846,6 +850,9 @@ impl AppEngine {
         event: Event,
     ) -> Result<Vec<Command>, AppPresentationError> {
         if matches!(event, Event::BiometricUnlockSucceeded) {
+            if let Some(held) = self.held_for_unlock.take() {
+                return self.dispatch_event(held);
+            }
             let outcome = self
                 .vauchi_mut()
                 .biometric_unlock_check()

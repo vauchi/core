@@ -26,6 +26,10 @@ printf '%s\n' "$job" | grep -q "cargo +nightly fuzz coverage -s none \"\$t\"" \
     || fail "nightly fuzzing does not measure corpus coverage without ASan, whose odr check aborts every replay on bundled sqlite3 (private#787)"
 printf '%s\n' "$job" | grep -q "cargo +nightly fuzz run {} -- " \
     || fail "nightly fuzz runs no longer use the default ASan build"
+printf '%s\n' "$job" | grep -q "fuzz coverage -s none \"\$t\" >\"\$REPLAY_LOG\" 2>&1" \
+    || fail "the coverage replay prints two lines per cached corpus file into the job log; the 4 MiB trace cap killed the 2026-11-01 run (private#1005)"
+printf '%s\n' "$job" | grep -q 'tail -n 20 "\$REPLAY_LOG"' \
+    || fail "a failed coverage replay shows nothing of its log"
 printf '%s\n' "$job" | grep -q "\"\$LLVM_COV\" report" \
     || fail "nightly fuzzing does not summarize coverage"
 printf '%s\n' "$job" | grep -q 'vauchi-core/fuzz/coverage/' \

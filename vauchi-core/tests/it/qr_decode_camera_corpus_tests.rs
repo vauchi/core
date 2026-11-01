@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! The production scanner reads real camera frames: the Pixel 3a's front
-//! camera looking at an iPhone SE's Hover code at both ends of the 7–14 cm
-//! target. Generated codes did not catch a detector swap that read 9 of 40
+//! The production scanner reads real camera frames: the Pixel 3a's and the
+//! Galaxy S7's front cameras looking at an iPhone SE's Hover code at both
+//! ends of the 7–14 cm target. Generated codes did not catch a detector swap that read 9 of 40
 //! such frames instead of 30, and Hover failed 17 of 17 at 13.5 cm
 //! (vauchi/private#450, #931).
 //!
@@ -150,6 +150,54 @@ fn front_camera_frames_at_14_cm_are_read_at_least_as_well_as_before() {
     const FLOOR: usize = 9;
 
     let reading = read_placement("pixel3a-front-14cm");
+
+    assert!(
+        reading.read >= FLOOR,
+        "read {} of 10, floor {FLOOR}; missed {:?}",
+        reading.read,
+        reading.missed
+    );
+    assert_eq!(reading.misread, Vec::<String>::new());
+}
+
+// @internal
+#[test]
+fn s7_front_camera_frames_at_7_cm_are_read_at_least_as_well_as_before() {
+    const FLOOR: usize = 10;
+
+    let reading = read_placement("s7-front-7cm");
+
+    assert!(
+        reading.read >= FLOOR,
+        "read {} of 10, floor {FLOOR}; missed {:?}",
+        reading.read,
+        reading.missed
+    );
+    assert_eq!(reading.misread, Vec::<String>::new());
+}
+
+// @internal
+#[test]
+fn s7_front_camera_frames_at_10_cm_are_read_at_least_as_well_as_before() {
+    const FLOOR: usize = 10;
+
+    let reading = read_placement("s7-front-10cm");
+
+    assert!(
+        reading.read >= FLOOR,
+        "read {} of 10, floor {FLOOR}; missed {:?}",
+        reading.read,
+        reading.missed
+    );
+    assert_eq!(reading.misread, Vec::<String>::new());
+}
+
+// @internal
+#[test]
+fn s7_front_camera_frames_at_14_cm_are_read_at_least_as_well_as_before() {
+    const FLOOR: usize = 10;
+
+    let reading = read_placement("s7-front-14cm");
 
     assert!(
         reading.read >= FLOOR,

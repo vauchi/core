@@ -324,6 +324,47 @@ check:spec-reverify-issue:
         - .gitlab-ci.yml
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
+# A Core merge owes two follow-ups (private#1010): the spec drops the
+# `name core!NNNN` pending claim names whose MR landed, since
+# check:claim-names fails them once the name is on main, and features
+# flips the scenarios whose annotated test landed from planned to
+# implemented. scripts/open-follow-up-mrs.sh opens both MRs; merging stays
+# with the maintainer, and each MR pipeline proves the change.
+check:follow-up-mrs:
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
+  tags: [docker]
+  needs: []
+  before_script:
+    - apk add --no-cache bash git python3
+  script:
+    - sh ci/tests/follow-up-mrs.test.sh
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - scripts/open-follow-up-mrs.sh
+        - scripts/follow_ups.py
+        - ci/tests/follow-up-mrs.test.sh
+        - .gitlab-ci.yml
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+open:follow-ups:
+  stage: trigger
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
+  tags: [docker]
+  needs: []
+  allow_failure: true
+  interruptible: false
+  variables:
+    # The diff needs both ends of the push; a shallow clone has only one.
+    GIT_DEPTH: 0
+  before_script:
+    - apk add --no-cache bash git python3 curl
+  script:
+    - bash scripts/open-follow-up-mrs.sh "$CI_COMMIT_BEFORE_SHA" "$CI_COMMIT_SHA"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+
 check:windows-trigger-safety:
   stage: lint
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21

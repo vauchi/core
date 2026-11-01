@@ -7,8 +7,8 @@
 # (vauchi/private#1010): in vauchi/spec, drop the `name core!NNNN` lines of
 # ci/claim-names.pending whose MR is now merged (check:claim-names fails a
 # pending name that is on main); in vauchi/features, flip the scenarios whose
-# `// @scenario: <stem> :: <name>` annotation the push added from @planned to
-# @implemented. What changes is decided by follow_ups.py beside this file;
+# scenario annotation (the marker, a feature stem and a scenario name) the
+# push added from planned to implemented. What changes is decided by follow_ups.py beside this file;
 # this script clones, commits, pushes and opens the MRs. Merging stays with
 # the maintainer; each MR pipeline proves the change. A failure in one
 # repository never stops the other; the job exits non-zero at the end.

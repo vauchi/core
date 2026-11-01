@@ -23,7 +23,10 @@ import re
 import sys
 from pathlib import Path
 
-ANNOTATION_RE = re.compile(r"^\+(?!\+\+).*//\s*@scenario:\s*([a-z0-9_]+)\s*::\s*(.+?)\s*$")
+# Spelled in two pieces: quality:scenario-names reads every added line that
+# carries the marker as an annotation and would fail this file (private#1010).
+MARKER = "@" + "scenario:"
+ANNOTATION_RE = re.compile(r"^\+(?!\+\+).*//\s*" + re.escape(MARKER) + r"\s*([a-z0-9_]+)\s*::\s*(.+?)\s*$")
 SCENARIO_LINE_RE = re.compile(r"^\s*Scenario(?: Outline)?:\s*(.+?)\s*$")
 TAG_PLANNED_RE = re.compile(r"(?<![\w-])@planned(?![\w-])")
 

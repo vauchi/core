@@ -77,11 +77,14 @@ printf 'fn base() {}\n' > "$T/src/core/tests/a.rs"
 git_quiet -C "$T/src/core" add -A
 git_quiet -C "$T/src/core" commit -q -m base
 BASE=$(git -C "$T/src/core" rev-parse HEAD)
-printf 'fn base() {}\n// @scenario: contact_exchange :: A QR contact carries its real exchange timestamp\nfn a_qr_session_stores_the_exchange_timestamp() {}\n// @scenario: contact_exchange :: Not in features yet\nfn other() {}\n' > "$T/src/core/tests/a.rs"
+# The marker is spelled in two pieces so quality:scenario-names does not read
+# these fixture lines as annotations of this repository.
+M='// @'"scenario:"
+printf 'fn base() {}\n%s contact_exchange :: A QR contact carries its real exchange timestamp\nfn a_qr_session_stores_the_exchange_timestamp() {}\n%s contact_exchange :: Not in features yet\nfn other() {}\n' "$M" "$M" > "$T/src/core/tests/a.rs"
 git_quiet -C "$T/src/core" add -A
 git_quiet -C "$T/src/core" commit -q -m "fix: stamp (private#948)"
 MERGED=$(git -C "$T/src/core" rev-parse HEAD)
-printf '// @scenario: contact_exchange :: In a mutual QR exchange one side emits the audio challenge first\n' > "$T/src/core/docs/note.md"
+printf '%s contact_exchange :: In a mutual QR exchange one side emits the audio challenge first\n' "$M" > "$T/src/core/docs/note.md"
 git_quiet -C "$T/src/core" add -A
 git_quiet -C "$T/src/core" commit -q -m "docs: note"
 AFTER=$(git -C "$T/src/core" rev-parse HEAD)

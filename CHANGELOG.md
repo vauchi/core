@@ -8,8 +8,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.95.0] — 2026-11-01
+
 ### Added
 
+- Core routes each command to the display shell or the OS's hardware
+  shell (ADR-077): `Command::target()` names the shell of every variant,
+  and a hardware shell attaches by sending
+  `Event::HardwareCapabilitiesReported`. From then on the hardware
+  commands go out in a separate `hardware` field of the C ABI and
+  UniFFI batches and wakeup envelopes; a shell that never reports keeps
+  receiving every command in `commands`, as before. A report made while
+  storage is locked carries over to the engine that opens. A hardware
+  shell reports a missing permission with `Event::PermissionRequired`,
+  the display shell asks with `Command::RequestPermission`, and
+  `Event::PermissionGranted` rebuilds the transports. With a hardware
+  shell attached, a camera request becomes `Command::CameraViewport`
+  for the display and `Command::CameraCapture` for the hardware, joined
+  by one preview id, and `Command::CameraStop` ends the capture when its
+  screen goes or a photo is answered (vauchi/private#770).
 - Settings → Privacy & Data → View My Data opens the "what we store"
   screen: what this device holds, counted when it opens (card fields,
   contacts, devices, queued updates, the database's size), what the
@@ -37,6 +54,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   any key pair empty any mailbox whose token it held (vauchi/private#944).
   `HttpTransport::purge` and `purge_scoped` lose the parameter; an old
   client's field is read past.
+
+### Fixed
+
+- In-person exchange: a Glance displayer spends its OOB nonce on the
+  first accepted KeyOffer (vauchi/private#892) and closes its own
+  60-second window; an exchanged contact carries the clock's timestamp,
+  one QR side emits audio first, a confirmed proximity is not lowered,
+  and a QR contact is named after the peer's QR (vauchi/private#948). A
+  repeat exchange refreshes the card but never rekeys an existing
+  contact, and a BLE card repeats its handshake's exchange key
+  (vauchi/private#941).
+- Duress: the storage file does not tell whether a duress PIN exists,
+  and a duress session journals only cover items for linked devices
+  (vauchi/private#947).
+- Recovery: the parsers take exactly their bytes, a guardian token is
+  under the voucher signature (vauchi/private#930), a tenth
+  recovery-trusted contact is refused (vauchi/private#929), the relay
+  stores a recovery proof sealed (vauchi/private#936), a revoked
+  contact's tombstone keeps what helpers need to vouch
+  (vauchi/private#935), and a proof older than 192 hours from its
+  earliest voucher is refused (vauchi/private#959, vauchi/private#926).
+- Sync and keys: a link bootstrap is signed for its card and exchange
+  (vauchi/private#942), the ratchet keys a sender's previous chain by
+  the generation its messages carry (vauchi/private#943), fetch padding
+  derives from the seed and the day (vauchi/private#946), and card
+  delivery binds identities to authenticated peers, keeps field order
+  and rolls back a failed receive (vauchi/private#925).
+- A refused value's error stays when focus leaves the field
+  (vauchi/private#845).
 
 ## [0.94.1] — 2026-10-30
 

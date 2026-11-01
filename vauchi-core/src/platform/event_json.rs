@@ -2,19 +2,22 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use super::{Event, InputValue};
-use crate::limits::MAX_FULL_BACKUP_BYTES;
 
 /// Maximum JSON payload accepted by the generic presentation dispatch path.
 ///
 /// Every shell event, byte-bearing hardware events included, travels this
 /// path (ADR-066 retires the typed hardware-event seam), so the
 /// ceiling is derived from the largest legitimate payload: a user-picked
-/// full backup of [`MAX_FULL_BACKUP_BYTES`]. Serde spells each byte as up to
+/// file of [`MAX_FILE_PICK_BYTES`]. Serde spells each byte as up to
 /// four JSON characters (`255,`); the envelope allowance covers the variant
 /// tag, field names, and the filename.
 pub const MAX_EVENT_JSON_BYTES: usize = MAX_FILE_PICK_BYTES * 4 + MAX_EVENT_ENVELOPE_BYTES;
-/// Raw file ceiling that fits the generic event envelope even as JSON byte arrays.
-pub const MAX_FILE_PICK_BYTES: usize = MAX_FULL_BACKUP_BYTES;
+/// Raw file ceiling a shell may hand Core in one pick (32 MiB), which also
+/// fits the generic event envelope as a JSON byte array. The bound lives
+/// with the shell protocol, not in Core's limits, because the protocol is
+/// what a shell builds against (ADR-078); Core's full-backup limit equals
+/// it, pinned by `tests/it/payload_bounds_tests.rs`.
+pub const MAX_FILE_PICK_BYTES: usize = 32 * 1024 * 1024;
 const MAX_EVENT_ENVELOPE_BYTES: usize = 4 * 1024;
 /// Maximum object/array nesting accepted before event deserialization.
 pub const MAX_EVENT_JSON_NESTING_DEPTH: usize = 16;

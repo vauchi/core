@@ -16,7 +16,7 @@ use vauchi_core::{
     PresentationRow,
 };
 
-const REQUIRED_CODE_IDS: [&str; 52] = [
+const REQUIRED_CODE_IDS: [&str; 53] = [
     "onboarding",
     "my_info-empty",
     "my_info",
@@ -40,6 +40,7 @@ const REQUIRED_CODE_IDS: [&str; 52] = [
     "duress_pin",
     "change_password",
     "decoy_contacts",
+    "emergency_broadcast",
     "emergency_shred",
     "delivery_status",
     "recovery",

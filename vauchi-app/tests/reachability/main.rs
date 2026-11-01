@@ -31,6 +31,7 @@ mod device_replacement;
 mod direct_transport;
 mod duplicate_detection;
 mod duress_pin;
+mod emergency_broadcast;
 mod emergency_shred;
 mod exchange;
 mod fingerprint_verify;

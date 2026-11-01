@@ -116,6 +116,7 @@ mod duress_pin_typing_tests;
 mod duress_pin_wiring_tests;
 mod duress_screen_tests;
 mod duress_setup_without_alerts_tests;
+mod emergency_broadcast_screen_tests;
 mod emergency_shred_crypto_tests;
 mod emergency_shred_screen_tests;
 mod emergency_shred_wipe_tests;

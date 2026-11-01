@@ -145,6 +145,7 @@ fn settings_bucket_screens_resolve_to_settings() {
         AppScreen::SettingsAdvanced,
         AppScreen::ChangePassword,
         AppScreen::DecoyContacts,
+        AppScreen::EmergencyBroadcast,
         AppScreen::EmergencyShred,
         AppScreen::RecoveryHelp,
         AppScreen::RecoveryClaimReview,

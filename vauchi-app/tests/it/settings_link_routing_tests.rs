@@ -136,6 +136,7 @@ fn advanced_settings_rows_reduce_to_list_item_selected() {
             ("security", "change_password"),
             ("security", "duress_pin"),
             ("security", "decoy_contacts"),
+            ("security", "emergency_broadcast"),
             ("security", "setup_new_device"),
             ("backup", "backup_reminders"),
             ("network", "relay_url"),

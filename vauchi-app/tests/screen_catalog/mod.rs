@@ -295,6 +295,7 @@ fn record_seeded(world: SeededWorld, locale: &'static str, screens: &mut Vec<Scr
         AppScreen::DuressPin,
         AppScreen::ChangePassword,
         AppScreen::DecoyContacts,
+        AppScreen::EmergencyBroadcast,
         AppScreen::EmergencyShred,
         AppScreen::DeliveryStatus,
         AppScreen::Recovery,

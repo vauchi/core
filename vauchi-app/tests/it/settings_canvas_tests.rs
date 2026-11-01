@@ -302,6 +302,7 @@ fn advanced_screen_keeps_every_row_the_canvas_dropped() {
             "change_password",
             "duress_pin",
             "decoy_contacts",
+            "emergency_broadcast",
             "setup_new_device"
         ]
     );

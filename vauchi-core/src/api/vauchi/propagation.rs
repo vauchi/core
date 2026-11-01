@@ -139,6 +139,66 @@ impl Vauchi {
         })
     }
 
+    /// One last update emptying my card on a contact's device, for a block
+    /// whose wipe the user confirmed (ADR-056 point 4). Not filtered by
+    /// visibility: a removal reveals nothing, and it must reach fields a
+    /// past grant delivered. Nothing to remove is a success: their copy is
+    /// already empty.
+    pub(crate) fn queue_final_empty_card_for_contact(&self, contact_id: &str) -> VauchiResult<()> {
+        use crate::card::ContactCard;
+        use crate::storage::{PendingUpdate, UpdateStatus};
+        use crate::sync::delta::CardDelta;
+
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        let mut contact = self
+            .storage
+            .contacts()
+            .load_contact(contact_id)?
+            .ok_or_else(|| VauchiError::NotFound(format!("contact: {}", contact_id)))?;
+        if contact.is_blocked() {
+            return Err(VauchiError::ContactBlocked(contact_id.to_string()));
+        }
+        contact
+            .kind()
+            .exchanged_data()
+            .ok_or_else(|| VauchiError::InvalidState("contact not exchanged".into()))?;
+
+        let our_card = self
+            .storage
+            .contacts()
+            .load_own_card()?
+            .unwrap_or_else(|| ContactCard::new(identity.display_name()));
+        let empty_card = ContactCard::new(identity.display_name());
+        let now = self.clock.unix_seconds();
+        let delta = CardDelta::compute(&our_card, &empty_card, now);
+        if delta.is_empty() {
+            return Ok(());
+        }
+
+        let relay_url = contact.relay_url().map(String::from);
+        self.seal_and_persist_card_delta(identity, &mut contact, delta, |prepared| {
+            for payload in prepared {
+                self.storage.pending().queue_update(&PendingUpdate {
+                    id: self.rng.uuid_v4(),
+                    contact_id: contact_id.to_string(),
+                    update_type: "card_delta".to_string(),
+                    payload: payload.encrypted.clone(),
+                    created_at: now,
+                    retry_count: 0,
+                    status: UpdateStatus::Pending,
+                    target_relay_url: relay_url.clone(),
+                    target_device_id: (payload.peer_device_id != [0u8; 32])
+                        .then_some(payload.peer_device_id),
+                })?;
+            }
+            Ok(())
+        })?;
+        Ok(())
+    }
+
     /// Prepares an encrypted card update for a single contact.
     ///
     /// Single crypto path for card propagation (ADR-021). Handles:
@@ -896,7 +956,8 @@ impl Vauchi {
                 SyncItem::ContactBlocked { ref contact_id, .. } => self
                     .save_if_present(self.storage.contacts().load_contact(contact_id)?, |c| {
                         c.block()
-                    }),
+                    })
+                    .and_then(|()| self.remove_from_emergency_contacts(contact_id).map(drop)),
                 SyncItem::ContactUnblocked { ref contact_id, .. } => self
                     .save_if_present(self.storage.contacts().load_contact(contact_id)?, |c| {
                         c.unblock()

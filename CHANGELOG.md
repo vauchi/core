@@ -17,6 +17,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   refused with the seconds left; who receives the alerts changes only
   after the session PIN. `Vauchi::emergency_broadcast_cooldown_remaining_secs`
   tells a screen how long to wait (vauchi/private#895).
+- Blocking a contact works as ADR-056 decides: the contact leaves every
+  group (unblocking does not put them back) and the emergency trusted
+  list, and `Vauchi::block_contact_and_report` optionally sends the one
+  final update that empties my card on their device, reporting what it
+  did. The app's contact screen offers Block and Unblock, with the wipe as
+  a choice in the question before blocking (vauchi/private#889).
 
 ### Changed
 

@@ -34,6 +34,19 @@ pub use trust::TrustLevel;
 pub use visibility::{FieldVisibility, VisibilityRules};
 
 use crate::card::ContactCard;
+
+/// What blocking a contact did beyond setting the flag (ADR-056,
+/// `Vauchi::block_contact_and_report`), so the app can tell the user.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BlockReport {
+    /// Their copy of my card is, or will be once delivered, empty: the one
+    /// final update was queued, or there was nothing left to remove.
+    pub wipe_queued: bool,
+    /// How many groups the contact was taken out of.
+    pub groups_left: usize,
+    /// The contact was on the emergency trusted list and is no longer.
+    pub removed_from_emergency_contacts: bool,
+}
 use crate::contact::reciprocity::{ConfirmationChannel, Reciprocity};
 use crate::contact::trust_metrics::TrustMetrics;
 use crate::crypto::SymmetricKey;

@@ -63,6 +63,27 @@ impl Vauchi {
         Ok(self.storage.emergency().load_emergency_config()?)
     }
 
+    /// Takes a blocked contact off the trusted list (maintainer decision
+    /// 2026-10-28, private#889); the last one leaving turns the broadcast
+    /// off rather than leaving a configured alert with nobody to send to.
+    /// Returns whether they were listed.
+    pub(crate) fn remove_from_emergency_contacts(&self, contact_id: &str) -> VauchiResult<bool> {
+        let Some(mut config) = self.storage.emergency().load_emergency_config()? else {
+            return Ok(false);
+        };
+        let listed = config.trusted_contact_ids.len();
+        config.trusted_contact_ids.retain(|id| id != contact_id);
+        if config.trusted_contact_ids.len() == listed {
+            return Ok(false);
+        }
+        if config.trusted_contact_ids.is_empty() {
+            self.storage.emergency().delete_emergency_config()?;
+        } else {
+            self.storage.emergency().save_emergency_config(&config)?;
+        }
+        Ok(true)
+    }
+
     /// Sends an emergency broadcast to all trusted contacts.
     ///
     /// For each trusted contact that has an established ratchet:

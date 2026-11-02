@@ -141,6 +141,18 @@ fn nfc_send_apdu_carries_framed_apdus_through_mobile_enum() {
     }
 }
 
+// The mapping's catch-all turns an unlisted command into QrRequestScan, so a
+// stop the app cannot name would open the scanner instead (private#770).
+// @internal
+#[test]
+fn ble_stop_advertising_reaches_the_app_as_a_stop() {
+    let mobile: MobileCommand = Command::BleStopAdvertising.into();
+    assert!(
+        matches!(mobile, MobileCommand::BleStopAdvertising),
+        "expected BleStopAdvertising, got {mobile:?}"
+    );
+}
+
 // @internal
 #[test]
 fn nfc_apdu_received_roundtrips_through_mobile_enum() {

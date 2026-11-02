@@ -120,3 +120,37 @@ fn the_advertised_token_is_fresh_per_session_and_not_the_identity_key() {
         "the signing key's prefix is on the air"
     );
 }
+
+fn command_names(commands: &[Command]) -> Vec<&'static str> {
+    commands.iter().map(Command::variant_name).collect()
+}
+
+// The hardware shell decides nothing (ADR-077), so the advertising Core
+// started ends only when Core says so: on leaving the exchange screen.
+// @internal
+#[test]
+fn leaving_the_ble_exchange_screen_stops_the_advertising_it_started() {
+    let mut engine = engine();
+    let entered = engine.drain_pending_commands();
+    assert!(command_names(&entered).contains(&"BleStartAdvertising"));
+
+    engine.navigate_to(AppScreen::Contacts);
+
+    let stops: Vec<_> = command_names(&engine.drain_pending_commands())
+        .into_iter()
+        .filter(|name| *name == "BleStopAdvertising")
+        .collect();
+    assert_eq!(stops, vec!["BleStopAdvertising"]);
+}
+
+// @internal
+#[test]
+fn the_advertising_keeps_running_while_the_exchange_screen_is_up() {
+    let mut engine = engine();
+    engine.drain_pending_commands();
+
+    let commands = engine.dispatch(observed(false)).unwrap();
+
+    assert!(!command_names(&commands).contains(&"BleStopAdvertising"));
+    assert!(!command_names(&engine.drain_pending_commands()).contains(&"BleStopAdvertising"));
+}

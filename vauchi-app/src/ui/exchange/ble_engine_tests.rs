@@ -393,15 +393,21 @@ fn glance_screen_exited_restores_the_platform_brightness() {
     );
     engine.screen_entered();
 
+    let exited = engine.screen_exited();
+
     assert_eq!(
-        engine.screen_exited(),
-        vec![Command::SetScreenBrightness { level: None }]
+        exited.first(),
+        Some(&Command::SetScreenBrightness { level: None })
+    );
+    assert_eq!(
+        exited.iter().map(Command::variant_name).collect::<Vec<_>>(),
+        vec!["SetScreenBrightness", "BleStopAdvertising"]
     );
 }
 
 // @internal
 #[test]
-fn qr_less_ble_modes_leave_brightness_alone_on_exit() {
+fn qr_less_ble_modes_leave_brightness_alone_and_stop_advertising_on_exit() {
     let mut engine = BleExchangeEngine::new(
         ExchangeMode::Bump,
         true,
@@ -411,6 +417,28 @@ fn qr_less_ble_modes_leave_brightness_alone_on_exit() {
         Locale::ENGLISH,
     );
     engine.screen_entered();
+
+    assert_eq!(
+        engine
+            .screen_exited()
+            .iter()
+            .map(Command::variant_name)
+            .collect::<Vec<_>>(),
+        vec!["BleStopAdvertising"]
+    );
+}
+
+// @internal
+#[test]
+fn a_screen_that_never_started_advertising_stops_nothing_on_exit() {
+    let mut engine = BleExchangeEngine::new(
+        ExchangeMode::Bump,
+        true,
+        vec![],
+        SystemClock::shared(),
+        None,
+        Locale::ENGLISH,
+    );
 
     assert_eq!(engine.screen_exited(), Vec::<Command>::new());
 }

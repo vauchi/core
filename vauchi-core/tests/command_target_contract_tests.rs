@@ -52,6 +52,7 @@ fn hardware_commands() -> Vec<Command> {
         Command::BleStartScanning {
             service_uuid: "uuid".into(),
         },
+        from_wire(serde_json::json!("BleStopAdvertising")),
         Command::BleConnect {
             device_id: "device".into(),
         },

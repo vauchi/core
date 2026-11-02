@@ -12,6 +12,7 @@
     "BleReadCharacteristic",
     "BleStartAdvertising",
     "BleStartScanning",
+    "BleStopAdvertising",
     "BleStopScanning",
     "BleWriteCharacteristic",
     "CameraCapture",

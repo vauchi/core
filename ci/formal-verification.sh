@@ -7,13 +7,16 @@
 # model also runs a control that must fail, or a weakened lemma or
 # invariant would pass unnoticed.
 #
-# Usage: [FORMAL_SET=gate|extended|all] ci/formal-verification.sh
+# Usage: [FORMAL_SET=code|models|gate|extended|all] ci/formal-verification.sh
 #        (from the core repo root)
 # Tools are cached under $FORMAL_HOME (default: ./.formal).
 #
-# FORMAL_SET picks what runs. `gate` is the merge-request set: Kani, the
-# wipe tests, the Tamarin models that answer in minutes and the
-# device-link Quint verifies, about 45 minutes together. `extended` is
+# FORMAL_SET picks what runs. `code` checks Rust: the Kani harnesses and
+# the wipe tests, about 16 minutes. `models` checks the hand-written
+# models, which read no Rust: the Tamarin models that answer in minutes
+# and the device-link Quint verifies, about 20 minutes. CI runs each on
+# the merge requests that change what it checks (private#1032); `gate`
+# is both, the merge-request set before the split. `extended` is
 # the rest: the Bluetooth handshake lemmas, one capped prover run each,
 # and the Apalache verifies of the Bluetooth and multi-stage machines,
 # which together pushed one job past its hour (private#842). `all`, the
@@ -22,13 +25,19 @@ set -eu
 
 FORMAL_SET=${FORMAL_SET:-all}
 case "$FORMAL_SET" in
-    gate | extended | all) ;;
+    code | models | gate | extended | all) ;;
     *)
-        echo "FAIL: FORMAL_SET must be gate, extended or all, not '$FORMAL_SET'" >&2
+        echo "FAIL: FORMAL_SET must be code, models, gate, extended or all, not '$FORMAL_SET'" >&2
         exit 2
         ;;
 esac
-wants() { [ "$FORMAL_SET" = all ] || [ "$FORMAL_SET" = "$1" ]; }
+wants() {
+    case "$FORMAL_SET" in
+        all) return 0 ;;
+        gate) [ "$1" = code ] || [ "$1" = models ] ;;
+        *) [ "$FORMAL_SET" = "$1" ] ;;
+    esac
+}
 
 KANI_VERSION=0.68.0
 TAMARIN_VERSION=1.12.0
@@ -55,11 +64,11 @@ export RUSTC_WRAPPER
 # binaries and the toolchain `kani setup` downloads.
 KANI_HOME=$FORMAL_HOME/kani
 export KANI_HOME
-if ! cargo kani --version 2>/dev/null | grep -q "$KANI_VERSION"; then
+if wants code && ! cargo kani --version 2>/dev/null | grep -q "$KANI_VERSION"; then
     cargo install --locked --root "$FORMAL_HOME" kani-verifier --version "$KANI_VERSION"
     cargo kani setup
 fi
-if wants gate; then
+if wants code; then
 for harness in \
     unpad_never_panics_and_only_accepts_a_prefixed_plaintext \
     parse_exchange_payload_never_panics_and_reads_each_field_at_its_offset \
@@ -77,7 +86,7 @@ for harness in \
     reconstruct_refuses_more_shares_than_guardians; do
     cargo kani -p vauchi-core -Z stubbing --harness "$harness"
 done
-fi # wants gate
+fi # wants code
 # Two recovery parser proofs run by hand, not here: the postcard token
 # parser over 140 symbolic bytes verified in 54 minutes on a 24-thread
 # laptop and the 171-byte voucher parser had not finished after 40, past
@@ -89,7 +98,7 @@ fi # wants gate
 # Kani cannot model zeroize's barrier; these tests read a dropped value's
 # storage back. Miri shows each read is defined behaviour; release shows the
 # optimizer keeps the wipe. Kani's own nightly carries Miri too.
-if wants gate; then
+if wants code; then
 MIRI_TOOLCHAIN=nightly-2026-08-21
 rustup toolchain install "$MIRI_TOOLCHAIN" --profile minimal --component miri,rust-src
 # The image has neither clang nor mold, the linker .cargo/config.toml names;
@@ -105,10 +114,10 @@ for wipe_test in wipe_on_drop_tests heap_wipe_on_drop_tests; do
         --test "$wipe_test"
     cargo test --release -p vauchi-core --features testing --test "$wipe_test"
 done
-fi # wants gate
+fi # wants code
 
 # ── Tamarin ───────────────────────────────────────────────────────────
-if [ ! -x "$FORMAL_HOME/bin/tamarin-prover" ]; then
+if { wants models || wants extended; } && [ ! -x "$FORMAL_HOME/bin/tamarin-prover" ]; then
     scratch=$(mktemp -d)
     fetch "https://github.com/tamarin-prover/tamarin-prover/releases/download/$TAMARIN_VERSION/tamarin-prover-$TAMARIN_VERSION-linux64-ubuntu.tar.gz" "$scratch/tamarin.tar.gz"
     tar -xzf "$scratch/tamarin.tar.gz" -C "$FORMAL_HOME/bin" tamarin-prover
@@ -187,7 +196,7 @@ tamarin_lemma_expect() {
     }
 }
 models=vauchi-core/verification
-if wants gate; then
+if wants models; then
 tamarin_expect "$models/qr_exchange.spthy" verified "" \
     executable session_key_secrecy no_misbinding
 # Without identity binding an attacker re-signs the peer's ephemeral key.
@@ -271,7 +280,7 @@ tamarin_expect "$models/link_exchange.spthy" falsified "" \
     contact_only_after_approval
 tamarin_expect "$models/link_exchange.spthy" verified "-DPIN_CONFIRMED" \
     executable contact_only_after_approval
-fi # wants gate
+fi # wants models
 # The six capped runs took 18 minutes on CI (job 17540297472): extended.
 if wants extended; then
 tamarin_lemma_expect "$models/ble_handshake.spthy" executable verified ""
@@ -289,14 +298,14 @@ fi # wants extended
 NODE_VERSION=22.20.0
 JRE_VERSION=21.0.8_9
 QUINT_VERSION=0.33.0
-if [ ! -x "$FORMAL_HOME/node/bin/node" ]; then
+if { wants models || wants extended; } && [ ! -x "$FORMAL_HOME/node/bin/node" ]; then
     scratch=$(mktemp -d)
     fetch "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.gz" "$scratch/node.tar.gz"
     mkdir -p "$FORMAL_HOME/node"
     tar -xzf "$scratch/node.tar.gz" -C "$FORMAL_HOME/node" --strip-components=1
     rm -rf "$scratch"
 fi
-if [ ! -x "$FORMAL_HOME/jre/bin/java" ]; then
+if { wants models || wants extended; } && [ ! -x "$FORMAL_HOME/jre/bin/java" ]; then
     scratch=$(mktemp -d)
     jre_tag=$(printf '%s' "$JRE_VERSION" | sed 's/_/%2B/')
     fetch "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-$jre_tag/OpenJDK21U-jre_x64_linux_hotspot_$JRE_VERSION.tar.gz" "$scratch/jre.tar.gz"
@@ -307,7 +316,7 @@ fi
 JAVA_HOME=$FORMAL_HOME/jre
 PATH="$FORMAL_HOME/node/bin:$JAVA_HOME/bin:$FORMAL_HOME/quint/node_modules/.bin:$PATH"
 export JAVA_HOME PATH
-if ! quint --version 2>/dev/null | grep -qx "$QUINT_VERSION"; then
+if { wants models || wants extended; } && ! quint --version 2>/dev/null | grep -qx "$QUINT_VERSION"; then
     npm install --prefix "$FORMAL_HOME/quint" --no-audit --no-fund \
         "@informalsystems/quint@$QUINT_VERSION"
 fi
@@ -339,14 +348,14 @@ quint_expect() {
         exit 1
     }
 }
-if wants gate; then
+if wants models; then
 quint_expect device_link_machines.qnt reliable_relay ok verify no_device_registered_for_a_failed_joiner
 quint_expect device_link_machines.qnt reliable_relay ok verify joiner_seed_implies_registered
 # Without the host's expiry check the host registers a device whose
 # joiner gave up; a lost response still does, which #808 leaves open.
 quint_expect device_link_machines.qnt before_808 violation run no_device_registered_for_a_failed_joiner
 quint_expect device_link_machines.qnt lossy_relay violation run no_device_registered_for_a_failed_joiner
-fi # wants gate
+fi # wants models
 # Each Apalache verify runs for about 80 s on CI; the eight below are the
 # extended set (private#842).
 if wants extended; then

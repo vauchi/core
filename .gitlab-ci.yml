@@ -990,11 +990,15 @@ test:core-32bit:
         compare_to: refs/heads/$CI_DEFAULT_BRANCH
         paths: [ci/tests/rust-cache.test.sh]
 
-# Kani proofs of the untrusted-byte parsers, the Tamarin models and the
-# device-link Quint verifies (#757). Runs only when what they check changes.
-# This is the merge-request set, about 45 minutes; the slow models run in
-# test:formal-extended below (private#842).
-test:formal:
+# The formal checks, in two jobs so each runs only on the merge requests
+# that change what it checks (#757, private#1032). Kani and the wipe
+# tests read Rust and its dependencies; the Tamarin and Quint models are
+# hand-written and read no Rust, so a Rust change does not start them.
+# Before the split one job ran both on every trigger, 32 to 51 minutes,
+# and half its runs were lockfile-only changes that no model reads.
+# check:formal-triggers holds both path lists to the files they check;
+# the slow models run in test:formal-extended below (private#842).
+test:formal-code:
   extends: [.timeout-long]
   stage: test
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/rust:1.93.1-bookworm
@@ -1008,27 +1012,55 @@ test:formal:
     # and `kani setup` needs rustup where CARGO_HOME points.
     CARGO_HOME: /usr/local/cargo
   cache:
-    key: core-formal
+    key: core-formal-code
     paths: [.formal/]
   script:
-    - FORMAL_SET=gate sh ci/formal-verification.sh
+    - FORMAL_SET=code sh ci/formal-verification.sh
   rules:
     - if: $CI_MERGE_REQUEST_IID
       changes:
         compare_to: refs/heads/$CI_DEFAULT_BRANCH
         paths:
-          - vauchi-core/src/crypto/padding*.rs
+          - vauchi-core/src/crypto/**/*.rs
           - vauchi-core/src/exchange/**/*.rs
           - vauchi-core/src/recovery/**/*.rs
-          - vauchi-core/verification/**/*
+          - vauchi-core/src/sync/delta*.rs
+          - vauchi-core/tests/*wipe_on_drop_tests.rs
           - ci/formal-verification.sh
           - Cargo.lock
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+
+test:formal-models:
+  extends: [.timeout-long]
+  stage: test
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/rust:1.93.1-bookworm
+  tags: [docker]
+  needs: []
+  variables:
+    FORMAL_HOME: ${CI_PROJECT_DIR}/.formal
+    CARGO_HOME: /usr/local/cargo
+  cache:
+    key: core-formal-models
+    paths: [.formal/]
+  script:
+    - FORMAL_SET=models sh ci/formal-verification.sh
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - vauchi-core/verification/**/*
+          - vauchi-app/verification/**/*
+          - ci/formal-verification.sh
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
 
 # The Bluetooth handshake lemmas (six capped prover runs, 18 minutes) and
 # the Apalache verifies of the Bluetooth and multi-stage machines, which
-# pushed test:formal past its hour (private#842, job 17540297472). Nightly
-# on main; on a merge request that touches the models it is there to press.
+# pushed the formal job past its hour (private#842, job 17540297472).
+# Nightly on main; on a merge request that touches the models it is there
+# to press. It shares test:formal-models' tools, so it shares its cache.
 test:formal-extended:
   extends: [.timeout-extended]
   stage: test
@@ -1039,7 +1071,7 @@ test:formal-extended:
     FORMAL_HOME: ${CI_PROJECT_DIR}/.formal
     CARGO_HOME: /usr/local/cargo
   cache:
-    key: core-formal
+    key: core-formal-models
     paths: [.formal/]
   script:
     - FORMAL_SET=extended sh ci/formal-verification.sh

@@ -74,6 +74,7 @@ pub(crate) const MAX_GUARDIAN_BACKUP_BYTES: usize = 32 * 1024 * 1024;
 
 // A backup at its cap, with its sealed share, must still travel to the
 // guardian in pieces (vauchi/private#796).
+#[cfg(feature = "storage")]
 const _: () = assert!(
     MAX_GUARDIAN_BACKUP_BYTES + 64 * 1024
         <= crate::sync::guardian_piece::MAX_GUARDIAN_DELIVERY_BYTES

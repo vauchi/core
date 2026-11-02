@@ -4,6 +4,7 @@
     { "repo": "cli", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
     { "repo": "tui", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
     { "repo": "e2e", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
+    { "repo": "e2e", "kind": "pins-env", "file": "ci/pins.env", "bumped_by": "bump:consumer-pins" },
     { "repo": "linux-gtk", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
     { "repo": "web-demo", "kind": "cargo", "file": "wasm/Cargo.toml", "bumped_by": "bump:consumer-pins" },
     { "repo": "relay", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },

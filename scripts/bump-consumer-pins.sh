@@ -64,8 +64,12 @@ if isinstance(data, list):
 print(data.get(sys.argv[2]) or "")' "$WORK/response.json" "$1"
 }
 
+# bump_one <repo> <kind> <file> [<kind> <file>...]: a consumer may pin Core in
+# several files (e2e: Cargo.toml and ci/pins.env, private#1034); they move in
+# one clone, one commit, one branch and one MR.
 bump_one() {
-    local repo=$1 kind=$2 file=$3 dir="$WORK/$1" project="vauchi%2F$1" current url status
+    local repo=$1 dir="$WORK/$1" project="vauchi%2F$1" current="" pinned kind file moved=0 url status
+    shift
     git clone -q --depth 1 "$GIT_BASE/$repo.git" "$dir"
 
     if git -C "$dir" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
@@ -80,18 +84,25 @@ bump_one() {
         return 1
     fi
 
-    current=$(python3 "$PINS" read --kind "$kind" "$dir/$file")
-    if [ "$current" = "v$VERSION" ]; then
+    while [ "$#" -ge 2 ]; do
+        kind=$1
+        file=$2
+        shift 2
+        pinned=$(python3 "$PINS" read --kind "$kind" "$dir/$file")
+        [ -n "$current" ] || current=$pinned
+        [ "$pinned" != "v$VERSION" ] || continue
+        python3 "$PINS" bump --kind "$kind" --version "$VERSION" "$dir/$file" >/dev/null
+        # --workspace re-resolves only what the rewritten manifest changed. Not
+        # `-p <crate>`: e2e locks relay's vauchi-protocol beside its own, and a
+        # bare name is ambiguous there (#558).
+        if [ "$kind" = cargo ]; then
+            (cd "$(dirname "$dir/$file")" && cargo update --workspace)
+        fi
+        moved=$((moved + 1))
+    done
+    if [ "$moved" -eq 0 ]; then
         echo "$repo: already pins v$VERSION"
         return 0
-    fi
-
-    python3 "$PINS" bump --kind "$kind" --version "$VERSION" "$dir/$file" >/dev/null
-    # --workspace re-resolves only what the rewritten manifest changed. Not
-    # `-p <crate>`: e2e locks relay's vauchi-protocol beside its own, and a
-    # bare name is ambiguous there (#558).
-    if [ "$kind" = cargo ]; then
-        (cd "$(dirname "$dir/$file")" && cargo update --workspace)
     fi
 
     git -C "$dir" checkout -q -b "$BRANCH"
@@ -135,7 +146,7 @@ print(json.dumps({
 }
 
 if [ "${MODE:-}" = one ]; then
-    bump_one "$4" "$5" "$6"
+    bump_one "${@:4}"
     exit 0
 fi
 
@@ -150,10 +161,15 @@ BOT_EMAIL=$(json_field commit_email)
 export BOT_NAME BOT_EMAIL
 
 FAILED=""
-python3 "$PINS" consumers --table "$TABLE" --bumped-by bump:consumer-pins > "$WORK/consumers"
-while read -r repo kind file; do
-    echo "── $repo ($kind $file)"
-    if ! bash "$0" --one "v$VERSION" "$TABLE" "$PINS" "$repo" "$kind" "$file" < /dev/null; then
+# One line per consumer repo, in table order: repo kind file [kind file...].
+python3 "$PINS" consumers --table "$TABLE" --bumped-by bump:consumer-pins |
+    awk '!($1 in files) { order[++n] = $1 }
+         { files[$1] = files[$1] " " $2 " " $3 }
+         END { for (i = 1; i <= n; i++) print order[i] files[order[i]] }' > "$WORK/consumers"
+while read -r repo pin_files; do
+    echo "── $repo ($pin_files)"
+    # shellcheck disable=SC2086 # kind and file pairs; no pin path holds a space
+    if ! bash "$0" --one "v$VERSION" "$TABLE" "$PINS" "$repo" $pin_files < /dev/null; then
         FAILED="$FAILED $repo"
     fi
 done < "$WORK/consumers"

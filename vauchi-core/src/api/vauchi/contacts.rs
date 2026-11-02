@@ -366,13 +366,15 @@ impl Vauchi {
                 .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         }
 
-        self.storage.contacts().save_contact(&contact)?;
-
-        // A new guardian set needs a new split of the backup (vauchi/private#796).
-        // Best-effort like the upload below: the trust change stands even
-        // when the backup cannot be queued yet.
-        #[allow(clippy::let_underscore_must_use)]
-        let _ = self.send_guardian_backup();
+        // A new guardian set needs a new split of the backup, so the two are
+        // one change (vauchi/private#796): a backup that cannot be queued
+        // leaves the set as it was. A guardian with no session yet is
+        // skipped inside the send, not an error.
+        self.storage.with_savepoint(|| -> VauchiResult<()> {
+            self.storage.contacts().save_contact(&contact)?;
+            self.send_guardian_backup()?;
+            Ok(())
+        })?;
 
         // Upload updated guardian entries to relay after trust change
         #[cfg(feature = "network-http")]

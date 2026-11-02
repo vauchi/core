@@ -21,16 +21,16 @@ use std::collections::BTreeMap;
 
 use sha2::{Digest, Sha256};
 
-use super::full_backup::MAX_GUARDIAN_BACKUP_BYTES;
-
 /// The most bytes one encoded piece takes, header included; a sealed
 /// mailbox message of this size stays far under the relay's 128 KB body
 /// limit after encryption and base64.
 pub const GUARDIAN_PIECE_MAX_BYTES: usize = 48 * 1024;
 
-/// The most bytes a delivery holds: the backup at its cap plus room for
-/// the guardian's sealed share and its framing.
-pub const MAX_GUARDIAN_DELIVERY_BYTES: usize = MAX_GUARDIAN_BACKUP_BYTES + 64 * 1024;
+/// The most bytes a delivery holds: the guardian backup at its 32 MiB cap
+/// plus room for the guardian's sealed share and its framing. Written out
+/// because `backup` depends on `sync`, not the reverse (VRS06);
+/// `backup::full_backup` asserts at compile time that its cap still fits.
+pub const MAX_GUARDIAN_DELIVERY_BYTES: usize = 32 * 1024 * 1024 + 64 * 1024;
 
 const BACKUP_ID_BYTES: usize = 16;
 const HASH_BYTES: usize = 32;

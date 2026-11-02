@@ -149,7 +149,7 @@ pub enum ReceiveOutcome {
     ResyncRequest,
     /// One piece of the sender's guardian backup; the ratchet advanced,
     /// and keeping the piece is the receive loop's (vauchi/private#796).
-    GuardianBackupPiece(crate::backup::GuardianBackupPiece),
+    GuardianBackupPiece(crate::sync::guardian_piece::GuardianBackupPiece),
 }
 
 /// Processes a batch of incoming card updates with full security checks.

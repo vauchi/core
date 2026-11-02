@@ -7,7 +7,7 @@
 //! delivery's hash (vauchi/private#796, decision D9).
 
 use proptest::prelude::*;
-use vauchi_core::backup::{
+use vauchi_core::sync::guardian_piece::{
     GUARDIAN_PIECE_MAX_BYTES, GuardianBackupPiece, MAX_GUARDIAN_DELIVERY_BYTES, PieceAssembly,
     PieceError, split_into_pieces,
 };

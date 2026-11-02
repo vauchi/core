@@ -72,6 +72,13 @@ const GUARDIAN_BACKUP_HEADER_LENGTH: usize =
 /// Maximum accepted v5 guardian backup size (32 MiB).
 pub(crate) const MAX_GUARDIAN_BACKUP_BYTES: usize = 32 * 1024 * 1024;
 
+// A backup at its cap, with its sealed share, must still travel to the
+// guardian in pieces (vauchi/private#796).
+const _: () = assert!(
+    MAX_GUARDIAN_BACKUP_BYTES + 64 * 1024
+        <= crate::sync::guardian_piece::MAX_GUARDIAN_DELIVERY_BYTES
+);
+
 /// Maximum accepted password-based full backup size (32 MiB).
 pub use crate::limits::MAX_FULL_BACKUP_BYTES;
 

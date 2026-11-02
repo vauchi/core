@@ -7,13 +7,13 @@
 //! contact, refused from a blocked one, refused when malformed.
 
 use vauchi_core::api::{CardUpdateError, ReceiveOutcome, process_single_card_update};
-use vauchi_core::backup::{GuardianBackupPiece, split_into_pieces};
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::sync::delta::{
     DeltaError, PAYLOAD_VERSION_GUARDIAN_BACKUP_PIECE, VersionedPayload,
     encode_guardian_backup_piece,
 };
+use vauchi_core::sync::guardian_piece::{GuardianBackupPiece, split_into_pieces};
 use vauchi_core::{Contact, ContactCard, SymmetricKey, Vauchi};
 
 use crate::common::helpers::create_vauchi_with_identity;

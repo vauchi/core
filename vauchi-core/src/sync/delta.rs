@@ -101,7 +101,9 @@ pub fn encode_resync_request() -> Vec<u8> {
 pub const PAYLOAD_VERSION_GUARDIAN_BACKUP_PIECE: u8 = 0x0b;
 
 /// Encodes a guardian backup piece.
-pub fn encode_guardian_backup_piece(piece: &crate::backup::GuardianBackupPiece) -> Vec<u8> {
+pub fn encode_guardian_backup_piece(
+    piece: &crate::sync::guardian_piece::GuardianBackupPiece,
+) -> Vec<u8> {
     let inner = piece.encode();
     let mut buf = Vec::with_capacity(capacity(&[1, inner.len()]));
     buf.push(PAYLOAD_VERSION_GUARDIAN_BACKUP_PIECE);
@@ -585,7 +587,7 @@ pub enum VersionedPayload {
     ResyncRequest,
     /// One piece of the sender's guardian backup, for this guardian to
     /// keep (version 0x0b, vauchi/private#796).
-    GuardianBackupPiece(crate::backup::GuardianBackupPiece),
+    GuardianBackupPiece(crate::sync::guardian_piece::GuardianBackupPiece),
 }
 
 impl VersionedPayload {
@@ -672,7 +674,7 @@ impl VersionedPayload {
             PAYLOAD_VERSION_COVER => Ok(VersionedPayload::Cover),
             PAYLOAD_VERSION_RESYNC_REQUEST => Ok(VersionedPayload::ResyncRequest),
             PAYLOAD_VERSION_GUARDIAN_BACKUP_PIECE => {
-                crate::backup::GuardianBackupPiece::decode(body)
+                crate::sync::guardian_piece::GuardianBackupPiece::decode(body)
                     .map(VersionedPayload::GuardianBackupPiece)
                     .map_err(|e| DeltaError::InvalidPayload(e.to_string()))
             }

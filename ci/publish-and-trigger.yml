@@ -792,7 +792,7 @@ verify:downstream-rust:
   extends: .trigger-parallel
   parallel:
     matrix:
-      - DOWNSTREAM: [vauchi/cli, vauchi/tui, vauchi/e2e, vauchi/relay, vauchi/linux-gtk]
+      - DOWNSTREAM: [vauchi/cli, vauchi/tui, vauchi/relay, vauchi/linux-gtk]
   # Do NOT leak core's pipeline variables into the child pipelines. Each
   # downstream repo must resolve its OWN pinned VAUCHI_SCRIPTS_REF (and its
   # own CARGO_HOME / runner config). Forwarding core's VAUCHI_SCRIPTS_REF made
@@ -805,16 +805,18 @@ verify:downstream-rust:
   # code via the `branch = \"main\"` git dependency"):
   #
   #   tui, relay, linux-gtk   `branch = "main"` — do verify this commit.
-  #   cli, e2e                `tag = "vX", version = "=X"` — resolve their
-  #                           OWN PIN. They verify the core they were last
-  #                           bumped to, not the code that triggered them.
+  #   cli                     `tag = "vX", version = "=X"` — resolves its
+  #                           OWN PIN. It verifies the core it was last
+  #                           bumped to, not the code that triggered it.
+  #   e2e                     removed (private#1032): test:e2e-smoke in
+  #                           .gitlab-ci.yml runs e2e against the MR's own
+  #                           Core instead, before the merge.
   #
   # So a green child here is not evidence that this merge is safe for the
-  # tag-pinned two. e2e sat on v0.61.0 for a month, passing on every core
-  # merge, while core reached v0.64.0. Forwarding a variable does not fix
-  # it either: a `[patch]` cannot satisfy `version = "=0.61.0"` with a
-  # 0.64.0 crate, so making these two verify this commit means moving the
-  # pin — which is the bump bot's job, not this bridge's.
+  # tag-pinned cli. e2e sat on v0.61.0 for a month this way, passing on
+  # every core merge, while core reached v0.64.0. Forwarding a variable
+  # does not fix it either: a `[patch]` cannot satisfy `version = "=0.61.0"`
+  # with a 0.64.0 crate; test:e2e-smoke rewrites the job's own clone instead.
   # See problems/2026-09-07-downstream-verify-tests-the-pin.
   trigger:
     project: $DOWNSTREAM
@@ -845,7 +847,7 @@ verify:downstream-rc:
   extends: .trigger-parallel-prerelease
   parallel:
     matrix:
-      - DOWNSTREAM: [vauchi/cli, vauchi/tui, vauchi/e2e, vauchi/relay, vauchi/linux-gtk]
+      - DOWNSTREAM: [vauchi/cli, vauchi/tui, vauchi/relay, vauchi/linux-gtk]
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
 

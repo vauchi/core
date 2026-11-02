@@ -1087,6 +1087,54 @@ test:formal-extended:
       allow_failure: true
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "schedule"
 
+# e2e's smoke suite against this merge request's own Core (vauchi/private#1032,
+# decision D8). The job clones e2e at main, points e2e's Core dependency at
+# this checkout and builds e2e's pinned relay and CLI against it, then runs
+# smoke_ with those binaries. A [patch] cannot do this: the exact
+# `version = "=X"` pins refuse a Core of another version, so
+# ci/point-core-at.sh rewrites the job's own clones and nothing is committed.
+# Replaces verify:downstream-rust for e2e, which built e2e's own pinned tag
+# and proved nothing about the merge. It needs e2e's pinned set on this
+# Core's version: when Core moves a minor, the e2e bump comes first.
+test:e2e-smoke:
+  extends: [.linux-runner, .timeout-cold-rebuild]
+  stage: test
+  needs: []
+  variables:
+    E2E_DIR: ${CI_PROJECT_DIR}/../e2e-for-core-${CI_JOB_ID}
+  script:
+    - git clone --depth=1 "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/e2e.git" "$E2E_DIR"
+    - sh "$E2E_DIR/ci/point-core-at.sh" "$CI_PROJECT_DIR" "$E2E_DIR/Cargo.toml"
+    - E2E_CORE_DIR="$CI_PROJECT_DIR" sh "$E2E_DIR/ci/build-pinned-binaries.sh" "$E2E_DIR/.bin"
+    - cd "$E2E_DIR" && E2E_BIN_DIR="$E2E_DIR/.bin" cargo nextest run --profile ci --run-ignored default -j 4 -- smoke_
+  after_script:
+    - rm -rf "${CI_PROJECT_DIR}/../e2e-for-core-${CI_JOB_ID}"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - vauchi-core/src/crypto/**/*
+          - vauchi-core/src/exchange/**/*
+          - vauchi-core/src/network/**/*
+          - vauchi-core/src/backup/**/*
+          - vauchi-core/src/recovery/**/*
+          - vauchi-core/src/sync/**/*
+          - vauchi-protocol/**/*
+          - Cargo.lock
+
+# The contract of test:e2e-smoke and the downstream matrices.
+check:e2e-smoke:
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
+  tags: [docker]
+  needs: []
+  script:
+    - sh ci/tests/e2e-smoke.test.sh
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
 test:cucumber:
   # .timeout-cold-rebuild: compiles the full workspace before running
   # cucumber — see the template comment.

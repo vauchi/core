@@ -111,6 +111,17 @@ pub fn encode_guardian_backup_piece(
     buf
 }
 
+/// Version byte for a guardian release: the designator took this contact
+/// out of its guardian set, so the guardian forgets what it held for it
+/// (vauchi/private#796). No body: the ratchet authenticates the sender, and
+/// a release reaches only what its own sender left.
+pub const PAYLOAD_VERSION_GUARDIAN_RELEASE: u8 = 0x0c;
+
+/// Encodes a guardian release.
+pub fn encode_guardian_release() -> Vec<u8> {
+    vec![PAYLOAD_VERSION_GUARDIAN_RELEASE]
+}
+
 /// Delta encoding error types.
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -588,6 +599,9 @@ pub enum VersionedPayload {
     /// One piece of the sender's guardian backup, for this guardian to
     /// keep (version 0x0b, vauchi/private#796).
     GuardianBackupPiece(crate::sync::guardian_piece::GuardianBackupPiece),
+    /// Forget what the sender left with this guardian (version 0x0c,
+    /// vauchi/private#796).
+    GuardianRelease,
 }
 
 impl VersionedPayload {
@@ -678,6 +692,7 @@ impl VersionedPayload {
                     .map(VersionedPayload::GuardianBackupPiece)
                     .map_err(|e| DeltaError::InvalidPayload(e.to_string()))
             }
+            PAYLOAD_VERSION_GUARDIAN_RELEASE => Ok(VersionedPayload::GuardianRelease),
             v => Err(DeltaError::UnknownPayloadVersion(v)),
         }
     }

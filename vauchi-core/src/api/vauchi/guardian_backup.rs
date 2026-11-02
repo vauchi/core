@@ -12,7 +12,8 @@
 
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::backup::KeyShardConfig;
-use crate::sync::delta::encode_guardian_backup_piece;
+use crate::contact::Contact;
+use crate::sync::delta::{encode_guardian_backup_piece, encode_guardian_release};
 use crate::sync::guardian_piece::{GuardianDelivery, split_into_pieces};
 
 use super::Vauchi;
@@ -90,5 +91,22 @@ impl Vauchi {
             }
         }
         Ok(sent)
+    }
+
+    /// Tells `contact`, just taken out of the guardian set, to forget what
+    /// it held for us (step 1d'). A contact with no session yet is skipped:
+    /// the next backup does not reach it, and what it holds stays.
+    pub(super) fn send_guardian_release(&self, contact: &Contact) -> VauchiResult<()> {
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        match self.queue_sealed_payload(identity, contact, &encode_guardian_release()) {
+            Ok(())
+            | Err(VauchiError::SendDeferred)
+            | Err(VauchiError::NotFound(_))
+            | Err(VauchiError::InvalidState(_)) => Ok(()),
+            Err(error) => Err(error),
+        }
     }
 }

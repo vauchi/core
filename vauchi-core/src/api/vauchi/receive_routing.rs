@@ -236,9 +236,11 @@ pub(super) fn process_received_blobs_with_routes(
                         resync_requested_by = Some(contact_id.clone());
                         (true, true, None, None, None, None, None)
                     }
-                    // A guardian backup piece (vauchi/private#796) was kept
-                    // in the receive transaction; nothing to show, no event.
-                    Ok(ReceiveOutcome::GuardianBackupPiece(_)) => {
+                    // A guardian backup piece was kept, or a release forgot
+                    // what the sender left, in the receive transaction
+                    // (vauchi/private#796); nothing to show, no event.
+                    Ok(ReceiveOutcome::GuardianBackupPiece(_))
+                    | Ok(ReceiveOutcome::GuardianRelease) => {
                         (true, true, None, None, None, None, None)
                     }
                     // P3: the signature is verified in

@@ -146,6 +146,23 @@ impl GuardianBackupStore<'_> {
         Ok(usize::try_from(count).unwrap_or(0))
     }
 
+    /// Forgets the kept backup and the waiting pieces `designator_id` left,
+    /// on its release (vauchi/private#796).
+    ///
+    /// # Errors
+    /// Storage errors.
+    pub fn forget_designator(&self, designator_id: &str) -> Result<(), StorageError> {
+        self.conn.execute(
+            "DELETE FROM guardian_backup_pieces WHERE designator_id = ?1",
+            params![designator_id],
+        )?;
+        self.conn.execute(
+            "DELETE FROM guardian_backups WHERE designator_id = ?1",
+            params![designator_id],
+        )?;
+        Ok(())
+    }
+
     fn complete(
         &self,
         designator_id: &str,

@@ -372,6 +372,9 @@ impl Vauchi {
         // skipped inside the send, not an error.
         self.storage.with_savepoint(|| -> VauchiResult<()> {
             self.storage.contacts().save_contact(&contact)?;
+            if !new_state {
+                self.send_guardian_release(&contact)?;
+            }
             self.send_guardian_backup()?;
             Ok(())
         })?;

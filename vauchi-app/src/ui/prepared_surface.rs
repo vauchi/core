@@ -4,8 +4,8 @@
 use std::collections::HashMap;
 
 use vauchi_core::{
-    BindingId, Command, Event, InputValue, InteractionId, PresentationColors, PresentationIdError,
-    PresentationTokens, SurfaceId, SurfaceLayout, SurfaceSpec,
+    BindingId, Command, Event, InputValue, InteractionId, PresentationColors, PresentationFonts,
+    PresentationIdError, PresentationTokens, SurfaceId, SurfaceLayout, SurfaceSpec,
 };
 
 use super::{RenderContext, ScreenLayout, ScreenModel, UserAction};
@@ -320,6 +320,10 @@ pub(crate) fn presentation_tokens(
                 .map(|on_accent| readable_on(on_accent, &[colors.accent.as_str()])),
             focus_ring: colors.focus_ring.clone(),
         }),
-        fonts: None,
+        fonts: Some(PresentationFonts {
+            display: tokens.font_family.display.clone(),
+            body: tokens.font_family.body.clone(),
+            mono: tokens.font_family.mono.clone(),
+        }),
     }
 }

@@ -199,7 +199,12 @@ proptest! {
 
     // @internal
     #[test]
-    fn arbitrary_bytes_never_panic_at_decode(bytes in proptest::collection::vec(any::<u8>(), 0..200)) {
-        let _ = GuardianBackupPiece::decode(&bytes);
+    fn arbitrary_bytes_are_refused_or_decode_to_a_piece_that_encodes_back(
+        bytes in proptest::collection::vec(any::<u8>(), 0..200),
+    ) {
+        match GuardianBackupPiece::decode(&bytes) {
+            Ok(piece) => prop_assert_eq!(piece.encode(), bytes),
+            Err(error) => prop_assert_eq!(error, PieceError::Malformed),
+        }
     }
 }

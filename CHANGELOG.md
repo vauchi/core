@@ -8,6 +8,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.96.1] — 2026-11-02
+
+### Fixed
+
+- A field hidden from a contact on one device and permitted again on
+  another reaches the contact again. Since 0.95.0 the receiver ordered
+  an addition by the field's own `updated_at`; a field permitted again
+  is unchanged, so that time predated the removal and the receiver
+  skipped it. An addition now takes the later of its field time and its
+  signed delta time, and a held old addition stays skipped
+  (vauchi/private#1031).
+
 ## [0.96.0] — 2026-11-02
 
 ### Added

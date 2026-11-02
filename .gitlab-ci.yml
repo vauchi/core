@@ -201,6 +201,22 @@ check:vendor-locales:
         - .gitlab-ci.yml
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
+# The formal jobs run on a merge request only when it changes what they
+# check, so a trigger path that misses a harness or a model lets a broken
+# proof merge until the nightly (vauchi/private#1032; the Shamir and delta
+# harnesses and the device-link Quint model were outside the paths, #950).
+# Seconds of grep, so it runs on every merge request.
+check:formal-triggers:
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
+  tags: [docker]
+  needs: []
+  script:
+    - sh ci/tests/formal-triggers.test.sh
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
 # The spec (vauchi/spec) cites Core's test, lemma and function names as the
 # proof behind its claims and runs its ci/check-claim-names.sh against Core
 # main. Running that check against this checkout tells the MR, not the

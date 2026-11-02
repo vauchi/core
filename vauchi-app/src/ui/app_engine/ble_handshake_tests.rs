@@ -610,6 +610,32 @@ fn a_glance_qr_opened_from_the_camera_continues_the_exchange() {
     );
 }
 
+// @scenario: ble_exchange :: Filter devices by exchange token
+#[test]
+fn a_glance_scanner_dials_only_the_peer_whose_code_it_scanned() {
+    // Carol shows her own Glance code nearby; Bob scanned Alice's, so only
+    // Alice's advertised token may start Bob's exchange (glance.rs gate).
+    let mut alice = fresh_engine("Alice");
+    let mut carol = fresh_engine("Carol");
+    let mut bob = fresh_engine("Bob");
+    let alice_qr = alice.begin_glance_display().expect("alice shows a QR");
+    carol.begin_glance_display().expect("carol shows a QR");
+    bob.dispatch(vauchi_core::Event::DeepLinkOpened { uri: alice_qr })
+        .expect("the link is handled");
+
+    bob.handle_glance_discovery("carol-device", &carol.ble_attempt_token());
+    assert!(
+        !bob.ble_handshake_session_active(),
+        "a bystander's Glance advert must not start an exchange"
+    );
+
+    bob.handle_glance_discovery("alice-device", &alice.ble_attempt_token());
+    assert!(
+        bob.ble_handshake_session_active(),
+        "the scanned peer's advert starts the exchange"
+    );
+}
+
 // @internal
 #[test]
 fn a_glance_link_opened_while_glance_is_showing_starts_the_radio_again() {

@@ -86,7 +86,7 @@ fn bump_and_shake_also_route_to_ble_exchange() {
     }
 }
 
-// @internal
+// @scenario: ble_exchange :: Discover nearby devices
 #[test]
 fn forwarding_ble_discovery_advances_engine_to_exchanging() {
     let mut engine = enter_unoffered_ble_mode(vauchi_core::exchange::mode::ExchangeMode::Magic);
@@ -172,7 +172,7 @@ fn losing_glare_link_disconnect_does_not_fail_the_exchange() {
     );
 }
 
-// @internal
+// @scenario: ble_exchange :: Discovery failure handling
 #[test]
 fn ble_permission_denied_mid_wait_renders_failed_screen() {
     // T2.3 mid-session: a BLE permission revoked WHILE the engine is in the

@@ -230,7 +230,7 @@ fn test_manual_proximity_exchange_timeout() {
 }
 
 /// Tests manual confirmation succeeds when user confirms
-// @internal
+// @scenario: ble_exchange :: Proximity challenge and response
 #[test]
 fn test_manual_confirmation_verifier() {
     // Manual confirmation is the fallback when hardware proximity isn't available
@@ -245,7 +245,9 @@ fn test_manual_confirmation_verifier() {
     let response = verifier
         .listen_for_response(Duration::from_secs(5))
         .unwrap();
-    assert!(!response.is_empty());
+    assert!(verifier.verify_response(&challenge, &response));
+    assert!(!verifier.verify_response(&challenge, &[]));
+    assert!(!verifier.verify_response(&challenge, &[0x00]));
 }
 
 // =============================================================================

@@ -4145,8 +4145,8 @@ dependencies = [
 
 [[package]]
 name = "vauchi-contract"
-version = "0.96.0"
-source = "git+https://gitlab.com/vauchi/contract.git?tag=v0.96.0#ef53be55ddf7c44051af077aa7dfc8b727275c84"
+version = "0.96.1"
+source = "git+https://gitlab.com/vauchi/contract.git?tag=v0.96.1#e9aa3c5329061da0729742b646e43e30e7858543"
 dependencies = [
  "schemars 0.8.22",
  "serde",

@@ -320,5 +320,6 @@ pub(crate) fn presentation_tokens(
                 .map(|on_accent| readable_on(on_accent, &[colors.accent.as_str()])),
             focus_ring: colors.focus_ring.clone(),
         }),
+        fonts: None,
     }
 }

@@ -41,6 +41,7 @@ fn surface() -> SurfaceSpec {
                 text_on_accent: None,
                 focus_ring: None,
             }),
+            fonts: None,
         },
         nodes: vec![PresentationNode::Group {
             id: Some(binding("profile.fields")),

@@ -368,6 +368,12 @@ impl Vauchi {
 
         self.storage.contacts().save_contact(&contact)?;
 
+        // A new guardian set needs a new split of the backup (vauchi/private#796).
+        // Best-effort like the upload below: the trust change stands even
+        // when the backup cannot be queued yet.
+        #[allow(clippy::let_underscore_must_use)]
+        let _ = self.send_guardian_backup();
+
         // Upload updated guardian entries to relay after trust change
         #[cfg(feature = "network-http")]
         {

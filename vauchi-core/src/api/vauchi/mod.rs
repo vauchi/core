@@ -45,6 +45,7 @@ mod reciprocity_send;
 mod recovery;
 mod recovery_offline;
 pub use recovery_offline::RecoveryClaimContact;
+mod guardian_backup;
 mod registry_push;
 mod registry_sibling_apply;
 #[cfg(feature = "network-http")]

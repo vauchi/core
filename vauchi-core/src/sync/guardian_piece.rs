@@ -169,6 +169,72 @@ pub fn split_into_pieces(
         .collect()
 }
 
+/// The most bytes a guardian's sealed share takes; a flat or grouped share
+/// sealed to one guardian is 124 bytes (Social Recovery, A3).
+const MAX_SEALED_SHARE_BYTES: usize = 1024;
+
+/// What one guardian receives: its own sealed share and the backup every
+/// guardian holds (D7). Wire form: share length (big-endian `u16`), the
+/// share, then the backup.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GuardianDelivery {
+    sealed_share: Vec<u8>,
+    backup: Vec<u8>,
+}
+
+impl GuardianDelivery {
+    /// # Errors
+    /// [`PieceError::Malformed`] for an empty share or one over 1 KiB, or
+    /// an empty backup.
+    pub fn new(sealed_share: Vec<u8>, backup: Vec<u8>) -> Result<Self, PieceError> {
+        if !(1..=MAX_SEALED_SHARE_BYTES).contains(&sealed_share.len()) || backup.is_empty() {
+            return Err(PieceError::Malformed);
+        }
+        Ok(Self {
+            sealed_share,
+            backup,
+        })
+    }
+
+    /// The share sealed to this guardian.
+    pub fn sealed_share(&self) -> &[u8] {
+        &self.sealed_share
+    }
+
+    /// The encrypted guardian backup.
+    pub fn backup(&self) -> &[u8] {
+        &self.backup
+    }
+
+    /// The wire form, which [`split_into_pieces`] carries.
+    pub fn encode(&self) -> Vec<u8> {
+        let share_len = u16::try_from(self.sealed_share.len())
+            .expect("a sealed share is at most 1 KiB, checked in new");
+        let mut bytes = Vec::with_capacity(
+            2_usize
+                .saturating_add(self.sealed_share.len())
+                .saturating_add(self.backup.len()),
+        );
+        bytes.extend_from_slice(&share_len.to_be_bytes());
+        bytes.extend_from_slice(&self.sealed_share);
+        bytes.extend_from_slice(&self.backup);
+        bytes
+    }
+
+    /// # Errors
+    /// [`PieceError::Malformed`] for a share length of zero, over 1 KiB or
+    /// past the end, or no backup after the share.
+    pub fn decode(bytes: &[u8]) -> Result<Self, PieceError> {
+        let (share_len, rest) = bytes
+            .split_first_chunk::<2>()
+            .ok_or(PieceError::Malformed)?;
+        let (sealed_share, backup) = rest
+            .split_at_checked(usize::from(u16::from_be_bytes(*share_len)))
+            .ok_or(PieceError::Malformed)?;
+        Self::new(sealed_share.to_vec(), backup.to_vec())
+    }
+}
+
 /// Collects the pieces of one delivery until it is whole.
 #[derive(Debug, Default)]
 pub struct PieceAssembly {

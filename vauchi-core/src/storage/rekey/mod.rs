@@ -142,6 +142,9 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("peer_card_ordering", "state_encrypted"),
     // V92 a revoked contact's name stays with its tombstone (#935)
     ("revoked_senders", "display_name_encrypted"),
+    // V95 guardian backups kept for designators (#796)
+    ("guardian_backup_pieces", "piece_encrypted"),
+    ("guardian_backups", "delivery_encrypted"),
     // V49 owner-private contact tags (ADR-051)
     ("tags", "name_encrypted"),
     // V50 owner-private named places (ADR-051)
@@ -244,7 +247,7 @@ impl Storage {
         self.wal_checkpoint()?;
 
         let old_key = &self.encryption_key;
-        const TOTAL_TABLES: u32 = 33;
+        const TOTAL_TABLES: u32 = 35;
         let mut completed: u32 = 0;
 
         let report = |completed: &mut u32, table: &str| {
@@ -324,6 +327,22 @@ impl Storage {
                 "display_name_encrypted",
             )?;
             report(&mut completed, "revoked_senders");
+
+            self.rekey_nullable_column(
+                old_key,
+                &new_key,
+                "guardian_backup_pieces",
+                "piece_encrypted",
+            )?;
+            report(&mut completed, "guardian_backup_pieces");
+
+            self.rekey_nullable_column(
+                old_key,
+                &new_key,
+                "guardian_backups",
+                "delivery_encrypted",
+            )?;
+            report(&mut completed, "guardian_backups");
 
             self.rekey_sync_timestamps(old_key, &new_key)?;
             report(&mut completed, "sync_timestamps");

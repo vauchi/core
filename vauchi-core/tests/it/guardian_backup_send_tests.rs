@@ -9,10 +9,13 @@
 
 use std::collections::HashMap;
 
-use vauchi_core::Vauchi;
 use vauchi_core::api::ReceiveOutcome;
+use vauchi_core::contact::Contact;
+use vauchi_core::contact_card::ContactCard;
+use vauchi_core::crypto::SigningKeyPair;
 use vauchi_core::recovery::RecoverySettings;
 use vauchi_core::sync::guardian_piece::{GuardianDelivery, PieceAssembly, PieceError};
+use vauchi_core::{SymmetricKey, Vauchi, VauchiError};
 
 use crate::common::helpers::create_vauchi_with_identity;
 use crate::common::two_recipient::{Recipient, add_recipient, receive};
@@ -222,4 +225,26 @@ fn a_removed_guardians_share_does_not_open_the_next_backup() {
             (&guardians[2], &kept[2])
         ]
     ));
+}
+
+/// The trust change and the backup it re-splits are one change: when the
+/// backup cannot be sent, the toggle fails and the guardian set stays.
+// @internal
+#[test]
+fn a_trust_change_whose_backup_cannot_be_sent_fails_and_changes_nothing() {
+    let wb = Vauchi::in_memory().unwrap();
+    let pk = *SigningKeyPair::generate().public_key().as_bytes();
+    let contact = Contact::from_exchange(pk, ContactCard::new("G"), SymmetricKey::generate(), 0);
+    let id = contact.id().to_string();
+    wb.storage().contacts().save_contact(&contact).unwrap();
+    wb.verify_contact_fingerprint(&id).unwrap();
+
+    let toggled = wb.toggle_recovery_trust(&id);
+
+    assert!(
+        matches!(toggled, Err(VauchiError::IdentityNotInitialized)),
+        "got {toggled:?}"
+    );
+    let stored = wb.storage().contacts().load_contact(&id).unwrap().unwrap();
+    assert!(!stored.is_recovery_trusted());
 }

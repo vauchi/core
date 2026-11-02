@@ -236,8 +236,8 @@ pub(super) fn process_received_blobs_with_routes(
                         resync_requested_by = Some(contact_id.clone());
                         (true, true, None, None, None, None, None)
                     }
-                    // TODO(vauchi/private#796 step 1d): keep the piece for its
-                    // designator; nothing sends one before step 1c.
+                    // A guardian backup piece (vauchi/private#796) was kept
+                    // in the receive transaction; nothing to show, no event.
                     Ok(ReceiveOutcome::GuardianBackupPiece(_)) => {
                         (true, true, None, None, None, None, None)
                     }

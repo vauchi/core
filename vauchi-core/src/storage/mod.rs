@@ -56,9 +56,10 @@ pub use stores::{
     ActivityLogStore, ConsentStore, ContactStore, DecoyStore, DeliveryStore, DeviceDeliveryStore,
     DeviceStore, EmergencyStore, FieldNoteStore, GENESIS_CONTACT_ATTEMPTS_PER_WINDOW,
     GENESIS_GLOBAL_ATTEMPTS_PER_WINDOW, GENESIS_WINDOW_SECS, GenesisFactWrite, GenesisLimitStore,
-    IdentityStore, LabelStore, OhttpCacheStore, OwnCardStore, PendingStore, PinCacheStore,
-    PlaceStore, RatchetStore, ReceiveCheckpoint, ReceiveScope, RecoveryStore, ReplayStore,
-    RetryStore, SafetyAlertFactStore, StoredSafetyAlertFact, SyncStore, TagStore, UxStore,
+    GuardianBackupStore, IdentityStore, KeptPiece, LabelStore, OhttpCacheStore, OwnCardStore,
+    PendingStore, PinCacheStore, PlaceStore, RatchetStore, ReceiveCheckpoint, ReceiveScope,
+    RecoveryStore, ReplayStore, RetryStore, SafetyAlertFactStore, StoredSafetyAlertFact, SyncStore,
+    TagStore, UxStore,
 };
 
 #[cfg(any(test, feature = "testing"))]

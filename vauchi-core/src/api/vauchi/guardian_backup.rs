@@ -68,10 +68,11 @@ impl Vauchi {
             hex::decode(&backup_hex).map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         let mut backup_id = [0u8; 16];
         self.rng.fill_bytes(&mut backup_id);
+        let created_at = self.clock.unix_seconds();
 
         let mut sent = 0;
         for (guardian, share) in guardians.iter().zip(shares) {
-            let delivery = GuardianDelivery::new(share, backup.clone())
+            let delivery = GuardianDelivery::new(created_at, share, backup.clone())
                 .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
             let pieces = split_into_pieces(backup_id, &delivery.encode())
                 .map_err(|e| VauchiError::InvalidState(e.to_string()))?;

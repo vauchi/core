@@ -561,12 +561,13 @@ fn process_single_card_update_for_device_with_budget(
     }
 
     // 3c'. Cover (0x09, vauchi/private#811), a resync request (0x0a, #691)
-    //      and a guardian backup piece (0x0b, #796) apply nothing here. The
+    //      and a guardian backup piece (0x0b, #796) apply no card change. The
     //      ratchet is persisted as for an update, so the sender's next
     //      message needs no skipped key and a deferred sender is released the
     //      same way; none may end as an error, which would keep the ratchet
-    //      unsaved and count as a failure. Honouring a resync request and
-    //      keeping a piece are the receive loop's.
+    //      unsaved and count as a failure. A piece is kept in the same
+    //      transaction, so a storage failure leaves its blob on the relay;
+    //      honouring a resync request is the receive loop's.
     let ratchet_only = match VersionedPayload::decode(&plaintext) {
         Ok(VersionedPayload::Cover) => Some(ReceiveOutcome::Cover),
         Ok(VersionedPayload::ResyncRequest) => Some(ReceiveOutcome::ResyncRequest),
@@ -577,12 +578,16 @@ fn process_single_card_update_for_device_with_budget(
     };
     if let Some(outcome) = ratchet_only {
         storage.begin_transaction()?;
-        let ratchet_txn = storage.ratchets().save_ratchet_state_for_device(
-            sender_id,
-            peer_device_id,
-            &ratchet,
-            is_initiator,
-        );
+        let ratchet_txn = storage
+            .ratchets()
+            .save_ratchet_state_for_device(sender_id, peer_device_id, &ratchet, is_initiator)
+            .and_then(|()| match &outcome {
+                ReceiveOutcome::GuardianBackupPiece(piece) => storage
+                    .guardian_backups()
+                    .keep_piece(sender_id, piece, storage.clock().unix_seconds())
+                    .map(|_| ()),
+                _ => Ok(()),
+            });
         match ratchet_txn {
             Ok(()) => storage.commit()?,
             Err(e) => {

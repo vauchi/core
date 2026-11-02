@@ -174,10 +174,12 @@ pub fn split_into_pieces(
 const MAX_SEALED_SHARE_BYTES: usize = 1024;
 
 /// What one guardian receives: its own sealed share and the backup every
-/// guardian holds (D7). Wire form: share length (big-endian `u16`), the
-/// share, then the backup.
+/// guardian holds (D7), with the designator's time of export. Wire form:
+/// creation time (big-endian `u64` seconds), share length (big-endian
+/// `u16`), the share, then the backup.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GuardianDelivery {
+    created_at: u64,
     sealed_share: Vec<u8>,
     backup: Vec<u8>,
 }
@@ -186,14 +188,26 @@ impl GuardianDelivery {
     /// # Errors
     /// [`PieceError::Malformed`] for an empty share or one over 1 KiB, or
     /// an empty backup.
-    pub fn new(sealed_share: Vec<u8>, backup: Vec<u8>) -> Result<Self, PieceError> {
+    pub fn new(
+        created_at: u64,
+        sealed_share: Vec<u8>,
+        backup: Vec<u8>,
+    ) -> Result<Self, PieceError> {
         if !(1..=MAX_SEALED_SHARE_BYTES).contains(&sealed_share.len()) || backup.is_empty() {
             return Err(PieceError::Malformed);
         }
         Ok(Self {
+            created_at,
             sealed_share,
             backup,
         })
+    }
+
+    /// When the designator exported this backup; a guardian keeps the
+    /// newest. Random backup ids and mailbox arrival carry no order, and
+    /// the ratchet authenticates the designator who set it.
+    pub fn created_at(&self) -> u64 {
+        self.created_at
     }
 
     /// The share sealed to this guardian.
@@ -211,10 +225,11 @@ impl GuardianDelivery {
         let share_len = u16::try_from(self.sealed_share.len())
             .expect("a sealed share is at most 1 KiB, checked in new");
         let mut bytes = Vec::with_capacity(
-            2_usize
+            10_usize
                 .saturating_add(self.sealed_share.len())
                 .saturating_add(self.backup.len()),
         );
+        bytes.extend_from_slice(&self.created_at.to_be_bytes());
         bytes.extend_from_slice(&share_len.to_be_bytes());
         bytes.extend_from_slice(&self.sealed_share);
         bytes.extend_from_slice(&self.backup);
@@ -222,16 +237,21 @@ impl GuardianDelivery {
     }
 
     /// # Errors
-    /// [`PieceError::Malformed`] for a share length of zero, over 1 KiB or
-    /// past the end, or no backup after the share.
+    /// [`PieceError::Malformed`] for a short time, a share length of zero,
+    /// over 1 KiB or past the end, or no backup after the share.
     pub fn decode(bytes: &[u8]) -> Result<Self, PieceError> {
-        let (share_len, rest) = bytes
-            .split_first_chunk::<2>()
+        let (created_at, rest) = bytes
+            .split_first_chunk::<8>()
             .ok_or(PieceError::Malformed)?;
+        let (share_len, rest) = rest.split_first_chunk::<2>().ok_or(PieceError::Malformed)?;
         let (sealed_share, backup) = rest
             .split_at_checked(usize::from(u16::from_be_bytes(*share_len)))
             .ok_or(PieceError::Malformed)?;
-        Self::new(sealed_share.to_vec(), backup.to_vec())
+        Self::new(
+            u64::from_be_bytes(*created_at),
+            sealed_share.to_vec(),
+            backup.to_vec(),
+        )
     }
 }
 

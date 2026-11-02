@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 94] = [
+const MIGRATIONS: [Migration; 95] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -742,7 +742,33 @@ const MIGRATIONS: [Migration; 94] = [
         name: "sealed_duress_content",
         action: MigrationAction::Callback(migrate_v94_sealed_duress_content),
     },
+    Migration {
+        version: 95,
+        name: "guardian_backups",
+        action: MigrationAction::Sql(MIGRATION_V95_GUARDIAN_BACKUPS),
+    },
 ];
+
+/// Migration v95 (vauchi/private#796 step 1d): a guardian keeps each
+/// designator's newest complete backup and the pieces of at most two
+/// unfinished ones. Pieces and deliveries are encrypted at rest (ADR-015);
+/// `created_at` is the designator's export time, which orders deliveries.
+const MIGRATION_V95_GUARDIAN_BACKUPS: &str = "
+    CREATE TABLE IF NOT EXISTS guardian_backup_pieces (
+        designator_id TEXT NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+        backup_id BLOB NOT NULL CHECK(length(backup_id) = 16),
+        piece_index INTEGER NOT NULL,
+        piece_encrypted BLOB NOT NULL,
+        received_at INTEGER NOT NULL,
+        PRIMARY KEY (designator_id, backup_id, piece_index)
+    );
+    CREATE TABLE IF NOT EXISTS guardian_backups (
+        designator_id TEXT PRIMARY KEY REFERENCES contacts(id) ON DELETE CASCADE,
+        created_at INTEGER NOT NULL,
+        delivery_encrypted BLOB NOT NULL,
+        received_at INTEGER NOT NULL
+    );
+";
 
 /// v94 (vauchi/private#1003): the five duress tables only a duress user
 /// fills move into one sealed `duress_content` row every database has.

@@ -26,6 +26,7 @@ mod device_delivery;
 mod emergency;
 mod field_notes;
 mod genesis_limit;
+mod guardian_backup;
 pub(super) mod identity;
 mod labels;
 mod ohttp_cache;
@@ -57,6 +58,7 @@ pub use genesis_limit::{
     GENESIS_CONTACT_ATTEMPTS_PER_WINDOW, GENESIS_GLOBAL_ATTEMPTS_PER_WINDOW, GENESIS_WINDOW_SECS,
     GenesisLimitStore,
 };
+pub use guardian_backup::{GuardianBackupStore, KeptPiece};
 pub use identity::IdentityStore;
 pub use labels::LabelStore;
 pub use ohttp_cache::OhttpCacheStore;

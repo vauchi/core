@@ -11,8 +11,10 @@
 
 use std::collections::HashSet;
 use vauchi_core::{
-    Contact, ContactCard, SymmetricKey, Vauchi, api::process_single_card_update,
-    crypto::cek::ContentEncryptionKey, exchange::X3DHKeyPair,
+    Contact, ContactCard, SymmetricKey, Vauchi,
+    api::{ReceiveOutcome, process_single_card_update},
+    crypto::cek::ContentEncryptionKey,
+    exchange::X3DHKeyPair,
 };
 
 /// A recipient instance plus the contact ids that bridge it to the sharer.
@@ -85,29 +87,42 @@ fn add_recipient_impl(
     }
 }
 
+impl Recipient {
+    /// The recipient's own instance.
+    pub fn vauchi(&self) -> &Vauchi {
+        &self.wb
+    }
+}
+
 /// Delivers every not-yet-seen pending update from `sharer` to `r`, applying
 /// each through the real receive pipeline. Returns how many were delivered.
 pub fn deliver(sharer: &Vauchi, r: &mut Recipient) -> usize {
+    receive(sharer, r).len()
+}
+
+/// Like [`deliver`], returning what the receive pipeline made of each
+/// message, in queue order.
+pub fn receive(sharer: &Vauchi, r: &mut Recipient) -> Vec<ReceiveOutcome> {
     let pending = sharer
         .storage()
         .pending()
         .get_pending_updates(&r.id_at_sharer)
         .unwrap();
-    let mut count = 0;
+    let mut outcomes = Vec::new();
     for upd in pending {
         if !r.delivered.insert(upd.id.clone()) {
             continue;
         }
-        process_single_card_update(
+        let outcome = process_single_card_update(
             r.wb.identity().unwrap(),
             r.wb.storage(),
             &r.sharer_id_here,
             &upd.payload,
         )
         .unwrap_or_else(|e| panic!("delivery failed: {e:?}"));
-        count += 1;
+        outcomes.push(outcome);
     }
-    count
+    outcomes
 }
 
 /// The display name on the recipient's stored copy of the sharer's card.

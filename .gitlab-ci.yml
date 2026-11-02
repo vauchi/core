@@ -1094,21 +1094,25 @@ test:formal-extended:
 # `version = "=X"` pins refuse a Core of another version, so
 # ci/point-core-at.sh rewrites the job's own clones and nothing is committed.
 # Replaces verify:downstream-rust for e2e, which built e2e's own pinned tag
-# and proved nothing about the merge. It needs e2e's pinned set on this
-# Core's version: when Core moves a minor, the e2e bump comes first.
+# and proved nothing about the merge. When it fails, ci/e2e-smoke.sh tries
+# the target branch's Core too: if that fails as well, e2e's pinned set is
+# behind Core (a Core minor moved, e2e's bump not yet in) and the job only
+# warns, exit 3, instead of blocking every protocol MR (private#1034).
 test:e2e-smoke:
   extends: [.linux-runner, .timeout-cold-rebuild]
   stage: test
   needs: []
+  allow_failure:
+    exit_codes: [3]
   variables:
     E2E_DIR: ${CI_PROJECT_DIR}/../e2e-for-core-${CI_JOB_ID}
+    TARGET_CORE_DIR: ${CI_PROJECT_DIR}/../core-target-${CI_JOB_ID}
   script:
     - git clone --depth=1 "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/e2e.git" "$E2E_DIR"
-    - sh "$E2E_DIR/ci/point-core-at.sh" "$CI_PROJECT_DIR" "$E2E_DIR/Cargo.toml"
-    - E2E_CORE_DIR="$CI_PROJECT_DIR" sh "$E2E_DIR/ci/build-pinned-binaries.sh" "$E2E_DIR/.bin"
-    - cd "$E2E_DIR" && E2E_BIN_DIR="$E2E_DIR/.bin" cargo nextest run --profile ci --run-ignored default -j 4 -- smoke_
+    - git clone --depth=1 --branch "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/core.git" "$TARGET_CORE_DIR"
+    - sh ci/e2e-smoke.sh "$E2E_DIR" "$CI_PROJECT_DIR" "$TARGET_CORE_DIR"
   after_script:
-    - rm -rf "${CI_PROJECT_DIR}/../e2e-for-core-${CI_JOB_ID}"
+    - rm -rf "${CI_PROJECT_DIR}/../e2e-for-core-${CI_JOB_ID}" "${CI_PROJECT_DIR}/../core-target-${CI_JOB_ID}"
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:

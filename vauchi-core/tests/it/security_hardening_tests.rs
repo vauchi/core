@@ -20,8 +20,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use vauchi_core::Identity;
 use vauchi_core::crypto::{SigningKeyPair, SymmetricKey, derive_key_argon2id};
 use vauchi_core::exchange::{
-    BLEProximityVerifier, ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession,
-    MockBLEVerifier, MockProximityVerifier, ProximityError, X3DHKeyPair,
+    ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession, MockProximityVerifier, X3DHKeyPair,
 };
 use vauchi_core::storage::Storage;
 
@@ -238,25 +237,6 @@ fn test_qr_clock_drift_detection() {
 // security.feature @attacks: "Relay attack prevention on BLE"
 // - Proximity verification is mandatory before key agreement
 // - TooFar error when device is beyond allowed range
-
-/// Scenario: BLE exchange requires proximity verification
-// @scenario: security :: Relay attack prevention on BLE
-#[test]
-fn test_ble_relay_attack_prevention() {
-    let verifier = MockBLEVerifier::success_at_distance(5.0); // 5 meters = too far
-    let device = &verifier.devices[0];
-
-    assert!(
-        !verifier.is_within_range(device, 2.0),
-        "Device at 5m should not be within 2m range"
-    );
-
-    let result = verifier.verify_device_proximity(device);
-    assert!(
-        matches!(result, Err(ProximityError::TooFar)),
-        "Should reject device that is too far"
-    );
-}
 
 /// Scenario: Exchange session blocks without mutual QR exchange
 // @scenario: security :: Man-in-the-middle detection during exchange

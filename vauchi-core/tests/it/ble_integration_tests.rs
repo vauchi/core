@@ -15,10 +15,7 @@
 
 use std::time::Duration;
 use vauchi_core::crypto::SigningKeyPair;
-use vauchi_core::exchange::{
-    BLEAdvertisement, BLEDevice, BLEExchangeSession, BLEExchangeState, BLEProximityVerifier,
-    MockBLEVerifier, ProximityError, ProximityVerifier,
-};
+use vauchi_core::exchange::{BLEAdvertisement, BLEDevice, BLEExchangeSession, BLEExchangeState};
 
 // ============================================================
 // Feature: ble_exchange.feature @integration @advertisement
@@ -88,64 +85,6 @@ fn test_parse_advertisement() {
 // ============================================================
 // Feature: ble_exchange.feature @integration @discovery
 // ============================================================
-
-/// Test: Discover nearby devices
-// @scenario: ble_exchange :: Discover nearby devices
-#[test]
-fn test_discover_nearby_devices() {
-    let device1 = BLEDevice::new("device-1", -50);
-    let device2 = BLEDevice::new("device-2", -70);
-    let mock = MockBLEVerifier::new(vec![device1, device2], 1.0);
-
-    let devices = mock.discover_nearby(Duration::from_secs(5)).unwrap();
-
-    assert_eq!(devices.len(), 2);
-    assert!(devices.iter().any(|d| d.id == "device-1"));
-}
-
-/// Test: Filter devices by exchange token
-// @scenario: ble_exchange :: Filter devices by exchange token
-#[test]
-fn test_filter_devices_with_exchange_token() {
-    let token = [42u8; 32];
-    let device_with_token = BLEDevice::new("device-1", -50).with_exchange_token(token);
-    let device_without = BLEDevice::new("device-2", -60);
-
-    let mock = MockBLEVerifier::new(vec![device_with_token, device_without], 1.0);
-    let devices = mock.discover_nearby(Duration::from_secs(5)).unwrap();
-
-    let vauchi_devices: Vec<_> = devices
-        .iter()
-        .filter(|d| d.exchange_token.is_some())
-        .collect();
-
-    assert_eq!(vauchi_devices.len(), 1);
-    assert_eq!(vauchi_devices[0].exchange_token.unwrap(), token);
-}
-
-/// Test: Estimate distance from RSSI
-// @scenario: ble_exchange :: Distance estimation from RSSI
-#[test]
-fn test_estimate_distance() {
-    let device = BLEDevice::new("device-1", -50);
-    let mock = MockBLEVerifier::success_at_distance(1.5);
-
-    let distance = mock.estimate_distance(&device).unwrap();
-
-    assert!((distance - 1.5).abs() < 0.01);
-}
-
-/// Test: Device within range check
-// @scenario: ble_exchange :: Proximity verification passes for close devices
-#[test]
-fn test_device_within_range() {
-    let device = BLEDevice::new("device-1", -50);
-    let close_mock = MockBLEVerifier::success_at_distance(1.0);
-    let far_mock = MockBLEVerifier::success_at_distance(5.0);
-
-    assert!(close_mock.is_within_range(&device, 2.0));
-    assert!(!far_mock.is_within_range(&device, 2.0));
-}
 
 // ============================================================
 // Feature: ble_exchange.feature @integration @session
@@ -304,66 +243,9 @@ fn test_cancel_session() {
 // Feature: ble_exchange.feature @integration @proximity
 // ============================================================
 
-/// Test: Verify device proximity before exchange
-// @scenario: ble_exchange :: Proximity verification passes for close devices
-// @scenario: ble_exchange :: Proximity fails when device is too far
-#[test]
-fn test_verify_proximity_before_exchange() {
-    let device = BLEDevice::new("peer", -50);
-
-    let close_verifier = MockBLEVerifier::success_at_distance(1.0);
-    let far_verifier = MockBLEVerifier::success_at_distance(10.0);
-
-    close_verifier
-        .verify_device_proximity(&device)
-        .expect("expected success");
-    far_verifier
-        .verify_device_proximity(&device)
-        .expect_err("expected error");
-}
-
-/// Test: Proximity challenge-response
-// @scenario: ble_exchange :: Proximity challenge and response
-#[test]
-fn test_proximity_challenge_response() {
-    let verifier = MockBLEVerifier::success_at_distance(1.0);
-    let challenge = [0u8; 16];
-
-    verifier.emit_challenge(&challenge).expect("Should emit");
-
-    let response = verifier
-        .listen_for_response(Duration::from_secs(5))
-        .expect("Should receive response");
-
-    assert!(verifier.verify_response(&challenge, &response));
-}
-
-/// Test: Proximity verification fails when too far
-// @scenario: ble_exchange :: Proximity fails when device is too far
-#[test]
-fn test_proximity_fails_when_too_far() {
-    let device = BLEDevice::new("far-device", -90);
-    let verifier = MockBLEVerifier::success_at_distance(5.0);
-
-    let result = verifier.verify_device_proximity(&device);
-
-    assert!(matches!(result, Err(ProximityError::TooFar)));
-}
-
 // ============================================================
 // Feature: ble_exchange.feature @integration @error
 // ============================================================
-
-/// Test: Discovery failure handling
-// @scenario: ble_exchange :: Discovery failure handling
-#[test]
-fn test_discovery_failure() {
-    let verifier = MockBLEVerifier::failure();
-
-    let result = verifier.discover_nearby(Duration::from_secs(5));
-
-    result.expect_err("expected error");
-}
 
 /// Test: Connection to device without token fails
 // @scenario: ble_exchange :: Connection requires exchange token

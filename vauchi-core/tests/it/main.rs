@@ -29,7 +29,7 @@ mod guardian_groups_exhaustive_tests;
 mod guardian_groups_tests;
 mod integration;
 
-mod accelerometer_verifier_tests;
+mod accelerometer_correlation_tests;
 mod accept_encrypted_exchange_tests;
 mod accessibility_tests;
 mod activity_log_storage_tests;
@@ -248,7 +248,6 @@ mod escrow_crypto_tests;
 mod escrow_exchange_tests;
 mod escrow_send_tests;
 mod exchange_audio_command_event_tests;
-mod exchange_ble_tests;
 mod exchange_ceremony_tests;
 mod exchange_command_event_integration_tests;
 mod exchange_completion_facts_tests;

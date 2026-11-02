@@ -120,17 +120,13 @@ pub mod tcp_transport;
 
 pub mod transport;
 
-pub use accelerometer::{
-    AccelerometerBackend, AccelerometerConfig, AccelerometerSample, AccelerometerVerifier,
-    MockAccelerometerBackend,
-};
+pub use accelerometer::AccelerometerConfig;
 pub use audio_modem::AudioConfig;
 pub use ble::{
     BLE_DEFAULT_USABLE, BLE_MIN_MTU, BLE_PAYLOAD_SIZE, BLEAdvertisement, BLEDevice, BLEError,
-    BLEExchangeSession, BLEExchangeState, BLEProximityVerifier, CHAR_CARD_EXCHANGE, CHAR_CHALLENGE,
-    CHAR_DATA_NOTIFY, CHAR_DATA_WRITE, CHAR_EXCHANGE_PAYLOAD, CHAR_HANDSHAKE_NOTIFY,
-    CHAR_HANDSHAKE_WRITE, ExchangeBle, MockBLEVerifier, VAUCHI_BLE_DIAGNOSTIC_SERVICE_UUID,
-    VAUCHI_BLE_SERVICE_UUID,
+    BLEExchangeSession, BLEExchangeState, CHAR_CARD_EXCHANGE, CHAR_CHALLENGE, CHAR_DATA_NOTIFY,
+    CHAR_DATA_WRITE, CHAR_EXCHANGE_PAYLOAD, CHAR_HANDSHAKE_NOTIFY, CHAR_HANDSHAKE_WRITE,
+    ExchangeBle, VAUCHI_BLE_DIAGNOSTIC_SERVICE_UUID, VAUCHI_BLE_SERVICE_UUID,
 };
 pub use ble_chunking::{BLE_CHUNK_OVERHEAD, BleChunker, BleReassembler};
 pub use ble_handshake::{

@@ -96,11 +96,6 @@ exclude_re = [
     # negated Laplacian gives the same variance (vauchi/private#522).
     "vauchi-core/src/qr/scanner\\.rs:255:17: replace \\+= with -= in fast_laplacian_variance$",
 
-    # MockBLEVerifier and MockBLETransport are test doubles that ship in src
-    # for downstream tests; a mutant there changes the double, not the
-    # product (vauchi/private#522).
-    "vauchi-core/src/exchange/ble\\.rs:[0-9]+:[0-9]+: .*MockBLE(Verifier|Transport)>?::",
-
     # run_device_sync_send's "two or more devices" gate only saves work: with
     # just its own device the orchestrator addresses no sibling and sends to
     # none, so `> 1` and `>= 1` both report 0 (vauchi/private#522).

@@ -91,8 +91,6 @@ mod ble;
 mod ble_advertisement;
 pub use ble_advertisement::{advertised_token, attempt_token_from_oob, fresh_attempt_token};
 
-#[cfg(feature = "audio-cpal")]
-pub mod audio_cpal;
 pub mod audio_modem;
 
 pub mod capability;
@@ -126,8 +124,6 @@ pub use accelerometer::{
     AccelerometerBackend, AccelerometerConfig, AccelerometerSample, AccelerometerVerifier,
     MockAccelerometerBackend,
 };
-#[cfg(feature = "audio-cpal")]
-pub use audio_cpal::CpalAudioBackend;
 pub use audio_modem::AudioConfig;
 pub use ble::{
     BLE_DEFAULT_USABLE, BLE_MIN_MTU, BLE_PAYLOAD_SIZE, BLEAdvertisement, BLEDevice, BLEError,

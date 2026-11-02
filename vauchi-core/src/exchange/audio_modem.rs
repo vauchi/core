@@ -18,8 +18,8 @@
 //! - Bit duration: 10 ms (100 bps)
 //! - Preamble: 50 ms at 19 kHz for synchronization
 
-// The non-cpal default build has no caller yet (Phase 3 of the audio
-// proximity rewire will introduce them); gate the lint until then.
+// The default build has no caller yet (Phase 3 of the audio proximity
+// rewire will introduce them); gate the lint until then.
 #![allow(dead_code)]
 
 use super::proximity::ProximityError;

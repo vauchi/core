@@ -30,8 +30,6 @@ secure-storage = ["keyring"]
 secure-storage-linux = ["secure-storage", "keyring/linux-native-sync-persistent"]
 secure-storage-apple = ["secure-storage", "keyring/apple-native"]
 secure-storage-windows = ["secure-storage", "keyring/windows-native"]
-# Real audio proximity verification using CPAL (desktop only)
-audio-cpal = ["cpal"]
 # Enable this feature to expose internal modules for integration tests
 testing = []
 # Reduces Argon2id KDF cost parameters for faster test execution (~5x speedup).
@@ -142,8 +140,6 @@ webpki-roots = { version = "1.0", optional = true }
 # Bare keyring dep used as the common optional dependency.
 keyring = { version = "3", optional = true }
 
-# Cross-platform audio for ultrasonic proximity verification (desktop only)
-cpal = { version = "0.15", optional = true }
 
 # Sync HTTP client for v2 relay protocol (no async runtime needed)
 # Use rustls-no-provider + webpki-roots to avoid pulling in ring — aws-lc-rs is our TLS backend

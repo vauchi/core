@@ -8,6 +8,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Removed
+
+- The `audio-cpal` feature and `exchange::CpalAudioBackend`: the cpal
+  audio port lives in `vauchi/linux-hw` (0.96.0, ADR-077); linux-gtk
+  reads it from there since linux-gtk!285.
+
 ## [0.96.1] — 2026-11-02
 
 ### Fixed

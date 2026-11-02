@@ -19,7 +19,7 @@
 //! callsites — timeouts, deadlines, retry windows inside state machines
 //! — migrate here. Diagnostic / perf-measurement `Instant::now()` reads
 //! (e.g. `qr_decode.rs` decode timing, `diagnostic/*`, transport
-//! traces, `audio_cpal` capture timing) are *exempt*: they measure
+//! traces) are *exempt*: they measure
 //! elapsed wall-time for logs and never feed a state transition, so
 //! they do not break `(state, input) → output` determinism. This
 //! mirrors the `OsRng` carve-out for crypto RNG.

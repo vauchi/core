@@ -980,8 +980,9 @@ impl ExchangeSession {
     ///
     /// If audio challenges are available (from QR codes), emits
     /// `AudioEmitChallenge` and/or `AudioListenForResponse` commands.
-    /// The frontend handles audio I/O via CpalAudioBackend (desktop) or
-    /// PlatformAudioBackend (mobile) and reports `AudioResponseReceived`.
+    /// The hardware shell handles audio I/O (`linux-hw`'s cpal port on
+    /// desktop, the platform backend on mobile) and reports
+    /// `AudioResponseReceived`.
     ///
     /// If no challenges are available, falls back to the synchronous
     /// ProximityVerifier (e.g., ManualConfirmationVerifier).

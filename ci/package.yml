@@ -31,8 +31,10 @@
 test:packaging-matrix:
   stage: test
   needs: []
+  # RUNNER_TAG, not RUNNER_OS: nell's shell runner answers to macos-host
+  # since vauchi/private#309, while the script below switches on the OS.
   tags:
-    - $RUNNER_OS
+    - $RUNNER_TAG
     - self-hosted
   # The macOS leg runs package-xcframework.sh, which waits on the
   # nell COSIGN_KEY file-variable staging race (see the wait-loop in
@@ -49,7 +51,10 @@ test:packaging-matrix:
       - unknown_failure
   parallel:
     matrix:
-      - RUNNER_OS: [linux, macos]
+      - RUNNER_OS: linux
+        RUNNER_TAG: linux
+      - RUNNER_OS: macos
+        RUNNER_TAG: macos-host
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:

@@ -28,8 +28,11 @@ pub(super) struct OrderedCard {
 }
 
 /// Called after signature verification, inside the receive write transaction.
-/// The signed field time orders re-propagated additions; the signed delta time
-/// orders removals and names. Device versions break same-origin, same-time ties.
+/// The signed delta time orders removals and names. An addition takes the
+/// later of its field time and its delta time, because a field permitted
+/// again after its removal is unchanged and keeps its original field time
+/// (private#1031); a held old addition stays blocked since both its times
+/// are old. Device versions break same-origin, same-time ties.
 /// Equal legacy stamps have no causal distinction and retain apply semantics.
 pub(super) fn apply(
     storage: &Storage,
@@ -65,7 +68,10 @@ pub(super) fn apply(
     let mut removed_fields = Vec::new();
     for change in &delta.changes {
         let (key, timestamp) = match change {
-            FieldChange::Added { field } => (format!("field:{}", field.id()), field.updated_at()),
+            FieldChange::Added { field } => (
+                format!("field:{}", field.id()),
+                field.updated_at().max(delta.timestamp),
+            ),
             FieldChange::Removed { field_id } => (format!("field:{field_id}"), delta.timestamp),
             FieldChange::DisplayNameChanged { .. } => ("name".to_string(), delta.timestamp),
         };

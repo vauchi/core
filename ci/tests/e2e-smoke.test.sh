@@ -44,10 +44,10 @@ if [ -z "$block" ]; then
 else
     for step in \
         'gitlab.com/vauchi/e2e.git' \
-        'ci/point-core-at.sh" "$CI_PROJECT_DIR" "$E2E_DIR/Cargo.toml"' \
-        'E2E_CORE_DIR="$CI_PROJECT_DIR" sh "$E2E_DIR/ci/build-pinned-binaries.sh"' \
-        'E2E_BIN_DIR="$E2E_DIR/.bin" cargo nextest run' \
-        '-- smoke_'; do
+        'gitlab.com/vauchi/core.git' \
+        'CI_MERGE_REQUEST_TARGET_BRANCH_NAME' \
+        'sh ci/e2e-smoke.sh "$E2E_DIR" "$CI_PROJECT_DIR" "$TARGET_CORE_DIR"' \
+        'exit_codes: [3]'; do
         if printf '%s\n' "$block" | grep -qF -- "$step"; then
             echo "PASS: $job runs $step"
         else
@@ -74,6 +74,34 @@ if grep -E 'DOWNSTREAM:' "$trigger_config" | grep -q 'vauchi/e2e'; then
 else
     echo "PASS: no downstream trigger runs e2e against its own pin"
 fi
+
+# ci/e2e-smoke.sh attributes a failure (decision of 2026-11-02): smoke on
+# the MR's Core; on failure the same against the target branch's Core.
+# 0 = the MR passes, 1 = only the MR fails, 3 = the target fails too, so
+# the pinned set is behind Core and the job only warns. Fakes stand in for
+# e2e's scripts and cargo; a core directory holding BROKEN fails.
+fake=$(mktemp -d)
+mkdir -p "$fake/e2e/ci" "$fake/bin" "$fake/mr" "$fake/target"
+printf '#!/bin/sh\nexit 0\n' > "$fake/e2e/ci/point-core-at.sh"
+printf '#!/bin/sh\n[ ! -f "$E2E_CORE_DIR/BROKEN" ]\n' > "$fake/e2e/ci/build-pinned-binaries.sh"
+printf '#!/bin/sh\nexit 0\n' > "$fake/bin/cargo"
+chmod +x "$fake/bin/cargo"
+attribution() { # mr-broken target-broken expected
+    rm -f "$fake/mr/BROKEN" "$fake/target/BROKEN"
+    [ "$1" = yes ] && : > "$fake/mr/BROKEN"
+    [ "$2" = yes ] && : > "$fake/target/BROKEN"
+    rc=0
+    PATH="$fake/bin:$PATH" sh ci/e2e-smoke.sh "$fake/e2e" "$fake/mr" "$fake/target" > "$fake/out" 2>&1 || rc=$?
+    if [ "$rc" = "$3" ]; then
+        echo "PASS: MR broken=$1, target broken=$2 exits $3"
+    else
+        fail "MR broken=$1, target broken=$2 must exit $3, got $rc: $(tail -3 "$fake/out")"
+    fi
+}
+attribution no no 0
+attribution yes no 1
+attribution yes yes 3
+rm -rf "$fake"
 
 if [ "$failures" -gt 0 ]; then
     echo "$failures failure(s)" >&2

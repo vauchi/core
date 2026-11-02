@@ -199,6 +199,38 @@ fn peer_card_ordering_allows_same_second_successor_and_newer_readd() {
 }
 
 // @claim: S2
+// @scenario: sync_updates :: A multi-device sender's versions are floored per device
+#[test]
+fn peer_card_ordering_restores_an_unchanged_field_permitted_again_on_a_sibling() {
+    for ordinary in [false, true] {
+        let world = cold_start_world();
+        let mut removed = world.base_card.clone();
+        removed
+            .remove_field(world.base_card.fields()[0].id())
+            .unwrap();
+        let hidden = blob(
+            &world,
+            &world.alice_a1,
+            CardDelta::compute(&world.base_card, &removed, 20),
+            ordinary,
+        );
+        receive(&world, &world.alice_a1, &hidden, ordinary).unwrap();
+        let permitted = blob(
+            &world,
+            &world.alice_a2,
+            CardDelta::compute(&removed, &world.base_card, 30),
+            ordinary,
+        );
+        receive(&world, &world.alice_a2, &permitted, ordinary).unwrap();
+        assert_eq!(
+            stored_email_value(&world),
+            "before@example.com",
+            "a field permitted again after its removal must reach the contact"
+        );
+    }
+}
+
+// @claim: S2
 // @scenario: sync_updates :: Genesis card versions are floored per origin device
 #[test]
 fn peer_card_ordering_survives_receiver_reload() {

@@ -311,6 +311,7 @@ mod group_tag_place_store_tests;
 mod group_transition_tests;
 mod groups_list_engine_tests;
 mod guardian_adversarial_tests;
+mod guardian_backup_piece_wire_tests;
 mod guardian_backup_pieces_tests;
 mod guardian_identity_key_contract_tests;
 mod guardian_token_proptest;

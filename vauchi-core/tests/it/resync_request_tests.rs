@@ -62,8 +62,8 @@ fn resync_request_codec() {
         Ok(VersionedPayload::ResyncRequest)
     ));
     assert!(matches!(
-        VersionedPayload::decode(&[0x0b]),
-        Err(DeltaError::UnknownPayloadVersion(0x0b))
+        VersionedPayload::decode(&[0x0c]),
+        Err(DeltaError::UnknownPayloadVersion(0x0c))
     ));
 }
 

@@ -129,6 +129,7 @@ pub enum MobileCommand {
         ciphertext: Vec<u8>,
         is_initiator: bool,
     },
+    BleStopAdvertising,
 }
 
 impl From<Command> for MobileCommand {
@@ -145,6 +146,7 @@ impl From<Command> for MobileCommand {
             },
             Command::BleStartScanning { service_uuid } => Self::BleStartScanning { service_uuid },
             Command::BleStopScanning => Self::BleStopScanning,
+            Command::BleStopAdvertising => Self::BleStopAdvertising,
             Command::BleConnect { device_id } => Self::BleConnect { device_id },
             Command::BleWriteCharacteristic {
                 device_id,

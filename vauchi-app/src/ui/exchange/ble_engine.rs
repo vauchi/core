@@ -694,11 +694,14 @@ impl WorkflowEngine for BleExchangeEngine {
     }
 
     fn screen_exited(&mut self) -> Vec<Command> {
+        let mut commands = Vec::with_capacity(2);
         if self.mode == ExchangeMode::Glance {
-            vec![Command::SetScreenBrightness { level: None }]
-        } else {
-            Vec::new()
+            commands.push(Command::SetScreenBrightness { level: None });
         }
+        if self.started {
+            commands.push(Command::BleStopAdvertising);
+        }
+        commands
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {

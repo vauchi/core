@@ -560,68 +560,37 @@ fn process_single_card_update_for_device_with_budget(
         });
     }
 
-    // 3c'. Cover (0x09): a duress session's stand-in for a withheld update
-    //      (vauchi/private#811). The ratchet is persisted as for an update,
-    //      so the sender's next message needs no skipped key and a deferred
-    //      sender is released the same way; nothing else is touched, and it
-    //      must not end as an error, which would keep the ratchet unsaved
-    //      and count as a failure.
-    if let Ok(VersionedPayload::Cover) = VersionedPayload::decode(&plaintext) {
+    // 3c'. Cover (0x09, vauchi/private#811), a resync request (0x0a, #691)
+    //      and a guardian backup piece (0x0b, #796) apply nothing here. The
+    //      ratchet is persisted as for an update, so the sender's next
+    //      message needs no skipped key and a deferred sender is released the
+    //      same way; none may end as an error, which would keep the ratchet
+    //      unsaved and count as a failure. Honouring a resync request and
+    //      keeping a piece are the receive loop's.
+    let ratchet_only = match VersionedPayload::decode(&plaintext) {
+        Ok(VersionedPayload::Cover) => Some(ReceiveOutcome::Cover),
+        Ok(VersionedPayload::ResyncRequest) => Some(ReceiveOutcome::ResyncRequest),
+        Ok(VersionedPayload::GuardianBackupPiece(piece)) => {
+            Some(ReceiveOutcome::GuardianBackupPiece(piece))
+        }
+        _ => None,
+    };
+    if let Some(outcome) = ratchet_only {
         storage.begin_transaction()?;
-        let cover_txn = storage.ratchets().save_ratchet_state_for_device(
+        let ratchet_txn = storage.ratchets().save_ratchet_state_for_device(
             sender_id,
             peer_device_id,
             &ratchet,
             is_initiator,
         );
-        match cover_txn {
+        match ratchet_txn {
             Ok(()) => storage.commit()?,
             Err(e) => {
                 storage.rollback();
                 return Err(e.into());
             }
         }
-        return Ok(ReceiveOutcome::Cover);
-    }
-
-    // 3c''. Resync request (0x0a, vauchi/private#691): persisted like cover;
-    //       the repropagation it asks for is the receive loop's to queue.
-    if let Ok(VersionedPayload::ResyncRequest) = VersionedPayload::decode(&plaintext) {
-        storage.begin_transaction()?;
-        let request_txn = storage.ratchets().save_ratchet_state_for_device(
-            sender_id,
-            peer_device_id,
-            &ratchet,
-            is_initiator,
-        );
-        match request_txn {
-            Ok(()) => storage.commit()?,
-            Err(e) => {
-                storage.rollback();
-                return Err(e.into());
-            }
-        }
-        return Ok(ReceiveOutcome::ResyncRequest);
-    }
-
-    // 3c'''. Guardian backup piece (0x0b, vauchi/private#796): persisted
-    //        like cover; keeping the piece is the receive loop's.
-    if let Ok(VersionedPayload::GuardianBackupPiece(piece)) = VersionedPayload::decode(&plaintext) {
-        storage.begin_transaction()?;
-        let piece_txn = storage.ratchets().save_ratchet_state_for_device(
-            sender_id,
-            peer_device_id,
-            &ratchet,
-            is_initiator,
-        );
-        match piece_txn {
-            Ok(()) => storage.commit()?,
-            Err(e) => {
-                storage.rollback();
-                return Err(e.into());
-            }
-        }
-        return Ok(ReceiveOutcome::GuardianBackupPiece(piece));
+        return Ok(outcome);
     }
 
     // 3d. F4 registry handshake payloads (0x05/0x06) — persist/ack registry

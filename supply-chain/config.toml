@@ -46,14 +46,6 @@ criteria = "safe-to-deploy"
 version = "0.8.12"
 criteria = "safe-to-deploy"
 
-[[exemptions.alsa]]
-version = "0.9.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.alsa-sys]]
-version = "0.3.1"
-criteria = "safe-to-deploy"
-
 [[exemptions.approx]]
 version = "0.5.1"
 criteria = "safe-to-deploy"
@@ -94,10 +86,6 @@ criteria = "safe-to-deploy"
 version = "1.2.67"
 criteria = "safe-to-deploy"
 
-[[exemptions.cesu8]]
-version = "1.1.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.chrono]]
 version = "0.4.45"
 criteria = "safe-to-deploy"
@@ -106,16 +94,8 @@ criteria = "safe-to-deploy"
 version = "0.10.4"
 criteria = "safe-to-deploy"
 
-[[exemptions.clang-sys]]
-version = "1.8.1"
-criteria = "safe-to-deploy"
-
 [[exemptions.codepage-437]]
 version = "0.1.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.combine]]
-version = "4.6.7"
 criteria = "safe-to-deploy"
 
 [[exemptions.console]]
@@ -132,18 +112,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.core-foundation]]
 version = "0.10.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.coreaudio-rs]]
-version = "0.11.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.coreaudio-sys]]
-version = "0.2.10"
-criteria = "safe-to-deploy"
-
-[[exemptions.cpal]]
-version = "0.15.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.crc32fast]]
@@ -208,10 +176,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.darling_macro]]
 version = "0.23.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.dasp_sample]]
-version = "0.11.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.dbus-secret-service]]
@@ -362,10 +326,6 @@ criteria = "safe-to-deploy"
 version = "0.12.1"
 criteria = "safe-to-deploy"
 
-[[exemptions.itertools]]
-version = "0.13.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.jni-sys]]
 version = "0.3.1"
 criteria = "safe-to-deploy"
@@ -396,10 +356,6 @@ criteria = "safe-to-run"
 
 [[exemptions.libdbus-sys]]
 version = "0.2.7"
-criteria = "safe-to-deploy"
-
-[[exemptions.libloading]]
-version = "0.8.9"
 criteria = "safe-to-deploy"
 
 [[exemptions.libsqlite3-sys]]
@@ -446,10 +402,6 @@ criteria = "safe-to-deploy"
 version = "0.17.2"
 criteria = "safe-to-deploy"
 
-[[exemptions.ndk]]
-version = "0.8.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.ndk-sys]]
 version = "0.5.0+25.2.9519653"
 criteria = "safe-to-deploy"
@@ -460,22 +412,6 @@ criteria = "safe-to-run"
 
 [[exemptions.num-iter]]
 version = "0.1.46"
-criteria = "safe-to-deploy"
-
-[[exemptions.num_enum]]
-version = "0.7.6"
-criteria = "safe-to-deploy"
-
-[[exemptions.num_enum_derive]]
-version = "0.7.6"
-criteria = "safe-to-deploy"
-
-[[exemptions.oboe]]
-version = "0.6.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.oboe-sys]]
-version = "0.6.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.once_cell]]
@@ -560,7 +496,7 @@ criteria = "safe-to-deploy"
 
 [[exemptions.proc-macro-crate]]
 version = "3.5.0"
-criteria = "safe-to-deploy"
+criteria = "safe-to-run"
 
 [[exemptions.proptest]]
 version = "1.11.0"
@@ -822,10 +758,6 @@ criteria = "safe-to-deploy"
 version = "0.2.126"
 criteria = "safe-to-deploy"
 
-[[exemptions.wasm-bindgen-futures]]
-version = "0.4.76"
-criteria = "safe-to-deploy"
-
 [[exemptions.wasm-bindgen-macro]]
 version = "0.2.126"
 criteria = "safe-to-deploy"
@@ -836,10 +768,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.wasm-bindgen-shared]]
 version = "0.2.126"
-criteria = "safe-to-deploy"
-
-[[exemptions.web-sys]]
-version = "0.3.103"
 criteria = "safe-to-deploy"
 
 [[exemptions.webpki-root-certs]]

@@ -8,6 +8,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.97.0] — 2026-11-02
+
+### Added
+
+- Prepared surfaces carry the theme's font families in their
+  presentation tokens (`PresentationTokens.fonts`, contract v0.96.1),
+  so display shells render the theme's fonts from the batch
+  (ADR-078 step 4c, vauchi/private#1029).
+- Core ends the BLE advertising it started when the exchange screen is
+  left, with `Command::BleStopAdvertising` (contract v0.96.0,
+  vauchi/private#770).
+- Designating guardians sends each its share and the backup in 48 KB
+  mailbox pieces that reassemble against the backup's hash, as ratchet
+  message kind `0x0b` (vauchi/private#796). A Core before 0.97.0 does
+  not know the kind.
+- A Core release bumps e2e's `Cargo.toml` and `ci/pins.env` in one MR;
+  protocol-path MRs run the e2e smoke on their own commit, which warns
+  when the pinned set is behind Core (vauchi/private#1032,
+  vauchi/private#1034).
+
+### Changed
+
+- Core pins `vauchi-contract` at v0.96.2. Contract tags are separate
+  cargo sources, so every repository linked into one binary pins the
+  same tag (ADR-078 decision 6).
+- `rqrr` comes from the fork in `vauchi/utils/rqrr` (tag
+  `v0.11.0+vauchi.1`) instead of `vendor/rqrr`; a lock-file test
+  guards it.
+- Core's copy of the shell fixtures is gone; they live in
+  `vauchi/contract`, and the regeneration tests write there.
+
+### Fixed
+
+- A trust change and the guardian backup it re-splits are one change
+  (vauchi/private#796).
+
 ### Removed
 
 - The `audio-cpal` feature and `exchange::CpalAudioBackend`: the cpal

@@ -369,7 +369,7 @@ fn two_party_ble_exchange_persists_each_others_contact() {
 // P1 step 2a+2b (full loop): a BLE exchange stamps the contact Pending, emits
 // the post-persist confirmation ack (G1), the peer verifies it, and reciprocity
 // resolves to Confirmed on both sides — relay-free over the native channel.
-// @internal
+// @scenario: contact_exchange :: Initiate BLE exchange
 #[test]
 fn two_party_ble_exchange_confirms_reciprocity_both_sides() {
     let mut alice = engine_named("Alice");

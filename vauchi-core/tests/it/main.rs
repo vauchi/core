@@ -511,6 +511,7 @@ mod resync_request_tests;
 mod retry_queue_tests;
 mod revocation_protocol_tests;
 mod rng_tests;
+mod rqrr_fork_tests;
 mod safety_alert_fact_storage_tests;
 mod safety_alert_receive_tests;
 mod safety_alert_tests;

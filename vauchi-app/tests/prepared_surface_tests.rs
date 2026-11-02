@@ -773,3 +773,23 @@ fn an_action_list_stays_an_ordinary_list_with_no_style_on_the_wire() {
     assert_eq!(style, PresentationListStyle::Rows);
     assert_eq!(json["List"].get("style"), None);
 }
+
+// @internal
+#[test]
+fn a_prepared_surface_carries_the_themes_font_families() {
+    let prepared =
+        PreparedSurface::from_screen(SurfaceId::new("profile").expect("surface id"), 1, &screen())
+            .expect("the screen projects to a generic surface");
+    let Command::ReplaceSurface { surface } = prepared.command() else {
+        panic!("projection must be atomic");
+    };
+    let families = vauchi_app::theme::DesignTokens::default().font_family;
+    let fonts = surface
+        .tokens
+        .fonts
+        .as_ref()
+        .expect("Core fills the font families (ADR-078 step 4c)");
+    assert_eq!(fonts.display, families.display);
+    assert_eq!(fonts.body, families.body);
+    assert_eq!(fonts.mono, families.mono);
+}

@@ -10,7 +10,6 @@
 //! These tests verify that:
 //! - Brute force attacks on backup passwords are rate-limited (Argon2id cost)
 //! - QR codes expire and cannot be reused after timeout
-//! - BLE relay attacks are prevented via proximity verification
 //! - Sensitive data is zeroed after use (zeroize)
 //! - Security events are logged and exportable
 //! - Key material never appears in logs/debug output
@@ -230,13 +229,6 @@ fn test_qr_clock_drift_detection() {
         "60 second drift should fail clock check"
     );
 }
-
-// =============================================================================
-// Test 3: BLE Relay Attack Prevention (Proximity Verification Required)
-// =============================================================================
-// security.feature @attacks: "Relay attack prevention on BLE"
-// - Proximity verification is mandatory before key agreement
-// - TooFar error when device is beyond allowed range
 
 /// Scenario: Exchange session blocks without mutual QR exchange
 // @scenario: security :: Man-in-the-middle detection during exchange

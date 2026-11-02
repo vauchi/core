@@ -94,6 +94,21 @@ pub fn encode_resync_request() -> Vec<u8> {
     vec![PAYLOAD_VERSION_RESYNC_REQUEST]
 }
 
+/// Version byte for one piece of a guardian backup on its way to the
+/// guardian (vauchi/private#796, D9). The ratchet authenticates the
+/// designator; the piece carries its own backup id, index, count and
+/// whole-delivery hash.
+pub const PAYLOAD_VERSION_GUARDIAN_BACKUP_PIECE: u8 = 0x0b;
+
+/// Encodes a guardian backup piece.
+pub fn encode_guardian_backup_piece(piece: &crate::backup::GuardianBackupPiece) -> Vec<u8> {
+    let inner = piece.encode();
+    let mut buf = Vec::with_capacity(capacity(&[1, inner.len()]));
+    buf.push(PAYLOAD_VERSION_GUARDIAN_BACKUP_PIECE);
+    buf.extend_from_slice(&inner);
+    buf
+}
+
 /// Delta encoding error types.
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -568,6 +583,9 @@ pub enum VersionedPayload {
     Cover,
     /// Please repropagate your visible card to me (vauchi/private#691).
     ResyncRequest,
+    /// One piece of the sender's guardian backup, for this guardian to
+    /// keep (version 0x0b, vauchi/private#796).
+    GuardianBackupPiece(crate::backup::GuardianBackupPiece),
 }
 
 impl VersionedPayload {
@@ -653,6 +671,11 @@ impl VersionedPayload {
             }
             PAYLOAD_VERSION_COVER => Ok(VersionedPayload::Cover),
             PAYLOAD_VERSION_RESYNC_REQUEST => Ok(VersionedPayload::ResyncRequest),
+            PAYLOAD_VERSION_GUARDIAN_BACKUP_PIECE => {
+                crate::backup::GuardianBackupPiece::decode(body)
+                    .map(VersionedPayload::GuardianBackupPiece)
+                    .map_err(|e| DeltaError::InvalidPayload(e.to_string()))
+            }
             v => Err(DeltaError::UnknownPayloadVersion(v)),
         }
     }

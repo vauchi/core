@@ -147,6 +147,9 @@ pub enum ReceiveOutcome {
     /// receive loop honors it, at most once per contact per day
     /// (vauchi/private#691).
     ResyncRequest,
+    /// One piece of the sender's guardian backup; the ratchet advanced,
+    /// and keeping the piece is the receive loop's (vauchi/private#796).
+    GuardianBackupPiece(crate::backup::GuardianBackupPiece),
 }
 
 /// Processes a batch of incoming card updates with full security checks.
@@ -232,7 +235,8 @@ pub fn process_card_updates(
             Ok(ReceiveOutcome::RegistryPushReceived(_))
             | Ok(ReceiveOutcome::RegistryAckReceived { .. })
             | Ok(ReceiveOutcome::Cover)
-            | Ok(ReceiveOutcome::ResyncRequest) => result.processed += 1,
+            | Ok(ReceiveOutcome::ResyncRequest)
+            | Ok(ReceiveOutcome::GuardianBackupPiece(_)) => result.processed += 1,
             Err(_) => result.skipped += 1,
         }
     }
@@ -598,6 +602,26 @@ fn process_single_card_update_for_device_with_budget(
             }
         }
         return Ok(ReceiveOutcome::ResyncRequest);
+    }
+
+    // 3c'''. Guardian backup piece (0x0b, vauchi/private#796): persisted
+    //        like cover; keeping the piece is the receive loop's.
+    if let Ok(VersionedPayload::GuardianBackupPiece(piece)) = VersionedPayload::decode(&plaintext) {
+        storage.begin_transaction()?;
+        let piece_txn = storage.ratchets().save_ratchet_state_for_device(
+            sender_id,
+            peer_device_id,
+            &ratchet,
+            is_initiator,
+        );
+        match piece_txn {
+            Ok(()) => storage.commit()?,
+            Err(e) => {
+                storage.rollback();
+                return Err(e.into());
+            }
+        }
+        return Ok(ReceiveOutcome::GuardianBackupPiece(piece));
     }
 
     // 3d. F4 registry handshake payloads (0x05/0x06) — persist/ack registry
@@ -1126,6 +1150,9 @@ fn decode_versioned_payload(
             )),
             Ok(VersionedPayload::ResyncRequest) => Err(CardUpdateError::InvalidPayload(
                 "resync request not handled here".into(),
+            )),
+            Ok(VersionedPayload::GuardianBackupPiece(_)) => Err(CardUpdateError::InvalidPayload(
+                "guardian backup piece not handled here".into(),
             )),
             Ok(VersionedPayload::ReciprocityConfirm(_)) => {
                 // ReciprocityConfirm is not a card delta — handled at caller level

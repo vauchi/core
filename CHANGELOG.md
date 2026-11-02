@@ -8,6 +8,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.96.0] — 2026-11-02
+
 ### Added
 
 - The relay wire has a published schema: `vauchi-protocol/schemas/`
@@ -17,6 +19,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   `wire_schema_tests` proves each bound against the parser and fails
   when the committed files drift from the code; the specification
   mirrors and validates them (vauchi/private#119).
+
+### Changed
+
+- The shell protocol is a crate of its own: `Command`, `Event`, their
+  sub-types, the executor contract, the exchange types and `NetworkCost`
+  live in `vauchi-contract` (`vauchi/contract`, ADR-078), and Core
+  depends on it at `v0.95.1`. `vauchi_core::platform`,
+  `vauchi_core::exchange_types` and `vauchi_core::settings::NetworkCost`
+  re-export them at their old paths, so no consumer changes an import.
+  The contract's enums are exhaustive: a new variant fails a consumer's
+  build instead of falling through a wildcard arm.
+- The fixture corpus and the domain-vocabulary boundary test live in the
+  contract repository; `vauchi-app` returns the crate's fixtures and
+  Core's `validate:schema` job is gone (contract!4, core!2145).
+
+### Removed
+
+- `vauchi-hardware` left the workspace for `vauchi/linux-hw` as
+  `vauchi-linux-hw` 0.95.0, on the contract alone (ADR-077 items 2 and
+  11, core!2146). A consumer that pinned it from Core's tag pins
+  `vauchi-hardware = { package = "vauchi-linux-hw", git =
+  "https://gitlab.com/vauchi/linux-hw.git", tag = "v0.95.0", version =
+  "=0.95.0" }` instead; its API is unchanged.
 
 ## [0.95.0] — 2026-11-01
 

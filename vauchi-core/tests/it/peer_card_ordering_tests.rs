@@ -199,7 +199,7 @@ fn peer_card_ordering_allows_same_second_successor_and_newer_readd() {
 }
 
 // @claim: S2
-// @scenario: sync_updates :: A multi-device sender's versions are floored per device
+// @scenario: visibility_control :: Granting visibility sends update to contact
 #[test]
 fn peer_card_ordering_restores_an_unchanged_field_permitted_again_on_a_sibling() {
     for ordinary in [false, true] {

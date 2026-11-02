@@ -79,4 +79,7 @@ unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 # The shell contract (ADR-078) is a git dependency by tag: there is no Cargo
 # registry, and Core's consumers pin Core the same way (ADR-026 amendment).
-allow-git = ["https://gitlab.com/vauchi/contract.git"]
+allow-git = [
+    "https://gitlab.com/vauchi/contract.git",
+    "https://gitlab.com/vauchi/utils/rqrr.git",
+]

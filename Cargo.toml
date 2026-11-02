@@ -11,14 +11,6 @@ members = [
     "vauchi-platform",
     "vauchi-protocol",
 ]
-# Vendored fork of rqrr (see [patch.crates-io] below). Excluded from the
-# workspace so it is NOT formatted, clippy-linted, or built by `--workspace`
-# commands — it is third-party code held byte-identical to upstream (one
-# patched function). It is still consumed via the [patch] redirect, and its
-# own tripwire tests run standalone: `cargo test --manifest-path vendor/rqrr/Cargo.toml --lib`
-# (--lib skips upstream's `img`-feature-gated crate-level doctest, which is
-# unrelated to the patch and not run in CI since the crate is workspace-excluded).
-exclude = ["vendor/rqrr"]
 
 [workspace.package]
 version = "0.96.1"
@@ -36,15 +28,14 @@ vauchi-protocol = { path = "vauchi-protocol", version = "0.96.1" }
 # fixture corpus; a git tag with a declared range, since there is no registry.
 vauchi-contract = { git = "https://gitlab.com/vauchi/contract.git", tag = "v0.96.0", version = "^0.96" }
 
-# Vendored fork of rqrr 0.11.0 — patches Perspective::map to clamp instead of
-# abort on a near-degenerate QR perspective (panic=abort makes the upstream
-# assert uncatchable). Upstream 0.11.0 still asserts, so the fork is still
-# needed; geometry.rs is byte-identical 0.10.1 -> 0.11.0, so the rebase was a
-# straight carry. Keeps version 0.11.0; redirects the `rqrr = "0.11"` dep
-# in vauchi-core. See _private/docs/problems/2026-05-25-rqrr-perspective-panic-crashes-qr-scan
-# and core/vendor/rqrr/src/geometry.rs (top-of-file patch marker).
+# rqrr 0.11.0 with the clamped Perspective::map (vauchi/utils/rqrr): upstream
+# aborts on a near-degenerate QR perspective, uncatchable under
+# panic = "abort". The version stays 0.11.0 so this redirects the
+# `rqrr = "0.11"` dependency in vauchi-core; tests/it/rqrr_fork_tests.rs
+# fails the moment it resolves from anywhere else. Record:
+# _private/docs/problems/done/2026-05-25-rqrr-perspective-panic-crashes-qr-scan
 [patch.crates-io]
-rqrr = { path = "vendor/rqrr" }
+rqrr = { git = "https://gitlab.com/vauchi/utils/rqrr.git", tag = "v0.11.0+vauchi.1" }
 
 # Release profile: optimized for size (mobile binaries)
 [profile.release]

@@ -82,7 +82,3 @@ SPDX-License-Identifier = "Apache-2.0"
 # src/geometry.rs. Covers src/, Cargo.toml, README, LICENSE-* and
 # test_data/ — none carry per-file SPDX, so declare upstream's license
 # expression here rather than editing the vendored files.
-[[annotations]]
-path = ["vendor/rqrr/**"]
-SPDX-FileCopyrightText = "WanzenBug <moritz@wanzenbug.xyz>"
-SPDX-License-Identifier = "(MIT OR Apache-2.0) AND ISC"

@@ -67,6 +67,9 @@ impl Vauchi {
     /// 4. Return combined outcome.
     #[tracing::instrument(level = "info", skip_all, name = "vauchi.sync")]
     pub fn sync(&mut self) -> VauchiResult<VauchiSyncOutcome> {
+        // Queued first, so a due guardian backup refresh leaves with this
+        // sync (vauchi/private#796, D11).
+        self.refresh_guardian_backup_if_stale()?;
         let outcome = self.sync_gated();
         // A received WipeThisDevice wipes this device now, whatever else
         // the sync did (#916).

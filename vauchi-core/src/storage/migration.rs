@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 95] = [
+const MIGRATIONS: [Migration; 96] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -747,7 +747,24 @@ const MIGRATIONS: [Migration; 95] = [
         name: "guardian_backups",
         action: MigrationAction::Sql(MIGRATION_V95_GUARDIAN_BACKUPS),
     },
+    Migration {
+        version: 96,
+        name: "guardian_backup_sent",
+        action: MigrationAction::Sql(MIGRATION_V96_GUARDIAN_BACKUP_SENT),
+    },
 ];
+
+/// Migration v96 (vauchi/private#796 step 1e): what this designator last
+/// sent its guardians, so the daily refresh sends again only when the
+/// backup's content changed. The digest is a domain-separated SHA-256 and
+/// reveals nothing about that content.
+const MIGRATION_V96_GUARDIAN_BACKUP_SENT: &str = "
+    CREATE TABLE IF NOT EXISTS guardian_backup_sent (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        content_digest BLOB NOT NULL CHECK(length(content_digest) = 32),
+        sent_at INTEGER NOT NULL
+    );
+";
 
 /// Migration v95 (vauchi/private#796 step 1d): a guardian keeps each
 /// designator's newest complete backup and the pieces of at most two

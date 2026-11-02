@@ -163,6 +163,45 @@ impl GuardianBackupStore<'_> {
         Ok(())
     }
 
+    /// The content digest and time of this designator's last send to its
+    /// guardians, if it ever sent one (step 1e).
+    ///
+    /// # Errors
+    /// Storage errors; [`StorageError::InvalidData`] for a digest that is
+    /// not 32 bytes.
+    pub fn last_sent(&self) -> Result<Option<([u8; 32], u64)>, StorageError> {
+        let row: Option<(Vec<u8>, i64)> = self
+            .conn
+            .query_row(
+                "SELECT content_digest, sent_at FROM guardian_backup_sent WHERE id = 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        row.map(|(digest, sent_at)| {
+            let digest: [u8; 32] = digest
+                .try_into()
+                .map_err(|_| StorageError::InvalidData("guardian backup digest".into()))?;
+            Ok((digest, u64::try_from(sent_at).unwrap_or(0)))
+        })
+        .transpose()
+    }
+
+    /// Records what this designator just sent its guardians.
+    ///
+    /// # Errors
+    /// Storage errors.
+    pub fn record_sent(&self, digest: &[u8; 32], sent_at: u64) -> Result<(), StorageError> {
+        self.conn.execute(
+            "INSERT INTO guardian_backup_sent (id, content_digest, sent_at) VALUES (1, ?1, ?2)
+             ON CONFLICT(id) DO UPDATE SET
+                 content_digest = excluded.content_digest,
+                 sent_at = excluded.sent_at",
+            params![&digest[..], seconds(sent_at)],
+        )?;
+        Ok(())
+    }
+
     fn complete(
         &self,
         designator_id: &str,

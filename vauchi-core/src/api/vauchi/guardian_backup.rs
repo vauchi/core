@@ -18,6 +18,10 @@ use crate::sync::guardian_piece::{GuardianDelivery, split_into_pieces};
 
 use super::Vauchi;
 
+/// A changed guardian backup is sent again at most once a day (D11): each
+/// send is about 2 MB per guardian, and a day-old copy still restores.
+const GUARDIAN_BACKUP_REFRESH_SECS: u64 = 86_400;
+
 impl Vauchi {
     /// Exports a fresh guardian backup and queues each recovery-trusted
     /// contact its share and the backup, in pieces. Returns how many
@@ -90,7 +94,95 @@ impl Vauchi {
                 Err(error) => return Err(error),
             }
         }
+        if sent > 0 {
+            self.storage
+                .guardian_backups()
+                .record_sent(&self.guardian_backup_digest()?, created_at)?;
+        }
         Ok(sent)
+    }
+
+    /// Sends the guardian backup again if what it holds changed since the
+    /// last send and a day has passed (step 1e, D11); never from a duress
+    /// session, whose stale mark waits for the next normal one (D12,
+    /// ADR-032). Returns whether a guardian was sent one.
+    ///
+    /// # Errors
+    /// Storage, export and sealing errors.
+    pub fn refresh_guardian_backup_if_stale(&self) -> VauchiResult<bool> {
+        if self.identity.is_none() || self.in_duress_mode() {
+            return Ok(false);
+        }
+        let last_sent = self.storage.guardian_backups().last_sent()?;
+        let now = self.clock.unix_seconds();
+        if let Some((digest, sent_at)) = last_sent {
+            if now < sent_at.saturating_add(GUARDIAN_BACKUP_REFRESH_SECS) {
+                return Ok(false);
+            }
+            if digest == self.guardian_backup_digest()? {
+                return Ok(false);
+            }
+        }
+        Ok(self.send_guardian_backup()? > 0)
+    }
+
+    /// A digest of what the guardian backup holds and how it is split: the
+    /// voucher threshold, the own card, each contact's id, key, card and
+    /// guardian flag, and the groups. Fields are length-prefixed so that
+    /// no two contents hash alike.
+    fn guardian_backup_digest(&self) -> VauchiResult<[u8; 32]> {
+        use sha2::{Digest, Sha256};
+
+        fn field(hasher: &mut Sha256, bytes: &[u8]) {
+            hasher.update((bytes.len() as u64).to_be_bytes());
+            hasher.update(bytes);
+        }
+        fn json(card: &crate::ContactCard) -> VauchiResult<Vec<u8>> {
+            serde_json::to_vec(card).map_err(|e| VauchiError::Serialization(e.to_string()))
+        }
+
+        let mut hasher = Sha256::new();
+        hasher.update(b"vauchi-guardian-backup-content-v1");
+        let threshold = self
+            .storage
+            .recovery()
+            .load_recovery_settings()?
+            .unwrap_or_default()
+            .recovery_threshold();
+        hasher.update(threshold.to_be_bytes());
+        match self.storage.contacts().load_own_card()? {
+            Some(card) => field(&mut hasher, &json(&card)?),
+            None => field(&mut hasher, &[]),
+        }
+        let mut contacts = self.storage.contacts().list_contacts()?;
+        contacts.sort_by(|a, b| a.id().cmp(b.id()));
+        for contact in &contacts {
+            field(&mut hasher, contact.id().as_bytes());
+            field(
+                &mut hasher,
+                contact.public_key().map_or(&[][..], |pk| &pk[..]),
+            );
+            field(
+                &mut hasher,
+                contact
+                    .shared_key()
+                    .map_or(&[][..], |key| &key.as_bytes()[..]),
+            );
+            field(&mut hasher, &json(contact.card())?);
+            hasher.update([u8::from(contact.is_recovery_trusted())]);
+        }
+        let mut groups = self.storage.labels().load_all_groups()?;
+        groups.sort_by(|a, b| a.id().cmp(b.id()));
+        for group in &groups {
+            field(&mut hasher, group.id().as_bytes());
+            field(&mut hasher, group.name().as_bytes());
+            let mut members: Vec<&String> = group.contacts().iter().collect();
+            members.sort();
+            for member in members {
+                field(&mut hasher, member.as_bytes());
+            }
+        }
+        Ok(hasher.finalize().into())
     }
 
     /// Tells `contact`, just taken out of the guardian set, to forget what

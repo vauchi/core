@@ -207,4 +207,37 @@ git -C "$T/remotes/flaky.git" rev-parse -q --verify "refs/heads/chore/bump-core-
     || fail "the retried push must land the bump branch"
 [ "$(grep -c '^POST .*vauchi%2Fflaky/merge_requests' "$T/log3")" -eq 1 ] || fail "flaky must get exactly one MR"
 
+# A consumer can list several pin files (private#1034): e2e pins Core in
+# Cargo.toml and names the same tag in ci/pins.env, the Core tag of its
+# pinned set. Both move in one clone, one commit, one branch and one MR;
+# a second MR for the same repo would find the first branch and skip.
+remote pinset Cargo.toml "$CARGO_TOML" Cargo.lock "# lock
+" ci/pins.env "# set
+CORE_TAG=v0.69.0
+RELAY_SHA=5f3fff43919199602aa316ed6bc68d3ac25bfaef
+"
+cat > "$T/table4.json" <<'TABLE'
+{ "consumers": [
+  { "repo": "pinset", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
+  { "repo": "pinset", "kind": "pins-env", "file": "ci/pins.env", "bumped_by": "bump:consumer-pins" }
+] }
+TABLE
+status=0
+PATH="$T/bin:$PATH" FAKE_LOG="$T/log4" PROJECT_ACCESS_TOKEN=token \
+    CI_API_V4_URL=https://gitlab.example/api/v4 CONSUMER_GIT_BASE="$T/remotes" \
+    bash "$HERE/scripts/bump-consumer-pins.sh" v0.70.0 "$T/table4.json" "$CORE_PINS" \
+    > "$T/out4" 2>&1 || status=$?
+cat "$T/out4"
+[ "$status" -eq 0 ] || fail "a consumer with two pin files must be bumped"
+git_quiet clone -q --branch "$branch" "$T/remotes/pinset.git" "$T/check-pinset" \
+    || fail "pinset must get branch $branch"
+grep -q 'tag = "v0.70.0", version = "=0.70.0"' "$T/check-pinset/Cargo.toml" \
+    || fail "pinset's Cargo.toml must pin v0.70.0"
+grep -qx 'CORE_TAG=v0.70.0' "$T/check-pinset/ci/pins.env" || fail "pinset's ci/pins.env must name v0.70.0"
+grep -qx 'RELAY_SHA=5f3fff43919199602aa316ed6bc68d3ac25bfaef' "$T/check-pinset/ci/pins.env" \
+    || fail "the bump must leave pins.env's commit pins alone"
+[ "$(git -C "$T/check-pinset" rev-list --count origin/main..HEAD)" -eq 1 ] \
+    || fail "both pin files must move in one commit"
+[ "$(grep -c '^POST .*vauchi%2Fpinset/merge_requests' "$T/log4")" -eq 1 ] || fail "pinset must get exactly one MR"
+
 echo "consumer-pins-bump: OK"

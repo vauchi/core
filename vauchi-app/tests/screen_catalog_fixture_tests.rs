@@ -274,12 +274,11 @@ fn screen_catalog_checked_in_catalog_matches_a_fresh_build_structurally() {
 
 // @internal
 #[test]
-#[ignore = "regenerates the checked-in Core screen catalog fixture"]
+#[ignore = "regenerates the contract repository's screen catalog fixture"]
 fn screen_catalog_regenerate_shared_fixture() {
     init_fixture_i18n();
     let json = serde_json::to_string_pretty(&build_catalog()).expect("serialize catalog");
-    let path =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/screen_catalog_v1.json");
+    let path = fixture_json::contract_fixtures_dir().join("screen_catalog_v1.json");
     std::fs::write(
         path,
         format!("{}\n", fixture_json::collapse_number_arrays(&json)),

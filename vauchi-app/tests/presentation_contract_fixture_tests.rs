@@ -236,11 +236,10 @@ fn shared_fixture_is_fresh() {
 
 // @internal
 #[test]
-#[ignore = "regenerates the checked-in Core contract fixture"]
+#[ignore = "regenerates the contract repository's presentation fixture"]
 fn regenerate_shared_fixture() {
     let json = serde_json::to_string_pretty(&current_fixture()).expect("serialize fixture");
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("fixtures/presentation_contract_v1.json");
+    let path = fixture_json::contract_fixtures_dir().join("presentation_contract_v1.json");
     std::fs::write(
         path,
         format!("{}\n", fixture_json::collapse_number_arrays(&json)),

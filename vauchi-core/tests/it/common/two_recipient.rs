@@ -92,6 +92,11 @@ impl Recipient {
     pub fn vauchi(&self) -> &Vauchi {
         &self.wb
     }
+
+    /// The sharer's contact id in the recipient's storage.
+    pub fn sharer_id(&self) -> &str {
+        &self.sharer_id_here
+    }
 }
 
 /// Delivers every not-yet-seen pending update from `sharer` to `r`, applying

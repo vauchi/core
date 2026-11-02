@@ -84,30 +84,36 @@ fn opens(backup: &[u8], holders: &[(&Recipient, &GuardianDelivery)]) -> bool {
 
 // @internal
 #[test]
-fn a_guardian_delivery_carries_its_share_and_the_backup_and_decodes_back() {
-    let delivery = GuardianDelivery::new(vec![3; 124], vec![9; 5000]).unwrap();
+fn a_guardian_delivery_carries_its_time_share_and_backup_and_decodes_back() {
+    let delivery = GuardianDelivery::new(1_700_000_000, vec![3; 124], vec![9; 5000]).unwrap();
 
     let decoded = GuardianDelivery::decode(&delivery.encode()).unwrap();
 
+    assert_eq!(decoded.created_at(), 1_700_000_000);
     assert_eq!(decoded.sealed_share(), &[3; 124]);
     assert_eq!(decoded.backup(), &[9; 5000]);
 }
 
+/// The wire form is the creation time (8 bytes), the share length
+/// (2 bytes), the share and the backup.
 // @internal
 #[test]
 fn a_malformed_guardian_delivery_is_refused() {
-    let encoded = GuardianDelivery::new(vec![3; 124], vec![9; 10])
+    let encoded = GuardianDelivery::new(7, vec![3; 124], vec![9; 10])
         .unwrap()
         .encode();
     let mut long_share = encoded.clone();
-    long_share[..2].copy_from_slice(&2000u16.to_be_bytes());
+    long_share[8..10].copy_from_slice(&2000u16.to_be_bytes());
+    let mut no_share = vec![0; 8];
+    no_share.extend_from_slice(&[0, 0, 9]);
 
-    let cases: [(&str, Vec<u8>); 5] = [
+    let cases: [(&str, Vec<u8>); 6] = [
         ("empty", Vec::new()),
-        ("no share", [0, 0, 9].to_vec()),
+        ("only part of the time", encoded[..5].to_vec()),
+        ("no share", no_share),
         ("share past the end", long_share),
-        ("cut inside the share", encoded[..60].to_vec()),
-        ("no backup", encoded[..126].to_vec()),
+        ("cut inside the share", encoded[..68].to_vec()),
+        ("no backup", encoded[..134].to_vec()),
     ];
     for (name, bytes) in cases {
         assert_eq!(
@@ -117,7 +123,7 @@ fn a_malformed_guardian_delivery_is_refused() {
         );
     }
     assert_eq!(
-        GuardianDelivery::new(Vec::new(), vec![1]).err(),
+        GuardianDelivery::new(7, Vec::new(), vec![1]).err(),
         Some(PieceError::Malformed)
     );
 }

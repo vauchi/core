@@ -1130,6 +1130,10 @@ const COVERED_ELSEWHERE: &[(&str, &str)] = &[
     // the_revoked_contacts_name_survives_a_key_rotation in
     // recovery_after_revocation_tests.rs.
     ("revoked_senders", "display_name_encrypted"),
+    // a_kept_backup_and_waiting_pieces_survive_a_storage_rekey in
+    // guardian_backup_keep_tests.rs.
+    ("guardian_backup_pieces", "piece_encrypted"),
+    ("guardian_backups", "delivery_encrypted"),
     // the_vcard_uid_lookup_survives_a_rekey in
     // identifying_columns_at_rest_tests.rs (value and lookup hash).
     ("contacts", "original_uid_encrypted"),
@@ -1176,6 +1180,6 @@ fn rekey_reports_progress_one_table_at_a_time() {
     let seen = seen.into_inner().unwrap();
     assert!(!seen.is_empty());
     for (step, (done, total)) in seen.iter().enumerate() {
-        assert_eq!((*done, *total), (step as u32 + 1, 33));
+        assert_eq!((*done, *total), (step as u32 + 1, 35));
     }
 }

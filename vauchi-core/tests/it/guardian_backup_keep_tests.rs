@@ -15,7 +15,7 @@ use vauchi_core::storage::KeptPiece;
 use vauchi_core::sync::guardian_piece::{
     GuardianBackupPiece, GuardianDelivery, PieceError, split_into_pieces,
 };
-use vauchi_core::{SymmetricKey, Vauchi};
+use vauchi_core::{Storage, SymmetricKey, Vauchi};
 
 use crate::common::helpers::create_vauchi_with_identity;
 use crate::common::two_recipient::{Recipient, add_recipient, receive};
@@ -163,6 +163,47 @@ fn a_third_unfinished_backup_evicts_the_oldest_and_the_others_still_complete() {
         "the oldest backup lost its first piece"
     );
     assert_eq!(keep_all(&wb, &alice, third[1..].to_vec()), KeptPiece::Kept);
+}
+
+/// Both tables are encrypted at rest, so a storage key rotation must carry
+/// them over: the kept backup still reads, and an unfinished one still
+/// completes.
+// @internal
+#[test]
+fn a_kept_backup_and_waiting_pieces_survive_a_storage_rekey() {
+    let mut storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let pk = *SigningKeyPair::generate().public_key().as_bytes();
+    let contact =
+        Contact::from_exchange(pk, ContactCard::new("Alice"), SymmetricKey::generate(), 0);
+    let alice = contact.id().to_string();
+    storage.contacts().save_contact(&contact).unwrap();
+    let kept_before = delivery(NOW, 1);
+    for piece in pieces(1, &kept_before) {
+        storage
+            .guardian_backups()
+            .keep_piece(&alice, &piece, NOW)
+            .unwrap();
+    }
+    let waiting = pieces(2, &delivery(NOW + 1, 2));
+    storage
+        .guardian_backups()
+        .keep_piece(&alice, &waiting[0], NOW)
+        .unwrap();
+
+    storage.rekey(SymmetricKey::generate()).unwrap();
+
+    assert_eq!(
+        storage.guardian_backups().kept(&alice).unwrap(),
+        Some(kept_before)
+    );
+    let mut last = KeptPiece::Waiting;
+    for piece in &waiting[1..] {
+        last = storage
+            .guardian_backups()
+            .keep_piece(&alice, piece, NOW)
+            .unwrap();
+    }
+    assert_eq!(last, KeptPiece::Kept);
 }
 
 // @internal

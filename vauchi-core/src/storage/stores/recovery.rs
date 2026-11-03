@@ -42,6 +42,9 @@ impl Storage {
     }
 }
 
+/// A vouched claim's old and new signing key, `(old_pk, new_pk)`.
+pub type VouchedKeys = ([u8; 32], [u8; 32]);
+
 impl RecoveryStore<'_> {
     fn now_secs(&self) -> u64 {
         self.clock.unix_seconds()
@@ -289,10 +292,7 @@ impl RecoveryStore<'_> {
     /// # Errors
     /// Storage errors; [`StorageError::InvalidData`] for a stored key that
     /// is not 32 bytes.
-    pub fn owed_hand_backs(
-        &self,
-        not_before: u64,
-    ) -> Result<Vec<([u8; 32], [u8; 32])>, StorageError> {
+    pub fn owed_hand_backs(&self, not_before: u64) -> Result<Vec<VouchedKeys>, StorageError> {
         let mut statement = self.conn.prepare(
             "SELECT old_pk, new_pk FROM vouched_claims
              WHERE handed_back_at IS NULL AND vouched_at >= ?1 ORDER BY vouched_at",

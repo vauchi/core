@@ -103,6 +103,11 @@ const FILLED_ON_FOLD: &[&str] = &[
 /// had them (a guardian stays one).
 const KEPT_SET_ON_FOLD: &[&str] = &["favorite", "proposal_trusted", "recovery_trusted"];
 
+/// Tables holding the old identity's devices and its device-registry
+/// handshake, which end with the old relationship: the new identity has
+/// other devices, and the contact runs the handshake with it again (D25).
+const ENDED_WITH_THE_OLD_IDENTITY: &[&str] = &["contact_device_registries", "registry_activation"];
+
 impl Storage {
     /// Moves the contact `old_id` to `new_id`, with everything that names
     /// it, in one transaction over both databases.
@@ -213,6 +218,12 @@ impl Storage {
         // the foreign keys are checked when the transaction commits.
         self.conn.execute_batch("PRAGMA defer_foreign_keys = ON")?;
         let update = if fold { "UPDATE OR IGNORE" } else { "UPDATE" };
+        for table in ENDED_WITH_THE_OLD_IDENTITY {
+            self.conn.execute(
+                &format!("DELETE FROM {table} WHERE contact_id = ?1"),
+                params![old_id],
+            )?;
+        }
         if fold {
             self.fold_annotations(old_id, new_id)?;
             // The old relationship's ratchets end with it; the new contact

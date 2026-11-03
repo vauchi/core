@@ -17,7 +17,7 @@
 use super::Vauchi;
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::crypto::SymmetricKey;
-use crate::sync::device_sync::ContactRekeySyncData;
+use crate::sync::device_sync::{ContactRekeySyncData, RekeySettledSyncData, SyncItem};
 
 impl Vauchi {
     /// Journals for the siblings that the contact `old_id` is now `new_id`.
@@ -77,6 +77,65 @@ impl Vauchi {
             self.storage
                 .ratchets()
                 .delete_ratchet_states_for_contact(&new_id)?;
+            Ok(())
+        })
+    }
+
+    /// Journals for the recovered identity's other devices that the
+    /// restored contact `contact_id` no longer waits, with its shared key
+    /// now (D26).
+    ///
+    /// # Errors
+    /// Storage errors; a contact without a shared key journals nothing.
+    pub(super) fn record_rekey_settled(&self, contact_id: &str) -> VauchiResult<()> {
+        let Some(contact) = self.storage.contacts().load_contact(contact_id)? else {
+            return Ok(());
+        };
+        let Some(shared_key) = contact.shared_key() else {
+            return Ok(());
+        };
+        self.record_sync_item(SyncItem::RekeySettled {
+            settled: RekeySettledSyncData {
+                contact_id: contact_id.to_string(),
+                shared_key: *shared_key.as_bytes(),
+            },
+            timestamp: self.clock.unix_seconds(),
+        });
+        Ok(())
+    }
+
+    /// Applies a sibling's settled rekey: a contact this device still has
+    /// waiting takes the shared key and stops waiting; a new key ends this
+    /// device's old sessions with it, and the handshake starts new ones.
+    ///
+    /// # Errors
+    /// Storage errors.
+    pub(super) fn apply_rekey_settled(&self, settled: &RekeySettledSyncData) -> VauchiResult<()> {
+        let contact_id = settled.contact_id.as_str();
+        let recovery = self.storage.recovery();
+        if !recovery.rekey_pending()?.iter().any(|id| id == contact_id) {
+            return Ok(());
+        }
+        let Some(mut contact) = self.storage.contacts().load_contact(contact_id)? else {
+            return Ok(());
+        };
+        let key_changed = contact
+            .shared_key()
+            .is_none_or(|held| held.as_bytes() != &settled.shared_key);
+        self.storage.with_savepoint(|| -> VauchiResult<()> {
+            if key_changed {
+                contact
+                    .adopt_exchange_shared_key(
+                        SymmetricKey::from_bytes(settled.shared_key),
+                        self.clock.unix_seconds(),
+                    )
+                    .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+                self.storage.contacts().save_contact(&contact)?;
+                self.storage
+                    .ratchets()
+                    .delete_ratchet_states_for_contact(contact_id)?;
+            }
+            recovery.clear_rekey_pending(contact_id)?;
             Ok(())
         })
     }

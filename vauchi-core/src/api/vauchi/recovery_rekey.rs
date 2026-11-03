@@ -154,6 +154,7 @@ impl Vauchi {
             match self.queue_sealed_payload(identity, &contact, &payload) {
                 Ok(()) => {
                     self.storage.recovery().clear_rekey_pending(&contact_id)?;
+                    self.record_rekey_settled(&contact_id)?;
                     sent += 1;
                 }
                 Err(VauchiError::SendDeferred)
@@ -233,6 +234,7 @@ impl Vauchi {
             self.storage.recovery().clear_rekey_pending(&contact_id)?;
             Ok(())
         })?;
+        self.record_rekey_settled(&contact_id)?;
         self.mark_own_card_repropagate()?;
         Ok(RekeyAnswerTaken::Completed { contact_id })
     }

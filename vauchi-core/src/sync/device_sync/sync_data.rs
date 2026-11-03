@@ -43,6 +43,26 @@ impl std::fmt::Debug for ContactRekeySyncData {
     }
 }
 
+/// A restored contact whose rekey one of the recovered identity's devices
+/// settled, by its answer or by the continuation after meeting it again
+/// (private#796, D26): the siblings take its shared key and stop waiting.
+#[derive(Clone, PartialEq, Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
+pub struct RekeySettledSyncData {
+    /// The contact that no longer waits.
+    pub contact_id: String,
+    /// The shared key of its relationship with this identity now.
+    #[serde(with = "crate::sync::device_sync::bytes_array_32")]
+    pub shared_key: [u8; 32],
+}
+
+impl std::fmt::Debug for RekeySettledSyncData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RekeySettledSyncData")
+            .field("contact_id", &self.contact_id)
+            .finish_non_exhaustive()
+    }
+}
+
 /// A restored contact still waiting for its rekey, as a linked device takes
 /// it over (private#796, D26).
 #[derive(Clone, PartialEq, Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]

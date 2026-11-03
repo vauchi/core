@@ -560,6 +560,7 @@ impl Vauchi {
                     ref rekey,
                     timestamp,
                 } => self.apply_contact_rekeyed(rekey, timestamp),
+                SyncItem::RekeySettled { ref settled, .. } => self.apply_rekey_settled(settled),
                 SyncItem::DeviceRegistryChanged {
                     ref registry_json, ..
                 } => {
@@ -979,6 +980,7 @@ fn sync_item_event(item: &crate::sync::device_sync::SyncItem) -> Option<VauchiEv
         SyncItem::ContactRekeyed { rekey, .. } => Some(VauchiEvent::ContactRemoved {
             contact_id: rekey.old_contact_id.clone(),
         }),
+        SyncItem::RekeySettled { .. } => None,
         SyncItem::DeviceRegistryChanged { .. } => None,
         // F4 control-plane state: never surfaced to the user (owner decision
         // 2026-07-24 — no device counts, no change events).

@@ -30,8 +30,8 @@ mod sync_data;
 
 pub use sync_data::{
     ContactExchangeLocation, ContactRekeySyncData, ContactSyncData, GroupSyncData,
-    ImportedContactSyncData, PlaceSyncData, RecoveryRekeySyncData, RekeyWaitingSyncData,
-    TagSyncData,
+    ImportedContactSyncData, PlaceSyncData, RecoveryRekeySyncData, RekeySettledSyncData,
+    RekeyWaitingSyncData, TagSyncData,
 };
 
 /// Why a device is being linked.
@@ -127,6 +127,15 @@ pub enum SyncItem {
         /// The old contact, the new key and the new shared key.
         rekey: ContactRekeySyncData,
         /// When the other device accepted the rekey.
+        timestamp: u64,
+    },
+
+    /// A restored contact's rekey settled on this identity's other device
+    /// (private#796, D26).
+    RekeySettled {
+        /// The contact and its shared key now.
+        settled: RekeySettledSyncData,
+        /// When the other device settled it.
         timestamp: u64,
     },
 
@@ -486,6 +495,7 @@ impl SyncItem {
             SyncItem::ContactRemoved { timestamp, .. } => *timestamp,
             SyncItem::ContactCardUpdated { timestamp, .. } => *timestamp,
             SyncItem::ContactRekeyed { timestamp, .. } => *timestamp,
+            SyncItem::RekeySettled { timestamp, .. } => *timestamp,
             SyncItem::DeviceRegistryChanged { version, .. } => *version,
             SyncItem::ContactRegistryReceived { timestamp, .. } => *timestamp,
             SyncItem::ContactActivationChanged { timestamp, .. } => *timestamp,

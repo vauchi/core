@@ -88,3 +88,31 @@ fn v108_rerun_over_the_current_schema_changes_nothing() {
 
     assert_eq!(columns(&conn, "recovery_rekey_answers"), before);
 }
+
+// @internal
+#[test]
+fn v109_marks_a_waiting_contact_with_a_session_on_this_device_as_met_again() {
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+    run_up_to(&conn, &key, 108);
+    conn.execute_batch(
+        "PRAGMA foreign_keys = OFF;
+         INSERT INTO recovery_rekey_pending (contact_id, restored_at) VALUES ('met', 5), ('waiting', 5);
+         INSERT INTO contact_ratchets (contact_id, ratchet_state_encrypted, is_initiator, updated_at)
+             VALUES ('met', x'01', 1, 5);",
+    )
+    .unwrap();
+
+    run_up_to(&conn, &key, u32::MAX);
+
+    let met_again = |id: &str| -> i64 {
+        conn.query_row(
+            "SELECT met_again FROM recovery_rekey_pending WHERE contact_id = ?1",
+            [id],
+            |row| row.get(0),
+        )
+        .unwrap()
+    };
+    assert_eq!(met_again("met"), 1);
+    assert_eq!(met_again("waiting"), 0);
+}

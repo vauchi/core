@@ -812,19 +812,16 @@ const MIGRATION_V106_RECOVERY_REKEY_ANSWERS: &str = "
         contact_id TEXT PRIMARY KEY REFERENCES contacts(id) ON DELETE CASCADE,
         answer_encrypted BLOB NOT NULL,
         old_shared_encrypted BLOB NOT NULL,
+        kept_at INTEGER NOT NULL,
         sent_at INTEGER
     );
 ";
 
-/// Migration v105 (vauchi/private#796, step 5a): the rekey offers a
-/// contact took in and has not answered yet, one per recovered contact.
-const MIGRATION_V105_RECOVERY_REKEY_INBOUND: &str = "
-    CREATE TABLE IF NOT EXISTS recovery_rekey_inbound (
-        contact_id TEXT PRIMARY KEY REFERENCES contacts(id) ON DELETE CASCADE,
-        offer_encrypted BLOB NOT NULL,
-        received_at INTEGER NOT NULL
-    );
-";
+/// Migration v105 (vauchi/private#796, step 5a) kept the rekey offers a
+/// contact took in for review. D18 accepts or drops an offer as it
+/// arrives, so nothing is kept; it stays a no-op so the versions stay
+/// contiguous. It never reached a release.
+const MIGRATION_V105_RECOVERY_REKEY_INBOUND: &str = "SELECT 1;";
 
 /// Migration v104 (vauchi/private#796, step 4b): the recovering identity's
 /// own sealed recovery proof, kept once its vouchers complete it, and the

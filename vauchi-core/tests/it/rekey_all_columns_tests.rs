@@ -1143,7 +1143,6 @@ const COVERED_ELSEWHERE: &[(&str, &str)] = &[
     ("recovery_passphrase", "key_encrypted"),
     ("recovery_own_proof", "proof_encrypted"),
     ("recovery_rekey_offers", "exchange_secret_encrypted"),
-    ("recovery_rekey_inbound", "offer_encrypted"),
     ("recovery_rekey_answers", "answer_encrypted"),
     ("recovery_rekey_answers", "old_shared_encrypted"),
     // the_vcard_uid_lookup_survives_a_rekey in
@@ -1192,6 +1191,6 @@ fn rekey_reports_progress_one_table_at_a_time() {
     let seen = seen.into_inner().unwrap();
     assert!(!seen.is_empty());
     for (step, (done, total)) in seen.iter().enumerate() {
-        assert_eq!((*done, *total), (step as u32 + 1, 43));
+        assert_eq!((*done, *total), (step as u32 + 1, 42));
     }
 }

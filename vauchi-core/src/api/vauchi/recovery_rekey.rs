@@ -20,6 +20,11 @@ use super::Vauchi;
 /// An unanswered offer goes out again after a day, with the same key.
 const REKEY_OFFER_RESEND_SECS: u64 = 86_400;
 
+/// Offers and answers go out for this long, then stop (D18): a contact
+/// silent that long is listed, and meeting in person settles it. The relay
+/// keeps a blob for longer, and a device catches up 14 days per cycle.
+pub(super) const REKEY_RESEND_WINDOW_SECS: u64 = 14 * 86_400;
+
 /// One rekey offer due for a restored contact, and where it goes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RekeyDelivery {
@@ -51,7 +56,10 @@ impl Vauchi {
         let now = self.clock.unix_seconds();
         let day = current_day_epoch(now);
         let mut deliveries = Vec::new();
-        for contact_id in self.storage.recovery().rekey_pending()? {
+        for (contact_id, restored_at) in self.storage.recovery().rekey_pending_since()? {
+            if now >= restored_at.saturating_add(REKEY_RESEND_WINDOW_SECS) {
+                continue;
+            }
             let Some(contact) = self.storage.contacts().load_contact(&contact_id)? else {
                 continue;
             };

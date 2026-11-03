@@ -879,6 +879,35 @@ impl RecoveryProof {
     }
 
     /// Verifies the proof against local contacts and returns confidence level.
+    /// Whether this proof shows, to the holder of `my_contacts`, that the
+    /// recovery is the real one, so its rekey is accepted without asking
+    /// (vauchi/private#796, D18): the proof is well-formed and signed, and
+    /// either at least the holder's verification threshold of its vouchers
+    /// carry a guardian token the old key signed (`validate` checks each
+    /// token), or that many vouchers are the holder's own contacts. The
+    /// threshold is the holder's, not the proof's, which the claimant sets.
+    /// No expiry applies (D21): a proof binds the old and the new key, so
+    /// an old one cannot serve another.
+    pub fn proves_the_recovery_to(
+        &self,
+        my_contacts: &[Contact],
+        settings: &RecoverySettings,
+    ) -> bool {
+        if self.validate().is_err() {
+            return false;
+        }
+        let guardian_vouchers = self
+            .vouchers
+            .iter()
+            .filter(|voucher| voucher.guardian_token().is_some())
+            .count();
+        guardian_vouchers >= settings.verification_threshold as usize
+            || matches!(
+                self.verify_for_contact(my_contacts, settings),
+                VerificationResult::HighConfidence { .. }
+            )
+    }
+
     pub fn verify_for_contact(
         &self,
         my_contacts: &[Contact],

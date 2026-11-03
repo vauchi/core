@@ -46,7 +46,7 @@ mod recovery;
 mod recovery_offline;
 pub use recovery_offline::RecoveryClaimContact;
 #[cfg(feature = "network-http")]
-pub use recovery_rekey_inbound::{PendingRekey, RekeyOfferTaken};
+pub use recovery_rekey_inbound::RekeyOfferTaken;
 mod guardian_backup;
 mod guardian_restore;
 mod recovery_passphrase;

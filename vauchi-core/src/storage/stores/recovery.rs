@@ -43,8 +43,8 @@ impl Storage {
 }
 
 /// A kept rekey answer: the contact's id, the answer, the old shared key
-/// that addresses it, and when it last went out.
-pub type KeptRekeyAnswer = (String, Vec<u8>, SymmetricKey, Option<u64>);
+/// that addresses it, when it was kept and when it last went out.
+pub type KeptRekeyAnswer = (String, Vec<u8>, SymmetricKey, u64, Option<u64>);
 
 /// A rekey offer's exchange secret and when the offer last went out.
 pub type RekeyExchange = (zeroize::Zeroizing<[u8; 32]>, Option<u64>);
@@ -483,6 +483,22 @@ impl RecoveryStore<'_> {
         Ok(())
     }
 
+    /// The contacts waiting for their rekey with when each was restored.
+    pub fn rekey_pending_since(&self) -> Result<Vec<(String, u64)>, StorageError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT contact_id, restored_at FROM recovery_rekey_pending ORDER BY restored_at, rowid",
+        )?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows
+            .into_iter()
+            .map(|(id, at)| (id, u64::try_from(at).unwrap_or(0)))
+            .collect())
+    }
+
     /// The contacts still waiting for their rekey, in the order restored.
     pub fn rekey_pending(&self) -> Result<Vec<String>, StorageError> {
         let mut stmt = self
@@ -579,51 +595,6 @@ impl RecoveryStore<'_> {
         Ok(())
     }
 
-    /// Keeps a rekey offer `contact_id` sent, replacing an earlier one.
-    pub fn keep_rekey_offer(&self, contact_id: &str, offer: &[u8]) -> Result<(), StorageError> {
-        let offer_encrypted = crate::crypto::encrypt(self.key, offer)
-            .map_err(|e| StorageError::Encryption(e.to_string()))?;
-        self.conn.execute(
-            "INSERT OR REPLACE INTO recovery_rekey_inbound (contact_id, offer_encrypted, received_at)
-             VALUES (?1, ?2, ?3)",
-            params![
-                contact_id,
-                offer_encrypted,
-                i64::try_from(self.now_secs()).unwrap_or(i64::MAX)
-            ],
-        )?;
-        Ok(())
-    }
-
-    /// Every rekey offer kept, as `(contact_id, offer)`, oldest first.
-    pub fn kept_rekey_offers(&self) -> Result<Vec<(String, Vec<u8>)>, StorageError> {
-        let mut stmt = self.conn.prepare(
-            "SELECT contact_id, offer_encrypted FROM recovery_rekey_inbound
-             ORDER BY received_at, rowid",
-        )?;
-        let rows = stmt
-            .query_map([], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?))
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-        rows.into_iter()
-            .map(|(id, sealed)| {
-                crate::crypto::decrypt(self.key, &sealed)
-                    .map(|offer| (id, offer))
-                    .map_err(|e| StorageError::Encryption(e.to_string()))
-            })
-            .collect()
-    }
-
-    /// Forgets the rekey offer `contact_id` sent, answered or declined.
-    pub fn forget_rekey_offer(&self, contact_id: &str) -> Result<(), StorageError> {
-        self.conn.execute(
-            "DELETE FROM recovery_rekey_inbound WHERE contact_id = ?1",
-            params![contact_id],
-        )?;
-        Ok(())
-    }
-
     /// Keeps the answer to `contact_id`'s rekey with the old relationship's
     /// shared key, which addresses it, replacing an earlier one.
     pub fn keep_rekey_answer(
@@ -638,9 +609,14 @@ impl RecoveryStore<'_> {
         };
         self.conn.execute(
             "INSERT OR REPLACE INTO recovery_rekey_answers
-             (contact_id, answer_encrypted, old_shared_encrypted, sent_at)
-             VALUES (?1, ?2, ?3, NULL)",
-            params![contact_id, seal(answer)?, seal(old_shared.as_bytes())?],
+             (contact_id, answer_encrypted, old_shared_encrypted, kept_at, sent_at)
+             VALUES (?1, ?2, ?3, ?4, NULL)",
+            params![
+                contact_id,
+                seal(answer)?,
+                seal(old_shared.as_bytes())?,
+                i64::try_from(self.now_secs()).unwrap_or(i64::MAX)
+            ],
         )?;
         Ok(())
     }
@@ -652,7 +628,7 @@ impl RecoveryStore<'_> {
     /// Storage errors; [`StorageError::InvalidData`] for a malformed key.
     pub fn kept_rekey_answers(&self) -> Result<Vec<KeptRekeyAnswer>, StorageError> {
         let mut stmt = self.conn.prepare(
-            "SELECT contact_id, answer_encrypted, old_shared_encrypted, sent_at
+            "SELECT contact_id, answer_encrypted, old_shared_encrypted, kept_at, sent_at
              FROM recovery_rekey_answers ORDER BY rowid",
         )?;
         let rows = stmt
@@ -661,7 +637,8 @@ impl RecoveryStore<'_> {
                     row.get::<_, String>(0)?,
                     row.get::<_, Vec<u8>>(1)?,
                     row.get::<_, Vec<u8>>(2)?,
-                    row.get::<_, Option<i64>>(3)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, Option<i64>>(4)?,
                 ))
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -670,7 +647,7 @@ impl RecoveryStore<'_> {
                 .map_err(|e| StorageError::Encryption(e.to_string()))
         };
         rows.into_iter()
-            .map(|(id, answer, old_shared, sent_at)| {
+            .map(|(id, answer, old_shared, kept_at, sent_at)| {
                 let key = zeroize::Zeroizing::new(open(&old_shared)?);
                 let key = <[u8; 32]>::try_from(key.as_slice())
                     .map_err(|_| StorageError::InvalidData("rekey old shared key".into()))?;
@@ -678,6 +655,7 @@ impl RecoveryStore<'_> {
                     id,
                     open(&answer)?,
                     SymmetricKey::from_bytes(key),
+                    u64::try_from(kept_at).unwrap_or(0),
                     sent_at.map(|at| u64::try_from(at).unwrap_or(0)),
                 ))
             })

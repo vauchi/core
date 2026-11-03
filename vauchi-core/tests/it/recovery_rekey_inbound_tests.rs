@@ -18,7 +18,7 @@ use vauchi_core::clock::FakeClock;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::recovery::rekey::RekeyOffer;
-use vauchi_core::{Identity, Storage, SymmetricKey, Vauchi};
+use vauchi_core::{Identity, SymmetricKey, Vauchi};
 
 use crate::common::helpers::create_vauchi_with_identity;
 use crate::common::meeting::signing_pk;
@@ -219,28 +219,4 @@ fn an_offer_sent_again_after_the_rekey_changes_nothing() {
     assert_eq!(again, RekeyOfferTaken::Dropped);
     assert_eq!(dave.list_contacts().unwrap().len(), after_first);
     assert_eq!(dave.rekey_answer_deliveries().unwrap().len(), 1);
-}
-
-// @internal
-#[test]
-fn a_kept_offer_survives_a_storage_rekey() {
-    let mut storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let contact = Contact::from_exchange(
-        *Identity::create("Alice", 0).signing_public_key(),
-        ContactCard::new("Alice"),
-        SymmetricKey::generate(),
-        0,
-    );
-    storage.contacts().save_contact(&contact).unwrap();
-    storage
-        .recovery()
-        .keep_rekey_offer(contact.id(), b"offer bytes")
-        .unwrap();
-
-    storage.rekey(SymmetricKey::generate()).unwrap();
-
-    assert_eq!(
-        storage.recovery().kept_rekey_offers().unwrap(),
-        vec![(contact.id().to_string(), b"offer bytes".to_vec())]
-    );
 }

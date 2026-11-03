@@ -384,6 +384,12 @@ quint_trace guardian_succession.qnt sign_once sign_once_
 quint_trace guardian_succession.qnt ballots ballots_
 quint_trace guardian_succession.qnt ballots_rolled_back rolled_back_
 quint_trace guardian_succession.qnt tolerant_rolled_back tolerant_
+# Chained decisions: a recovery competes with a policy change, the next
+# decision goes to the new guardians, a lost phone is recovered again;
+# deleting retired keys closes the old decision, stolen undeleted ones
+# fork a contact offline since the handover (P23's accepted exposure).
+quint_trace guardian_history.qnt deleted_keys '(history|deleted)_'
+quint_trace guardian_history.qnt stolen_old_keys '(history|stolen)_'
 quint_expect device_link_machines.qnt reliable_relay ok verify no_device_registered_for_a_failed_joiner
 quint_expect device_link_machines.qnt reliable_relay ok verify joiner_seed_implies_registered
 # Without the host's expiry check the host registers a device whose

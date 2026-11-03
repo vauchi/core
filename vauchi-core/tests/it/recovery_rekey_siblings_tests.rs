@@ -17,7 +17,7 @@ use vauchi_core::sync::device_sync::{ContactRekeySyncData, SyncItem};
 
 use crate::common::device_sync::{journal_for_tablet, link_tablet};
 use crate::common::helpers::create_vauchi_with_identity;
-use crate::common::meeting::{meet, signing_pk};
+use crate::common::meeting::{deliver, meet, signing_pk};
 use crate::common::recovered_phone::{World, recovered};
 
 /// Alice's phone, restored, and the offer it makes Dave.
@@ -180,4 +180,27 @@ fn the_rekey_item_keeps_its_shared_key_out_of_debug_output() {
 
     assert!(shown.contains("old"));
     assert!(!shown.contains("201"), "{shown}");
+}
+
+// @internal
+#[test]
+fn a_continuation_met_in_person_reaches_the_siblings_too() {
+    let world = recovered(create_vauchi_with_identity("Alice, new phone"), None, 3);
+    world.phone.restore_from_returned_backups(None).unwrap();
+    let dave = world.dave.vauchi();
+    let old_id = world.dave.sharer_id().to_string();
+    let (phone_at_dave, dave_at_phone) = meet(dave, &world.phone, false);
+    let (registry, tablet_id) = link_tablet(dave, [65u8; 32]);
+    world.phone.send_owed_recovery_continuations().unwrap();
+
+    deliver(&world.phone, &dave_at_phone, dave, &phone_at_dave);
+
+    let journal = journal_for_tablet(dave, registry, &tablet_id);
+    let told = rekeys(&journal);
+    assert_eq!(told.len(), 1);
+    assert_eq!(told[0].old_contact_id, old_id);
+    assert_eq!(
+        hex::encode(told[0].new_public_key.as_bytes()),
+        phone_at_dave
+    );
 }

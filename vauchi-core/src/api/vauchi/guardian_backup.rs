@@ -232,8 +232,67 @@ impl Vauchi {
             .guardian_backups()
             .kept(&hex::encode(old_pk))?
             .ok_or_else(refused)?;
+        self.queue_hand_back(identity, &contact, &new_pk, &kept)?;
+        self.storage
+            .recovery()
+            .mark_handed_back(&old_pk, &new_pk, self.clock.unix_seconds())?;
+        Ok(())
+    }
 
-        let resealed = self.respond_to_recovery(kept.sealed_share(), &new_pk)?;
+    /// Sends every hand-back this guardian still owes (step 2c, D14): a
+    /// vouched claim, still within its age, whose new key is an exchanged
+    /// contact and whose old key's backup is kept. Tried as an exchange
+    /// completes and on every sync, so a guardian that answered the
+    /// exchange and has no sending chain yet sends once the new phone has
+    /// written. Returns how many went out; a duress session sends none.
+    ///
+    /// # Errors
+    /// Storage and sealing errors; a contact that cannot be sent to yet is
+    /// owed, not an error.
+    pub fn hand_back_owed(&self) -> VauchiResult<usize> {
+        let Some(identity) = self.identity.as_ref() else {
+            return Ok(0);
+        };
+        if self.in_duress_mode() {
+            return Ok(0);
+        }
+        let now = self.clock.unix_seconds();
+        let not_before = now.saturating_sub(crate::recovery::RecoveryClaim::MAX_AGE_SECS);
+        let mut sent = 0;
+        for (old_pk, new_pk) in self.storage.recovery().owed_hand_backs(not_before)? {
+            let Some(contact) = self.storage.contacts().load_contact(&hex::encode(new_pk))? else {
+                continue;
+            };
+            if contact.public_key() != Some(&new_pk) {
+                continue;
+            }
+            let Some(kept) = self.storage.guardian_backups().kept(&hex::encode(old_pk))? else {
+                continue;
+            };
+            match self.queue_hand_back(identity, &contact, &new_pk, &kept) {
+                Ok(()) => {
+                    self.storage
+                        .recovery()
+                        .mark_handed_back(&old_pk, &new_pk, now)?;
+                    sent += 1;
+                }
+                Err(VauchiError::SendDeferred) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(sent)
+    }
+
+    /// Re-seals the kept share to `new_pk` and queues it with the backup to
+    /// `contact` as `0x0d` pieces, all or none.
+    fn queue_hand_back(
+        &self,
+        identity: &crate::identity::Identity,
+        contact: &Contact,
+        new_pk: &[u8; 32],
+        kept: &GuardianDelivery,
+    ) -> VauchiResult<()> {
+        let resealed = self.respond_to_recovery(kept.sealed_share(), new_pk)?;
         let returned = GuardianDelivery::new(kept.created_at(), resealed, kept.backup().to_vec())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         let mut backup_id = [0u8; 16];
@@ -244,7 +303,7 @@ impl Vauchi {
             pieces.iter().try_for_each(|piece| {
                 self.queue_sealed_payload(
                     identity,
-                    &contact,
+                    contact,
                     &crate::sync::delta::encode_returned_backup_piece(piece),
                 )
             })

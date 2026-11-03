@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 98] = [
+const MIGRATIONS: [Migration; 99] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -762,7 +762,34 @@ const MIGRATIONS: [Migration; 98] = [
         name: "vouched_claims",
         action: MigrationAction::Sql(MIGRATION_V98_VOUCHED_CLAIMS),
     },
+    Migration {
+        version: 99,
+        name: "vouched_claims_handed_back",
+        action: MigrationAction::Callback(migrate_v99_vouched_claims_handed_back),
+    },
 ];
+
+/// Migration v99 (vauchi/private#796 step 2c): when the hand-back for a
+/// vouched claim went out, so a guardian that could not send it at the
+/// exchange owes it until a later sync, and sends it once. Checked first,
+/// like v92, because SQLite has no `ADD COLUMN IF NOT EXISTS`.
+fn migrate_v99_vouched_claims_handed_back(
+    conn: &Connection,
+    _key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    let present: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('vouched_claims') WHERE name = 'handed_back_at'",
+        [],
+        |row| row.get(0),
+    )?;
+    if present == 0 {
+        conn.execute(
+            "ALTER TABLE vouched_claims ADD COLUMN handed_back_at INTEGER",
+            [],
+        )?;
+    }
+    Ok(())
+}
 
 /// Migration v98 (vauchi/private#796 step 2b): the claims this device
 /// vouched for, so a guardian hands its backup back only to the new key of

@@ -140,6 +140,10 @@ impl Vauchi {
         // which silently broke device-to-device sync
         // (2026-06-30 device root-cause; `2026-06-28-sync-delivery-sent-not-received`).
         self.mark_own_card_repropagate()?;
+        // A guardian in a recovery meeting hands back as the exchange with
+        // the claim's new key completes (vauchi/private#796, D14); one that
+        // cannot send yet owes it to the next sync.
+        self.hand_back_owed()?;
         Ok(())
     }
 }

@@ -70,6 +70,7 @@ impl Vauchi {
         // Queued first, so a due guardian backup refresh leaves with this
         // sync (vauchi/private#796, D11).
         self.refresh_guardian_backup_if_stale()?;
+        self.hand_back_owed()?;
         let outcome = self.sync_gated();
         // A received WipeThisDevice wipes this device now, whatever else
         // the sync did (#916).

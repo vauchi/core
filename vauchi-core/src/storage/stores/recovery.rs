@@ -283,6 +283,59 @@ impl RecoveryStore<'_> {
         Ok(())
     }
 
+    /// The claims vouched for at or after `not_before` whose hand-back has
+    /// not gone out yet, as `(old_pk, new_pk)` (step 2c).
+    ///
+    /// # Errors
+    /// Storage errors; [`StorageError::InvalidData`] for a stored key that
+    /// is not 32 bytes.
+    pub fn owed_hand_backs(
+        &self,
+        not_before: u64,
+    ) -> Result<Vec<([u8; 32], [u8; 32])>, StorageError> {
+        let mut statement = self.conn.prepare(
+            "SELECT old_pk, new_pk FROM vouched_claims
+             WHERE handed_back_at IS NULL AND vouched_at >= ?1 ORDER BY vouched_at",
+        )?;
+        let rows = statement
+            .query_map(
+                params![i64::try_from(not_before).unwrap_or(i64::MAX)],
+                |row| Ok((row.get::<_, Vec<u8>>(0)?, row.get::<_, Vec<u8>>(1)?)),
+            )?
+            .collect::<Result<Vec<_>, _>>()?;
+        rows.into_iter()
+            .map(|(old, new)| {
+                let key = |bytes: Vec<u8>| {
+                    <[u8; 32]>::try_from(bytes)
+                        .map_err(|_| StorageError::InvalidData("vouched claim key".into()))
+                };
+                Ok((key(old)?, key(new)?))
+            })
+            .collect()
+    }
+
+    /// Records that the hand-back for the claim from `old_pk` to `new_pk`
+    /// went out.
+    ///
+    /// # Errors
+    /// Storage errors.
+    pub fn mark_handed_back(
+        &self,
+        old_pk: &[u8; 32],
+        new_pk: &[u8; 32],
+        at: u64,
+    ) -> Result<(), StorageError> {
+        self.conn.execute(
+            "UPDATE vouched_claims SET handed_back_at = ?3 WHERE old_pk = ?1 AND new_pk = ?2",
+            params![
+                &old_pk[..],
+                &new_pk[..],
+                i64::try_from(at).unwrap_or(i64::MAX)
+            ],
+        )?;
+        Ok(())
+    }
+
     /// The old key of the latest claim this device vouched for whose new
     /// key is `new_pk`, vouched at or after `not_before`.
     ///

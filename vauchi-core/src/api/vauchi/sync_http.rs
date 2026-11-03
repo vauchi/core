@@ -495,6 +495,7 @@ impl Vauchi {
         let mut unscoped = 0usize;
         let mut device_blobs: Vec<(String, Vec<u8>)> = Vec::new();
         let mut revocations: Vec<(String, crate::network::IdentityRevoked)> = Vec::new();
+        let mut rekey_offers: Vec<(String, Vec<u8>)> = Vec::new();
         let mut update_blobs: Vec<(String, String, Vec<u8>, Option<String>)> = Vec::new();
         while let Some(envelope) = adapter.receive().map_err(VauchiError::Network)? {
             if let MessagePayload::EncryptedUpdate(update) = envelope.payload {
@@ -526,6 +527,9 @@ impl Vauchi {
                         message_id,
                         revocation,
                     } => revocations.push((message_id, revocation)),
+                    InboundBlob::RekeyOffer { message_id, blob } => {
+                        rekey_offers.push((message_id, blob));
+                    }
                     InboundBlob::ContactUpdate {
                         message_id,
                         token,
@@ -577,6 +581,26 @@ impl Vauchi {
             // ACK. Otherwise a WAL-lock/disk-full would silently lose the
             // revocation.
             if crate::network::revocation::process_revocation(&rev, &self.storage).is_err() {
+                continue;
+            }
+            let ack = create_envelope(
+                MessagePayload::Acknowledgment(Acknowledgment {
+                    message_id: message_id.into(),
+                    status: AckStatus::Stored,
+                    error: None,
+                }),
+                self.clock.unix_seconds(),
+                self.rng.uuid_v4().into(),
+            );
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = adapter.send(&ack);
+        }
+
+        // 2d. Rekey offers from recovered contacts (vauchi/private#796): kept
+        //     for review when valid, dropped otherwise; ACKed unless a
+        //     storage error asks for a retry, like revocations.
+        for (message_id, blob) in rekey_offers {
+            if self.take_rekey_offer(&blob).is_err() {
                 continue;
             }
             let ack = create_envelope(
@@ -1272,6 +1296,9 @@ enum InboundBlob {
         message_id: String,
         revocation: crate::network::IdentityRevoked,
     },
+    /// Magic-prefixed signed rekey offer from a recovered contact
+    /// (vauchi/private#796), checked by `take_rekey_offer`.
+    RekeyOffer { message_id: String, blob: Vec<u8> },
     /// Ratchet-encrypted contact update, routed by mailbox token.
     ContactUpdate {
         message_id: String,
@@ -1293,6 +1320,12 @@ fn classify_inbound_blob(
         return InboundBlob::DeviceSync {
             message_id,
             ciphertext,
+        };
+    }
+    if crate::recovery::rekey::is_rekey_offer(&ciphertext) {
+        return InboundBlob::RekeyOffer {
+            message_id,
+            blob: ciphertext,
         };
     }
     match crate::network::revocation::decode_revocation_blob(&ciphertext) {

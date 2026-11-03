@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 104] = [
+const MIGRATIONS: [Migration; 105] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -792,7 +792,22 @@ const MIGRATIONS: [Migration; 104] = [
         name: "recovery_rekey_offers",
         action: MigrationAction::Sql(MIGRATION_V104_RECOVERY_REKEY_OFFERS),
     },
+    Migration {
+        version: 105,
+        name: "recovery_rekey_inbound",
+        action: MigrationAction::Sql(MIGRATION_V105_RECOVERY_REKEY_INBOUND),
+    },
 ];
+
+/// Migration v105 (vauchi/private#796, step 5a): the rekey offers a
+/// contact took in and has not answered yet, one per recovered contact.
+const MIGRATION_V105_RECOVERY_REKEY_INBOUND: &str = "
+    CREATE TABLE IF NOT EXISTS recovery_rekey_inbound (
+        contact_id TEXT PRIMARY KEY REFERENCES contacts(id) ON DELETE CASCADE,
+        offer_encrypted BLOB NOT NULL,
+        received_at INTEGER NOT NULL
+    );
+";
 
 /// Migration v104 (vauchi/private#796, step 4b): the recovering identity's
 /// own sealed recovery proof, kept once its vouchers complete it, and the

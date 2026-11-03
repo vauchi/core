@@ -154,6 +154,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     // V104 the recovery proof and rekey offers' exchange keys (#796)
     ("recovery_own_proof", "proof_encrypted"),
     ("recovery_rekey_offers", "exchange_secret_encrypted"),
+    // V105 rekey offers taken in (#796)
+    ("recovery_rekey_inbound", "offer_encrypted"),
     // V49 owner-private contact tags (ADR-051)
     ("tags", "name_encrypted"),
     // V50 owner-private named places (ADR-051)
@@ -256,7 +258,7 @@ impl Storage {
         self.wal_checkpoint()?;
 
         let old_key = &self.encryption_key;
-        const TOTAL_TABLES: u32 = 41;
+        const TOTAL_TABLES: u32 = 42;
         let mut completed: u32 = 0;
 
         let report = |completed: &mut u32, table: &str| {
@@ -385,6 +387,14 @@ impl Storage {
                 "exchange_secret_encrypted",
             )?;
             report(&mut completed, "recovery_rekey_offers");
+
+            self.rekey_nullable_column(
+                old_key,
+                &new_key,
+                "recovery_rekey_inbound",
+                "offer_encrypted",
+            )?;
+            report(&mut completed, "recovery_rekey_inbound");
 
             self.rekey_sync_timestamps(old_key, &new_key)?;
             report(&mut completed, "sync_timestamps");

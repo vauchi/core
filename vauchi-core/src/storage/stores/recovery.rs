@@ -575,6 +575,42 @@ impl RecoveryStore<'_> {
         Ok(())
     }
 
+    /// Keeps a rekey offer `contact_id` sent, replacing an earlier one.
+    pub fn keep_rekey_offer(&self, contact_id: &str, offer: &[u8]) -> Result<(), StorageError> {
+        let offer_encrypted = crate::crypto::encrypt(self.key, offer)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        self.conn.execute(
+            "INSERT OR REPLACE INTO recovery_rekey_inbound (contact_id, offer_encrypted, received_at)
+             VALUES (?1, ?2, ?3)",
+            params![
+                contact_id,
+                offer_encrypted,
+                i64::try_from(self.now_secs()).unwrap_or(i64::MAX)
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Every rekey offer kept, as `(contact_id, offer)`, oldest first.
+    pub fn kept_rekey_offers(&self) -> Result<Vec<(String, Vec<u8>)>, StorageError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT contact_id, offer_encrypted FROM recovery_rekey_inbound
+             ORDER BY received_at, rowid",
+        )?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        rows.into_iter()
+            .map(|(id, sealed)| {
+                crate::crypto::decrypt(self.key, &sealed)
+                    .map(|offer| (id, offer))
+                    .map_err(|e| StorageError::Encryption(e.to_string()))
+            })
+            .collect()
+    }
+
     /// Forgets the owner's recovery passphrase.
     pub fn clear_recovery_passphrase(&self) -> Result<(), StorageError> {
         self.conn

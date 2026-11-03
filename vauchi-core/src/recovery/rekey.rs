@@ -43,6 +43,12 @@ const SIGNATURE: usize = 64;
 const OFFER_FIXED: usize = MAGIC_OFFER.len() + KEY + KEY + SIGNATURE + 4;
 const ANSWER_LEN: usize = MAGIC_ANSWER.len() + KEY + KEY + KEY + SIGNATURE;
 
+/// Whether `bytes` is meant as a rekey offer; the receive path routes it
+/// here instead of to the contact router.
+pub fn is_rekey_offer(bytes: &[u8]) -> bool {
+    bytes.starts_with(MAGIC_OFFER)
+}
+
 /// Why a rekey message could not be built or read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum RekeyError {

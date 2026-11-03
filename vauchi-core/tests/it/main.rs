@@ -312,6 +312,7 @@ mod groups_list_engine_tests;
 mod guardian_adversarial_tests;
 mod guardian_backup_handback_tests;
 mod guardian_backup_keep_tests;
+mod guardian_backup_meeting_tests;
 mod guardian_backup_piece_wire_tests;
 mod guardian_backup_pieces_tests;
 mod guardian_backup_refresh_tests;

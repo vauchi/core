@@ -17,16 +17,13 @@ pub struct RecoveryAuthorization {
 }
 
 impl RecoveryAuthorization {
-    pub(crate) fn new(old_pk: [u8; 32], new_pk: [u8; 32]) -> Self {
-        Self { old_pk, new_pk }
-    }
-
     /// An authorization assumed by a test, to exercise what follows one
     /// without the decision that grants it. Never in a release build: the
-    /// `testing` feature is enabled by test and coverage jobs only.
+    /// `testing` feature is enabled by test and coverage jobs only, and no
+    /// other constructor exists until the decision certificate does (P18).
     #[cfg(any(test, feature = "testing"))]
     pub fn assumed_for_tests(old_pk: [u8; 32], new_pk: [u8; 32]) -> Self {
-        Self::new(old_pk, new_pk)
+        Self { old_pk, new_pk }
     }
 
     /// The key of the contact that moves.

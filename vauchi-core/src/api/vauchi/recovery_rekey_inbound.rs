@@ -6,20 +6,20 @@
 //! steps 5a and 5b, D18).
 //!
 //! The recovered contact asks for the rekey; this device is not asked to
-//! confirm. It accepts an offer when it is provably the recovered
-//! contact's (`RecoveryProof::proves_the_recovery_to`): the new identity
-//! signed it, the proof opens for one of this device's contacts, names
-//! that same identity, and carries enough guardian tokens the old key
-//! signed or enough vouchers from this device's own contacts. Anything
-//! else is dropped without a trace, and every offer in a duress session.
-//! Accepting answers it (`recovery_acceptance.spthy`, John_answers) and
-//! moves the contact to the new key's id with a fresh ratchet.
+//! confirm. It accepts an offer only with a [`RecoveryAuthorization`] for
+//! it, which only a policy-guardian decision certificate will grant
+//! (design 2026-11-03-pinned-guardian-policy, P15, P18). None exists yet,
+//! so every offer is dropped: vouchers, guardian tokens and old-key
+//! signatures authorize nothing, since two legitimate attempts could each
+//! gather vouchers and a thief with the old device signs the rest. Every
+//! offer is dropped in a duress session too. Accepting answers it
+//! (`recovery_acceptance.spthy`, John_answers) and moves the contact to
+//! the new key's id with a fresh ratchet.
 
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::crypto::ratchet::DoubleRatchetState;
 use crate::exchange::X3DHKeyPair;
 use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
-use crate::recovery::RecoveryProof;
 use crate::recovery::authorization::RecoveryAuthorization;
 use crate::recovery::rekey::{RekeyAnswer, RekeyOffer, rekey_shared_key};
 
@@ -50,7 +50,7 @@ impl Vauchi {
         let Ok(offer) = RekeyOffer::decode(blob) else {
             return Ok(RekeyOfferTaken::Dropped);
         };
-        match self.authorize_recovery(&offer)? {
+        match authorize_recovery(&offer) {
             Some(authorization) => self.take_rekey_offer_authorized(blob, &authorization),
             None => Ok(RekeyOfferTaken::Dropped),
         }
@@ -218,47 +218,12 @@ impl Vauchi {
         }
         Ok(sent)
     }
+}
 
-    /// The authorization for `offer` when it is signed by the identity it
-    /// names, its proof opens for an exchanged, unblocked contact here,
-    /// names that same identity, and proves the recovery to this device.
-    fn authorize_recovery(
-        &self,
-        offer: &RekeyOffer,
-    ) -> VauchiResult<Option<RecoveryAuthorization>> {
-        if !offer.verify() {
-            return Ok(None);
-        }
-        let contacts = self.storage.contacts().list_contacts()?;
-        let opened = if RecoveryProof::is_sealed(offer.proof()) {
-            RecoveryProof::open_sealed_for_contacts(offer.proof(), &contacts)
-        } else {
-            RecoveryProof::from_bytes(offer.proof())
-        };
-        let Ok(proof) = opened else {
-            return Ok(None);
-        };
-        if proof.new_pk().as_bytes() != offer.new_pk() {
-            return Ok(None);
-        }
-        let settings = self
-            .storage
-            .recovery()
-            .load_recovery_settings()?
-            .unwrap_or_default();
-        if !proof.proves_the_recovery_to(&contacts, &settings) {
-            return Ok(None);
-        }
-        let contact_id = hex::encode(proof.old_pk());
-        let Some(contact) = contacts.iter().find(|contact| contact.id() == contact_id) else {
-            return Ok(None);
-        };
-        if contact.is_blocked() || contact.public_key().is_none() {
-            return Ok(None);
-        }
-        Ok(Some(RecoveryAuthorization::new(
-            *proof.old_pk().as_bytes(),
-            *offer.new_pk(),
-        )))
-    }
+/// The authorization for `offer`. None is granted until the policy
+/// guardians' decision certificate exists (P15, P18): a confidence score
+/// from vouchers cannot keep two legitimate attempts from both being
+/// accepted (P11), and the old key's signatures are the thief's too.
+fn authorize_recovery(_offer: &RekeyOffer) -> Option<RecoveryAuthorization> {
+    None
 }

@@ -2,28 +2,27 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! A contact takes in a rekey offer and accepts it by itself when it is
-//! provably the recovered contact's (vauchi/private#796, D18): the new
-//! identity signed it, its proof opens for one of this device's contacts
-//! and names that same identity, and either enough of the vouchers carry a
-//! guardian token the old key signed, or enough of them are this device's
-//! own contacts. Anything else is dropped without a trace; nobody is asked.
-//! The proof is judged without its 192-hour expiry (D21).
+//! A contact takes in a rekey offer (vauchi/private#796). It accepts one
+//! only with a recovery authorization, which only the policy guardians'
+//! decision certificate will grant (P15, P18): until then every offer is
+//! dropped, even one the contact's own contacts vouched for, since two
+//! legitimate attempts could each gather vouchers (P11). With an
+//! authorization the offer must still be signed by the identity it names,
+//! that identity must be the authorized one, and the old key must be an
+//! exchanged contact's; anything else is dropped without a trace.
 
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 use vauchi_core::api::RekeyOfferTaken;
 use vauchi_core::clock::FakeClock;
-use vauchi_core::contact::Contact;
-use vauchi_core::contact_card::ContactCard;
+use vauchi_core::recovery::authorization::RecoveryAuthorization;
 use vauchi_core::recovery::rekey::RekeyOffer;
-use vauchi_core::{Identity, SymmetricKey, Vauchi};
+use vauchi_core::{Identity, Vauchi};
 
 use crate::common::helpers::create_vauchi_with_identity;
 use crate::common::meeting::signing_pk;
 use crate::common::recovered_phone::{World, recovered};
-use crate::common::two_recipient::{Recipient, add_recipient};
 
 /// Alice's phone, restored, and the offer it makes Dave.
 fn offered() -> (World, Vec<u8>) {
@@ -38,65 +37,18 @@ fn offered() -> (World, Vec<u8>) {
     (world, blob)
 }
 
-/// Someone claims Alice's old key with vouches from three of her friends,
-/// who are no guardians, and offers Dave a rekey. Returns Dave and the
-/// offer; `friends_of_dave` makes the friends Dave's contacts too.
-fn offered_by_a_claim_of_friends(friends_of_dave: bool) -> (Recipient, Vec<u8>) {
-    let alice = create_vauchi_with_identity("Alice");
-    let alice_pk = signing_pk(&alice);
-    let dave = add_recipient(&alice, &alice_pk, "Dave");
-    let dave_pk = signing_pk(dave.vauchi());
-    let friends: Vec<Recipient> = (0..3)
-        .map(|index| add_recipient(&alice, &alice_pk, &format!("F{index}")))
-        .collect();
-    if friends_of_dave {
-        for friend in &friends {
-            dave.vauchi()
-                .add_contact(Contact::from_exchange(
-                    signing_pk(friend.vauchi()),
-                    ContactCard::new("Friend"),
-                    SymmetricKey::generate(),
-                    0,
-                ))
-                .unwrap();
-        }
-    }
-    let claimant = create_vauchi_with_identity("Claimant");
-    let claim = claimant
-        .create_recovery_claim_hex_b64(&hex::encode(alice_pk))
-        .unwrap();
-    for friend in &friends {
-        let voucher = friend
-            .vauchi()
-            .create_voucher_from_claim_b64(&claim)
-            .unwrap();
-        claimant.add_recovery_voucher_b64(&voucher).unwrap();
-    }
-    let dave_at_claimant = Contact::from_exchange(
-        dave_pk,
-        ContactCard::new("Dave"),
-        SymmetricKey::generate(),
-        0,
-    );
-    let id = dave_at_claimant.id().to_string();
-    claimant.add_contact(dave_at_claimant).unwrap();
-    claimant
-        .storage()
-        .recovery()
-        .mark_rekey_pending(&id)
-        .unwrap();
-    let blob = claimant.rekey_offer_deliveries().unwrap()[0].blob.clone();
-    (dave, blob)
+fn authorization_for(world: &World, new_pk: [u8; 32]) -> RecoveryAuthorization {
+    RecoveryAuthorization::assumed_for_tests(signing_pk(&world.alice), new_pk)
 }
 
 // @internal
 #[test]
-fn an_offer_alices_guardians_vouched_for_is_accepted_without_asking() {
+fn an_authorized_offer_is_accepted_without_asking() {
     let (world, blob) = offered();
     let dave = world.dave.vauchi();
     let old_id = world.dave.sharer_id().to_string();
 
-    let taken = dave.take_rekey_offer(&blob).unwrap();
+    let taken = world.dave_takes_as_authorized(&blob);
 
     let new_id = hex::encode(signing_pk(&world.phone));
     assert_eq!(
@@ -111,54 +63,37 @@ fn an_offer_alices_guardians_vouched_for_is_accepted_without_asking() {
 
 // @internal
 #[test]
-fn an_offer_backed_only_by_vouchers_dave_cannot_place_is_dropped() {
-    let (dave, blob) = offered_by_a_claim_of_friends(false);
-    let alice_id = dave.sharer_id().to_string();
-
-    let taken = dave.vauchi().take_rekey_offer(&blob).unwrap();
-
-    assert_eq!(taken, RekeyOfferTaken::Dropped);
-    assert!(dave.vauchi().get_contact(&alice_id).unwrap().is_some());
-}
-
-// @internal
-#[test]
-fn an_offer_daves_own_contacts_vouched_for_is_accepted() {
-    let (dave, blob) = offered_by_a_claim_of_friends(true);
-
-    let taken = dave.vauchi().take_rekey_offer(&blob).unwrap();
-
-    assert!(
-        matches!(taken, RekeyOfferTaken::Accepted { .. }),
-        "{taken:?}"
-    );
-}
-
-// @internal
-#[test]
-fn an_offer_whose_proof_is_past_its_window_is_still_accepted() {
+fn an_offer_daves_own_contacts_vouched_for_is_dropped_until_certificates_exist() {
     let (world, blob) = offered();
-    world.dave_clock.advance(Duration::from_secs(30 * 86_400));
+    let dave = world.dave.vauchi();
+    let old_id = world.dave.sharer_id().to_string();
 
-    let taken = world.dave.vauchi().take_rekey_offer(&blob).unwrap();
+    let taken = dave.take_rekey_offer(&blob).unwrap();
 
-    assert!(
-        matches!(taken, RekeyOfferTaken::Accepted { .. }),
-        "{taken:?}"
+    assert_eq!(
+        taken,
+        RekeyOfferTaken::Dropped,
+        "two legitimate attempts could each gather vouchers (P11, P18)"
     );
+    assert!(dave.get_contact(&old_id).unwrap().is_some());
 }
 
 // @internal
 #[test]
-fn an_offer_signed_by_an_identity_the_proof_does_not_name_is_dropped() {
+fn an_offer_signed_by_an_identity_the_authorization_does_not_name_is_dropped() {
     let (world, blob) = offered();
     let honest = RekeyOffer::decode(&blob).unwrap();
     let thief = Identity::create("Thief", 0);
     let forged = RekeyOffer::create(&thief, *honest.exchange_key(), honest.proof().to_vec())
         .unwrap()
         .encode();
+    let authorization = authorization_for(&world, signing_pk(&world.phone));
 
-    let taken = world.dave.vauchi().take_rekey_offer(&forged).unwrap();
+    let taken = world
+        .dave
+        .vauchi()
+        .take_rekey_offer_authorized(&forged, &authorization)
+        .unwrap();
 
     assert_eq!(taken, RekeyOfferTaken::Dropped);
     assert!(
@@ -173,26 +108,49 @@ fn an_offer_signed_by_an_identity_the_proof_does_not_name_is_dropped() {
 
 // @internal
 #[test]
-fn an_offer_for_someone_who_is_not_a_contact_is_dropped() {
-    let (_world, blob) = offered();
+fn an_authorization_for_another_identity_takes_no_offer() {
+    let (world, blob) = offered();
+    let authorization = authorization_for(&world, [7; 32]);
+
+    let taken = world
+        .dave
+        .vauchi()
+        .take_rekey_offer_authorized(&blob, &authorization)
+        .unwrap();
+
+    assert_eq!(taken, RekeyOfferTaken::Dropped);
+}
+
+// @internal
+#[test]
+fn an_authorized_offer_for_someone_who_is_not_a_contact_is_dropped() {
+    let (world, blob) = offered();
     let stranger = create_vauchi_with_identity("Stranger");
+    let authorization = authorization_for(&world, signing_pk(&world.phone));
 
     assert_eq!(
-        stranger.take_rekey_offer(&blob).unwrap(),
+        stranger
+            .take_rekey_offer_authorized(&blob, &authorization)
+            .unwrap(),
         RekeyOfferTaken::Dropped
     );
 }
 
 // @internal
 #[test]
-fn garbled_or_tampered_offers_are_dropped() {
+fn garbled_or_tampered_offers_are_dropped_even_when_authorized() {
     let (world, blob) = offered();
     let mut tampered = blob.clone();
     tampered[4 + 32] ^= 1;
+    let authorization = authorization_for(&world, signing_pk(&world.phone));
 
     for bytes in [Vec::new(), b"VRK1".to_vec(), tampered] {
         assert_eq!(
-            world.dave.vauchi().take_rekey_offer(&bytes).unwrap(),
+            world
+                .dave
+                .vauchi()
+                .take_rekey_offer_authorized(&bytes, &authorization)
+                .unwrap(),
             RekeyOfferTaken::Dropped
         );
     }
@@ -211,10 +169,10 @@ fn garbled_or_tampered_offers_are_dropped() {
 fn an_offer_sent_again_after_the_rekey_changes_nothing() {
     let (world, blob) = offered();
     let dave = world.dave.vauchi();
-    dave.take_rekey_offer(&blob).unwrap();
+    world.dave_takes_as_authorized(&blob);
     let after_first = dave.list_contacts().unwrap().len();
 
-    let again = dave.take_rekey_offer(&blob).unwrap();
+    let again = world.dave_takes_as_authorized(&blob);
 
     assert_eq!(again, RekeyOfferTaken::Dropped);
     assert_eq!(dave.list_contacts().unwrap().len(), after_first);
@@ -223,14 +181,14 @@ fn an_offer_sent_again_after_the_rekey_changes_nothing() {
 
 // @internal
 #[test]
-fn an_offer_for_a_contact_met_again_in_person_folds_the_old_contact_into_the_new_one() {
+fn an_authorized_offer_for_a_contact_met_again_in_person_folds_the_old_contact_into_the_new_one() {
     let (world, blob) = offered();
     let dave = world.dave.vauchi();
     let old_id = world.dave.sharer_id().to_string();
     let (_, phone_at_dave) = crate::common::meeting::meet(&world.phone, dave, true);
     let met = dave.get_contact(&phone_at_dave).unwrap().unwrap();
 
-    let taken = dave.take_rekey_offer(&blob).unwrap();
+    let taken = world.dave_takes_as_authorized(&blob);
 
     assert_eq!(
         taken,
@@ -249,21 +207,4 @@ fn an_offer_for_a_contact_met_again_in_person_folds_the_old_contact_into_the_new
         dave.rekey_answer_deliveries().unwrap().is_empty(),
         "no answer: the meeting already joined them"
     );
-}
-
-// @internal
-#[test]
-fn an_offer_daves_own_contacts_vouched_for_is_dropped_until_certificates_exist() {
-    let (world, blob) = offered();
-    let dave = world.dave.vauchi();
-    let old_id = world.dave.sharer_id().to_string();
-
-    let taken = dave.take_rekey_offer(&blob).unwrap();
-
-    assert_eq!(
-        taken,
-        RekeyOfferTaken::Dropped,
-        "two legitimate attempts could each gather vouchers (P11, P18)"
-    );
-    assert!(dave.get_contact(&old_id).unwrap().is_some());
 }

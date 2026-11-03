@@ -40,6 +40,7 @@ use crate::identifiers::IdentityKey;
 pub mod guardian;
 #[cfg(kani)]
 mod proofs;
+pub mod rekey;
 pub mod sealed_box;
 
 /// Recovery-related errors.

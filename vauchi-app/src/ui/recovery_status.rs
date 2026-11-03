@@ -9,6 +9,10 @@
 //! guardians, and submits the proof when the threshold is met.
 
 use crate::i18n::{Locale, get_string, get_string_with_args};
+use crate::ui::recovery_passphrase_step::{
+    CANCEL_ACTION as PASSPHRASE_CANCEL, PASSPHRASE_ROW, PassphraseState, passphrase_row,
+    passphrase_screen,
+};
 use crate::ui::recovery_restore::{
     CANCEL_RESTORE_ACTION, PASSPHRASE_INPUT, RESTORE_ROW, RestoreState, apply_restore_update,
     restore_row, restore_screen,
@@ -41,6 +45,8 @@ enum RecoveryStep {
     Complete,
     /// Restoring what the guardians handed back (vauchi/private#796).
     Restore,
+    /// Setting, changing or removing the recovery passphrase (D16).
+    Passphrase,
 }
 
 const TRUSTED_LIST_ID: &str = "recovery_trusted";
@@ -87,6 +93,7 @@ pub struct RecoveryEngine {
     voucher_error: Option<String>,
     /// Set once a guardian handed a backup back; `None` offers no restore.
     restore: Option<RestoreState>,
+    passphrase: PassphraseState,
     locale: Locale,
 }
 
@@ -105,6 +112,7 @@ impl RecoveryEngine {
             voucher_input: String::new(),
             voucher_error: None,
             restore: None,
+            passphrase: PassphraseState::default(),
             locale: Locale::ENGLISH,
         }
     }
@@ -199,6 +207,7 @@ impl RecoveryEngine {
             RecoveryStep::ShowClaimQr => self.build_claim_qr_screen(),
             RecoveryStep::CollectVouchers => self.build_collect_screen(),
             RecoveryStep::Complete => self.build_complete_screen(),
+            RecoveryStep::Passphrase => passphrase_screen(self.locale, &self.passphrase),
             RecoveryStep::Restore => restore_screen(
                 self.locale,
                 self.restore.as_ref().unwrap_or(&RestoreState::default()),
@@ -298,6 +307,7 @@ impl RecoveryEngine {
                         a11y: None,
                         info_key: None,
                     },
+                    passphrase_row(self.locale, &self.passphrase),
                 ])
                 .collect(),
         });
@@ -444,6 +454,8 @@ impl WorkflowEngine for RecoveryEngine {
             old_key_input: self.old_key_input().to_string(),
             voucher_input: (self.step == RecoveryStep::CollectVouchers)
                 .then(|| self.voucher_input.clone()),
+            new_passphrase: (self.step == RecoveryStep::Passphrase)
+                .then(|| (self.passphrase.new.clone(), self.passphrase.confirm.clone())),
             restore_passphrase: (self.step == RecoveryStep::Restore)
                 .then(|| self.restore.as_ref().map(|state| state.passphrase.clone()))
                 .flatten(),
@@ -472,6 +484,15 @@ impl WorkflowEngine for RecoveryEngine {
                 self.voucher_error = Some(message);
             }
             crate::ui::RecoveryUpdate::ProofSubmitted => self.step = RecoveryStep::Complete,
+            update @ (crate::ui::RecoveryUpdate::PassphraseSet(_)
+            | crate::ui::RecoveryUpdate::PassphraseRefused(_)) => {
+                if self.step == RecoveryStep::Passphrase
+                    && matches!(update, crate::ui::RecoveryUpdate::PassphraseSet(_))
+                {
+                    self.step = RecoveryStep::Intro;
+                }
+                self.passphrase.apply(update);
+            }
             update @ (crate::ui::RecoveryUpdate::RestoreOffered { .. }
             | crate::ui::RecoveryUpdate::Restored(_)
             | crate::ui::RecoveryUpdate::RestoreRefused(_)) => {
@@ -640,6 +661,37 @@ impl WorkflowEngine for RecoveryEngine {
                 if action_id == "done" =>
             {
                 ActionResult::Complete
+            }
+
+            // Recovery passphrase (D16); the AppEngine intercepts save
+            // and remove.
+            (
+                RecoveryStep::Intro,
+                UserAction::ListItemSelected {
+                    ref component_id,
+                    ref item_id,
+                },
+            ) if component_id == ACTIONS_ID && item_id == PASSPHRASE_ROW => {
+                self.passphrase.clear();
+                self.step = RecoveryStep::Passphrase;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            (
+                RecoveryStep::Passphrase,
+                UserAction::TextChanged {
+                    ref component_id,
+                    value,
+                },
+            ) if PassphraseState::is_input(component_id) => {
+                self.passphrase.typed(component_id, value);
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            (RecoveryStep::Passphrase, UserAction::ActionPressed { ref action_id })
+                if action_id == PASSPHRASE_CANCEL =>
+            {
+                self.passphrase.clear();
+                self.step = RecoveryStep::Intro;
+                ActionResult::UpdateScreen(self.build_screen())
             }
 
             // Restore (vauchi/private#796); the AppEngine intercepts

@@ -59,6 +59,11 @@ impl AppEngine {
                         super::intercept::vouchers_collected(&progress),
                     ));
                 }
+                engine.apply_update(crate::ui::EngineUpdate::Recovery(
+                    crate::ui::RecoveryUpdate::PassphraseSet(
+                        vauchi.has_recovery_passphrase().unwrap_or(false),
+                    ),
+                ));
                 if let Ok(handed_back @ 1..) = vauchi.guardians_handed_back() {
                     engine.apply_update(crate::ui::EngineUpdate::Recovery(
                         crate::ui::RecoveryUpdate::RestoreOffered {

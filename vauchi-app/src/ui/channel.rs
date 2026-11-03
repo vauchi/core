@@ -106,6 +106,9 @@ pub enum EngineOutput {
         voucher_input: Option<String>,
         /// The passphrase typed on the restore step, `Some` only there.
         restore_passphrase: Option<String>,
+        /// The owner's new passphrase and its repetition, `Some` only on
+        /// the passphrase step.
+        new_passphrase: Option<(String, String)>,
     },
     /// The pasted claim input on the RecoveryHelp screen.
     RecoveryHelp { claim_input: String },
@@ -359,6 +362,11 @@ pub enum RecoveryUpdate {
     Restored(usize),
     /// The restore did not open; the localized reason.
     RestoreRefused(String),
+    /// Whether the owner's recovery passphrase is set, after loading,
+    /// saving or removing it (vauchi/private#796, D16).
+    PassphraseSet(bool),
+    /// The passphrase was not saved; the localized reason.
+    PassphraseRefused(String),
 }
 
 /// Results pushed back into the recovery-help engine.
@@ -492,6 +500,8 @@ impl EngineUpdate {
                 RecoveryUpdate::RestoreOffered { .. } => "Recovery::RestoreOffered",
                 RecoveryUpdate::Restored(_) => "Recovery::Restored",
                 RecoveryUpdate::RestoreRefused(_) => "Recovery::RestoreRefused",
+                RecoveryUpdate::PassphraseSet(_) => "Recovery::PassphraseSet",
+                RecoveryUpdate::PassphraseRefused(_) => "Recovery::PassphraseRefused",
             },
             Self::RecoveryHelp(u) => match u {
                 RecoveryHelpUpdate::ParsedClaim(_) => "RecoveryHelp::ParsedClaim",
@@ -729,6 +739,7 @@ impl std::fmt::Debug for EngineOutput {
                 old_key_input,
                 voucher_input,
                 restore_passphrase,
+                new_passphrase,
             } => f
                 .debug_struct("Recovery")
                 .field("old_key_input_len", &old_key_input.len())
@@ -739,6 +750,10 @@ impl std::fmt::Debug for EngineOutput {
                 .field(
                     "restore_passphrase_len",
                     &restore_passphrase.as_ref().map(String::len),
+                )
+                .field(
+                    "new_passphrase_len",
+                    &new_passphrase.as_ref().map(|(new, _)| new.len()),
                 )
                 .finish(),
             Self::RecoveryHelp { claim_input } => f

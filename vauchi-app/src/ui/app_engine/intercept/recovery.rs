@@ -180,6 +180,42 @@ impl AppEngine {
 }
 
 impl AppEngine {
+    /// Intercept saving or removing the owner's recovery passphrase on
+    /// the Recovery screen (D16): the two entries must match, and Core
+    /// judges the strength and sends the guardians a new backup.
+    pub(in crate::ui::app_engine) fn intercept_passphrase_action(
+        &mut self,
+        remove: bool,
+    ) -> Option<ActionResult> {
+        let Some(crate::ui::EngineOutput::Recovery {
+            new_passphrase: Some((new, confirm)),
+            ..
+        }) = self.engine.engine_output()
+        else {
+            return None;
+        };
+        let update = if remove {
+            match self.vauchi.clear_recovery_passphrase() {
+                Ok(()) => crate::ui::RecoveryUpdate::PassphraseSet(false),
+                Err(_) => crate::ui::RecoveryUpdate::PassphraseRefused(
+                    self.t("recovery.passphrase_not_saved"),
+                ),
+            }
+        } else if new != confirm {
+            crate::ui::RecoveryUpdate::PassphraseRefused(self.t("recovery.passphrase_mismatch"))
+        } else {
+            match self.vauchi.set_recovery_passphrase(&new) {
+                Ok(()) => crate::ui::RecoveryUpdate::PassphraseSet(true),
+                Err(_) => {
+                    crate::ui::RecoveryUpdate::PassphraseRefused(self.t("recovery.passphrase_weak"))
+                }
+            }
+        };
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::Recovery(update))
+            .then(|| ActionResult::UpdateScreen(self.engine.current_screen()))
+    }
+
     /// Intercept "restore_now" on the Recovery screen's restore step:
     /// restores what the guardians handed back (vauchi/private#796, step
     /// 3b), with the typed passphrase when the backup needs one.

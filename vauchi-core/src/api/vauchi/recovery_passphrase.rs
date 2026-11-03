@@ -20,7 +20,7 @@ impl Vauchi {
     /// backup sealed under it, replacing an earlier passphrase.
     ///
     /// # Errors
-    /// [`VauchiError::InvalidState`] for an empty passphrase; storage,
+    /// [`VauchiError::InvalidState`] for an empty or weak passphrase; storage,
     /// derivation and sending errors otherwise.
     pub fn set_recovery_passphrase(&self, passphrase: &str) -> VauchiResult<()> {
         if passphrase.is_empty() {
@@ -28,6 +28,10 @@ impl Vauchi {
                 "The recovery passphrase is empty".into(),
             ));
         }
+        // Guardians who collude hold the backup and every share and can
+        // guess offline, so the bar is the backup password's (D16).
+        crate::identity::password::validate_password(passphrase)
+            .map_err(|_| VauchiError::InvalidState("The recovery passphrase is too weak".into()))?;
         let mut salt = [0u8; 16];
         self.rng.fill_bytes(&mut salt);
         let key = passphrase_layer::passphrase_key(passphrase, &salt)

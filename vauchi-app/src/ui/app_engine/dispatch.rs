@@ -501,6 +501,15 @@ impl AppEngine {
             return Some(result);
         }
         if self.screen == AppScreen::Recovery
+            && let UserAction::ActionPressed { action_id } = action
+            && (action_id == "save_recovery_passphrase"
+                || action_id == "remove_recovery_passphrase")
+            && let Some(result) =
+                self.intercept_passphrase_action(action_id == "remove_recovery_passphrase")
+        {
+            return Some(result);
+        }
+        if self.screen == AppScreen::Recovery
             && matches!(action, UserAction::ActionPressed { action_id } if action_id == "restore_now")
             && let Some(result) = self.intercept_restore_action()
         {

@@ -8,12 +8,15 @@
 //! backup is sealed under one, and says how many contacts came back, or
 //! that the backup did not open.
 
+use std::sync::Arc;
 use vauchi_app::ui::{
     ActionResult, AppEngine, AppScreen, Component, ScreenModel, UserAction, WorkflowEngine,
 };
+
 use vauchi_core::api::Vauchi;
 use vauchi_core::backup::GuardianGroups;
 use vauchi_core::backup::passphrase_layer;
+use vauchi_core::clock::{Clock, SystemClock};
 use vauchi_core::sync::guardian_piece::{GuardianDelivery, split_into_pieces};
 use vauchi_core::{Contact, ContactCard, Identity, SymmetricKey};
 
@@ -42,6 +45,11 @@ fn exchanged(public_key: [u8; 32], name: &str) -> Contact {
 /// is sealed under `passphrase` when given. Her new phone holds what the
 /// first `handing_back` guardians returned, on its recovery screen.
 fn phone(passphrase: Option<&str>, handing_back: usize) -> AppEngine {
+    phone_on(Arc::new(SystemClock), passphrase, handing_back)
+}
+
+/// [`phone`] with the new phone on `clock`.
+fn phone_on(clock: Arc<dyn Clock>, passphrase: Option<&str>, handing_back: usize) -> AppEngine {
     let alice = vauchi_named("Alice");
     alice
         .add_contact(exchanged(
@@ -60,7 +68,8 @@ fn phone(passphrase: Option<&str>, handing_back: usize) -> AppEngine {
         backup = passphrase_layer::seal(&key, &salt, &backup).unwrap();
     }
 
-    let phone = vauchi_named("Alice, new phone");
+    let mut phone = Vauchi::in_memory_with_clock(clock).unwrap();
+    phone.create_identity("Alice, new phone").unwrap();
     let phone_pk = signing_pk(&phone);
     for (index, guardian) in guardians.iter().enumerate().take(handing_back) {
         let at_phone = exchanged(signing_pk(guardian), &format!("G{index}"));
@@ -227,4 +236,54 @@ fn cancelling_restore_goes_back_and_restores_nothing() {
 
     assert!(action_rows(&screen).contains(&"restore_contacts".into()));
     assert!(!has_dave(&engine));
+}
+
+/// The waiting list's rows on the recovery screen, as (name, detail).
+#[cfg(feature = "testing")]
+fn waiting_rows(screen: &ScreenModel) -> Vec<(String, String)> {
+    screen
+        .components
+        .iter()
+        .find_map(|component| match component {
+            Component::InfoPanel { id, items, .. } if id == "rekey_waiting" => Some(
+                items
+                    .iter()
+                    .map(|item| (item.title.clone(), item.detail.clone()))
+                    .collect(),
+            ),
+            _ => None,
+        })
+        .unwrap_or_default()
+}
+
+// @internal
+#[cfg(feature = "testing")]
+#[test]
+fn after_the_restore_the_recovery_screen_lists_who_has_not_moved_yet() {
+    use std::time::{Duration, SystemTime};
+    use vauchi_core::clock::FakeClock;
+    let clock = Arc::new(FakeClock::new(SystemTime::now()));
+    let mut engine = phone_on(clock.clone(), None, 3);
+    assert!(waiting_rows(&engine.current_screen()).is_empty());
+    open_restore(&mut engine);
+    press(&mut engine, "restore_now");
+
+    engine.navigate_to(AppScreen::Recovery);
+    let asking = waiting_rows(&engine.current_screen());
+    let dave = asking
+        .iter()
+        .find(|(name, _)| name == "Dave")
+        .cloned()
+        .unwrap();
+
+    clock.advance(Duration::from_secs(14 * 86_400));
+    engine.navigate_to(AppScreen::Recovery);
+    let later = waiting_rows(&engine.current_screen());
+    let dave_later = later
+        .iter()
+        .find(|(name, _)| name == "Dave")
+        .cloned()
+        .unwrap();
+
+    assert_ne!(dave.1, dave_later.1, "asking, then not answered");
 }

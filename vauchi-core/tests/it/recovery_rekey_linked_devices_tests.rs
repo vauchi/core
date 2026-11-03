@@ -90,25 +90,29 @@ fn a_device_linked_while_contacts_wait_makes_the_phones_offers() {
 
 // @internal
 #[test]
-fn a_device_linked_while_contacts_wait_holds_the_old_seed() {
+fn a_device_linked_while_contacts_wait_never_gets_the_old_seed() {
     let world = restored_and_offered();
+    assert!(
+        world
+            .phone
+            .storage()
+            .recovery()
+            .load_old_identity_seed()
+            .unwrap()
+            .is_some()
+    );
 
     let tablet = linked_tablet(&world.phone);
 
-    let at_phone = world
-        .phone
-        .storage()
-        .recovery()
-        .load_old_identity_seed()
-        .unwrap()
-        .unwrap();
-    let at_tablet = tablet
-        .storage()
-        .recovery()
-        .load_old_identity_seed()
-        .unwrap()
-        .expect("the tablet signs continuations too");
-    assert_eq!(*at_tablet, *at_phone);
+    assert!(
+        tablet
+            .storage()
+            .recovery()
+            .load_old_identity_seed()
+            .unwrap()
+            .is_none(),
+        "the old key stays on the device that restored it (owner decision 2026-11-03)"
+    );
 }
 
 // @internal
@@ -225,7 +229,7 @@ fn a_settled_rekey_for_a_contact_not_waiting_changes_nothing() {
 
 // @internal
 #[test]
-fn a_link_whose_rekey_state_carries_a_short_seed_fails_and_keeps_nothing() {
+fn a_link_whose_rekey_state_carries_a_short_exchange_key_fails_and_keeps_nothing() {
     let world = restored_and_offered();
     let identity = world.phone.identity().unwrap();
     let seed = *identity.master_seed();
@@ -239,7 +243,12 @@ fn a_link_whose_rekey_state_carries_a_short_seed_fails_and_keeps_nothing() {
         DeviceSyncOrchestrator::new(world.phone.storage(), phone_device, registry.clone())
             .create_full_sync_payload(DeviceLinkIntent::AddDevice)
             .unwrap();
-    payload.recovery_rekey.as_mut().unwrap().old_seed = Some(vec![7u8; 31]);
+    let waiting = &mut payload.recovery_rekey.as_mut().unwrap().waiting;
+    let offered = waiting
+        .iter_mut()
+        .find(|waiting| waiting.exchange_secret.is_some())
+        .unwrap();
+    offered.exchange_secret = Some(vec![7u8; 31]);
     let tablet = Vauchi::in_memory().unwrap();
     let tablet_device =
         Identity::from_device_link(seed, "Alice".into(), 1, "Alice tablet".into(), now)
@@ -253,14 +262,6 @@ fn a_link_whose_rekey_state_carries_a_short_seed_fails_and_keeps_nothing() {
         tablet
             .storage()
             .recovery()
-            .load_old_identity_seed()
-            .unwrap()
-            .is_none()
-    );
-    assert!(
-        tablet
-            .storage()
-            .recovery()
             .rekey_pending()
             .unwrap()
             .is_empty()
@@ -269,7 +270,7 @@ fn a_link_whose_rekey_state_carries_a_short_seed_fails_and_keeps_nothing() {
 
 // @internal
 #[test]
-fn the_rekey_state_keeps_its_seed_and_exchange_keys_out_of_debug_output() {
+fn the_rekey_state_keeps_its_exchange_keys_out_of_debug_output() {
     let state = RecoveryRekeySyncData {
         waiting: vec![RekeyWaitingSyncData {
             contact_id: "c1".into(),
@@ -279,11 +280,9 @@ fn the_rekey_state_keeps_its_seed_and_exchange_keys_out_of_debug_output() {
             offer_sent_at: None,
         }],
         own_proof: None,
-        old_seed: Some(vec![201u8; 32]),
     };
 
     let shown = format!("{state:?}");
 
-    assert!(!shown.contains("201"), "{shown}");
     assert!(!shown.contains("203"), "{shown}");
 }

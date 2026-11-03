@@ -8,9 +8,12 @@
 use std::sync::Arc;
 use std::time::SystemTime;
 
+use vauchi_core::api::RekeyOfferTaken;
 use vauchi_core::clock::FakeClock;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
+use vauchi_core::recovery::authorization::RecoveryAuthorization;
+use vauchi_core::recovery::rekey::RekeyOffer;
 use vauchi_core::{SymmetricKey, Vauchi};
 
 use crate::common::helpers::create_vauchi_with_identity;
@@ -31,6 +34,21 @@ pub struct World {
     pub phone: Vauchi,
     /// Each guardian's contact id at the phone.
     pub guardians_at_phone: Vec<String>,
+}
+
+impl World {
+    /// Dave takes the phone's rekey offer as if the recovery were
+    /// authorized: what follows an authorization, without the decision
+    /// that grants one, which nothing grants yet (P18).
+    pub fn dave_takes_as_authorized(&self, offer: &[u8]) -> RekeyOfferTaken {
+        let new_pk = *RekeyOffer::decode(offer).unwrap().new_pk();
+        let authorization =
+            RecoveryAuthorization::assumed_for_tests(signing_pk(&self.alice), new_pk);
+        self.dave
+            .vauchi()
+            .take_rekey_offer_authorized(offer, &authorization)
+            .unwrap()
+    }
 }
 
 /// Dave no longer knows Alice's guardians: their vouchers are then nobody

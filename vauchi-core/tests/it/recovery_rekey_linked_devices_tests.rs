@@ -129,7 +129,7 @@ fn the_linked_device_completes_with_an_answer_the_phone_did_not_fetch() {
     let tablet = linked_tablet(&world.phone);
     let offer = offer_to_dave(&world);
     let dave = world.dave.vauchi();
-    dave.take_rekey_offer(&offer).unwrap();
+    world.dave_takes_as_authorized(&offer);
     let answer = dave.rekey_answer_deliveries().unwrap()[0].blob.clone();
 
     let taken = tablet.take_rekey_answer(&answer).unwrap();
@@ -150,7 +150,7 @@ fn a_rekey_one_device_completes_reaches_the_others_with_the_new_shared_key() {
     let (registry, tablet_id) = link_tablet(&world.phone, [71u8; 32]);
     let offer = offer_to_dave(&world);
     let dave = world.dave.vauchi();
-    dave.take_rekey_offer(&offer).unwrap();
+    world.dave_takes_as_authorized(&offer);
     let answer = dave.rekey_answer_deliveries().unwrap()[0].blob.clone();
     world.phone.take_rekey_answer(&answer).unwrap();
     let journal = journal_for_tablet(&world.phone, registry, &tablet_id);

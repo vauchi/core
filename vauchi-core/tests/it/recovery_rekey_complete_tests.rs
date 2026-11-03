@@ -33,7 +33,7 @@ fn answered() -> (World, RekeyOffer, Vec<u8>) {
     let offer = world.phone.rekey_offer_deliveries().unwrap()[0]
         .blob
         .clone();
-    world.dave.vauchi().take_rekey_offer(&offer).unwrap();
+    world.dave_takes_as_authorized(&offer);
     let answer = world.dave.vauchi().rekey_answer_deliveries().unwrap()[0]
         .blob
         .clone();

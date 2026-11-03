@@ -61,7 +61,7 @@ fn the_device_that_took_the_rekey_tells_its_siblings_the_new_key_and_shared_key(
     let old_id = world.dave.sharer_id().to_string();
     let (registry, tablet_id) = link_tablet(dave, [61u8; 32]);
 
-    dave.take_rekey_offer(&blob).unwrap();
+    world.dave_takes_as_authorized(&blob);
 
     let new_pk = signing_pk(&world.phone);
     let moved = dave.get_contact(&hex::encode(new_pk)).unwrap().unwrap();
@@ -81,7 +81,7 @@ fn a_sibling_applying_the_rekey_holds_the_contact_under_the_new_key() {
     let old_id = world.dave.sharer_id().to_string();
     let tablet = tablet_holding(dave, &[&old_id]);
     let (registry, tablet_id) = link_tablet(dave, [62u8; 32]);
-    dave.take_rekey_offer(&blob).unwrap();
+    world.dave_takes_as_authorized(&blob);
     let journal = journal_for_tablet(dave, registry, &tablet_id);
 
     tablet.apply_sync_items(journal).unwrap();
@@ -112,7 +112,7 @@ fn a_sibling_folds_the_old_contact_into_the_one_met_in_person() {
     let tablet = tablet_holding(dave, &[&old_id, &phone_at_dave]);
     let met = dave.get_contact(&phone_at_dave).unwrap().unwrap();
     let (registry, tablet_id) = link_tablet(dave, [63u8; 32]);
-    dave.take_rekey_offer(&blob).unwrap();
+    world.dave_takes_as_authorized(&blob);
     let journal = journal_for_tablet(dave, registry, &tablet_id);
 
     tablet.apply_sync_items(journal).unwrap();
@@ -133,7 +133,7 @@ fn a_rekey_naming_a_contact_the_sibling_does_not_hold_changes_nothing() {
     let dave = world.dave.vauchi();
     let tablet = create_vauchi_with_identity("Dave, tablet");
     let (registry, tablet_id) = link_tablet(dave, [64u8; 32]);
-    dave.take_rekey_offer(&blob).unwrap();
+    world.dave_takes_as_authorized(&blob);
     let journal = journal_for_tablet(dave, registry, &tablet_id);
 
     tablet.apply_sync_items(journal).unwrap();

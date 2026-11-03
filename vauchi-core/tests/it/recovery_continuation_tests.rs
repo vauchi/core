@@ -37,7 +37,7 @@ fn a_contact_met_after_the_restore_is_offered_the_rekey_and_folds_on_its_proof()
         .expect("a contact met again is offered the rekey too")
         .blob;
 
-    let taken = dave.take_rekey_offer(&offer).unwrap();
+    let taken = world.dave_takes_as_authorized(&offer);
 
     assert_eq!(
         taken,

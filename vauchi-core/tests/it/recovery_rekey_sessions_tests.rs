@@ -74,7 +74,7 @@ fn after_the_rekey_the_contact_starts_the_handshake_with_the_new_identity() {
         "only the guardians he knows; the old identity confirmed Dave's registry"
     );
 
-    dave.take_rekey_offer(&blob).unwrap();
+    world.dave_takes_as_authorized(&blob);
 
     assert_eq!(dave.queue_registry_pushes().unwrap(), 1);
 }
@@ -86,7 +86,7 @@ fn after_the_rekey_the_contact_sends_nothing_to_the_old_identitys_devices() {
     let dave = world.dave.vauchi();
     let new_id = hex::encode(signing_pk(&world.phone));
 
-    dave.take_rekey_offer(&blob).unwrap();
+    world.dave_takes_as_authorized(&blob);
 
     let current = dave.storage().contacts().load_own_card().unwrap().unwrap();
     let sent = dave.prepare_card_updates_for_contact(&new_id, &ContactCard::new("Dave"), &current);
@@ -130,7 +130,7 @@ fn the_new_phone_starts_the_handshake_with_a_contact_once_its_rekey_completes() 
         .blob
         .clone();
     let dave = world.dave.vauchi();
-    dave.take_rekey_offer(&offer).unwrap();
+    world.dave_takes_as_authorized(&offer);
     let answer = dave.rekey_answer_deliveries().unwrap()[0].blob.clone();
     world.phone.take_rekey_answer(&answer).unwrap();
 

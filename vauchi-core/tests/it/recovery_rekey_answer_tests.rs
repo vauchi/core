@@ -51,7 +51,7 @@ fn accepted() -> Accepted {
         .shared_key()
         .unwrap()
         .clone();
-    world.dave.vauchi().take_rekey_offer(&blob).unwrap();
+    world.dave_takes_as_authorized(&blob);
     Accepted {
         offer: RekeyOffer::decode(&blob).unwrap(),
         world,

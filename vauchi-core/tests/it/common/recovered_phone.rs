@@ -8,8 +8,10 @@
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use vauchi_core::Vauchi;
 use vauchi_core::clock::FakeClock;
+use vauchi_core::contact::Contact;
+use vauchi_core::contact_card::ContactCard;
+use vauchi_core::{SymmetricKey, Vauchi};
 
 use crate::common::helpers::create_vauchi_with_identity;
 use crate::common::meeting::{deliver, meet, signing_pk};
@@ -29,6 +31,18 @@ pub struct World {
     pub phone: Vauchi,
     /// Each guardian's contact id at the phone.
     pub guardians_at_phone: Vec<String>,
+}
+
+/// Dave no longer knows Alice's guardians: their vouchers are then nobody
+/// he can place, as a thief's sock puppets would be.
+pub fn dave_forgets_the_guardians(world: &World) {
+    for guardian in &world.guardians {
+        world
+            .dave
+            .vauchi()
+            .remove_contact(&hex::encode(signing_pk(guardian.vauchi())))
+            .unwrap();
+    }
 }
 
 /// Alice has Dave in her "Family" label and three guardians, each in a
@@ -64,6 +78,19 @@ pub fn recovered(phone: Vauchi, passphrase: Option<&str>, handing_back: usize) -
     }
     for guardian in &mut guardians {
         receive(&alice, guardian);
+    }
+    // Dave knows Alice's guardians himself, so their vouchers count for him
+    // on keys a thief with the old device does not hold (D18's contacts'
+    // route; the security review of 2026-11-03).
+    for guardian in &guardians {
+        dave.vauchi()
+            .add_contact(Contact::from_exchange(
+                signing_pk(guardian.vauchi()),
+                ContactCard::new("Guardian"),
+                SymmetricKey::generate(),
+                0,
+            ))
+            .unwrap();
     }
 
     let claim = phone

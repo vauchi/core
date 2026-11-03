@@ -70,8 +70,8 @@ fn after_the_rekey_the_contact_starts_the_handshake_with_the_new_identity() {
     let dave = world.dave.vauchi();
     assert_eq!(
         dave.queue_registry_pushes().unwrap(),
-        0,
-        "the old identity confirmed Dave's registry"
+        world.guardians.len(),
+        "only the guardians he knows; the old identity confirmed Dave's registry"
     );
 
     dave.take_rekey_offer(&blob).unwrap();

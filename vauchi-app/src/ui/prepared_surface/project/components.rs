@@ -237,6 +237,8 @@ impl Projection {
                 error_correction: *error_correction,
                 size: *size,
                 accessibility: accessibility(a11y, label.as_deref().unwrap_or(id)),
+                capture_placeholder: None,
+                capture_submit_label: None,
             }),
             Component::Preview {
                 name,

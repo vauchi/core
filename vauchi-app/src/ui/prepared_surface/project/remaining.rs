@@ -234,6 +234,7 @@ impl Projection {
             label: Some(title.to_owned()),
             rows,
             searchable: false,
+            search_placeholder: None,
             paging: None,
             accessibility: accessibility(a11y, title),
             style: vauchi_core::PresentationListStyle::Rows,

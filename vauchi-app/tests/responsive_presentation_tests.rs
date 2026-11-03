@@ -30,6 +30,7 @@ fn profile(window_class: WindowClass, pane_layout: PaneLayout, active_surface: &
             primary_surface: surface("main"),
             detail_surface: Some(surface("detail")),
             active_surface: surface(active_surface),
+            window_title: None,
         },
     }
 }
@@ -149,6 +150,7 @@ fn test_one_jump_across_both_boundaries_lands_in_the_damped_class() {
                 primary_surface: surface("main"),
                 detail_surface: Some(surface("detail")),
                 active_surface: surface("main"),
+                window_title: None,
             },
         }],
         "580 is within the band below 600, so it stays medium, not compact"

@@ -218,6 +218,7 @@ impl PresentationCoordinator {
             primary_surface: self.primary_surface.clone(),
             detail_surface: self.detail_surface.clone(),
             active_surface: self.active_surface.clone(),
+            window_title: None,
         })
     }
 

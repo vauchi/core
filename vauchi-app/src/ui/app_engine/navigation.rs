@@ -247,6 +247,15 @@ impl AppEngine {
 
         // Swap in the new engine, get the old one back
         let mut old_engine = std::mem::replace(&mut self.engine, new_engine);
+        // A cached recovery engine keeps what was typed, but who is still
+        // waiting for the rekey changes with time and syncs (#796).
+        if screen == AppScreen::Recovery {
+            self.engine.apply_update(crate::ui::EngineUpdate::Recovery(
+                crate::ui::RecoveryUpdate::RekeyWaiting(
+                    super::screens_security::rekey_waiting_rows(&self.vauchi),
+                ),
+            ));
+        }
 
         // Entering the Exchange screen afresh starts a new legacy-QR exchange:
         // clear the persist-at-Complete guard so the next completion persists.

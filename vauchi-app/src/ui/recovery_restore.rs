@@ -56,6 +56,37 @@ pub(crate) fn apply_restore_update(slot: &mut Option<RestoreState>, update: Reco
     }
 }
 
+/// The contacts not yet moved to this phone, by name, with whether each
+/// did not answer in 14 days; `None` when every contact moved.
+pub(crate) fn rekey_waiting_panel(locale: Locale, waiting: &[(String, bool)]) -> Option<Component> {
+    if waiting.is_empty() {
+        return None;
+    }
+    let items = waiting
+        .iter()
+        .map(|(name, not_answered)| InfoItem {
+            icon: None,
+            title: name.clone(),
+            detail: get_string(
+                locale,
+                if *not_answered {
+                    "recovery.rekey_not_answered"
+                } else {
+                    "recovery.rekey_asking"
+                },
+            ),
+        })
+        .collect();
+    let title = get_string(locale, "recovery.rekey_waiting_title");
+    Some(Component::InfoPanel {
+        id: "rekey_waiting".into(),
+        icon: None,
+        a11y: Some(A11y::labeled(title.clone())),
+        title,
+        items,
+    })
+}
+
 /// `key_one` for one, `key` with `{count}` otherwise.
 fn counted(locale: Locale, key: &str, count: usize) -> String {
     if count == 1 {

@@ -15,7 +15,7 @@ use crate::ui::recovery_passphrase_step::{
 };
 use crate::ui::recovery_restore::{
     CANCEL_RESTORE_ACTION, PASSPHRASE_INPUT, RESTORE_ROW, RestoreState, apply_restore_update,
-    restore_row, restore_screen,
+    rekey_waiting_panel, restore_row, restore_screen,
 };
 use crate::ui::*;
 
@@ -94,6 +94,9 @@ pub struct RecoveryEngine {
     /// Set once a guardian handed a backup back; `None` offers no restore.
     restore: Option<RestoreState>,
     passphrase: PassphraseState,
+    /// Restored contacts not yet moved, by name, and whether each did not
+    /// answer in 14 days.
+    rekey_waiting: Vec<(String, bool)>,
     locale: Locale,
 }
 
@@ -113,6 +116,7 @@ impl RecoveryEngine {
             voucher_error: None,
             restore: None,
             passphrase: PassphraseState::default(),
+            rekey_waiting: Vec::new(),
             locale: Locale::ENGLISH,
         }
     }
@@ -282,6 +286,7 @@ impl RecoveryEngine {
         // Always enabled: recovery starts on a new device with a fresh
         // identity and no contacts; the lost identity's guardians are the
         // ones that count, and they live on the relay, not here (#459).
+        components.extend(rekey_waiting_panel(self.locale, &self.rekey_waiting));
         let restore_row = self
             .restore
             .as_ref()
@@ -484,6 +489,7 @@ impl WorkflowEngine for RecoveryEngine {
                 self.voucher_error = Some(message);
             }
             crate::ui::RecoveryUpdate::ProofSubmitted => self.step = RecoveryStep::Complete,
+            crate::ui::RecoveryUpdate::RekeyWaiting(waiting) => self.rekey_waiting = waiting,
             update @ (crate::ui::RecoveryUpdate::PassphraseSet(_)
             | crate::ui::RecoveryUpdate::PassphraseRefused(_)) => {
                 if self.step == RecoveryStep::Passphrase

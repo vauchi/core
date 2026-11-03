@@ -527,6 +527,14 @@ impl AppEngine {
             AppScreen::AvatarEditor => self.complete_avatar_editor(),
             AppScreen::DeviceReplacement => self.complete_device_replacement(),
             AppScreen::DeepLinkConsent { payload } => self.complete_deep_link_consent(payload),
+            // A finished recovery step (proof sent, backup restored) opens
+            // afresh on the next visit, with what is still waiting
+            // (vauchi/private#796).
+            AppScreen::Recovery => {
+                let back = self.navigate_back();
+                self.engine_cache.remove(&AppScreen::Recovery);
+                ActionResult::NavigateTo(back)
+            }
             _ => ActionResult::NavigateTo(self.navigate_back()),
         }
     }

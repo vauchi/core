@@ -367,6 +367,9 @@ pub enum RecoveryUpdate {
     PassphraseSet(bool),
     /// The passphrase was not saved; the localized reason.
     PassphraseRefused(String),
+    /// The contacts restored and not yet moved to this phone, by name,
+    /// each with whether it did not answer in 14 days (vauchi/private#796).
+    RekeyWaiting(Vec<(String, bool)>),
 }
 
 /// Results pushed back into the recovery-help engine.
@@ -502,6 +505,7 @@ impl EngineUpdate {
                 RecoveryUpdate::RestoreRefused(_) => "Recovery::RestoreRefused",
                 RecoveryUpdate::PassphraseSet(_) => "Recovery::PassphraseSet",
                 RecoveryUpdate::PassphraseRefused(_) => "Recovery::PassphraseRefused",
+                RecoveryUpdate::RekeyWaiting(_) => "Recovery::RekeyWaiting",
             },
             Self::RecoveryHelp(u) => match u {
                 RecoveryHelpUpdate::ParsedClaim(_) => "RecoveryHelp::ParsedClaim",

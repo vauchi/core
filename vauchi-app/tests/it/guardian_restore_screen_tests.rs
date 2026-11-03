@@ -267,6 +267,9 @@ fn after_the_restore_the_recovery_screen_lists_who_has_not_moved_yet() {
     assert!(waiting_rows(&engine.current_screen()).is_empty());
     open_restore(&mut engine);
     press(&mut engine, "restore_now");
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "done".into(),
+    });
 
     engine.navigate_to(AppScreen::Recovery);
     let asking = waiting_rows(&engine.current_screen());
@@ -277,6 +280,7 @@ fn after_the_restore_the_recovery_screen_lists_who_has_not_moved_yet() {
         .unwrap();
 
     clock.advance(Duration::from_secs(14 * 86_400));
+    engine.navigate_to(AppScreen::Contacts);
     engine.navigate_to(AppScreen::Recovery);
     let later = waiting_rows(&engine.current_screen());
     let dave_later = later

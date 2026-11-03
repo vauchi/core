@@ -64,6 +64,9 @@ impl AppEngine {
                         vauchi.has_recovery_passphrase().unwrap_or(false),
                     ),
                 ));
+                engine.apply_update(crate::ui::EngineUpdate::Recovery(
+                    crate::ui::RecoveryUpdate::RekeyWaiting(rekey_waiting_rows(vauchi)),
+                ));
                 if let Ok(handed_back @ 1..) = vauchi.guardians_handed_back() {
                     engine.apply_update(crate::ui::EngineUpdate::Recovery(
                         crate::ui::RecoveryUpdate::RestoreOffered {
@@ -104,4 +107,23 @@ impl AppEngine {
             _ => unreachable!("create_security_engine called for {screen:?}"),
         }
     }
+}
+
+/// The recovered contacts still waiting for their rekey, by name, with
+/// whether each did not answer in 14 days (vauchi/private#796).
+pub(super) fn rekey_waiting_rows(vauchi: &vauchi_core::api::Vauchi) -> Vec<(String, bool)> {
+    vauchi
+        .rekey_waiting()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|(id, wait)| {
+            let name = vauchi
+                .get_contact(&id)
+                .ok()
+                .flatten()?
+                .display_name()
+                .to_string();
+            Some((name, wait == vauchi_core::api::RekeyWait::NotAnswered))
+        })
+        .collect()
 }

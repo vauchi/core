@@ -33,6 +33,7 @@ mod form_validation_event_path_tests;
 mod glance_displayed_code_tests;
 mod glance_failed_screen_tests;
 mod glance_manual_code_entry_tests;
+mod guardian_group_picker_tests;
 mod help_encryption_answer_tests;
 mod kept_pick_tests;
 mod network_cost_tests;

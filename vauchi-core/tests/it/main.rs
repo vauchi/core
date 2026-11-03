@@ -315,6 +315,7 @@ mod guardian_backup_groups_tests;
 mod guardian_backup_handback_tests;
 mod guardian_backup_keep_tests;
 mod guardian_backup_meeting_tests;
+mod guardian_backup_passphrase_tests;
 mod guardian_backup_piece_wire_tests;
 mod guardian_backup_pieces_tests;
 mod guardian_backup_refresh_tests;

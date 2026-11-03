@@ -16,6 +16,7 @@ use crate::common::meeting::{deliver, meet, signing_pk};
 use crate::common::two_recipient::{Recipient, add_recipient, receive};
 
 const PASSPHRASE: &str = "the owl flies at noon";
+const FAMILY_FIELD: &str = "home-phone";
 
 struct World {
     guardians: Vec<Recipient>,
@@ -36,6 +37,9 @@ fn world(passphrase: Option<&str>, handing_back: usize) -> World {
     let family = alice.create_group("Family").unwrap();
     alice
         .add_contact_to_group(family.id(), &dave.id_at_sharer)
+        .unwrap();
+    alice
+        .set_group_field_visibility(family.id(), FAMILY_FIELD, true)
         .unwrap();
     let mut guardians: Vec<Recipient> = (0..3)
         .map(|index| add_recipient(&alice, &alice_pk, &format!("G{index}")))
@@ -193,4 +197,24 @@ fn restoring_again_restores_nothing_new() {
         vec![world.dave_id.clone()]
     );
     assert_eq!(world.guardians.len(), 3);
+}
+
+// @internal
+#[test]
+fn a_restored_label_shows_the_fields_it_showed() {
+    let world = world(None, 3);
+
+    world.phone.restore_from_returned_backups(None).unwrap();
+
+    let family = world
+        .phone
+        .list_groups()
+        .unwrap()
+        .into_iter()
+        .find(|group| group.name() == "Family")
+        .unwrap();
+    assert_eq!(
+        family.visible_fields().iter().collect::<Vec<_>>(),
+        vec![FAMILY_FIELD]
+    );
 }

@@ -144,6 +144,17 @@ impl RatchetStore<'_> {
     }
 
     /// Deletes the ratchet session for one device belonging to a contact.
+    /// Deletes every ratchet state of `contact_id`, on all its devices.
+    pub fn delete_ratchet_states_for_contact(
+        &self,
+        contact_id: &str,
+    ) -> Result<usize, StorageError> {
+        Ok(self.conn.execute(
+            "DELETE FROM contact_ratchets WHERE contact_id = ?1",
+            rusqlite::params![contact_id],
+        )?)
+    }
+
     pub fn delete_ratchet_state_for_device(
         &self,
         contact_id: &str,

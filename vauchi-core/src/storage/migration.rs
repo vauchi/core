@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 105] = [
+const MIGRATIONS: [Migration; 106] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -797,7 +797,24 @@ const MIGRATIONS: [Migration; 105] = [
         name: "recovery_rekey_inbound",
         action: MigrationAction::Sql(MIGRATION_V105_RECOVERY_REKEY_INBOUND),
     },
+    Migration {
+        version: 106,
+        name: "recovery_rekey_answers",
+        action: MigrationAction::Sql(MIGRATION_V106_RECOVERY_REKEY_ANSWERS),
+    },
 ];
+
+/// Migration v106 (vauchi/private#796, step 5b): a contact's answer to a
+/// rekey it accepted, kept with the old relationship's shared key that
+/// addresses it, so it can go again until the new relationship is in use.
+const MIGRATION_V106_RECOVERY_REKEY_ANSWERS: &str = "
+    CREATE TABLE IF NOT EXISTS recovery_rekey_answers (
+        contact_id TEXT PRIMARY KEY REFERENCES contacts(id) ON DELETE CASCADE,
+        answer_encrypted BLOB NOT NULL,
+        old_shared_encrypted BLOB NOT NULL,
+        sent_at INTEGER
+    );
+";
 
 /// Migration v105 (vauchi/private#796, step 5a): the rekey offers a
 /// contact took in and has not answered yet, one per recovered contact.

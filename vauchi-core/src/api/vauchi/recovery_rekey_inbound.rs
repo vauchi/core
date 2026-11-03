@@ -10,11 +10,19 @@
 //! accepted proof names). It is then kept for the contact to review with
 //! the proof's verdict (D3); nothing changes until the contact confirms.
 
-use crate::api::error::VauchiResult;
+use crate::api::error::{VauchiError, VauchiResult};
+use crate::crypto::ratchet::DoubleRatchetState;
+use crate::exchange::X3DHKeyPair;
+use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
 use crate::recovery::VerificationResult;
-use crate::recovery::rekey::RekeyOffer;
+use crate::recovery::rekey::{RekeyAnswer, RekeyOffer, rekey_shared_key};
 
 use super::Vauchi;
+use super::recovery_rekey::RekeyDelivery;
+
+/// An answer not yet followed by the new relationship goes again after a
+/// day; its exchange key stays the one the contact already switched to.
+const REKEY_ANSWER_RESEND_SECS: u64 = 86_400;
 
 /// What [`Vauchi::take_rekey_offer`] made of an offer.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,6 +80,160 @@ impl Vauchi {
             }
         }
         Ok(pending)
+    }
+
+    /// Accepts the kept rekey offer of `contact_id` (step 5b): answers it,
+    /// moves the contact to the new key's id with the shared key both
+    /// sides derive and a fresh ratchet, and keeps the answer to send.
+    /// Returns the contact's new id.
+    ///
+    /// # Errors
+    /// [`VauchiError::NotFound`] when no offer from `contact_id` is kept,
+    /// [`VauchiError::InvalidState`] when it no longer holds; storage
+    /// errors otherwise, which change nothing.
+    pub fn accept_rekey_offer(&self, contact_id: &str) -> VauchiResult<String> {
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        let blob = self
+            .storage
+            .recovery()
+            .kept_rekey_offers()?
+            .into_iter()
+            .find(|(id, _)| id == contact_id)
+            .map(|(_, blob)| blob)
+            .ok_or_else(|| VauchiError::NotFound("No rekey offer from this contact".into()))?;
+        let Some((checked_id, (new_pk, _))) = self.checked_offer(&blob)? else {
+            return Err(VauchiError::InvalidState(
+                "The rekey offer no longer holds".into(),
+            ));
+        };
+        if checked_id != contact_id {
+            return Err(VauchiError::InvalidState(
+                "The rekey offer names another contact".into(),
+            ));
+        }
+        let offer =
+            RekeyOffer::decode(&blob).map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        let contact = self
+            .storage
+            .contacts()
+            .load_contact(contact_id)?
+            .ok_or_else(|| VauchiError::NotFound(contact_id.to_string()))?;
+        let old_shared = contact
+            .shared_key()
+            .ok_or_else(|| VauchiError::InvalidState("The contact has no shared key".into()))?
+            .clone();
+        let exchange = X3DHKeyPair::generate();
+        let shared = rekey_shared_key(
+            &exchange,
+            offer.exchange_key(),
+            &new_pk,
+            identity.signing_public_key(),
+        )
+        .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        let answer = RekeyAnswer::create(identity, *exchange.public_key(), *offer.exchange_key());
+        let ratchet = DoubleRatchetState::initialize_responder(&shared, exchange);
+        let new_id = hex::encode(new_pk);
+        let now = self.clock.unix_seconds();
+        self.storage.with_savepoint(|| -> VauchiResult<()> {
+            self.storage.move_contact_id(contact_id, &new_id)?;
+            let mut moved = self
+                .storage
+                .contacts()
+                .load_contact(&new_id)?
+                .ok_or_else(|| VauchiError::NotFound(new_id.clone()))?;
+            moved
+                .accept_recovery(new_pk, shared.clone(), now)
+                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+            self.storage.contacts().save_contact(&moved)?;
+            let ratchets = self.storage.ratchets();
+            ratchets.delete_ratchet_states_for_contact(&new_id)?;
+            ratchets.save_ratchet_state(&new_id, &ratchet, false)?;
+            let recovery = self.storage.recovery();
+            recovery.forget_rekey_offer(&new_id)?;
+            recovery.keep_rekey_answer(&new_id, &answer.encode(), &old_shared)?;
+            Ok(())
+        })?;
+        Ok(new_id)
+    }
+
+    /// Declines the kept rekey offer of `contact_id`: it is forgotten and
+    /// nothing is answered.
+    ///
+    /// # Errors
+    /// Storage errors.
+    pub fn decline_rekey_offer(&self, contact_id: &str) -> VauchiResult<()> {
+        Ok(self.storage.recovery().forget_rekey_offer(contact_id)?)
+    }
+
+    /// The rekey answers due now, each to `token(old shared key, new key,
+    /// day)`, the mailbox the recovered contact's new phone polls; one that
+    /// went out in the last day waits.
+    ///
+    /// # Errors
+    /// Storage errors.
+    pub fn rekey_answer_deliveries(&self) -> VauchiResult<Vec<RekeyDelivery>> {
+        let now = self.clock.unix_seconds();
+        let day = current_day_epoch(now);
+        let mut deliveries = Vec::new();
+        for (contact_id, blob, old_shared, sent_at) in
+            self.storage.recovery().kept_rekey_answers()?
+        {
+            if sent_at.is_some_and(|at| now < at.saturating_add(REKEY_ANSWER_RESEND_SECS)) {
+                continue;
+            }
+            let Some(contact) = self.storage.contacts().load_contact(&contact_id)? else {
+                continue;
+            };
+            let Some(new_pk) = contact.public_key() else {
+                continue;
+            };
+            deliveries.push(RekeyDelivery {
+                token_hex: token_hex(&compute_mailbox_token(old_shared.as_bytes(), new_pk, day)),
+                contact_id,
+                blob,
+            });
+        }
+        Ok(deliveries)
+    }
+
+    /// Records that the answer to `contact_id`'s rekey went out now.
+    ///
+    /// # Errors
+    /// Storage errors.
+    pub fn record_rekey_answer_sent(&self, contact_id: &str) -> VauchiResult<()> {
+        Ok(self
+            .storage
+            .recovery()
+            .record_rekey_answer_sent(contact_id, self.clock.unix_seconds())?)
+    }
+
+    /// Sends the rekey answers due now, recording each one that went out.
+    /// Returns how many went out.
+    ///
+    /// # Errors
+    /// Storage errors while preparing them.
+    pub fn send_rekey_answers(&self) -> VauchiResult<usize> {
+        use base64::Engine;
+        let deliveries = self.rekey_answer_deliveries()?;
+        if deliveries.is_empty() {
+            return Ok(0);
+        }
+        let transport = self.create_guardian_transport();
+        let mut sent = 0;
+        for delivery in &deliveries {
+            let blob_b64 = base64::engine::general_purpose::STANDARD.encode(&delivery.blob);
+            if transport
+                .send_update(&delivery.token_hex, &blob_b64, None)
+                .is_ok()
+            {
+                self.record_rekey_answer_sent(&delivery.contact_id)?;
+                sent += 1;
+            }
+        }
+        Ok(sent)
     }
 
     /// The recovered contact's id, the new key and the proof's verdict

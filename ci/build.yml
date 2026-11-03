@@ -131,6 +131,67 @@ build:android:
     # 7 days: release pipeline retries may span multiple days
     expire_in: 7 days
 
+
+# Builds the Android libvauchi_platform.so twice from this checkout and
+# compares the hashes. Moved from android's verify:reproducible-so (owner
+# 2026-11-03, private#972): it checks Core's own release library, and a
+# binding repo never builds Core (ADR-025). Advisory as it was there, until
+# the build is hermetic.
+verify:reproducible-android-so:
+  extends: [.linux-runner, .timeout-long]
+  stage: build
+  needs: []
+  allow_failure: true
+  variables:
+    SOURCE_DATE_EPOCH: "0"
+    CARGO_INCREMENTAL: "0"
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - !reference [.clone-themes, before_script]
+    - |
+      for ndk_path in /opt/android-sdk/ndk/* /opt/android-ndk $HOME/Android/Sdk/ndk/*; do
+        if [ -d "$ndk_path" ]; then
+          export ANDROID_NDK_HOME="$ndk_path"
+          break
+        fi
+      done
+      # A missing toolchain must not read as "not reproducible".
+      if [ -z "${ANDROID_NDK_HOME:-}" ]; then
+        echo "ERROR: Android NDK not found. Install it or set ANDROID_NDK_HOME."
+        exit 1
+      fi
+      echo "Using NDK at ${ANDROID_NDK_HOME}"
+    - rustup target add aarch64-linux-android
+  script:
+    - |
+      set -eu
+      command -v cargo-ndk >/dev/null 2>&1 || cargo binstall cargo-ndk --no-confirm || cargo install cargo-ndk
+      export CARGO_TARGET_DIR="${CI_PROJECT_DIR}/.cargo-target-repro"
+      export RUSTFLAGS="--remap-path-prefix=${CI_PROJECT_DIR}=/build"
+      SO_PATH="${CARGO_TARGET_DIR}/aarch64-linux-android/release/libvauchi_platform.so"
+      BUILD1_SO="/tmp/build1-${CI_JOB_ID}.so"
+      BUILD2_SO="/tmp/build2-${CI_JOB_ID}.so"
+
+      cargo ndk -t aarch64-linux-android build -p vauchi-platform --release
+      cp "$SO_PATH" "$BUILD1_SO"
+      cargo clean -p vauchi-platform
+      cargo ndk -t aarch64-linux-android build -p vauchi-platform --release
+      cp "$SO_PATH" "$BUILD2_SO"
+
+      HASH1=$(sha256sum "$BUILD1_SO" | cut -d' ' -f1)
+      HASH2=$(sha256sum "$BUILD2_SO" | cut -d' ' -f1)
+      echo "Build 1: ${HASH1}"
+      echo "Build 2: ${HASH2}"
+      rm -f "$BUILD1_SO" "$BUILD2_SO"
+      if [ "$HASH1" != "$HASH2" ]; then
+        echo "Builds differ: not reproducible"
+        exit 1
+      fi
+      echo "Builds are reproducible"
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
 # Validate generated bindings have all expected types
 build:validate-bindings:
   extends: [.linux-runner, .release-or-rc]

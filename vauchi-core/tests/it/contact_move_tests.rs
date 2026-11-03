@@ -234,3 +234,93 @@ fn a_move_onto_a_contact_that_exists_or_from_one_that_does_not_is_refused() {
     );
     assert!(storage.contacts().load_contact(bob.id()).unwrap().is_some());
 }
+
+/// Alice's old contact with John's notes, label, tag, guardian group and a
+/// kept backup, and the new contact an in-person exchange just made.
+fn old_and_new(storage: &Storage) -> (String, Contact) {
+    let old = contact("Alice");
+    let old_id = old.id().to_string();
+    storage.contacts().save_contact(&old).unwrap();
+    storage
+        .field_notes()
+        .save_contact_field_note(&old_id, "phone", b"call after six")
+        .unwrap();
+    storage
+        .field_notes()
+        .save_contact_field_note(&old_id, "email", b"the old address")
+        .unwrap();
+    let tag = storage.tags().create_tag("climbing").unwrap();
+    storage.tags().add_to_tag(&tag.id, &old_id).unwrap();
+    storage.recovery().set_guardian_group(&old_id, 2).unwrap();
+    storage
+        .connection()
+        .execute(
+            "UPDATE contacts SET recovery_trusted = 1, favorite = 1 WHERE id = ?1",
+            [&old_id],
+        )
+        .unwrap();
+    let new = Contact::from_exchange(
+        *Identity::create("Alice, new phone", 0).signing_public_key(),
+        ContactCard::new("Alice (new phone)"),
+        SymmetricKey::generate(),
+        0,
+    );
+    storage.contacts().save_contact(&new).unwrap();
+    storage
+        .field_notes()
+        .save_contact_field_note(new.id(), "email", b"the new address")
+        .unwrap();
+    (old_id, new)
+}
+
+// @internal
+#[test]
+fn a_fold_keeps_the_new_contacts_keys_and_card_and_brings_what_only_the_old_one_held() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let (old_id, new) = old_and_new(&storage);
+
+    storage.fold_contact_into(&old_id, new.id()).unwrap();
+
+    assert!(storage.contacts().load_contact(&old_id).unwrap().is_none());
+    let folded = storage.contacts().load_contact(new.id()).unwrap().unwrap();
+    assert_eq!(folded.public_key(), new.public_key());
+    assert_eq!(
+        folded.shared_key().unwrap().as_bytes(),
+        new.shared_key().unwrap().as_bytes()
+    );
+    assert_eq!(folded.display_name(), "Alice (new phone)");
+    assert!(
+        folded.is_recovery_trusted(),
+        "the guardian role comes across"
+    );
+    let notes = storage
+        .field_notes()
+        .load_contact_field_notes(new.id())
+        .unwrap();
+    assert_eq!(
+        notes.get("phone").map(Vec::as_slice),
+        Some(b"call after six".as_slice())
+    );
+    assert_eq!(
+        notes.get("email").map(Vec::as_slice),
+        Some(b"the new address".as_slice()),
+        "a row both hold keeps the new contact's"
+    );
+    let tags = storage.tags().list_tags().unwrap();
+    assert_eq!(tags[0].contact_ids, HashSet::from([new.id().to_string()]));
+    assert_eq!(
+        storage.recovery().guardian_groups().unwrap(),
+        vec![(2, vec![new.id().to_string()])]
+    );
+}
+
+// @internal
+#[test]
+fn a_fold_needs_both_contacts() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let (old_id, new) = old_and_new(&storage);
+
+    assert!(storage.fold_contact_into(&old_id, &new_id()).is_err());
+    assert!(storage.fold_contact_into(&new_id(), new.id()).is_err());
+    assert!(storage.contacts().load_contact(&old_id).unwrap().is_some());
+}

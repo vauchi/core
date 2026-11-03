@@ -220,3 +220,33 @@ fn an_offer_sent_again_after_the_rekey_changes_nothing() {
     assert_eq!(dave.list_contacts().unwrap().len(), after_first);
     assert_eq!(dave.rekey_answer_deliveries().unwrap().len(), 1);
 }
+
+// @internal
+#[test]
+fn an_offer_for_a_contact_met_again_in_person_folds_the_old_contact_into_the_new_one() {
+    let (world, blob) = offered();
+    let dave = world.dave.vauchi();
+    let old_id = world.dave.sharer_id().to_string();
+    let (_, phone_at_dave) = crate::common::meeting::meet(&world.phone, dave, true);
+    let met = dave.get_contact(&phone_at_dave).unwrap().unwrap();
+
+    let taken = dave.take_rekey_offer(&blob).unwrap();
+
+    assert_eq!(
+        taken,
+        RekeyOfferTaken::Accepted {
+            contact_id: phone_at_dave.clone()
+        }
+    );
+    assert!(dave.get_contact(&old_id).unwrap().is_none());
+    let folded = dave.get_contact(&phone_at_dave).unwrap().unwrap();
+    assert_eq!(
+        folded.shared_key().unwrap().as_bytes(),
+        met.shared_key().unwrap().as_bytes(),
+        "the meeting's relationship stays"
+    );
+    assert!(
+        dave.rekey_answer_deliveries().unwrap().is_empty(),
+        "no answer: the meeting already joined them"
+    );
+}

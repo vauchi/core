@@ -360,7 +360,30 @@ quint_expect() {
         exit 1
     }
 }
+# quint_trace <model> <main> <prefix>: an instance's witness traces, each
+# an explicit run that must reach the state it asserts (CC-27: the forks
+# and the stall show the checks are not vacuous).
+quint_trace() {
+    q_out=$(HOME=$quint_home quint test --backend=typescript --main="$2" --match="^$3" \
+        "vauchi-app/verification/$1" 2>&1) || true
+    echo "$1 $2 traces $3:"
+    printf '%s\n' "$q_out" | grep -E '^ +ok ' || true
+    printf '%s\n' "$q_out" | grep -q 'passed' && ! printf '%s\n' "$q_out" | grep -q 'failed' || {
+        printf '%s\n' "$q_out" | tail -20
+        echo "FAIL: Quint traces $3 of $2 do not all pass" >&2
+        exit 1
+    }
+}
 if wants models; then
+# The one successor of an identity or policy (private#796, P11, P19):
+# one-per-group sign-once forks, a split sign-once stalls, ballots carry a
+# certified value into a retry, a rolled-back device forks P1's majority
+# but not P19's quorum (that trace shows one promise set, not all).
+quint_trace guardian_succession.qnt naive naive_
+quint_trace guardian_succession.qnt sign_once sign_once_
+quint_trace guardian_succession.qnt ballots ballots_
+quint_trace guardian_succession.qnt ballots_rolled_back rolled_back_
+quint_trace guardian_succession.qnt tolerant_rolled_back tolerant_
 quint_expect device_link_machines.qnt reliable_relay ok verify no_device_registered_for_a_failed_joiner
 quint_expect device_link_machines.qnt reliable_relay ok verify joiner_seed_implies_registered
 # Without the host's expiry check the host registers a device whose

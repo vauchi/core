@@ -19,6 +19,8 @@ pub const PASSPHRASE: &str = "the owl flies at noon";
 pub const FAMILY_FIELD: &str = "home-phone";
 
 pub struct World {
+    /// Alice's old device, which the recovery replaces.
+    pub alice: Vauchi,
     pub guardians: Vec<Recipient>,
     pub dave: Recipient,
     pub dave_id: String,
@@ -77,6 +79,7 @@ pub fn recovered(phone: Vauchi, passphrase: Option<&str>, handing_back: usize) -
         guardians_at_phone.push(g_at_phone);
     }
     World {
+        alice,
         guardians,
         dave_id: dave.id_at_sharer.clone(),
         dave_clock,

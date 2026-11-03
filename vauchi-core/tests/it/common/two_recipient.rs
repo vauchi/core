@@ -48,6 +48,13 @@ pub fn add_recipient_no_cek(sharer: &Vauchi, sharer_pk: &[u8; 32], name: &str) -
     add_recipient_impl(sharer, sharer_pk, name, false)
 }
 
+/// Like [`add_recipient`] for a recipient instance the test built itself,
+/// for instance on a `FakeClock`; it must already have an identity.
+pub fn add_recipient_from(sharer: &Vauchi, sharer_pk: &[u8; 32], wb: Vauchi) -> Recipient {
+    let name = wb.identity().unwrap().display_name().to_string();
+    pair(sharer, sharer_pk, wb, &name, true)
+}
+
 fn add_recipient_impl(
     sharer: &Vauchi,
     sharer_pk: &[u8; 32],
@@ -56,6 +63,16 @@ fn add_recipient_impl(
 ) -> Recipient {
     let mut wb = Vauchi::in_memory().unwrap();
     wb.create_identity(name).unwrap();
+    pair(sharer, sharer_pk, wb, name, with_cek)
+}
+
+fn pair(
+    sharer: &Vauchi,
+    sharer_pk: &[u8; 32],
+    wb: Vauchi,
+    name: &str,
+    with_cek: bool,
+) -> Recipient {
     let recipient_pk = *wb.identity().unwrap().signing_public_key();
     let shared = SymmetricKey::generate();
 
@@ -96,6 +113,11 @@ impl Recipient {
     /// The sharer's contact id in the recipient's storage.
     pub fn sharer_id(&self) -> &str {
         &self.sharer_id_here
+    }
+
+    /// The recipient's own instance, for a test that needs it mutably.
+    pub fn into_vauchi(self) -> Vauchi {
+        self.wb
     }
 }
 

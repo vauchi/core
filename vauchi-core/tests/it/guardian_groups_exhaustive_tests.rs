@@ -14,7 +14,9 @@ use vauchi_core::{Contact, ContactCard, Vauchi, VauchiError};
 
 const MAX_GUARDIANS: usize = 9;
 const MIN_GROUPS: usize = 3;
-const MAX_MEMBERS: usize = 3;
+/// No per-group cap (D17, vauchi/private#796): with three groups the most
+/// one group can hold is nine minus two.
+const MAX_MEMBERS: usize = MAX_GUARDIANS - (MIN_GROUPS - 1);
 
 fn identity(name: &str) -> Vauchi {
     let mut wb = Vauchi::in_memory().unwrap();

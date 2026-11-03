@@ -217,6 +217,47 @@ fn key(byte: u8) -> [u8; 32] {
     [byte; 32]
 }
 
+/// No per-group cap (D17, vauchi/private#796): nine guardians as 4/2/2/1
+/// is a valid split, opened by one guardian of each of the four groups.
+// @scenario: backup_recovery :: Recover with one guardian from each group
+#[test]
+fn a_group_may_hold_more_than_three_and_one_of_each_group_opens() {
+    let guardians = guardians(9);
+    let pks: Vec<[u8; 32]> = guardians.iter().map(signing_pk).collect();
+    let groups = GuardianGroups::new(vec![
+        pks[0..4].to_vec(),
+        pks[4..6].to_vec(),
+        pks[6..8].to_vec(),
+        pks[8..9].to_vec(),
+    ])
+    .unwrap();
+    let (backup_hex, sealed) = alice().export_guardian_backup_for_groups(&groups).unwrap();
+    assert_eq!(
+        sealed.iter().map(Vec::len).collect::<Vec<_>>(),
+        [4, 2, 2, 1]
+    );
+    let (recovering, pk) = recovering();
+    let respond = |member: usize, group: usize, index: usize| {
+        guardians[member]
+            .respond_to_recovery(&sealed[group][index], &pk)
+            .unwrap()
+    };
+
+    let envelope = recovering
+        .recover_guardian_backup(
+            &backup_hex,
+            &[
+                respond(3, 0, 3),
+                respond(5, 1, 1),
+                respond(6, 2, 0),
+                respond(8, 3, 0),
+            ],
+        )
+        .unwrap();
+
+    assert_eq!(envelope.sections.identity.display_name, "Alice Smith");
+}
+
 // @internal
 #[test]
 fn three_groups_of_one_is_all_of_three() {
@@ -239,12 +280,6 @@ fn shapes_outside_the_bounds_are_refused() {
     let empty_group = vec![vec![key(1)], vec![], vec![key(3)]];
     assert_eq!(
         GuardianGroups::new(empty_group),
-        Err(KeyShardError::InvalidParameters)
-    );
-
-    let four_in_a_group = vec![(1..=4).map(key).collect(), vec![key(5)], vec![key(6)]];
-    assert_eq!(
-        GuardianGroups::new(four_in_a_group),
         Err(KeyShardError::InvalidParameters)
     );
 

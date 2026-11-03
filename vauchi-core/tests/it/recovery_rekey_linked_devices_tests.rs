@@ -15,10 +15,11 @@ use vauchi_core::api::RekeyAnswerTaken;
 use vauchi_core::api::sync::DeviceSyncOrchestrator;
 use vauchi_core::clock::FakeClock;
 use vauchi_core::identity::DeviceRegistry;
-use vauchi_core::sync::device_sync::DeviceLinkIntent;
+use vauchi_core::sync::device_sync::{DeviceLinkIntent, RekeySettledSyncData, SyncItem};
 use vauchi_core::{Identity, Vauchi};
 
 use crate::common::device_sync::{journal_for_tablet, link_tablet};
+use crate::common::meeting::meet;
 use crate::common::recovered_phone::{World, recovered};
 
 /// Alice's restored phone, its offers made, before anyone answered.
@@ -158,5 +159,64 @@ fn a_rekey_one_device_completes_reaches_the_others_with_the_new_shared_key() {
     assert!(
         tablet.rekey_offer_deliveries().unwrap().is_empty(),
         "no more offers to a contact already moved"
+    );
+}
+
+// @internal
+#[test]
+fn a_continuation_the_phone_sent_ends_the_wait_on_the_linked_device() {
+    let world = restored_and_offered();
+    let dave = world.dave.vauchi();
+    let tablet = linked_tablet(&world.phone);
+    assert!(
+        tablet
+            .rekey_pending_contacts()
+            .unwrap()
+            .contains(&world.dave_id),
+        "Dave waits on the tablet until a continuation goes"
+    );
+    let (registry, tablet_id) = link_tablet(&world.phone, [72u8; 32]);
+    let (_, dave_at_phone) = meet(dave, &world.phone, false);
+    world.phone.send_owed_recovery_continuations().unwrap();
+    let journal = journal_for_tablet(&world.phone, registry, &tablet_id);
+
+    tablet.apply_sync_items(journal).unwrap();
+
+    assert!(
+        !tablet
+            .rekey_pending_contacts()
+            .unwrap()
+            .contains(&dave_at_phone)
+    );
+    let at_phone = world.phone.get_contact(&dave_at_phone).unwrap().unwrap();
+    let at_tablet = tablet.get_contact(&dave_at_phone).unwrap().unwrap();
+    assert_eq!(
+        at_tablet.shared_key().unwrap().as_bytes(),
+        at_phone.shared_key().unwrap().as_bytes(),
+        "the tablet takes the meeting's relationship"
+    );
+}
+
+// @internal
+#[test]
+fn a_settled_rekey_for_a_contact_not_waiting_changes_nothing() {
+    let world = restored_and_offered();
+    let dave = world.dave.vauchi();
+    let alice_at_dave = world.dave.sharer_id().to_string();
+    let before = dave.get_contact(&alice_at_dave).unwrap().unwrap();
+
+    let applied = dave.apply_sync_items(vec![SyncItem::RekeySettled {
+        settled: RekeySettledSyncData {
+            contact_id: alice_at_dave.clone(),
+            shared_key: [9u8; 32],
+        },
+        timestamp: 1,
+    }]);
+
+    assert_eq!(applied.unwrap(), 1, "accepted, and nothing to do");
+    let after = dave.get_contact(&alice_at_dave).unwrap().unwrap();
+    assert_eq!(
+        after.shared_key().unwrap().as_bytes(),
+        before.shared_key().unwrap().as_bytes()
     );
 }

@@ -240,7 +240,8 @@ pub(super) fn process_received_blobs_with_routes(
                     // what the sender left, in the receive transaction
                     // (vauchi/private#796); nothing to show, no event.
                     Ok(ReceiveOutcome::GuardianBackupPiece(_))
-                    | Ok(ReceiveOutcome::GuardianRelease) => {
+                    | Ok(ReceiveOutcome::GuardianRelease)
+                    | Ok(ReceiveOutcome::ReturnedBackupPiece(_)) => {
                         (true, true, None, None, None, None, None)
                     }
                     // P3: the signature is verified in

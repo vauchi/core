@@ -41,6 +41,14 @@ const KEPT_FOR_DESIGNATORS: Tables = Tables {
     owner: "designator_id",
 };
 
+/// Backups guardians returned to this recovering identity, per guardian
+/// (step 2a, D13); restore (step 3) reads them.
+const RETURNED_BY_GUARDIANS: Tables = Tables {
+    pieces: "returned_backup_pieces",
+    kept: "returned_backups",
+    owner: "guardian_id",
+};
+
 /// What [`GuardianBackupStore::keep_piece`] made of a piece.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeptPiece {
@@ -69,6 +77,16 @@ impl Storage {
             conn: &self.conn,
             key: &self.encryption_key,
             tables: &KEPT_FOR_DESIGNATORS,
+        }
+    }
+
+    /// Scoped persistence view for the backups guardians returned to this
+    /// recovering identity, kept per guardian like the guardian's own.
+    pub fn returned_backups(&self) -> GuardianBackupStore<'_> {
+        GuardianBackupStore {
+            conn: &self.conn,
+            key: &self.encryption_key,
+            tables: &RETURNED_BY_GUARDIANS,
         }
     }
 }

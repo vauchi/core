@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 96] = [
+const MIGRATIONS: [Migration; 97] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -752,7 +752,32 @@ const MIGRATIONS: [Migration; 96] = [
         name: "guardian_backup_sent",
         action: MigrationAction::Sql(MIGRATION_V96_GUARDIAN_BACKUP_SENT),
     },
+    Migration {
+        version: 97,
+        name: "returned_backups",
+        action: MigrationAction::Sql(MIGRATION_V97_RETURNED_BACKUPS),
+    },
 ];
+
+/// Migration v97 (vauchi/private#796 step 2a): the backups guardians return
+/// to a recovering identity, kept per guardian with the same shape as v95's
+/// so the one store serves both; encrypted at rest (ADR-015).
+const MIGRATION_V97_RETURNED_BACKUPS: &str = "
+    CREATE TABLE IF NOT EXISTS returned_backup_pieces (
+        guardian_id TEXT NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+        backup_id BLOB NOT NULL CHECK(length(backup_id) = 16),
+        piece_index INTEGER NOT NULL,
+        piece_encrypted BLOB NOT NULL,
+        received_at INTEGER NOT NULL,
+        PRIMARY KEY (guardian_id, backup_id, piece_index)
+    );
+    CREATE TABLE IF NOT EXISTS returned_backups (
+        guardian_id TEXT PRIMARY KEY REFERENCES contacts(id) ON DELETE CASCADE,
+        created_at INTEGER NOT NULL,
+        delivery_encrypted BLOB NOT NULL,
+        received_at INTEGER NOT NULL
+    );
+";
 
 /// Migration v96 (vauchi/private#796 step 1e): what this designator last
 /// sent its guardians, so the daily refresh sends again only when the

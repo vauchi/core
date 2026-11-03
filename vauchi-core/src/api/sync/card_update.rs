@@ -153,6 +153,9 @@ pub enum ReceiveOutcome {
     /// The sender took us out of its guardian set; what it left with us was
     /// forgotten in the receive transaction (vauchi/private#796).
     GuardianRelease,
+    /// One piece of the backup a guardian returns to this recovering
+    /// identity; kept as returned in the receive transaction (#796).
+    ReturnedBackupPiece(crate::sync::guardian_piece::GuardianBackupPiece),
 }
 
 /// Processes a batch of incoming card updates with full security checks.
@@ -240,7 +243,8 @@ pub fn process_card_updates(
             | Ok(ReceiveOutcome::Cover)
             | Ok(ReceiveOutcome::ResyncRequest)
             | Ok(ReceiveOutcome::GuardianBackupPiece(_))
-            | Ok(ReceiveOutcome::GuardianRelease) => result.processed += 1,
+            | Ok(ReceiveOutcome::GuardianRelease)
+            | Ok(ReceiveOutcome::ReturnedBackupPiece(_)) => result.processed += 1,
             Err(_) => result.skipped += 1,
         }
     }
@@ -579,6 +583,9 @@ fn process_single_card_update_for_device_with_budget(
             Some(ReceiveOutcome::GuardianBackupPiece(piece))
         }
         Ok(VersionedPayload::GuardianRelease) => Some(ReceiveOutcome::GuardianRelease),
+        Ok(VersionedPayload::ReturnedBackupPiece(piece)) => {
+            Some(ReceiveOutcome::ReturnedBackupPiece(piece))
+        }
         _ => None,
     };
     if let Some(outcome) = ratchet_only {
@@ -594,6 +601,10 @@ fn process_single_card_update_for_device_with_budget(
                 ReceiveOutcome::GuardianRelease => {
                     storage.guardian_backups().forget_designator(sender_id)
                 }
+                ReceiveOutcome::ReturnedBackupPiece(piece) => storage
+                    .returned_backups()
+                    .keep_piece(sender_id, piece, storage.clock().unix_seconds())
+                    .map(|_| ()),
                 _ => Ok(()),
             });
         match ratchet_txn {
@@ -1138,6 +1149,9 @@ fn decode_versioned_payload(
             )),
             Ok(VersionedPayload::GuardianRelease) => Err(CardUpdateError::InvalidPayload(
                 "guardian release not handled here".into(),
+            )),
+            Ok(VersionedPayload::ReturnedBackupPiece(_)) => Err(CardUpdateError::InvalidPayload(
+                "returned backup piece not handled here".into(),
             )),
             Ok(VersionedPayload::ReciprocityConfirm(_)) => {
                 // ReciprocityConfirm is not a card delta — handled at caller level

@@ -122,6 +122,22 @@ pub fn encode_guardian_release() -> Vec<u8> {
     vec![PAYLOAD_VERSION_GUARDIAN_RELEASE]
 }
 
+/// Version byte for one piece of a guardian backup a guardian returns to
+/// a recovering identity (vauchi/private#796 step 2, D13). Its own kind, so
+/// the receiver keeps it as returned and never as a designation.
+pub const PAYLOAD_VERSION_RETURNED_BACKUP_PIECE: u8 = 0x0d;
+
+/// Encodes a returned guardian backup piece.
+pub fn encode_returned_backup_piece(
+    piece: &crate::sync::guardian_piece::GuardianBackupPiece,
+) -> Vec<u8> {
+    let inner = piece.encode();
+    let mut buf = Vec::with_capacity(capacity(&[1, inner.len()]));
+    buf.push(PAYLOAD_VERSION_RETURNED_BACKUP_PIECE);
+    buf.extend_from_slice(&inner);
+    buf
+}
+
 /// Delta encoding error types.
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -602,6 +618,9 @@ pub enum VersionedPayload {
     /// Forget what the sender left with this guardian (version 0x0c,
     /// vauchi/private#796).
     GuardianRelease,
+    /// One piece of a guardian backup a guardian returns to this
+    /// recovering identity (version 0x0d, vauchi/private#796).
+    ReturnedBackupPiece(crate::sync::guardian_piece::GuardianBackupPiece),
 }
 
 impl VersionedPayload {
@@ -693,6 +712,11 @@ impl VersionedPayload {
                     .map_err(|e| DeltaError::InvalidPayload(e.to_string()))
             }
             PAYLOAD_VERSION_GUARDIAN_RELEASE => Ok(VersionedPayload::GuardianRelease),
+            PAYLOAD_VERSION_RETURNED_BACKUP_PIECE => {
+                crate::sync::guardian_piece::GuardianBackupPiece::decode(body)
+                    .map(VersionedPayload::ReturnedBackupPiece)
+                    .map_err(|e| DeltaError::InvalidPayload(e.to_string()))
+            }
             v => Err(DeltaError::UnknownPayloadVersion(v)),
         }
     }

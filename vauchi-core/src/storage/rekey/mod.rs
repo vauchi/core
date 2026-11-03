@@ -145,6 +145,9 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     // V95 guardian backups kept for designators (#796)
     ("guardian_backup_pieces", "piece_encrypted"),
     ("guardian_backups", "delivery_encrypted"),
+    // V97 backups guardians returned to a recovering identity (#796)
+    ("returned_backup_pieces", "piece_encrypted"),
+    ("returned_backups", "delivery_encrypted"),
     // V49 owner-private contact tags (ADR-051)
     ("tags", "name_encrypted"),
     // V50 owner-private named places (ADR-051)
@@ -247,7 +250,7 @@ impl Storage {
         self.wal_checkpoint()?;
 
         let old_key = &self.encryption_key;
-        const TOTAL_TABLES: u32 = 35;
+        const TOTAL_TABLES: u32 = 37;
         let mut completed: u32 = 0;
 
         let report = |completed: &mut u32, table: &str| {
@@ -343,6 +346,22 @@ impl Storage {
                 "delivery_encrypted",
             )?;
             report(&mut completed, "guardian_backups");
+
+            self.rekey_nullable_column(
+                old_key,
+                &new_key,
+                "returned_backup_pieces",
+                "piece_encrypted",
+            )?;
+            report(&mut completed, "returned_backup_pieces");
+
+            self.rekey_nullable_column(
+                old_key,
+                &new_key,
+                "returned_backups",
+                "delivery_encrypted",
+            )?;
+            report(&mut completed, "returned_backups");
 
             self.rekey_sync_timestamps(old_key, &new_key)?;
             report(&mut completed, "sync_timestamps");

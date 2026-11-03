@@ -26,6 +26,7 @@ mod e2e;
 mod emergency_wipe_sends_nothing_tests;
 mod emergency_wipe_shred_tests;
 mod guardian_count_limit_tests;
+mod guardian_delivery_token_tests;
 mod guardian_groups_exhaustive_tests;
 mod guardian_groups_tests;
 mod integration;

@@ -9,72 +9,17 @@
 //! waits for its rekey, and a guardian she just met again keeps the new
 //! relationship.
 
-use vauchi_core::Vauchi;
-
 use crate::common::helpers::create_vauchi_with_identity;
-use crate::common::meeting::{deliver, meet, signing_pk};
-use crate::common::two_recipient::{Recipient, add_recipient, receive};
+use crate::common::meeting::signing_pk;
+use crate::common::recovered_phone::{FAMILY_FIELD, PASSPHRASE, World, recovered};
 
-const PASSPHRASE: &str = "the owl flies at noon";
-const FAMILY_FIELD: &str = "home-phone";
-
-struct World {
-    guardians: Vec<Recipient>,
-    dave_id: String,
-    phone: Vauchi,
-    /// Each guardian's contact id at the phone.
-    guardians_at_phone: Vec<String>,
-}
-
-/// Alice has Dave in her "Family" label and three guardians, each in a
-/// group of its own, holding her backup (sealed under `passphrase` when
-/// given). Her new phone claims her old key; `handing_back` of the
-/// guardians vouch, meet the phone and hand back.
+/// The restore world with a plain new phone.
 fn world(passphrase: Option<&str>, handing_back: usize) -> World {
-    let alice = create_vauchi_with_identity("Alice");
-    let alice_pk = signing_pk(&alice);
-    let dave = add_recipient(&alice, &alice_pk, "Dave");
-    let family = alice.create_group("Family").unwrap();
-    alice
-        .add_contact_to_group(family.id(), &dave.id_at_sharer)
-        .unwrap();
-    alice
-        .set_group_field_visibility(family.id(), FAMILY_FIELD, true)
-        .unwrap();
-    let mut guardians: Vec<Recipient> = (0..3)
-        .map(|index| add_recipient(&alice, &alice_pk, &format!("G{index}")))
-        .collect();
-    for guardian in &guardians {
-        alice
-            .verify_contact_fingerprint(&guardian.id_at_sharer)
-            .unwrap();
-        alice.toggle_recovery_trust(&guardian.id_at_sharer).unwrap();
-    }
-    if let Some(passphrase) = passphrase {
-        alice.set_recovery_passphrase(passphrase).unwrap();
-    }
-    for guardian in &mut guardians {
-        receive(&alice, guardian);
-    }
-
-    let phone = create_vauchi_with_identity("Alice, new phone");
-    let claim = phone
-        .create_recovery_claim_hex_b64(&hex::encode(alice_pk))
-        .unwrap();
-    let mut guardians_at_phone = Vec::new();
-    for guardian in guardians.iter().take(handing_back) {
-        let g = guardian.vauchi();
-        g.create_voucher_from_claim_b64(&claim).unwrap();
-        let (phone_at_g, g_at_phone) = meet(g, &phone, true);
-        deliver(g, &phone_at_g, &phone, &g_at_phone);
-        guardians_at_phone.push(g_at_phone);
-    }
-    World {
-        guardians,
-        dave_id: dave.id_at_sharer.clone(),
-        phone,
-        guardians_at_phone,
-    }
+    recovered(
+        create_vauchi_with_identity("Alice, new phone"),
+        passphrase,
+        handing_back,
+    )
 }
 
 // @internal

@@ -35,9 +35,14 @@
 //   quint verify --max-steps=8  --main=naive     --invariant=one_successor     violated
 //   quint verify --max-steps=6  --main=sign_once --invariant=can_still_certify violated
 //   quint verify --max-steps=10 --main=sign_once --invariant=one_successor     holds
+//   quint run --max-samples=200000 --max-steps=25 --seed=7 --invariant=one_successor
+//     --main=ballots_rolled_back   violated (the control reaches the fork)
+//     --main=tolerant_rolled_back  no violation found
+//     --main=ballots               no violation found
 // Not yet shown: `quint verify` of ballots, ballots_rolled_back and
 // tolerant_rolled_back at the 17 to 21 steps a second round needs ran an
-// hour each without a verdict (2026-11-03). Bounded checks are not proofs.
+// hour each without a verdict (2026-11-03). Simulation samples traces and
+// bounded checks stop at a depth: neither is a proof.
 // Not modelled: recovery racing a policy change, membership handover,
 // approval-device replacement, offline catch-up, the restore-first
 // sequence (vauchi/private#796, note 4153459959).

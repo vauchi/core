@@ -20,6 +20,7 @@ use crate::crypto::ratchet::DoubleRatchetState;
 use crate::exchange::X3DHKeyPair;
 use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
 use crate::recovery::RecoveryProof;
+use crate::recovery::authorization::RecoveryAuthorization;
 use crate::recovery::rekey::{RekeyAnswer, RekeyOffer, rekey_shared_key};
 
 use super::Vauchi;
@@ -46,6 +47,26 @@ impl Vauchi {
     /// Storage errors only, which change nothing; a refused offer is
     /// [`RekeyOfferTaken::Dropped`].
     pub fn take_rekey_offer(&self, blob: &[u8]) -> VauchiResult<RekeyOfferTaken> {
+        let Ok(offer) = RekeyOffer::decode(blob) else {
+            return Ok(RekeyOfferTaken::Dropped);
+        };
+        match self.authorize_recovery(&offer)? {
+            Some(authorization) => self.take_rekey_offer_authorized(blob, &authorization),
+            None => Ok(RekeyOfferTaken::Dropped),
+        }
+    }
+
+    /// Takes in a rekey offer `authorization` permits: signed by the new
+    /// identity it names, for an exchanged, unblocked contact holding the
+    /// authorization's old key. Drops it otherwise.
+    ///
+    /// # Errors
+    /// Storage errors only, which change nothing.
+    pub fn take_rekey_offer_authorized(
+        &self,
+        blob: &[u8],
+        authorization: &RecoveryAuthorization,
+    ) -> VauchiResult<RekeyOfferTaken> {
         let Some(identity) = self.identity.as_ref() else {
             return Ok(RekeyOfferTaken::Dropped);
         };
@@ -55,9 +76,14 @@ impl Vauchi {
         let Ok(offer) = RekeyOffer::decode(blob) else {
             return Ok(RekeyOfferTaken::Dropped);
         };
-        let Some(contact_id) = self.proven_offer(&offer)? else {
+        if !offer.verify() || offer.new_pk() != authorization.new_pk() {
             return Ok(RekeyOfferTaken::Dropped);
-        };
+        }
+        let contact_id = hex::encode(authorization.old_pk());
+        match self.storage.contacts().load_contact(&contact_id)? {
+            Some(contact) if !contact.is_blocked() && contact.public_key().is_some() => {}
+            _ => return Ok(RekeyOfferTaken::Dropped),
+        }
         let new_pk = *offer.new_pk();
         let new_id = hex::encode(new_pk);
         // Met again in person, the contact already has the new key and the
@@ -193,10 +219,13 @@ impl Vauchi {
         Ok(sent)
     }
 
-    /// The recovered contact's id when `offer` is signed by the identity it
+    /// The authorization for `offer` when it is signed by the identity it
     /// names, its proof opens for an exchanged, unblocked contact here,
     /// names that same identity, and proves the recovery to this device.
-    fn proven_offer(&self, offer: &RekeyOffer) -> VauchiResult<Option<String>> {
+    fn authorize_recovery(
+        &self,
+        offer: &RekeyOffer,
+    ) -> VauchiResult<Option<RecoveryAuthorization>> {
         if !offer.verify() {
             return Ok(None);
         }
@@ -227,6 +256,9 @@ impl Vauchi {
         if contact.is_blocked() || contact.public_key().is_none() {
             return Ok(None);
         }
-        Ok(Some(contact_id))
+        Ok(Some(RecoveryAuthorization::new(
+            *proof.old_pk().as_bytes(),
+            *offer.new_pk(),
+        )))
     }
 }

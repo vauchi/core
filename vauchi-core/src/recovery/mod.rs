@@ -37,6 +37,7 @@ use crate::contact::Contact;
 use crate::crypto::{HKDF, PublicKey, Signature, SigningKeyPair, SymmetricKey};
 use crate::identifiers::IdentityKey;
 
+pub mod authorization;
 pub mod guardian;
 #[cfg(kani)]
 mod proofs;

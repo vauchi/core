@@ -43,6 +43,77 @@ const SIGNATURE: usize = 64;
 const OFFER_FIXED: usize = MAGIC_OFFER.len() + KEY + KEY + SIGNATURE + 4;
 const ANSWER_LEN: usize = MAGIC_ANSWER.len() + KEY + KEY + KEY + SIGNATURE;
 
+const CONTINUATION_DOMAIN: &[u8] = b"vauchi-recovery-continue-v1";
+const CONTINUATION_LEN: usize = KEY + KEY + SIGNATURE;
+
+/// The recovered identity's word, signed with its old key, that `new_pk`
+/// continues it (D20). Sent over the ratchet an in-person exchange set up,
+/// so it comes from the person met; the contact folds its old contact for
+/// `old_pk` into the one the meeting made. Wire form: `old_pk(32) ||
+/// new_pk(32) || sig(64)`, the signature over `CONTINUATION_DOMAIN ||
+/// old_pk || new_pk`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecoveryContinuation {
+    old_pk: [u8; KEY],
+    new_pk: [u8; KEY],
+    signature: [u8; SIGNATURE],
+}
+
+impl RecoveryContinuation {
+    /// Signs, with the old identity's key pair, that `new_pk` continues it.
+    pub fn create(old_keys: &crate::crypto::SigningKeyPair, new_pk: &[u8; KEY]) -> Self {
+        let old_pk = *old_keys.public_key().as_bytes();
+        let signature = *old_keys
+            .sign(&continuation_message(&old_pk, new_pk))
+            .as_bytes();
+        Self {
+            old_pk,
+            new_pk: *new_pk,
+            signature,
+        }
+    }
+
+    pub fn old_pk(&self) -> &[u8; KEY] {
+        &self.old_pk
+    }
+
+    pub fn new_pk(&self) -> &[u8; KEY] {
+        &self.new_pk
+    }
+
+    /// Whether the old key signed it.
+    pub fn verify(&self) -> bool {
+        PublicKey::from_bytes(self.old_pk).verify(
+            &continuation_message(&self.old_pk, &self.new_pk),
+            &Signature::from_bytes(self.signature),
+        )
+    }
+
+    pub fn encode(&self) -> Vec<u8> {
+        [&self.old_pk[..], &self.new_pk[..], &self.signature[..]].concat()
+    }
+
+    /// # Errors
+    /// [`RekeyError::Malformed`] for any other length.
+    pub fn decode(bytes: &[u8]) -> Result<Self, RekeyError> {
+        if bytes.len() != CONTINUATION_LEN {
+            return Err(RekeyError::Malformed);
+        }
+        let (old_pk, rest) = take::<KEY>(bytes)?;
+        let (new_pk, rest) = take::<KEY>(rest)?;
+        let (signature, _) = take::<SIGNATURE>(rest)?;
+        Ok(Self {
+            old_pk,
+            new_pk,
+            signature,
+        })
+    }
+}
+
+fn continuation_message(old_pk: &[u8; KEY], new_pk: &[u8; KEY]) -> Vec<u8> {
+    [CONTINUATION_DOMAIN, old_pk, new_pk].concat()
+}
+
 /// Whether `bytes` is meant as a rekey offer; the receive path routes it
 /// here instead of to the contact router.
 pub fn is_rekey_offer(bytes: &[u8]) -> bool {

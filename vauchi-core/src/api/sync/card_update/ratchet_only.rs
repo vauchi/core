@@ -4,8 +4,8 @@
 
 //! The receive kinds that apply no card change: cover (0x09,
 //! vauchi/private#811), a resync request (0x0a, #691), a guardian backup
-//! piece (0x0b), a guardian release (0x0c) and a returned backup piece
-//! (0x0d, #796).
+//! piece (0x0b), a guardian release (0x0c), a returned backup piece
+//! (0x0d) and a recovery continuation (0x0e, #796).
 //!
 //! The ratchet is persisted as for an update, so the sender's next message
 //! needs no skipped key and a deferred sender is released the same way;
@@ -30,6 +30,9 @@ pub(super) fn outcome_of(payload: Result<VersionedPayload, DeltaError>) -> Optio
         Ok(VersionedPayload::GuardianRelease) => Some(ReceiveOutcome::GuardianRelease),
         Ok(VersionedPayload::ReturnedBackupPiece(piece)) => {
             Some(ReceiveOutcome::ReturnedBackupPiece(piece))
+        }
+        Ok(VersionedPayload::RecoveryContinuation(continuation)) => {
+            Some(ReceiveOutcome::RecoveryContinuation(continuation))
         }
         _ => None,
     }
@@ -61,6 +64,9 @@ pub(super) fn receive(
             ReceiveOutcome::ReturnedBackupPiece(piece) => storage
                 .returned_backups()
                 .keep_piece(sender_id, piece, now)
+                .map(|_| ()),
+            ReceiveOutcome::RecoveryContinuation(continuation) => storage
+                .honour_recovery_continuation(sender_id, continuation)
                 .map(|_| ()),
             _ => Ok(()),
         });

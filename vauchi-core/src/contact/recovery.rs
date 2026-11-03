@@ -9,6 +9,26 @@
 use super::*;
 
 impl Contact {
+    /// Takes the shared key of an in-person exchange for a contact restored
+    /// from a guardian backup, which has no relationship on this device yet
+    /// (vauchi/private#796, D20). The old shared key, which a thief holding
+    /// the old device may also have, is discarded.
+    ///
+    /// Returns `Err` if called on an imported contact.
+    pub fn adopt_exchange_shared_key(
+        &mut self,
+        shared_key: SymmetricKey,
+        now: u64,
+    ) -> Result<(), ContactError> {
+        let data = self
+            .kind
+            .exchanged_data_mut()
+            .ok_or(ContactError::OperationRequiresExchangedContact)?;
+        data.shared_key = shared_key;
+        data.exchange_timestamp = now;
+        Ok(())
+    }
+
     /// Accepts a recovery, updating the contact's public key and shared secret.
     ///
     /// This is called when the user accepts a recovery proof from this contact.

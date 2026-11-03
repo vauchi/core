@@ -64,10 +64,9 @@ fn a_contact_met_after_the_restore_folds_and_gets_no_more_offers() {
     world.phone.restore_from_returned_backups(None).unwrap();
     let dave = world.dave.vauchi();
     let alice_old_at_dave = world.dave.sharer_id().to_string();
-    let (phone_at_dave, dave_at_phone) = meet(dave, &world.phone, true);
-    // Dave initiated, so he writes first and the phone can then send.
-    dave.update_own_card(&ContactCard::new("Dave")).unwrap();
-    deliver(dave, &phone_at_dave, &world.phone, &dave_at_phone);
+    // The phone starts the exchange, so it can send at once; a phone that
+    // cannot send yet owes the continuation (the guardian case above).
+    let (phone_at_dave, dave_at_phone) = meet(dave, &world.phone, false);
 
     world.phone.send_owed_recovery_continuations().unwrap();
     deliver(&world.phone, &dave_at_phone, dave, &phone_at_dave);

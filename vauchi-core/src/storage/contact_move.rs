@@ -142,6 +142,38 @@ impl Storage {
         self.in_both_databases(|| self.move_references(old_id, new_id, true))
     }
 
+    /// Folds the old contact a continuation names into its sender (D20),
+    /// when the old key signed it, it names the sender's key as the new
+    /// one, and the old contact is an exchanged, unblocked one. Returns
+    /// whether it folded; anything else changes nothing.
+    ///
+    /// # Errors
+    /// Storage errors.
+    pub fn honour_recovery_continuation(
+        &self,
+        sender_id: &str,
+        continuation: &crate::recovery::rekey::RecoveryContinuation,
+    ) -> Result<bool, StorageError> {
+        let old_id = hex::encode(continuation.old_pk());
+        if !continuation.verify()
+            || hex::encode(continuation.new_pk()) != sender_id
+            || old_id == sender_id
+        {
+            return Ok(false);
+        }
+        let Some(old) = self.contacts().load_contact(&old_id)? else {
+            return Ok(false);
+        };
+        if old.is_blocked() || old.public_key().is_none() {
+            return Ok(false);
+        }
+        if self.contacts().load_contact(sender_id)?.is_none() {
+            return Ok(false);
+        }
+        self.fold_contact_into(&old_id, sender_id)?;
+        Ok(true)
+    }
+
     /// Runs `operation` in a savepoint on both databases and seals the
     /// duress content, or rolls both back.
     fn in_both_databases(

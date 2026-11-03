@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 106] = [
+const MIGRATIONS: [Migration; 107] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -802,7 +802,22 @@ const MIGRATIONS: [Migration; 106] = [
         name: "recovery_rekey_answers",
         action: MigrationAction::Sql(MIGRATION_V106_RECOVERY_REKEY_ANSWERS),
     },
+    Migration {
+        version: 107,
+        name: "recovery_old_identity",
+        action: MigrationAction::Sql(MIGRATION_V107_RECOVERY_OLD_IDENTITY),
+    },
 ];
+
+/// Migration v107 (vauchi/private#796, D20): the recovered identity's old
+/// seed from the restored backup, so the new phone can sign a continuation
+/// with the old key when it meets a contact again.
+const MIGRATION_V107_RECOVERY_OLD_IDENTITY: &str = "
+    CREATE TABLE IF NOT EXISTS recovery_old_identity (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        seed_encrypted BLOB NOT NULL
+    );
+";
 
 /// Migration v106 (vauchi/private#796, step 5b): a contact's answer to a
 /// rekey it accepted, kept with the old relationship's shared key that

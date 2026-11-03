@@ -145,8 +145,8 @@ fn cover_payload_codec() {
     ));
 
     assert!(matches!(
-        VersionedPayload::decode(&[0x0e, 1, 2, 3]),
-        Err(DeltaError::UnknownPayloadVersion(0x0e))
+        VersionedPayload::decode(&[0x0f, 1, 2, 3]),
+        Err(DeltaError::UnknownPayloadVersion(0x0f))
     ));
     assert!(matches!(
         VersionedPayload::decode(&[]),

@@ -157,6 +157,9 @@ pub enum ReceiveOutcome {
     /// One piece of the backup a guardian returns to this recovering
     /// identity; kept as returned in the receive transaction (#796).
     ReturnedBackupPiece(crate::sync::guardian_piece::GuardianBackupPiece),
+    /// The sender continues a recovered contact; honoured in the receive
+    /// transaction (vauchi/private#796, D20).
+    RecoveryContinuation(crate::recovery::rekey::RecoveryContinuation),
 }
 
 /// Processes a batch of incoming card updates with full security checks.
@@ -245,7 +248,8 @@ pub fn process_card_updates(
             | Ok(ReceiveOutcome::ResyncRequest)
             | Ok(ReceiveOutcome::GuardianBackupPiece(_))
             | Ok(ReceiveOutcome::GuardianRelease)
-            | Ok(ReceiveOutcome::ReturnedBackupPiece(_)) => result.processed += 1,
+            | Ok(ReceiveOutcome::ReturnedBackupPiece(_))
+            | Ok(ReceiveOutcome::RecoveryContinuation(_)) => result.processed += 1,
             Err(_) => result.skipped += 1,
         }
     }
@@ -1108,7 +1112,8 @@ fn decode_versioned_payload(
                 | VersionedPayload::ResyncRequest
                 | VersionedPayload::GuardianBackupPiece(_)
                 | VersionedPayload::GuardianRelease
-                | VersionedPayload::ReturnedBackupPiece(_),
+                | VersionedPayload::ReturnedBackupPiece(_)
+                | VersionedPayload::RecoveryContinuation(_),
             ) => Err(CardUpdateError::InvalidPayload(
                 "ratchet-only payload not handled here".into(),
             )),

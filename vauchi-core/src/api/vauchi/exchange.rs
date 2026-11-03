@@ -123,9 +123,35 @@ impl Vauchi {
     ) -> VauchiResult<()> {
         if let Some(mut stored) = self.storage.contacts().load_contact(contact.id())? {
             stored.update_card(contact.card().clone(), self.clock.unix_seconds());
-            return self.save_exchanged_card(&stored);
+            // The one exception to keeping the first exchange's keys: a
+            // contact restored from a guardian backup and waiting for its
+            // rekey has no relationship on this device, only an old shared
+            // key a thief may also hold; meeting it in person gives it one
+            // (vauchi/private#796, D20).
+            let restored_waiting = self
+                .storage
+                .recovery()
+                .rekey_pending()?
+                .iter()
+                .any(|id| id == contact.id())
+                && self
+                    .storage
+                    .ratchets()
+                    .load_ratchet_state(contact.id())?
+                    .is_none();
+            if !restored_waiting {
+                return self.save_exchanged_card(&stored);
+            }
+            let shared = contact.shared_key().ok_or_else(|| {
+                VauchiError::InvalidState("An exchanged contact has a shared key".into())
+            })?;
+            stored
+                .adopt_exchange_shared_key(shared.clone(), self.clock.unix_seconds())
+                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+            self.save_exchanged_card(&stored)?;
+        } else {
+            self.save_exchanged_card(contact)?;
         }
-        self.save_exchanged_card(contact)?;
         self.save_exchange_ratchet(contact.id(), ratchet, is_initiator)?;
         // Bootstrap card-update sync to the freshly-exchanged contact. The
         // initiator's first send establishes the responder's Double-Ratchet
@@ -144,6 +170,7 @@ impl Vauchi {
         // the claim's new key completes (vauchi/private#796, D14); one that
         // cannot send yet owes it to the next sync.
         self.hand_back_owed()?;
+        self.send_owed_recovery_continuations()?;
         Ok(())
     }
 }

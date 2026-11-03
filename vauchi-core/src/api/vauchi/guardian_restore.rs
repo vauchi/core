@@ -59,20 +59,24 @@ impl Vauchi {
         let now = self.clock.unix_seconds();
         self.storage.with_savepoint(|| -> VauchiResult<usize> {
             let mut restored = 0;
+            let seed = crate::backup::extract_master_seed(&envelope.sections.identity)
+                .map_err(|_| restore_refused())?;
+            self.storage.recovery().save_old_identity_seed(&seed)?;
             for contact in &contacts {
-                if self
+                // A contact met again before the restore keeps the
+                // meeting's relationship, and is owed the continuation.
+                let met_again = self
                     .storage
                     .contacts()
                     .load_contact(contact.id())?
-                    .is_some()
-                {
-                    continue;
+                    .is_some();
+                if !met_again {
+                    self.storage.contacts().save_contact(contact)?;
+                    restored += 1;
                 }
-                self.storage.contacts().save_contact(contact)?;
                 if contact.public_key().is_some() {
                     self.storage.recovery().mark_rekey_pending(contact.id())?;
                 }
-                restored += 1;
             }
             if let Some(card) = &envelope.sections.own_card {
                 self.storage.contacts().save_own_card(card)?;

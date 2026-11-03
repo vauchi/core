@@ -63,6 +63,15 @@ impl Vauchi {
             let Some(contact) = self.storage.contacts().load_contact(&contact_id)? else {
                 continue;
             };
+            // Met again in person: the continuation settles it (D20).
+            if self
+                .storage
+                .ratchets()
+                .load_ratchet_state(&contact_id)?
+                .is_some()
+            {
+                continue;
+            }
             let (Some(contact_pk), Some(old_shared)) = (contact.public_key(), contact.shared_key())
             else {
                 continue;
@@ -95,6 +104,56 @@ impl Vauchi {
             });
         }
         Ok(deliveries)
+    }
+
+    /// Sends a continuation, signed with the old key from the restored
+    /// backup, to each contact waiting for its rekey that this phone met
+    /// in person (it has their ratchet); a contact the ratchet cannot reach
+    /// yet stays owed until the next sync (D20). Returns how many went out.
+    ///
+    /// # Errors
+    /// Storage and sealing errors.
+    pub fn send_owed_recovery_continuations(&self) -> VauchiResult<usize> {
+        let Some(identity) = self.identity.as_ref() else {
+            return Ok(0);
+        };
+        if self.in_duress_mode() {
+            return Ok(0);
+        }
+        let Some(seed) = self.storage.recovery().load_old_identity_seed()? else {
+            return Ok(0);
+        };
+        let old_keys = crate::crypto::SigningKeyPair::from_seed(&seed);
+        let continuation = crate::recovery::rekey::RecoveryContinuation::create(
+            &old_keys,
+            identity.signing_public_key(),
+        );
+        let payload = crate::sync::delta::encode_recovery_continuation(&continuation);
+        let mut sent = 0;
+        for contact_id in self.storage.recovery().rekey_pending()? {
+            if self
+                .storage
+                .ratchets()
+                .load_ratchet_state(&contact_id)?
+                .is_none()
+            {
+                continue;
+            }
+            let Some(contact) = self.storage.contacts().load_contact(&contact_id)? else {
+                continue;
+            };
+            match self.queue_sealed_payload(identity, &contact, &payload) {
+                Ok(()) => {
+                    self.storage.recovery().clear_rekey_pending(&contact_id)?;
+                    sent += 1;
+                }
+                Err(VauchiError::SendDeferred)
+                | Err(VauchiError::NotFound(_))
+                | Err(VauchiError::InvalidState(_)) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(sent)
     }
 
     /// Records that a contact's rekey offer went out now, so it goes out

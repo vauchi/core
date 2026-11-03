@@ -122,6 +122,20 @@ pub fn encode_guardian_release() -> Vec<u8> {
     vec![PAYLOAD_VERSION_GUARDIAN_RELEASE]
 }
 
+/// Version byte for a recovered identity's continuation, signed with its
+/// old key, over the ratchet an in-person exchange set up
+/// (vauchi/private#796, D20).
+pub const PAYLOAD_VERSION_RECOVERY_CONTINUATION: u8 = 0x0e;
+
+/// A recovery continuation as a ratchet payload.
+pub fn encode_recovery_continuation(
+    continuation: &crate::recovery::rekey::RecoveryContinuation,
+) -> Vec<u8> {
+    let mut buf = vec![PAYLOAD_VERSION_RECOVERY_CONTINUATION];
+    buf.extend_from_slice(&continuation.encode());
+    buf
+}
+
 /// Version byte for one piece of a guardian backup a guardian returns to
 /// a recovering identity (vauchi/private#796 step 2, D13). Its own kind, so
 /// the receiver keeps it as returned and never as a designation.
@@ -621,6 +635,9 @@ pub enum VersionedPayload {
     /// One piece of a guardian backup a guardian returns to this
     /// recovering identity (version 0x0d, vauchi/private#796).
     ReturnedBackupPiece(crate::sync::guardian_piece::GuardianBackupPiece),
+    /// The sender continues a recovered contact (version 0x0e,
+    /// vauchi/private#796, D20).
+    RecoveryContinuation(crate::recovery::rekey::RecoveryContinuation),
 }
 
 impl VersionedPayload {
@@ -715,6 +732,11 @@ impl VersionedPayload {
             PAYLOAD_VERSION_RETURNED_BACKUP_PIECE => {
                 crate::sync::guardian_piece::GuardianBackupPiece::decode(body)
                     .map(VersionedPayload::ReturnedBackupPiece)
+                    .map_err(|e| DeltaError::InvalidPayload(e.to_string()))
+            }
+            PAYLOAD_VERSION_RECOVERY_CONTINUATION => {
+                crate::recovery::rekey::RecoveryContinuation::decode(body)
+                    .map(VersionedPayload::RecoveryContinuation)
                     .map_err(|e| DeltaError::InvalidPayload(e.to_string()))
             }
             v => Err(DeltaError::UnknownPayloadVersion(v)),

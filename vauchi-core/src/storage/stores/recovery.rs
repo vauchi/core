@@ -671,6 +671,59 @@ impl RecoveryStore<'_> {
         Ok(())
     }
 
+    /// Keeps the recovered identity's old seed from the restored backup.
+    pub fn save_old_identity_seed(&self, seed: &[u8; 32]) -> Result<(), StorageError> {
+        let seed_encrypted = crate::crypto::encrypt(self.key, seed)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        self.conn.execute(
+            "INSERT OR REPLACE INTO recovery_old_identity (id, seed_encrypted) VALUES (1, ?1)",
+            params![seed_encrypted],
+        )?;
+        Ok(())
+    }
+
+    /// The recovered identity's old seed, once a backup was restored.
+    ///
+    /// # Errors
+    /// Storage errors; [`StorageError::InvalidData`] for a malformed seed.
+    pub fn load_old_identity_seed(
+        &self,
+    ) -> Result<Option<zeroize::Zeroizing<[u8; 32]>>, StorageError> {
+        use rusqlite::OptionalExtension;
+        let sealed: Option<Vec<u8>> = self
+            .conn
+            .query_row(
+                "SELECT seed_encrypted FROM recovery_old_identity WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let Some(sealed) = sealed else {
+            return Ok(None);
+        };
+        let plain = zeroize::Zeroizing::new(
+            crate::crypto::decrypt(self.key, &sealed)
+                .map_err(|e| StorageError::Encryption(e.to_string()))?,
+        );
+        let seed = <[u8; 32]>::try_from(plain.as_slice())
+            .map_err(|_| StorageError::InvalidData("recovery old identity seed".into()))?;
+        Ok(Some(zeroize::Zeroizing::new(seed)))
+    }
+
+    /// Ends a contact's wait for its rekey: it was met again in person, or
+    /// it answered.
+    pub fn clear_rekey_pending(&self, contact_id: &str) -> Result<(), StorageError> {
+        self.conn.execute(
+            "DELETE FROM recovery_rekey_pending WHERE contact_id = ?1",
+            params![contact_id],
+        )?;
+        self.conn.execute(
+            "DELETE FROM recovery_rekey_offers WHERE contact_id = ?1",
+            params![contact_id],
+        )?;
+        Ok(())
+    }
+
     /// Forgets the owner's recovery passphrase.
     pub fn clear_recovery_passphrase(&self) -> Result<(), StorageError> {
         self.conn

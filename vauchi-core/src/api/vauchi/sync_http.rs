@@ -71,6 +71,7 @@ impl Vauchi {
         // sync (vauchi/private#796, D11).
         self.refresh_guardian_backup_if_stale()?;
         self.hand_back_owed()?;
+        self.send_owed_recovery_continuations()?;
         let outcome = self.sync_gated();
         // A received WipeThisDevice wipes this device now, whatever else
         // the sync did (#916).

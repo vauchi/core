@@ -8,6 +8,64 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.98.0] — 2026-11-03
+
+### Added
+
+- A guardian sends a changed guardian backup again at most once a day,
+  when a digest of what it holds has changed since the last send, and
+  never in a duress session (vauchi/private#796).
+- A guardian's return to a recovering identity travels as its own ratchet
+  message kind, `0x0d`, in the guardian-backup pieces. The receiver keeps
+  it as a returned backup (migration v97, encrypted at rest), never as a
+  designation (vauchi/private#796).
+- A guardian hands its share and the backup back only to the new key of a
+  recovery claim it vouched for within the claim's maximum age (migration
+  v98, `vouched_claims`) (vauchi/private#796).
+- The hand-back follows the recovery meeting's exchange and stays owed
+  until it can be sent; `sync()` retries it (vauchi/private#796).
+- Guardians form groups as the owner adds them: a group holds any number
+  of members, at most nine guardians in all, and the backup is split over
+  the groups. Turning on recovery trust asks which group the contact joins
+  (vauchi/private#796).
+- The owner may seal the guardian backup under a recovery passphrase, set,
+  changed or removed on the recovery screen, so the guardians' shares alone
+  open nothing (vauchi/private#796).
+- A guardian keys what it keeps by a tag, never by the designator's id
+  (vauchi/private#796).
+- The new phone's recovery screen restores the backup its guardians handed
+  back, labels and the fields they show included (vauchi/private#796).
+- After a social recovery, the new phone offers each restored contact a
+  rekey in the mailbox it already polls, again each day until answered.
+  A contact keeps an offer for review only when its proof names the offer's
+  identity. Accepting moves the contact, with everything that names it, to
+  the new key in one transaction (vauchi/private#796).
+- `test:formal` proves the Tamarin model of the #788 v2 device-link
+  candidate and its broken variants (vauchi/private#788).
+- Core's release publishes a signed Linux x86_64 `libvauchi_platform.so`
+  (`vauchi-platform-host-linux/<version>`) for consumers' JVM tests, so
+  binding repositories stop building Core (ADR-025, vauchi/private#972).
+- Core verifies its Android library is reproducible
+  (`verify:reproducible-android-so`, advisory). The job moved from android
+  (vauchi/private#972).
+
+### Changed
+
+- `verify:downstream-rust` is gone. It built each consumer's own pinned
+  Core, so it said nothing about the merge (vauchi/private#1051).
+- Core's blocking cross-cutting CI job runs `check-adr-constraints.sh`
+  (no Platform trait, no hardware crate dependency, no hardware trait or
+  mock, no `Transport` generic). It now fails rather than skips when a
+  pinned check script is missing (vauchi/private#972).
+
+### Removed
+
+- **Breaking:** `AccelerometerBackend`, `AccelerometerVerifier`,
+  `MockAccelerometerBackend`, `AccelerometerSample`, `BLEProximityVerifier`
+  and `MockBLEVerifier` leave `vauchi-core`. They had no shell
+  implementation and no production constructor (ADR-031, SC-64,
+  vauchi/private#972). `ProximityVerifier` stays.
+
 ## [0.97.0] — 2026-11-02
 
 ### Added

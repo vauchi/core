@@ -35,10 +35,13 @@
 //     with the retired keys stolen, A certifies Y after P while A2
 //     certifies X: two successors (P23's accepted exposure)
 //   Each instance's own trace fails in the other instance.
-//   quint run --max-samples=100000 --max-steps=40 --seed=7, stolen_old_keys,
-//     alice_has_one_successor: no verdict within 30 minutes; random search
-//     rarely steals all four G1 keys and runs two rounds in 40 steps, so the
-//     trace is the evidence that the fork is reachable.
+//   quint run --max-samples=5000 --max-steps=30 --seed=7 (about 22 traces/s):
+//     deleted_keys    alice_has_one_successor  no violation found
+//     deleted_keys    one_decision_each        no violation found
+//     stolen_old_keys alice_has_one_successor  no violation found
+//   The last shows the sampling too weak to reach a fork here: the trace
+//   proves that fork reachable, so "no violation" under deleted_keys is
+//   weak evidence, not a result.
 // Not shown: an exhaustive check of either instance; recovery-guardian
 // approvals (P15) and the restore-first sequence (P20), offline catch-up
 // (P21), approval-device replacement short of a policy change, liveness
@@ -76,6 +79,7 @@ module guardian_history {
   var s: State
 
   pure val KEYS = tuples(DECISIONS, ALL_GUARDIANS)
+  pure val QUORUMS = ALL_GUARDIANS.powerset().filter(q => isQuorumOf(G1, q) or isQuorumOf(G2, q))
 
   action init = s' = {
     promised: KEYS.mapBy(_ => 0),
@@ -163,7 +167,7 @@ module guardian_history {
     nondet d = DECISIONS.oneOf()
     nondet g = ALL_GUARDIANS.oneOf()
     nondet b = 1.to(MAX_BALLOT).oneOf()
-    nondet q = ALL_GUARDIANS.powerset().filter(q => isQuorumOf(G1, q) or isQuorumOf(G2, q)).oneOf()
+    nondet q = QUORUMS.oneOf()
     nondet v = Set("X", "Y", "P").oneOf()
     any {
       promise(d, g, b),

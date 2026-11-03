@@ -72,6 +72,11 @@ impl Vauchi {
         self.refresh_guardian_backup_if_stale()?;
         self.hand_back_owed()?;
         self.send_owed_recovery_continuations()?;
+        // The rekey after a recovery: offers from the new phone, answers
+        // from its contacts (vauchi/private#796). A relay out of reach
+        // leaves them for the next sync.
+        self.send_rekey_offers()?;
+        self.send_rekey_answers()?;
         let outcome = self.sync_gated();
         // A received WipeThisDevice wipes this device now, whatever else
         // the sync did (#916).

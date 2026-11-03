@@ -258,6 +258,9 @@ impl Vauchi {
     #[cfg(feature = "network-http")]
     pub fn send_rekey_offers(&self) -> VauchiResult<usize> {
         use base64::Engine;
+        if self.identity.is_none() {
+            return Ok(0);
+        }
         let deliveries = self.rekey_offer_deliveries()?;
         if deliveries.is_empty() {
             return Ok(0);

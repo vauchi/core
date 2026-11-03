@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 107] = [
+const MIGRATIONS: [Migration; 108] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -807,7 +807,36 @@ const MIGRATIONS: [Migration; 107] = [
         name: "recovery_old_identity",
         action: MigrationAction::Sql(MIGRATION_V107_RECOVERY_OLD_IDENTITY),
     },
+    Migration {
+        version: 108,
+        name: "recovery_rekey_answers_kept_at",
+        action: MigrationAction::Callback(migrate_v108_rekey_answers_kept_at),
+    },
 ];
+
+/// Migration v108 (vauchi/private#796, D18): a rekey answer records when it
+/// was kept, so its resends end after 14 days; an answer kept before has
+/// none yet (0) and takes the time it is next seen. The kept-offer table
+/// v105 made goes, since an offer is accepted or dropped as it arrives.
+/// Skipped where the column is there already.
+fn migrate_v108_rekey_answers_kept_at(
+    conn: &Connection,
+    _key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    let present: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('recovery_rekey_answers') WHERE name = 'kept_at'",
+        [],
+        |row| row.get(0),
+    )?;
+    if present == 0 {
+        conn.execute(
+            "ALTER TABLE recovery_rekey_answers ADD COLUMN kept_at INTEGER NOT NULL DEFAULT 0",
+            [],
+        )?;
+    }
+    conn.execute("DROP TABLE IF EXISTS recovery_rekey_inbound", [])?;
+    Ok(())
+}
 
 /// Migration v107 (vauchi/private#796, D20): the recovered identity's old
 /// seed from the restored backup, so the new phone can sign a continuation
@@ -827,16 +856,20 @@ const MIGRATION_V106_RECOVERY_REKEY_ANSWERS: &str = "
         contact_id TEXT PRIMARY KEY REFERENCES contacts(id) ON DELETE CASCADE,
         answer_encrypted BLOB NOT NULL,
         old_shared_encrypted BLOB NOT NULL,
-        kept_at INTEGER NOT NULL,
         sent_at INTEGER
     );
 ";
 
-/// Migration v105 (vauchi/private#796, step 5a) kept the rekey offers a
-/// contact took in for review. D18 accepts or drops an offer as it
-/// arrives, so nothing is kept; it stays a no-op so the versions stay
-/// contiguous. It never reached a release.
-const MIGRATION_V105_RECOVERY_REKEY_INBOUND: &str = "SELECT 1;";
+/// Migration v105 (vauchi/private#796, step 5a): the rekey offers a
+/// contact took in and has not answered yet, one per recovered contact.
+/// D18 keeps none; v108 drops the table.
+const MIGRATION_V105_RECOVERY_REKEY_INBOUND: &str = "
+    CREATE TABLE IF NOT EXISTS recovery_rekey_inbound (
+        contact_id TEXT PRIMARY KEY REFERENCES contacts(id) ON DELETE CASCADE,
+        offer_encrypted BLOB NOT NULL,
+        received_at INTEGER NOT NULL
+    );
+";
 
 /// Migration v104 (vauchi/private#796, step 4b): the recovering identity's
 /// own sealed recovery proof, kept once its vouchers complete it, and the

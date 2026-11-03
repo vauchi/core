@@ -672,6 +672,16 @@ impl RecoveryStore<'_> {
         Ok(())
     }
 
+    /// Records when the answer to `contact_id`'s rekey was kept, for one
+    /// kept before that time was recorded.
+    pub fn record_rekey_answer_kept(&self, contact_id: &str, at: u64) -> Result<(), StorageError> {
+        self.conn.execute(
+            "UPDATE recovery_rekey_answers SET kept_at = ?2 WHERE contact_id = ?1",
+            params![contact_id, i64::try_from(at).unwrap_or(i64::MAX)],
+        )?;
+        Ok(())
+    }
+
     /// Records that the answer to `contact_id`'s rekey went out at `at`.
     pub fn record_rekey_answer_sent(&self, contact_id: &str, at: u64) -> Result<(), StorageError> {
         self.conn.execute(

@@ -176,3 +176,19 @@ fn a_kept_answer_survives_a_storage_rekey() {
     assert_eq!(kept[0].1, b"answer bytes");
     assert_eq!(kept[0].2.as_bytes(), old_shared.as_bytes());
 }
+
+// @internal
+#[test]
+fn an_answer_kept_before_its_time_was_recorded_gets_fourteen_days_from_now() {
+    let a = accepted();
+    let dave = a.world.dave.vauchi();
+    dave.storage()
+        .connection()
+        .execute("UPDATE recovery_rekey_answers SET kept_at = 0", [])
+        .unwrap();
+    a.world.dave_clock.advance(DAY * 30);
+
+    assert_eq!(dave.rekey_answer_deliveries().unwrap().len(), 1);
+    a.world.dave_clock.advance(DAY * 14);
+    assert!(dave.rekey_answer_deliveries().unwrap().is_empty());
+}

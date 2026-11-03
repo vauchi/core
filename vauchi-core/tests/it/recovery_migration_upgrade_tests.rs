@@ -47,12 +47,8 @@ fn a_device_on_the_shipped_v106_upgrades_its_answers_and_drops_the_kept_offers()
     run_up_to(&conn, &key, 107);
     assert!(!columns(&conn, "recovery_rekey_answers").contains(&"kept_at".to_string()));
     assert!(has_table(&conn, "recovery_rekey_inbound"));
-    conn.execute(
-        "INSERT INTO contacts (id, public_key, display_name, card_encrypted, shared_key_encrypted, \
-         visibility_rules_json, exchange_timestamp) VALUES ('c1', x'00', 'C', x'00', x'00', '{}', 0)",
-        [],
-    )
-    .unwrap();
+    // The answer's contact is beside the point here.
+    conn.execute_batch("PRAGMA foreign_keys = OFF").unwrap();
     conn.execute(
         "INSERT INTO recovery_rekey_answers (contact_id, answer_encrypted, old_shared_encrypted) \
          VALUES ('c1', x'01', x'02')",

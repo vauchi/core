@@ -123,6 +123,16 @@ impl Vauchi {
         for (contact_id, blob, old_shared, kept_at, sent_at) in
             self.storage.recovery().kept_rekey_answers()?
         {
+            // Kept before its time was recorded (migration v108): its 14
+            // days start now.
+            let kept_at = if kept_at == 0 {
+                self.storage
+                    .recovery()
+                    .record_rekey_answer_kept(&contact_id, now)?;
+                now
+            } else {
+                kept_at
+            };
             if now >= kept_at.saturating_add(REKEY_RESEND_WINDOW_SECS) {
                 continue;
             }

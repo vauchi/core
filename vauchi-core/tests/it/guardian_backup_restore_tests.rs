@@ -146,6 +146,7 @@ fn each_restored_exchanged_contact_waits_for_its_rekey_and_a_guardian_met_again_
 fn without_a_share_of_every_group_nothing_is_restored() {
     let world = world(None, 2);
 
+    assert_eq!(world.phone.guardians_handed_back().unwrap(), 2);
     assert!(world.phone.restore_from_returned_backups(None).is_err());
 
     assert!(world.phone.get_contact(&world.dave_id).unwrap().is_none());
@@ -157,6 +158,7 @@ fn without_a_share_of_every_group_nothing_is_restored() {
 fn with_nothing_handed_back_nothing_is_restored() {
     let world = world(None, 0);
 
+    assert_eq!(world.phone.guardians_handed_back().unwrap(), 0);
     assert!(!world.phone.returned_backup_needs_passphrase().unwrap());
     assert!(world.phone.restore_from_returned_backups(None).is_err());
 }

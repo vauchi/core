@@ -383,7 +383,11 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             .with_places(places)
             .with_exchange_locations(exchange_locations)
             .with_contact_device_registries(contact_device_registries)
-            .with_contact_activations(contact_activations))
+            .with_contact_activations(contact_activations)
+            .with_recovery_rekey(
+                super::rekey_snapshot::rekey_snapshot(self.storage)
+                    .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?,
+            ))
     }
 
     /// Applies a full sync payload received during device linking.
@@ -538,6 +542,10 @@ impl<'a> DeviceSyncOrchestrator<'a> {
                 self.storage
                     .save_exchange_location(&loc.contact_id, &loc.location())
                     .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+            }
+
+            if let Some(rekey) = &payload.recovery_rekey {
+                super::rekey_snapshot::restore_rekey_snapshot(self.storage, rekey)?;
             }
 
             // Update version vector to match received version

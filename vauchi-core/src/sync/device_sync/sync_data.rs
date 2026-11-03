@@ -43,6 +43,44 @@ impl std::fmt::Debug for ContactRekeySyncData {
     }
 }
 
+/// A restored contact still waiting for its rekey, as a linked device takes
+/// it over (private#796, D26).
+#[derive(Clone, PartialEq, Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
+pub struct RekeyWaitingSyncData {
+    /// The waiting contact.
+    pub contact_id: String,
+    /// When the backup that holds it was restored.
+    pub restored_at: u64,
+    /// Whether it was met again in person, so it is owed a continuation.
+    pub met_again: bool,
+    /// The X25519 secret its offer carries, once one was made.
+    pub exchange_secret: Option<Vec<u8>>,
+    /// When its offer last went out.
+    pub offer_sent_at: Option<u64>,
+}
+
+/// What a recovered identity needs to finish its rekeys on a device linked
+/// while contacts still wait (private#796, D26): the waiting list, the
+/// sealed proof the offers carry, and the old identity's seed that signs
+/// continuations.
+#[derive(Clone, Default, PartialEq, Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
+pub struct RecoveryRekeySyncData {
+    /// The contacts still waiting, in the order restored.
+    pub waiting: Vec<RekeyWaitingSyncData>,
+    /// This identity's sealed recovery proof.
+    pub own_proof: Option<Vec<u8>>,
+    /// The old identity's seed.
+    pub old_seed: Option<Vec<u8>>,
+}
+
+impl std::fmt::Debug for RecoveryRekeySyncData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RecoveryRekeySyncData")
+            .field("waiting", &self.waiting.len())
+            .finish_non_exhaustive()
+    }
+}
+
 /// Serializable contact data for device sync.
 ///
 /// Contains all information needed to reconstruct a contact on a new device.

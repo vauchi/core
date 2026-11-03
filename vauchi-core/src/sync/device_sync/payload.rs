@@ -12,7 +12,7 @@ use crate::contact::Contact;
 use super::{
     ContactActivationSyncData, ContactDeviceRegistrySyncData, ContactExchangeLocation,
     ContactSyncData, DeviceSyncError, GroupSyncData, ImportedContactSyncData, PlaceSyncData,
-    TagSyncData,
+    RecoveryRekeySyncData, TagSyncData,
 };
 
 /// Payload for syncing all contacts during device linking.
@@ -47,6 +47,10 @@ pub struct DeviceSyncPayload {
     /// `#[serde(default)]` for back-compat with pre-F4 payloads.
     #[serde(default)]
     pub contact_activations: Vec<ContactActivationSyncData>,
+    /// A recovered identity's unfinished rekeys (private#796, D26).
+    /// `#[serde(default)]` for payloads from older devices.
+    #[serde(default)]
+    pub recovery_rekey: Option<RecoveryRekeySyncData>,
     /// Version number for conflict resolution.
     pub version: u64,
 }
@@ -64,6 +68,7 @@ impl DeviceSyncPayload {
             exchange_locations: Vec::new(),
             contact_device_registries: Vec::new(),
             contact_activations: Vec::new(),
+            recovery_rekey: None,
             version: 0,
         }
     }
@@ -99,6 +104,7 @@ impl DeviceSyncPayload {
             exchange_locations: Vec::new(),
             contact_device_registries: Vec::new(),
             contact_activations: Vec::new(),
+            recovery_rekey: None,
             version,
         }
     }
@@ -142,6 +148,14 @@ impl DeviceSyncPayload {
         self
     }
 
+    /// Attaches a recovered identity's unfinished rekeys.
+    #[must_use]
+    pub fn with_recovery_rekey(mut self, recovery_rekey: Option<RecoveryRekeySyncData>) -> Self {
+        self.recovery_rekey = recovery_rekey;
+        self
+    }
+
+    /// Adds F4 activation-handshake snapshots.
     pub fn with_contact_activations(mut self, activations: Vec<ContactActivationSyncData>) -> Self {
         self.contact_activations = activations;
         self

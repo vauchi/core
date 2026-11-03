@@ -30,7 +30,8 @@ mod sync_data;
 
 pub use sync_data::{
     ContactExchangeLocation, ContactRekeySyncData, ContactSyncData, GroupSyncData,
-    ImportedContactSyncData, PlaceSyncData, TagSyncData,
+    ImportedContactSyncData, PlaceSyncData, RecoveryRekeySyncData, RekeyWaitingSyncData,
+    TagSyncData,
 };
 
 /// Why a device is being linked.

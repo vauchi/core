@@ -483,6 +483,26 @@ impl RecoveryStore<'_> {
         Ok(())
     }
 
+    /// Takes over a waiting contact from a linked device, with when it was
+    /// restored and whether it was met again (D26).
+    pub fn restore_rekey_pending(
+        &self,
+        contact_id: &str,
+        restored_at: u64,
+        met_again: bool,
+    ) -> Result<(), StorageError> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO recovery_rekey_pending (contact_id, restored_at, met_again)
+             VALUES (?1, ?2, ?3)",
+            params![
+                contact_id,
+                i64::try_from(restored_at).unwrap_or(i64::MAX),
+                met_again
+            ],
+        )?;
+        Ok(())
+    }
+
     /// Marks a waiting contact as met again in person: it holds the new
     /// identity already and is owed a continuation, not an offer (D20).
     pub fn mark_rekey_met_again(&self, contact_id: &str) -> Result<(), StorageError> {

@@ -612,8 +612,9 @@ impl Vauchi {
                 self.clock.unix_seconds(),
                 self.rng.uuid_v4().into(),
             );
-            #[allow(clippy::let_underscore_must_use)]
-            let _ = adapter.send(&ack);
+            // An offer whose ACK is lost comes again next sync, and keeping
+            // it again replaces the kept one.
+            if let Err(_ack_lost) = adapter.send(&ack) {}
         }
 
         // 3. Route + apply each contact blob, build per-blob ACK envelopes.

@@ -140,3 +140,44 @@ fn a_rekey_naming_a_contact_the_sibling_does_not_hold_changes_nothing() {
 
     assert!(tablet.list_contacts().unwrap().is_empty());
 }
+
+// @internal
+#[test]
+fn a_rekey_naming_the_old_key_as_the_new_one_changes_nothing() {
+    let (world, _) = offered();
+    let dave = world.dave.vauchi();
+    let old_id = world.dave.sharer_id().to_string();
+    let before = dave.get_contact(&old_id).unwrap().unwrap();
+    let old_pk = *before.public_key().unwrap();
+
+    let applied = dave.apply_sync_items(vec![SyncItem::ContactRekeyed {
+        rekey: ContactRekeySyncData {
+            old_contact_id: old_id.clone(),
+            new_public_key: old_pk.into(),
+            shared_key: [9u8; 32],
+        },
+        timestamp: 1,
+    }]);
+
+    assert_eq!(applied.unwrap(), 0);
+    let after = dave.get_contact(&old_id).unwrap().unwrap();
+    assert_eq!(
+        after.shared_key().unwrap().as_bytes(),
+        before.shared_key().unwrap().as_bytes()
+    );
+}
+
+// @internal
+#[test]
+fn the_rekey_item_keeps_its_shared_key_out_of_debug_output() {
+    let rekey = ContactRekeySyncData {
+        old_contact_id: "old".into(),
+        new_public_key: [3u8; 32].into(),
+        shared_key: [201u8; 32],
+    };
+
+    let shown = format!("{rekey:?}");
+
+    assert!(shown.contains("old"));
+    assert!(!shown.contains("201"), "{shown}");
+}

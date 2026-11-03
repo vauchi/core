@@ -91,6 +91,10 @@ impl Vauchi {
         let broadcast_bytes = own_broadcast.to_json().into_bytes();
         let now = self.clock.unix_seconds();
         let mut queued = 0;
+        // A contact still waiting for its rekey, and not met again in
+        // person, holds this identity's old key and cannot open the push; the
+        // handshake waits for its answer (private#796, D25).
+        let rekey_pending = self.storage.recovery().rekey_pending()?;
 
         for contact in self.storage.contacts().list_contacts()? {
             // ADR-056: a blocked contact receives nothing, silently.
@@ -98,6 +102,15 @@ impl Vauchi {
                 continue;
             }
             let contact_id = contact.id().to_string();
+            if rekey_pending.contains(&contact_id)
+                && self
+                    .storage
+                    .ratchets()
+                    .load_ratchet_state(&contact_id)?
+                    .is_none()
+            {
+                continue;
+            }
             let mut tracker = self
                 .storage
                 .registry_activation()

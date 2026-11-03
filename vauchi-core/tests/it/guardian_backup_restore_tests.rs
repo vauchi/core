@@ -75,15 +75,30 @@ fn a_guardian_met_again_keeps_the_new_relationship() {
 
 // @internal
 #[test]
-fn each_restored_exchanged_contact_waits_for_its_rekey_and_a_guardian_met_again_does_not() {
+fn each_restored_exchanged_contact_waits_for_its_rekey_including_those_met_again() {
     let world = world(None, 3);
 
     world.phone.restore_from_returned_backups(None).unwrap();
 
-    assert_eq!(
-        world.phone.rekey_pending_contacts().unwrap(),
-        vec![world.dave_id.clone()]
-    );
+    assert_eq!(pending(&world), waiting(&world));
+}
+
+/// The contacts the phone holds as waiting for their rekey.
+fn pending(world: &World) -> std::collections::HashSet<String> {
+    world
+        .phone
+        .rekey_pending_contacts()
+        .unwrap()
+        .into_iter()
+        .collect()
+}
+
+/// Every restored exchanged contact: Dave, and the guardians met again,
+/// who are owed the in-person continuation (D20).
+fn waiting(world: &World) -> std::collections::HashSet<String> {
+    std::iter::once(world.dave_id.clone())
+        .chain(world.guardians_at_phone.iter().cloned())
+        .collect()
 }
 
 // @internal
@@ -139,10 +154,7 @@ fn restoring_again_restores_nothing_new() {
     world.phone.restore_from_returned_backups(None).unwrap();
 
     assert_eq!(world.phone.restore_from_returned_backups(None).unwrap(), 0);
-    assert_eq!(
-        world.phone.rekey_pending_contacts().unwrap(),
-        vec![world.dave_id.clone()]
-    );
+    assert_eq!(pending(&world), waiting(&world));
     assert_eq!(world.guardians.len(), 3);
 }
 

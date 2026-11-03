@@ -484,6 +484,7 @@ mod recovery_binding_tests;
 mod recovery_boundary_tests;
 mod recovery_claim_review_tests;
 mod recovery_comprehensive_tests;
+mod recovery_continuation_tests;
 mod recovery_engine_tests;
 mod recovery_guardian_api_tests;
 mod recovery_lost_key_voucher_tests;

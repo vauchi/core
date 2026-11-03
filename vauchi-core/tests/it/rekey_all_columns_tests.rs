@@ -1138,6 +1138,9 @@ const COVERED_ELSEWHERE: &[(&str, &str)] = &[
     // guardian_backup_return_tests.rs.
     ("returned_backup_pieces", "piece_encrypted"),
     ("returned_backups", "delivery_encrypted"),
+    // the_kept_passphrase_key_survives_a_storage_rekey in
+    // guardian_backup_passphrase_tests.rs.
+    ("recovery_passphrase", "key_encrypted"),
     // the_vcard_uid_lookup_survives_a_rekey in
     // identifying_columns_at_rest_tests.rs (value and lookup hash).
     ("contacts", "original_uid_encrypted"),
@@ -1184,6 +1187,6 @@ fn rekey_reports_progress_one_table_at_a_time() {
     let seen = seen.into_inner().unwrap();
     assert!(!seen.is_empty());
     for (step, (done, total)) in seen.iter().enumerate() {
-        assert_eq!((*done, *total), (step as u32 + 1, 38));
+        assert_eq!((*done, *total), (step as u32 + 1, 39));
     }
 }

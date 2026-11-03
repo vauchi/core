@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 101] = [
+const MIGRATIONS: [Migration; 102] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -777,7 +777,23 @@ const MIGRATIONS: [Migration; 101] = [
         name: "guardian_groups",
         action: MigrationAction::Sql(MIGRATION_V101_GUARDIAN_GROUPS),
     },
+    Migration {
+        version: 102,
+        name: "recovery_passphrase",
+        action: MigrationAction::Sql(MIGRATION_V102_RECOVERY_PASSPHRASE),
+    },
 ];
+
+/// Migration v102 (vauchi/private#796, D16): the owner's optional recovery
+/// passphrase, kept as its salt and derived key so the daily backup refresh
+/// can seal without asking for it again.
+const MIGRATION_V102_RECOVERY_PASSPHRASE: &str = "
+    CREATE TABLE IF NOT EXISTS recovery_passphrase (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        salt BLOB NOT NULL,
+        key_encrypted BLOB NOT NULL
+    );
+";
 
 /// Migration v101 (vauchi/private#796, D17): the group the owner put each
 /// guardian in; one Shamir share per group. A guardian trusted before

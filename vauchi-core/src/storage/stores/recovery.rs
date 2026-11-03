@@ -414,4 +414,58 @@ impl RecoveryStore<'_> {
             })
             .transpose()
     }
+
+    /// Keeps the owner's recovery passphrase as its salt and derived key
+    /// (the key encrypted at rest), replacing any earlier one.
+    pub fn save_recovery_passphrase(
+        &self,
+        salt: &[u8; 16],
+        key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        let key_encrypted = crate::crypto::encrypt(self.key, key.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        self.conn.execute(
+            "INSERT OR REPLACE INTO recovery_passphrase (id, salt, key_encrypted)
+             VALUES (1, ?1, ?2)",
+            params![&salt[..], key_encrypted],
+        )?;
+        Ok(())
+    }
+
+    /// The owner's recovery passphrase salt and key, if one is set.
+    ///
+    /// # Errors
+    /// Storage errors; [`StorageError::InvalidData`] for a malformed row.
+    pub fn load_recovery_passphrase(
+        &self,
+    ) -> Result<Option<([u8; 16], SymmetricKey)>, StorageError> {
+        use rusqlite::OptionalExtension;
+        use zeroize::Zeroize;
+        let row: Option<(Vec<u8>, Vec<u8>)> = self
+            .conn
+            .query_row(
+                "SELECT salt, key_encrypted FROM recovery_passphrase WHERE id = 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        let Some((salt, key_encrypted)) = row else {
+            return Ok(None);
+        };
+        let salt = <[u8; 16]>::try_from(salt)
+            .map_err(|_| StorageError::InvalidData("recovery passphrase salt".into()))?;
+        let mut plain = crate::crypto::decrypt(self.key, &key_encrypted)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let bytes = <[u8; 32]>::try_from(plain.as_slice())
+            .map_err(|_| StorageError::InvalidData("recovery passphrase key".into()));
+        plain.zeroize();
+        Ok(Some((salt, SymmetricKey::from_bytes(bytes?))))
+    }
+
+    /// Forgets the owner's recovery passphrase.
+    pub fn clear_recovery_passphrase(&self) -> Result<(), StorageError> {
+        self.conn
+            .execute("DELETE FROM recovery_passphrase WHERE id = 1", [])?;
+        Ok(())
+    }
 }

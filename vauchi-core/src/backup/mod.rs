@@ -15,6 +15,7 @@ pub mod guardian_groups;
 #[cfg(feature = "network-rustls")]
 mod guardian_recovery;
 mod key_shard;
+pub mod passphrase_layer;
 #[cfg(feature = "network-rustls")]
 pub(crate) mod snapshot;
 

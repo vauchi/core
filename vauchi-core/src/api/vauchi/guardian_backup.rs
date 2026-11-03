@@ -80,8 +80,12 @@ impl Vauchi {
         let groups = crate::backup::GuardianGroups::new(keys)
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         let (backup_hex, sealed) = self.export_guardian_backup_for_groups(&groups)?;
-        let backup =
+        let mut backup =
             hex::decode(&backup_hex).map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        if let Some((salt, key)) = self.storage.recovery().load_recovery_passphrase()? {
+            backup = crate::backup::passphrase_layer::seal(&key, &salt, &backup)
+                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        }
         let mut backup_id = [0u8; 16];
         self.rng.fill_bytes(&mut backup_id);
         let created_at = self.clock.unix_seconds();
@@ -162,6 +166,11 @@ impl Vauchi {
             .unwrap_or_default()
             .recovery_threshold();
         hasher.update(threshold.to_be_bytes());
+        // A passphrase set, changed or cleared needs a new seal (D16).
+        match self.storage.recovery().load_recovery_passphrase()? {
+            Some((salt, _)) => field(&mut hasher, &salt),
+            None => field(&mut hasher, &[]),
+        }
         match self.storage.contacts().load_own_card()? {
             Some(card) => field(&mut hasher, &json(&card)?),
             None => field(&mut hasher, &[]),

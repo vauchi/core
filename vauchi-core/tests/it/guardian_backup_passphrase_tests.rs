@@ -10,9 +10,9 @@
 
 use std::collections::HashMap;
 
-use vauchi_core::Vauchi;
 use vauchi_core::api::ReceiveOutcome;
 use vauchi_core::sync::guardian_piece::{GuardianDelivery, PieceAssembly};
+use vauchi_core::{Storage, SymmetricKey, Vauchi};
 
 use crate::common::helpers::create_vauchi_with_identity;
 use crate::common::two_recipient::{Recipient, add_recipient, receive};
@@ -136,4 +136,25 @@ fn an_empty_passphrase_is_refused() {
 
     assert!(alice.set_recovery_passphrase("").is_err());
     assert!(!alice.has_recovery_passphrase().unwrap());
+}
+
+// @internal
+#[test]
+fn the_kept_passphrase_key_survives_a_storage_rekey() {
+    let mut storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let key = SymmetricKey::generate();
+    storage
+        .recovery()
+        .save_recovery_passphrase(&[7; 16], &key)
+        .unwrap();
+
+    storage.rekey(SymmetricKey::generate()).unwrap();
+
+    let (salt, kept) = storage
+        .recovery()
+        .load_recovery_passphrase()
+        .unwrap()
+        .unwrap();
+    assert_eq!(salt, [7; 16]);
+    assert_eq!(kept.as_bytes(), key.as_bytes());
 }

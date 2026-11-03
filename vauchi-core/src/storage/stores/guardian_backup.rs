@@ -12,11 +12,16 @@
 //! instead of reassembling on every piece, which would read up to 32 MB per
 //! arrival. The caller runs [`GuardianBackupStore::keep_piece`] inside the
 //! receive transaction, so a storage failure leaves the blob on the relay.
+//!
+//! A guardian is never told it is one (#459), and its database does not say
+//! for whom either (D15): those rows carry [`designator_tag`], a keyed tag
+//! of the designator, never its contact id. Callers still pass contact ids.
 
 use rusqlite::{Connection, OptionalExtension, params};
 
 use super::super::{Storage, StorageError};
 use crate::crypto::SymmetricKey;
+use crate::crypto::kdf::HKDF;
 use crate::sync::guardian_piece::{
     GuardianBackupPiece, GuardianDelivery, PieceAssembly, PieceError,
 };
@@ -25,29 +30,50 @@ use crate::sync::guardian_piece::{
 /// contact cannot make this device hold more than two in flight.
 const MAX_UNFINISHED_BACKUPS: usize = 2;
 
-/// Where a store keeps its pieces and whole deliveries, and the column that
-/// names whose they are. Constants of this module, never input, so they are
+/// Where a store keeps its pieces and whole deliveries, the column that
+/// names whose they are, and whether that column holds a keyed tag rather
+/// than the contact id. Constants of this module, never input, so they are
 /// safe to format into SQL.
 struct Tables {
     pieces: &'static str,
     kept: &'static str,
     owner: &'static str,
+    tagged: bool,
 }
 
-/// Backups this device keeps as a guardian, per designator.
+/// Backups this device keeps as a guardian, per designator, tagged (D15).
 const KEPT_FOR_DESIGNATORS: Tables = Tables {
     pieces: "guardian_backup_pieces",
     kept: "guardian_backups",
-    owner: "designator_id",
+    owner: "designator_tag",
+    tagged: true,
 };
 
 /// Backups guardians returned to this recovering identity, per guardian
-/// (step 2a, D13); restore (step 3) reads them.
+/// (step 2a, D13); restore (step 3) reads them. The recovering person knows
+/// their guardians, so these keep the contact id.
 const RETURNED_BY_GUARDIANS: Tables = Tables {
     pieces: "returned_backup_pieces",
     kept: "returned_backups",
     owner: "guardian_id",
+    tagged: false,
 };
+
+/// HKDF info for the designator tag key, its own domain (ADR-007).
+const DESIGNATOR_TAG_INFO: &[u8] = b"Vauchi_Guardian_Designator_Tag_v1";
+
+/// The tag a guardian stores instead of a designator's contact id (D15):
+/// HMAC-SHA256 of the id under a key derived from the storage key, in hex.
+/// A storage rekey recomputes it.
+pub(crate) fn designator_tag(storage_key: &SymmetricKey, designator_id: &str) -> String {
+    use hmac::{Hmac, Mac};
+
+    let tag_key = HKDF::derive_key(None, storage_key.as_bytes(), DESIGNATOR_TAG_INFO);
+    let mut mac =
+        Hmac::<sha2::Sha256>::new_from_slice(&*tag_key).expect("HMAC accepts any key length");
+    mac.update(designator_id.as_bytes());
+    hex::encode(mac.finalize().into_bytes())
+}
 
 /// What [`GuardianBackupStore::keep_piece`] made of a piece.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -103,6 +129,7 @@ impl GuardianBackupStore<'_> {
         piece: &GuardianBackupPiece,
         now: u64,
     ) -> Result<KeptPiece, StorageError> {
+        let owner_key = self.owner_key(owner_id);
         let Tables { pieces, owner, .. } = self.tables;
         let backup_id = piece.backup_id();
         let encoded = piece.encode();
@@ -113,7 +140,7 @@ impl GuardianBackupStore<'_> {
                     "SELECT piece_encrypted FROM {pieces}
                      WHERE {owner} = ?1 AND backup_id = ?2 AND piece_index = ?3"
                 ),
-                params![owner_id, &backup_id[..], piece.index()],
+                params![owner_key, &backup_id[..], piece.index()],
                 |row| row.get(0),
             )
             .optional()?;
@@ -121,12 +148,12 @@ impl GuardianBackupStore<'_> {
             if self.open(&sealed)? == encoded {
                 return Ok(KeptPiece::Waiting);
             }
-            self.drop_backup(owner_id, &backup_id)?;
+            self.drop_backup(&owner_key, &backup_id)?;
             return Ok(KeptPiece::Dropped(PieceError::ConflictingDuplicate));
         }
 
-        if self.held_pieces(owner_id, &backup_id)? == 0 {
-            self.make_room(owner_id)?;
+        if self.held_pieces(&owner_key, &backup_id)? == 0 {
+            self.make_room(&owner_key)?;
         }
         let sealed = crate::crypto::encrypt(self.key, &encoded)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
@@ -137,7 +164,7 @@ impl GuardianBackupStore<'_> {
                  VALUES (?1, ?2, ?3, ?4, ?5)"
             ),
             params![
-                owner_id,
+                owner_key,
                 &backup_id[..],
                 piece.index(),
                 sealed,
@@ -145,10 +172,10 @@ impl GuardianBackupStore<'_> {
             ],
         )?;
 
-        if self.held_pieces(owner_id, &backup_id)? < usize::from(piece.count()) {
+        if self.held_pieces(&owner_key, &backup_id)? < usize::from(piece.count()) {
             return Ok(KeptPiece::Waiting);
         }
-        self.complete(owner_id, &backup_id, now)
+        self.complete(&owner_key, &backup_id, now)
     }
 
     /// The newest complete delivery `owner_id` sent, if any.
@@ -157,12 +184,13 @@ impl GuardianBackupStore<'_> {
     /// Storage and decryption errors; [`StorageError::InvalidData`] for a
     /// stored delivery that no longer decodes.
     pub fn kept(&self, owner_id: &str) -> Result<Option<GuardianDelivery>, StorageError> {
+        let owner_key = self.owner_key(owner_id);
         let Tables { kept, owner, .. } = self.tables;
         let sealed: Option<Vec<u8>> = self
             .conn
             .query_row(
                 &format!("SELECT delivery_encrypted FROM {kept} WHERE {owner} = ?1"),
-                params![owner_id],
+                params![owner_key],
                 |row| row.get(0),
             )
             .optional()?;
@@ -179,33 +207,29 @@ impl GuardianBackupStore<'_> {
     /// # Errors
     /// Storage errors.
     pub fn unfinished_backups(&self, owner_id: &str) -> Result<usize, StorageError> {
-        let Tables { pieces, owner, .. } = self.tables;
-        let count: i64 = self.conn.query_row(
-            &format!("SELECT COUNT(DISTINCT backup_id) FROM {pieces} WHERE {owner} = ?1"),
-            params![owner_id],
-            |row| row.get(0),
-        )?;
-        Ok(usize::try_from(count).unwrap_or(0))
+        self.count_unfinished(&self.owner_key(owner_id))
     }
 
     /// Forgets the kept backup and the waiting pieces `designator_id` left,
-    /// on its release (vauchi/private#796).
+    /// on its release or its removal as a contact (vauchi/private#796).
     ///
     /// # Errors
     /// Storage errors.
     pub fn forget_designator(&self, designator_id: &str) -> Result<(), StorageError> {
+        let owner_key = self.owner_key(designator_id);
         let Tables {
             pieces,
             kept,
             owner,
+            ..
         } = self.tables;
         self.conn.execute(
             &format!("DELETE FROM {pieces} WHERE {owner} = ?1"),
-            params![designator_id],
+            params![owner_key],
         )?;
         self.conn.execute(
             &format!("DELETE FROM {kept} WHERE {owner} = ?1"),
-            params![designator_id],
+            params![owner_key],
         )?;
         Ok(())
     }
@@ -249,9 +273,19 @@ impl GuardianBackupStore<'_> {
         Ok(())
     }
 
+    /// What the owner column holds for `owner_id`: its tag where the store
+    /// is tagged, the id itself otherwise.
+    fn owner_key(&self, owner_id: &str) -> String {
+        if self.tables.tagged {
+            designator_tag(self.key, owner_id)
+        } else {
+            owner_id.to_string()
+        }
+    }
+
     fn complete(
         &self,
-        owner_id: &str,
+        owner_key: &str,
         backup_id: &[u8; 16],
         now: u64,
     ) -> Result<KeptPiece, StorageError> {
@@ -259,13 +293,14 @@ impl GuardianBackupStore<'_> {
             pieces,
             kept,
             owner,
+            ..
         } = self.tables;
         let mut statement = self.conn.prepare(&format!(
             "SELECT piece_encrypted FROM {pieces}
              WHERE {owner} = ?1 AND backup_id = ?2 ORDER BY piece_index"
         ))?;
         let sealed_pieces = statement
-            .query_map(params![owner_id, &backup_id[..]], |row| {
+            .query_map(params![owner_key, &backup_id[..]], |row| {
                 row.get::<_, Vec<u8>>(0)
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -277,12 +312,12 @@ impl GuardianBackupStore<'_> {
             match assembly.add(piece) {
                 Ok(done) => whole = done.or(whole),
                 Err(error) => {
-                    self.drop_backup(owner_id, backup_id)?;
+                    self.drop_backup(owner_key, backup_id)?;
                     return Ok(KeptPiece::Dropped(error));
                 }
             }
         }
-        self.drop_backup(owner_id, backup_id)?;
+        self.drop_backup(owner_key, backup_id)?;
         let Some(bytes) = whole else {
             return Ok(KeptPiece::Dropped(PieceError::Malformed));
         };
@@ -295,7 +330,7 @@ impl GuardianBackupStore<'_> {
             .conn
             .query_row(
                 &format!("SELECT created_at FROM {kept} WHERE {owner} = ?1"),
-                params![owner_id],
+                params![owner_key],
                 |row| row.get(0),
             )
             .optional()?;
@@ -314,7 +349,7 @@ impl GuardianBackupStore<'_> {
                      received_at = excluded.received_at"
             ),
             params![
-                owner_id,
+                owner_key,
                 seconds(delivery.created_at()),
                 sealed,
                 seconds(now)
@@ -323,41 +358,51 @@ impl GuardianBackupStore<'_> {
         Ok(KeptPiece::Kept)
     }
 
-    fn held_pieces(&self, owner_id: &str, backup_id: &[u8; 16]) -> Result<usize, StorageError> {
+    fn count_unfinished(&self, owner_key: &str) -> Result<usize, StorageError> {
+        let Tables { pieces, owner, .. } = self.tables;
+        let count: i64 = self.conn.query_row(
+            &format!("SELECT COUNT(DISTINCT backup_id) FROM {pieces} WHERE {owner} = ?1"),
+            params![owner_key],
+            |row| row.get(0),
+        )?;
+        Ok(usize::try_from(count).unwrap_or(0))
+    }
+
+    fn held_pieces(&self, owner_key: &str, backup_id: &[u8; 16]) -> Result<usize, StorageError> {
         let Tables { pieces, owner, .. } = self.tables;
         let count: i64 = self.conn.query_row(
             &format!("SELECT COUNT(*) FROM {pieces} WHERE {owner} = ?1 AND backup_id = ?2"),
-            params![owner_id, &backup_id[..]],
+            params![owner_key, &backup_id[..]],
             |row| row.get(0),
         )?;
         Ok(usize::try_from(count).unwrap_or(0))
     }
 
     /// Evicts the oldest unfinished backups until a new one fits.
-    fn make_room(&self, owner_id: &str) -> Result<(), StorageError> {
+    fn make_room(&self, owner_key: &str) -> Result<(), StorageError> {
         let Tables { pieces, owner, .. } = self.tables;
-        while self.unfinished_backups(owner_id)? >= MAX_UNFINISHED_BACKUPS {
+        while self.count_unfinished(owner_key)? >= MAX_UNFINISHED_BACKUPS {
             let oldest: Vec<u8> = self.conn.query_row(
                 &format!(
                     "SELECT backup_id FROM {pieces} WHERE {owner} = ?1
                      GROUP BY backup_id ORDER BY MIN(received_at), MIN(rowid) LIMIT 1"
                 ),
-                params![owner_id],
+                params![owner_key],
                 |row| row.get(0),
             )?;
             self.conn.execute(
                 &format!("DELETE FROM {pieces} WHERE {owner} = ?1 AND backup_id = ?2"),
-                params![owner_id, oldest],
+                params![owner_key, oldest],
             )?;
         }
         Ok(())
     }
 
-    fn drop_backup(&self, owner_id: &str, backup_id: &[u8; 16]) -> Result<(), StorageError> {
+    fn drop_backup(&self, owner_key: &str, backup_id: &[u8; 16]) -> Result<(), StorageError> {
         let Tables { pieces, owner, .. } = self.tables;
         self.conn.execute(
             &format!("DELETE FROM {pieces} WHERE {owner} = ?1 AND backup_id = ?2"),
-            params![owner_id, &backup_id[..]],
+            params![owner_key, &backup_id[..]],
         )?;
         Ok(())
     }

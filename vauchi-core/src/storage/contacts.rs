@@ -31,6 +31,9 @@ impl Storage {
         self.sync().forget_contact(id)?;
         self.pending().delete_pending_updates_for_contact(id)?;
         self.labels().remove_contact_from_all_groups(id)?;
+        // Kept by a keyed tag, not the id, so no foreign key cascades it
+        // (vauchi/private#796, D15).
+        self.guardian_backups().forget_designator(id)?;
         self.conn.execute(
             "DELETE FROM dismissed_duplicates WHERE id1 = ?1 OR id2 = ?1",
             params![id],

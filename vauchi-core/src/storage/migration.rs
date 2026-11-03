@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 99] = [
+const MIGRATIONS: [Migration; 100] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -767,7 +767,101 @@ const MIGRATIONS: [Migration; 99] = [
         name: "vouched_claims_handed_back",
         action: MigrationAction::Callback(migrate_v99_vouched_claims_handed_back),
     },
+    Migration {
+        version: 100,
+        name: "guardian_designator_tags",
+        action: MigrationAction::Callback(migrate_v100_guardian_designator_tags),
+    },
 ];
+
+/// Migration v100 (vauchi/private#796, D15): a guardian's tables carry a
+/// keyed tag of the designator instead of its contact id, so the database
+/// does not say for whom it keeps a backup. Rows are tagged through their
+/// id; the foreign key goes with the id, so contact removal forgets them
+/// explicitly. Skipped when the tag column is already there.
+fn migrate_v100_guardian_designator_tags(
+    conn: &Connection,
+    key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    use super::stores::designator_tag;
+
+    let tagged: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('guardian_backups') WHERE name = 'designator_tag'",
+        [],
+        |row| row.get(0),
+    )?;
+    if tagged > 0 {
+        return Ok(());
+    }
+    conn.execute_batch(
+        "CREATE TABLE guardian_backup_pieces_tagged (
+             designator_tag TEXT NOT NULL,
+             backup_id BLOB NOT NULL CHECK(length(backup_id) = 16),
+             piece_index INTEGER NOT NULL,
+             piece_encrypted BLOB NOT NULL,
+             received_at INTEGER NOT NULL,
+             PRIMARY KEY (designator_tag, backup_id, piece_index)
+         );
+         CREATE TABLE guardian_backups_tagged (
+             designator_tag TEXT PRIMARY KEY,
+             created_at INTEGER NOT NULL,
+             delivery_encrypted BLOB NOT NULL,
+             received_at INTEGER NOT NULL
+         );",
+    )?;
+
+    let pieces: Vec<(String, Vec<u8>, i64, Vec<u8>, i64)> = conn
+        .prepare(
+            "SELECT designator_id, backup_id, piece_index, piece_encrypted, received_at
+             FROM guardian_backup_pieces",
+        )?
+        .query_map([], |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+            ))
+        })?
+        .collect::<Result<_, _>>()?;
+    for (id, backup_id, index, sealed, received_at) in pieces {
+        conn.execute(
+            "INSERT INTO guardian_backup_pieces_tagged
+                 (designator_tag, backup_id, piece_index, piece_encrypted, received_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params![
+                designator_tag(key, &id),
+                backup_id,
+                index,
+                sealed,
+                received_at
+            ],
+        )?;
+    }
+    let kept: Vec<(String, i64, Vec<u8>, i64)> = conn
+        .prepare(
+            "SELECT designator_id, created_at, delivery_encrypted, received_at FROM guardian_backups",
+        )?
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)))?
+        .collect::<Result<_, _>>()?;
+    for (id, created_at, sealed, received_at) in kept {
+        conn.execute(
+            "INSERT INTO guardian_backups_tagged
+                 (designator_tag, created_at, delivery_encrypted, received_at)
+             VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![designator_tag(key, &id), created_at, sealed, received_at],
+        )?;
+    }
+
+    conn.execute_batch(
+        "DROP TABLE guardian_backup_pieces;
+         DROP TABLE guardian_backups;
+         ALTER TABLE guardian_backup_pieces_tagged RENAME TO guardian_backup_pieces;
+         ALTER TABLE guardian_backups_tagged RENAME TO guardian_backups;",
+    )?;
+    Ok(())
+}
 
 /// Migration v99 (vauchi/private#796 step 2c): when the hand-back for a
 /// vouched claim went out, so a guardian that could not send it at the

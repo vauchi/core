@@ -34,6 +34,7 @@ use super::{Storage, StorageError};
 // Each re-encrypts one table's encrypted columns from `old_key` to `new_key`;
 // `rekey_with_progress` calls them in sequence inside its EXCLUSIVE transaction.
 mod contacts;
+mod guardian;
 mod identity;
 mod safety;
 mod sync;
@@ -250,7 +251,7 @@ impl Storage {
         self.wal_checkpoint()?;
 
         let old_key = &self.encryption_key;
-        const TOTAL_TABLES: u32 = 37;
+        const TOTAL_TABLES: u32 = 38;
         let mut completed: u32 = 0;
 
         let report = |completed: &mut u32, table: &str| {
@@ -362,6 +363,9 @@ impl Storage {
                 "delivery_encrypted",
             )?;
             report(&mut completed, "returned_backups");
+
+            self.retag_guardian_designators(old_key, &new_key)?;
+            report(&mut completed, "guardian_designator_tags");
 
             self.rekey_sync_timestamps(old_key, &new_key)?;
             report(&mut completed, "sync_timestamps");

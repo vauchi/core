@@ -58,6 +58,7 @@ pub use genesis_limit::{
     GENESIS_CONTACT_ATTEMPTS_PER_WINDOW, GENESIS_GLOBAL_ATTEMPTS_PER_WINDOW, GENESIS_WINDOW_SECS,
     GenesisLimitStore,
 };
+pub(crate) use guardian_backup::designator_tag;
 pub use guardian_backup::{GuardianBackupStore, KeptPiece};
 pub use identity::IdentityStore;
 pub use labels::LabelStore;

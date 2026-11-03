@@ -162,3 +162,43 @@ fn an_answer_taken_again_changes_nothing() {
         key.as_bytes()
     );
 }
+
+// @internal
+#[test]
+fn the_phone_lists_who_is_still_being_asked_and_who_did_not_answer_in_fourteen_days() {
+    use vauchi_core::api::RekeyWait;
+    let clock = Arc::new(FakeClock::new(SystemTime::now()));
+    let mut phone = Vauchi::in_memory_with_clock(clock.clone()).unwrap();
+    phone.create_identity("Alice, new phone").unwrap();
+    let world = recovered(phone, None, 3);
+    world.phone.restore_from_returned_backups(None).unwrap();
+    let dave = |phone: &Vauchi| {
+        phone
+            .rekey_waiting()
+            .unwrap()
+            .into_iter()
+            .find(|(id, _)| *id == world.dave_id)
+            .map(|(_, wait)| wait)
+    };
+
+    assert_eq!(dave(&world.phone), Some(RekeyWait::Asking));
+    clock.advance(Duration::from_secs(14 * 86_400));
+    assert_eq!(dave(&world.phone), Some(RekeyWait::NotAnswered));
+}
+
+// @internal
+#[test]
+fn a_contact_that_answered_is_no_longer_listed() {
+    let (world, _, answer) = answered();
+
+    world.phone.take_rekey_answer(&answer).unwrap();
+
+    assert!(
+        world
+            .phone
+            .rekey_waiting()
+            .unwrap()
+            .iter()
+            .all(|(id, _)| *id != world.dave_id)
+    );
+}

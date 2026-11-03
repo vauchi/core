@@ -13,7 +13,6 @@ use vauchi_core::api::ReceiveOutcome;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SigningKeyPair;
-use vauchi_core::recovery::RecoverySettings;
 use vauchi_core::sync::guardian_piece::{GuardianDelivery, PieceAssembly, PieceError};
 use vauchi_core::{SymmetricKey, Vauchi, VauchiError};
 
@@ -36,15 +35,6 @@ fn trust_all(alice: &Vauchi, guardians: &[Recipient]) {
             .unwrap();
         assert!(alice.toggle_recovery_trust(&guardian.id_at_sharer).unwrap());
     }
-}
-
-fn set_voucher_threshold(alice: &Vauchi, threshold: u32) {
-    let settings = RecoverySettings::new(threshold, 1).unwrap();
-    alice
-        .storage()
-        .recovery()
-        .save_recovery_settings(&settings)
-        .unwrap();
 }
 
 /// The newest whole delivery among the pieces `guardian` received.
@@ -144,44 +134,6 @@ fn designating_three_guardians_sends_each_a_backup_all_three_open_and_two_do_not
 
     assert!(opens(&backup, &holders));
     assert!(!opens(&backup, &holders[..2]));
-}
-
-// @internal
-#[test]
-fn a_voucher_threshold_above_the_guardian_count_is_capped_at_the_count() {
-    let (alice, mut guardians) = alice_with_guardians(4);
-    trust_all(&alice, &guardians);
-    set_voucher_threshold(&alice, 9);
-
-    assert_eq!(alice.send_guardian_backup().unwrap(), 4);
-
-    let deliveries: Vec<GuardianDelivery> = guardians
-        .iter_mut()
-        .map(|guardian| latest_delivery(&alice, guardian).unwrap())
-        .collect();
-    let backup = deliveries[0].backup().to_vec();
-    let holders: Vec<(&Recipient, &GuardianDelivery)> = guardians.iter().zip(&deliveries).collect();
-    assert!(opens(&backup, &holders));
-    assert!(!opens(&backup, &holders[..3]));
-}
-
-// @internal
-#[test]
-fn a_voucher_threshold_of_one_still_needs_two_guardians() {
-    let (alice, mut guardians) = alice_with_guardians(3);
-    trust_all(&alice, &guardians);
-    set_voucher_threshold(&alice, 1);
-
-    assert_eq!(alice.send_guardian_backup().unwrap(), 3);
-
-    let deliveries: Vec<GuardianDelivery> = guardians
-        .iter_mut()
-        .map(|guardian| latest_delivery(&alice, guardian).unwrap())
-        .collect();
-    let backup = deliveries[0].backup().to_vec();
-    let holders: Vec<(&Recipient, &GuardianDelivery)> = guardians.iter().zip(&deliveries).collect();
-    assert!(opens(&backup, &holders[..2]));
-    assert!(!opens(&backup, &holders[..1]));
 }
 
 // @internal

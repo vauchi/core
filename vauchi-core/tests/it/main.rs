@@ -311,6 +311,7 @@ mod group_transition_tests;
 mod groups_list_engine_tests;
 mod guardian_adversarial_tests;
 mod guardian_backup_confidentiality_tests;
+mod guardian_backup_groups_tests;
 mod guardian_backup_handback_tests;
 mod guardian_backup_keep_tests;
 mod guardian_backup_meeting_tests;

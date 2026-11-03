@@ -173,14 +173,25 @@ pub fn split_into_pieces(
 /// sealed to one guardian is 124 bytes (Social Recovery, A3).
 const MAX_SEALED_SHARE_BYTES: usize = 1024;
 
+/// The most bytes a guardian token takes; one is about 140 bytes.
+const MAX_GUARDIAN_TOKEN_BYTES: usize = 1024;
+
+/// Marks the form that carries a guardian token. The earlier form starts
+/// with the creation time's high byte, which is zero for any real time.
+const WITH_TOKEN_MARKER: u8 = 0x01;
+
 /// What one guardian receives: its own sealed share and the backup every
-/// guardian holds (D7), with the designator's time of export. Wire form:
-/// creation time (big-endian `u64` seconds), share length (big-endian
-/// `u16`), the share, then the backup.
+/// guardian holds (D7), with the designator's time of export, and the
+/// guardian's token, the designator's key naming this guardian (D19).
+/// Wire form: creation time (big-endian `u64` seconds), share length
+/// (big-endian `u16`), the share, then the backup; with a token,
+/// `0x01 || time || share length || share || token length (u16) || token
+/// || backup`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GuardianDelivery {
     created_at: u64,
     sealed_share: Vec<u8>,
+    guardian_token: Option<Vec<u8>>,
     backup: Vec<u8>,
 }
 
@@ -199,8 +210,27 @@ impl GuardianDelivery {
         Ok(Self {
             created_at,
             sealed_share,
+            guardian_token: None,
             backup,
         })
+    }
+
+    /// The same delivery carrying the guardian's token, as serialized
+    /// `GuardianToken` bytes.
+    ///
+    /// # Errors
+    /// [`PieceError::Malformed`] for an empty token or one over 1 KiB.
+    pub fn with_guardian_token(mut self, token: Vec<u8>) -> Result<Self, PieceError> {
+        if !(1..=MAX_GUARDIAN_TOKEN_BYTES).contains(&token.len()) {
+            return Err(PieceError::Malformed);
+        }
+        self.guardian_token = Some(token);
+        Ok(self)
+    }
+
+    /// The guardian's token, when the designator sent one.
+    pub fn guardian_token(&self) -> Option<&[u8]> {
+        self.guardian_token.as_deref()
     }
 
     /// When the designator exported this backup; a guardian keeps the
@@ -224,14 +254,25 @@ impl GuardianDelivery {
     pub fn encode(&self) -> Vec<u8> {
         let share_len = u16::try_from(self.sealed_share.len())
             .expect("a sealed share is at most 1 KiB, checked in new");
+        let token_len = self.guardian_token.as_ref().map_or(0, Vec::len);
         let mut bytes = Vec::with_capacity(
-            10_usize
+            13_usize
                 .saturating_add(self.sealed_share.len())
+                .saturating_add(token_len)
                 .saturating_add(self.backup.len()),
         );
+        if self.guardian_token.is_some() {
+            bytes.push(WITH_TOKEN_MARKER);
+        }
         bytes.extend_from_slice(&self.created_at.to_be_bytes());
         bytes.extend_from_slice(&share_len.to_be_bytes());
         bytes.extend_from_slice(&self.sealed_share);
+        if let Some(token) = &self.guardian_token {
+            let token_len =
+                u16::try_from(token.len()).expect("a token is at most 1 KiB, checked when set");
+            bytes.extend_from_slice(&token_len.to_be_bytes());
+            bytes.extend_from_slice(token);
+        }
         bytes.extend_from_slice(&self.backup);
         bytes
     }
@@ -240,18 +281,35 @@ impl GuardianDelivery {
     /// [`PieceError::Malformed`] for a short time, a share length of zero,
     /// over 1 KiB or past the end, or no backup after the share.
     pub fn decode(bytes: &[u8]) -> Result<Self, PieceError> {
+        let (with_token, bytes) = match bytes.split_first() {
+            Some((&WITH_TOKEN_MARKER, rest)) => (true, rest),
+            _ => (false, bytes),
+        };
         let (created_at, rest) = bytes
             .split_first_chunk::<8>()
             .ok_or(PieceError::Malformed)?;
         let (share_len, rest) = rest.split_first_chunk::<2>().ok_or(PieceError::Malformed)?;
-        let (sealed_share, backup) = rest
+        let (sealed_share, rest) = rest
             .split_at_checked(usize::from(u16::from_be_bytes(*share_len)))
             .ok_or(PieceError::Malformed)?;
-        Self::new(
+        let (token, backup) = if with_token {
+            let (token_len, rest) = rest.split_first_chunk::<2>().ok_or(PieceError::Malformed)?;
+            let (token, backup) = rest
+                .split_at_checked(usize::from(u16::from_be_bytes(*token_len)))
+                .ok_or(PieceError::Malformed)?;
+            (Some(token.to_vec()), backup)
+        } else {
+            (None, rest)
+        };
+        let delivery = Self::new(
             u64::from_be_bytes(*created_at),
             sealed_share.to_vec(),
             backup.to_vec(),
-        )
+        )?;
+        match token {
+            Some(token) => delivery.with_guardian_token(token),
+            None => Ok(delivery),
+        }
     }
 }
 

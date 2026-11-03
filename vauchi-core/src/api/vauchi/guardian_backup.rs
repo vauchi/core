@@ -93,7 +93,19 @@ impl Vauchi {
         let mut sent = 0;
         let each_member = grouped.iter().flatten().zip(sealed.into_iter().flatten());
         for (guardian, share) in each_member {
+            let guardian_pk = guardian
+                .public_key()
+                .copied()
+                .ok_or_else(|| VauchiError::InvalidState("A guardian has no public key".into()))?;
+            // The token lets a contact tell this guardian's in-person vouch
+            // from anyone's (D19).
+            let token = crate::recovery::guardian::GuardianToken::create(
+                identity.signing_keypair(),
+                crate::crypto::PublicKey::from_bytes(guardian_pk),
+                created_at,
+            );
             let delivery = GuardianDelivery::new(created_at, share, backup.clone())
+                .and_then(|delivery| delivery.with_guardian_token(token.to_bytes()))
                 .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
             let pieces = split_into_pieces(backup_id, &delivery.encode())
                 .map_err(|e| VauchiError::InvalidState(e.to_string()))?;

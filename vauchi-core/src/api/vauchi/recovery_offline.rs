@@ -177,7 +177,7 @@ impl Vauchi {
         let voucher = RecoveryVoucher::create_from_claim(
             &claim,
             identity.signing_keypair(),
-            None,
+            self.held_guardian_token(claim.old_pk().as_bytes())?,
             self.clock.unix_seconds(),
         )
         .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
@@ -189,6 +189,33 @@ impl Vauchi {
             self.clock.unix_seconds(),
         )?;
         Ok(base64::engine::general_purpose::STANDARD.encode(voucher.to_bytes()))
+    }
+
+    /// The token naming this device's identity as `designator_pk`'s guardian,
+    /// from the backup it keeps for that designator (D19); `None` when it
+    /// keeps none, or one that does not name this pair.
+    fn held_guardian_token(
+        &self,
+        designator_pk: &[u8; 32],
+    ) -> VauchiResult<Option<crate::recovery::guardian::GuardianToken>> {
+        let Some(identity) = self.identity.as_ref() else {
+            return Ok(None);
+        };
+        let Some(kept) = self
+            .storage
+            .guardian_backups()
+            .kept(&hex::encode(designator_pk))?
+        else {
+            return Ok(None);
+        };
+        Ok(kept
+            .guardian_token()
+            .and_then(|bytes| crate::recovery::guardian::GuardianToken::from_bytes(bytes).ok())
+            .filter(|token| {
+                token.verify()
+                    && token.designator_pk() == designator_pk
+                    && token.guardian_pk() == identity.signing_public_key()
+            }))
     }
 
     /// Adds a voucher to the in-progress recovery proof.

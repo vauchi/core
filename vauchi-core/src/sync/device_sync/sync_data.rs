@@ -80,17 +80,14 @@ pub struct RekeyWaitingSyncData {
 }
 
 /// What a recovered identity needs to finish its rekeys on a device linked
-/// while contacts still wait (private#796, D26): the waiting list, the
-/// sealed proof the offers carry, and the old identity's seed that signs
-/// continuations.
+/// while contacts still wait (private#796, D26): the waiting list and the
+/// sealed proof the offers carry. Never the old identity's seed.
 #[derive(Clone, Default, PartialEq, Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
 pub struct RecoveryRekeySyncData {
     /// The contacts still waiting, in the order restored.
     pub waiting: Vec<RekeyWaitingSyncData>,
     /// This identity's sealed recovery proof.
     pub own_proof: Option<Vec<u8>>,
-    /// The old identity's seed.
-    pub old_seed: Option<Vec<u8>>,
 }
 
 impl std::fmt::Debug for RecoveryRekeySyncData {

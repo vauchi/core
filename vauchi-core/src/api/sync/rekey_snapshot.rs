@@ -4,21 +4,23 @@
 
 //! A recovered identity's unfinished rekeys in the device-link full sync
 //! (vauchi/private#796, D26): a device linked while contacts still wait
-//! takes over the waiting list, each offer's exchange key, the proof and
-//! the old seed, so it can offer, complete and sign continuations too.
+//! takes over the waiting list, each offer's exchange key and the proof, so
+//! it can offer and complete too. The old identity's seed stays on the
+//! device that restored it: old-key signatures may never authorize a
+//! recovery or a merge on their own (owner decision 2026-11-03, social
+//! recovery security review).
 
 use crate::storage::{Storage, StorageError};
 use crate::sync::device_sync::{DeviceSyncError, RecoveryRekeySyncData, RekeyWaitingSyncData};
 
-/// The rekey state to hand a newly linked device; `None` when this
-/// identity was never restored from a guardian backup.
+/// The rekey state to hand a newly linked device; `None` when no contact
+/// waits.
 pub(super) fn rekey_snapshot(
     storage: &Storage,
 ) -> Result<Option<RecoveryRekeySyncData>, StorageError> {
     let recovery = storage.recovery();
-    let old_seed = recovery.load_old_identity_seed()?;
     let pending = recovery.rekey_pending_since()?;
-    if old_seed.is_none() && pending.is_empty() {
+    if pending.is_empty() {
         return Ok(None);
     }
     let mut waiting = Vec::with_capacity(pending.len());
@@ -35,7 +37,6 @@ pub(super) fn rekey_snapshot(
     Ok(Some(RecoveryRekeySyncData {
         waiting,
         own_proof: recovery.load_own_proof()?,
-        old_seed: old_seed.map(|seed| seed.to_vec()),
     }))
 }
 
@@ -43,19 +44,14 @@ pub(super) fn rekey_snapshot(
 /// this device does not hold is skipped.
 ///
 /// # Errors
-/// [`DeviceSyncError::Deserialization`] for a seed or exchange key that is
-/// not 32 bytes, or a proof over the offer's bound; storage errors.
+/// [`DeviceSyncError::Deserialization`] for an exchange key that is not 32
+/// bytes, or a proof over the offer's bound; storage errors.
 pub(super) fn restore_rekey_snapshot(
     storage: &Storage,
     snapshot: &RecoveryRekeySyncData,
 ) -> Result<(), DeviceSyncError> {
     let stored = |e: StorageError| DeviceSyncError::Deserialization(e.to_string());
     let recovery = storage.recovery();
-    if let Some(seed) = &snapshot.old_seed {
-        recovery
-            .save_old_identity_seed(&*thirty_two(seed, "old identity seed")?)
-            .map_err(stored)?;
-    }
     if let Some(proof) = &snapshot.own_proof {
         if proof.len() > crate::recovery::rekey::MAX_PROOF_BYTES {
             return Err(DeviceSyncError::Deserialization(

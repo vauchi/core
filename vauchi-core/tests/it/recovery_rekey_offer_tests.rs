@@ -163,3 +163,16 @@ fn the_kept_exchange_key_and_proof_survive_a_storage_rekey() {
         Some(b"sealed proof".as_slice())
     );
 }
+
+// @internal
+#[test]
+fn offers_go_for_fourteen_days_after_the_restore_and_no_longer() {
+    let clock = clock();
+    let world = restored(&clock);
+
+    clock.advance(DAY * 14 - Duration::from_secs(1));
+    assert_eq!(world.phone.rekey_offer_deliveries().unwrap().len(), 1);
+
+    clock.advance(Duration::from_secs(1));
+    assert!(world.phone.rekey_offer_deliveries().unwrap().is_empty());
+}

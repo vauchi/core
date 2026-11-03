@@ -2,13 +2,16 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! A contact takes in a rekey offer (vauchi/private#796 step 5a): it keeps
-//! one only when the new identity signed it and the recovery proof it
-//! carries opens for one of its contacts and names that same identity, and
-//! lists it for review with the proof's verdict. Anything else is dropped.
+//! A contact takes in a rekey offer and accepts it by itself when it is
+//! provably the recovered contact's (vauchi/private#796, D18): the new
+//! identity signed it, its proof opens for one of this device's contacts
+//! and names that same identity, and either enough of the vouchers carry a
+//! guardian token the old key signed, or enough of them are this device's
+//! own contacts. Anything else is dropped without a trace; nobody is asked.
+//! The proof is judged without its 192-hour expiry (D21).
 
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use vauchi_core::api::RekeyOfferTaken;
 use vauchi_core::clock::FakeClock;
@@ -20,6 +23,7 @@ use vauchi_core::{Identity, Storage, SymmetricKey, Vauchi};
 use crate::common::helpers::create_vauchi_with_identity;
 use crate::common::meeting::signing_pk;
 use crate::common::recovered_phone::{World, recovered};
+use crate::common::two_recipient::{Recipient, add_recipient};
 
 /// Alice's phone, restored, and the offer it makes Dave.
 fn offered() -> (World, Vec<u8>) {
@@ -34,25 +38,114 @@ fn offered() -> (World, Vec<u8>) {
     (world, blob)
 }
 
+/// Someone claims Alice's old key with vouches from three of her friends,
+/// who are no guardians, and offers Dave a rekey. Returns Dave and the
+/// offer; `friends_of_dave` makes the friends Dave's contacts too.
+fn offered_by_a_claim_of_friends(friends_of_dave: bool) -> (Recipient, Vec<u8>) {
+    let alice = create_vauchi_with_identity("Alice");
+    let alice_pk = signing_pk(&alice);
+    let dave = add_recipient(&alice, &alice_pk, "Dave");
+    let dave_pk = signing_pk(dave.vauchi());
+    let friends: Vec<Recipient> = (0..3)
+        .map(|index| add_recipient(&alice, &alice_pk, &format!("F{index}")))
+        .collect();
+    if friends_of_dave {
+        for friend in &friends {
+            dave.vauchi()
+                .add_contact(Contact::from_exchange(
+                    signing_pk(friend.vauchi()),
+                    ContactCard::new("Friend"),
+                    SymmetricKey::generate(),
+                    0,
+                ))
+                .unwrap();
+        }
+    }
+    let claimant = create_vauchi_with_identity("Claimant");
+    let claim = claimant
+        .create_recovery_claim_hex_b64(&hex::encode(alice_pk))
+        .unwrap();
+    for friend in &friends {
+        let voucher = friend
+            .vauchi()
+            .create_voucher_from_claim_b64(&claim)
+            .unwrap();
+        claimant.add_recovery_voucher_b64(&voucher).unwrap();
+    }
+    let dave_at_claimant = Contact::from_exchange(
+        dave_pk,
+        ContactCard::new("Dave"),
+        SymmetricKey::generate(),
+        0,
+    );
+    let id = dave_at_claimant.id().to_string();
+    claimant.add_contact(dave_at_claimant).unwrap();
+    claimant
+        .storage()
+        .recovery()
+        .mark_rekey_pending(&id)
+        .unwrap();
+    let blob = claimant.rekey_offer_deliveries().unwrap()[0].blob.clone();
+    (dave, blob)
+}
+
 // @internal
 #[test]
-fn dave_keeps_an_offer_whose_proof_names_its_key_and_lists_it_for_review() {
+fn an_offer_alices_guardians_vouched_for_is_accepted_without_asking() {
     let (world, blob) = offered();
     let dave = world.dave.vauchi();
+    let old_id = world.dave.sharer_id().to_string();
 
     let taken = dave.take_rekey_offer(&blob).unwrap();
 
-    let alice_at_dave = world.dave.sharer_id().to_string();
+    let new_id = hex::encode(signing_pk(&world.phone));
     assert_eq!(
         taken,
-        RekeyOfferTaken::Kept {
-            contact_id: alice_at_dave.clone()
+        RekeyOfferTaken::Accepted {
+            contact_id: new_id.clone()
         }
     );
-    let pending = dave.pending_rekey_offers().unwrap();
-    assert_eq!(pending.len(), 1);
-    assert_eq!(pending[0].contact_id, alice_at_dave);
-    assert_eq!(pending[0].new_pk, signing_pk(&world.phone));
+    assert!(dave.get_contact(&old_id).unwrap().is_none());
+    assert!(dave.get_contact(&new_id).unwrap().is_some());
+}
+
+// @internal
+#[test]
+fn an_offer_backed_only_by_vouchers_dave_cannot_place_is_dropped() {
+    let (dave, blob) = offered_by_a_claim_of_friends(false);
+    let alice_id = dave.sharer_id().to_string();
+
+    let taken = dave.vauchi().take_rekey_offer(&blob).unwrap();
+
+    assert_eq!(taken, RekeyOfferTaken::Dropped);
+    assert!(dave.vauchi().get_contact(&alice_id).unwrap().is_some());
+}
+
+// @internal
+#[test]
+fn an_offer_daves_own_contacts_vouched_for_is_accepted() {
+    let (dave, blob) = offered_by_a_claim_of_friends(true);
+
+    let taken = dave.vauchi().take_rekey_offer(&blob).unwrap();
+
+    assert!(
+        matches!(taken, RekeyOfferTaken::Accepted { .. }),
+        "{taken:?}"
+    );
+}
+
+// @internal
+#[test]
+fn an_offer_whose_proof_is_past_its_window_is_still_accepted() {
+    let (world, blob) = offered();
+    world.dave_clock.advance(Duration::from_secs(30 * 86_400));
+
+    let taken = world.dave.vauchi().take_rekey_offer(&blob).unwrap();
+
+    assert!(
+        matches!(taken, RekeyOfferTaken::Accepted { .. }),
+        "{taken:?}"
+    );
 }
 
 // @internal
@@ -72,9 +165,9 @@ fn an_offer_signed_by_an_identity_the_proof_does_not_name_is_dropped() {
         world
             .dave
             .vauchi()
-            .pending_rekey_offers()
+            .get_contact(world.dave.sharer_id())
             .unwrap()
-            .is_empty()
+            .is_some()
     );
 }
 
@@ -88,7 +181,6 @@ fn an_offer_for_someone_who_is_not_a_contact_is_dropped() {
         stranger.take_rekey_offer(&blob).unwrap(),
         RekeyOfferTaken::Dropped
     );
-    assert!(stranger.pending_rekey_offers().unwrap().is_empty());
 }
 
 // @internal
@@ -108,22 +200,25 @@ fn garbled_or_tampered_offers_are_dropped() {
         world
             .dave
             .vauchi()
-            .pending_rekey_offers()
+            .get_contact(world.dave.sharer_id())
             .unwrap()
-            .is_empty()
+            .is_some()
     );
 }
 
 // @internal
 #[test]
-fn an_offer_sent_again_is_listed_once() {
+fn an_offer_sent_again_after_the_rekey_changes_nothing() {
     let (world, blob) = offered();
     let dave = world.dave.vauchi();
-
     dave.take_rekey_offer(&blob).unwrap();
-    dave.take_rekey_offer(&blob).unwrap();
+    let after_first = dave.list_contacts().unwrap().len();
 
-    assert_eq!(dave.pending_rekey_offers().unwrap().len(), 1);
+    let again = dave.take_rekey_offer(&blob).unwrap();
+
+    assert_eq!(again, RekeyOfferTaken::Dropped);
+    assert_eq!(dave.list_contacts().unwrap().len(), after_first);
+    assert_eq!(dave.rekey_answer_deliveries().unwrap().len(), 1);
 }
 
 // @internal

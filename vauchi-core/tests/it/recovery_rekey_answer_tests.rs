@@ -2,13 +2,12 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! A contact accepts a rekey offer (vauchi/private#796 step 5b;
-//! `recovery_acceptance.spthy`, John_answers): it answers with its own
+//! A contact that accepts a rekey (vauchi/private#796 step 5b;
+//! `recovery_acceptance.spthy`, John_answers) answers with its own
 //! exchange key, signed and naming the offer's, to the mailbox the new
 //! phone polls; it moves the recovered contact to the new key with the
-//! shared key both sides derive, and a fresh ratchet. The answer goes again
-//! each day until the new relationship is in use. Declining changes
-//! nothing.
+//! shared key both sides derive, and a fresh ratchet. The answer goes
+//! again each day, for at most 14 days (D18).
 
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -24,15 +23,16 @@ use crate::common::recovered_phone::{World, recovered};
 
 const DAY: Duration = Duration::from_secs(86_400);
 
-struct Offered {
+struct Accepted {
     world: World,
     offer: RekeyOffer,
-    clock: Arc<FakeClock>,
+    old_id: String,
+    old_shared: SymmetricKey,
 }
 
-/// Alice's restored phone has offered Dave a rekey, and Dave, on its own
-/// fake clock, has kept the offer.
-fn offered() -> Offered {
+/// Alice's restored phone has offered Dave a rekey, and Dave has taken it
+/// in, which accepted it.
+fn accepted() -> Accepted {
     let mut phone =
         Vauchi::in_memory_with_clock(Arc::new(FakeClock::new(SystemTime::now()))).unwrap();
     phone.create_identity("Alice, new phone").unwrap();
@@ -41,48 +41,43 @@ fn offered() -> Offered {
     let blob = world.phone.rekey_offer_deliveries().unwrap()[0]
         .blob
         .clone();
-    let clock = world.dave_clock.clone();
-    world.dave.vauchi().take_rekey_offer(&blob).unwrap();
-    Offered {
-        offer: RekeyOffer::decode(&blob).unwrap(),
-        world,
-        clock,
-    }
-}
-
-fn old_shared(o: &Offered) -> SymmetricKey {
-    o.world
+    let old_id = world.dave.sharer_id().to_string();
+    let old_shared = world
         .dave
         .vauchi()
-        .get_contact(o.world.dave.sharer_id())
+        .get_contact(&old_id)
         .unwrap()
         .unwrap()
         .shared_key()
         .unwrap()
-        .clone()
+        .clone();
+    world.dave.vauchi().take_rekey_offer(&blob).unwrap();
+    Accepted {
+        offer: RekeyOffer::decode(&blob).unwrap(),
+        world,
+        old_id,
+        old_shared,
+    }
 }
 
 // @internal
 #[test]
 fn accepting_moves_alice_to_her_new_key_with_the_key_both_sides_derive() {
-    let o = offered();
-    let dave = o.world.dave.vauchi();
-    let old_id = o.world.dave.sharer_id().to_string();
-    let phone_pk = signing_pk(&o.world.phone);
+    let a = accepted();
+    let dave = a.world.dave.vauchi();
+    let phone_pk = signing_pk(&a.world.phone);
+    let new_id = hex::encode(phone_pk);
 
-    let new_id = dave.accept_rekey_offer(&old_id).unwrap();
-
-    assert_eq!(new_id, hex::encode(phone_pk));
-    assert!(dave.get_contact(&old_id).unwrap().is_none());
+    assert!(dave.get_contact(&a.old_id).unwrap().is_none());
     let alice = dave.get_contact(&new_id).unwrap().unwrap();
     assert_eq!(alice.public_key(), Some(&phone_pk));
     let answer = RekeyAnswer::decode(&dave.rekey_answer_deliveries().unwrap()[0].blob).unwrap();
-    let (secret, _) = o
+    let (secret, _) = a
         .world
         .phone
         .storage()
         .recovery()
-        .rekey_exchange(&o.world.dave_id)
+        .rekey_exchange(&a.world.dave_id)
         .unwrap()
         .unwrap();
     let at_phone = rekey_shared_key(
@@ -100,18 +95,15 @@ fn accepting_moves_alice_to_her_new_key_with_the_key_both_sides_derive() {
             .unwrap()
             .is_some()
     );
-    assert!(dave.pending_rekey_offers().unwrap().is_empty());
 }
 
 // @internal
 #[test]
 fn the_answer_names_the_offer_and_goes_to_the_mailbox_the_new_phone_polls() {
-    let o = offered();
-    let dave = o.world.dave.vauchi();
-    let old_shared = old_shared(&o);
-    let phone_pk = signing_pk(&o.world.phone);
+    let a = accepted();
+    let dave = a.world.dave.vauchi();
+    let phone_pk = signing_pk(&a.world.phone);
 
-    dave.accept_rekey_offer(o.world.dave.sharer_id()).unwrap();
     let deliveries = dave.rekey_answer_deliveries().unwrap();
 
     assert_eq!(deliveries.len(), 1);
@@ -119,26 +111,25 @@ fn the_answer_names_the_offer_and_goes_to_the_mailbox_the_new_phone_polls() {
     assert_eq!(
         deliveries[0].token_hex,
         token_hex(&compute_mailbox_token(
-            old_shared.as_bytes(),
+            a.old_shared.as_bytes(),
             &phone_pk,
             today
         ))
     );
     let answer = RekeyAnswer::decode(&deliveries[0].blob).unwrap();
-    assert!(answer.verify(&signing_pk(dave), o.offer.exchange_key()));
+    assert!(answer.verify(&signing_pk(dave), a.offer.exchange_key()));
 }
 
 // @internal
 #[test]
 fn an_unanswered_answer_goes_again_after_a_day() {
-    let o = offered();
-    let dave = o.world.dave.vauchi();
-    let new_id = dave.accept_rekey_offer(o.world.dave.sharer_id()).unwrap();
+    let a = accepted();
+    let dave = a.world.dave.vauchi();
     let first = dave.rekey_answer_deliveries().unwrap();
-    dave.record_rekey_answer_sent(&new_id).unwrap();
+    dave.record_rekey_answer_sent(&first[0].contact_id).unwrap();
 
     assert!(dave.rekey_answer_deliveries().unwrap().is_empty());
-    o.clock.advance(DAY);
+    a.world.dave_clock.advance(DAY);
     let again = dave.rekey_answer_deliveries().unwrap();
 
     assert_eq!(again.len(), 1);
@@ -147,31 +138,17 @@ fn an_unanswered_answer_goes_again_after_a_day() {
 
 // @internal
 #[test]
-fn declining_keeps_the_old_contact_and_answers_nothing() {
-    let o = offered();
-    let dave = o.world.dave.vauchi();
-    let old_id = o.world.dave.sharer_id().to_string();
+fn an_answer_goes_for_fourteen_days_and_no_longer() {
+    let a = accepted();
+    let dave = a.world.dave.vauchi();
 
-    dave.decline_rekey_offer(&old_id).unwrap();
+    a.world
+        .dave_clock
+        .advance(DAY * 14 - Duration::from_secs(1));
+    assert_eq!(dave.rekey_answer_deliveries().unwrap().len(), 1);
 
-    assert!(dave.get_contact(&old_id).unwrap().is_some());
-    assert!(dave.pending_rekey_offers().unwrap().is_empty());
+    a.world.dave_clock.advance(Duration::from_secs(1));
     assert!(dave.rekey_answer_deliveries().unwrap().is_empty());
-}
-
-// @internal
-#[test]
-fn an_offer_that_was_not_kept_cannot_be_accepted() {
-    let o = offered();
-    let dave = o.world.dave.vauchi();
-    dave.decline_rekey_offer(o.world.dave.sharer_id()).unwrap();
-
-    assert!(dave.accept_rekey_offer(o.world.dave.sharer_id()).is_err());
-    assert!(
-        dave.get_contact(o.world.dave.sharer_id())
-            .unwrap()
-            .is_some()
-    );
 }
 
 // @internal

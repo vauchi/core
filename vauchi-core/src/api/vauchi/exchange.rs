@@ -134,11 +134,7 @@ impl Vauchi {
                 .rekey_pending()?
                 .iter()
                 .any(|id| id == contact.id())
-                && self
-                    .storage
-                    .ratchets()
-                    .load_ratchet_state(contact.id())?
-                    .is_none();
+                && !self.storage.recovery().rekey_met_again(contact.id())?;
             if !restored_waiting {
                 return self.save_exchanged_card(&stored);
             }
@@ -149,6 +145,7 @@ impl Vauchi {
                 .adopt_exchange_shared_key(shared.clone(), self.clock.unix_seconds())
                 .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
             self.save_exchanged_card(&stored)?;
+            self.storage.recovery().mark_rekey_met_again(contact.id())?;
         } else {
             self.save_exchanged_card(contact)?;
         }

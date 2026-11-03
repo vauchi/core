@@ -483,6 +483,30 @@ impl RecoveryStore<'_> {
         Ok(())
     }
 
+    /// Marks a waiting contact as met again in person: it holds the new
+    /// identity already and is owed a continuation, not an offer (D20).
+    pub fn mark_rekey_met_again(&self, contact_id: &str) -> Result<(), StorageError> {
+        self.conn.execute(
+            "UPDATE recovery_rekey_pending SET met_again = 1 WHERE contact_id = ?1",
+            params![contact_id],
+        )?;
+        Ok(())
+    }
+
+    /// Whether a waiting contact was met again in person.
+    pub fn rekey_met_again(&self, contact_id: &str) -> Result<bool, StorageError> {
+        use rusqlite::OptionalExtension;
+        let met: Option<bool> = self
+            .conn
+            .query_row(
+                "SELECT met_again FROM recovery_rekey_pending WHERE contact_id = ?1",
+                params![contact_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        Ok(met.unwrap_or(false))
+    }
+
     /// The contacts waiting for their rekey with when each was restored.
     pub fn rekey_pending_since(&self) -> Result<Vec<(String, u64)>, StorageError> {
         let mut stmt = self.conn.prepare(

@@ -83,12 +83,7 @@ impl Vauchi {
                 continue;
             };
             // Met again in person: the continuation settles it (D20).
-            if self
-                .storage
-                .ratchets()
-                .load_ratchet_state(&contact_id)?
-                .is_some()
-            {
+            if self.storage.recovery().rekey_met_again(&contact_id)? {
                 continue;
             }
             let (Some(contact_pk), Some(old_shared)) = (contact.public_key(), contact.shared_key())
@@ -150,12 +145,7 @@ impl Vauchi {
         let payload = crate::sync::delta::encode_recovery_continuation(&continuation);
         let mut sent = 0;
         for contact_id in self.storage.recovery().rekey_pending()? {
-            if self
-                .storage
-                .ratchets()
-                .load_ratchet_state(&contact_id)?
-                .is_none()
-            {
+            if !self.storage.recovery().rekey_met_again(&contact_id)? {
                 continue;
             }
             let Some(contact) = self.storage.contacts().load_contact(&contact_id)? else {

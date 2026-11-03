@@ -103,11 +103,7 @@ impl Vauchi {
             }
             let contact_id = contact.id().to_string();
             if rekey_pending.contains(&contact_id)
-                && self
-                    .storage
-                    .ratchets()
-                    .load_ratchet_state(&contact_id)?
-                    .is_none()
+                && !self.storage.recovery().rekey_met_again(&contact_id)?
             {
                 continue;
             }

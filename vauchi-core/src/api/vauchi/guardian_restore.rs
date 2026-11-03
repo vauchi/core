@@ -75,7 +75,11 @@ impl Vauchi {
                     restored += 1;
                 }
                 if contact.public_key().is_some() {
-                    self.storage.recovery().mark_rekey_pending(contact.id())?;
+                    let recovery = self.storage.recovery();
+                    recovery.mark_rekey_pending(contact.id())?;
+                    if met_again {
+                        recovery.mark_rekey_met_again(contact.id())?;
+                    }
                 }
             }
             if let Some(card) = &envelope.sections.own_card {

@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 108] = [
+const MIGRATIONS: [Migration; 109] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -812,7 +812,40 @@ const MIGRATIONS: [Migration; 108] = [
         name: "recovery_rekey_answers_kept_at",
         action: MigrationAction::Callback(migrate_v108_rekey_answers_kept_at),
     },
+    Migration {
+        version: 109,
+        name: "recovery_rekey_pending_met_again",
+        action: MigrationAction::Callback(migrate_v109_rekey_pending_met_again),
+    },
 ];
+
+/// Migration v109 (vauchi/private#796, D26): a waiting contact records
+/// whether it was met again in person, which a session on one device
+/// cannot tell its linked devices. Before, the session was the sign, so a
+/// contact this device holds one with is marked. Skipped where the column
+/// is there already.
+fn migrate_v109_rekey_pending_met_again(
+    conn: &Connection,
+    _key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    let present: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('recovery_rekey_pending') WHERE name = 'met_again'",
+        [],
+        |row| row.get(0),
+    )?;
+    if present == 0 {
+        conn.execute(
+            "ALTER TABLE recovery_rekey_pending ADD COLUMN met_again INTEGER NOT NULL DEFAULT 0",
+            [],
+        )?;
+        conn.execute(
+            "UPDATE recovery_rekey_pending SET met_again = 1
+             WHERE contact_id IN (SELECT contact_id FROM contact_ratchets)",
+            [],
+        )?;
+    }
+    Ok(())
+}
 
 /// Migration v108 (vauchi/private#796, D18): a rekey answer records when it
 /// was kept, so its resends end after 14 days; an answer kept before has

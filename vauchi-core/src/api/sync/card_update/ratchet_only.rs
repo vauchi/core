@@ -41,6 +41,7 @@ pub(super) fn outcome_of(payload: Result<VersionedPayload, DeltaError>) -> Optio
 /// Persists the ratchet and does what `outcome` asks of storage, in one
 /// transaction.
 pub(super) fn receive(
+    identity: &crate::identity::Identity,
     storage: &Storage,
     sender_id: &str,
     peer_device_id: &[u8; 32],
@@ -50,6 +51,7 @@ pub(super) fn receive(
 ) -> Result<ReceiveOutcome, CardUpdateError> {
     storage.begin_transaction()?;
     let now = storage.clock().unix_seconds();
+    let mut folded = false;
     let txn = storage
         .ratchets()
         .save_ratchet_state_for_device(sender_id, peer_device_id, ratchet, is_initiator)
@@ -67,7 +69,7 @@ pub(super) fn receive(
                 .map(|_| ()),
             ReceiveOutcome::RecoveryContinuation(continuation) => storage
                 .honour_recovery_continuation(sender_id, continuation)
-                .map(|_| ()),
+                .map(|honoured| folded = honoured),
             _ => Ok(()),
         });
     match txn {
@@ -76,6 +78,14 @@ pub(super) fn receive(
             storage.rollback();
             return Err(e.into());
         }
+    }
+    if let (true, ReceiveOutcome::RecoveryContinuation(continuation)) = (folded, &outcome) {
+        crate::api::sync::journal_contact_rekeyed_for_siblings(
+            identity,
+            storage,
+            &hex::encode(continuation.old_pk()),
+            sender_id,
+        );
     }
     Ok(outcome)
 }

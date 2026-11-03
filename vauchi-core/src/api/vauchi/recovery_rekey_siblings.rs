@@ -17,7 +17,7 @@
 use super::Vauchi;
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::crypto::SymmetricKey;
-use crate::sync::device_sync::{ContactRekeySyncData, SyncItem};
+use crate::sync::device_sync::ContactRekeySyncData;
 
 impl Vauchi {
     /// Journals for the siblings that the contact `old_id` is now `new_id`.
@@ -26,21 +26,9 @@ impl Vauchi {
     /// Storage errors; a missing or non-exchanged `new_id` journals nothing.
     #[cfg(feature = "network-http")]
     pub(super) fn record_contact_rekeyed(&self, old_id: &str, new_id: &str) -> VauchiResult<()> {
-        let Some(contact) = self.storage.contacts().load_contact(new_id)? else {
-            return Ok(());
-        };
-        let (Some(public_key), Some(shared_key)) = (contact.public_key(), contact.shared_key())
-        else {
-            return Ok(());
-        };
-        self.record_sync_item(SyncItem::ContactRekeyed {
-            rekey: ContactRekeySyncData {
-                old_contact_id: old_id.to_string(),
-                new_public_key: (*public_key).into(),
-                shared_key: *shared_key.as_bytes(),
-            },
-            timestamp: self.clock.unix_seconds(),
-        });
+        if let Some(item) = crate::api::sync::contact_rekeyed_item(&self.storage, old_id, new_id)? {
+            self.record_sync_item(item);
+        }
         Ok(())
     }
 

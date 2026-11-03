@@ -30,8 +30,11 @@ pub mod registry_handshake;
 #[cfg(not(feature = "testing"))]
 mod registry_handshake;
 
+mod rekey_journal;
+
 pub use registry_handshake::RegistryReplyNeeded;
 pub(crate) use registry_handshake::journal_handshake_state_for_siblings;
+pub(crate) use rekey_journal::{contact_rekeyed_item, journal_contact_rekeyed_for_siblings};
 
 pub use card_update::{
     CardUpdateError, CardUpdateResult, ReceiveOutcome, ReceivedAlert, process_card_updates,

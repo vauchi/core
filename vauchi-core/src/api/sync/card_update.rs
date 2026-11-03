@@ -579,6 +579,7 @@ fn process_single_card_update_for_device_with_budget(
     // 3c'. The kinds that apply no card change (`ratchet_only`).
     if let Some(outcome) = ratchet_only::outcome_of(VersionedPayload::decode(&plaintext)) {
         return ratchet_only::receive(
+            identity,
             storage,
             sender_id,
             peer_device_id,

@@ -783,14 +783,13 @@ impl Vauchi {
         let contacts = self.storage.contacts().list_contacts()?;
         let own_card = self.storage.contacts().load_own_card()?;
         let groups = self.storage.labels().load_all_groups()?;
-        let labels: Vec<(String, String, Vec<String>)> = groups
+        let labels: Vec<crate::backup::LabelSection> = groups
             .iter()
-            .map(|g| {
-                (
-                    g.id().to_string(),
-                    g.name().to_string(),
-                    g.contacts().iter().cloned().collect(),
-                )
+            .map(|g| crate::backup::LabelSection {
+                label_id: g.id().to_string(),
+                name: g.name().to_string(),
+                contacts: g.contacts().iter().cloned().collect(),
+                visible_fields: g.visible_fields().iter().cloned().collect(),
             })
             .collect();
 

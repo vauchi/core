@@ -67,6 +67,7 @@ fn backup_debug_output_carries_no_secrets_or_contact_data() {
         label_id: "label-id-secret".into(),
         name: "label-name-secret".into(),
         contacts: vec!["label-member-secret".into()],
+        visible_fields: vec!["label-field-secret".into()],
     };
     let envelope = FullBackupEnvelope {
         version: 3,

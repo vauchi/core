@@ -68,6 +68,7 @@ fn test_crypto_hardening_full_backup_debug_redacts_secret_material() {
             label_id: label_id.to_string(),
             name: label_name.to_string(),
             contacts: vec![label_contact.to_string()],
+            visible_fields: vec![],
         }],
     };
 

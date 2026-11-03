@@ -206,11 +206,15 @@ impl std::fmt::Debug for IdentitySection {
 }
 
 /// A label (group) stored inside the backup envelope.
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct LabelSection {
     pub label_id: String,
     pub name: String,
     pub contacts: Vec<String>,
+    /// The fields the label shows its contacts. Absent from backups made
+    /// before vauchi/private#796 step 3c, which restore showing none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub visible_fields: Vec<String>,
 }
 
 impl std::fmt::Debug for LabelSection {
@@ -219,6 +223,7 @@ impl std::fmt::Debug for LabelSection {
             .field("label_id", &"[REDACTED]")
             .field("name", &"[REDACTED]")
             .field("contacts", &"[REDACTED]")
+            .field("visible_fields", &"[REDACTED]")
             .finish()
     }
 }
@@ -361,6 +366,7 @@ pub fn export_full_backup(
             label_id: id.clone(),
             name: name.clone(),
             contacts: contact_ids.clone(),
+            visible_fields: Vec::new(),
         })
         .collect();
 
@@ -414,7 +420,7 @@ pub fn export_guardian_backup(
     identity_data: &FullBackupIdentityData,
     contacts: &[Contact],
     own_card: Option<&ContactCard>,
-    labels: &[(String, String, Vec<String>)],
+    labels: &[LabelSection],
     key: &SymmetricKey,
     metadata: GuardianBackupMetadata,
     now: u64,
@@ -434,15 +440,6 @@ pub fn export_guardian_backup(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let label_sections: Vec<LabelSection> = labels
-        .iter()
-        .map(|(id, name, contact_ids)| LabelSection {
-            label_id: id.clone(),
-            name: name.clone(),
-            contacts: contact_ids.clone(),
-        })
-        .collect();
-
     let envelope = FullBackupEnvelope {
         version: 5,
         created_at: now,
@@ -450,7 +447,7 @@ pub fn export_guardian_backup(
             identity,
             contacts: contact_values,
             own_card: own_card.cloned(),
-            labels: label_sections,
+            labels: labels.to_vec(),
         },
     };
 

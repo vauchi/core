@@ -90,7 +90,7 @@ impl Vauchi {
                     label.label_id.clone(),
                     label.name.clone(),
                     members,
-                    HashSet::new(),
+                    label.visible_fields.iter().cloned().collect(),
                     None,
                     None,
                     None,

@@ -497,6 +497,7 @@ mod recovery_rekey_complete_tests;
 mod recovery_rekey_inbound_tests;
 mod recovery_rekey_offer_tests;
 mod recovery_rekey_sessions_tests;
+mod recovery_rekey_siblings_tests;
 mod recovery_rekey_wire_tests;
 mod recovery_storage_tests;
 mod recovery_tests;

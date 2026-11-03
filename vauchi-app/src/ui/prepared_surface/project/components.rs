@@ -237,8 +237,10 @@ impl Projection {
                 error_correction: *error_correction,
                 size: *size,
                 accessibility: accessibility(a11y, label.as_deref().unwrap_or(id)),
-                capture_placeholder: None,
-                capture_submit_label: None,
+                capture_placeholder: matches!(mode, QrMode::Scan)
+                    .then(|| crate::i18n::get_string(self.locale, "platform.qr_paste_placeholder")),
+                capture_submit_label: matches!(mode, QrMode::Scan)
+                    .then(|| crate::i18n::get_string(self.locale, "platform.qr_submit")),
             }),
             Component::Preview {
                 name,

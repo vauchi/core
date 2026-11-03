@@ -73,7 +73,8 @@ impl Projection {
             label: None,
             rows,
             searchable,
-            search_placeholder: None,
+            search_placeholder: searchable
+                .then(|| crate::i18n::get_string(self.locale, "action.search")),
             paging: (total_count > 0).then_some(PresentationPaging {
                 total_count,
                 offset,

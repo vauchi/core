@@ -39,6 +39,18 @@ pub struct PresentationCoordinator {
     left_behind: Vec<SurfaceId>,
 }
 
+/// Puts the window title into each presentation profile of a batch: Core
+/// prepares the copy, so no display shell picks a title of its own
+/// (ADR-066, private#1029). The coordinator knows no locale, so the batch's
+/// owner supplies it on the way out.
+pub(crate) fn title_profiles(commands: &mut [Command], window_title: impl Fn() -> String) {
+    for command in commands {
+        if let Command::SetPresentationProfile { profile } = command {
+            profile.window_title = Some(window_title());
+        }
+    }
+}
+
 impl PresentationCoordinator {
     pub fn new(primary_surface: SurfaceId) -> Self {
         Self {

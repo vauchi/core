@@ -196,7 +196,11 @@ impl StorageLockPresentation {
                     .insert(PresentationCoordinator::new(surface_id))
             }
         };
-        coordinator.handle_event(event).unwrap_or_default()
+        let mut commands = coordinator.handle_event(event).unwrap_or_default();
+        crate::ui::presentation::title_profiles(&mut commands, || {
+            get_string(self.locale, "app.name")
+        });
+        commands
     }
 
     fn handle_action(&mut self, action_id: &str) -> StorageLockStep {

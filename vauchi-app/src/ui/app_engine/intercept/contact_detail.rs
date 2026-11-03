@@ -9,6 +9,22 @@
 
 use super::super::AppEngine;
 use crate::ui::action::{ActionResult, UserAction};
+use crate::ui::contact_detail_guardian_group::{
+    GROUP_ROW_PREFIX, GUARDIAN_GROUP_LIST, NEW_GROUP_ROW,
+};
+
+/// The group a picked row stands for: `Some(Some(n))` for group `n`,
+/// `Some(None)` for a new group, `None` for a row the picker never made.
+fn picked_group(row_id: &str) -> Option<Option<u8>> {
+    if row_id == NEW_GROUP_ROW {
+        return Some(None);
+    }
+    row_id
+        .strip_prefix(GROUP_ROW_PREFIX)?
+        .parse()
+        .ok()
+        .map(Some)
+}
 
 impl AppEngine {
     /// Intercept proposal_trusted toggle on ContactDetail and persist to storage.
@@ -73,6 +89,15 @@ impl AppEngine {
             return None;
         }
 
+        if let Some(groups) = self.guardian_groups_to_ask(contact_id) {
+            return self
+                .engine
+                .apply_update(crate::ui::EngineUpdate::ContactDetail(
+                    crate::ui::ContactDetailUpdate::AskGuardianGroup(groups),
+                ))
+                .then(|| ActionResult::UpdateScreen(self.engine.current_screen()));
+        }
+
         // A refused toggle (a tenth guardian, private#929) must not flip the
         // switch on screen only to revert on the next read: the person
         // reads why instead.
@@ -83,6 +108,79 @@ impl AppEngine {
             });
         }
 
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::ContactDetail(
+                crate::ui::ContactDetailUpdate::ToggleRecoveryTrusted,
+            ))
+            .then(|| ActionResult::UpdateScreen(self.engine.current_screen()))
+    }
+
+    /// The groups to ask about as recovery trust turns on for `contact_id`;
+    /// `None` when it is turning off or no group exists yet, since the
+    /// first guardian can only start one (vauchi/private#796, D17).
+    fn guardian_groups_to_ask(&self, contact_id: &str) -> Option<Vec<crate::ui::GuardianGroupRow>> {
+        let contact = self.vauchi.get_contact(contact_id).ok().flatten()?;
+        if contact.is_recovery_trusted() {
+            return None;
+        }
+        let groups = self.vauchi.guardian_groups().ok()?;
+        if groups.is_empty() {
+            return None;
+        }
+        let name_of = |id: &String| {
+            self.vauchi
+                .get_contact(id)
+                .ok()
+                .flatten()
+                .map(|member| member.display_name().to_string())
+        };
+        Some(
+            groups
+                .into_iter()
+                .map(|(group_id, members)| crate::ui::GuardianGroupRow {
+                    group_id,
+                    member_names: members.iter().filter_map(name_of).collect(),
+                })
+                .collect(),
+        )
+    }
+
+    /// Intercept the group picked in the guardian group question: trust
+    /// the contact in it, or say why not and keep the question open.
+    pub(in crate::ui::app_engine) fn intercept_guardian_group_pick(
+        &mut self,
+        contact_id: &str,
+        action: &UserAction,
+    ) -> Option<ActionResult> {
+        let UserAction::ListItemSelected {
+            component_id,
+            item_id,
+        } = action
+        else {
+            return None;
+        };
+        if component_id != GUARDIAN_GROUP_LIST {
+            return None;
+        }
+        let refused = |message: String| {
+            Some(ActionResult::ValidationError {
+                component_id: component_id.clone(),
+                message,
+            })
+        };
+        let Some(group) = picked_group(item_id) else {
+            return refused(crate::i18n::get_string(
+                self.render_context.resolved_locale(),
+                "contact_detail.guardian_group_unknown",
+            ));
+        };
+        if let Err(error) = self.vauchi.trust_for_recovery_in_group(contact_id, group) {
+            return refused(error.to_string());
+        }
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::ContactDetail(
+                crate::ui::ContactDetailUpdate::CloseGuardianGroup,
+            ));
         self.engine
             .apply_update(crate::ui::EngineUpdate::ContactDetail(
                 crate::ui::ContactDetailUpdate::ToggleRecoveryTrusted,

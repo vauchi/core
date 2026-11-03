@@ -306,6 +306,11 @@ pub enum LinkExchangeUpdate {
 pub enum ContactDetailUpdate {
     ToggleProposalTrusted,
     ToggleRecoveryTrusted,
+    /// Recovery trust is being turned on and a guardian group exists:
+    /// ask which group the contact joins (vauchi/private#796, D17).
+    AskGuardianGroup(Vec<super::GuardianGroupRow>),
+    /// The guardian group question is answered or dismissed.
+    CloseGuardianGroup,
     ToggleHidden,
     ToggleIgnored,
     /// Storage changed the block flag (ADR-056); the question closes.
@@ -450,6 +455,8 @@ impl EngineUpdate {
                 ContactDetailUpdate::ToggleRecoveryTrusted => {
                     "ContactDetail::ToggleRecoveryTrusted"
                 }
+                ContactDetailUpdate::AskGuardianGroup(_) => "ContactDetail::AskGuardianGroup",
+                ContactDetailUpdate::CloseGuardianGroup => "ContactDetail::CloseGuardianGroup",
                 ContactDetailUpdate::ToggleHidden => "ContactDetail::ToggleHidden",
                 ContactDetailUpdate::ToggleIgnored => "ContactDetail::ToggleIgnored",
                 ContactDetailUpdate::SetBlocked(_) => "ContactDetail::SetBlocked",

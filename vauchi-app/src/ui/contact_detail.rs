@@ -90,6 +90,9 @@ pub struct ContactDetailEngine {
     /// Drives both the `Recovery Trusted` indicator and the
     /// `recovery_permissions` SettingsGroup toggle.
     is_recovery_trusted: bool,
+    /// The guardian groups to pick from while recovery trust is being
+    /// turned on (vauchi/private#796, D17); `None` when not asking.
+    guardian_group_question: Option<Vec<GuardianGroupRow>>,
     /// Whether this contact is trusted for simplified contact proposals (user-editable).
     proposal_trusted: bool,
     /// Whether this contact is hidden from the main contact list.
@@ -351,6 +354,13 @@ impl ContactDetailEngine {
                 info_key: None,
             }],
         });
+        if let Some(groups) = &self.guardian_group_question {
+            components.extend(guardian_group_components(
+                self.locale,
+                &self.contact.name,
+                groups,
+            ));
+        }
         if let Some(panel) = self.delivery_status_panel() {
             components.push(panel);
         }
@@ -730,6 +740,8 @@ impl WorkflowEngine for ContactDetailEngine {
         match update {
             U::ToggleProposalTrusted => self.toggle_proposal_trusted(),
             U::ToggleRecoveryTrusted => self.toggle_recovery_trusted(),
+            U::AskGuardianGroup(groups) => self.guardian_group_question = Some(groups),
+            U::CloseGuardianGroup => self.guardian_group_question = None,
             U::ToggleHidden => self.toggle_hidden(),
             U::ToggleIgnored => self.toggle_ignored(),
             U::SetBlocked(is_blocked) => {
@@ -779,6 +791,14 @@ impl WorkflowEngine for ContactDetailEngine {
                 ref item_id,
             } if component_id == "recovery_permissions" && item_id == "recovery_trusted" => {
                 self.is_recovery_trusted = !self.is_recovery_trusted;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            // The AppEngine intercepts a picked group and trusts through
+            // Vauchi; here the question only closes.
+            UserAction::ListItemSelected { component_id, .. }
+                if component_id == GUARDIAN_GROUP_CANCEL_LIST =>
+            {
+                self.guardian_group_question = None;
                 ActionResult::UpdateScreen(self.build_screen())
             }
             UserAction::ListItemAction {

@@ -19,6 +19,7 @@ mod change_password;
 mod channel;
 mod component;
 mod contact_detail;
+mod contact_detail_guardian_group;
 mod contact_detail_rules;
 mod contact_edit;
 mod contact_field_links;
@@ -108,6 +109,10 @@ pub use component::{
 };
 pub use contact_detail::{
     ContactDetailEngine, ContactNotFoundEngine, ContactViewMode, DeliverySummary, SharedInfoView,
+};
+pub use contact_detail_guardian_group::GuardianGroupRow;
+pub(crate) use contact_detail_guardian_group::{
+    GUARDIAN_GROUP_CANCEL_LIST, guardian_group_components,
 };
 pub use contact_detail_rules::{
     ContactPlace, ContactTag, ReciprocityBannerKind,

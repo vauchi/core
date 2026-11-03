@@ -325,6 +325,9 @@ impl AppEngine {
             if let Some(result) = self.intercept_recovery_trust_toggle(&contact_id, action) {
                 return Some(result);
             }
+            if let Some(result) = self.intercept_guardian_group_pick(&contact_id, action) {
+                return Some(result);
+            }
             if let Some(result) = self.intercept_hide_toggle(&contact_id, action) {
                 return Some(result);
             }

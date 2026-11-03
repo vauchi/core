@@ -96,3 +96,43 @@ fn after_the_rekey_the_contact_sends_nothing_to_the_old_identitys_devices() {
         sent.map(|copies| copies.len())
     );
 }
+
+/// Alice's restored phone, before any contact answered its rekey.
+fn restored_phone() -> World {
+    let clock = Arc::new(FakeClock::new(SystemTime::now()));
+    let mut phone = Vauchi::in_memory_with_clock(clock).unwrap();
+    phone.create_identity("Alice, new phone").unwrap();
+    let world = recovered(phone, None, 3);
+    world.phone.restore_from_returned_backups(None).unwrap();
+    world
+}
+
+// @internal
+#[test]
+fn the_new_phone_starts_no_handshake_with_a_contact_still_waiting_for_its_rekey() {
+    let world = restored_phone();
+
+    let pushed = world.phone.queue_registry_pushes().unwrap();
+
+    assert_eq!(
+        pushed,
+        world.guardians_at_phone.len(),
+        "only the guardians met in person; Dave holds the old key yet"
+    );
+}
+
+// @internal
+#[test]
+fn the_new_phone_starts_the_handshake_with_a_contact_once_its_rekey_completes() {
+    let world = restored_phone();
+    world.phone.queue_registry_pushes().unwrap();
+    let offer = world.phone.rekey_offer_deliveries().unwrap()[0]
+        .blob
+        .clone();
+    let dave = world.dave.vauchi();
+    dave.take_rekey_offer(&offer).unwrap();
+    let answer = dave.rekey_answer_deliveries().unwrap()[0].blob.clone();
+    world.phone.take_rekey_answer(&answer).unwrap();
+
+    assert_eq!(world.phone.queue_registry_pushes().unwrap(), 1);
+}

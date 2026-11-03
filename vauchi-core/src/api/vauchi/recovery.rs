@@ -310,13 +310,21 @@ impl Vauchi {
         })?;
 
         // Create voucher: signs (old_pk, new_pk) with our keypair, attaching the guardian token
-        RecoveryVoucher::create_from_claim(
+        let voucher = RecoveryVoucher::create_from_claim(
             claim,
             identity.signing_keypair(),
             Some(token),
             self.clock.unix_seconds(),
         )
-        .map_err(|e| VauchiError::InvalidState(e.to_string()))
+        .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        // As in the offline vouch: the record lets the guardian hand its
+        // backup back to the claim's new key (vauchi/private#796 step 2b).
+        self.storage.recovery().record_vouched_claim(
+            claim.old_pk().as_bytes(),
+            claim.new_pk().as_bytes(),
+            self.clock.unix_seconds(),
+        )?;
+        Ok(voucher)
     }
 
     /// Saves a recovery response (accept, reject, or remind me later).

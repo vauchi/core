@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 97] = [
+const MIGRATIONS: [Migration; 98] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -757,7 +757,24 @@ const MIGRATIONS: [Migration; 97] = [
         name: "returned_backups",
         action: MigrationAction::Sql(MIGRATION_V97_RETURNED_BACKUPS),
     },
+    Migration {
+        version: 98,
+        name: "vouched_claims",
+        action: MigrationAction::Sql(MIGRATION_V98_VOUCHED_CLAIMS),
+    },
 ];
+
+/// Migration v98 (vauchi/private#796 step 2b): the claims this device
+/// vouched for, so a guardian hands its backup back only to the new key of
+/// one of them, and only while that claim may live.
+const MIGRATION_V98_VOUCHED_CLAIMS: &str = "
+    CREATE TABLE IF NOT EXISTS vouched_claims (
+        old_pk BLOB NOT NULL CHECK(length(old_pk) = 32),
+        new_pk BLOB NOT NULL CHECK(length(new_pk) = 32),
+        vouched_at INTEGER NOT NULL,
+        PRIMARY KEY (old_pk, new_pk)
+    );
+";
 
 /// Migration v97 (vauchi/private#796 step 2a): the backups guardians return
 /// to a recovering identity, kept per guardian with the same shape as v95's

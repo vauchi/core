@@ -181,6 +181,13 @@ impl Vauchi {
             self.clock.unix_seconds(),
         )
         .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        // The vouch is what lets this guardian hand its backup back to the
+        // claim's new key in the same meeting (vauchi/private#796 step 2b).
+        self.storage.recovery().record_vouched_claim(
+            claim.old_pk().as_bytes(),
+            claim.new_pk().as_bytes(),
+            self.clock.unix_seconds(),
+        )?;
         Ok(base64::engine::general_purpose::STANDARD.encode(voucher.to_bytes()))
     }
 

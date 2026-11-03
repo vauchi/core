@@ -258,4 +258,57 @@ impl RecoveryStore<'_> {
             .execute("DELETE FROM recovery_progress WHERE id = 1", [])?;
         Ok(())
     }
+
+    /// Records that this device vouched for a claim from `old_pk` to
+    /// `new_pk`, so it may hand the guardian backup back to `new_pk`
+    /// (vauchi/private#796 step 2b). A second vouch moves the time.
+    ///
+    /// # Errors
+    /// Storage errors.
+    pub fn record_vouched_claim(
+        &self,
+        old_pk: &[u8; 32],
+        new_pk: &[u8; 32],
+        vouched_at: u64,
+    ) -> Result<(), StorageError> {
+        self.conn.execute(
+            "INSERT INTO vouched_claims (old_pk, new_pk, vouched_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT(old_pk, new_pk) DO UPDATE SET vouched_at = excluded.vouched_at",
+            params![
+                &old_pk[..],
+                &new_pk[..],
+                i64::try_from(vouched_at).unwrap_or(i64::MAX)
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// The old key of the latest claim this device vouched for whose new
+    /// key is `new_pk`, vouched at or after `not_before`.
+    ///
+    /// # Errors
+    /// Storage errors; [`StorageError::InvalidData`] for a stored key that
+    /// is not 32 bytes.
+    pub fn vouched_old_key_for(
+        &self,
+        new_pk: &[u8; 32],
+        not_before: u64,
+    ) -> Result<Option<[u8; 32]>, StorageError> {
+        use rusqlite::OptionalExtension;
+        let old_pk: Option<Vec<u8>> = self
+            .conn
+            .query_row(
+                "SELECT old_pk FROM vouched_claims WHERE new_pk = ?1 AND vouched_at >= ?2
+                 ORDER BY vouched_at DESC LIMIT 1",
+                params![&new_pk[..], i64::try_from(not_before).unwrap_or(i64::MAX)],
+                |row| row.get(0),
+            )
+            .optional()?;
+        old_pk
+            .map(|key| {
+                <[u8; 32]>::try_from(key)
+                    .map_err(|_| StorageError::InvalidData("vouched claim key".into()))
+            })
+            .transpose()
+    }
 }

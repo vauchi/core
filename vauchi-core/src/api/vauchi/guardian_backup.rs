@@ -188,6 +188,69 @@ impl Vauchi {
     /// Tells `contact`, just taken out of the guardian set, to forget what
     /// it held for us (step 1d'). A contact with no session yet is skipped:
     /// the next backup does not reach it, and what it holds stays.
+    /// In the recovery meeting, after vouching and exchanging with the new
+    /// identity, hands back this guardian's share re-sealed to
+    /// `contact_id`'s key together with the backup it keeps (step 2b, D13).
+    ///
+    /// Only to the new key of a claim this device vouched for, and only
+    /// while that claim may live ([`crate::recovery::RecoveryClaim::MAX_AGE_SECS`]
+    /// from the vouch); the old device's key is a vouched claim's old key,
+    /// never its new one. A duress session holds no backup to hand back
+    /// (ADR-032). Every refusal is the same error, so none tells the
+    /// others apart.
+    ///
+    /// # Errors
+    /// [`VauchiError::InvalidState`] when there is nothing to hand back to
+    /// this contact; storage, sealing and send errors otherwise.
+    pub fn return_guardian_backup(&self, contact_id: &str) -> VauchiResult<()> {
+        let refused =
+            || VauchiError::InvalidState("No guardian backup to hand back to this contact".into());
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        if self.in_duress_mode() {
+            return Err(refused());
+        }
+        let contact = self
+            .storage
+            .contacts()
+            .load_contact(contact_id)?
+            .ok_or_else(refused)?;
+        let new_pk = *contact.public_key().ok_or_else(refused)?;
+        let not_before = self
+            .clock
+            .unix_seconds()
+            .saturating_sub(crate::recovery::RecoveryClaim::MAX_AGE_SECS);
+        let old_pk = self
+            .storage
+            .recovery()
+            .vouched_old_key_for(&new_pk, not_before)?
+            .ok_or_else(refused)?;
+        let kept = self
+            .storage
+            .guardian_backups()
+            .kept(&hex::encode(old_pk))?
+            .ok_or_else(refused)?;
+
+        let resealed = self.respond_to_recovery(kept.sealed_share(), &new_pk)?;
+        let returned = GuardianDelivery::new(kept.created_at(), resealed, kept.backup().to_vec())
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        let mut backup_id = [0u8; 16];
+        self.rng.fill_bytes(&mut backup_id);
+        let pieces = split_into_pieces(backup_id, &returned.encode())
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        self.storage.with_savepoint(|| {
+            pieces.iter().try_for_each(|piece| {
+                self.queue_sealed_payload(
+                    identity,
+                    &contact,
+                    &crate::sync::delta::encode_returned_backup_piece(piece),
+                )
+            })
+        })
+    }
+
     pub(super) fn send_guardian_release(&self, contact: &Contact) -> VauchiResult<()> {
         let identity = self
             .identity

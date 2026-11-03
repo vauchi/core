@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 102] = [
+const MIGRATIONS: [Migration; 103] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -782,7 +782,21 @@ const MIGRATIONS: [Migration; 102] = [
         name: "recovery_passphrase",
         action: MigrationAction::Sql(MIGRATION_V102_RECOVERY_PASSPHRASE),
     },
+    Migration {
+        version: 103,
+        name: "recovery_rekey_pending",
+        action: MigrationAction::Sql(MIGRATION_V103_RECOVERY_REKEY_PENDING),
+    },
 ];
+
+/// Migration v103 (vauchi/private#796, step 3): the contacts restored from
+/// the guardian backup that still wait for their rekey to the new identity.
+const MIGRATION_V103_RECOVERY_REKEY_PENDING: &str = "
+    CREATE TABLE IF NOT EXISTS recovery_rekey_pending (
+        contact_id TEXT PRIMARY KEY REFERENCES contacts(id) ON DELETE CASCADE,
+        restored_at INTEGER NOT NULL
+    );
+";
 
 /// Migration v102 (vauchi/private#796, D16): the owner's optional recovery
 /// passphrase, kept as its salt and derived key so the daily backup refresh

@@ -462,6 +462,31 @@ impl RecoveryStore<'_> {
         Ok(Some((salt, SymmetricKey::from_bytes(bytes?))))
     }
 
+    /// Marks a contact restored from the guardian backup as waiting for its
+    /// rekey to the new identity; marking it again changes nothing.
+    pub fn mark_rekey_pending(&self, contact_id: &str) -> Result<(), StorageError> {
+        self.conn.execute(
+            "INSERT OR IGNORE INTO recovery_rekey_pending (contact_id, restored_at)
+             VALUES (?1, ?2)",
+            params![
+                contact_id,
+                i64::try_from(self.now_secs()).unwrap_or(i64::MAX)
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// The contacts still waiting for their rekey, in the order restored.
+    pub fn rekey_pending(&self) -> Result<Vec<String>, StorageError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT contact_id FROM recovery_rekey_pending ORDER BY restored_at, rowid")?;
+        let ids = stmt
+            .query_map([], |row| row.get(0))?
+            .collect::<Result<Vec<String>, _>>()?;
+        Ok(ids)
+    }
+
     /// Forgets the owner's recovery passphrase.
     pub fn clear_recovery_passphrase(&self) -> Result<(), StorageError> {
         self.conn

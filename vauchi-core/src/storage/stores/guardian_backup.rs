@@ -202,6 +202,28 @@ impl GuardianBackupStore<'_> {
             .transpose()
     }
 
+    /// Every complete delivery kept, whoever sent it.
+    ///
+    /// # Errors
+    /// Storage and decryption errors; [`StorageError::InvalidData`] for a
+    /// stored delivery that no longer decodes.
+    pub fn all_kept(&self) -> Result<Vec<GuardianDelivery>, StorageError> {
+        let Tables { kept, .. } = self.tables;
+        let mut stmt = self
+            .conn
+            .prepare(&format!("SELECT delivery_encrypted FROM {kept}"))?;
+        let sealed = stmt
+            .query_map([], |row| row.get::<_, Vec<u8>>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        sealed
+            .iter()
+            .map(|sealed| {
+                GuardianDelivery::decode(&self.open(sealed)?)
+                    .map_err(|e| StorageError::InvalidData(e.to_string()))
+            })
+            .collect()
+    }
+
     /// How many backups of `owner_id` have pieces waiting.
     ///
     /// # Errors

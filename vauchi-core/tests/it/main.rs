@@ -320,6 +320,7 @@ mod guardian_backup_piece_wire_tests;
 mod guardian_backup_pieces_tests;
 mod guardian_backup_refresh_tests;
 mod guardian_backup_release_tests;
+mod guardian_backup_restore_tests;
 mod guardian_backup_return_tests;
 mod guardian_backup_send_tests;
 mod guardian_backup_tag_tests;

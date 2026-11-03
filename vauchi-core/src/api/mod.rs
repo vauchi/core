@@ -178,8 +178,8 @@ pub use emergency::BroadcastResult;
 pub use vauchi::{
     AuthMode, BIOMETRIC_UNLOCK_MIN_DURATION, BiometricUnlockOutcome, DeviceInfo, DeviceLinkResult,
     DeviceRemoval, ExchangeQrData, GroupDraft, ImportResult, ImportWarning, RecoveryClaimContact,
-    RecoveryReadiness, SearchFacets, SetupProgress, Vauchi, VauchiBuilder, VauchiSyncOutcome,
-    validate_duress_pin,
+    RecoveryReadiness, RekeyAnswerTaken, SearchFacets, SetupProgress, Vauchi, VauchiBuilder,
+    VauchiSyncOutcome, validate_duress_pin,
 };
 #[cfg(feature = "network-http")]
 pub use vauchi::{

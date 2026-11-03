@@ -114,6 +114,12 @@ fn continuation_message(old_pk: &[u8; KEY], new_pk: &[u8; KEY]) -> Vec<u8> {
     [CONTINUATION_DOMAIN, old_pk, new_pk].concat()
 }
 
+/// Whether `bytes` is meant as a rekey answer; the receive path routes it
+/// to the recovering phone instead of to the contact router.
+pub fn is_rekey_answer(bytes: &[u8]) -> bool {
+    bytes.starts_with(MAGIC_ANSWER)
+}
+
 /// Whether `bytes` is meant as a rekey offer; the receive path routes it
 /// here instead of to the contact router.
 pub fn is_rekey_offer(bytes: &[u8]) -> bool {

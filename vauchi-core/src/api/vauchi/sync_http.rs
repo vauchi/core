@@ -497,6 +497,7 @@ impl Vauchi {
         let mut device_blobs: Vec<(String, Vec<u8>)> = Vec::new();
         let mut revocations: Vec<(String, crate::network::IdentityRevoked)> = Vec::new();
         let mut rekey_offers: Vec<(String, Vec<u8>)> = Vec::new();
+        let mut rekey_answers: Vec<(String, Vec<u8>)> = Vec::new();
         let mut update_blobs: Vec<(String, String, Vec<u8>, Option<String>)> = Vec::new();
         while let Some(envelope) = adapter.receive().map_err(VauchiError::Network)? {
             if let MessagePayload::EncryptedUpdate(update) = envelope.payload {
@@ -530,6 +531,9 @@ impl Vauchi {
                     } => revocations.push((message_id, revocation)),
                     InboundBlob::RekeyOffer { message_id, blob } => {
                         rekey_offers.push((message_id, blob));
+                    }
+                    InboundBlob::RekeyAnswer { message_id, blob } => {
+                        rekey_answers.push((message_id, blob));
                     }
                     InboundBlob::ContactUpdate {
                         message_id,
@@ -600,8 +604,17 @@ impl Vauchi {
         // 2d. Rekey offers from recovered contacts (vauchi/private#796): kept
         //     for review when valid, dropped otherwise; ACKed unless a
         //     storage error asks for a retry, like revocations.
-        for (message_id, blob) in rekey_offers {
-            if self.take_rekey_offer(&blob).is_err() {
+        let rekeys = rekey_offers
+            .into_iter()
+            .map(|(id, blob)| (id, self.take_rekey_offer(&blob).map(|_| ())))
+            .chain(
+                rekey_answers
+                    .into_iter()
+                    .map(|(id, blob)| (id, self.take_rekey_answer(&blob).map(|_| ()))),
+            )
+            .collect::<Vec<_>>();
+        for (message_id, taken) in rekeys {
+            if taken.is_err() {
                 continue;
             }
             let ack = create_envelope(
@@ -1301,6 +1314,9 @@ enum InboundBlob {
     /// Magic-prefixed signed rekey offer from a recovered contact
     /// (vauchi/private#796), checked by `take_rekey_offer`.
     RekeyOffer { message_id: String, blob: Vec<u8> },
+    /// Magic-prefixed signed rekey answer to this recovering phone's offer
+    /// (vauchi/private#796), checked by `take_rekey_answer`.
+    RekeyAnswer { message_id: String, blob: Vec<u8> },
     /// Ratchet-encrypted contact update, routed by mailbox token.
     ContactUpdate {
         message_id: String,
@@ -1326,6 +1342,12 @@ fn classify_inbound_blob(
     }
     if crate::recovery::rekey::is_rekey_offer(&ciphertext) {
         return InboundBlob::RekeyOffer {
+            message_id,
+            blob: ciphertext,
+        };
+    }
+    if crate::recovery::rekey::is_rekey_answer(&ciphertext) {
+        return InboundBlob::RekeyAnswer {
             message_id,
             blob: ciphertext,
         };

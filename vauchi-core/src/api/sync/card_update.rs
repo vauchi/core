@@ -292,6 +292,9 @@ pub fn process_single_card_update_for_device(
         ciphertext,
         GenesisBudget::EnforceAndSurface,
     )?;
+    // A message on the relationship a rekey made: the answer kept for it
+    // need not go again (vauchi/private#796).
+    storage.recovery().forget_rekey_answer(sender_id)?;
     // A responder's sends to this contact were deferred until now
     // (`VauchiError::SendDeferred`); its first sending chain owes them.
     if could_send == Some(false)

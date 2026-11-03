@@ -25,6 +25,15 @@ const REKEY_OFFER_RESEND_SECS: u64 = 86_400;
 /// keeps a blob for longer, and a device catches up 14 days per cycle.
 pub(super) const REKEY_RESEND_WINDOW_SECS: u64 = 14 * 86_400;
 
+/// What [`Vauchi::take_rekey_answer`] made of an answer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RekeyAnswerTaken {
+    /// The contact with this id moved to the new relationship.
+    Completed { contact_id: String },
+    /// Not an answer to an offer of this phone; nothing changed.
+    Dropped,
+}
+
 /// One rekey offer due for a restored contact, and where it goes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RekeyDelivery {
@@ -154,6 +163,78 @@ impl Vauchi {
             }
         }
         Ok(sent)
+    }
+
+    /// Takes in a contact's answer to a rekey offer (step 6;
+    /// `recovery_acceptance.spthy`, Alice_completes): only when the
+    /// contact's key from the backup signed it and it names the exchange
+    /// key this phone offered. Then the contact moves to the shared key both
+    /// derived, with a fresh ratchet this phone starts, and this phone's
+    /// card goes to it on the next sync. Anything else is dropped, and every
+    /// answer in a duress session.
+    ///
+    /// # Errors
+    /// Storage errors only, which change nothing.
+    pub fn take_rekey_answer(&self, blob: &[u8]) -> VauchiResult<RekeyAnswerTaken> {
+        let Some(identity) = self.identity.as_ref() else {
+            return Ok(RekeyAnswerTaken::Dropped);
+        };
+        if self.in_duress_mode() {
+            return Ok(RekeyAnswerTaken::Dropped);
+        }
+        let Ok(answer) = crate::recovery::rekey::RekeyAnswer::decode(blob) else {
+            return Ok(RekeyAnswerTaken::Dropped);
+        };
+        let contact_id = hex::encode(answer.contact_pk());
+        if !self
+            .storage
+            .recovery()
+            .rekey_pending()?
+            .contains(&contact_id)
+        {
+            return Ok(RekeyAnswerTaken::Dropped);
+        }
+        let Some((secret, _)) = self.storage.recovery().rekey_exchange(&contact_id)? else {
+            return Ok(RekeyAnswerTaken::Dropped);
+        };
+        let exchange = X3DHKeyPair::from_bytes(*secret);
+        let Some(mut contact) = self.storage.contacts().load_contact(&contact_id)? else {
+            return Ok(RekeyAnswerTaken::Dropped);
+        };
+        let Some(contact_pk) = contact.public_key().copied() else {
+            return Ok(RekeyAnswerTaken::Dropped);
+        };
+        if !answer.verify(&contact_pk, exchange.public_key()) {
+            return Ok(RekeyAnswerTaken::Dropped);
+        }
+        let Ok(shared) = crate::recovery::rekey::rekey_shared_key(
+            &exchange,
+            answer.exchange_key(),
+            identity.signing_public_key(),
+            &contact_pk,
+        ) else {
+            return Ok(RekeyAnswerTaken::Dropped);
+        };
+        let Ok(ratchet) = crate::crypto::ratchet::DoubleRatchetState::initialize_initiator(
+            &shared,
+            *answer.exchange_key(),
+        ) else {
+            return Ok(RekeyAnswerTaken::Dropped);
+        };
+        let now = self.clock.unix_seconds();
+        self.storage.with_savepoint(|| -> VauchiResult<()> {
+            contact
+                .adopt_exchange_shared_key(shared.clone(), now)
+                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+            self.storage.contacts().save_contact(&contact)?;
+            let ratchets = self.storage.ratchets();
+            ratchets.delete_ratchet_states_for_contact(&contact_id)?;
+            ratchets.save_ratchet_state(&contact_id, &ratchet, true)?;
+            self.storage.recovery().clear_rekey_pending(&contact_id)?;
+            Ok(())
+        })?;
+        self.mark_own_card_repropagate()?;
+        Ok(RekeyAnswerTaken::Completed { contact_id })
     }
 
     /// Records that a contact's rekey offer went out now, so it goes out

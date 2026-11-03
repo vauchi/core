@@ -662,6 +662,16 @@ impl RecoveryStore<'_> {
             .collect()
     }
 
+    /// Forgets the answer to `contact_id`'s rekey: the new relationship is
+    /// in use, so it need not go again.
+    pub fn forget_rekey_answer(&self, contact_id: &str) -> Result<(), StorageError> {
+        self.conn.execute(
+            "DELETE FROM recovery_rekey_answers WHERE contact_id = ?1",
+            params![contact_id],
+        )?;
+        Ok(())
+    }
+
     /// Records that the answer to `contact_id`'s rekey went out at `at`.
     pub fn record_rekey_answer_sent(&self, contact_id: &str, at: u64) -> Result<(), StorageError> {
         self.conn.execute(

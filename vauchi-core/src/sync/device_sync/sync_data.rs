@@ -18,6 +18,31 @@ use crate::contact::{Contact, Group, ImportSource};
 use crate::crypto::SymmetricKey;
 use crate::identifiers::IdentityKey;
 
+/// A contact recovered to a new identity, as the device that accepted the
+/// rekey tells its siblings (private#796, D25). A sibling holding the new
+/// identity already folds the old contact into it; otherwise it moves the
+/// old contact to the new key with this shared key.
+#[derive(Clone, PartialEq, Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
+pub struct ContactRekeySyncData {
+    /// The contact's id under its old key.
+    pub old_contact_id: String,
+    /// The contact's new Ed25519 public key.
+    #[serde(with = "crate::identifiers::wire_identity_key_base64")]
+    pub new_public_key: IdentityKey,
+    /// The shared key of the relationship with the new identity.
+    #[serde(with = "crate::sync::device_sync::bytes_array_32")]
+    pub shared_key: [u8; 32],
+}
+
+impl std::fmt::Debug for ContactRekeySyncData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ContactRekeySyncData")
+            .field("old_contact_id", &self.old_contact_id)
+            .field("new_public_key", &self.new_public_key)
+            .finish_non_exhaustive()
+    }
+}
+
 /// Serializable contact data for device sync.
 ///
 /// Contains all information needed to reconstruct a contact on a new device.

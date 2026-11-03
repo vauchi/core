@@ -29,8 +29,8 @@ pub use payload::DeviceSyncPayload;
 mod sync_data;
 
 pub use sync_data::{
-    ContactExchangeLocation, ContactSyncData, GroupSyncData, ImportedContactSyncData,
-    PlaceSyncData, TagSyncData,
+    ContactExchangeLocation, ContactRekeySyncData, ContactSyncData, GroupSyncData,
+    ImportedContactSyncData, PlaceSyncData, TagSyncData,
 };
 
 /// Why a device is being linked.
@@ -117,6 +117,15 @@ pub enum SyncItem {
         /// ID of the removed contact.
         contact_id: String,
         /// Timestamp of removal.
+        timestamp: u64,
+    },
+
+    /// A contact recovered to a new identity on this identity's other device
+    /// (private#796, D25).
+    ContactRekeyed {
+        /// The old contact, the new key and the new shared key.
+        rekey: ContactRekeySyncData,
+        /// When the other device accepted the rekey.
         timestamp: u64,
     },
 
@@ -475,6 +484,7 @@ impl SyncItem {
             SyncItem::ContactAdded { timestamp, .. } => *timestamp,
             SyncItem::ContactRemoved { timestamp, .. } => *timestamp,
             SyncItem::ContactCardUpdated { timestamp, .. } => *timestamp,
+            SyncItem::ContactRekeyed { timestamp, .. } => *timestamp,
             SyncItem::DeviceRegistryChanged { version, .. } => *version,
             SyncItem::ContactRegistryReceived { timestamp, .. } => *timestamp,
             SyncItem::ContactActivationChanged { timestamp, .. } => *timestamp,

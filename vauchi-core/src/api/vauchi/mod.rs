@@ -54,6 +54,7 @@ mod recovery_passphrase;
 mod recovery_rekey;
 #[cfg(feature = "network-http")]
 mod recovery_rekey_inbound;
+mod recovery_rekey_siblings;
 mod registry_push;
 mod registry_sibling_apply;
 #[cfg(feature = "network-http")]

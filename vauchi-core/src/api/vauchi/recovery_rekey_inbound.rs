@@ -65,6 +65,7 @@ impl Vauchi {
         // answered (D21).
         if self.storage.contacts().load_contact(&new_id)?.is_some() {
             self.storage.fold_contact_into(&contact_id, &new_id)?;
+            self.record_contact_rekeyed(&contact_id, &new_id)?;
             return Ok(RekeyOfferTaken::Accepted { contact_id: new_id });
         }
         let contact = self
@@ -107,6 +108,7 @@ impl Vauchi {
                 .keep_rekey_answer(&new_id, &answer.encode(), &old_shared)?;
             Ok(())
         })?;
+        self.record_contact_rekeyed(&contact_id, &new_id)?;
         Ok(RekeyOfferTaken::Accepted { contact_id: new_id })
     }
 

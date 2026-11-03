@@ -685,6 +685,9 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             SyncItem::ContactCardUpdated { contact_id, .. } => {
                 format!("contact_card:{}", contact_id)
             }
+            SyncItem::ContactRekeyed { rekey, .. } => {
+                format!("contact_rekey:{}", rekey.old_contact_id)
+            }
             SyncItem::DeviceRegistryChanged { .. } => "device_registry".to_string(),
             SyncItem::ContactRegistryReceived { contact_id, .. } => {
                 format!("contact_registry:{}", contact_id)

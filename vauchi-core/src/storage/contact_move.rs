@@ -91,6 +91,18 @@ pub const CONTACT_REFERENCES: &[(&str, &str, ContactReference)] = &[
 
 const MOVE_SAVEPOINT: &str = "vauchi_contact_move";
 
+/// The owner's own annotations on a contact, which a fold fills in on the
+/// new contact where it has none.
+const FILLED_ON_FOLD: &[&str] = &[
+    "personal_notes_encrypted",
+    "nickname_encrypted",
+    "custom_avatar_encrypted",
+];
+
+/// The owner's marks on a contact, which a fold keeps when either contact
+/// had them (a guardian stays one).
+const KEPT_SET_ON_FOLD: &[&str] = &["favorite", "proposal_trusted", "recovery_trusted"];
+
 impl Storage {
     /// Moves the contact `old_id` to `new_id`, with everything that names
     /// it, in one transaction over both databases.
@@ -108,13 +120,41 @@ impl Storage {
         if self.contacts().load_contact(old_id)?.is_none() {
             return Err(StorageError::NotFound(old_id.to_string()));
         }
+        self.in_both_databases(|| self.move_references(old_id, new_id, false))
+    }
+
+    /// Folds the contact `old_id` into the contact `new_id` (D21), when both
+    /// exist: the new one keeps its key, shared key, ratchet, card and the
+    /// choices made at its exchange; what only the old one held comes
+    /// across (the owner's notes, nickname, custom avatar, field notes,
+    /// labels, tags, guardian roles, kept backups, history); a row both
+    /// hold keeps the new one's; then the old contact goes.
+    ///
+    /// # Errors
+    /// [`StorageError::NotFound`] when either is not a contact; nothing
+    /// changes then, nor on any other error.
+    pub fn fold_contact_into(&self, old_id: &str, new_id: &str) -> Result<(), StorageError> {
+        for id in [old_id, new_id] {
+            if self.contacts().load_contact(id)?.is_none() {
+                return Err(StorageError::NotFound(id.to_string()));
+            }
+        }
+        self.in_both_databases(|| self.move_references(old_id, new_id, true))
+    }
+
+    /// Runs `operation` in a savepoint on both databases and seals the
+    /// duress content, or rolls both back.
+    fn in_both_databases(
+        &self,
+        operation: impl FnOnce() -> Result<(), StorageError>,
+    ) -> Result<(), StorageError> {
         let begin = format!("SAVEPOINT {MOVE_SAVEPOINT}");
         self.duress_db.execute_batch(&begin)?;
         if let Err(error) = self.conn.execute_batch(&begin) {
             rollback(&self.duress_db);
             return Err(error.into());
         }
-        let moved = self.move_references(old_id, new_id).and_then(|()| {
+        let moved = operation().and_then(|()| {
             super::duress_content::write_sealed(&self.conn, &self.duress_db, &self.encryption_key)
         });
         match moved {
@@ -132,17 +172,32 @@ impl Storage {
         }
     }
 
-    fn move_references(&self, old_id: &str, new_id: &str) -> Result<(), StorageError> {
+    /// Points everything naming `old_id` at `new_id`. A move renames the
+    /// contacts row; a fold keeps the new row, takes the owner's
+    /// annotations from the old one, keeps the new contact's row wherever
+    /// both have one, and removes the old contact and what is left of it.
+    fn move_references(&self, old_id: &str, new_id: &str, fold: bool) -> Result<(), StorageError> {
         // The children point at the new id only after the parent row moved;
         // the foreign keys are checked when the transaction commits.
         self.conn.execute_batch("PRAGMA defer_foreign_keys = ON")?;
-        self.conn.execute(
-            "UPDATE contacts SET id = ?2 WHERE id = ?1",
-            params![old_id, new_id],
-        )?;
+        let update = if fold { "UPDATE OR IGNORE" } else { "UPDATE" };
+        if fold {
+            self.fold_annotations(old_id, new_id)?;
+            // The old relationship's ratchets end with it; the new contact
+            // has the meeting's.
+            self.conn.execute(
+                "DELETE FROM contact_ratchets WHERE contact_id = ?1",
+                params![old_id],
+            )?;
+        } else {
+            self.conn.execute(
+                "UPDATE contacts SET id = ?2 WHERE id = ?1",
+                params![old_id, new_id],
+            )?;
+        }
         for (table, column) in foreign_keys_to_contacts(&self.conn)? {
             self.conn.execute(
-                &format!("UPDATE {table} SET {column} = ?2 WHERE {column} = ?1"),
+                &format!("{update} {table} SET {column} = ?2 WHERE {column} = ?1"),
                 params![old_id, new_id],
             )?;
         }
@@ -151,9 +206,15 @@ impl Storage {
             match reference {
                 ContactReference::Id => {
                     conn.execute(
-                        &format!("UPDATE {table} SET {column} = ?2 WHERE {column} = ?1"),
+                        &format!("{update} {table} SET {column} = ?2 WHERE {column} = ?1"),
                         params![old_id, new_id],
                     )?;
+                    if fold {
+                        conn.execute(
+                            &format!("DELETE FROM {table} WHERE {column} = ?1"),
+                            params![old_id],
+                        )?;
+                    }
                 }
                 ContactReference::StaleId => {
                     conn.execute(
@@ -174,8 +235,45 @@ impl Storage {
         let new_tag = super::stores::designator_tag(&self.encryption_key, new_id);
         for table in ["guardian_backups", "guardian_backup_pieces"] {
             self.conn.execute(
-                &format!("UPDATE {table} SET designator_tag = ?2 WHERE designator_tag = ?1"),
+                &format!("{update} {table} SET designator_tag = ?2 WHERE designator_tag = ?1"),
                 params![old_tag, new_tag],
+            )?;
+            if fold {
+                self.conn.execute(
+                    &format!("DELETE FROM {table} WHERE designator_tag = ?1"),
+                    params![old_tag],
+                )?;
+            }
+        }
+        if fold {
+            // What the foreign keys still tie to the old contact is what
+            // the new one already had; it goes with the old contact.
+            self.conn
+                .execute("DELETE FROM contacts WHERE id = ?1", params![old_id])?;
+        }
+        Ok(())
+    }
+
+    /// The owner's annotations on the old contact come to the new one: a
+    /// value the new contact lacks is filled, and a mark set on either
+    /// stays set.
+    fn fold_annotations(&self, old_id: &str, new_id: &str) -> Result<(), StorageError> {
+        for column in FILLED_ON_FOLD {
+            self.conn.execute(
+                &format!(
+                    "UPDATE contacts SET {column} = (SELECT {column} FROM contacts WHERE id = ?1)
+                     WHERE id = ?2 AND {column} IS NULL"
+                ),
+                params![old_id, new_id],
+            )?;
+        }
+        for column in KEPT_SET_ON_FOLD {
+            self.conn.execute(
+                &format!(
+                    "UPDATE contacts SET {column} = MAX({column}, (SELECT {column} FROM contacts WHERE id = ?1))
+                     WHERE id = ?2"
+                ),
+                params![old_id, new_id],
             )?;
         }
         Ok(())

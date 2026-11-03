@@ -60,10 +60,12 @@ impl Vauchi {
         };
         let new_pk = *offer.new_pk();
         let new_id = hex::encode(new_pk);
-        // A contact with the new key already (met in person again) is
-        // folded into, not moved onto (D21); until then the offer waits.
+        // Met again in person, the contact already has the new key and the
+        // meeting's relationship: the old one folds into it and nothing is
+        // answered (D21).
         if self.storage.contacts().load_contact(&new_id)?.is_some() {
-            return Ok(RekeyOfferTaken::Dropped);
+            self.storage.fold_contact_into(&contact_id, &new_id)?;
+            return Ok(RekeyOfferTaken::Accepted { contact_id: new_id });
         }
         let contact = self
             .storage

@@ -250,3 +250,20 @@ fn an_offer_for_a_contact_met_again_in_person_folds_the_old_contact_into_the_new
         "no answer: the meeting already joined them"
     );
 }
+
+// @internal
+#[test]
+fn an_offer_daves_own_contacts_vouched_for_is_dropped_until_certificates_exist() {
+    let (world, blob) = offered();
+    let dave = world.dave.vauchi();
+    let old_id = world.dave.sharer_id().to_string();
+
+    let taken = dave.take_rekey_offer(&blob).unwrap();
+
+    assert_eq!(
+        taken,
+        RekeyOfferTaken::Dropped,
+        "two legitimate attempts could each gather vouchers (P11, P18)"
+    );
+    assert!(dave.get_contact(&old_id).unwrap().is_some());
+}

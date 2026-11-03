@@ -18,6 +18,7 @@
 //! - Atomic transaction for all DB writes
 
 mod ordering;
+mod ratchet_only;
 
 use crate::crypto::cek::ContentEncryptionKey;
 use crate::crypto::ratchet::RatchetMessage;
@@ -568,53 +569,16 @@ fn process_single_card_update_for_device_with_budget(
         });
     }
 
-    // 3c'. Cover (0x09, vauchi/private#811), a resync request (0x0a, #691)
-    //      and a guardian backup piece (0x0b, #796) apply no card change. The
-    //      ratchet is persisted as for an update, so the sender's next
-    //      message needs no skipped key and a deferred sender is released the
-    //      same way; none may end as an error, which would keep the ratchet
-    //      unsaved and count as a failure. A piece is kept in the same
-    //      transaction, so a storage failure leaves its blob on the relay;
-    //      honouring a resync request is the receive loop's.
-    let ratchet_only = match VersionedPayload::decode(&plaintext) {
-        Ok(VersionedPayload::Cover) => Some(ReceiveOutcome::Cover),
-        Ok(VersionedPayload::ResyncRequest) => Some(ReceiveOutcome::ResyncRequest),
-        Ok(VersionedPayload::GuardianBackupPiece(piece)) => {
-            Some(ReceiveOutcome::GuardianBackupPiece(piece))
-        }
-        Ok(VersionedPayload::GuardianRelease) => Some(ReceiveOutcome::GuardianRelease),
-        Ok(VersionedPayload::ReturnedBackupPiece(piece)) => {
-            Some(ReceiveOutcome::ReturnedBackupPiece(piece))
-        }
-        _ => None,
-    };
-    if let Some(outcome) = ratchet_only {
-        storage.begin_transaction()?;
-        let ratchet_txn = storage
-            .ratchets()
-            .save_ratchet_state_for_device(sender_id, peer_device_id, &ratchet, is_initiator)
-            .and_then(|()| match &outcome {
-                ReceiveOutcome::GuardianBackupPiece(piece) => storage
-                    .guardian_backups()
-                    .keep_piece(sender_id, piece, storage.clock().unix_seconds())
-                    .map(|_| ()),
-                ReceiveOutcome::GuardianRelease => {
-                    storage.guardian_backups().forget_designator(sender_id)
-                }
-                ReceiveOutcome::ReturnedBackupPiece(piece) => storage
-                    .returned_backups()
-                    .keep_piece(sender_id, piece, storage.clock().unix_seconds())
-                    .map(|_| ()),
-                _ => Ok(()),
-            });
-        match ratchet_txn {
-            Ok(()) => storage.commit()?,
-            Err(e) => {
-                storage.rollback();
-                return Err(e.into());
-            }
-        }
-        return Ok(outcome);
+    // 3c'. The kinds that apply no card change (`ratchet_only`).
+    if let Some(outcome) = ratchet_only::outcome_of(VersionedPayload::decode(&plaintext)) {
+        return ratchet_only::receive(
+            storage,
+            sender_id,
+            peer_device_id,
+            &ratchet,
+            is_initiator,
+            outcome,
+        );
     }
 
     // 3d. F4 registry handshake payloads (0x05/0x06) — persist/ack registry
@@ -1138,20 +1102,15 @@ fn decode_versioned_payload(
                     .map_err(|_| CardUpdateError::CekDecryptionFailed)?;
                 Ok((decrypted, Some(cek)))
             }
-            Ok(VersionedPayload::Cover) => Err(CardUpdateError::InvalidPayload(
-                "cover not handled here".into(),
-            )),
-            Ok(VersionedPayload::ResyncRequest) => Err(CardUpdateError::InvalidPayload(
-                "resync request not handled here".into(),
-            )),
-            Ok(VersionedPayload::GuardianBackupPiece(_)) => Err(CardUpdateError::InvalidPayload(
-                "guardian backup piece not handled here".into(),
-            )),
-            Ok(VersionedPayload::GuardianRelease) => Err(CardUpdateError::InvalidPayload(
-                "guardian release not handled here".into(),
-            )),
-            Ok(VersionedPayload::ReturnedBackupPiece(_)) => Err(CardUpdateError::InvalidPayload(
-                "returned backup piece not handled here".into(),
+            // The ratchet-only kinds are taken before a delta is decoded.
+            Ok(
+                VersionedPayload::Cover
+                | VersionedPayload::ResyncRequest
+                | VersionedPayload::GuardianBackupPiece(_)
+                | VersionedPayload::GuardianRelease
+                | VersionedPayload::ReturnedBackupPiece(_),
+            ) => Err(CardUpdateError::InvalidPayload(
+                "ratchet-only payload not handled here".into(),
             )),
             Ok(VersionedPayload::ReciprocityConfirm(_)) => {
                 // ReciprocityConfirm is not a card delta — handled at caller level

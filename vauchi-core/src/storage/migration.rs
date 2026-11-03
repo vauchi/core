@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 100] = [
+const MIGRATIONS: [Migration; 101] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -772,7 +772,26 @@ const MIGRATIONS: [Migration; 100] = [
         name: "guardian_designator_tags",
         action: MigrationAction::Callback(migrate_v100_guardian_designator_tags),
     },
+    Migration {
+        version: 101,
+        name: "guardian_groups",
+        action: MigrationAction::Sql(MIGRATION_V101_GUARDIAN_GROUPS),
+    },
 ];
+
+/// Migration v101 (vauchi/private#796, D17): the group the owner put each
+/// guardian in; one Shamir share per group. A guardian trusted before
+/// groups existed gets a group of its own, so its backup keeps going out.
+const MIGRATION_V101_GUARDIAN_GROUPS: &str = "
+    CREATE TABLE IF NOT EXISTS guardian_groups (
+        contact_id TEXT PRIMARY KEY REFERENCES contacts(id) ON DELETE CASCADE,
+        group_id INTEGER NOT NULL CHECK (group_id BETWEEN 1 AND 9)
+    );
+    INSERT OR IGNORE INTO guardian_groups (contact_id, group_id)
+        SELECT id, ROW_NUMBER() OVER (ORDER BY id) FROM contacts
+        WHERE recovery_trusted = 1 AND blocked = 0
+        LIMIT 9;
+";
 
 /// Migration v100 (vauchi/private#796, D15): a guardian's tables carry a
 /// keyed tag of the designator instead of its contact id, so the database

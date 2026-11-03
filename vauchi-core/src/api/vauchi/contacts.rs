@@ -4,7 +4,6 @@
 
 //! Contact and double ratchet operations.
 
-use crate::backup::GuardianGroups;
 use crate::contact::Contact;
 use crate::crypto::SymmetricKey;
 use crate::crypto::ratchet::DoubleRatchetState;
@@ -342,29 +341,15 @@ impl Vauchi {
             ));
         }
 
-        let new_state = !contact.is_recovery_trusted();
-        if new_state {
-            let guardians = self
-                .storage
-                .contacts()
-                .list_contacts()?
-                .iter()
-                .filter(|c| c.is_recovery_trusted())
-                .count();
-            if guardians >= GuardianGroups::MAX_GUARDIANS {
-                return Err(VauchiError::InvalidState(format!(
-                    "At most {} contacts can be trusted for recovery; release one first",
-                    GuardianGroups::MAX_GUARDIANS
-                )));
-            }
-            contact
-                .trust_for_recovery()
-                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        } else {
-            contact
-                .untrust_for_recovery()
-                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        if !contact.is_recovery_trusted() {
+            // A caller that does not ask the owner for a group starts a
+            // group of its own; the add-a-guardian screen asks (D17).
+            self.trust_for_recovery_in_group(contact_id, None)?;
+            return Ok(true);
         }
+        contact
+            .untrust_for_recovery()
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
 
         // A new guardian set needs a new split of the backup, so the two are
         // one change (vauchi/private#796): a backup that cannot be queued
@@ -372,25 +357,13 @@ impl Vauchi {
         // skipped inside the send, not an error.
         self.storage.with_savepoint(|| -> VauchiResult<()> {
             self.storage.contacts().save_contact(&contact)?;
-            if !new_state {
-                self.send_guardian_release(&contact)?;
-            }
+            self.storage.recovery().remove_guardian_group(contact_id)?;
+            self.send_guardian_release(&contact)?;
             self.send_guardian_backup()?;
             Ok(())
         })?;
-
-        // Upload updated guardian entries to relay after trust change
-        #[cfg(feature = "network-http")]
-        {
-            // Best-effort: log but don't fail the local toggle on relay errors
-            if let Err(_e) = self.upload_guardian_entries() {
-                // Relay upload failed — local state is correct, relay will be
-                // updated on next sync or manual retry. Silent for now;
-                // future: emit an event for the UI to show a warning.
-            }
-        }
-
-        Ok(new_state)
+        self.upload_guardian_entries_best_effort();
+        Ok(false)
     }
 
     /// Verifies a contact's fingerprint.

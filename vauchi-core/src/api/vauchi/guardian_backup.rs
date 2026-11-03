@@ -43,32 +43,43 @@ impl Vauchi {
             .into_iter()
             .filter(|contact| contact.is_recovery_trusted() && !contact.is_blocked())
             .collect();
-        let count = u8::try_from(guardians.len()).unwrap_or(u8::MAX);
-        if count < KeyShardConfig::MIN_COUNT {
-            return Ok(0);
-        }
-
-        let voucher_threshold = self
+        // Each group the owner formed, with the guardians in it (D17); a
+        // group whose members are all gone no longer counts.
+        let grouped: Vec<Vec<&Contact>> = self
             .storage
             .recovery()
-            .load_recovery_settings()?
-            .unwrap_or_default()
-            .recovery_threshold();
-        let threshold = u8::try_from(voucher_threshold)
-            .unwrap_or(u8::MAX)
-            .clamp(KeyShardConfig::MIN_THRESHOLD, count);
-        let keys = guardians
-            .iter()
-            .map(|guardian| {
-                guardian.public_key().copied().ok_or_else(|| {
-                    VauchiError::InvalidState(format!(
-                        "Guardian {} has no public key",
-                        guardian.id()
-                    ))
-                })
+            .guardian_groups()?
+            .into_iter()
+            .map(|(_, members)| {
+                members
+                    .iter()
+                    .filter_map(|id| guardians.iter().find(|guardian| guardian.id() == id))
+                    .collect::<Vec<_>>()
             })
-            .collect::<VauchiResult<Vec<[u8; 32]>>>()?;
-        let (backup_hex, shares) = self.export_guardian_backup_with_shards(&keys, threshold)?;
+            .filter(|members| !members.is_empty())
+            .collect();
+        if grouped.len() < usize::from(KeyShardConfig::MIN_COUNT) {
+            return Ok(0);
+        }
+        let keys = grouped
+            .iter()
+            .map(|members| {
+                members
+                    .iter()
+                    .map(|guardian| {
+                        guardian.public_key().copied().ok_or_else(|| {
+                            VauchiError::InvalidState(format!(
+                                "Guardian {} has no public key",
+                                guardian.id()
+                            ))
+                        })
+                    })
+                    .collect::<VauchiResult<Vec<[u8; 32]>>>()
+            })
+            .collect::<VauchiResult<Vec<_>>>()?;
+        let groups = crate::backup::GuardianGroups::new(keys)
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        let (backup_hex, sealed) = self.export_guardian_backup_for_groups(&groups)?;
         let backup =
             hex::decode(&backup_hex).map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         let mut backup_id = [0u8; 16];
@@ -76,7 +87,8 @@ impl Vauchi {
         let created_at = self.clock.unix_seconds();
 
         let mut sent = 0;
-        for (guardian, share) in guardians.iter().zip(shares) {
+        let each_member = grouped.iter().flatten().zip(sealed.into_iter().flatten());
+        for (guardian, share) in each_member {
             let delivery = GuardianDelivery::new(created_at, share, backup.clone())
                 .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
             let pieces = split_into_pieces(backup_id, &delivery.encode())
@@ -156,7 +168,16 @@ impl Vauchi {
         }
         let mut contacts = self.storage.contacts().list_contacts()?;
         contacts.sort_by(|a, b| a.id().cmp(b.id()));
+        // A guardian moved between groups needs a new split (D17).
+        let groups = self.storage.recovery().guardian_groups()?;
+        let group_of = |id: &str| {
+            groups
+                .iter()
+                .find(|(_, members)| members.iter().any(|member| member == id))
+                .map_or(0, |(group_id, _)| *group_id)
+        };
         for contact in &contacts {
+            hasher.update([group_of(contact.id())]);
             field(&mut hasher, contact.id().as_bytes());
             field(
                 &mut hasher,
@@ -308,6 +329,89 @@ impl Vauchi {
                 )
             })
         })
+    }
+
+    /// Trusts `contact_id` for recovery in the group the owner chose as it
+    /// is added (D17): `Some(group)` joins an existing group, `None` starts
+    /// a new one. Returns the group's number. A guardian already trusted
+    /// moves to the chosen group. The new grouping, and the backup split
+    /// over it, are one change.
+    ///
+    /// # Errors
+    /// [`VauchiError::InvalidState`] for an unknown or blocked contact, a
+    /// group that does not exist, a tenth guardian, or a contact not
+    /// verified in person; storage and send errors otherwise.
+    pub fn trust_for_recovery_in_group(
+        &self,
+        contact_id: &str,
+        group: Option<u8>,
+    ) -> VauchiResult<u8> {
+        let mut contact = self
+            .storage
+            .contacts()
+            .load_contact(contact_id)?
+            .ok_or_else(|| VauchiError::InvalidState("Contact not found".into()))?;
+        if contact.is_blocked() {
+            return Err(VauchiError::InvalidState(
+                "Blocked contacts cannot be trusted for recovery".into(),
+            ));
+        }
+        let groups = self.storage.recovery().guardian_groups()?;
+        // The guardian limit is checked before a group is chosen, so a
+        // tenth guardian is told the limit, not that no group is free.
+        if !contact.is_recovery_trusted() {
+            let trusted = groups
+                .iter()
+                .map(|(_, members)| members.len())
+                .sum::<usize>();
+            if trusted >= crate::backup::GuardianGroups::MAX_GUARDIANS {
+                return Err(VauchiError::InvalidState(format!(
+                    "At most {} contacts can be trusted for recovery; release one first",
+                    crate::backup::GuardianGroups::MAX_GUARDIANS
+                )));
+            }
+            contact
+                .trust_for_recovery()
+                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        }
+        let group_id = match group {
+            Some(group_id) if groups.iter().any(|(id, _)| *id == group_id) => group_id,
+            Some(_) => {
+                return Err(VauchiError::InvalidState(
+                    "That guardian group does not exist".into(),
+                ));
+            }
+            None => (1..=crate::backup::GuardianGroups::MAX_GUARDIANS as u8)
+                .find(|id| !groups.iter().any(|(group_id, _)| group_id == id))
+                .ok_or_else(|| VauchiError::InvalidState("No guardian group is free".into()))?,
+        };
+        self.storage.with_savepoint(|| -> VauchiResult<()> {
+            self.storage.contacts().save_contact(&contact)?;
+            self.storage
+                .recovery()
+                .set_guardian_group(contact_id, group_id)?;
+            self.send_guardian_backup()?;
+            Ok(())
+        })?;
+        self.upload_guardian_entries_best_effort();
+        Ok(group_id)
+    }
+
+    /// The guardian groups by number, each with its members' contact ids,
+    /// for the screen where the owner adds a guardian (D17).
+    ///
+    /// # Errors
+    /// Storage errors.
+    pub fn guardian_groups(&self) -> VauchiResult<Vec<(u8, Vec<String>)>> {
+        Ok(self.storage.recovery().guardian_groups()?)
+    }
+
+    /// Re-uploads the guardian tokens after a change to the guardian set;
+    /// the local change stands when the relay cannot be reached, and the
+    /// next change or sync uploads again.
+    pub(super) fn upload_guardian_entries_best_effort(&self) {
+        #[cfg(feature = "network-http")]
+        if let Err(_relay_unreachable) = self.upload_guardian_entries() {}
     }
 
     pub(super) fn send_guardian_release(&self, contact: &Contact) -> VauchiResult<()> {

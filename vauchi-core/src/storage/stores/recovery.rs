@@ -314,6 +314,56 @@ impl RecoveryStore<'_> {
             .collect()
     }
 
+    /// Puts `contact_id` in guardian group `group_id` (1 to 9), moving it
+    /// from any group it was in (D17).
+    ///
+    /// # Errors
+    /// Storage errors, a group outside 1 to 9 among them.
+    pub fn set_guardian_group(&self, contact_id: &str, group_id: u8) -> Result<(), StorageError> {
+        self.conn.execute(
+            "INSERT INTO guardian_groups (contact_id, group_id) VALUES (?1, ?2)
+             ON CONFLICT(contact_id) DO UPDATE SET group_id = excluded.group_id",
+            params![contact_id, group_id],
+        )?;
+        Ok(())
+    }
+
+    /// Takes `contact_id` out of its guardian group.
+    ///
+    /// # Errors
+    /// Storage errors.
+    pub fn remove_guardian_group(&self, contact_id: &str) -> Result<(), StorageError> {
+        self.conn.execute(
+            "DELETE FROM guardian_groups WHERE contact_id = ?1",
+            params![contact_id],
+        )?;
+        Ok(())
+    }
+
+    /// The guardian groups by number, each with its members' contact ids
+    /// in the order they joined.
+    ///
+    /// # Errors
+    /// Storage errors.
+    pub fn guardian_groups(&self) -> Result<Vec<(u8, Vec<String>)>, StorageError> {
+        let mut statement = self
+            .conn
+            .prepare("SELECT group_id, contact_id FROM guardian_groups ORDER BY group_id, rowid")?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok((row.get::<_, u8>(0)?, row.get::<_, String>(1)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut groups: Vec<(u8, Vec<String>)> = Vec::new();
+        for (group_id, contact_id) in rows {
+            match groups.last_mut() {
+                Some((last, members)) if *last == group_id => members.push(contact_id),
+                _ => groups.push((group_id, vec![contact_id])),
+            }
+        }
+        Ok(groups)
+    }
+
     /// Records that the hand-back for the claim from `old_pk` to `new_pk`
     /// went out.
     ///

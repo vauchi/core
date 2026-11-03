@@ -4,12 +4,13 @@
 
 //! A device that ran migrations v105 and v106 as Core 0.98.0 shipped them
 //! upgrades in place (vauchi/private#796): v108 adds the answers' `kept_at`
-//! and drops the kept-offer table D18 no longer uses, and a rerun changes
-//! nothing.
+//! and drops the kept-offer table D18 no longer uses; v109 marks a waiting
+//! contact met again where this device holds a session with it (D26); a
+//! rerun of either changes nothing.
 
 use rusqlite::Connection;
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::storage::migration::{MigrationRunner, all_migrations};
+use vauchi_core::storage::migration::{MigrationAction, MigrationRunner, all_migrations};
 
 fn run_up_to(conn: &Connection, key: &SymmetricKey, up_to: u32) {
     let subset: Vec<_> = all_migrations()
@@ -70,6 +71,20 @@ fn a_device_on_the_shipped_v106_upgrades_its_answers_and_drops_the_kept_offers()
     assert_eq!(kept_at, 0, "an answer kept before v108 has no time yet");
 }
 
+/// Runs migration `version`'s callback again over `conn`; the runner
+/// itself skips a migration at or below the schema's version.
+fn rerun(conn: &Connection, key: &SymmetricKey, version: u32) {
+    let migration = all_migrations()
+        .iter()
+        .find(|migration| migration.version == version)
+        .copied()
+        .unwrap();
+    let MigrationAction::Callback(callback) = migration.action else {
+        panic!("v{version} is a callback");
+    };
+    callback(conn, key).unwrap();
+}
+
 // @internal
 #[test]
 fn v108_rerun_over_the_current_schema_changes_nothing() {
@@ -78,15 +93,35 @@ fn v108_rerun_over_the_current_schema_changes_nothing() {
     run_up_to(&conn, &key, u32::MAX);
     let before = columns(&conn, "recovery_rekey_answers");
 
-    let v108: Vec<_> = all_migrations()
-        .iter()
-        .filter(|migration| migration.version == 108)
-        .copied()
-        .collect();
-    assert_eq!(v108.len(), 1);
-    MigrationRunner::run(&conn, &key, &v108, None, 0).unwrap();
+    rerun(&conn, &key, 108);
 
     assert_eq!(columns(&conn, "recovery_rekey_answers"), before);
+}
+
+// @internal
+#[test]
+fn v109_rerun_keeps_the_marks_it_made() {
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+    run_up_to(&conn, &key, u32::MAX);
+    conn.execute_batch(
+        "PRAGMA foreign_keys = OFF;
+         INSERT INTO recovery_rekey_pending (contact_id, restored_at, met_again) VALUES ('c1', 5, 1);",
+    )
+    .unwrap();
+    let before = columns(&conn, "recovery_rekey_pending");
+
+    rerun(&conn, &key, 109);
+
+    assert_eq!(columns(&conn, "recovery_rekey_pending"), before);
+    let met_again: i64 = conn
+        .query_row(
+            "SELECT met_again FROM recovery_rekey_pending WHERE contact_id = 'c1'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(met_again, 1);
 }
 
 // @internal

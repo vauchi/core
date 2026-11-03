@@ -1138,16 +1138,12 @@ const COVERED_ELSEWHERE: &[(&str, &str)] = &[
     // guardian_backup_return_tests.rs.
     ("returned_backup_pieces", "piece_encrypted"),
     ("returned_backups", "delivery_encrypted"),
-    // the_kept_passphrase_key_survives_a_storage_rekey in
-    // guardian_backup_passphrase_tests.rs.
+    // The social recovery tables (#796), each with a survives_a_storage_rekey
+    // test in guardian_backup_passphrase_tests.rs and recovery_rekey_*_tests.rs.
     ("recovery_passphrase", "key_encrypted"),
-    // the_kept_exchange_key_and_proof_survive_a_storage_rekey in
-    // recovery_rekey_offer_tests.rs.
     ("recovery_own_proof", "proof_encrypted"),
     ("recovery_rekey_offers", "exchange_secret_encrypted"),
-    // a_kept_offer_survives_a_storage_rekey in recovery_rekey_inbound_tests.rs.
     ("recovery_rekey_inbound", "offer_encrypted"),
-    // a_kept_answer_survives_a_storage_rekey in recovery_rekey_answer_tests.rs.
     ("recovery_rekey_answers", "answer_encrypted"),
     ("recovery_rekey_answers", "old_shared_encrypted"),
     // the_vcard_uid_lookup_survives_a_rekey in

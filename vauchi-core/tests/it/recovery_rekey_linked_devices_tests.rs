@@ -15,7 +15,9 @@ use vauchi_core::api::RekeyAnswerTaken;
 use vauchi_core::api::sync::DeviceSyncOrchestrator;
 use vauchi_core::clock::FakeClock;
 use vauchi_core::identity::DeviceRegistry;
-use vauchi_core::sync::device_sync::{DeviceLinkIntent, RekeySettledSyncData, SyncItem};
+use vauchi_core::sync::device_sync::{
+    DeviceLinkIntent, RecoveryRekeySyncData, RekeySettledSyncData, RekeyWaitingSyncData, SyncItem,
+};
 use vauchi_core::{Identity, Vauchi};
 
 use crate::common::device_sync::{journal_for_tablet, link_tablet};
@@ -219,4 +221,69 @@ fn a_settled_rekey_for_a_contact_not_waiting_changes_nothing() {
         after.shared_key().unwrap().as_bytes(),
         before.shared_key().unwrap().as_bytes()
     );
+}
+
+// @internal
+#[test]
+fn a_link_whose_rekey_state_carries_a_short_seed_fails_and_keeps_nothing() {
+    let world = restored_and_offered();
+    let identity = world.phone.identity().unwrap();
+    let seed = *identity.master_seed();
+    let now = world.phone.storage().clock().unix_seconds();
+    let phone_device = identity.create_device_info(now);
+    let registry = DeviceRegistry::new(
+        phone_device.to_registered(&seed),
+        identity.signing_keypair(),
+    );
+    let mut payload =
+        DeviceSyncOrchestrator::new(world.phone.storage(), phone_device, registry.clone())
+            .create_full_sync_payload(DeviceLinkIntent::AddDevice)
+            .unwrap();
+    payload.recovery_rekey.as_mut().unwrap().old_seed = Some(vec![7u8; 31]);
+    let tablet = Vauchi::in_memory().unwrap();
+    let tablet_device =
+        Identity::from_device_link(seed, "Alice".into(), 1, "Alice tablet".into(), now)
+            .create_device_info(now);
+
+    let linked = DeviceSyncOrchestrator::new(tablet.storage(), tablet_device, registry)
+        .apply_full_sync(payload);
+
+    assert!(linked.is_err());
+    assert!(
+        tablet
+            .storage()
+            .recovery()
+            .load_old_identity_seed()
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        tablet
+            .storage()
+            .recovery()
+            .rekey_pending()
+            .unwrap()
+            .is_empty()
+    );
+}
+
+// @internal
+#[test]
+fn the_rekey_state_keeps_its_seed_and_exchange_keys_out_of_debug_output() {
+    let state = RecoveryRekeySyncData {
+        waiting: vec![RekeyWaitingSyncData {
+            contact_id: "c1".into(),
+            restored_at: 5,
+            met_again: false,
+            exchange_secret: Some(vec![203u8; 32]),
+            offer_sent_at: None,
+        }],
+        own_proof: None,
+        old_seed: Some(vec![201u8; 32]),
+    };
+
+    let shown = format!("{state:?}");
+
+    assert!(!shown.contains("201"), "{shown}");
+    assert!(!shown.contains("203"), "{shown}");
 }

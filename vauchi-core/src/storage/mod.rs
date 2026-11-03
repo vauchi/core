@@ -10,6 +10,7 @@
 #[cfg(feature = "network-rustls")]
 mod backup_snapshot;
 mod connection;
+mod contact_move;
 mod device;
 pub(crate) mod duress_content;
 mod key_check;
@@ -65,6 +66,7 @@ pub use stores::{
 #[cfg(any(test, feature = "testing"))]
 pub use secure::MemoryKeyStorage;
 
+pub use contact_move::{CONTACT_REFERENCES, ContactReference};
 #[cfg(feature = "testing")]
 pub use rekey::{ENCRYPTED_COLUMNS, REKEY_SKIP_COLUMNS};
 

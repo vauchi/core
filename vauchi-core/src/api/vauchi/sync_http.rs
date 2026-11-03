@@ -71,7 +71,6 @@ impl Vauchi {
         // sync (vauchi/private#796, D11).
         self.refresh_guardian_backup_if_stale()?;
         self.hand_back_owed()?;
-        self.send_owed_recovery_continuations()?;
         // The rekey after a recovery: offers from the new phone, answers
         // from its contacts (vauchi/private#796). A relay out of reach
         // leaves them for the next sync.

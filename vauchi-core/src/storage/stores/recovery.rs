@@ -504,7 +504,7 @@ impl RecoveryStore<'_> {
     }
 
     /// Marks a waiting contact as met again in person: it holds the new
-    /// identity already and is owed a continuation, not an offer (D20).
+    /// identity already, so its handshake need not wait for the rekey.
     pub fn mark_rekey_met_again(&self, contact_id: &str) -> Result<(), StorageError> {
         self.conn.execute(
             "UPDATE recovery_rekey_pending SET met_again = 1 WHERE contact_id = ?1",

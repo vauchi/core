@@ -33,6 +33,17 @@ fn restored(clock: &Arc<FakeClock>) -> World {
     world
 }
 
+/// The offers due now to `contact_id` alone.
+fn offers_to(world: &World, contact_id: &str) -> Vec<vauchi_core::api::RekeyDelivery> {
+    world
+        .phone
+        .rekey_offer_deliveries()
+        .unwrap()
+        .into_iter()
+        .filter(|delivery| delivery.contact_id == contact_id)
+        .collect()
+}
+
 fn clock() -> Arc<FakeClock> {
     Arc::new(FakeClock::new(SystemTime::now()))
 }
@@ -45,13 +56,20 @@ fn each_waiting_contact_gets_one_offer_in_the_mailbox_it_polls() {
 
     let deliveries = world.phone.rekey_offer_deliveries().unwrap();
 
-    assert_eq!(
-        deliveries
-            .iter()
-            .map(|delivery| delivery.contact_id.as_str())
-            .collect::<Vec<_>>(),
-        [world.dave_id.as_str()]
-    );
+    let mut offered: Vec<&str> = deliveries
+        .iter()
+        .map(|delivery| delivery.contact_id.as_str())
+        .collect();
+    offered.sort_unstable();
+    let mut waiting: Vec<&str> = world
+        .guardians_at_phone
+        .iter()
+        .map(String::as_str)
+        .chain([world.dave_id.as_str()])
+        .collect();
+    waiting.sort_unstable();
+    assert_eq!(offered, waiting, "Dave and the guardians met again");
+    let deliveries = offers_to(&world, &world.dave_id);
     let dave_at_phone = world.phone.get_contact(&world.dave_id).unwrap().unwrap();
     let old_shared = dave_at_phone.shared_key().unwrap();
     let dave_pk = signing_pk(world.dave.vauchi());
@@ -73,7 +91,7 @@ fn the_offer_is_signed_by_the_new_identity_and_carries_a_proof_dave_can_check() 
     let clock = clock();
     let world = restored(&clock);
 
-    let deliveries = world.phone.rekey_offer_deliveries().unwrap();
+    let deliveries = offers_to(&world, &world.dave_id);
     let offer = RekeyOffer::decode(&deliveries[0].blob).unwrap();
 
     assert!(offer.verify());
@@ -92,18 +110,18 @@ fn the_offer_is_signed_by_the_new_identity_and_carries_a_proof_dave_can_check() 
 fn an_offer_goes_out_once_a_day_until_answered_with_the_same_exchange_key() {
     let clock = clock();
     let world = restored(&clock);
-    let first = world.phone.rekey_offer_deliveries().unwrap();
+    let first = offers_to(&world, &world.dave_id);
     world
         .phone
         .record_rekey_offer_sent(&first[0].contact_id)
         .unwrap();
 
-    assert!(world.phone.rekey_offer_deliveries().unwrap().is_empty());
+    assert!(offers_to(&world, &world.dave_id).is_empty());
     clock.advance(DAY - Duration::from_secs(1));
-    assert!(world.phone.rekey_offer_deliveries().unwrap().is_empty());
+    assert!(offers_to(&world, &world.dave_id).is_empty());
 
     clock.advance(Duration::from_secs(1));
-    let again = world.phone.rekey_offer_deliveries().unwrap();
+    let again = offers_to(&world, &world.dave_id);
 
     assert_eq!(again.len(), 1);
     assert_eq!(
@@ -171,7 +189,7 @@ fn offers_go_for_fourteen_days_after_the_restore_and_no_longer() {
     let world = restored(&clock);
 
     clock.advance(DAY * 14 - Duration::from_secs(1));
-    assert_eq!(world.phone.rekey_offer_deliveries().unwrap().len(), 1);
+    assert_eq!(offers_to(&world, &world.dave_id).len(), 1);
 
     clock.advance(Duration::from_secs(1));
     assert!(world.phone.rekey_offer_deliveries().unwrap().is_empty());

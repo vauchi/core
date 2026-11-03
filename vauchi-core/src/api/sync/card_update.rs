@@ -157,8 +157,9 @@ pub enum ReceiveOutcome {
     /// One piece of the backup a guardian returns to this recovering
     /// identity; kept as returned in the receive transaction (#796).
     ReturnedBackupPiece(crate::sync::guardian_piece::GuardianBackupPiece),
-    /// The sender continues a recovered contact; honoured in the receive
-    /// transaction (vauchi/private#796, D20).
+    /// The sender continues a recovered contact (vauchi/private#796, D20).
+    /// Nothing follows from it: an old-key signature authorizes no merge
+    /// (security review 2026-11-03); only the ratchet advances.
     RecoveryContinuation(crate::recovery::rekey::RecoveryContinuation),
 }
 
@@ -579,7 +580,6 @@ fn process_single_card_update_for_device_with_budget(
     // 3c'. The kinds that apply no card change (`ratchet_only`).
     if let Some(outcome) = ratchet_only::outcome_of(VersionedPayload::decode(&plaintext)) {
         return ratchet_only::receive(
-            identity,
             storage,
             sender_id,
             peer_device_id,

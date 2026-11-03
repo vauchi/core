@@ -636,7 +636,8 @@ pub enum VersionedPayload {
     /// recovering identity (version 0x0d, vauchi/private#796).
     ReturnedBackupPiece(crate::sync::guardian_piece::GuardianBackupPiece),
     /// The sender continues a recovered contact (version 0x0e,
-    /// vauchi/private#796, D20).
+    /// vauchi/private#796, D20); decoded so a receiver stays tolerant, and
+    /// acted on by none.
     RecoveryContinuation(crate::recovery::rekey::RecoveryContinuation),
 }
 

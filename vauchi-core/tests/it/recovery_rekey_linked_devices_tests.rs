@@ -21,7 +21,6 @@ use vauchi_core::sync::device_sync::{
 use vauchi_core::{Identity, Vauchi};
 
 use crate::common::device_sync::{journal_for_tablet, link_tablet};
-use crate::common::meeting::meet;
 use crate::common::recovered_phone::{World, recovered};
 
 /// Alice's restored phone, its offers made, before anyone answered.
@@ -74,6 +73,14 @@ fn offer_blobs(device: &Vauchi) -> Vec<(String, Vec<u8>)> {
         .collect()
 }
 
+fn offer_to_dave(world: &World) -> Vec<u8> {
+    offer_blobs(&world.phone)
+        .into_iter()
+        .find(|(contact_id, _)| contact_id == &world.dave_id)
+        .unwrap()
+        .1
+}
+
 // @internal
 #[test]
 fn a_device_linked_while_contacts_wait_makes_the_phones_offers() {
@@ -120,7 +127,7 @@ fn a_device_linked_while_contacts_wait_never_gets_the_old_seed() {
 fn the_linked_device_completes_with_an_answer_the_phone_did_not_fetch() {
     let world = restored_and_offered();
     let tablet = linked_tablet(&world.phone);
-    let offer = offer_blobs(&world.phone).remove(0).1;
+    let offer = offer_to_dave(&world);
     let dave = world.dave.vauchi();
     dave.take_rekey_offer(&offer).unwrap();
     let answer = dave.rekey_answer_deliveries().unwrap()[0].blob.clone();
@@ -141,7 +148,7 @@ fn a_rekey_one_device_completes_reaches_the_others_with_the_new_shared_key() {
     let world = restored_and_offered();
     let tablet = linked_tablet(&world.phone);
     let (registry, tablet_id) = link_tablet(&world.phone, [71u8; 32]);
-    let offer = offer_blobs(&world.phone).remove(0).1;
+    let offer = offer_to_dave(&world);
     let dave = world.dave.vauchi();
     dave.take_rekey_offer(&offer).unwrap();
     let answer = dave.rekey_answer_deliveries().unwrap()[0].blob.clone();
@@ -163,43 +170,10 @@ fn a_rekey_one_device_completes_reaches_the_others_with_the_new_shared_key() {
             .contains(&world.dave_id)
     );
     assert!(
-        tablet.rekey_offer_deliveries().unwrap().is_empty(),
+        offer_blobs(&tablet)
+            .iter()
+            .all(|(contact_id, _)| contact_id != &world.dave_id),
         "no more offers to a contact already moved"
-    );
-}
-
-// @internal
-#[test]
-fn a_continuation_the_phone_sent_ends_the_wait_on_the_linked_device() {
-    let world = restored_and_offered();
-    let dave = world.dave.vauchi();
-    let tablet = linked_tablet(&world.phone);
-    assert!(
-        tablet
-            .rekey_pending_contacts()
-            .unwrap()
-            .contains(&world.dave_id),
-        "Dave waits on the tablet until a continuation goes"
-    );
-    let (registry, tablet_id) = link_tablet(&world.phone, [72u8; 32]);
-    let (_, dave_at_phone) = meet(dave, &world.phone, false);
-    world.phone.send_owed_recovery_continuations().unwrap();
-    let journal = journal_for_tablet(&world.phone, registry, &tablet_id);
-
-    tablet.apply_sync_items(journal).unwrap();
-
-    assert!(
-        !tablet
-            .rekey_pending_contacts()
-            .unwrap()
-            .contains(&dave_at_phone)
-    );
-    let at_phone = world.phone.get_contact(&dave_at_phone).unwrap().unwrap();
-    let at_tablet = tablet.get_contact(&dave_at_phone).unwrap().unwrap();
-    assert_eq!(
-        at_tablet.shared_key().unwrap().as_bytes(),
-        at_phone.shared_key().unwrap().as_bytes(),
-        "the tablet takes the meeting's relationship"
     );
 }
 

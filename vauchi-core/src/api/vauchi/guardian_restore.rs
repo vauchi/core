@@ -64,7 +64,7 @@ impl Vauchi {
             self.storage.recovery().save_old_identity_seed(&seed)?;
             for contact in &contacts {
                 // A contact met again before the restore keeps the
-                // meeting's relationship, and is owed the continuation.
+                // meeting's relationship.
                 let met_again = self
                     .storage
                     .contacts()

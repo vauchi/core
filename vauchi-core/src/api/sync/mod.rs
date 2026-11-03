@@ -35,7 +35,7 @@ mod rekey_snapshot;
 
 pub use registry_handshake::RegistryReplyNeeded;
 pub(crate) use registry_handshake::journal_handshake_state_for_siblings;
-pub(crate) use rekey_journal::{contact_rekeyed_item, journal_contact_rekeyed_for_siblings};
+pub(crate) use rekey_journal::contact_rekeyed_item;
 
 pub use card_update::{
     CardUpdateError, CardUpdateResult, ReceiveOutcome, ReceivedAlert, process_card_updates,

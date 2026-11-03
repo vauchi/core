@@ -167,7 +167,6 @@ impl Vauchi {
         // the claim's new key completes (vauchi/private#796, D14); one that
         // cannot send yet owes it to the next sync.
         self.hand_back_owed()?;
-        self.send_owed_recovery_continuations()?;
         Ok(())
     }
 }

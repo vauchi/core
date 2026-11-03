@@ -829,7 +829,9 @@ fn migrate_v100_guardian_designator_tags(
          );",
     )?;
 
-    let pieces: Vec<(String, Vec<u8>, i64, Vec<u8>, i64)> = conn
+    // (designator_id, backup_id, piece_index, piece_encrypted, received_at)
+    type PieceRow = (String, Vec<u8>, i64, Vec<u8>, i64);
+    let pieces: Vec<PieceRow> = conn
         .prepare(
             "SELECT designator_id, backup_id, piece_index, piece_encrypted, received_at
              FROM guardian_backup_pieces",

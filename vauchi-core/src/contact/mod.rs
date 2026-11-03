@@ -14,6 +14,7 @@ pub mod merge;
 pub mod place;
 pub mod reciprocity;
 pub mod reciprocity_tokens;
+mod recovery;
 pub mod statistics;
 pub mod tag;
 pub mod trust;
@@ -615,46 +616,6 @@ impl Contact {
         self.card_updated_at = Some(now);
     }
 
-    /// Accepts a recovery, updating the contact's public key and shared secret.
-    ///
-    /// This is called when the user accepts a recovery proof from this contact.
-    /// The old shared secret is discarded and fingerprint verification is reset.
-    ///
-    /// Returns `Err` if called on an imported contact.
-    pub fn accept_recovery(
-        &mut self,
-        new_public_key: [u8; 32],
-        new_shared_key: SymmetricKey,
-        now: u64,
-    ) -> Result<(), ContactError> {
-        let data = self
-            .kind
-            .exchanged_data_mut()
-            .ok_or(ContactError::OperationRequiresExchangedContact)?;
-        data.public_key = new_public_key;
-        data.shared_key = new_shared_key;
-        data.fingerprint_verified = false;
-        data.has_recovered = true;
-        data.exchange_timestamp = now;
-        self.id = hex::encode(new_public_key);
-        Ok(())
-    }
-
-    /// Accepts a recovery with a new contact card.
-    ///
-    /// This is called when the recovering contact also provides an updated card.
-    pub fn accept_recovery_with_card(
-        &mut self,
-        new_public_key: [u8; 32],
-        new_shared_key: SymmetricKey,
-        new_card: ContactCard,
-        now: u64,
-    ) -> Result<(), ContactError> {
-        self.accept_recovery(new_public_key, new_shared_key, now)?;
-        self.update_card(new_card, now);
-        Ok(())
-    }
-
     /// Updates the contact's display name.
     pub fn set_display_name(&mut self, name: &str) -> Result<(), crate::card::ContactCardError> {
         self.card.set_display_name(name)?;
@@ -728,66 +689,6 @@ impl Contact {
     /// Sets the blocked status directly.
     pub fn set_blocked(&mut self, blocked: bool) {
         self.blocked = blocked;
-    }
-
-    /// Returns whether this contact is trusted for recovery purposes.
-    /// Returns `false` for imported contacts.
-    pub fn is_recovery_trusted(&self) -> bool {
-        self.kind
-            .exchanged_data()
-            .is_some_and(|d| d.recovery_trusted)
-    }
-
-    /// Marks this contact as trusted for recovery.
-    ///
-    /// Returns `Err` if called on an imported contact, a blocked contact,
-    /// or if trust level is below High (not in-person verified).
-    pub fn trust_for_recovery(&mut self) -> Result<(), ContactError> {
-        let _data = self
-            .kind
-            .exchanged_data_mut()
-            .ok_or(ContactError::OperationRequiresExchangedContact)?;
-
-        if self.is_blocked() {
-            return Err(ContactError::ContactIsBlocked);
-        }
-
-        let level = self.trust_level();
-        if !matches!(level, TrustLevel::High | TrustLevel::Verified) {
-            return Err(ContactError::InsufficientTrustLevel(level));
-        }
-
-        // Re-borrow after trust_level() released the immutable ref
-        let data = self
-            .kind
-            .exchanged_data_mut()
-            .ok_or(ContactError::OperationRequiresExchangedContact)?;
-        data.recovery_trusted = true;
-        Ok(())
-    }
-
-    /// Removes recovery trust from this contact.
-    ///
-    /// Returns `Err` if called on an imported contact.
-    pub fn untrust_for_recovery(&mut self) -> Result<(), ContactError> {
-        let data = self
-            .kind
-            .exchanged_data_mut()
-            .ok_or(ContactError::OperationRequiresExchangedContact)?;
-        data.recovery_trusted = false;
-        Ok(())
-    }
-
-    /// Sets the recovery trust status directly.
-    ///
-    /// Returns `Err` if called on an imported contact.
-    pub fn set_recovery_trusted(&mut self, trusted: bool) -> Result<(), ContactError> {
-        let data = self
-            .kind
-            .exchanged_data_mut()
-            .ok_or(ContactError::OperationRequiresExchangedContact)?;
-        data.recovery_trusted = trusted;
-        Ok(())
     }
 
     /// Returns whether this contact is trusted for simplified contact proposals.

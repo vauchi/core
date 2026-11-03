@@ -1098,8 +1098,8 @@ test:formal-extended:
 # smoke_ with those binaries. A [patch] cannot do this: the exact
 # `version = "=X"` pins refuse a Core of another version, so
 # ci/point-core-at.sh rewrites the job's own clones and nothing is committed.
-# Replaces verify:downstream-rust for e2e, which built e2e's own pinned tag
-# and proved nothing about the merge. When it fails, ci/e2e-smoke.sh tries
+# Replaced verify:downstream-rust's e2e leg (that job is gone, private#1051),
+# which built e2e's own pinned tag and proved nothing about the merge. When it fails, ci/e2e-smoke.sh tries
 # the target branch's Core too: if that fails as well, e2e's pinned set is
 # behind Core (a Core minor moved, e2e's bump not yet in) and the job only
 # warns, exit 3, instead of blocking every protocol MR (private#1034).

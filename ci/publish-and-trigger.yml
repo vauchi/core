@@ -777,70 +777,16 @@ trigger:android:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
 
 # ============================================================
-# Downstream Verification (main branch only)
+# Downstream Verification
 # ============================================================
-# When core merges to main, verify that Rust consumer repos (cli,
-# tui, e2e, relay, linux-gtk) still build and pass tests. This catches
-# API breaks early — before a release is even considered.
-#
-# Uses GitLab's trigger: keyword which creates linked child pipelines
-# visible in the pipeline graph. CI_JOB_TOKEN is used implicitly —
-# downstream projects must add vauchi/core to their CI_JOB_TOKEN allowlist.
-
-verify:downstream-rust:
-  stage: trigger
-  extends: .trigger-parallel
-  parallel:
-    matrix:
-      - DOWNSTREAM: [vauchi/cli, vauchi/tui, vauchi/relay, vauchi/linux-gtk]
-  # Do NOT leak core's pipeline variables into the child pipelines. Each
-  # downstream repo must resolve its OWN pinned VAUCHI_SCRIPTS_REF (and its
-  # own CARGO_HOME / runner config). Forwarding core's VAUCHI_SCRIPTS_REF made
-  # verified-fetch download a humble_check.py that mismatched the downstream's
-  # pinned checksum (cli lint:humble), and leaked an unwritable CARGO_HOME into
-  # cargo-vet on read-only runners (relay security:vet).
-  #
-  # What each child actually verifies, because it is NOT uniform and the
-  # previous wording here claimed it was ("downstream verifies core's new
-  # code via the `branch = \"main\"` git dependency"):
-  #
-  #   tui, relay, linux-gtk   `branch = "main"` — do verify this commit.
-  #   cli                     `tag = "vX", version = "=X"` — resolves its
-  #                           OWN PIN. It verifies the core it was last
-  #                           bumped to, not the code that triggered it.
-  #   e2e                     removed (private#1032): test:e2e-smoke in
-  #                           .gitlab-ci.yml runs e2e against the MR's own
-  #                           Core instead, before the merge.
-  #
-  # So a green child here is not evidence that this merge is safe for the
-  # tag-pinned cli. e2e sat on v0.61.0 for a month this way, passing on
-  # every core merge, while core reached v0.64.0. Forwarding a variable
-  # does not fix it either: a `[patch]` cannot satisfy `version = "=0.61.0"`
-  # with a 0.64.0 crate; test:e2e-smoke rewrites the job's own clone instead.
-  # See problems/2026-09-07-downstream-verify-tests-the-pin.
-  trigger:
-    project: $DOWNSTREAM
-    strategy: depend
-    forward:
-      yaml_variables: false
-      pipeline_variables: false
-  rules:
-    # Skip on the scheduled (nightly) pipeline — this fans out to 5 downstream
-    # repos; changes: evaluates true on schedules so it rode along, triggering
-    # pointless downstream verify pipelines. Downstream verify belongs to main
-    # merges (source=push), not the mutation/fuzz nightly.
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes:
-        paths:
-          - "**/*.rs"
-          - "**/Cargo.toml"
-          - "**/Cargo.lock"
-
-# verify:downstream-dev removed — verify:downstream-rust on main already
-# triggers the same 5 repos against the same code. Running again from the
-# dev tag was pure redundancy (~20 min wasted per merge).
+# verify:downstream-rust, which triggered cli, tui, relay and linux-gtk
+# on every main merge, is gone (private#1051): all four pin Core by
+# exact tag, so each child built its own pin and a green run said
+# nothing about the merge (problems/done/
+# 2026-09-07-downstream-verify-tests-the-pin). e2e runs against the
+# MR's own Core in test:e2e-smoke (private#1032). Under ADR-078 the
+# display shells depend on the contract alone, so their check belongs
+# to the contract repository.
 
 # When core gets an RC tag, trigger downstream to verify compatibility
 verify:downstream-rc:

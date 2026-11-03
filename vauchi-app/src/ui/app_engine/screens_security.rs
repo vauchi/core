@@ -59,6 +59,16 @@ impl AppEngine {
                         super::intercept::vouchers_collected(&progress),
                     ));
                 }
+                if let Ok(handed_back @ 1..) = vauchi.guardians_handed_back() {
+                    engine.apply_update(crate::ui::EngineUpdate::Recovery(
+                        crate::ui::RecoveryUpdate::RestoreOffered {
+                            handed_back,
+                            needs_passphrase: vauchi
+                                .returned_backup_needs_passphrase()
+                                .unwrap_or(true),
+                        },
+                    ));
+                }
                 Box::new(engine)
             }
             AppScreen::DuressPin => {

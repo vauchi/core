@@ -19,6 +19,14 @@ use crate::contact::Group;
 use super::Vauchi;
 
 impl Vauchi {
+    /// How many guardians have handed a backup back to this identity.
+    ///
+    /// # Errors
+    /// Storage errors.
+    pub fn guardians_handed_back(&self) -> VauchiResult<usize> {
+        Ok(self.storage.returned_backups().all_kept()?.len())
+    }
+
     /// Whether the backup the guardians handed back is sealed under the
     /// owner's passphrase, so the restore screen asks for it.
     ///

@@ -179,6 +179,32 @@ impl AppEngine {
     }
 }
 
+impl AppEngine {
+    /// Intercept "restore_now" on the Recovery screen's restore step:
+    /// restores what the guardians handed back (vauchi/private#796, step
+    /// 3b), with the typed passphrase when the backup needs one.
+    pub(in crate::ui::app_engine) fn intercept_restore_action(&mut self) -> Option<ActionResult> {
+        let Some(crate::ui::EngineOutput::Recovery {
+            restore_passphrase: Some(passphrase),
+            ..
+        }) = self.engine.engine_output()
+        else {
+            return None;
+        };
+        let passphrase = (!passphrase.is_empty()).then_some(passphrase);
+        let update = match self
+            .vauchi
+            .restore_from_returned_backups(passphrase.as_deref())
+        {
+            Ok(count) => crate::ui::RecoveryUpdate::Restored(count),
+            Err(_) => crate::ui::RecoveryUpdate::RestoreRefused(self.t("recovery.restore_refused")),
+        };
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::Recovery(update))
+            .then(|| ActionResult::UpdateScreen(self.engine.current_screen()))
+    }
+}
+
 /// The first four groups of a key's fingerprint, in the format of
 /// `Vauchi::own_fingerprint`: enough to tell helpers apart on screen.
 /// The proof's signers and threshold, as the recovery screen lists them.

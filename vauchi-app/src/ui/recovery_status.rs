@@ -9,6 +9,10 @@
 //! guardians, and submits the proof when the threshold is met.
 
 use crate::i18n::{Locale, get_string, get_string_with_args};
+use crate::ui::recovery_restore::{
+    CANCEL_RESTORE_ACTION, PASSPHRASE_INPUT, RESTORE_ROW, RestoreState, apply_restore_update,
+    restore_row, restore_screen,
+};
 use crate::ui::*;
 
 /// Steps in the outgoing recovery workflow.
@@ -35,6 +39,8 @@ enum RecoveryStep {
     CollectVouchers,
     /// Recovery proof submitted successfully.
     Complete,
+    /// Restoring what the guardians handed back (vauchi/private#796).
+    Restore,
 }
 
 const TRUSTED_LIST_ID: &str = "recovery_trusted";
@@ -79,6 +85,8 @@ pub struct RecoveryEngine {
     voucher_input: String,
     /// Why the last pasted voucher was refused.
     voucher_error: Option<String>,
+    /// Set once a guardian handed a backup back; `None` offers no restore.
+    restore: Option<RestoreState>,
     locale: Locale,
 }
 
@@ -96,6 +104,7 @@ impl RecoveryEngine {
             generated_claim_b64: None,
             voucher_input: String::new(),
             voucher_error: None,
+            restore: None,
             locale: Locale::ENGLISH,
         }
     }
@@ -190,6 +199,10 @@ impl RecoveryEngine {
             RecoveryStep::ShowClaimQr => self.build_claim_qr_screen(),
             RecoveryStep::CollectVouchers => self.build_collect_screen(),
             RecoveryStep::Complete => self.build_complete_screen(),
+            RecoveryStep::Restore => restore_screen(
+                self.locale,
+                self.restore.as_ref().unwrap_or(&RestoreState::default()),
+            ),
         }
     }
 
@@ -260,26 +273,33 @@ impl RecoveryEngine {
         // Always enabled: recovery starts on a new device with a fresh
         // identity and no contacts; the lost identity's guardians are the
         // ones that count, and they live on the relay, not here (#459).
+        let restore_row = self
+            .restore
+            .as_ref()
+            .map(|state| restore_row(self.locale, state));
         components.push(Component::ButtonList {
             id: ACTIONS_ID.into(),
-            items: vec![
-                ActionListItem {
-                    id: START_ACTION.into(),
-                    label: self.t("recovery.start_button"),
-                    icon: None,
-                    detail: Some(self.t("recovery.start_detail")),
-                    a11y: None,
-                    info_key: None,
-                },
-                ActionListItem {
-                    id: HOW_IT_WORKS_ACTION.into(),
-                    label: self.t("recovery.how_it_works_button"),
-                    icon: None,
-                    detail: None,
-                    a11y: None,
-                    info_key: None,
-                },
-            ],
+            items: restore_row
+                .into_iter()
+                .chain([
+                    ActionListItem {
+                        id: START_ACTION.into(),
+                        label: self.t("recovery.start_button"),
+                        icon: None,
+                        detail: Some(self.t("recovery.start_detail")),
+                        a11y: None,
+                        info_key: None,
+                    },
+                    ActionListItem {
+                        id: HOW_IT_WORKS_ACTION.into(),
+                        label: self.t("recovery.how_it_works_button"),
+                        icon: None,
+                        detail: None,
+                        a11y: None,
+                        info_key: None,
+                    },
+                ])
+                .collect(),
         });
 
         ScreenModel {
@@ -708,6 +728,9 @@ impl WorkflowEngine for RecoveryEngine {
             old_key_input: self.old_key_input().to_string(),
             voucher_input: (self.step == RecoveryStep::CollectVouchers)
                 .then(|| self.voucher_input.clone()),
+            restore_passphrase: (self.step == RecoveryStep::Restore)
+                .then(|| self.restore.as_ref().map(|state| state.passphrase.clone()))
+                .flatten(),
         })
     }
 
@@ -733,6 +756,11 @@ impl WorkflowEngine for RecoveryEngine {
                 self.voucher_error = Some(message);
             }
             crate::ui::RecoveryUpdate::ProofSubmitted => self.step = RecoveryStep::Complete,
+            update @ (crate::ui::RecoveryUpdate::RestoreOffered { .. }
+            | crate::ui::RecoveryUpdate::Restored(_)
+            | crate::ui::RecoveryUpdate::RestoreRefused(_)) => {
+                apply_restore_update(&mut self.restore, update);
+            }
         }
         true
     }
@@ -893,6 +921,45 @@ impl WorkflowEngine for RecoveryEngine {
 
             // Complete actions
             (RecoveryStep::Complete, UserAction::ActionPressed { ref action_id })
+                if action_id == "done" =>
+            {
+                ActionResult::Complete
+            }
+
+            // Restore (vauchi/private#796); the AppEngine intercepts
+            // `restore_now` and runs the restore.
+            (
+                RecoveryStep::Intro,
+                UserAction::ListItemSelected {
+                    ref component_id,
+                    ref item_id,
+                },
+            ) if component_id == ACTIONS_ID && item_id == RESTORE_ROW && self.restore.is_some() => {
+                self.step = RecoveryStep::Restore;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            (
+                RecoveryStep::Restore,
+                UserAction::TextChanged {
+                    ref component_id,
+                    value,
+                },
+            ) if component_id == PASSPHRASE_INPUT => {
+                if let Some(state) = &mut self.restore {
+                    state.passphrase = value;
+                }
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            (RecoveryStep::Restore, UserAction::ActionPressed { ref action_id })
+                if action_id == CANCEL_RESTORE_ACTION =>
+            {
+                if let Some(state) = &mut self.restore {
+                    state.refused = None;
+                }
+                self.step = RecoveryStep::Intro;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            (RecoveryStep::Restore, UserAction::ActionPressed { ref action_id })
                 if action_id == "done" =>
             {
                 ActionResult::Complete

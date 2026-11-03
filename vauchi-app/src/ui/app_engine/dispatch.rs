@@ -500,6 +500,12 @@ impl AppEngine {
         {
             return Some(result);
         }
+        if self.screen == AppScreen::Recovery
+            && matches!(action, UserAction::ActionPressed { action_id } if action_id == "restore_now")
+            && let Some(result) = self.intercept_restore_action()
+        {
+            return Some(result);
+        }
 
         // Unarchive from ArchivedContacts screen
         if self.screen == AppScreen::ArchivedContacts

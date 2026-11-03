@@ -104,10 +104,20 @@ fn press(engine: &mut AppEngine, action_id: &str) -> ScreenModel {
 }
 
 fn type_passphrase(engine: &mut AppEngine, value: &str) {
-    engine.handle_action(UserAction::TextChanged {
+    let screen = screen_of(engine.handle_action(UserAction::TextChanged {
         component_id: "restore_passphrase".into(),
         value: value.into(),
-    });
+    }));
+    let shown = screen
+        .components
+        .iter()
+        .find_map(|component| match component {
+            Component::TextInput { id, value, .. } if id == "restore_passphrase" => {
+                Some(value.clone())
+            }
+            _ => None,
+        });
+    assert_eq!(shown.as_deref(), Some(value));
 }
 
 fn has(screen: &ScreenModel, wanted: &str) -> bool {

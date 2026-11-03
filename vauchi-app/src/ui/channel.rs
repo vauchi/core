@@ -104,6 +104,8 @@ pub enum EngineOutput {
     Recovery {
         old_key_input: String,
         voucher_input: Option<String>,
+        /// The passphrase typed on the restore step, `Some` only there.
+        restore_passphrase: Option<String>,
     },
     /// The pasted claim input on the RecoveryHelp screen.
     RecoveryHelp { claim_input: String },
@@ -348,6 +350,15 @@ pub enum RecoveryUpdate {
     },
     VoucherRefused(String),
     ProofSubmitted,
+    /// Guardians handed a backup back (vauchi/private#796, step 3b).
+    RestoreOffered {
+        handed_back: usize,
+        needs_passphrase: bool,
+    },
+    /// The restore brought this many contacts back.
+    Restored(usize),
+    /// The restore did not open; the localized reason.
+    RestoreRefused(String),
 }
 
 /// Results pushed back into the recovery-help engine.
@@ -478,6 +489,9 @@ impl EngineUpdate {
                 RecoveryUpdate::VouchersCollected { .. } => "Recovery::VouchersCollected",
                 RecoveryUpdate::VoucherRefused(_) => "Recovery::VoucherRefused",
                 RecoveryUpdate::ProofSubmitted => "Recovery::ProofSubmitted",
+                RecoveryUpdate::RestoreOffered { .. } => "Recovery::RestoreOffered",
+                RecoveryUpdate::Restored(_) => "Recovery::Restored",
+                RecoveryUpdate::RestoreRefused(_) => "Recovery::RestoreRefused",
             },
             Self::RecoveryHelp(u) => match u {
                 RecoveryHelpUpdate::ParsedClaim(_) => "RecoveryHelp::ParsedClaim",
@@ -714,12 +728,17 @@ impl std::fmt::Debug for EngineOutput {
             Self::Recovery {
                 old_key_input,
                 voucher_input,
+                restore_passphrase,
             } => f
                 .debug_struct("Recovery")
                 .field("old_key_input_len", &old_key_input.len())
                 .field(
                     "voucher_input_len",
                     &voucher_input.as_ref().map(String::len),
+                )
+                .field(
+                    "restore_passphrase_len",
+                    &restore_passphrase.as_ref().map(String::len),
                 )
                 .finish(),
             Self::RecoveryHelp { claim_input } => f

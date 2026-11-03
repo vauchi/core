@@ -68,6 +68,7 @@ mod presentation;
 pub mod reciprocity_confirmer;
 pub mod recovery_claim_review;
 mod recovery_help;
+mod recovery_restore;
 mod recovery_status;
 mod rejection;
 pub mod render_context;

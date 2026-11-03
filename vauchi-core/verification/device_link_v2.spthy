@@ -1,11 +1,14 @@
 /*
  * SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
  *
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: AGPL-3.0-or-later
  *
  * Candidate device-link protocol for #788. The link QR is assumed copied
  * (photographed) in every trace, and the attacker owns the relay and the
- * network, as the threat model assumes.
+ * network, as the threat model assumes. Core does not run this protocol:
+ * the one it runs is device_link.spthy, which spec claim S15 rests on.
+ * This model is the design evidence for #788; its lemmas back no claim
+ * until the protocol is built.
  *
  *   - QR: identity key, link key, an X25519 key gA of the existing device,
  *     and a commitment h(nA) to a nonce it keeps; signed.

@@ -38,6 +38,7 @@ mod guardian_restore_screen_tests;
 mod help_encryption_answer_tests;
 mod kept_pick_tests;
 mod network_cost_tests;
+mod recovery_passphrase_screen_tests;
 mod schedule_wakeup_tests;
 // The multi-stage half needs FakeClock (gated inside the file); the
 // BLE half runs featureless.

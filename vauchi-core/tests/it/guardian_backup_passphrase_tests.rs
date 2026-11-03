@@ -138,6 +138,22 @@ fn an_empty_passphrase_is_refused() {
     assert!(!alice.has_recovery_passphrase().unwrap());
 }
 
+/// Guardians who collude hold the backup and every share, so they can
+/// guess the passphrase offline: it must be as strong as a backup password.
+// @internal
+#[test]
+fn a_weak_passphrase_is_refused_and_a_strong_one_kept() {
+    let (alice, _guardians) = alice_and_guardians();
+
+    for weak in ["password", "12345678", "alice", "qwertyuiop"] {
+        assert!(alice.set_recovery_passphrase(weak).is_err(), "{weak}");
+    }
+    assert!(!alice.has_recovery_passphrase().unwrap());
+
+    alice.set_recovery_passphrase(PASSPHRASE).unwrap();
+    assert!(alice.has_recovery_passphrase().unwrap());
+}
+
 // @internal
 #[test]
 fn the_kept_passphrase_key_survives_a_storage_rekey() {

@@ -489,6 +489,7 @@ mod recovery_lost_key_voucher_tests;
 mod recovery_parsing_bounds_tests;
 mod recovery_proof_window_tests;
 mod recovery_readiness_tests;
+mod recovery_rekey_answer_tests;
 mod recovery_rekey_inbound_tests;
 mod recovery_rekey_offer_tests;
 mod recovery_rekey_wire_tests;

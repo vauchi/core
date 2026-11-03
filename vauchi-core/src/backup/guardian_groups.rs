@@ -9,10 +9,10 @@
 //! a group's share is sealed to every one of its members. Members of one
 //! group therefore recover as one — a group with two members has a spare —
 //! and no group can recover without the others. All of three guardians is
-//! three groups of one — the same mechanic, no screen of its own. A group
-//! holds one to three members (one needed, up to two spares), and the
-//! guardians number at most nine in all, so groups with spares are at most
-//! four.
+//! three groups of one — the same mechanic, no screen of its own. The
+//! bounds are 3 <= groups <= guardians <= 9 with no group empty and no cap
+//! on a group's size (maintainer, 2026-11-03, vauchi/private#796 D17; the
+//! three-member cap of 2026-10-26 is gone).
 
 use std::collections::HashSet;
 
@@ -27,15 +27,11 @@ pub struct GuardianGroups {
 }
 
 impl GuardianGroups {
-    /// The most members a group holds: one needed, up to two spares
-    /// (maintainer, 2026-10-26, vauchi/private#815).
-    pub const MAX_MEMBERS_PER_GROUP: usize = 3;
-    /// The most guardians in all, as for flat guardians (#816). With the
-    /// member cap this allows at most four groups once groups have spares.
+    /// The most guardians in all, as for flat guardians (#816).
     pub const MAX_GUARDIANS: usize = MAX_COUNT as usize;
 
-    /// Three to nine groups of one to three members, at most nine members
-    /// in all, no key in two groups. All of `n` is `n` groups of one.
+    /// Three to nine groups, none empty, at most nine members in all, no
+    /// key in two groups. All of `n` is `n` groups of one.
     ///
     /// # Errors
     /// [`KeyShardError::InvalidParameters`] for a shape outside those
@@ -44,11 +40,7 @@ impl GuardianGroups {
         let count = u8::try_from(groups.len()).map_err(|_| KeyShardError::InvalidParameters)?;
         let config = KeyShardConfig::new(count, count)?;
         let members: usize = groups.iter().map(Vec::len).sum();
-        if members > Self::MAX_GUARDIANS
-            || groups
-                .iter()
-                .any(|group| !(1..=Self::MAX_MEMBERS_PER_GROUP).contains(&group.len()))
-        {
+        if members > Self::MAX_GUARDIANS || groups.iter().any(Vec::is_empty) {
             return Err(KeyShardError::InvalidParameters);
         }
         let mut seen = HashSet::with_capacity(members);

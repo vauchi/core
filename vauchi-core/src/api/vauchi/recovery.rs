@@ -176,37 +176,7 @@ impl Vauchi {
             .load_recovery_progress()?
             .ok_or_else(|| VauchiError::InvalidState("No recovery in progress".into()))?;
 
-        if !progress.is_complete() {
-            return Err(VauchiError::InvalidState(format!(
-                "Insufficient vouchers: have {}, need {}",
-                progress.voucher_count(),
-                progress.threshold,
-            )));
-        }
-
-        if progress.started_at > self.clock.unix_seconds() {
-            return Err(VauchiError::InvalidState(
-                "Recovery start time is in the future".into(),
-            ));
-        }
-
-        let mut proof = RecoveryProof::new(
-            *progress.claim.old_pk(),
-            *progress.claim.new_pk(),
-            progress.threshold,
-            progress.started_at,
-        );
-        for voucher in progress.vouchers {
-            proof
-                .add_voucher(voucher)
-                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        }
-        proof
-            .validate_at(self.clock.unix_seconds())
-            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        let proof_bytes = proof
-            .seal_for_relay()
-            .map_err(|e| VauchiError::Serialization(e.to_string()))?;
+        let proof_bytes = self.sealed_recovery_proof(&progress)?;
 
         // Key: hash(old_pk) — same key contacts will query
         let key_hash = hex::encode(Sha256::digest(progress.claim.old_pk()));

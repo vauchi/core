@@ -209,8 +209,55 @@ impl Vauchi {
             .add_voucher(voucher)
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         self.storage.recovery().save_recovery_progress(&progress)?;
+        // The rekey offers carry the proof after the upload clears the
+        // progress (vauchi/private#796, step 4b).
+        if progress.is_complete() {
+            let sealed = self.sealed_recovery_proof(&progress)?;
+            self.storage.recovery().save_own_proof(&sealed)?;
+        }
 
         Ok(progress)
+    }
+
+    /// The complete proof `progress` makes, sealed for the relay as
+    /// contacts read it.
+    ///
+    /// # Errors
+    /// [`VauchiError::InvalidState`] while vouchers are missing, for a
+    /// start time in the future or a proof that does not validate.
+    pub(super) fn sealed_recovery_proof(
+        &self,
+        progress: &crate::recovery::RecoveryProgress,
+    ) -> VauchiResult<Vec<u8>> {
+        if !progress.is_complete() {
+            return Err(VauchiError::InvalidState(format!(
+                "Insufficient vouchers: have {}, need {}",
+                progress.voucher_count(),
+                progress.threshold,
+            )));
+        }
+        if progress.started_at > self.clock.unix_seconds() {
+            return Err(VauchiError::InvalidState(
+                "Recovery start time is in the future".into(),
+            ));
+        }
+        let mut proof = crate::recovery::RecoveryProof::new(
+            *progress.claim.old_pk(),
+            *progress.claim.new_pk(),
+            progress.threshold,
+            progress.started_at,
+        );
+        for voucher in &progress.vouchers {
+            proof
+                .add_voucher(voucher.clone())
+                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        }
+        proof
+            .validate_at(self.clock.unix_seconds())
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        proof
+            .seal_for_relay()
+            .map_err(|e| VauchiError::Serialization(e.to_string()))
     }
 
     /// Returns current recovery progress, if any.

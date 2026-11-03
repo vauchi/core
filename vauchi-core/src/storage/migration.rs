@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 103] = [
+const MIGRATIONS: [Migration; 104] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -787,7 +787,27 @@ const MIGRATIONS: [Migration; 103] = [
         name: "recovery_rekey_pending",
         action: MigrationAction::Sql(MIGRATION_V103_RECOVERY_REKEY_PENDING),
     },
+    Migration {
+        version: 104,
+        name: "recovery_rekey_offers",
+        action: MigrationAction::Sql(MIGRATION_V104_RECOVERY_REKEY_OFFERS),
+    },
 ];
+
+/// Migration v104 (vauchi/private#796, step 4b): the recovering identity's
+/// own sealed recovery proof, kept once its vouchers complete it, and the
+/// exchange key each rekey offer carries with when it last went out.
+const MIGRATION_V104_RECOVERY_REKEY_OFFERS: &str = "
+    CREATE TABLE IF NOT EXISTS recovery_own_proof (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        proof_encrypted BLOB NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS recovery_rekey_offers (
+        contact_id TEXT PRIMARY KEY REFERENCES contacts(id) ON DELETE CASCADE,
+        exchange_secret_encrypted BLOB NOT NULL,
+        sent_at INTEGER
+    );
+";
 
 /// Migration v103 (vauchi/private#796, step 3): the contacts restored from
 /// the guardian backup that still wait for their rekey to the new identity.

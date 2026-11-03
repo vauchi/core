@@ -42,6 +42,9 @@ impl Storage {
     }
 }
 
+/// A rekey offer's exchange secret and when the offer last went out.
+pub type RekeyExchange = (zeroize::Zeroizing<[u8; 32]>, Option<u64>);
+
 /// A vouched claim's old and new signing key, `(old_pk, new_pk)`.
 pub type VouchedKeys = ([u8; 32], [u8; 32]);
 
@@ -485,6 +488,91 @@ impl RecoveryStore<'_> {
             .query_map([], |row| row.get(0))?
             .collect::<Result<Vec<String>, _>>()?;
         Ok(ids)
+    }
+
+    /// Keeps this identity's sealed recovery proof, which the rekey offers
+    /// carry (vauchi/private#796, step 4b).
+    pub fn save_own_proof(&self, sealed_proof: &[u8]) -> Result<(), StorageError> {
+        let proof_encrypted = crate::crypto::encrypt(self.key, sealed_proof)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        self.conn.execute(
+            "INSERT OR REPLACE INTO recovery_own_proof (id, proof_encrypted) VALUES (1, ?1)",
+            params![proof_encrypted],
+        )?;
+        Ok(())
+    }
+
+    /// This identity's sealed recovery proof, once its vouchers completed it.
+    pub fn load_own_proof(&self) -> Result<Option<Vec<u8>>, StorageError> {
+        use rusqlite::OptionalExtension;
+        let sealed: Option<Vec<u8>> = self
+            .conn
+            .query_row(
+                "SELECT proof_encrypted FROM recovery_own_proof WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        sealed
+            .map(|sealed| {
+                crate::crypto::decrypt(self.key, &sealed)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))
+            })
+            .transpose()
+    }
+
+    /// Keeps the exchange key a contact's rekey offer carries; a key kept
+    /// before stays, so every resent offer carries the same one.
+    pub fn save_rekey_exchange(
+        &self,
+        contact_id: &str,
+        secret: &[u8; 32],
+    ) -> Result<(), StorageError> {
+        let secret_encrypted = crate::crypto::encrypt(self.key, secret)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO recovery_rekey_offers (contact_id, exchange_secret_encrypted)
+             VALUES (?1, ?2)",
+            params![contact_id, secret_encrypted],
+        )?;
+        Ok(())
+    }
+
+    /// A contact's rekey exchange key and when its offer last went out.
+    ///
+    /// # Errors
+    /// Storage errors; [`StorageError::InvalidData`] for a malformed key.
+    pub fn rekey_exchange(&self, contact_id: &str) -> Result<Option<RekeyExchange>, StorageError> {
+        use rusqlite::OptionalExtension;
+        let row: Option<(Vec<u8>, Option<i64>)> = self
+            .conn
+            .query_row(
+                "SELECT exchange_secret_encrypted, sent_at FROM recovery_rekey_offers
+                 WHERE contact_id = ?1",
+                params![contact_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        let Some((sealed, sent_at)) = row else {
+            return Ok(None);
+        };
+        let plain = zeroize::Zeroizing::new(
+            crate::crypto::decrypt(self.key, &sealed)
+                .map_err(|e| StorageError::Encryption(e.to_string()))?,
+        );
+        let secret = <[u8; 32]>::try_from(plain.as_slice())
+            .map_err(|_| StorageError::InvalidData("rekey exchange key".into()))?;
+        let sent_at = sent_at.map(|at| u64::try_from(at).unwrap_or(0));
+        Ok(Some((zeroize::Zeroizing::new(secret), sent_at)))
+    }
+
+    /// Records that a contact's rekey offer went out at `at`.
+    pub fn record_rekey_offer_sent(&self, contact_id: &str, at: u64) -> Result<(), StorageError> {
+        self.conn.execute(
+            "UPDATE recovery_rekey_offers SET sent_at = ?2 WHERE contact_id = ?1",
+            params![contact_id, i64::try_from(at).unwrap_or(i64::MAX)],
+        )?;
+        Ok(())
     }
 
     /// Forgets the owner's recovery passphrase.

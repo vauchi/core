@@ -48,6 +48,7 @@ pub use recovery_offline::RecoveryClaimContact;
 mod guardian_backup;
 mod guardian_restore;
 mod recovery_passphrase;
+mod recovery_rekey;
 mod registry_push;
 mod registry_sibling_apply;
 #[cfg(feature = "network-http")]

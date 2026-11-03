@@ -45,7 +45,7 @@ mod reciprocity_send;
 mod recovery;
 mod recovery_offline;
 pub use recovery_offline::RecoveryClaimContact;
-pub use recovery_rekey::RekeyAnswerTaken;
+pub use recovery_rekey::{RekeyAnswerTaken, RekeyWait};
 #[cfg(feature = "network-http")]
 pub use recovery_rekey_inbound::RekeyOfferTaken;
 mod guardian_backup;

@@ -25,6 +25,16 @@ const REKEY_OFFER_RESEND_SECS: u64 = 86_400;
 /// keeps a blob for longer, and a device catches up 14 days per cycle.
 pub(super) const REKEY_RESEND_WINDOW_SECS: u64 = 14 * 86_400;
 
+/// Where a contact restored from the guardian backup stands in its rekey.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RekeyWait {
+    /// Offers still go to it.
+    Asking,
+    /// It did not answer within 14 days of the restore; meeting it in
+    /// person settles it (the continuation, D20).
+    NotAnswered,
+}
+
 /// What [`Vauchi::take_rekey_answer`] made of an answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RekeyAnswerTaken {
@@ -235,6 +245,29 @@ impl Vauchi {
         })?;
         self.mark_own_card_repropagate()?;
         Ok(RekeyAnswerTaken::Completed { contact_id })
+    }
+
+    /// Each contact still waiting for its rekey, with where it stands, in
+    /// the order restored, for the owner's list.
+    ///
+    /// # Errors
+    /// Storage errors.
+    pub fn rekey_waiting(&self) -> VauchiResult<Vec<(String, RekeyWait)>> {
+        let now = self.clock.unix_seconds();
+        Ok(self
+            .storage
+            .recovery()
+            .rekey_pending_since()?
+            .into_iter()
+            .map(|(id, restored_at)| {
+                let wait = if now >= restored_at.saturating_add(REKEY_RESEND_WINDOW_SECS) {
+                    RekeyWait::NotAnswered
+                } else {
+                    RekeyWait::Asking
+                };
+                (id, wait)
+            })
+            .collect())
     }
 
     /// Records that a contact's rekey offer went out now, so it goes out

@@ -26,6 +26,8 @@ pub enum TransferError {
     State,
     #[error("Recovery piece does not match the accepted share")]
     PieceMismatch,
+    #[error("Recovery transfer was cancelled")]
+    Cancelled,
 }
 
 struct Packet<'a> {

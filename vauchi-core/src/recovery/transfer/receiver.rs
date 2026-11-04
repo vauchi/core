@@ -9,6 +9,7 @@ pub struct HandBackReceiver {
     hash: [u8; 32],
     metadata: Option<(u16, usize)>,
     bytes: Vec<u8>,
+    cancelled: bool,
 }
 
 /// Persist the completed piece before sending its acknowledgement (A11).
@@ -34,11 +35,15 @@ impl HandBackReceiver {
             hash: accepted_backup_hash,
             metadata: None,
             bytes: Vec::new(),
+            cancelled: false,
         }
     }
 
     /// Refuses gaps and validates the piece before returning a completed receipt.
     pub fn receive(&mut self, bytes: &[u8]) -> Result<PieceReceipt, TransferError> {
+        if self.cancelled {
+            return Err(TransferError::Cancelled);
+        }
         let frame = packet(bytes)?;
         let next_piece = self
             .metadata
@@ -50,10 +55,14 @@ impl HandBackReceiver {
             self.metadata = Some((frame.index, frame.total));
             self.bytes = Vec::with_capacity(frame.total);
         }
-        if self.metadata != Some((frame.index, frame.total)) || frame.offset != self.bytes.len() {
+        if self.metadata != Some((frame.index, frame.total)) {
             return Err(TransferError::State);
         }
-        self.bytes.extend_from_slice(frame.body);
+        if frame.offset == self.bytes.len() {
+            self.bytes.extend_from_slice(frame.body);
+        } else if self.bytes.get(frame.offset..frame.end) != Some(frame.body) {
+            return Err(TransferError::State);
+        }
         let piece = if self.bytes.len() == frame.total {
             match GuardianBackupPiece::decode(&self.bytes) {
                 Ok(piece) if piece.index() == frame.index && piece.hash() == self.hash => {
@@ -72,5 +81,12 @@ impl HandBackReceiver {
             acknowledgement: acknowledgement(frame.index, frame.end)?,
             piece,
         })
+    }
+
+    /// Cancels this receiver permanently; late observations cannot restore a piece.
+    pub fn cancel(&mut self) {
+        self.cancelled = true;
+        self.metadata = None;
+        self.bytes = Vec::new();
     }
 }

@@ -11,6 +11,7 @@ pub struct HandBackSender {
     offset: usize,
     payload_bytes: usize,
     pending_end: Option<usize>,
+    cancelled: bool,
 }
 
 impl HandBackSender {
@@ -32,11 +33,15 @@ impl HandBackSender {
                 .checked_sub(HEADER_BYTES)
                 .ok_or(TransferError::Frame)?,
             pending_end: None,
+            cancelled: false,
         })
     }
 
     /// Emits one packet, then waits for its acknowledgement.
     pub fn next_packet(&mut self) -> Result<Option<Vec<u8>>, TransferError> {
+        if self.cancelled {
+            return Err(TransferError::Cancelled);
+        }
         if self.pending_end.is_some() || self.is_complete() {
             return Ok(None);
         }
@@ -52,8 +57,17 @@ impl HandBackSender {
 
     /// Advances only for the outstanding packet's piece and end offset.
     pub fn acknowledge(&mut self, bytes: &[u8]) -> Result<(), TransferError> {
+        if self.cancelled {
+            return Err(TransferError::Cancelled);
+        }
         let (index, end) = read_ack(bytes)?;
-        if index != self.index || self.pending_end != Some(end) {
+        if index != self.index {
+            return Err(TransferError::State);
+        }
+        if end <= self.offset {
+            return Ok(());
+        }
+        if self.pending_end != Some(end) {
             return Err(TransferError::State);
         }
         self.offset = end;
@@ -63,7 +77,22 @@ impl HandBackSender {
 
     /// Completion concerns this piece's transport, not storage or identity recovery.
     pub fn is_complete(&self) -> bool {
-        self.offset == self.bytes.len()
+        !self.cancelled && self.offset == self.bytes.len()
+    }
+
+    /// Core may resend only after its own deadline; no timer runs in the codec.
+    pub fn retry_packet(&self) -> Result<Vec<u8>, TransferError> {
+        if self.cancelled {
+            return Err(TransferError::Cancelled);
+        }
+        self.encode(self.pending_end.ok_or(TransferError::State)?)
+    }
+
+    /// Cancels this sender permanently and releases its buffered ciphertext.
+    pub fn cancel(&mut self) {
+        self.cancelled = true;
+        self.pending_end = None;
+        self.bytes = Vec::new();
     }
 
     fn encode(&self, end: usize) -> Result<Vec<u8>, TransferError> {

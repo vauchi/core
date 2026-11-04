@@ -957,7 +957,8 @@ test:core-32bit:
   extends: [.validation-rust, .timeout-long]
   stage: test
   image:
-    name: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/i386/rust:1.93.1-bookworm
+    # Bookworm's sccache 0.4 pre-release races its startup notification socket.
+    name: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/i386/rust:1.93.1-trixie
     docker:
       platform: linux/386
   tags: [docker]

@@ -43,6 +43,7 @@ pub mod guardian;
 mod proofs;
 pub mod rekey;
 pub mod sealed_box;
+pub mod transfer;
 
 /// Recovery-related errors.
 #[derive(Error, Debug)]

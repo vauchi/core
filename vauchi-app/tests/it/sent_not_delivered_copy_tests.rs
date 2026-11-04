@@ -35,7 +35,8 @@ fn a_sent_card_update_reads_sent_in_the_activity_log() {
     let json = serde_json::to_string(&engine.current_screen()).unwrap();
 
     assert!(json.contains("Card update sent to Ada"), "{json}");
-    assert!(!screen_text(&json).contains("deliver"), "{json}");
+    // The event key `card_delivered:…` is an internal dedupe id, never shown.
+    assert!(!screen_text(&json).contains("delivered to"), "{json}");
 }
 
 // @internal

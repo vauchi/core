@@ -253,7 +253,7 @@ fn an_empty_queue_says_nothing_is_waiting_to_send() {
     // ADR-057 amendment: Vauchi cannot see a contact's device receive an
     // update, so an empty queue claims nothing about arrival (private#1065).
     assert!(
-        texts.contains(&"Changes you make are sent the next time Vauchi syncs.".to_string()),
+        texts.contains(&"Nothing waiting to send".to_string()),
         "{texts:?}"
     );
     assert!(

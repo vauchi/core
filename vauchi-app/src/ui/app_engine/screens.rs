@@ -908,25 +908,13 @@ impl AppEngine {
                         detail("delivery_status.detail_stored", &[]),
                         false,
                     ),
-                    DeliveryStatus::Delivered => {
-                        let summary = vauchi
-                            .storage()
-                            .device_deliveries()
-                            .get_delivery_summary(&r.message_id)
-                            .ok()
-                            .filter(|s| s.total_devices > 0);
-                        let detail = match summary {
-                            Some(s) => detail(
-                                "delivery_status.detail_delivered_devices",
-                                &[
-                                    ("delivered", &s.delivered_devices.to_string()),
-                                    ("total", &s.total_devices.to_string()),
-                                ],
-                            ),
-                            None => detail("delivery_status.detail_delivered", &[]),
-                        };
-                        (Status::Success, detail, false)
-                    }
+                    // ADR-057 amendment: Vauchi does not claim a contact's
+                    // device received the update, only that the relay holds it.
+                    DeliveryStatus::Delivered => (
+                        Status::Success,
+                        detail("delivery_status.detail_stored", &[]),
+                        false,
+                    ),
                     DeliveryStatus::Expired => (
                         Status::Warning,
                         detail("delivery_status.detail_expired", &[]),

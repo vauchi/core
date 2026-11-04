@@ -480,13 +480,13 @@ impl ContactDetailEngine {
             items.push(InfoItem {
                 icon: None,
                 title: self.t("contacts.status"),
-                detail: self.t("contact_detail.all_delivered_detail"),
+                detail: self.t("contact_detail.nothing_waiting_detail"),
             });
         } else {
             items.push(InfoItem {
                 icon: None,
-                title: self.t("delivery.status_delivered"),
-                detail: summary.delivered.to_string(),
+                title: self.t("delivery.status_sent"),
+                detail: (summary.total - summary.pending - summary.failed).to_string(),
             });
             if summary.pending > 0 {
                 items.push(InfoItem {

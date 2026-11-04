@@ -200,7 +200,7 @@ impl DeliveryStatusEngine {
             components.push(Component::InfoPanel {
                 id: "empty".into(),
                 icon: Some("checkmark".into()),
-                title: self.t("delivery_status.all_delivered"),
+                title: self.t("delivery_status.nothing_waiting_title"),
                 items: vec![],
                 a11y: None,
             });

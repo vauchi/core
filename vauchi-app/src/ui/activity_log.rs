@@ -103,7 +103,7 @@ fn format_entry(entry: &ActivityLogEntry, name: &str, locale: Locale) -> (String
             )
         }
         ActivityLogEntry::CardUpdateDelivered { .. } => (
-            get_string_with_args(locale, "activity_log.card_delivered", &[("name", name)]),
+            get_string_with_args(locale, "activity_log.card_sent", &[("name", name)]),
             None,
         ),
         ActivityLogEntry::CardUpdatePending { .. } => (

@@ -22,7 +22,7 @@ impl AhaMomentType {
             AhaMomentType::FirstEdit => "Nice edit!",
             AhaMomentType::FirstContactAdded => "First contact added!",
             AhaMomentType::FirstUpdateReceived => "You received an update!",
-            AhaMomentType::FirstOutboundDelivered => "Update delivered!",
+            AhaMomentType::FirstOutboundDelivered => "Update sent",
             AhaMomentType::FirstFieldEdit => "Field updated!",
             AhaMomentType::ThreeContactsReached => "Growing network!",
             AhaMomentType::DeviceLinked => "Device linked!",
@@ -44,7 +44,9 @@ impl AhaMomentType {
             AhaMomentType::FirstUpdateReceived => {
                 "This is the magic - they updated, you see it instantly."
             }
-            AhaMomentType::FirstOutboundDelivered => "Your contacts now have your latest info.",
+            AhaMomentType::FirstOutboundDelivered => {
+                "Your contacts get it the next time their device checks in."
+            }
             AhaMomentType::FirstFieldEdit => {
                 "Your contacts will see this change the next time the app syncs."
             }
@@ -117,7 +119,7 @@ impl AhaMoment {
                 format!("{} updated their card and you see it instantly!", name)
             }
             (AhaMomentType::FirstOutboundDelivered, Some(count)) => {
-                format!("Your update was delivered to {} contacts.", count)
+                format!("Your update was sent to {} contacts.", count)
             }
             _ => self.moment_type.message().to_string(),
         }

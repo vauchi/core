@@ -826,13 +826,16 @@ const MIGRATIONS: [Migration; 110] = [
 
 /// Migration v110 (vauchi/private#796, P32): the temporary recovery key a
 /// phone with no identity holds while its guardians hand back the backup,
-/// and the hand-backs taken in person, keyed by their share's digest since
-/// their givers are no contacts of this phone; kept so the ceremony can
-/// span restarts, cleared once the identity is restored.
+/// with the old identity's key its claim names (the only identity it may
+/// restore), and the hand-backs taken in person, keyed by their opened
+/// share's digest since their givers are no contacts of this phone; kept
+/// so the ceremony can span restarts, cleared once the identity is
+/// restored.
 const MIGRATION_V110_RECOVERY_MODE_KEY: &str = "
     CREATE TABLE IF NOT EXISTS recovery_mode_key (
         id INTEGER PRIMARY KEY CHECK (id = 1),
-        seed_encrypted BLOB NOT NULL
+        seed_encrypted BLOB NOT NULL,
+        target_pk BLOB NOT NULL CHECK (length(target_pk) = 32)
     );
     CREATE TABLE IF NOT EXISTS recovery_hand_backs (
         share_digest BLOB PRIMARY KEY CHECK (length(share_digest) = 32),

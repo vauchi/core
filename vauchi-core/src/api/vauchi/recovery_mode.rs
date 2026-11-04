@@ -21,12 +21,38 @@ use sha2::Digest as _;
 use super::Vauchi;
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::crypto::SigningKeyPair;
-use crate::identity::Identity;
+use crate::identity::{DeviceInfo, DeviceRegistry, Identity};
 use crate::recovery::RecoveryClaim;
 use crate::sync::guardian_piece::GuardianDelivery;
 
 /// The device name a restored identity takes until the owner renames it.
 const RESTORED_DEVICE_NAME: &str = "Restored device";
+
+/// At most one share per guardian, so a flood of hand-backs cannot grow
+/// the store, and the backup opens from at most this many shares.
+const MAX_HAND_BACKS: usize = crate::backup::KeyShardConfig::MAX_COUNT as usize;
+
+/// The signed registry of the restored identity: the lost device, derived
+/// from the backup's seed and device index and revoked, and this device.
+fn restored_registry(
+    master_seed: &[u8; 32],
+    identity: &Identity,
+    lost_index: u32,
+    lost_name: String,
+    now: u64,
+) -> VauchiResult<DeviceRegistry> {
+    let signing = identity.signing_keypair();
+    let lost = DeviceInfo::derive(master_seed, lost_index, lost_name, 0);
+    let mut registry = DeviceRegistry::new(lost.to_registered(master_seed), signing);
+    let device_error = |e: crate::identity::DeviceError| VauchiError::InvalidState(e.to_string());
+    registry
+        .add_device(identity.device_info().to_registered(master_seed), signing)
+        .map_err(device_error)?;
+    registry
+        .revoke_device(lost.device_id(), signing, now)
+        .map_err(device_error)?;
+    Ok(registry)
+}
 
 impl Vauchi {
     /// Begins a social recovery of the identity `old_pk_hex` on this phone,
@@ -45,7 +71,7 @@ impl Vauchi {
             .ok()
             .and_then(|bytes| bytes.try_into().ok())
             .ok_or_else(|| VauchiError::Serialization("public key must be 32 bytes".into()))?;
-        let recovery_key = self.recovery_mode_key()?;
+        let recovery_key = self.recovery_mode_key(&old_pk)?;
         let claim = RecoveryClaim::new(
             old_pk,
             recovery_key.public_key().as_bytes(),
@@ -93,22 +119,31 @@ impl Vauchi {
     }
 
     /// Keeps a guardian's hand-back on this phone in recovery mode, and
-    /// returns how many it holds. The same hand-back taken twice is kept
-    /// once.
+    /// returns how many it holds. Its share is opened as it is taken and the
+    /// hand-back keyed by that share, so a retried hand-back, sealed afresh,
+    /// and two guardians of one group (who hold the same share) count once.
     ///
     /// # Errors
-    /// [`VauchiError::InvalidState`] when no recovery is under way or the
-    /// bytes are not a hand-back; storage errors.
+    /// [`VauchiError::InvalidState`] when no recovery is under way, the
+    /// bytes are not a hand-back, its share does not open for this phone's
+    /// recovery key, or a new share would pass the bound; storage errors.
     pub fn take_hand_back(&self, hand_back: &[u8]) -> VauchiResult<usize> {
-        if self.identity.is_some() || self.storage.recovery().load_recovery_mode_seed()?.is_none() {
-            return Err(VauchiError::InvalidState("No recovery under way".into()));
-        }
-        let delivery = GuardianDelivery::decode(hand_back)
-            .map_err(|_| VauchiError::InvalidState("Not a guardian hand-back".into()))?;
-        let digest: [u8; 32] = sha2::Sha256::digest(delivery.sealed_share()).into();
+        let not_a_hand_back = || VauchiError::InvalidState("Not a guardian hand-back".into());
         let recovery = self.storage.recovery();
+        let seed = match (&self.identity, recovery.load_recovery_mode()?) {
+            (None, Some((seed, _))) => seed,
+            _ => return Err(VauchiError::InvalidState("No recovery under way".into())),
+        };
+        let delivery = GuardianDelivery::decode(hand_back).map_err(|_| not_a_hand_back())?;
+        let secret = SigningKeyPair::from_seed(&seed).to_x25519_secret();
+        let share = crate::backup::open_share_for_guardian(delivery.sealed_share(), &secret)
+            .map_err(|_| not_a_hand_back())?;
+        let digest: [u8; 32] = sha2::Sha256::digest(share.to_bytes()).into();
+        if !recovery.has_hand_back(&digest)? && recovery.hand_back_count()? >= MAX_HAND_BACKS {
+            return Err(not_a_hand_back());
+        }
         recovery.keep_hand_back(&digest, hand_back, self.clock.unix_seconds())?;
-        Ok(recovery.hand_backs()?.len())
+        Ok(recovery.hand_back_count()?)
     }
 
     /// Opens the backup the hand-backs open and becomes its identity, as a
@@ -128,10 +163,10 @@ impl Vauchi {
         if self.identity.is_some() {
             return Err(VauchiError::AlreadyInitialized);
         }
-        let seed = self
+        let (seed, target_pk) = self
             .storage
             .recovery()
-            .load_recovery_mode_seed()?
+            .load_recovery_mode()?
             .ok_or_else(refused)?;
         let secret = SigningKeyPair::from_seed(&seed).to_x25519_secret();
         let envelope = self.open_hand_backs(passphrase, &secret)?;
@@ -140,17 +175,32 @@ impl Vauchi {
         let master_seed = crate::backup::extract_master_seed(&envelope.sections.identity)
             .map_err(|_| refused())?;
         let now = self.clock.unix_seconds();
+        let lost_index = envelope.sections.identity.device_index;
         let identity = Identity::from_device_link(
             *master_seed,
             envelope.sections.identity.display_name.clone(),
-            self.new_device_index(envelope.sections.identity.device_index),
+            self.new_device_index(lost_index),
             RESTORED_DEVICE_NAME.into(),
             now,
         );
+        // A backup that opens is not yet the claimed one: anyone can seal a
+        // share of another identity's backup to the recovery key a claim
+        // shows.
+        if identity.signing_public_key() != &target_pk {
+            return Err(refused());
+        }
+        let registry = restored_registry(
+            &master_seed,
+            &identity,
+            lost_index,
+            envelope.sections.identity.device_name.clone(),
+            now,
+        )?;
         let restored = self.storage.with_savepoint(|| -> VauchiResult<usize> {
             self.storage
                 .identity()
                 .save_identity(&identity.to_storage_bytes())?;
+            self.storage.device().save_device_registry(&registry)?;
             for contact in &contacts {
                 self.storage.contacts().save_contact(contact)?;
             }
@@ -162,15 +212,25 @@ impl Vauchi {
         Ok(restored)
     }
 
-    /// The recovery key, made once and kept until the restore.
-    fn recovery_mode_key(&self) -> VauchiResult<SigningKeyPair> {
+    /// The recovery key, made once and kept until the restore, now
+    /// recovering `target_pk`. Hand-backs for another target are dropped.
+    fn recovery_mode_key(&self, target_pk: &[u8; 32]) -> VauchiResult<SigningKeyPair> {
         let recovery = self.storage.recovery();
-        if let Some(seed) = recovery.load_recovery_mode_seed()? {
-            return Ok(SigningKeyPair::from_seed(&seed));
-        }
-        let mut seed = zeroize::Zeroizing::new([0u8; 32]);
-        self.rng.fill_bytes(seed.as_mut());
-        recovery.save_recovery_mode_seed(&seed)?;
+        let seed = match recovery.load_recovery_mode()? {
+            Some((seed, target)) if &target == target_pk => {
+                return Ok(SigningKeyPair::from_seed(&seed));
+            }
+            Some((seed, _)) => {
+                recovery.clear_hand_backs()?;
+                seed
+            }
+            None => {
+                let mut seed = zeroize::Zeroizing::new([0u8; 32]);
+                self.rng.fill_bytes(seed.as_mut());
+                seed
+            }
+        };
+        recovery.save_recovery_mode(&seed, target_pk)?;
         Ok(SigningKeyPair::from_seed(&seed))
     }
 

@@ -211,7 +211,7 @@ fn the_recovery_key_and_hand_backs_survive_a_storage_rekey() {
     let mut storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     storage
         .recovery()
-        .save_recovery_mode_seed(&[4; 32])
+        .save_recovery_mode(&[4; 32], &[6; 32])
         .unwrap();
     storage
         .recovery()
@@ -223,10 +223,10 @@ fn the_recovery_key_and_hand_backs_survive_a_storage_rekey() {
     assert_eq!(
         storage
             .recovery()
-            .load_recovery_mode_seed()
+            .load_recovery_mode()
             .unwrap()
-            .as_deref(),
-        Some(&[4u8; 32])
+            .map(|(seed, target)| (*seed, target)),
+        Some(([4u8; 32], [6u8; 32]))
     );
     assert_eq!(
         storage.recovery().hand_backs().unwrap(),

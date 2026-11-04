@@ -736,34 +736,41 @@ impl RecoveryStore<'_> {
     }
 
     /// Keeps the temporary recovery key's seed of a phone in recovery mode
-    /// (P32).
-    pub fn save_recovery_mode_seed(&self, seed: &[u8; 32]) -> Result<(), StorageError> {
+    /// and the old identity's key it recovers (P32).
+    pub fn save_recovery_mode(
+        &self,
+        seed: &[u8; 32],
+        target_pk: &[u8; 32],
+    ) -> Result<(), StorageError> {
         let seed_encrypted = crate::crypto::encrypt(self.key, seed)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
         self.conn.execute(
-            "INSERT OR REPLACE INTO recovery_mode_key (id, seed_encrypted) VALUES (1, ?1)",
-            params![seed_encrypted],
+            "INSERT OR REPLACE INTO recovery_mode_key (id, seed_encrypted, target_pk)
+             VALUES (1, ?1, ?2)",
+            params![seed_encrypted, target_pk.as_slice()],
         )?;
         Ok(())
     }
 
-    /// The temporary recovery key's seed, while a recovery is under way.
+    /// The temporary recovery key's seed and the identity it recovers,
+    /// while a recovery is under way.
     ///
     /// # Errors
-    /// Storage errors; [`StorageError::InvalidData`] for a malformed seed.
-    pub fn load_recovery_mode_seed(
+    /// Storage errors; [`StorageError::InvalidData`] for a malformed row.
+    #[allow(clippy::type_complexity)]
+    pub fn load_recovery_mode(
         &self,
-    ) -> Result<Option<zeroize::Zeroizing<[u8; 32]>>, StorageError> {
+    ) -> Result<Option<(zeroize::Zeroizing<[u8; 32]>, [u8; 32])>, StorageError> {
         use rusqlite::OptionalExtension;
-        let sealed: Option<Vec<u8>> = self
+        let row: Option<(Vec<u8>, Vec<u8>)> = self
             .conn
             .query_row(
-                "SELECT seed_encrypted FROM recovery_mode_key WHERE id = 1",
+                "SELECT seed_encrypted, target_pk FROM recovery_mode_key WHERE id = 1",
                 [],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .optional()?;
-        let Some(sealed) = sealed else {
+        let Some((sealed, target)) = row else {
             return Ok(None);
         };
         let plain = zeroize::Zeroizing::new(
@@ -772,7 +779,36 @@ impl RecoveryStore<'_> {
         );
         let seed = <[u8; 32]>::try_from(plain.as_slice())
             .map_err(|_| StorageError::InvalidData("recovery mode key".into()))?;
-        Ok(Some(zeroize::Zeroizing::new(seed)))
+        let target = <[u8; 32]>::try_from(target.as_slice())
+            .map_err(|_| StorageError::InvalidData("recovery target".into()))?;
+        Ok(Some((zeroize::Zeroizing::new(seed), target)))
+    }
+
+    /// Discards the hand-backs taken so far (the recovery's target
+    /// changed).
+    pub fn clear_hand_backs(&self) -> Result<(), StorageError> {
+        self.conn.execute("DELETE FROM recovery_hand_backs", [])?;
+        Ok(())
+    }
+
+    /// How many hand-backs are kept.
+    pub fn hand_back_count(&self) -> Result<usize, StorageError> {
+        let count: i64 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM recovery_hand_backs", [], |row| {
+                    row.get(0)
+                })?;
+        Ok(usize::try_from(count).unwrap_or(usize::MAX))
+    }
+
+    /// Whether a hand-back with this share digest is kept.
+    pub fn has_hand_back(&self, share_digest: &[u8; 32]) -> Result<bool, StorageError> {
+        let count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM recovery_hand_backs WHERE share_digest = ?1",
+            params![share_digest.as_slice()],
+            |row| row.get(0),
+        )?;
+        Ok(count > 0)
     }
 
     /// Discards the temporary recovery key and the hand-backs once the

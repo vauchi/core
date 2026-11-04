@@ -10,7 +10,9 @@
 //! a new device of it. Contacts come back with their shared keys and
 //! nothing waits for a rekey.
 
-use vauchi_core::api::{ReceiveOutcome, process_single_card_update};
+use vauchi_core::api::{
+    ReceiveOutcome, process_single_card_update, process_single_card_update_for_device,
+};
 use vauchi_core::sync::guardian_piece::GuardianDelivery;
 use vauchi_core::{AuthMode, ContactField, FieldType, Storage, SymmetricKey, Vauchi, VauchiConfig};
 
@@ -374,11 +376,15 @@ fn contacts_reconnect_with_the_restored_identity_without_a_rotation() {
         .prepare_card_updates_for_contact(&dave_at_phone, &old_card, &new_card)
         .unwrap();
     assert!(!copies.is_empty());
+    // Opened for the device that sealed it, as the relay route resolves it:
+    // the copy rides the device-pair session when the restored phone is its
+    // initiator, which the identities' key order decides.
     for (_, payload) in copies {
-        process_single_card_update(
+        process_single_card_update_for_device(
             dave.identity().unwrap(),
             dave.storage(),
             &alice_at_dave,
+            &restored_device,
             &payload,
         )
         .unwrap();

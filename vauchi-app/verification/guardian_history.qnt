@@ -3,22 +3,25 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // One successor along a history of decisions (vauchi/private#796, design
-// 2026-11-03-pinned-guardian-policy, P11, P19, P23). guardian_succession.qnt
-// decides one successor; this model chains them: a recovery competes with
-// a policy change in one decision, a policy change hands the next decision
-// to new guardians, and a recovered phone lost after its certificate is
-// itself recovered. Each decision is single-decree Paxos among its own
-// policy guardians (quorum 2q > n + F with one per group); crypto is left
-// out, as in guardian_succession.qnt.
+// 2026-11-03-pinned-guardian-policy, P11, P19, P23, P25 to P27). Each
+// identity's next identity is registered in advance (P25): its hash is in
+// every contact's pin and its seed is split among the policy guardians, so
+// a recovery has one destination, whichever phone runs the ceremony. A
+// decision per identity and policy version chooses between rotating to
+// that registered identity and a policy change that replaces it; each is
+// single-decree Paxos among that version's policy guardians (quorum
+// 2q > n + F, one per group). Crypto is left out (next_identity.spthy
+// covers the seed's secrecy).
 //
 // Decisions:
-//   A   Alice under policy v1 (guardians G1): phone X, phone Y, or policy P
-//   A2  Alice under policy v2 (guardians G2), open once A certified P: X or Y
-//   X   phone X's successor, open once X is certified (the phone was lost
-//       after its commitment): Y, under the policy then current
-// A contact follows the chain: Alice's successor is A's X or Y, or after P,
-// A2's. `alice_has_one_successor` is over everything any contact could
-// accept, not over a single decision.
+//   A   Alice under policy v1 (guardians G1): rotate to N1, or policy P
+//       (v2, guardians G2, registering N2 instead)
+//   A2  Alice under v2, open once A certified P: rotate to N2
+//   N1  N1 under its own registered successor N1b (P27), open once A
+//       rotated to N1: the phone holding N1 was lost too
+// A contact follows the chain: Alice's successor is what A rotated to, or
+// after P what A2 rotated to. `alice_has_one_successor` is over everything
+// any contact could accept, not over a single decision.
 //
 // KEYS_DELETED: retiring G1 approval devices delete their keys once A
 // certifies P (P23). STOLEN_OLD_KEYS: G1's approval state for A can be
@@ -26,26 +29,21 @@
 // afresh; with KEYS_DELETED that is impossible, without it this is P23's
 // accepted exposure for a contact offline since the handover.
 //
-// Checked (tools as in guardian_succession.qnt):
-//   quint test --main=deleted_keys --match='^(history|deleted)_'   (CI)
-//     a policy change certified in A hands the next decision to G2, which
-//     decides X; an interrupted handover leaves one decision and A2 shut;
-//     deleted keys close A; a lost X is recovered again under G2
-//   quint test --main=stolen_old_keys --match='^(history|stolen)_' (CI)
-//     with the retired keys stolen, A certifies Y after P while A2
-//     certifies X: two successors (P23's accepted exposure)
+// Checked (tools as in guardian_succession.qnt; 2026-11-04), in CI:
+//   quint test --main=deleted_keys --match='^(history|deleted)_'
+//     two phones running the ceremony propose the same rotation; a rotation
+//     wins over an interrupted policy change and A2 stays shut; after P,
+//     v2 rotates to N2; a second loss rotates N1 to N1b; deleted keys
+//     close A
+//   quint test --main=stolen_old_keys --match='^(history|stolen)_'
+//     with the retired keys stolen, A rotates to N1 after P while A2
+//     rotated to N2: two successors (P23's accepted exposure)
 //   Each instance's own trace fails in the other instance.
-//   quint run --max-samples=5000 --max-steps=30 --seed=7 (about 22 traces/s):
-//     deleted_keys    alice_has_one_successor  no violation found
-//     deleted_keys    one_decision_each        no violation found
-//     stolen_old_keys alice_has_one_successor  no violation found
-//   The last shows the sampling too weak to reach a fork here: the trace
-//   proves that fork reachable, so "no violation" under deleted_keys is
-//   weak evidence, not a result.
-// Not shown: an exhaustive check of either instance; recovery-guardian
-// approvals (P15) and the restore-first sequence (P20), offline catch-up
-// (P21), approval-device replacement short of a policy change, liveness
-// under explicit delivery assumptions.
+// Each decision's uniqueness is guardian_voting.qnt's inductive proof (two
+// values, one forgetful device); the chain's is by construction here: A2
+// opens only after A certified P, and N1 only after A certified N1. Not
+// shown: an exhaustive check of this model, recovery-guardian approvals
+// (P15), offline catch-up (P21), liveness.
 module guardian_history {
   const KEYS_DELETED: bool
   const STOLEN_OLD_KEYS: bool
@@ -55,11 +53,11 @@ module guardian_history {
   pure val G2 = Map("A1" -> "A", "A2" -> "A", "B1" -> "B", "B3" -> "B", "C2" -> "C")
   pure val F = 1
   pure val MAX_BALLOT = 2
-  pure val DECISIONS = Set("A", "A2", "X")
+  pure val DECISIONS = Set("A", "A2", "N1")
   pure val ALL_GUARDIANS = G1.keys().union(G2.keys())
 
   pure def valuesOf(d: str): Set[str] =
-    if (d == "A") Set("X", "Y", "P") else if (d == "A2") Set("X", "Y") else Set("Y")
+    if (d == "A") Set("N1", "P") else if (d == "A2") Set("N2") else Set("N1b")
 
   pure def isQuorumOf(policy: str -> str, q: Set[str]): bool = and {
     q.subseteq(policy.keys()),
@@ -90,18 +88,15 @@ module guardian_history {
     certs: DECISIONS.mapBy(_ => Set()),
   }
 
-  // Who decides d: A2 always G2; X under the policy current when X was
-  // certified (G2 after a handover, else G1).
+  // Who decides d: A and N1 under v1's guardians (N1 is reached from A),
+  // A2 under v2's.
   pure def policyOf(st: State, d: str): str -> str =
-    if (d == "A") G1
-    else if (d == "A2") G2
-    else if (st.certs.get("A").contains("P")) G2
-    else G1
+    if (d == "A2") G2 else G1
 
   pure def isOpen(st: State, d: str): bool =
     if (d == "A") not(KEYS_DELETED and st.certs.get("A").contains("P"))
     else if (d == "A2") st.certs.get("A").contains("P")
-    else st.certs.get("A").union(st.certs.get("A2")).contains("X")
+    else st.certs.get("A").contains("N1")
 
   action promise(d: str, g: str, b: int): bool = all {
     isOpen(s, d),
@@ -168,7 +163,7 @@ module guardian_history {
     nondet g = ALL_GUARDIANS.oneOf()
     nondet b = 1.to(MAX_BALLOT).oneOf()
     nondet q = QUORUMS.oneOf()
-    nondet v = Set("X", "Y", "P").oneOf()
+    nondet v = Set("N1", "P", "N2", "N1b").oneOf()
     any {
       promise(d, g, b),
       propose(d, b, q, v),
@@ -189,29 +184,40 @@ module guardian_history {
   // ── Witness traces ──
 
   pure val Q1 = Set("A1", "A2", "B1", "C1")
+  pure val Q1b = Set("A2", "B1", "B2", "C1")
   pure val Q2 = Set("A1", "A2", "B3", "C2")
 
-  // A recovery and a policy change compete in A; once P is certified the
-  // old guardians cannot certify X in A, and v2's guardians decide X in A2.
-  run history_policy_change_then_recovery =
+  // A on ballot 1 certifies v with Q1.
+  run certifiedInA(v: str): bool =
     init
       .then(promise("A", "A1", 1)).then(promise("A", "A2", 1))
       .then(promise("A", "B1", 1)).then(promise("A", "C1", 1))
-      .then(propose("A", 1, Q1, "P"))
+      .then(propose("A", 1, Q1, v))
       .then(accept("A", "A1", 1)).then(accept("A", "A2", 1))
       .then(accept("A", "B1", 1)).then(accept("A", "C1", 1))
-      .then(certify("A", Q1, 1, "P"))
-      .then(promise("A2", "A1", 1)).then(promise("A2", "A2", 1))
-      .then(promise("A2", "B3", 1)).then(promise("A2", "C2", 1))
-      .then(propose("A2", 1, Q2, "X"))
-      .then(accept("A2", "A1", 1)).then(accept("A2", "A2", 1))
-      .then(accept("A2", "B3", 1)).then(accept("A2", "C2", 1))
-      .then(certify("A2", Q2, 1, "X"))
-      .expect(s.certs.get("A") == Set("P") and s.certs.get("A2") == Set("X"))
+      .then(certify("A", Q1, 1, v))
 
-  // An interrupted handover: P reached A1 only; ballot 2's quorum leaves
-  // A1 out, reports nothing, and decides X; A2 never opens.
-  run history_interrupted_handover_leaves_one_decision =
+  // `quint test --main=deleted_keys --match='^(history|deleted)_'`
+
+  // Two phones run the ceremony: the second proposer, on ballot 2, hears
+  // N1 reported and proposes N1 too; both rebuilt the same identity.
+  run history_two_phones_propose_the_same_rotation =
+    init
+      .then(promise("A", "A1", 1)).then(promise("A", "A2", 1))
+      .then(promise("A", "B1", 1)).then(promise("A", "C1", 1))
+      .then(propose("A", 1, Q1, "N1"))
+      .then(accept("A", "A1", 1)).then(accept("A", "A2", 1))
+      .then(promise("A", "A2", 2)).then(promise("A", "B1", 2))
+      .then(promise("A", "B2", 2)).then(promise("A", "C1", 2))
+      .then(propose("A", 2, Q1b, "N1"))
+      .then(accept("A", "A2", 2)).then(accept("A", "B1", 2))
+      .then(accept("A", "B2", 2)).then(accept("A", "C1", 2))
+      .then(certify("A", Q1b, 2, "N1"))
+      .expect(s.certs.get("A") == Set("N1"))
+
+  // A rotation competes with a policy change: P reached A1 only, ballot
+  // 2's quorum leaves A1 out and rotates to N1; A2 never opens.
+  run history_rotation_wins_over_an_interrupted_policy_change =
     init
       .then(promise("A", "A1", 1)).then(promise("A", "A2", 1))
       .then(promise("A", "B1", 1)).then(promise("A", "C1", 1))
@@ -219,49 +225,62 @@ module guardian_history {
       .then(accept("A", "A1", 1))
       .then(promise("A", "A2", 2)).then(promise("A", "B1", 2))
       .then(promise("A", "B2", 2)).then(promise("A", "C1", 2))
-      .then(propose("A", 2, Set("A2", "B1", "B2", "C1"), "X"))
+      .then(propose("A", 2, Q1b, "N1"))
       .then(accept("A", "A2", 2)).then(accept("A", "B1", 2))
       .then(accept("A", "B2", 2)).then(accept("A", "C1", 2))
-      .then(certify("A", Set("A2", "B1", "B2", "C1"), 2, "X"))
-      .expect(s.certs.get("A") == Set("X"))
+      .then(certify("A", Q1b, 2, "N1"))
+      .expect(s.certs.get("A") == Set("N1"))
       .then(promise("A2", "A1", 1))
       .fail()
 
-  // With the retired keys stolen and not deleted, G1 certifies X in A after
-  // P while G2 certifies Y in A2: a contact offline since the handover
-  // follows X, the others Y. P23's accepted exposure.
+  // A certified policy change: v2's guardians rotate to N2, its registered
+  // identity.
+  run history_policy_change_then_rotation_to_n2 =
+    certifiedInA("P")
+      .then(promise("A2", "A1", 1)).then(promise("A2", "A2", 1))
+      .then(promise("A2", "B3", 1)).then(promise("A2", "C2", 1))
+      .then(propose("A2", 1, Q2, "N2"))
+      .then(accept("A2", "A1", 1)).then(accept("A2", "A2", 1))
+      .then(accept("A2", "B3", 1)).then(accept("A2", "C2", 1))
+      .then(certify("A2", Q2, 1, "N2"))
+      .expect(s.certs.get("A") == Set("P") and s.certs.get("A2") == Set("N2"))
+
+  // The phone holding N1 is lost too: N1's own registered successor N1b
+  // (P27) is rotated to, and contacts follow Alice, N1, then N1b.
+  run history_lost_again_rotates_to_the_next_registered =
+    certifiedInA("N1")
+      .then(promise("N1", "A1", 1)).then(promise("N1", "A2", 1))
+      .then(promise("N1", "B1", 1)).then(promise("N1", "C1", 1))
+      .then(propose("N1", 1, Q1, "N1b"))
+      .then(accept("N1", "A1", 1)).then(accept("N1", "A2", 1))
+      .then(accept("N1", "B1", 1)).then(accept("N1", "C1", 1))
+      .then(certify("N1", Q1, 1, "N1b"))
+      .expect(s.certs.get("N1") == Set("N1b") and alice_has_one_successor)
+
+  // With the keys deleted at the handover, A is closed.
+  run deleted_keys_close_the_old_decision =
+    history_policy_change_then_rotation_to_n2
+      .then(promise("A", "A1", 2))
+      .fail()
+
+  // `quint test --main=stolen_old_keys --match='^(history|stolen)_'`
+
+  // The retired keys survive and are stolen: G1 rotates to N1 after P while
+  // G2 rotated to N2, so a contact offline since the handover follows N1
+  // and the others N2. P23's accepted exposure; N1's seed is in the old
+  // guardians' pieces, so this also needs a quorum of them.
   run stolen_keys_fork_an_offline_contact =
-    history_policy_change_then_recovery
+    history_policy_change_then_rotation_to_n2
       .then(stealOldKey("A1")).then(stealOldKey("A2"))
       .then(stealOldKey("B1")).then(stealOldKey("C1"))
       .then(promise("A", "A1", 2)).then(promise("A", "A2", 2))
       .then(promise("A", "B1", 2)).then(promise("A", "C1", 2))
-      .then(propose("A", 2, Q1, "Y"))
+      .then(propose("A", 2, Q1, "N1"))
       .then(accept("A", "A1", 2)).then(accept("A", "A2", 2))
       .then(accept("A", "B1", 2)).then(accept("A", "C1", 2))
-      .then(certify("A", Q1, 2, "Y"))
+      .then(certify("A", Q1, 2, "N1"))
       .expect(not(alice_has_one_successor))
-
-  // With the keys deleted at the handover, A is closed: nothing more can
-  // be promised in it.
-  run deleted_keys_close_the_old_decision =
-    history_policy_change_then_recovery
-      .then(promise("A", "A1", 2))
-      .fail()
-
-  // Phone X is lost after its certificate: X's own successor is decided,
-  // under v2, and contacts follow Alice, X, then Y.
-  run history_lost_phone_is_recovered_again =
-    history_policy_change_then_recovery
-      .then(promise("X", "A1", 1)).then(promise("X", "A2", 1))
-      .then(promise("X", "B3", 1)).then(promise("X", "C2", 1))
-      .then(propose("X", 1, Q2, "Y"))
-      .then(accept("X", "A1", 1)).then(accept("X", "A2", 1))
-      .then(accept("X", "B3", 1)).then(accept("X", "C2", 1))
-      .then(certify("X", Q2, 1, "Y"))
-      .expect(s.certs.get("X") == Set("Y") and alice_has_one_successor)
 }
-
 // P23 as decided: retiring keys are deleted at the handover.
 module deleted_keys {
   import guardian_history(KEYS_DELETED = true, STOLEN_OLD_KEYS = false).*

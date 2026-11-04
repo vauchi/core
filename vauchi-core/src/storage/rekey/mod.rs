@@ -159,6 +159,10 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("recovery_rekey_answers", "old_shared_encrypted"),
     // V107 the recovered identity's old seed (#796)
     ("recovery_old_identity", "seed_encrypted"),
+    // V110 the temporary key of a phone in recovery mode and its
+    // hand-backs (#796, P32)
+    ("recovery_mode_key", "seed_encrypted"),
+    ("recovery_hand_backs", "delivery_encrypted"),
     // V49 owner-private contact tags (ADR-051)
     ("tags", "name_encrypted"),
     // V50 owner-private named places (ADR-051)
@@ -261,7 +265,7 @@ impl Storage {
         self.wal_checkpoint()?;
 
         let old_key = &self.encryption_key;
-        const TOTAL_TABLES: u32 = 43;
+        const TOTAL_TABLES: u32 = 45;
         let mut completed: u32 = 0;
 
         let report = |completed: &mut u32, table: &str| {
@@ -412,6 +416,17 @@ impl Storage {
                 "seed_encrypted",
             )?;
             report(&mut completed, "recovery_old_identity");
+
+            self.rekey_nullable_column(old_key, &new_key, "recovery_mode_key", "seed_encrypted")?;
+            report(&mut completed, "recovery_mode_key");
+
+            self.rekey_nullable_column(
+                old_key,
+                &new_key,
+                "recovery_hand_backs",
+                "delivery_encrypted",
+            )?;
+            report(&mut completed, "recovery_hand_backs");
 
             self.rekey_sync_timestamps(old_key, &new_key)?;
             report(&mut completed, "sync_timestamps");

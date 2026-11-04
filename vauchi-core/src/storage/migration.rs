@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 109] = [
+const MIGRATIONS: [Migration; 110] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -817,7 +817,29 @@ const MIGRATIONS: [Migration; 109] = [
         name: "recovery_rekey_pending_met_again",
         action: MigrationAction::Callback(migrate_v109_rekey_pending_met_again),
     },
+    Migration {
+        version: 110,
+        name: "recovery_mode_key",
+        action: MigrationAction::Sql(MIGRATION_V110_RECOVERY_MODE_KEY),
+    },
 ];
+
+/// Migration v110 (vauchi/private#796, P32): the temporary recovery key a
+/// phone with no identity holds while its guardians hand back the backup,
+/// and the hand-backs taken in person, keyed by their share's digest since
+/// their givers are no contacts of this phone; kept so the ceremony can
+/// span restarts, cleared once the identity is restored.
+const MIGRATION_V110_RECOVERY_MODE_KEY: &str = "
+    CREATE TABLE IF NOT EXISTS recovery_mode_key (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        seed_encrypted BLOB NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS recovery_hand_backs (
+        share_digest BLOB PRIMARY KEY CHECK (length(share_digest) = 32),
+        delivery_encrypted BLOB NOT NULL,
+        received_at INTEGER NOT NULL
+    );
+";
 
 /// Migration v109 (vauchi/private#796, D26): a waiting contact records
 /// whether it was met again in person, which a session on one device

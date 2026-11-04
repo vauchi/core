@@ -1,0 +1,167 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! Social recovery restores the same identity (vauchi/private#796, P28,
+//! P32). The new phone starts with no identity, holding a temporary
+//! recovery key its claim names beside the old identity's key; each
+//! guardian, in person, hands back its share re-sealed to that key with
+//! the backup; with enough of them the phone becomes the old identity as
+//! a new device of it. Contacts come back with their shared keys and
+//! nothing waits for a rekey.
+
+use vauchi_core::Vauchi;
+
+use crate::common::helpers::create_vauchi_with_identity;
+use crate::common::meeting::signing_pk;
+use crate::common::two_recipient::{Recipient, add_recipient, add_recipient_from, receive};
+
+/// Alice with Dave as a contact and three guardians, each in a group of
+/// its own, holding her backup.
+struct Lost {
+    alice: Vauchi,
+    dave: Recipient,
+    guardians: Vec<Recipient>,
+}
+
+fn lost() -> Lost {
+    let alice = create_vauchi_with_identity("Alice");
+    let alice_pk = signing_pk(&alice);
+    let dave = add_recipient_from(&alice, &alice_pk, create_vauchi_with_identity("Dave"));
+    let mut guardians: Vec<Recipient> = (0..3)
+        .map(|index| add_recipient(&alice, &alice_pk, &format!("G{index}")))
+        .collect();
+    for guardian in &guardians {
+        alice
+            .verify_contact_fingerprint(&guardian.id_at_sharer)
+            .unwrap();
+        alice.toggle_recovery_trust(&guardian.id_at_sharer).unwrap();
+    }
+    for guardian in &mut guardians {
+        receive(&alice, guardian);
+    }
+    Lost {
+        alice,
+        dave,
+        guardians,
+    }
+}
+
+fn alice_pk_hex(lost: &Lost) -> String {
+    hex::encode(signing_pk(&lost.alice))
+}
+
+/// The new phone begins a recovery and takes the hand-backs of the first
+/// `handing_back` guardians.
+fn handed_back(lost: &Lost, handing_back: usize) -> Vauchi {
+    let phone = Vauchi::in_memory().unwrap();
+    let claim = phone.begin_recovery(&alice_pk_hex(lost)).unwrap();
+    for guardian in lost.guardians.iter().take(handing_back) {
+        let hand_back = guardian.vauchi().hand_back_in_person(&claim).unwrap();
+        phone.take_hand_back(&hand_back).unwrap();
+    }
+    phone
+}
+
+// @internal
+#[test]
+fn a_phone_without_an_identity_begins_a_recovery_naming_the_old_key_and_a_temporary_one() {
+    let lost = lost();
+    let phone = Vauchi::in_memory().unwrap();
+
+    let claim_b64 = phone.begin_recovery(&alice_pk_hex(&lost)).unwrap();
+
+    let claim = lost.guardians[0]
+        .vauchi()
+        .parse_recovery_claim_b64(&claim_b64)
+        .unwrap();
+    assert_eq!(claim.old_pk().as_bytes(), &signing_pk(&lost.alice));
+    assert_ne!(claim.new_pk().as_bytes(), &signing_pk(&lost.alice));
+    assert!(!phone.has_identity(), "no identity until the restore");
+}
+
+// @internal
+#[test]
+fn beginning_again_keeps_the_same_temporary_key() {
+    let lost = lost();
+    let phone = Vauchi::in_memory().unwrap();
+    let guardian = lost.guardians[0].vauchi();
+
+    let first = phone.begin_recovery(&alice_pk_hex(&lost)).unwrap();
+    let again = phone.begin_recovery(&alice_pk_hex(&lost)).unwrap();
+
+    assert_eq!(
+        guardian.parse_recovery_claim_b64(&first).unwrap().new_pk(),
+        guardian.parse_recovery_claim_b64(&again).unwrap().new_pk()
+    );
+}
+
+// @internal
+#[test]
+fn a_phone_with_an_identity_cannot_begin_a_recovery() {
+    let lost = lost();
+    let phone = create_vauchi_with_identity("Someone");
+
+    assert!(phone.begin_recovery(&alice_pk_hex(&lost)).is_err());
+}
+
+// @internal
+#[test]
+fn a_guardian_hands_back_only_for_an_identity_whose_backup_it_keeps() {
+    let lost = lost();
+    let stranger = create_vauchi_with_identity("Stranger");
+    let phone = Vauchi::in_memory().unwrap();
+    let claim = phone
+        .begin_recovery(&hex::encode(signing_pk(&stranger)))
+        .unwrap();
+
+    assert!(
+        lost.guardians[0]
+            .vauchi()
+            .hand_back_in_person(&claim)
+            .is_err()
+    );
+}
+
+// @internal
+#[test]
+fn the_hand_backs_restore_the_same_identity_on_a_new_device() {
+    let lost = lost();
+    let mut phone = handed_back(&lost, 3);
+
+    let restored = phone.restore_identity_from_hand_backs(None).unwrap();
+
+    assert!(restored >= 1);
+    let identity = phone.identity().unwrap();
+    let alice = lost.alice.identity().unwrap();
+    assert_eq!(identity.signing_public_key(), alice.signing_public_key());
+    assert_ne!(
+        identity.device_id(),
+        alice.device_id(),
+        "a new device of the identity, so the lost one can be revoked"
+    );
+    let dave_at_phone = phone.get_contact(&lost.dave.id_at_sharer).unwrap().unwrap();
+    let dave_at_alice = lost
+        .alice
+        .get_contact(&lost.dave.id_at_sharer)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        dave_at_phone.shared_key().unwrap().as_bytes(),
+        dave_at_alice.shared_key().unwrap().as_bytes()
+    );
+    assert!(
+        phone.rekey_pending_contacts().unwrap().is_empty(),
+        "nothing waits for a rekey"
+    );
+}
+
+// @internal
+#[test]
+fn too_few_hand_backs_restore_nothing() {
+    let lost = lost();
+    let mut phone = handed_back(&lost, 2);
+
+    assert!(phone.restore_identity_from_hand_backs(None).is_err());
+    assert!(!phone.has_identity());
+}

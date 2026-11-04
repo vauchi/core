@@ -500,6 +500,7 @@ mod recovery_rekey_offer_tests;
 mod recovery_rekey_sessions_tests;
 mod recovery_rekey_siblings_tests;
 mod recovery_rekey_wire_tests;
+mod recovery_same_identity_tests;
 mod recovery_stolen_device_tests;
 mod recovery_storage_tests;
 mod recovery_tests;

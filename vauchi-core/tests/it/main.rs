@@ -352,6 +352,7 @@ mod ignored_contact_propagation_tests;
 mod imported_contact_api_tests;
 mod imported_contact_storage_tests;
 mod imported_contact_sync_tests;
+mod imports_never_override_exchanged_tests;
 mod info_key_proptest;
 mod install_id_tests;
 mod leave_vauchi_tests;

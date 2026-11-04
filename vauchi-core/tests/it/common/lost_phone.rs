@@ -46,3 +46,13 @@ pub fn lost() -> Lost {
 pub fn alice_pk_hex(lost: &Lost) -> String {
     hex::encode(signing_pk(&lost.alice))
 }
+
+/// One guardian's hand-back in the meeting: the phone scans its share and
+/// takes every piece of its backup.
+pub fn hand_over(guardian: &Vauchi, claim: &str, phone: &Vauchi) {
+    let hand_back = guardian.hand_back_in_person(claim).unwrap();
+    phone.take_hand_back(hand_back.share()).unwrap();
+    for piece in hand_back.backup_pieces() {
+        phone.take_hand_back_piece(piece).unwrap();
+    }
+}

@@ -10,14 +10,15 @@
 //! a new device of it. Contacts come back with their shared keys and
 //! nothing waits for a rekey.
 
+use sha2::{Digest, Sha256};
 use vauchi_core::api::{
     ReceiveOutcome, process_single_card_update, process_single_card_update_for_device,
 };
-use vauchi_core::sync::guardian_piece::GuardianDelivery;
+use vauchi_core::sync::guardian_piece::{HandBackShare, split_backup_for_hand_back};
 use vauchi_core::{AuthMode, ContactField, FieldType, Storage, SymmetricKey, Vauchi, VauchiConfig};
 
 use crate::common::helpers::create_vauchi_with_identity;
-use crate::common::lost_phone::{Lost, alice_pk_hex, lost};
+use crate::common::lost_phone::{Lost, alice_pk_hex, hand_over, lost};
 use crate::common::meeting::signing_pk;
 
 /// The new phone begins a recovery and takes the hand-backs of the first
@@ -26,8 +27,7 @@ fn handed_back(lost: &Lost, handing_back: usize) -> Vauchi {
     let phone = Vauchi::in_memory().unwrap();
     let claim = phone.begin_recovery(&alice_pk_hex(lost)).unwrap();
     for guardian in lost.guardians.iter().take(handing_back) {
-        let hand_back = guardian.vauchi().hand_back_in_person(&claim).unwrap();
-        phone.take_hand_back(&hand_back).unwrap();
+        hand_over(guardian.vauchi(), &claim, &phone);
     }
     phone
 }
@@ -146,8 +146,8 @@ fn taking_the_same_hand_back_twice_keeps_it_once() {
         .hand_back_in_person(&claim)
         .unwrap();
 
-    assert_eq!(phone.take_hand_back(&hand_back).unwrap(), 1);
-    assert_eq!(phone.take_hand_back(&hand_back).unwrap(), 1);
+    assert_eq!(phone.take_hand_back(hand_back.share()).unwrap(), 1);
+    assert_eq!(phone.take_hand_back(hand_back.share()).unwrap(), 1);
 }
 
 /// A coerced guardian answers as one that holds no backup (ADR-032).
@@ -228,10 +228,16 @@ fn a_backup_of_another_identity_restores_nothing() {
         let resealed = g
             .respond_to_recovery(kept.sealed_share(), &recovery_pk)
             .unwrap();
-        let forged = GuardianDelivery::new(kept.created_at(), resealed, kept.backup().to_vec())
-            .unwrap()
-            .encode();
-        phone.take_hand_back(&forged).unwrap();
+        let forged = HandBackShare::new(
+            kept.created_at(),
+            resealed,
+            Sha256::digest(kept.backup()).into(),
+        )
+        .unwrap();
+        phone.take_hand_back(&forged.encode()).unwrap();
+        for piece in split_backup_for_hand_back(kept.backup()).unwrap() {
+            phone.take_hand_back_piece(&piece.encode()).unwrap();
+        }
     }
 
     assert!(phone.restore_identity_from_hand_backs(None).is_err());
@@ -253,8 +259,7 @@ fn the_restored_phone_registers_itself_and_the_lost_device_as_revoked() {
                 .unwrap();
         let claim = phone.begin_recovery(&alice_pk_hex(&lost)).unwrap();
         for guardian in &lost.guardians {
-            let hand_back = guardian.vauchi().hand_back_in_person(&claim).unwrap();
-            phone.take_hand_back(&hand_back).unwrap();
+            hand_over(guardian.vauchi(), &claim, &phone);
         }
         phone.restore_identity_from_hand_backs(None).unwrap();
     }
@@ -288,11 +293,10 @@ fn retried_hand_backs_count_once_and_do_not_stop_the_restore() {
     let first = lost.guardians[0].vauchi();
     for _ in 0..25 {
         let hand_back = first.hand_back_in_person(&claim).unwrap();
-        assert_eq!(phone.take_hand_back(&hand_back).unwrap(), 1);
+        assert_eq!(phone.take_hand_back(hand_back.share()).unwrap(), 1);
     }
     for guardian in &lost.guardians[1..] {
-        let hand_back = guardian.vauchi().hand_back_in_person(&claim).unwrap();
-        phone.take_hand_back(&hand_back).unwrap();
+        hand_over(guardian.vauchi(), &claim, &phone);
     }
 
     phone.restore_identity_from_hand_backs(None).unwrap();

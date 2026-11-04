@@ -61,7 +61,7 @@ fn an_authorized_offer_is_accepted_without_asking() {
     assert!(dave.get_contact(&new_id).unwrap().is_some());
 }
 
-// @internal
+// @scenario: contact_recovery :: No contact accepts a recovery without the certificate
 #[test]
 fn an_offer_daves_own_contacts_vouched_for_is_dropped_until_certificates_exist() {
     let (world, blob) = offered();

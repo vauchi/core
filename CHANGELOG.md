@@ -8,6 +8,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Security
+
+- `Vauchi::new` refuses a plaintext relay or OHTTP relay URL from
+  `VauchiConfig`, as `set_relay` already did: https, `wss`, or plain
+  http or `ws` to a loopback host only (ADR-037 addendum,
+  vauchi/private#1066). A stored plaintext relay URL is no longer used
+  at launch; the built-in relay stays in place. A consumer passing
+  `http://` or `ws://` to a non-loopback relay now gets an error.
+
 ## [0.99.0] — 2026-11-04
 
 The minor moves because Core takes contract v0.97.0, whose new fields

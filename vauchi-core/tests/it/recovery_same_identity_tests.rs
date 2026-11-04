@@ -10,8 +10,9 @@
 //! a new device of it. Contacts come back with their shared keys and
 //! nothing waits for a rekey.
 
+use vauchi_core::api::{ReceiveOutcome, process_single_card_update};
 use vauchi_core::sync::guardian_piece::GuardianDelivery;
-use vauchi_core::{AuthMode, Storage, SymmetricKey, Vauchi, VauchiConfig};
+use vauchi_core::{AuthMode, ContactField, FieldType, Storage, SymmetricKey, Vauchi, VauchiConfig};
 
 use crate::common::helpers::create_vauchi_with_identity;
 use crate::common::meeting::signing_pk;
@@ -333,4 +334,107 @@ fn retried_hand_backs_count_once_and_do_not_stop_the_restore() {
         phone.identity().unwrap().signing_public_key(),
         lost.alice.identity().unwrap().signing_public_key()
     );
+}
+
+/// Delivers every update `from` queued for `to`, as a relay hand-off would.
+fn deliver_all(
+    from: &Vauchi,
+    to_id_in_from: &str,
+    to: &Vauchi,
+    from_id_in_to: &str,
+) -> Vec<ReceiveOutcome> {
+    let queued = from
+        .storage()
+        .pending()
+        .get_pending_updates(to_id_in_from)
+        .unwrap();
+    queued
+        .into_iter()
+        .map(|update| {
+            from.storage()
+                .pending()
+                .delete_pending_update(&update.id)
+                .unwrap();
+            process_single_card_update(
+                to.identity().unwrap(),
+                to.storage(),
+                from_id_in_to,
+                &update.payload,
+            )
+            .unwrap()
+        })
+        .collect()
+}
+
+/// After the restore Dave keeps Alice as she was: the restored phone runs
+/// the device-registry handshake, Dave learns the new device and opens its
+/// card update, and no rotation, rekey or new contact happens.
+// @internal
+#[test]
+fn contacts_reconnect_with_the_restored_identity_without_a_rotation() {
+    let lost = lost();
+    let mut phone = handed_back(&lost, 3);
+    phone.restore_identity_from_hand_backs(None).unwrap();
+    let dave = lost.dave.vauchi();
+    let dave_at_phone = lost.dave.id_at_sharer.clone();
+    let alice_at_dave = lost.dave.sharer_id().to_string();
+    let dave_contacts_before = dave.list_contacts().unwrap().len();
+    let alice_before = dave.get_contact(&alice_at_dave).unwrap().unwrap();
+
+    assert!(phone.queue_registry_pushes().unwrap() >= 1);
+    for outcome in deliver_all(&phone, &dave_at_phone, dave, &alice_at_dave) {
+        if let ReceiveOutcome::RegistryPushReceived(reply) = outcome {
+            dave.queue_registry_ack(&reply).unwrap();
+        }
+    }
+    deliver_all(dave, &alice_at_dave, &phone, &dave_at_phone);
+    let restored_device = *phone.identity().unwrap().device_id();
+    assert!(
+        dave.storage()
+            .device()
+            .load_contact_device_registry(&alice_at_dave)
+            .unwrap()
+            .expect("Dave holds Alice's registry")
+            .contains_device(&restored_device),
+        "Dave learned the restored device"
+    );
+
+    let old_card = phone.storage().contacts().load_own_card().unwrap().unwrap();
+    let field = ContactField::new(FieldType::Email, "Work", "alice@new.example", 0);
+    let field_id = field.id().to_string();
+    phone.add_own_field(field).unwrap();
+    phone.set_own_field_public(&field_id).unwrap();
+    let new_card = phone.storage().contacts().load_own_card().unwrap().unwrap();
+    let copies = phone
+        .prepare_card_updates_for_contact(&dave_at_phone, &old_card, &new_card)
+        .unwrap();
+    assert!(!copies.is_empty());
+    for (_, payload) in copies {
+        process_single_card_update(
+            dave.identity().unwrap(),
+            dave.storage(),
+            &alice_at_dave,
+            &payload,
+        )
+        .unwrap();
+    }
+
+    let alice_after = dave.get_contact(&alice_at_dave).unwrap().unwrap();
+    assert_eq!(alice_after.public_key(), alice_before.public_key());
+    assert_eq!(
+        alice_after.shared_key().unwrap().as_bytes(),
+        alice_before.shared_key().unwrap().as_bytes(),
+        "no rotation: the relationship's key is the one Dave had"
+    );
+    assert!(
+        alice_after
+            .card()
+            .fields()
+            .iter()
+            .any(|f| f.value() == "alice@new.example"),
+        "Dave opened the restored phone's card update"
+    );
+    assert_eq!(dave.list_contacts().unwrap().len(), dave_contacts_before);
+    assert!(dave.rekey_answer_deliveries().unwrap().is_empty());
+    assert!(phone.rekey_offer_deliveries().unwrap().is_empty());
 }

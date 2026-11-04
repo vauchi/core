@@ -86,6 +86,11 @@ impl GuardianBackupPiece {
         self.count
     }
 
+    /// The SHA-256 of the whole delivery.
+    pub fn hash(&self) -> [u8; HASH_BYTES] {
+        self.hash
+    }
+
     /// The wire form; see the module doc.
     pub fn encode(&self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(HEADER_BYTES.saturating_add(self.body.len()));
@@ -167,6 +172,22 @@ pub fn split_into_pieces(
             })
         })
         .collect()
+}
+
+/// Splits a guardian's backup into the pieces it sends the recovering
+/// phone over Bluetooth (P33). Their id is the start of the backup's hash,
+/// not random as for a mailbox delivery, so a resent backup gives the same
+/// pieces and those of a retry complete an interrupted transfer.
+///
+/// # Errors
+/// [`PieceError::Size`] for an empty backup or one over
+/// [`MAX_GUARDIAN_DELIVERY_BYTES`].
+pub fn split_backup_for_hand_back(backup: &[u8]) -> Result<Vec<GuardianBackupPiece>, PieceError> {
+    let hash: [u8; HASH_BYTES] = Sha256::digest(backup).into();
+    let (backup_id, _) = hash
+        .split_first_chunk::<BACKUP_ID_BYTES>()
+        .ok_or(PieceError::Size)?;
+    split_into_pieces(*backup_id, backup)
 }
 
 /// The most bytes a guardian's sealed share takes; a flat or grouped share
@@ -354,5 +375,88 @@ impl PieceAssembly {
             return Err(PieceError::HashMismatch);
         }
         Ok(Some(whole))
+    }
+}
+
+/// The most bytes an encoded [`HandBackShare`] takes.
+pub const MAX_HAND_BACK_SHARE_BYTES: usize = 8 + 2 + MAX_SEALED_SHARE_BYTES + HASH_BYTES;
+
+/// What a guardian shows the recovering phone as a QR code in the meeting
+/// (P33): its share re-sealed to the phone's recovery key, and the SHA-256
+/// of the backup it sends alongside over Bluetooth, so the phone keeps
+/// only pieces a share it took names. Wire form: creation time (big-endian
+/// `u64` seconds), share length (big-endian `u16`), the share, the hash.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HandBackShare {
+    created_at: u64,
+    sealed_share: Vec<u8>,
+    backup_hash: [u8; HASH_BYTES],
+}
+
+impl HandBackShare {
+    /// # Errors
+    /// [`PieceError::Malformed`] for an empty share or one over 1 KiB.
+    pub fn new(
+        created_at: u64,
+        sealed_share: Vec<u8>,
+        backup_hash: [u8; HASH_BYTES],
+    ) -> Result<Self, PieceError> {
+        if !(1..=MAX_SEALED_SHARE_BYTES).contains(&sealed_share.len()) {
+            return Err(PieceError::Malformed);
+        }
+        Ok(Self {
+            created_at,
+            sealed_share,
+            backup_hash,
+        })
+    }
+
+    /// When the owner exported the backup; the phone tries the newest
+    /// first.
+    pub fn created_at(&self) -> u64 {
+        self.created_at
+    }
+
+    /// The share sealed to the phone's recovery key.
+    pub fn sealed_share(&self) -> &[u8] {
+        &self.sealed_share
+    }
+
+    /// The SHA-256 of the backup the guardian sends over Bluetooth.
+    pub fn backup_hash(&self) -> [u8; HASH_BYTES] {
+        self.backup_hash
+    }
+
+    /// The wire form, shown as one QR code.
+    pub fn encode(&self) -> Vec<u8> {
+        let share_len = u16::try_from(self.sealed_share.len())
+            .expect("a sealed share is at most 1 KiB, checked in new");
+        let mut bytes = Vec::with_capacity(MAX_HAND_BACK_SHARE_BYTES);
+        bytes.extend_from_slice(&self.created_at.to_be_bytes());
+        bytes.extend_from_slice(&share_len.to_be_bytes());
+        bytes.extend_from_slice(&self.sealed_share);
+        bytes.extend_from_slice(&self.backup_hash);
+        bytes
+    }
+
+    /// Parses and bounds a scanned share before anything reads it (DC-01).
+    ///
+    /// # Errors
+    /// [`PieceError::Malformed`] for a short time, a share length of zero,
+    /// over 1 KiB or past the end, or anything but a hash after the share.
+    pub fn decode(bytes: &[u8]) -> Result<Self, PieceError> {
+        let (created_at, rest) = bytes
+            .split_first_chunk::<8>()
+            .ok_or(PieceError::Malformed)?;
+        let (share_len, rest) = rest.split_first_chunk::<2>().ok_or(PieceError::Malformed)?;
+        let (sealed_share, hash) = rest
+            .split_at_checked(usize::from(u16::from_be_bytes(*share_len)))
+            .ok_or(PieceError::Malformed)?;
+        let backup_hash: [u8; HASH_BYTES] = hash.try_into().map_err(|_| PieceError::Malformed)?;
+        Self::new(
+            u64::from_be_bytes(*created_at),
+            sealed_share.to_vec(),
+            backup_hash,
+        )
     }
 }

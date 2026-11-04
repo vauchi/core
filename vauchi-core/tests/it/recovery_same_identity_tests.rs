@@ -10,7 +10,8 @@
 //! a new device of it. Contacts come back with their shared keys and
 //! nothing waits for a rekey.
 
-use vauchi_core::{AuthMode, Storage, SymmetricKey, Vauchi};
+use vauchi_core::sync::guardian_piece::GuardianDelivery;
+use vauchi_core::{AuthMode, Storage, SymmetricKey, Vauchi, VauchiConfig};
 
 use crate::common::helpers::create_vauchi_with_identity;
 use crate::common::meeting::signing_pk;
@@ -230,5 +231,106 @@ fn the_recovery_key_and_hand_backs_survive_a_storage_rekey() {
     assert_eq!(
         storage.recovery().hand_backs().unwrap(),
         vec![b"hand-back".to_vec()]
+    );
+}
+
+/// Guardians of another identity seal that identity's backup to the
+/// recovery key the claim shows; the restore must not adopt it.
+// @internal
+#[test]
+fn a_backup_of_another_identity_restores_nothing() {
+    let wanted = lost();
+    let other = lost();
+    let mut phone = Vauchi::in_memory().unwrap();
+    let claim = phone.begin_recovery(&alice_pk_hex(&wanted)).unwrap();
+    let recovery_pk = *other.guardians[0]
+        .vauchi()
+        .parse_recovery_claim_b64(&claim)
+        .unwrap()
+        .new_pk()
+        .as_bytes();
+    for guardian in &other.guardians {
+        let g = guardian.vauchi();
+        let kept = g
+            .storage()
+            .guardian_backups()
+            .kept(&alice_pk_hex(&other))
+            .unwrap()
+            .unwrap();
+        let resealed = g
+            .respond_to_recovery(kept.sealed_share(), &recovery_pk)
+            .unwrap();
+        let forged = GuardianDelivery::new(kept.created_at(), resealed, kept.backup().to_vec())
+            .unwrap()
+            .encode();
+        phone.take_hand_back(&forged).unwrap();
+    }
+
+    assert!(phone.restore_identity_from_hand_backs(None).is_err());
+    assert!(!phone.has_identity());
+}
+
+/// The restored phone registers itself and lists the lost device as
+/// revoked, and both survive a restart.
+// @internal
+#[test]
+fn the_restored_phone_registers_itself_and_the_lost_device_as_revoked() {
+    let lost = lost();
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("phone.db");
+    let key = SymmetricKey::generate();
+    {
+        let mut phone =
+            Vauchi::new(VauchiConfig::with_storage_path(&path).with_storage_key(key.clone()))
+                .unwrap();
+        let claim = phone.begin_recovery(&alice_pk_hex(&lost)).unwrap();
+        for guardian in &lost.guardians {
+            let hand_back = guardian.vauchi().hand_back_in_person(&claim).unwrap();
+            phone.take_hand_back(&hand_back).unwrap();
+        }
+        phone.restore_identity_from_hand_backs(None).unwrap();
+    }
+
+    let phone = Vauchi::new(VauchiConfig::with_storage_path(&path).with_storage_key(key)).unwrap();
+
+    let devices = phone.list_devices().unwrap();
+    assert_eq!(devices.len(), 2, "{devices:?}");
+    let current: Vec<_> = devices.iter().filter(|d| d.is_current).collect();
+    assert_eq!(current.len(), 1);
+    assert!(current[0].is_active);
+    let lost_device = devices.iter().find(|d| !d.is_current).unwrap();
+    assert!(!lost_device.is_active, "the lost device is revoked");
+    let registry = phone
+        .storage()
+        .device()
+        .load_device_registry()
+        .unwrap()
+        .unwrap();
+    assert!(registry.verify(&phone.identity().unwrap().signing_keypair().public_key()));
+}
+
+/// A guardian whose hand-back is retried many times counts once, and the
+/// retries do not stop the restore.
+// @internal
+#[test]
+fn retried_hand_backs_count_once_and_do_not_stop_the_restore() {
+    let lost = lost();
+    let mut phone = Vauchi::in_memory().unwrap();
+    let claim = phone.begin_recovery(&alice_pk_hex(&lost)).unwrap();
+    let first = lost.guardians[0].vauchi();
+    for _ in 0..25 {
+        let hand_back = first.hand_back_in_person(&claim).unwrap();
+        assert_eq!(phone.take_hand_back(&hand_back).unwrap(), 1);
+    }
+    for guardian in &lost.guardians[1..] {
+        let hand_back = guardian.vauchi().hand_back_in_person(&claim).unwrap();
+        phone.take_hand_back(&hand_back).unwrap();
+    }
+
+    phone.restore_identity_from_hand_backs(None).unwrap();
+
+    assert_eq!(
+        phone.identity().unwrap().signing_public_key(),
+        lost.alice.identity().unwrap().signing_public_key()
     );
 }

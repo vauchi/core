@@ -10,7 +10,7 @@
 //! a new device of it. Contacts come back with their shared keys and
 //! nothing waits for a rekey.
 
-use vauchi_core::Vauchi;
+use vauchi_core::{AuthMode, Storage, SymmetricKey, Vauchi};
 
 use crate::common::helpers::create_vauchi_with_identity;
 use crate::common::meeting::signing_pk;
@@ -164,4 +164,71 @@ fn too_few_hand_backs_restore_nothing() {
 
     assert!(phone.restore_identity_from_hand_backs(None).is_err());
     assert!(!phone.has_identity());
+}
+
+// @internal
+#[test]
+fn taking_the_same_hand_back_twice_keeps_it_once() {
+    let lost = lost();
+    let phone = Vauchi::in_memory().unwrap();
+    let claim = phone.begin_recovery(&alice_pk_hex(&lost)).unwrap();
+    let hand_back = lost.guardians[0]
+        .vauchi()
+        .hand_back_in_person(&claim)
+        .unwrap();
+
+    assert_eq!(phone.take_hand_back(&hand_back).unwrap(), 1);
+    assert_eq!(phone.take_hand_back(&hand_back).unwrap(), 1);
+}
+
+/// A coerced guardian answers as one that holds no backup (ADR-032).
+// @internal
+#[test]
+fn a_duress_session_hands_back_nothing_and_answers_as_one_with_no_backup() {
+    let mut lost = lost();
+    let phone = Vauchi::in_memory().unwrap();
+    let claim = phone.begin_recovery(&alice_pk_hex(&lost)).unwrap();
+    let stranger_claim = Vauchi::in_memory()
+        .unwrap()
+        .begin_recovery(&hex::encode([9u8; 32]))
+        .unwrap();
+    let mut guardian = lost.guardians.remove(0).into_vauchi();
+    let no_backup = format!("{:?}", guardian.hand_back_in_person(&stranger_claim));
+    guardian.setup_app_password("normal-pin").unwrap();
+    guardian.setup_duress_password("112233").unwrap();
+    assert_eq!(guardian.authenticate("112233").unwrap(), AuthMode::Duress);
+
+    let coerced = guardian.hand_back_in_person(&claim);
+
+    assert!(coerced.is_err());
+    assert_eq!(format!("{coerced:?}"), no_backup);
+}
+
+// @internal
+#[test]
+fn the_recovery_key_and_hand_backs_survive_a_storage_rekey() {
+    let mut storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    storage
+        .recovery()
+        .save_recovery_mode_seed(&[4; 32])
+        .unwrap();
+    storage
+        .recovery()
+        .keep_hand_back(&[5; 32], b"hand-back", 7)
+        .unwrap();
+
+    storage.rekey(SymmetricKey::generate()).unwrap();
+
+    assert_eq!(
+        storage
+            .recovery()
+            .load_recovery_mode_seed()
+            .unwrap()
+            .as_deref(),
+        Some(&[4u8; 32])
+    );
+    assert_eq!(
+        storage.recovery().hand_backs().unwrap(),
+        vec![b"hand-back".to_vec()]
+    );
 }

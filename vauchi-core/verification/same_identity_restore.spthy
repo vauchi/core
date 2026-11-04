@@ -1,0 +1,115 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Social recovery restoring the same identity (vauchi/private#796, P28,
+ * P32; Social Recovery A11). Alice's guardian backup, holding her seed,
+ * is encrypted under a key split into one share per group, groups {G1},
+ * {G2}, {G3}. Her new phone has no identity: it makes a recovery key r,
+ * shows a claim naming her old key and pk(r), and keeps that old key as
+ * its target. In person, a guardian keeping Alice's backup seals its
+ * share to pk(r) and hands it over. With a share of each group the phone
+ * opens a backup and adopts its seed only if the seed derives the target.
+ *
+ * Bob, another owner, has his own guardians, shares and backup, and is
+ * the attacker's: his shares are public. The attacker owns the network,
+ * sees every claim, and may hand the phone anything sealed to pk(r) (an
+ * in-person hand-back cannot be told from one a stranger seals), and may
+ * corrupt Alice's guardians.
+ *
+ * Run: tamarin-prover --prove same_identity_restore.spthy
+ * Prove it can fail:
+ *   -DNO_TARGET_CHECK: the phone adopts any backup that opens; Bob's
+ *     shares sealed to the claim's pk(r) make it Bob
+ *     (restore_adopts_only_the_claimed_identity falsified).
+ */
+theory SameIdentityRestore
+begin
+
+builtins: asymmetric-encryption, symmetric-encryption, hashing
+
+restriction Once:
+  "All x #i #j. Once(x) @ i & Once(x) @ j ==> #i = #j"
+
+/* Alice's backup and her guardians' shares; Bob's, whose shares the
+   attacker holds. A backup ciphertext is public; its contents are read
+   from state keyed by the true shares, which keeps the search finite and
+   still needs all three. */
+rule Setup:
+  let bka = h(<~a1, ~a2, ~a3>)
+      bkb = h(<~b1, ~b2, ~b3>)
+  in
+  [ Fr(~sa), Fr(~sb), Fr(~a1), Fr(~a2), Fr(~a3), Fr(~b1), Fr(~b2), Fr(~b3) ]
+  --[ Once('setup'), Owner('Alice', pk(~sa)), BackupKey('Alice', bka) ]->
+  [ !OwnerPk('Alice', pk(~sa))
+  , !Shard('G1', pk(~sa), ~a1), !Shard('G2', pk(~sa), ~a2), !Shard('G3', pk(~sa), ~a3)
+  , !Backup(<~a1, ~a2, ~a3>, ~sa), !Backup(<~b1, ~b2, ~b3>, ~sb)
+  , Out(pk(~sa)), Out(pk(~sb)), Out(senc(~sa, bka)), Out(senc(~sb, bkb))
+  , Out(<~b1, ~b2, ~b3>)
+  ]
+
+rule Corrupt_guardian:
+  [ !Shard(G, A, s) ]
+  --[ Compromised(G) ]->
+  [ Out(s) ]
+
+/* The new phone begins Alice's recovery. */
+rule Begin_recovery:
+  [ Fr(~r), Fr(~ph), !OwnerPk('Alice', pka) ]
+  --[ Once('begin'), TargetSet(~ph, pka) ]->
+  [ !Phone(~ph, ~r), !Target(~ph, pka), !Claimed(~ph, pka, ~r), Out(<pka, pk(~r)>) ]
+
+/* In person: a guardian keeping the claimed owner's backup seals its
+   share to the phone's recovery key. */
+rule Hand_back:
+  [ !Shard(G, A, s), !Claimed(ph, A, r) ]
+  --[ HandedBack(G, ph) ]->
+  [ Out(aenc(s, pk(r))) ]
+
+/* The phone keeps any share sealed to its recovery key. */
+rule Take_hand_back:
+  [ !Phone(ph, r), In(aenc(s, pk(r))) ]
+  -->
+  [ !Taken(ph, s) ]
+
+#ifdef NO_TARGET_CHECK
+rule Restore:
+  [ !Phone(ph, r), !Taken(ph, x1), !Taken(ph, x2), !Taken(ph, x3)
+  , !Backup(<x1, x2, x3>, seed)
+  ]
+  --[ Restored(ph, pk(seed)) ]->
+  [ !Identity(ph, seed) ]
+#else
+rule Restore:
+  [ !Phone(ph, r), !Target(ph, target), !Taken(ph, x1), !Taken(ph, x2), !Taken(ph, x3)
+  , !Backup(<x1, x2, x3>, seed)
+  ]
+  --[ Restored(ph, pk(seed)), Eq(pk(seed), target) ]->
+  [ !Identity(ph, seed) ]
+#endif
+
+restriction Equality:
+  "All x y #i. Eq(x, y) @ i ==> x = y"
+
+/* The honest ceremony restores Alice with no guardian corrupted. */
+lemma executable:
+  exists-trace
+  "Ex ph k #i #o. Restored(ph, k) @ i & Owner('Alice', k) @ o
+     & not (Ex G #c. Compromised(G) @ c)"
+
+/* The phone becomes only the identity its claim named, though anyone can
+   seal another backup's shares to the pk(r) the claim shows. */
+lemma restore_adopts_only_the_claimed_identity:
+  "All ph k #i. Restored(ph, k) @ i ==> Ex #j. TargetSet(ph, k) @ j"
+
+/* Alice's backup key stays secret unless a guardian of every group is
+   corrupted: shares handed back are sealed to the phone's recovery key. */
+lemma backup_needs_a_share_of_every_group:
+  "All bk #s.
+     BackupKey('Alice', bk) @ s
+     ==> not (Ex #x. K(bk) @ x)
+         | (Ex #c1 #c2 #c3. Compromised('G1') @ c1 & Compromised('G2') @ c2
+            & Compromised('G3') @ c3)"
+
+end

@@ -273,6 +273,13 @@ tamarin_expect "$models/next_identity.spthy" verified "" \
 tamarin_expect "$models/next_identity.spthy" falsified "-DMAJORITY" next_seed_secrecy
 tamarin_expect "$models/next_identity.spthy" falsified "-DPAPER_UNSEALED" next_seed_secrecy
 tamarin_expect "$models/next_identity.spthy" falsified "-DPIECES_ON_PHONE" next_seed_secrecy
+# Social recovery restoring the same identity (#796, P32): the phone
+# adopts only the claimed identity although anyone can seal another
+# backup's shares to its recovery key; the backup needs every group.
+tamarin_expect "$models/same_identity_restore.spthy" verified "" \
+    executable restore_adopts_only_the_claimed_identity backup_needs_a_share_of_every_group
+tamarin_expect "$models/same_identity_restore.spthy" falsified "-DNO_TARGET_CHECK" \
+    restore_adopts_only_the_claimed_identity
 # Card updates (#757): the signature binds the recipient, and the version
 # floor stops a relay that only reorders from rolling a card back.
 tamarin_expect "$models/card_update.spthy" verified "" \

@@ -22,6 +22,10 @@ pub(crate) struct HardwareRoute {
     current_surface: Option<SurfaceId>,
     capture: Option<Capture>,
     captures_started: u64,
+    /// A camera request met a report with no camera (private#1070). Read
+    /// by the engine's toast, which exists with network-rustls.
+    #[cfg_attr(not(feature = "network-rustls"), allow(dead_code))]
+    camera_missing: bool,
 }
 
 #[derive(Debug)]
@@ -57,6 +61,13 @@ impl HardwareRoute {
                     self.surface_shown(&surface.surface_id, &mut routed);
                     routed.push(Command::ReplaceSurface { surface });
                 }
+                Command::QrRequestScan | Command::ImageCaptureFromCamera
+                    if !self.report.as_ref().is_some_and(|report| report.has_camera) =>
+                {
+                    // The hardware shell has no camera port: a capture would
+                    // be Unsupported and report nothing (private#1070).
+                    self.camera_missing = true;
+                }
                 Command::QrRequestScan => self.start_capture(CameraPurpose::QrScan, &mut routed),
                 Command::ImageCaptureFromCamera => {
                     self.start_capture(CameraPurpose::Photo, &mut routed);
@@ -89,6 +100,12 @@ impl HardwareRoute {
                 preview_id: capture.preview_id,
             });
         }
+    }
+
+    /// Whether a camera request since the last call found no camera.
+    #[cfg(feature = "network-rustls")]
+    pub(crate) fn take_camera_missing(&mut self) -> bool {
+        std::mem::take(&mut self.camera_missing)
     }
 
     pub(crate) fn drain(&mut self) -> Vec<Command> {

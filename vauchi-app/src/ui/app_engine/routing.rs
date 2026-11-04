@@ -54,6 +54,19 @@ impl AppEngine {
         }
     }
 
+    /// "<capability> is not available on this device", or the generic line
+    /// for a transport without a user-facing name.
+    pub(super) fn unavailable_message(&self, transport: &str) -> String {
+        match self.capability_label(transport) {
+            Some(name) => crate::i18n::get_string_with_args(
+                self.render_context.resolved_locale(),
+                "hardware.unavailable",
+                &[("name", &name)],
+            ),
+            None => self.t("hardware.unavailable_generic"),
+        }
+    }
+
     fn capability_label(&self, transport: &str) -> Option<String> {
         let token = transport.trim().to_ascii_lowercase();
         NAMEABLE_CAPABILITIES
@@ -282,14 +295,7 @@ impl AppEngine {
         // before delegating to the engine (which may transition to Failed).
         let ui_override = match &event {
             Event::HardwareUnavailable { transport } => Some(ActionResult::ShowToast {
-                message: match self.capability_label(transport) {
-                    Some(name) => crate::i18n::get_string_with_args(
-                        self.render_context.resolved_locale(),
-                        "hardware.unavailable",
-                        &[("name", &name)],
-                    ),
-                    None => self.t("hardware.unavailable_generic"),
-                },
+                message: self.unavailable_message(transport),
                 undo_action_id: None,
                 undo_label: None,
             }),

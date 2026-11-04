@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use vauchi_core::recovery::transfer::{HandBackReceiver, HandBackSender, TransferError};
 use vauchi_core::sync::guardian_piece::{GUARDIAN_PIECE_MAX_BYTES, split_backup_for_hand_back};
+use vauchi_core::sync::guardian_transfer::{HandBackReceiver, HandBackSender, TransferError};
 
 // @internal — P33: transport primitives do not complete the domain acceptance scenario.
 #[test]

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use proptest::prelude::*;
-use vauchi_core::recovery::transfer::{HandBackReceiver, HandBackSender, TransferError};
 use vauchi_core::sync::guardian_piece::split_backup_for_hand_back;
+use vauchi_core::sync::guardian_transfer::{HandBackReceiver, HandBackSender, TransferError};
 
 proptest! {
     // @internal

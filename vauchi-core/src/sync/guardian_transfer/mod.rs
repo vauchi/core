@@ -1,8 +1,19 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Bounded recovery-piece transport (Social Recovery A11, P33).
+//! MTU-bounded guardian-piece transport (Social Recovery A11, P33).
 //! Acknowledgements pace packets; they do not prove persistence or restoration.
+
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::arithmetic_side_effects,
+        clippy::indexing_slicing,
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic
+    )
+)]
 
 mod receiver;
 mod sender;

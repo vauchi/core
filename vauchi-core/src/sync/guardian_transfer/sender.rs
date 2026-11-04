@@ -4,7 +4,7 @@
 use super::{DATA_MAGIC, HEADER_BYTES, MAX_ATTRIBUTE_BYTES, TransferError, read_ack};
 use crate::sync::guardian_piece::{GUARDIAN_PIECE_MAX_BYTES, GuardianBackupPiece};
 
-/// One piece, with at most one unacknowledged attribute value.
+/// One guardian piece, with at most one unacknowledged attribute value.
 pub struct HandBackSender {
     bytes: Vec<u8>,
     index: u16,

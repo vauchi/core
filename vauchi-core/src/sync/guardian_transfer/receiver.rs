@@ -4,7 +4,7 @@
 use super::{TransferError, acknowledgement, packet};
 use crate::sync::guardian_piece::GuardianBackupPiece;
 
-/// One bounded in-flight piece of the backup named by an accepted share.
+/// One bounded guardian-piece buffer for the backup named by an accepted share.
 pub struct HandBackReceiver {
     hash: [u8; 32],
     metadata: Option<(u16, usize)>,

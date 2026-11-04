@@ -12,6 +12,7 @@ pub mod delta;
 mod delta_proofs;
 pub mod device_sync;
 pub mod guardian_piece;
+pub mod guardian_transfer;
 pub mod merkle;
 pub mod registry_activation;
 pub mod safety_alert;

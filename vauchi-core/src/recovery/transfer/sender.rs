@@ -65,7 +65,11 @@ impl HandBackSender {
             return Err(TransferError::State);
         }
         if end <= self.offset {
-            return Ok(());
+            return if end == self.bytes.len() || end.checked_rem(self.payload_bytes) == Some(0) {
+                Ok(())
+            } else {
+                Err(TransferError::State)
+            };
         }
         if self.pending_end != Some(end) {
             return Err(TransferError::State);

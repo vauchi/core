@@ -8,6 +8,59 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.99.0] — 2026-11-04
+
+The minor moves because Core takes contract v0.97.0, whose new fields
+Rust consumers that build these types with literals must name, and because
+migration v108 changes the kept-offer storage.
+
+### Added
+
+- Core sends the copy a display shell looked up itself (ADR-066,
+  vauchi/private#1029): every presentation profile carries the window
+  title, a searchable list its search placeholder, and a QR capture its
+  field placeholder and submit label (contract v0.97.0).
+- The guardian delivery carries the guardian's token, and an in-person
+  vouch attaches it (vauchi/private#796).
+- After a social recovery, a rekey that is provably the recovered
+  contact's is accepted as it arrives; resends stop after 14 days. The new
+  phone completes a rekey with a contact's answer, and each sync sends the
+  offers and answers that are due (vauchi/private#796).
+- A recovered contact met again in person is folded into, not duplicated;
+  a contact met in person gets a continuation signed with the old key
+  (vauchi/private#796).
+- The new phone and its recovery screen list the contacts still waiting
+  for their rekey and those that did not answer (vauchi/private#796).
+- A rekey or continuation taken on one of a contact's devices reaches its
+  siblings; a rekey settled on one of the recovered owner's devices reaches
+  the others with the contact's shared key; a device linked while contacts
+  wait takes over the waiting list, offers, proof and old seed
+  (vauchi/private#796).
+
+### Changed
+
+- Core is on contract v0.97.0 (vauchi/private#1029).
+- A rekey moves a contact only with a `RecoveryAuthorization`, which one
+  check makes; a waiting contact records that it was met again
+  (vauchi/private#796).
+- The locale catalogue is re-vendored at locales `432ce85`.
+
+### Fixed
+
+- Migrations v105 and v106 stay as Core 0.98.0 shipped them; v108 adds
+  `kept_at` and drops the kept-offer table (vauchi/private#796).
+- A rekey ends the old identity's device registry and handshake, and the
+  new phone holds the handshake back from a contact until its rekey
+  completes (vauchi/private#796).
+- The device-link full sync leaves the old identity's seed on the device
+  that restored it (vauchi/private#796).
+- A rekey is accepted only on vouchers from the contact's own contacts,
+  never on guardian tokens the old key signed, and no rekey offer is
+  accepted until the policy guardians' certificate exists
+  (vauchi/private#796).
+- A continuation signed with the old key merges no contacts, and the
+  restored phone sends none (vauchi/private#796).
+
 ## [0.98.0] — 2026-11-03
 
 ### Added

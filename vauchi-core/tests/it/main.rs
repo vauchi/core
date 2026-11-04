@@ -547,6 +547,7 @@ mod secure_storage_failure_tests;
 mod security_hardening_tests;
 mod security_tests;
 mod send_phase_outcome_tests;
+mod sensitive_data_at_rest_tests;
 mod settings_engine_tests;
 mod settings_flags_tests;
 mod shred_purge_freshness_tests;

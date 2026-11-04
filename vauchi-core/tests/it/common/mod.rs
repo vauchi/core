@@ -28,6 +28,7 @@
 //! | Sharer→recipient share + deliver | [`two_recipient::add_recipient`], [`two_recipient::deliver`] |
 //! | `AppEngine` onboarding / PIN drive | [`app_engine_helpers::drive_onboarding`], [`app_engine_helpers::enter_pin`] |
 //! | A linked sibling and its pending sync journal | [`device_sync::link_tablet`], [`device_sync::journal_for_tablet`] |
+//! | An owner who lost her phone, with guardians holding her backup | [`lost_phone::lost`] |
 //! | A sealed card-update envelope | [`card_update::seal_update`], [`card_update::seal_update_default`] |
 //! | A relay HTTP response stub | [`mock_relay::CannedResponse`] (feature `network-http`) |
 //! | Contact-count / card-field assertions | [`helpers::assert_contact_count`], [`helpers::assert_card_has_field`] |
@@ -55,6 +56,8 @@ pub mod device_sync;
 pub mod field_validation_helpers;
 #[allow(dead_code)]
 pub mod linked_peer;
+#[allow(dead_code)]
+pub mod lost_phone;
 #[cfg(feature = "network-http")]
 mod mailbox_store;
 #[allow(dead_code)]

@@ -15,43 +15,8 @@ use vauchi_core::sync::guardian_piece::GuardianDelivery;
 use vauchi_core::{AuthMode, ContactField, FieldType, Storage, SymmetricKey, Vauchi, VauchiConfig};
 
 use crate::common::helpers::create_vauchi_with_identity;
+use crate::common::lost_phone::{Lost, alice_pk_hex, lost};
 use crate::common::meeting::signing_pk;
-use crate::common::two_recipient::{Recipient, add_recipient, add_recipient_from, receive};
-
-/// Alice with Dave as a contact and three guardians, each in a group of
-/// its own, holding her backup.
-struct Lost {
-    alice: Vauchi,
-    dave: Recipient,
-    guardians: Vec<Recipient>,
-}
-
-fn lost() -> Lost {
-    let alice = create_vauchi_with_identity("Alice");
-    let alice_pk = signing_pk(&alice);
-    let dave = add_recipient_from(&alice, &alice_pk, create_vauchi_with_identity("Dave"));
-    let mut guardians: Vec<Recipient> = (0..3)
-        .map(|index| add_recipient(&alice, &alice_pk, &format!("G{index}")))
-        .collect();
-    for guardian in &guardians {
-        alice
-            .verify_contact_fingerprint(&guardian.id_at_sharer)
-            .unwrap();
-        alice.toggle_recovery_trust(&guardian.id_at_sharer).unwrap();
-    }
-    for guardian in &mut guardians {
-        receive(&alice, guardian);
-    }
-    Lost {
-        alice,
-        dave,
-        guardians,
-    }
-}
-
-fn alice_pk_hex(lost: &Lost) -> String {
-    hex::encode(signing_pk(&lost.alice))
-}
 
 /// The new phone begins a recovery and takes the hand-backs of the first
 /// `handing_back` guardians.

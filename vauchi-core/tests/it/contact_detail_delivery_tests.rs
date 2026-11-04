@@ -4,8 +4,7 @@
 
 //! Tests for delivery status display in contact detail (J1 MVP).
 //!
-//! Users should see whether their card updates have been delivered
-//! to a contact when viewing that contact's detail screen.
+//! An empty outbound queue does not imply arrival at a contact's device.
 
 use vauchi_app::ui::{
     Component, ContactDetailEngine, DeliverySummary, Field, Item, UiFieldVisibility, WorkflowEngine,
@@ -62,7 +61,7 @@ fn contact_detail_shows_delivery_summary_when_present() {
 
 // @scenario: update_propagation :: All delivered shows success
 #[test]
-fn all_delivered_shows_success_message() {
+fn no_pending_updates_says_nothing_waiting_to_send() {
     let summary = DeliverySummary {
         total: 3,
         delivered: 3,
@@ -81,7 +80,7 @@ fn all_delivered_shows_success_message() {
     let items = delivery_panel.unwrap();
     let status_item = items.iter().find(|i| i.title == "Status");
     assert!(status_item.is_some(), "should have Status item");
-    assert_eq!(status_item.unwrap().detail, "All delivered");
+    assert_eq!(status_item.unwrap().detail, "Nothing waiting to send");
 }
 
 // @scenario: update_propagation :: No delivery records shows nothing

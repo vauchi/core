@@ -134,6 +134,9 @@ fn conflicting_duplicates_and_gaps_do_not_change_received_bytes() {
     let first = sender.next_packet().unwrap().unwrap();
     let receipt = receiver.receive(&first).unwrap();
     assert_eq!(receiver.receive(&first).unwrap(), receipt);
+    let mut changed_length = first.clone();
+    changed_length[8..10].copy_from_slice(&153u16.to_be_bytes());
+    assert_eq!(receiver.receive(&changed_length), Err(TransferError::State));
     let mut changed = first.clone();
     *changed.last_mut().unwrap() ^= 1;
     assert_eq!(receiver.receive(&changed), Err(TransferError::State));
@@ -207,4 +210,75 @@ fn unusable_or_out_of_range_mtus_are_refused() {
             Some(TransferError::Frame)
         );
     }
+}
+
+// @internal — only a final-fragment retry may request persistence again (A11).
+#[test]
+fn replaying_an_earlier_fragment_after_completion_does_not_repeat_the_whole_piece() {
+    let pieces = split_backup_for_hand_back(&[7; 100]).unwrap();
+    let piece = &pieces[0];
+    let mut sender = HandBackSender::new(piece, 23).unwrap();
+    let mut receiver = HandBackReceiver::new(piece.hash());
+    let first = sender.next_packet().unwrap().unwrap();
+    let first_receipt = receiver.receive(&first).unwrap();
+    sender.acknowledge(first_receipt.acknowledgement()).unwrap();
+    let mut last = Vec::new();
+    let mut packets = 1;
+    while !sender.is_complete() {
+        packets += 1;
+        assert!(packets < 1000);
+        last = sender.next_packet().unwrap().unwrap();
+        let receipt = receiver.receive(&last).unwrap();
+        sender.acknowledge(receipt.acknowledgement()).unwrap();
+    }
+
+    let replay = receiver.receive(&first).unwrap();
+    assert_eq!(replay.acknowledgement(), first_receipt.acknowledgement());
+    assert_eq!(replay.piece(), None);
+    assert_eq!(receiver.receive(&last).unwrap().piece(), Some(piece));
+}
+
+// @internal
+#[test]
+fn unsolicited_acknowledgements_cannot_skip_the_first_packet() {
+    let pieces = split_backup_for_hand_back(&[7; 100]).unwrap();
+    let piece = &pieces[0];
+    let mut sender = HandBackSender::new(piece, 23).unwrap();
+    let mut peer_sender = HandBackSender::new(piece, 23).unwrap();
+    let mut receiver = HandBackReceiver::new(piece.hash());
+    let first = peer_sender.next_packet().unwrap().unwrap();
+    let receipt = receiver.receive(&first).unwrap();
+
+    assert_eq!(sender.retry_packet(), Err(TransferError::State));
+    assert_eq!(
+        sender.acknowledge(receipt.acknowledgement()),
+        Err(TransferError::State)
+    );
+    assert!(!sender.is_complete());
+    assert_eq!(sender.next_packet().unwrap(), Some(first));
+}
+
+// @internal
+#[test]
+fn successive_pieces_share_a_receiver_without_mixing_their_buffers() {
+    let pieces = split_backup_for_hand_back(&vec![7; 60_000]).unwrap();
+    let mut receiver = HandBackReceiver::new(pieces[0].hash());
+    let mut received = Vec::new();
+    for piece in &pieces {
+        let mut sender = HandBackSender::new(piece, 517).unwrap();
+        let max_packets = piece.encode().len();
+        let mut packets = 0;
+        while !sender.is_complete() {
+            packets += 1;
+            assert!(packets <= max_packets);
+            let packet = sender.next_packet().unwrap().unwrap();
+            assert!(packet.len() <= 512);
+            let receipt = receiver.receive(&packet).unwrap();
+            if let Some(complete) = receipt.piece() {
+                received.push(complete.clone());
+            }
+            sender.acknowledge(receipt.acknowledgement()).unwrap();
+        }
+    }
+    assert_eq!(received, pieces);
 }

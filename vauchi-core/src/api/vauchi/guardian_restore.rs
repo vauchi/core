@@ -82,40 +82,54 @@ impl Vauchi {
                     }
                 }
             }
-            if let Some(card) = &envelope.sections.own_card {
-                self.storage.contacts().save_own_card(card)?;
-            }
-            let existing: HashSet<String> = self
-                .storage
-                .labels()
-                .load_all_groups()?
-                .iter()
-                .map(|group| group.id().to_string())
-                .collect();
-            for label in &envelope.sections.labels {
-                if existing.contains(&label.label_id) {
-                    continue;
-                }
-                let mut members = HashSet::new();
-                for id in &label.contacts {
-                    if self.storage.contacts().load_contact(id)?.is_some() {
-                        members.insert(id.clone());
-                    }
-                }
-                self.storage.labels().save_group(&Group::from_storage(
-                    label.label_id.clone(),
-                    label.name.clone(),
-                    members,
-                    label.visible_fields.iter().cloned().collect(),
-                    None,
-                    None,
-                    None,
-                    now,
-                    now,
-                ))?;
-            }
+            self.restore_labels_and_card(&envelope, now)?;
             Ok(restored)
         })
+    }
+
+    /// Restores the backup's own card and its labels not already here,
+    /// each with the members this device holds.
+    ///
+    /// # Errors
+    /// Storage errors.
+    pub(super) fn restore_labels_and_card(
+        &self,
+        envelope: &FullBackupEnvelope,
+        now: u64,
+    ) -> VauchiResult<()> {
+        if let Some(card) = &envelope.sections.own_card {
+            self.storage.contacts().save_own_card(card)?;
+        }
+        let existing: HashSet<String> = self
+            .storage
+            .labels()
+            .load_all_groups()?
+            .iter()
+            .map(|group| group.id().to_string())
+            .collect();
+        for label in &envelope.sections.labels {
+            if existing.contains(&label.label_id) {
+                continue;
+            }
+            let mut members = HashSet::new();
+            for id in &label.contacts {
+                if self.storage.contacts().load_contact(id)?.is_some() {
+                    members.insert(id.clone());
+                }
+            }
+            self.storage.labels().save_group(&Group::from_storage(
+                label.label_id.clone(),
+                label.name.clone(),
+                members,
+                label.visible_fields.iter().cloned().collect(),
+                None,
+                None,
+                None,
+                now,
+                now,
+            ))?;
+        }
+        Ok(())
     }
 
     /// The contacts restored from the guardian backup that still wait for

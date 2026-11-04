@@ -63,7 +63,7 @@ impl HandBackReceiver {
         } else if self.bytes.get(frame.offset..frame.end) != Some(frame.body) {
             return Err(TransferError::State);
         }
-        let piece = if self.bytes.len() == frame.total {
+        let piece = if self.bytes.len() == frame.total && frame.end == frame.total {
             match GuardianBackupPiece::decode(&self.bytes) {
                 Ok(piece) if piece.index() == frame.index && piece.hash() == self.hash => {
                     Some(piece)

@@ -86,6 +86,13 @@ fn malformed_or_unexpected_acks_leave_the_packet_outstanding() {
         assert_eq!(sender.retry_packet().unwrap(), packet);
     }
     sender.acknowledge(&good).unwrap();
+    let mut unissued_old_end = good.clone();
+    unissued_old_end[6..8].copy_from_slice(&1u16.to_be_bytes());
+    assert_eq!(
+        sender.acknowledge(&unissued_old_end),
+        Err(TransferError::State)
+    );
+    sender.acknowledge(&good).unwrap();
     assert!(sender.next_packet().unwrap().is_some());
 }
 

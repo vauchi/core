@@ -73,6 +73,8 @@ impl Projection {
             label: None,
             rows,
             searchable,
+            search_placeholder: searchable
+                .then(|| crate::i18n::get_string(self.locale, "action.search")),
             paging: (total_count > 0).then_some(PresentationPaging {
                 total_count,
                 offset,
@@ -135,6 +137,7 @@ impl Projection {
             rows,
             style: PresentationListStyle::Rows,
             searchable: false,
+            search_placeholder: None,
             paging: None,
             accessibility: accessibility(a11y, label),
         })
@@ -209,6 +212,7 @@ impl Projection {
             label: (!label.is_empty()).then(|| label.to_owned()),
             rows,
             searchable: false,
+            search_placeholder: None,
             paging: None,
             accessibility: AccessibilitySpec::label(label),
             style: PresentationListStyle::Rows,
@@ -278,6 +282,7 @@ impl Projection {
             label: label.clone(),
             rows,
             searchable: false,
+            search_placeholder: None,
             paging: None,
             accessibility: AccessibilitySpec::label(label.as_deref().unwrap_or("")),
             style,
@@ -347,6 +352,7 @@ impl Projection {
             label: None,
             rows: field_rows,
             searchable: false,
+            search_placeholder: None,
             paging: None,
             accessibility: accessibility(a11y, name),
             style: PresentationListStyle::Rows,

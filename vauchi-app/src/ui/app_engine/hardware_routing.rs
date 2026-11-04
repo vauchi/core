@@ -50,7 +50,8 @@ impl AppEngine {
     /// shell is attached, hardware commands are queued for
     /// [`Self::drain_hardware_commands`]. Bindings route commands they add to a
     /// batch, such as a keychain release, through it.
-    pub fn route_to_shells(&mut self, commands: Vec<Command>) -> Vec<Command> {
+    pub fn route_to_shells(&mut self, mut commands: Vec<Command>) -> Vec<Command> {
+        crate::ui::presentation::title_profiles(&mut commands, || self.t("app.name"));
         self.hardware_route.route(commands)
     }
 }

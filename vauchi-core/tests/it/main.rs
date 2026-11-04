@@ -346,6 +346,7 @@ mod identity_device_tests;
 mod identity_password_coverage_tests;
 mod identity_password_tests;
 mod identity_shred_tests;
+mod identity_signing_key_seed_tests;
 mod identity_tests;
 mod ignored_contact_propagation_tests;
 mod imported_contact_api_tests;

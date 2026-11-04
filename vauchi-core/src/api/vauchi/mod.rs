@@ -353,6 +353,11 @@ impl Vauchi {
         // panic on the first HTTPS request.
         crate::network::ensure_rustls_provider_installed();
 
+        // No plaintext relay connection (ADR-037 addendum): the C ABI, the
+        // mobile engine and tui pass the URL here, not through `set_relay`
+        // (private#1066).
+        validate_relay_urls(&config.relay)?;
+
         let clock = clock.unwrap_or_else(SystemClock::shared);
         let rng = rng.unwrap_or_else(OsSecureRng::shared);
         let sleeper = SystemSleeper::shared();
@@ -410,6 +415,7 @@ impl Vauchi {
         if config.relay.server_url == crate::api::config::DEFAULT_RELAY_URL
             && config.relay.ohttp_anchor.is_none()
             && let Ok(Some(url)) = storage.ux().load_relay_url()
+            && crate::relay_url::validate_configured_relay_url(&url).is_ok()
         {
             config.relay.server_url = url;
             config.relay.ohttp_anchor = storage.ux().load_relay_anchor().ok().flatten();
@@ -664,5 +670,27 @@ impl Vauchi {
             last_sync_unix_seconds: None,
             last_emergency_broadcast_unix_seconds: None,
         })
+    }
+}
+
+fn validate_relay_urls(relay: &crate::api::RelayConfig) -> VauchiResult<()> {
+    let urls = std::iter::once(relay.server_url.as_str()).chain(relay.ohttp_relay_url.as_deref());
+    for url in urls {
+        crate::relay_url::validate_configured_relay_url(&as_http_scheme(url))
+            .map_err(|error| VauchiError::Configuration(format!("relay URL: {error}")))?;
+    }
+    Ok(())
+}
+
+/// The cli, tui and Windows defaults spell the relay `wss://`, which Core
+/// reaches over https (`config::http_origin`), so `wss` is TLS and `ws` is
+/// plaintext.
+fn as_http_scheme(url: &str) -> std::borrow::Cow<'_, str> {
+    if let Some(rest) = url.strip_prefix("wss://") {
+        format!("https://{rest}").into()
+    } else if let Some(rest) = url.strip_prefix("ws://") {
+        format!("http://{rest}").into()
+    } else {
+        url.into()
     }
 }

@@ -111,7 +111,13 @@ fn config_at(dir: &tempfile::TempDir) -> VauchiConfig {
 // @scenario: relay_transport_security :: Non-https relay URLs are rejected at the parse boundary
 #[test]
 fn vauchi_new_refuses_every_relay_url_that_would_skip_tls() {
-    for url in NON_TLS_URLS {
+    // `wss` is TLS: Core reaches a `wss://` relay over https, and the
+    // cli, tui and Windows defaults are spelled that way.
+    let refused = NON_TLS_URLS
+        .iter()
+        .filter(|url| !url.starts_with("wss://"))
+        .chain(&["ws://relay.example.com:443", "WS://relay.example.com"]);
+    for url in refused {
         let dir = tempfile::tempdir().unwrap();
         let relay = Vauchi::new(config_at(&dir).with_relay_url(*url));
         let ohttp_relay = Vauchi::new(config_at(&dir).with_ohttp_relay_url(*url));
@@ -127,9 +133,11 @@ fn vauchi_new_accepts_https_and_plaintext_loopback() {
     for url in [
         "https://relay.example.com",
         "https://relay.example.com:8443/v2",
+        "wss://relay.vauchi.app",
         "http://127.0.0.1:8080",
         "http://localhost:8080",
         "http://[::1]:8080",
+        "ws://127.0.0.1:8080",
     ] {
         let dir = tempfile::tempdir().unwrap();
         let vauchi = Vauchi::new(

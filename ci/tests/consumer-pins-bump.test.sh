@@ -14,6 +14,18 @@ set -eu
 
 CORE_PINS=${CORE_PINS:?set CORE_PINS to vauchi/scripts/scripts/core-pins.py}
 HERE=$(cd "$(dirname "$0")/../.." && pwd)
+python3 - "$HERE/ci/consumer-pins.json" "$HERE/ci/publish-and-trigger.yml" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+consumers = json.loads(Path(sys.argv[1]).read_text())["consumers"]
+cargo_consumers = {entry["repo"] for entry in consumers if entry["kind"] == "cargo"}
+assert "linux-app" in cargo_consumers, "linux-app must receive Core version bumps"
+assert "linux-gtk" not in cargo_consumers, "the GTK display depends on the contract alone"
+matrix = [line for line in Path(sys.argv[2]).read_text().splitlines() if "DOWNSTREAM:" in line]
+assert all("vauchi/linux-gtk" not in line for line in matrix), "Core RC verification must not target the display"
+PY
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 

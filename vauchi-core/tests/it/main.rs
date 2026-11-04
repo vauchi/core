@@ -465,6 +465,7 @@ mod protocol_compatibility_tests;
 mod protocol_exchange_vectors_tests;
 mod protocol_test_vectors_tests;
 mod proximity_confidence_tests;
+mod public_keys_never_route_tests;
 mod purge_signing_tests;
 mod qr_decode_camera_corpus_tests;
 mod qr_landing_url_tests;

@@ -136,6 +136,8 @@ struct MockGateway {
     signed_record: Vec<u8>,
     /// Inner actions decapsulated so far, in arrival order.
     actions: Vec<String>,
+    /// Inner request bodies decapsulated so far, unpadded, in arrival order.
+    inner_requests: Vec<Vec<u8>>,
     /// Blobs every `fetch` answers with.
     blobs: Vec<serde_json::Value>,
     /// Encapsulated answers to ticketed requests, by ticket (#628). The
@@ -243,6 +245,7 @@ impl MockRelay {
             key_config: encoded_config,
             signed_record,
             actions: Vec::new(),
+            inner_requests: Vec::new(),
             blobs: Vec::new(),
             async_answers: std::collections::HashMap::new(),
             held_polls: 0,
@@ -367,6 +370,17 @@ impl MockRelay {
             .gateway
             .as_mut()
             .expect("enable_ohttp_gateway first"))
+    }
+
+    /// Inner request bodies the gateway has decapsulated, in arrival order.
+    pub fn ohttp_inner_requests(&self) -> Vec<Vec<u8>> {
+        self.state
+            .lock()
+            .unwrap()
+            .gateway
+            .as_ref()
+            .map(|gateway| gateway.inner_requests.clone())
+            .unwrap_or_default()
     }
 
     /// Inner actions the gateway has decapsulated, in arrival order.
@@ -513,7 +527,11 @@ fn serve_ohttp(gateway: &mut MockGateway, body: &[u8]) -> CannedResponse {
     let Ok((padded_request, server_response)) = gateway.server.decapsulate(body) else {
         return CannedResponse::status(400);
     };
-    let request = vauchi_core::crypto::padding::unpad(&padded_request)
+    let unpadded = vauchi_core::crypto::padding::unpad(&padded_request);
+    if let Some(inner) = &unpadded {
+        gateway.inner_requests.push(inner.clone());
+    }
+    let request = unpadded
         .and_then(|request| serde_json::from_slice::<serde_json::Value>(&request).ok())
         .unwrap_or_default();
     let action = request

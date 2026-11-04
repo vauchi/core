@@ -99,20 +99,31 @@ fn wire(outer: &MockRelay, application: &MockRelay) -> Vec<Vec<u8>> {
     wire
 }
 
-// @internal
-#[test]
-fn a_send_and_a_receive_put_no_public_key_on_the_wire() {
+const BOB_NAME: &str = "Bartholomew Quince-Arbuthnot";
+const BOB_EMAIL: &str = "bartholomew.8c2e@example.invalid";
+
+/// Alice and Bob after Bob sent Alice a new email field through the
+/// relay and Alice received it.
+struct Delivered {
+    outer: MockRelay,
+    application: MockRelay,
+    alice: Vauchi,
+    bob: Vauchi,
+    _dirs: [tempfile::TempDir; 2],
+}
+
+fn bob_sends_alice_an_email() -> Delivered {
     let outer = MockRelay::start();
     let application = MockRelay::start();
     let clock = Arc::new(FakeClock::new(UNIX_EPOCH + Duration::from_secs(NOW)));
     outer.enable_ohttp_gateway(&SignedGateway::new(0x63), window_of(NOW));
     outer.enable_gateway_mailboxes(clock.clone(), 8);
-    let (mut alice, _alice_dir) = client(&outer, &application, clock.clone(), "Alice");
-    let (mut bob, _bob_dir) = client(&outer, &application, clock.clone(), "Bob");
-    let linked = link_contacts(&alice, &bob, "Bob");
+    let (mut alice, alice_dir) = client(&outer, &application, clock.clone(), "Alice");
+    let (mut bob, bob_dir) = client(&outer, &application, clock.clone(), BOB_NAME);
+    let linked = link_contacts(&alice, &bob, BOB_NAME);
 
     let mut updated = bob.own_card().unwrap().unwrap().clone();
-    let field = ContactField::new(FieldType::Email, "Email", "bob@example.invalid", 0);
+    let field = ContactField::new(FieldType::Email, "Email", BOB_EMAIL, 0);
     let field_id = field.id().to_string();
     updated.add_field(field).unwrap();
     bob.update_own_card(&updated).unwrap();
@@ -128,15 +139,30 @@ fn a_send_and_a_receive_put_no_public_key_on_the_wire() {
         .card()
         .fields()
         .iter()
-        .any(|f| f.value() == "bob@example.invalid");
+        .any(|f| f.value() == BOB_EMAIL);
     assert!(
         received,
         "the update must cross the relay, or the wire proves nothing"
     );
-    let inner = outer.ohttp_inner_requests();
-    assert!(!inner.is_empty(), "the gateway decapsulated no request");
+    assert!(
+        !outer.ohttp_inner_requests().is_empty(),
+        "the gateway decapsulated no request"
+    );
+    Delivered {
+        outer,
+        application,
+        alice,
+        bob,
+        _dirs: [alice_dir, bob_dir],
+    }
+}
 
-    let keys: Vec<(&str, Vec<u8>)> = [("Alice", &alice), ("Bob", &bob)]
+// @internal
+#[test]
+fn a_send_and_a_receive_put_no_public_key_on_the_wire() {
+    let delivered = bob_sends_alice_an_email();
+
+    let keys: Vec<(&str, Vec<u8>)> = [("Alice", &delivered.alice), ("Bob", &delivered.bob)]
         .into_iter()
         .flat_map(|(name, client)| {
             let identity = client.identity().unwrap();
@@ -146,11 +172,29 @@ fn a_send_and_a_receive_put_no_public_key_on_the_wire() {
             ]
         })
         .collect();
-    for request in wire(&outer, &application) {
+    for request in wire(&delivered.outer, &delivered.application) {
         for (name, key) in &keys {
             assert!(
                 !carries(&request, key),
                 "a request carries {name}'s public key: {}",
+                String::from_utf8_lossy(&request)
+            );
+        }
+    }
+}
+
+// adr-constraints "Never expose plaintext to the relay" (ADR-004): the
+// relay sees the update only as an encrypted blob.
+// @internal
+#[test]
+fn the_relay_never_sees_the_card_update_in_plaintext() {
+    let delivered = bob_sends_alice_an_email();
+
+    for request in wire(&delivered.outer, &delivered.application) {
+        for (what, secret) in [("email", BOB_EMAIL), ("name", BOB_NAME)] {
+            assert!(
+                !carries(&request, secret.as_bytes()),
+                "a request carries Bob's {what}: {}",
                 String::from_utf8_lossy(&request)
             );
         }

@@ -19,6 +19,8 @@ use crate::clock::Clock;
 use crate::crypto::SymmetricKey;
 use crate::recovery::{RecoveryProgress, RecoverySettings};
 
+mod mode;
+
 /// Scoped persistence view for the recovery domain (responses, rate limits,
 /// settings, in-progress state).
 pub struct RecoveryStore<'a> {

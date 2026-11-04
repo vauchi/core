@@ -26,7 +26,7 @@ vauchi-app = { path = "vauchi-app", version = "0.99.0", default-features = false
 vauchi-protocol = { path = "vauchi-protocol", version = "0.99.0" }
 # The shell contract (ADR-078): the Command/Event types, their schema and the
 # fixture corpus; a git tag with a declared range, since there is no registry.
-vauchi-contract = { git = "https://gitlab.com/vauchi/contract.git", tag = "v0.97.0", version = "^0.97" }
+vauchi-contract = { git = "https://gitlab.com/vauchi/contract.git", tag = "v0.97.2", version = "^0.97" }
 
 # rqrr 0.11.0 with the clamped Perspective::map (vauchi/utils/rqrr): upstream
 # aborts on a near-degenerate QR perspective, uncatchable under

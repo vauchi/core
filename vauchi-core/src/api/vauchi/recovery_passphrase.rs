@@ -92,16 +92,36 @@ impl Vauchi {
         re_sealed_shares: &[Vec<u8>],
         passphrase: Option<&str>,
     ) -> VauchiResult<crate::backup::FullBackupEnvelope> {
-        if !Self::guardian_backup_needs_passphrase(backup_data) {
-            return self.recover_guardian_backup(backup_data, re_sealed_shares);
-        }
-        let refused = || VauchiError::Configuration("Guardian backup recovery failed".into());
-        if backup_data.trim().len() > MAX_SEALED_HEX_LEN {
-            return Err(refused());
-        }
-        let bytes = hex::decode(backup_data.trim()).map_err(|_| refused())?;
-        let inner = passphrase_layer::open(passphrase.ok_or_else(refused)?, &bytes)
-            .map_err(|_| refused())?;
-        self.recover_guardian_backup(&hex::encode(inner), re_sealed_shares)
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        open_guardian_backup_with_passphrase(
+            backup_data,
+            re_sealed_shares,
+            passphrase,
+            &identity.signing_keypair().to_x25519_secret(),
+        )
     }
+}
+
+/// Opens a guardian backup, under its passphrase when it has one, with the
+/// shares re-sealed to `our_secret`'s key (P32).
+pub(super) fn open_guardian_backup_with_passphrase(
+    backup_data: &str,
+    re_sealed_shares: &[Vec<u8>],
+    passphrase: Option<&str>,
+    our_secret: &x25519_dalek::StaticSecret,
+) -> VauchiResult<crate::backup::FullBackupEnvelope> {
+    if !Vauchi::guardian_backup_needs_passphrase(backup_data) {
+        return super::identity::open_guardian_backup(backup_data, re_sealed_shares, our_secret);
+    }
+    let refused = || VauchiError::Configuration("Guardian backup recovery failed".into());
+    if backup_data.trim().len() > MAX_SEALED_HEX_LEN {
+        return Err(refused());
+    }
+    let bytes = hex::decode(backup_data.trim()).map_err(|_| refused())?;
+    let inner =
+        passphrase_layer::open(passphrase.ok_or_else(refused)?, &bytes).map_err(|_| refused())?;
+    super::identity::open_guardian_backup(&hex::encode(inner), re_sealed_shares, our_secret)
 }

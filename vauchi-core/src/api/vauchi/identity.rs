@@ -886,32 +886,44 @@ impl Vauchi {
         backup_data: &str,
         re_sealed_shares: &[Vec<u8>],
     ) -> VauchiResult<crate::backup::FullBackupEnvelope> {
-        let bytes = crate::backup::decode_guardian_backup_hex(backup_data)
-            .map_err(|_| guardian_recovery_failed())?;
-        let metadata = crate::backup::guardian_backup_metadata(&bytes)
-            .map_err(|_| guardian_recovery_failed())?;
-        let maximum_responses = crate::backup::KeyShardConfig::MAX_COUNT as usize * 2;
-        if re_sealed_shares.len() > maximum_responses {
-            return Err(guardian_recovery_failed());
-        }
-
         let identity = self
             .identity
             .as_ref()
             .ok_or(VauchiError::IdentityNotInitialized)?;
-        let our_secret = identity.signing_keypair().to_x25519_secret();
-
-        let mut shards = Vec::with_capacity(re_sealed_shares.len());
-        for sealed in re_sealed_shares {
-            if let Ok(shard) = crate::backup::open_share_for_guardian(sealed, &our_secret)
-                && shard.metadata() == metadata
-            {
-                shards.push(shard);
-            }
-        }
-
-        crate::backup::recover_from_shards(&bytes, &shards).map_err(|_| guardian_recovery_failed())
+        open_guardian_backup(
+            backup_data,
+            re_sealed_shares,
+            &identity.signing_keypair().to_x25519_secret(),
+        )
     }
+}
+
+/// Opens a guardian backup with the shares re-sealed to `our_secret`'s key:
+/// the identity's, or a recovering phone's temporary key (P32).
+pub(super) fn open_guardian_backup(
+    backup_data: &str,
+    re_sealed_shares: &[Vec<u8>],
+    our_secret: &x25519_dalek::StaticSecret,
+) -> VauchiResult<crate::backup::FullBackupEnvelope> {
+    let bytes = crate::backup::decode_guardian_backup_hex(backup_data)
+        .map_err(|_| guardian_recovery_failed())?;
+    let metadata =
+        crate::backup::guardian_backup_metadata(&bytes).map_err(|_| guardian_recovery_failed())?;
+    let maximum_responses = crate::backup::KeyShardConfig::MAX_COUNT as usize * 2;
+    if re_sealed_shares.len() > maximum_responses {
+        return Err(guardian_recovery_failed());
+    }
+
+    let mut shards = Vec::with_capacity(re_sealed_shares.len());
+    for sealed in re_sealed_shares {
+        if let Ok(shard) = crate::backup::open_share_for_guardian(sealed, our_secret)
+            && shard.metadata() == metadata
+        {
+            shards.push(shard);
+        }
+    }
+
+    crate::backup::recover_from_shards(&bytes, &shards).map_err(|_| guardian_recovery_failed())
 }
 
 fn guardian_recovery_failed() -> VauchiError {

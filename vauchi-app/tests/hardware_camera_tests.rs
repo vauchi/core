@@ -147,3 +147,53 @@ fn a_new_capture_stops_the_running_one_first() {
     assert_ne!(first, second);
     assert_eq!(stops(&hardware), vec![first]);
 }
+
+fn attached_without_a_camera() -> AppEngine {
+    let mut engine = engine();
+    engine
+        .dispatch(
+            event_from_json(
+                r#"{"HardwareCapabilitiesReported":{"capabilities":{"has_camera":false}}}"#,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    engine
+}
+
+fn toasts(display: &[Command]) -> Vec<String> {
+    display
+        .iter()
+        .filter_map(|command| match command {
+            Command::ShowToast { toast } => Some(toast.message.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+// @internal — private#1070: the hardware shell has no camera port to run a
+// capture on, so Core starts none and says so, instead of waiting on a scan
+// that never begins.
+#[test]
+fn without_a_camera_a_scan_starts_no_capture_and_says_why() {
+    let mut engine = attached_without_a_camera();
+
+    let (display, hardware) = request(&mut engine, Command::QrRequestScan);
+
+    assert_eq!(viewport(&display), None);
+    assert_eq!(capture(&hardware), None);
+    assert!(!display.contains(&Command::QrRequestScan));
+    assert_eq!(toasts(&display), ["Camera is not available on this device"]);
+}
+
+// @internal — private#1070, the same for a photo.
+#[test]
+fn without_a_camera_a_photo_starts_no_capture_and_says_why() {
+    let mut engine = attached_without_a_camera();
+
+    let (display, hardware) = request(&mut engine, Command::ImageCaptureFromCamera);
+
+    assert_eq!(viewport(&display), None);
+    assert_eq!(capture(&hardware), None);
+    assert_eq!(toasts(&display), ["Camera is not available on this device"]);
+}

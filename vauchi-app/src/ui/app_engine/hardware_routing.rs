@@ -52,6 +52,14 @@ impl AppEngine {
     /// batch, such as a keychain release, through it.
     pub fn route_to_shells(&mut self, mut commands: Vec<Command>) -> Vec<Command> {
         crate::ui::presentation::title_profiles(&mut commands, || self.t("app.name"));
-        self.hardware_route.route(commands)
+        let mut display = self.hardware_route.route(commands);
+        if self.hardware_route.take_camera_missing() {
+            display.push(Command::ShowToast {
+                toast: vauchi_core::ToastSpec {
+                    message: self.unavailable_message("camera"),
+                },
+            });
+        }
+        display
     }
 }

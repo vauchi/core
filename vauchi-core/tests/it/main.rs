@@ -326,6 +326,7 @@ mod guardian_backup_restore_tests;
 mod guardian_backup_return_tests;
 mod guardian_backup_send_tests;
 mod guardian_backup_tag_tests;
+mod guardian_hand_back_share_tests;
 mod guardian_identity_key_contract_tests;
 mod guardian_token_proptest;
 mod guardian_token_tests;

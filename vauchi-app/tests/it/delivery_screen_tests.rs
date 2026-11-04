@@ -246,13 +246,21 @@ fn only_the_failed_list_offers_retry_all() {
 
 // @internal
 #[test]
-fn nothing_to_deliver_says_everything_arrived() {
+fn an_empty_queue_says_nothing_is_waiting_to_send() {
     let screen = DeliveryStatusEngine::new(vec![]).current_screen();
     assert!(switch(&screen).is_none(), "no switch without deliveries");
+    let texts = texts(&screen);
+    // ADR-057 amendment: Vauchi cannot see a contact's device receive an
+    // update, so an empty queue claims nothing about arrival (private#1065).
     assert!(
-        texts(&screen).contains(
-            &"Everything you changed has reached everyone who should have it.".to_string()
-        )
+        texts.contains(&"Changes you make are sent the next time Vauchi syncs.".to_string()),
+        "{texts:?}"
+    );
+    assert!(
+        texts
+            .iter()
+            .all(|t| !t.contains("reached") && !t.contains("Delivered")),
+        "{texts:?}"
     );
 }
 

@@ -262,6 +262,7 @@ mod restorable_state_tests;
 mod restore_over_identity_tests;
 mod result_routing_wiring_tests;
 mod row_info_tests;
+mod sent_not_delivered_copy_tests;
 mod settings_canvas_tests;
 mod settings_link_routing_tests;
 mod settings_parity_tests;

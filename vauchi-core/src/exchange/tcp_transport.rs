@@ -16,20 +16,13 @@
 //! The protocol is symmetric — both sides run the same code. The initiator
 //! connects, the responder listens.
 
-use std::io::{self, Read, Write};
+use std::io;
 use std::net::TcpStream;
+
+use vauchi_contract::direct::{self, DirectFrameError, MAX_DIRECT_PAYLOAD};
 
 use super::direct_transport::ProximityLevel;
 use super::error::ExchangeError;
-
-/// Maximum payload size (64 KB). Exchange payloads are typically ~300 bytes.
-const MAX_PAYLOAD_SIZE: u32 = 65_536;
-
-/// Vauchi exchange protocol magic bytes (sent first to identify protocol).
-const PROTOCOL_MAGIC: &[u8; 4] = b"VXCH";
-
-/// Protocol version.
-const PROTOCOL_VERSION: u8 = 1;
 
 /// Errors from TCP transport operations.
 #[derive(Debug, thiserror::Error)]
@@ -44,7 +37,7 @@ pub enum TcpTransportError {
     #[error("Unsupported protocol version: {0}")]
     UnsupportedVersion(u8),
 
-    #[error("Payload too large: {0} bytes (max {MAX_PAYLOAD_SIZE})")]
+    #[error("Payload too large: {0} bytes (max {MAX_DIRECT_PAYLOAD})")]
     PayloadTooLarge(u32),
 
     #[error("Connection closed by peer")]
@@ -53,74 +46,43 @@ pub enum TcpTransportError {
 
 /// Send an exchange payload over a TCP stream.
 ///
-/// Writes: magic (4) + version (1) + length (4 BE) + payload.
+/// The frame is the contract's (`vauchi_contract::direct`): magic (4) +
+/// version (1) + length (4 BE) + payload. Core chooses the framing
+/// (ADR-077), and the contract holds the one codec the hardware shells use
+/// too (private#1029).
 pub fn send_payload(stream: &mut TcpStream, payload: &[u8]) -> Result<(), TcpTransportError> {
-    if payload.is_empty() {
-        return Err(TcpTransportError::ConnectionClosed);
-    }
-    let len = payload.len() as u32;
-    if len > MAX_PAYLOAD_SIZE {
-        return Err(TcpTransportError::PayloadTooLarge(len));
-    }
-
-    stream.write_all(PROTOCOL_MAGIC)?;
-    stream.write_all(&[PROTOCOL_VERSION])?;
-    stream.write_all(&len.to_be_bytes())?;
-    stream.write_all(payload)?;
-    stream.flush()?;
-    Ok(())
+    Ok(direct::write_frame(stream, payload)?)
 }
 
 /// Receive an exchange payload from a TCP stream.
-///
-/// Reads: magic (4) + version (1) + length (4 BE) + payload.
 pub fn recv_payload(stream: &mut TcpStream) -> Result<Vec<u8>, TcpTransportError> {
-    let mut magic = [0u8; 4];
-    stream.read_exact(&mut magic)?;
-    if &magic != PROTOCOL_MAGIC {
-        return Err(TcpTransportError::InvalidMagic);
-    }
-
-    let mut version = [0u8; 1];
-    stream.read_exact(&mut version)?;
-    if version[0] != PROTOCOL_VERSION {
-        return Err(TcpTransportError::UnsupportedVersion(version[0]));
-    }
-
-    let mut len_buf = [0u8; 4];
-    stream.read_exact(&mut len_buf)?;
-    let len = u32::from_be_bytes(len_buf);
-    if len > MAX_PAYLOAD_SIZE {
-        return Err(TcpTransportError::PayloadTooLarge(len));
-    }
-    if len == 0 {
-        return Err(TcpTransportError::ConnectionClosed);
-    }
-
-    let mut payload = vec![0u8; len as usize];
-    stream.read_exact(&mut payload)?;
-    Ok(payload)
+    Ok(direct::read_frame(stream)?)
 }
 
 /// Exchange payloads bidirectionally over a TCP stream.
 ///
-/// Sends our payload and receives the peer's payload. The order is:
-/// - Initiator (client): send first, then receive
-/// - Responder (server): receive first, then send
-///
-/// This avoids deadlock since both sides agree on who sends first.
+/// The initiator sends first and the responder receives first, so both
+/// sides agree on who sends first and neither deadlocks.
 pub fn exchange_payloads(
     stream: &mut TcpStream,
     our_payload: &[u8],
     is_initiator: bool,
 ) -> Result<Vec<u8>, TcpTransportError> {
-    if is_initiator {
-        send_payload(stream, our_payload)?;
-        recv_payload(stream)
-    } else {
-        let theirs = recv_payload(stream)?;
-        send_payload(stream, our_payload)?;
-        Ok(theirs)
+    Ok(direct::exchange(stream, our_payload, is_initiator)?)
+}
+
+impl From<DirectFrameError> for TcpTransportError {
+    fn from(error: DirectFrameError) -> Self {
+        match error {
+            DirectFrameError::Io(error) => Self::Io(error),
+            DirectFrameError::InvalidMagic => Self::InvalidMagic,
+            DirectFrameError::UnsupportedVersion(version) => Self::UnsupportedVersion(version),
+            DirectFrameError::PayloadTooLarge(len) => Self::PayloadTooLarge(len),
+            // An empty frame, either way, is what Core always called a closed
+            // connection.
+            DirectFrameError::EmptyPayload => Self::ConnectionClosed,
+            _ => Self::Io(io::Error::other(error.to_string())),
+        }
     }
 }
 

@@ -81,6 +81,13 @@ class ContractPinsTest(unittest.TestCase):
         self.assertEqual(manifest.read_text(), '[dependencies]\n# ' + OLD + 'serde = "1"\n' + NEW.rstrip() + ' # old tag = "v0.1.0"\n')
 
     # @internal
+    def test_contract_urls_in_package_metadata_are_preserved(self):
+        metadata = '[package.metadata.example]\n' + OLD
+        manifest = self.write("Cargo.toml", '[dependencies]\n' + OLD + metadata)
+        self.assertEqual(ALIGN(manifest, self.core), ["Cargo.toml"])
+        self.assertEqual(manifest.read_text(), '[dependencies]\n' + NEW + metadata)
+
+    # @internal
     def test_consumer_without_a_contract_dependency_is_unchanged(self):
         manifest = self.write("Cargo.toml", '[dependencies]\nserde = "1"\n')
         self.assertEqual(ALIGN(manifest, self.core), [])

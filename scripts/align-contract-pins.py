@@ -92,9 +92,22 @@ def _comment(line):
 def _rewrite(text, tag):
     tomllib.loads(text)
     result = []
+    dependency_table = False
     for line in text.splitlines(keepends=True):
         code, comment = _comment(line)
-        if GIT.search(code):
+        if code.lstrip().startswith("["):
+            table = tomllib.loads(code)
+            parts = []
+            while isinstance(table, dict) and len(table) == 1:
+                name, table = next(iter(table.items()))
+                parts.append(name)
+            kinds = {"dependencies", "dev-dependencies", "build-dependencies"}
+            dependency_table = bool(parts) and (
+                parts[0] in kinds
+                or parts[:2] == ["workspace", "dependencies"]
+                or len(parts) >= 3 and parts[0] == "target" and parts[2] in kinds
+            )
+        if dependency_table and GIT.search(code):
             if "{" not in code or "}" not in code:
                 raise ValueError("contract dependencies must use one-line inline tables")
             pin = TAG if TAG.search(code) else BRANCH

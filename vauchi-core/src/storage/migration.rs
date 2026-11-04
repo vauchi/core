@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 110] = [
+const MIGRATIONS: [Migration; 111] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -822,7 +822,30 @@ const MIGRATIONS: [Migration; 110] = [
         name: "recovery_mode_key",
         action: MigrationAction::Sql(MIGRATION_V110_RECOVERY_MODE_KEY),
     },
+    Migration {
+        version: 111,
+        name: "recovery_backup_pieces",
+        action: MigrationAction::Sql(MIGRATION_V111_RECOVERY_BACKUP_PIECES),
+    },
 ];
+
+/// Migration v111 (vauchi/private#796, P33): a guardian hands back its
+/// share by QR and its backup in pieces over Bluetooth, so the recovering
+/// phone keeps the pieces apart, by the backup hash a taken share names,
+/// with the piece count beside them so taking one reads no other. A
+/// hand-back kept by v110 held share and backup together, a form the
+/// phone no longer reads; it is dropped, to be handed back again.
+const MIGRATION_V111_RECOVERY_BACKUP_PIECES: &str = "
+    CREATE TABLE IF NOT EXISTS recovery_backup_pieces (
+        backup_hash BLOB NOT NULL CHECK (length(backup_hash) = 32),
+        piece_index INTEGER NOT NULL,
+        piece_count INTEGER NOT NULL,
+        piece_encrypted BLOB NOT NULL,
+        received_at INTEGER NOT NULL,
+        PRIMARY KEY (backup_hash, piece_index)
+    );
+    DELETE FROM recovery_hand_backs;
+";
 
 /// Migration v110 (vauchi/private#796, P32): the temporary recovery key a
 /// phone with no identity holds while its guardians hand back the backup,

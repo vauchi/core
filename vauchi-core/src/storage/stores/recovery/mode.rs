@@ -64,6 +64,8 @@ impl RecoveryStore<'_> {
     /// changed).
     pub fn clear_hand_backs(&self) -> Result<(), StorageError> {
         self.conn.execute("DELETE FROM recovery_hand_backs", [])?;
+        self.conn
+            .execute("DELETE FROM recovery_backup_pieces", [])?;
         Ok(())
     }
 
@@ -92,8 +94,7 @@ impl RecoveryStore<'_> {
     pub fn clear_recovery_mode_seed(&self) -> Result<(), StorageError> {
         self.conn
             .execute("DELETE FROM recovery_mode_key WHERE id = 1", [])?;
-        self.conn.execute("DELETE FROM recovery_hand_backs", [])?;
-        Ok(())
+        self.clear_hand_backs()
     }
 
     /// Keeps a hand-back taken in person, once per share.
@@ -132,5 +133,81 @@ impl RecoveryStore<'_> {
                     .map_err(|e| StorageError::Encryption(e.to_string()))
             })
             .collect()
+    }
+
+    /// Keeps one piece of the backup `backup_hash` names, once per index.
+    pub fn keep_backup_piece(
+        &self,
+        backup_hash: &[u8; 32],
+        index: u16,
+        count: u16,
+        piece: &[u8],
+        received_at: u64,
+    ) -> Result<(), StorageError> {
+        let piece_encrypted = crate::crypto::encrypt(self.key, piece)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO recovery_backup_pieces
+             (backup_hash, piece_index, piece_count, piece_encrypted, received_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                backup_hash.as_slice(),
+                index,
+                count,
+                piece_encrypted,
+                i64::try_from(received_at).unwrap_or(i64::MAX)
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// How many pieces of the backup `backup_hash` names are kept, and the
+    /// count they give, once one is.
+    pub fn backup_piece_progress(
+        &self,
+        backup_hash: &[u8; 32],
+    ) -> Result<Option<(u16, u16)>, StorageError> {
+        let (received, count): (i64, Option<i64>) = self.conn.query_row(
+            "SELECT COUNT(*), MAX(piece_count) FROM recovery_backup_pieces WHERE backup_hash = ?1",
+            params![backup_hash.as_slice()],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        let Some(count) = count else {
+            return Ok(None);
+        };
+        let narrow = |value: i64| {
+            u16::try_from(value).map_err(|_| StorageError::InvalidData("backup piece count".into()))
+        };
+        Ok(Some((narrow(received)?, narrow(count)?)))
+    }
+
+    /// The kept pieces of the backup `backup_hash` names, in order.
+    pub fn backup_pieces(&self, backup_hash: &[u8; 32]) -> Result<Vec<Vec<u8>>, StorageError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT piece_encrypted FROM recovery_backup_pieces
+             WHERE backup_hash = ?1 ORDER BY piece_index",
+        )?;
+        let sealed = stmt
+            .query_map(params![backup_hash.as_slice()], |row| {
+                row.get::<_, Vec<u8>>(0)
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        sealed
+            .iter()
+            .map(|blob| {
+                crate::crypto::decrypt(self.key, blob)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))
+            })
+            .collect()
+    }
+
+    /// Drops the pieces of the backup `backup_hash` names, so it can be
+    /// sent again.
+    pub fn drop_backup_pieces(&self, backup_hash: &[u8; 32]) -> Result<(), StorageError> {
+        self.conn.execute(
+            "DELETE FROM recovery_backup_pieces WHERE backup_hash = ?1",
+            params![backup_hash.as_slice()],
+        )?;
+        Ok(())
     }
 }

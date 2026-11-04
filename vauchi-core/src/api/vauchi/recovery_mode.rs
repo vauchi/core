@@ -23,7 +23,9 @@ use crate::api::error::{VauchiError, VauchiResult};
 use crate::crypto::SigningKeyPair;
 use crate::identity::{DeviceInfo, DeviceRegistry, Identity};
 use crate::recovery::RecoveryClaim;
-use crate::sync::guardian_piece::GuardianDelivery;
+use crate::sync::guardian_piece::{
+    GuardianBackupPiece, HandBackShare, PieceAssembly, split_backup_for_hand_back,
+};
 
 /// The device name a restored identity takes until the owner renames it.
 const RESTORED_DEVICE_NAME: &str = "Restored device";
@@ -31,6 +33,53 @@ const RESTORED_DEVICE_NAME: &str = "Restored device";
 /// At most one share per guardian, so a flood of hand-backs cannot grow
 /// the store, and the backup opens from at most this many shares.
 const MAX_HAND_BACKS: usize = crate::backup::KeyShardConfig::MAX_COUNT as usize;
+
+/// What a guardian hands back in the recovery meeting (P33): its share,
+/// shown as one QR code, and the pieces of the backup it keeps, sent over
+/// Bluetooth.
+#[derive(Clone, PartialEq, Eq)]
+pub struct InPersonHandBack {
+    share: Vec<u8>,
+    backup_pieces: Vec<Vec<u8>>,
+}
+
+impl InPersonHandBack {
+    /// The encoded [`HandBackShare`], for the QR code.
+    pub fn share(&self) -> &[u8] {
+        &self.share
+    }
+
+    /// The encoded backup pieces, for Bluetooth.
+    pub fn backup_pieces(&self) -> &[Vec<u8>] {
+        &self.backup_pieces
+    }
+}
+
+impl std::fmt::Debug for InPersonHandBack {
+    /// Lengths only: a backup runs to megabytes.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InPersonHandBack")
+            .field("share_bytes", &self.share.len())
+            .field("backup_pieces", &self.backup_pieces.len())
+            .finish()
+    }
+}
+
+/// How many pieces of a handed-back backup the phone holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BackupProgress {
+    /// Pieces kept.
+    pub received: u16,
+    /// Pieces the backup has.
+    pub count: u16,
+}
+
+impl BackupProgress {
+    /// Every piece is in and the whole matches the hash its share names.
+    pub fn is_whole(&self) -> bool {
+        self.received >= self.count
+    }
+}
 
 /// The signed registry of the restored identity: the lost device, derived
 /// from the backup's seed and device index and revoked, and this device.
@@ -82,15 +131,15 @@ impl Vauchi {
 
     /// The guardian's side, in the recovery meeting: once the owner is
     /// recognized, re-seals this guardian's share of the backup it keeps
-    /// for the claim's old identity to the claim's recovery key, and
-    /// returns it with that backup, for the meeting's channel. Records the
+    /// for the claim's old identity to the claim's recovery key, naming
+    /// that backup's hash, and splits the backup into pieces. Records the
     /// vouch. Every refusal is the same error.
     ///
     /// # Errors
     /// [`VauchiError::InvalidState`] for a malformed or expired claim, an
     /// identity whose backup this guardian does not keep, or a duress
     /// session (ADR-032); storage and sealing errors.
-    pub fn hand_back_in_person(&self, claim_b64: &str) -> VauchiResult<Vec<u8>> {
+    pub fn hand_back_in_person(&self, claim_b64: &str) -> VauchiResult<InPersonHandBack> {
         let refused = || VauchiError::InvalidState("Nothing to hand back for this claim".into());
         if self.identity.is_none() || self.in_duress_mode() {
             return Err(refused());
@@ -110,40 +159,95 @@ impl Vauchi {
             .kept(&hex::encode(old_pk))?
             .ok_or_else(refused)?;
         let resealed = self.respond_to_recovery(kept.sealed_share(), &recovery_pk)?;
-        let hand_back = GuardianDelivery::new(kept.created_at(), resealed, kept.backup().to_vec())
-            .map_err(|_| refused())?;
+        let share = HandBackShare::new(
+            kept.created_at(),
+            resealed,
+            sha2::Sha256::digest(kept.backup()).into(),
+        )
+        .map_err(|_| refused())?;
+        let backup_pieces = split_backup_for_hand_back(kept.backup())
+            .map_err(|_| refused())?
+            .iter()
+            .map(GuardianBackupPiece::encode)
+            .collect();
         self.storage
             .recovery()
             .record_vouched_claim(&old_pk, &recovery_pk, now)?;
-        Ok(hand_back.encode())
+        Ok(InPersonHandBack {
+            share: share.encode(),
+            backup_pieces,
+        })
     }
 
-    /// Keeps a guardian's hand-back on this phone in recovery mode, and
-    /// returns how many it holds. Its share is opened as it is taken and the
-    /// hand-back keyed by that share, so a retried hand-back, sealed afresh,
-    /// and two guardians of one group (who hold the same share) count once.
+    /// Keeps a guardian's share, scanned from its QR code on this phone in
+    /// recovery mode, and returns how many it holds. The share is opened as
+    /// it is taken and kept by its digest, so a retried hand-back, sealed
+    /// afresh, and two guardians of one group (who hold the same share)
+    /// count once.
     ///
     /// # Errors
     /// [`VauchiError::InvalidState`] when no recovery is under way, the
-    /// bytes are not a hand-back, its share does not open for this phone's
-    /// recovery key, or a new share would pass the bound; storage errors.
-    pub fn take_hand_back(&self, hand_back: &[u8]) -> VauchiResult<usize> {
-        let not_a_hand_back = || VauchiError::InvalidState("Not a guardian hand-back".into());
-        let recovery = self.storage.recovery();
-        let seed = match (&self.identity, recovery.load_recovery_mode()?) {
-            (None, Some((seed, _))) => seed,
-            _ => return Err(VauchiError::InvalidState("No recovery under way".into())),
-        };
-        let delivery = GuardianDelivery::decode(hand_back).map_err(|_| not_a_hand_back())?;
+    /// bytes are not a share, it does not open for this phone's recovery
+    /// key, or a new share would pass the bound; storage errors.
+    pub fn take_hand_back(&self, share: &[u8]) -> VauchiResult<usize> {
+        let not_a_share = || VauchiError::InvalidState("Not a guardian hand-back".into());
+        let seed = self.recovery_mode_seed()?;
+        let decoded = HandBackShare::decode(share).map_err(|_| not_a_share())?;
         let secret = SigningKeyPair::from_seed(&seed).to_x25519_secret();
-        let share = crate::backup::open_share_for_guardian(delivery.sealed_share(), &secret)
-            .map_err(|_| not_a_hand_back())?;
-        let digest: [u8; 32] = sha2::Sha256::digest(share.to_bytes()).into();
+        let opened = crate::backup::open_share_for_guardian(decoded.sealed_share(), &secret)
+            .map_err(|_| not_a_share())?;
+        let digest: [u8; 32] = sha2::Sha256::digest(opened.to_bytes()).into();
+        let recovery = self.storage.recovery();
         if !recovery.has_hand_back(&digest)? && recovery.hand_back_count()? >= MAX_HAND_BACKS {
-            return Err(not_a_hand_back());
+            return Err(not_a_share());
         }
-        recovery.keep_hand_back(&digest, hand_back, self.clock.unix_seconds())?;
+        recovery.keep_hand_back(&digest, share, self.clock.unix_seconds())?;
         Ok(recovery.hand_back_count()?)
+    }
+
+    /// Keeps one piece of a backup a taken share names, received over
+    /// Bluetooth, and returns how much of that backup the phone holds. A
+    /// piece taken again counts once. When the last piece is in and the
+    /// whole does not match the hash, the backup's pieces are dropped, so
+    /// the guardian can send it again.
+    ///
+    /// # Errors
+    /// [`VauchiError::InvalidState`] when no recovery is under way, the
+    /// bytes are not a piece, no taken share names its backup, it gives
+    /// that backup another count, or the completed backup does not match;
+    /// storage errors.
+    pub fn take_hand_back_piece(&self, piece: &[u8]) -> VauchiResult<BackupProgress> {
+        let refused = || VauchiError::InvalidState("Not a piece of a handed-back backup".into());
+        self.recovery_mode_seed()?;
+        let decoded = GuardianBackupPiece::decode(piece).map_err(|_| refused())?;
+        let hash = decoded.hash();
+        if !self
+            .hand_back_shares()?
+            .iter()
+            .any(|share| share.backup_hash() == hash)
+        {
+            return Err(refused());
+        }
+        let recovery = self.storage.recovery();
+        if let Some((_, count)) = recovery.backup_piece_progress(&hash)?
+            && count != decoded.count()
+        {
+            return Err(refused());
+        }
+        recovery.keep_backup_piece(
+            &hash,
+            decoded.index(),
+            decoded.count(),
+            piece,
+            self.clock.unix_seconds(),
+        )?;
+        let (received, count) = recovery.backup_piece_progress(&hash)?.ok_or_else(refused)?;
+        let progress = BackupProgress { received, count };
+        if progress.is_whole() && self.whole_backup(&hash)?.is_none() {
+            recovery.drop_backup_pieces(&hash)?;
+            return Err(refused());
+        }
+        Ok(progress)
     }
 
     /// Opens the backup the hand-backs open and becomes its identity, as a
@@ -248,35 +352,73 @@ impl Vauchi {
         }
     }
 
-    /// Every hand-back's share tried on each handed-back backup, newest
-    /// first: guardians keep the newest delivery they had, so their backups
-    /// may differ, and a share opens only its own backup.
+    /// The recovery key's seed while a recovery is under way on this phone.
+    fn recovery_mode_seed(&self) -> VauchiResult<zeroize::Zeroizing<[u8; 32]>> {
+        match (
+            &self.identity,
+            self.storage.recovery().load_recovery_mode()?,
+        ) {
+            (None, Some((seed, _))) => Ok(seed),
+            _ => Err(VauchiError::InvalidState("No recovery under way".into())),
+        }
+    }
+
+    /// The shares taken so far, newest backup first.
+    fn hand_back_shares(&self) -> VauchiResult<Vec<HandBackShare>> {
+        let mut shares: Vec<HandBackShare> = self
+            .storage
+            .recovery()
+            .hand_backs()?
+            .iter()
+            .filter_map(|bytes| HandBackShare::decode(bytes).ok())
+            .collect();
+        shares.sort_by_key(|share| std::cmp::Reverse(share.created_at()));
+        Ok(shares)
+    }
+
+    /// The backup `hash` names, once all its pieces are in and the whole
+    /// matches.
+    fn whole_backup(&self, hash: &[u8; 32]) -> VauchiResult<Option<Vec<u8>>> {
+        let mut assembly = PieceAssembly::default();
+        for bytes in self.storage.recovery().backup_pieces(hash)? {
+            let Ok(piece) = GuardianBackupPiece::decode(&bytes) else {
+                return Ok(None);
+            };
+            match assembly.add(piece) {
+                Ok(Some(whole)) => return Ok(Some(whole)),
+                Ok(None) => {}
+                Err(_) => return Ok(None),
+            }
+        }
+        Ok(None)
+    }
+
+    /// Every share tried on each whole backup, newest first: guardians keep
+    /// the newest delivery they had, so their backups may differ, and a
+    /// share opens only its own backup.
     fn open_hand_backs(
         &self,
         passphrase: Option<&str>,
         secret: &x25519_dalek::StaticSecret,
     ) -> VauchiResult<crate::backup::FullBackupEnvelope> {
-        let mut deliveries: Vec<GuardianDelivery> = self
-            .storage
-            .recovery()
-            .hand_backs()?
+        let shares = self.hand_back_shares()?;
+        let sealed: Vec<Vec<u8>> = shares
             .iter()
-            .filter_map(|bytes| GuardianDelivery::decode(bytes).ok())
+            .map(|share| share.sealed_share().to_vec())
             .collect();
-        deliveries.sort_by_key(|delivery| std::cmp::Reverse(delivery.created_at()));
-        let shares: Vec<Vec<u8>> = deliveries
-            .iter()
-            .map(|delivery| delivery.sealed_share().to_vec())
-            .collect();
-        let mut tried: Vec<&[u8]> = Vec::new();
-        for delivery in &deliveries {
-            if tried.contains(&delivery.backup()) {
+        let mut tried: Vec<[u8; 32]> = Vec::new();
+        for share in &shares {
+            let hash = share.backup_hash();
+            if tried.contains(&hash) {
                 continue;
             }
-            tried.push(delivery.backup());
+            tried.push(hash);
+            let Some(backup) = self.whole_backup(&hash)? else {
+                continue;
+            };
             if let Ok(envelope) = super::recovery_passphrase::open_guardian_backup_with_passphrase(
-                &hex::encode(delivery.backup()),
-                &shares,
+                &hex::encode(&backup),
+                &sealed,
                 passphrase,
                 secret,
             ) {

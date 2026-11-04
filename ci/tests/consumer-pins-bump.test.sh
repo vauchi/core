@@ -43,7 +43,15 @@ vauchi-core = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.69.0", ver
 vauchi-app = { git = "https://gitlab.com/vauchi/core.git", tag = "v0.69.0", version = "=0.69.0" }
 '
 mkdir -p "$T/remotes" "$T/bin"
-remote cli Cargo.toml "$CARGO_TOML" Cargo.lock "# lock
+remote cli Cargo.toml "$CARGO_TOML
+[workspace]
+members = [\"cli-display\"]
+" cli-display/Cargo.toml '[package]
+name = "cli-display"
+version = "0.1.0"
+[dependencies]
+vauchi-contract = { git = "https://gitlab.com/vauchi/contract.git", tag = "v0.1.0", version = "=0.1.0" }
+' Cargo.lock "# lock
 "
 remote linux-qt core-ref "v0.70.0
 "
@@ -136,6 +144,9 @@ branch=chore/bump-core-0.70.0
 git_quiet clone -q --branch "$branch" "$T/remotes/cli.git" "$T/check-cli" || fail "cli must get branch $branch"
 grep -q 'tag = "v0.70.0", version = "=0.70.0"' "$T/check-cli/Cargo.toml" || fail "cli's Cargo.toml must pin v0.70.0"
 grep -q '# lock updated' "$T/check-cli/Cargo.lock" || fail "cli's Cargo.lock must be committed with the bump"
+contract_tag=$(python3 -c 'import sys,tomllib; print(tomllib.load(open(sys.argv[1], "rb"))["workspace"]["dependencies"]["vauchi-contract"]["tag"])' "$HERE/Cargo.toml")
+grep -q "tag = \"$contract_tag\"" "$T/check-cli/cli-display/Cargo.toml" \
+    || fail "the display contract pin must match the released Core contract"
 [ "$(git -C "$T/check-cli" log -1 --format=%ae)" = bot@example.invalid ] || fail "the commit must be authored by the bot identity"
 grep -q "cargo update --workspace (in cli)" "$T/log" || fail "cargo update must re-resolve the bumped manifest"
 # e2e locks relay's vauchi-protocol beside its own (#558): a -p by name is
@@ -240,4 +251,5 @@ grep -qx 'RELAY_SHA=5f3fff43919199602aa316ed6bc68d3ac25bfaef' "$T/check-pinset/c
     || fail "both pin files must move in one commit"
 [ "$(grep -c '^POST .*vauchi%2Fpinset/merge_requests' "$T/log4")" -eq 1 ] || fail "pinset must get exactly one MR"
 
+python3 "$HERE/ci/tests/contract-pins.test.py"
 echo "consumer-pins-bump: OK"

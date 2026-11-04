@@ -34,6 +34,7 @@ PINS="${3:?core-pins.py}"
 API="${CI_API_V4_URL:-https://gitlab.com/api/v4}"
 GIT_BASE="${CONSUMER_GIT_BASE:-https://vauchi-gitlab-runner:${PROJECT_ACCESS_TOKEN}@gitlab.com/vauchi}"
 BRANCH="chore/bump-core-${VERSION}"
+ALIGN_CONTRACT_PINS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/align-contract-pins.py"
 
 if [ "${MODE:-}" != one ]; then
     WORK=$(mktemp -d)
@@ -68,7 +69,7 @@ print(data.get(sys.argv[2]) or "")' "$WORK/response.json" "$1"
 # several files (e2e: Cargo.toml and ci/pins.env, private#1034); they move in
 # one clone, one commit, one branch and one MR.
 bump_one() {
-    local repo=$1 dir="$WORK/$1" project="vauchi%2F$1" current="" pinned kind file moved=0 url status
+    local repo=$1 dir="$WORK/$1" project="vauchi%2F$1" current="" pinned kind file moved=0 url status contract_changes
     shift
     git clone -q --depth 1 "$GIT_BASE/$repo.git" "$dir"
 
@@ -90,7 +91,13 @@ bump_one() {
         shift 2
         pinned=$(python3 "$PINS" read --kind "$kind" "$dir/$file")
         [ -n "$current" ] || current=$pinned
-        [ "$pinned" != "v$VERSION" ] || continue
+        contract_changes=""
+        if [ "$kind" = cargo ]; then
+            contract_changes=$(python3 "$ALIGN_CONTRACT_PINS" "$dir/$file")
+        fi
+        if [ "$pinned" = "v$VERSION" ] && [ -z "$contract_changes" ]; then
+            continue
+        fi
         python3 "$PINS" bump --kind "$kind" --version "$VERSION" "$dir/$file" >/dev/null
         # --workspace re-resolves only what the rewritten manifest changed. Not
         # `-p <crate>`: e2e locks relay's vauchi-protocol beside its own, and a

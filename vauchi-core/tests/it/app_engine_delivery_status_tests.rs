@@ -196,6 +196,6 @@ fn test_delivery_status_maps_statuses_correctly() {
     );
     assert_eq!(
         row_details(&show(&mut engine, "recent")),
-        ["Delivered · 2 hours ago"]
+        ["Stored on relay · 2 hours ago"]
     );
 }

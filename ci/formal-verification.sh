@@ -265,6 +265,14 @@ tamarin_expect "$models/social_recovery.spthy" falsified "-DTHREE_GROUPS -DONE_G
     backup_needs_both_guardians
 tamarin_expect "$models/social_recovery.spthy" falsified "-DUNBOUND_ANSWER" \
     alice_rekeys_only_with_the_real_john
+# The next identity registered in advance (#796, P25): its seed stays
+# secret with the old phone stolen unless a P19 quorum of policy guardians,
+# the sealed paper with the password, or the new phone leaks.
+tamarin_expect "$models/next_identity.spthy" verified "" \
+    executable next_seed_secrecy
+tamarin_expect "$models/next_identity.spthy" falsified "-DMAJORITY" next_seed_secrecy
+tamarin_expect "$models/next_identity.spthy" falsified "-DPAPER_UNSEALED" next_seed_secrecy
+tamarin_expect "$models/next_identity.spthy" falsified "-DPIECES_ON_PHONE" next_seed_secrecy
 # Card updates (#757): the signature binds the recipient, and the version
 # floor stops a relay that only reorders from rolling a card back.
 tamarin_expect "$models/card_update.spthy" verified "" \

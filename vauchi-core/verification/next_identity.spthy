@@ -1,0 +1,183 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * The next identity registered in advance (vauchi/private#796, design
+ * 2026-11-03-pinned-guardian-policy, P25 to P27). Alice's next identity's
+ * seed N exists before any loss: its hash is in every contact's pin, it is
+ * Shamir-split among her five policy guardians in groups {A1, A2},
+ * {B1, B2}, {C1} under P19's threshold (more than (n + 1) / 2 of them, one
+ * per group: four, always with C1), and she may keep an offline copy
+ * sealed with her password. After a loss she meets the guardians in
+ * person; a quorum gives her new phone its pieces and the phone rebuilds N.
+ *
+ * Shamir is abstracted: each guardian holds a fresh share, a quorum fact
+ * names the shares that rebuild N, and the attacker rebuilds N from the
+ * shares of any quorum it knows. In-person hand-over is authentic and
+ * confidential (a linear fact to the phone). The attacker owns the
+ * network, steals the old phone (its identity key and N's hash), may
+ * corrupt any guardian, steal the paper copy, learn the password, or
+ * corrupt the new phone. Whether a rotation is authorized (P26) is the
+ * guardians' decision, modelled in guardian_history.qnt, not here.
+ *
+ * Run: tamarin-prover --prove next_identity.spthy
+ * Prove it can fail:
+ *   -DMAJORITY: quorums of three (P1's bare majority, one per group);
+ *     corrupting A1, B1 and C1 rebuilds N (next_seed_secrecy falsified).
+ *   -DPAPER_UNSEALED: the offline copy is not sealed with the password;
+ *     stealing it gives N (next_seed_secrecy falsified).
+ *   -DPIECES_ON_PHONE: the old phone held the shares; the thief rebuilds N
+ *     (next_seed_secrecy falsified).
+ */
+theory NextIdentity
+begin
+
+builtins: hashing, symmetric-encryption
+
+restriction Once:
+  "All x #i #j. Once(x) @ i & Once(x) @ j ==> #i = #j"
+
+rule Register_next:
+  [ Fr(~old), Fr(~n), Fr(~pw)
+  , Fr(~a1), Fr(~a2), Fr(~b1), Fr(~b2), Fr(~c1)
+  ]
+  --[ Once('register'), Registered('Alice', ~n) ]->
+  [ !Ltk('Alice', ~old), !Next('Alice', ~n), !Password('Alice', ~pw)
+  , !Share('A1', 'Alice', ~a1), !Share('A2', 'Alice', ~a2)
+  , !Share('B1', 'Alice', ~b1), !Share('B2', 'Alice', ~b2)
+  , !Share('C1', 'Alice', ~c1)
+  , !Shares('Alice', <~a1, ~a2, ~b1, ~b2, ~c1>)
+  , Out(h(~n))
+  ]
+
+/* The quorums whose shares rebuild N. */
+#ifdef MAJORITY
+rule Quorums:
+  [ !Shares(A, <a1, a2, b1, b2, c1>) ]
+  --[ Once('quorums') ]->
+  [ !Quorum3(A, a1, b1, c1), !Quorum3(A, a1, b2, c1)
+  , !Quorum3(A, a2, b1, c1), !Quorum3(A, a2, b2, c1)
+  ]
+#else
+rule Quorums:
+  [ !Shares(A, <a1, a2, b1, b2, c1>) ]
+  --[ Once('quorums') ]->
+  [ !Quorum(A, a2, b1, b2, c1), !Quorum(A, a1, b1, b2, c1)
+  , !Quorum(A, a1, a2, b2, c1), !Quorum(A, a1, a2, b1, c1)
+  ]
+#endif
+
+/* The offline copy. */
+#ifdef PAPER_UNSEALED
+rule Make_paper:
+  [ !Next(A, n) ]
+  --[ Once('paper') ]->
+  [ !Paper(A, n) ]
+#else
+rule Make_paper:
+  [ !Next(A, n), !Password(A, pw) ]
+  --[ Once('paper') ]->
+  [ !Paper(A, senc(n, h(pw))) ]
+#endif
+
+rule Corrupt_guardian:
+  [ !Share(G, A, s) ]
+  --[ Compromised(G) ]->
+  [ Out(s) ]
+
+rule Steal_paper:
+  [ !Paper(A, c) ]
+  --[ StolePaper(A) ]->
+  [ Out(c) ]
+
+rule Reveal_password:
+  [ !Password(A, pw) ]
+  --[ PasswordRevealed(A) ]->
+  [ Out(pw) ]
+
+/* The phone is lost or stolen: its identity key leaks. */
+#ifdef PIECES_ON_PHONE
+rule Lose_device:
+  [ !Ltk(A, old), !Shares(A, shares) ]
+  --[ Once('lose'), LostDevice(A) ]->
+  [ Out(old), Out(shares) ]
+#else
+rule Lose_device:
+  [ !Ltk(A, old) ]
+  --[ Once('lose'), LostDevice(A) ]->
+  [ Out(old) ]
+#endif
+
+/* The attacker rebuilds N from the shares of a quorum it knows. */
+#ifdef MAJORITY
+rule Attacker_rebuilds:
+  [ !Quorum3(A, x, y, z), !Next(A, n), In(x), In(y), In(z) ]
+  --[ AttackerRebuilt(A) ]->
+  [ Out(n) ]
+#else
+rule Attacker_rebuilds:
+  [ !Quorum(A, w, x, y, z), !Next(A, n), In(w), In(x), In(y), In(z) ]
+  --[ AttackerRebuilt(A) ]->
+  [ Out(n) ]
+#endif
+
+rule New_phone:
+  [ Fr(~ph) ]
+  --[ Once('phone') ]->
+  [ !NewPhone('Alice', ~ph) ]
+
+/* In person: a guardian recognizes Alice and hands its share to her new
+   phone. */
+rule Hand_over_piece:
+  [ !Share(G, A, s), !NewPhone(A, ph) ]
+  --[ HandedOver(G, A) ]->
+  [ Piece(ph, s) ]
+
+rule Phone_rebuilds:
+  [ !Quorum(A, w, x, y, z), !Next(A, n), !NewPhone(A, ph)
+  , Piece(ph, w), Piece(ph, x), Piece(ph, y), Piece(ph, z)
+  ]
+  --[ Rebuilt(A, ph, n) ]->
+  [ !NextKey(ph, n) ]
+
+rule Corrupt_new_phone:
+  [ !NextKey(ph, n) ]
+  --[ CompromisedPhone(ph) ]->
+  [ Out(n) ]
+
+/* After the old phone is stolen, the new phone rebuilds N with no
+   guardian, paper, password or phone compromised. */
+lemma executable:
+  exists-trace
+  "Ex A ph n #i #l.
+     Rebuilt(A, ph, n) @ i & LostDevice(A) @ l
+     & not (Ex G #c. Compromised(G) @ c)
+     & not (Ex B #c. StolePaper(B) @ c)
+     & not (Ex B #c. PasswordRevealed(B) @ c)
+     & not (Ex p #c. CompromisedPhone(p) @ c)"
+
+/* N stays secret, the old phone stolen or not, unless a P19 quorum of
+   guardians is corrupted (C1 and three of A1, A2, B1, B2), the paper and
+   the password both leak, or the new phone is corrupted after the
+   rebuild. */
+lemma next_seed_secrecy:
+  "All A n #i.
+     Registered(A, n) @ i
+     ==> not (Ex #x. K(n) @ x)
+         | (Ex #c1 #x1 #x2 #x3.
+              Compromised('C1') @ c1 & Compromised('A2') @ x1
+              & Compromised('B1') @ x2 & Compromised('B2') @ x3)
+         | (Ex #c1 #x1 #x2 #x3.
+              Compromised('C1') @ c1 & Compromised('A1') @ x1
+              & Compromised('B1') @ x2 & Compromised('B2') @ x3)
+         | (Ex #c1 #x1 #x2 #x3.
+              Compromised('C1') @ c1 & Compromised('A1') @ x1
+              & Compromised('A2') @ x2 & Compromised('B2') @ x3)
+         | (Ex #c1 #x1 #x2 #x3.
+              Compromised('C1') @ c1 & Compromised('A1') @ x1
+              & Compromised('A2') @ x2 & Compromised('B1') @ x3)
+         | (Ex #p #q. StolePaper(A) @ p & PasswordRevealed(A) @ q)
+         | (Ex ph #c. CompromisedPhone(ph) @ c)"
+
+end

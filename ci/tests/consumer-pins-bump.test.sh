@@ -115,9 +115,15 @@ cat > "$T/bin/cargo" <<'EOF'
 #!/bin/sh
 echo "cargo $* (in $(basename "$PWD"))" >> "$FAKE_LOG"
 case "$PWD" in */linux-gtk) echo "error: failed to select a version" >&2; exit 101 ;; esac
+if [ -f cli-display/Cargo.toml ]; then
+    grep -q "tag = \"$EXPECTED_CONTRACT_TAG\"" cli-display/Cargo.toml \
+        || { echo "contract pin must align before Cargo resolves" >&2; exit 101; }
+fi
 printf '# lock updated\n' > Cargo.lock
 EOF
 chmod +x "$T/bin/curl" "$T/bin/cargo"
+EXPECTED_CONTRACT_TAG=$(python3 -c 'import sys,tomllib; print(tomllib.load(open(sys.argv[1], "rb"))["workspace"]["dependencies"]["vauchi-contract"]["tag"])' "$HERE/Cargo.toml")
+export EXPECTED_CONTRACT_TAG
 
 status=0
 PATH="$T/bin:$PATH" FAKE_LOG="$T/log" PROJECT_ACCESS_TOKEN=token \
@@ -144,8 +150,7 @@ branch=chore/bump-core-0.70.0
 git_quiet clone -q --branch "$branch" "$T/remotes/cli.git" "$T/check-cli" || fail "cli must get branch $branch"
 grep -q 'tag = "v0.70.0", version = "=0.70.0"' "$T/check-cli/Cargo.toml" || fail "cli's Cargo.toml must pin v0.70.0"
 grep -q '# lock updated' "$T/check-cli/Cargo.lock" || fail "cli's Cargo.lock must be committed with the bump"
-contract_tag=$(python3 -c 'import sys,tomllib; print(tomllib.load(open(sys.argv[1], "rb"))["workspace"]["dependencies"]["vauchi-contract"]["tag"])' "$HERE/Cargo.toml")
-grep -q "tag = \"$contract_tag\"" "$T/check-cli/cli-display/Cargo.toml" \
+grep -q "tag = \"$EXPECTED_CONTRACT_TAG\"" "$T/check-cli/cli-display/Cargo.toml" \
     || fail "the display contract pin must match the released Core contract"
 [ "$(git -C "$T/check-cli" log -1 --format=%ae)" = bot@example.invalid ] || fail "the commit must be authored by the bot identity"
 grep -q "cargo update --workspace (in cli)" "$T/log" || fail "cargo update must re-resolve the bumped manifest"
@@ -250,6 +255,24 @@ grep -qx 'RELAY_SHA=5f3fff43919199602aa316ed6bc68d3ac25bfaef' "$T/check-pinset/c
 [ "$(git -C "$T/check-pinset" rev-list --count origin/main..HEAD)" -eq 1 ] \
     || fail "both pin files must move in one commit"
 [ "$(grep -c '^POST .*vauchi%2Fpinset/merge_requests' "$T/log4")" -eq 1 ] || fail "pinset must get exactly one MR"
+
+current_core=$(printf '%s' "$CARGO_TOML" | sed 's/0.69.0/0.70.0/g')
+remote repair Cargo.toml "$current_core
+[workspace]
+members = [\"cli-display\"]
+" cli-display/Cargo.toml "$(cat "$T/src/cli/cli-display/Cargo.toml")" Cargo.lock "# lock
+"
+printf '%s\n' '{ "consumers": [ { "repo": "repair", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" } ] }' > "$T/table5.json"
+PATH="$T/bin:$PATH" FAKE_LOG="$T/log5" PROJECT_ACCESS_TOKEN=token \
+    CI_API_V4_URL=https://gitlab.example/api/v4 CONSUMER_GIT_BASE="$T/remotes" \
+    bash "$HERE/scripts/bump-consumer-pins.sh" v0.70.0 "$T/table5.json" "$CORE_PINS" \
+    > "$T/out5" 2>&1 || { cat "$T/out5"; fail "current Core with a stale contract must be repaired"; }
+git_quiet clone -q --branch "$branch" "$T/remotes/repair.git" "$T/check-repair" \
+    || fail "stale contract must get a repair branch even when Core is current"
+grep -q "tag = \"$EXPECTED_CONTRACT_TAG\"" "$T/check-repair/cli-display/Cargo.toml" \
+    || fail "repair branch must align the stale contract"
+grep -q '# lock updated' "$T/check-repair/Cargo.lock" || fail "contract repair must resolve its lockfile"
+[ "$(grep -c '^POST .*vauchi%2Frepair/merge_requests' "$T/log5")" -eq 1 ] || fail "repair must get exactly one MR"
 
 python3 "$HERE/ci/tests/contract-pins.test.py"
 echo "consumer-pins-bump: OK"

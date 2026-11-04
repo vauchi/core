@@ -1537,10 +1537,10 @@ mod tests {
     // @scenario: ohttp_sync :: URL scheme conversion ws to http
     #[test]
     fn test_http_relay_url_ws_converts_to_http() {
-        let (v, _dir) = vauchi_with_server_url("http://relay.local/ws");
+        let (v, _dir) = vauchi_with_server_url("http://127.0.0.1:8080/ws");
         assert_eq!(
             v.http_relay_url(),
-            "http://relay.local/ws",
+            "http://127.0.0.1:8080/ws",
             "http:// must be converted to http://"
         );
     }
@@ -1559,10 +1559,10 @@ mod tests {
     // @scenario: ohttp_sync :: URL scheme passthrough for http
     #[test]
     fn test_http_relay_url_http_unchanged() {
-        let (v, _dir) = vauchi_with_server_url("http://relay.local");
+        let (v, _dir) = vauchi_with_server_url("http://127.0.0.1:8080");
         assert_eq!(
             v.http_relay_url(),
-            "http://relay.local",
+            "http://127.0.0.1:8080",
             "http:// must pass through unchanged"
         );
     }

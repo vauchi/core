@@ -347,6 +347,10 @@ quint_expect() {
     # simulator's Rust evaluator needs glibc 2.39, newer than this image's.
     if [ "$q_mode" = verify ]; then
         set -- verify --max-steps=15
+    elif [ "$q_mode" = inductive ]; then
+        # q_invariant names "<inductive>:<implied>"; unbounded in depth.
+        set -- verify "--inductive-invariant=${q_invariant%%:*}"
+        q_invariant=${q_invariant#*:}
     else
         set -- run --backend=typescript --max-steps=40 --max-samples=20000 --seed=7
     fi
@@ -390,6 +394,12 @@ quint_trace guardian_succession.qnt tolerant_rolled_back tolerant_
 # fork a contact offline since the handover (P23's accepted exposure).
 quint_trace guardian_history.qnt deleted_keys '(history|deleted)_'
 quint_trace guardian_history.qnt stolen_old_keys '(history|stolen)_'
+# Unbounded in run length for five guardians, three ballots, two values:
+# P19 with one forgetful device keeps one value chosen; P1's majority with
+# it does not.
+quint_expect guardian_voting.qnt crash_only ok inductive inv:one_value_chosen
+quint_expect guardian_voting.qnt tolerant ok inductive inv:one_value_chosen
+quint_expect guardian_voting.qnt majority_with_a_faulty_device violation inductive inv:one_value_chosen
 quint_expect device_link_machines.qnt reliable_relay ok verify no_device_registered_for_a_failed_joiner
 quint_expect device_link_machines.qnt reliable_relay ok verify joiner_seed_implies_registered
 # Without the host's expiry check the host registers a device whose

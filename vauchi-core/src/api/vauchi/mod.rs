@@ -51,6 +51,7 @@ pub use recovery_rekey_inbound::RekeyOfferTaken;
 mod guardian_backup;
 mod guardian_restore;
 mod recovery_mode;
+pub use recovery_mode::{BackupProgress, InPersonHandBack};
 mod recovery_passphrase;
 mod recovery_rekey;
 #[cfg(feature = "network-http")]

@@ -5,6 +5,7 @@
 //! screen reachable without hardware or a peer and recording each
 //! `initial_commands` batch.
 
+pub mod equivalence;
 pub mod seed;
 
 use vauchi_app::ui::{
@@ -101,33 +102,6 @@ pub fn replaced_surface_ids(commands: &[Command]) -> Vec<&str> {
         .filter_map(|command| match command {
             Command::ReplaceSurface { surface } => Some(surface.surface_id.as_str()),
             _ => None,
-        })
-        .collect()
-}
-
-/// The externally tagged serde variant name, so a new node variant never
-/// needs a match arm here.
-pub fn node_kind(node: &PresentationNode) -> String {
-    match serde_json::to_value(node).expect("presentation node serializes") {
-        serde_json::Value::String(unit_variant) => unit_variant,
-        serde_json::Value::Object(tagged) => tagged
-            .keys()
-            .next()
-            .cloned()
-            .expect("externally tagged node"),
-        other => panic!("unexpected node encoding: {other}"),
-    }
-}
-
-pub fn node_kinds(nodes: &[PresentationNode]) -> Vec<String> {
-    nodes
-        .iter()
-        .flat_map(|node| {
-            let mut kinds = vec![node_kind(node)];
-            if let PresentationNode::Group { children, .. } = node {
-                kinds.extend(node_kinds(children));
-            }
-            kinds
         })
         .collect()
 }

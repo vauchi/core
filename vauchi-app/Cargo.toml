@@ -86,6 +86,12 @@ path = "tests/reachability/main.rs"
 # `ui::testing`. Plan Task 1.4.
 required-features = ["test-support"]
 
+[[test]]
+name = "screen_catalog_fixture_tests"
+# QR semantic comparison uses the existing test-only protocol parser (#1087).
+# check:journey-fixtures and just test both explicitly enable testing.
+required-features = ["testing"]
+
 [dev-dependencies]
 tempfile = "3.0"
 proptest = "1.4"

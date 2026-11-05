@@ -10,7 +10,8 @@
 //! integration test `tests/screen_catalog_fixture_tests.rs` builds the
 //! catalog from an in-memory [`super::AppEngine`] seeded with an identity,
 //! contacts, groups, and own-card entries, and pins the checked-in file's
-//! structure (code ids, surface titles, node kinds) against a fresh build.
+//! values against a fresh build, with explicit equivalence for seeded
+//! keys, opaque field IDs and elapsed initial-frame time.
 //!
 //! Keys and ids are random per run, so the bytes are not byte-stable; the
 //! `#[ignore]` `regenerate_shared_fixture` test rewrites the file on demand.

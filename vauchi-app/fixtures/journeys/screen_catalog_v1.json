@@ -2433,7 +2433,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_f2313f5f5b4431bd",
+                    "id": "field_e3a8666dd9043163",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2471,13 +2471,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:f2313f5f5b4431bd",
+                    "id": "field_note:e3a8666dd9043163",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:f2313f5f5b4431bd",
+                          "id": "field_note:e3a8666dd9043163",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2517,7 +2517,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_074a03e61a8305bc",
+                    "id": "field_80d368118b47aec0",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2555,13 +2555,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:074a03e61a8305bc",
+                    "id": "field_note:80d368118b47aec0",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:074a03e61a8305bc",
+                          "id": "field_note:80d368118b47aec0",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2601,7 +2601,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_1640cbccf04de924",
+                    "id": "field_c7eb11b6e932a69d",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2639,13 +2639,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:1640cbccf04de924",
+                    "id": "field_note:c7eb11b6e932a69d",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:1640cbccf04de924",
+                          "id": "field_note:c7eb11b6e932a69d",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -5008,10 +5008,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "D3C1 5C6B 7470 A069 C9CA C88B CF74 835B C5CD 61B4 FC67 C023 D492 121A C133 3D70",
+                    "content": "F9C0 0C1C 9643 0E1B 7F3F 5EF6 29AD 84FC 9861 C82E 2C6C 8FD0 A4AA 0EF7 3E9B 9549",
                     "style": "body",
                     "accessibility": {
-                      "label": "D3C1 5C6B 7470 A069 C9CA C88B CF74 835B C5CD 61B4 FC67 C023 D492 121A C133 3D70",
+                      "label": "F9C0 0C1C 9643 0E1B 7F3F 5EF6 29AD 84FC 9861 C82E 2C6C 8FD0 A4AA 0EF7 3E9B 9549",
                       "description": null
                     }
                   }
@@ -5030,10 +5030,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "F646 BDDA 142D 2582 F40F 942D 7C88 54F7 3E3E 5513 3813 1D61 9A41 7605 25DE 5000",
+                    "content": "262E 30A2 6985 044A AD6C EA45 A038 D6DF ACCE ACBC 2728 E3F9 4503 C4F5 A374 BA89",
                     "style": "body",
                     "accessibility": {
-                      "label": "F646 BDDA 142D 2582 F40F 942D 7C88 54F7 3E3E 5513 3813 1D61 9A41 7605 25DE 5000",
+                      "label": "262E 30A2 6985 044A AD6C EA45 A038 D6DF ACCE ACBC 2728 E3F9 4503 C4F5 A374 BA89",
                       "description": null
                     }
                   }
@@ -18297,7 +18297,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "https://vauchi.app/x#pk=iFleDYAhLs9aLhqz54PFy_sejOqNKdvYbWUlj1k9wFg&n=ZaXGvnpJmM3ESk__ifGbLOJh04HbrwZKE9WUAryja7g&nm=QWRhIExvdmVsYWNl",
+                    "content": "https://vauchi.app/x#pk=lgHoFT0hX5UZVbL1jreFKpNA92N4wkcoA-Kndrwf4AM&n=78RdMxt_zDFfQkcCoonq8nMbyCuPsen8fvvJmxeasoo&nm=QWRhIExvdmVsYWNl",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -18417,11 +18417,11 @@
         },
         {
           "ScheduleWakeup": {
-            "earliest_secs": 30,
-            "deadline_secs": 90,
-            "min_interval_secs": 30,
+            "earliest_secs": 1,
+            "deadline_secs": 1,
+            "min_interval_secs": 1,
             "earliest_millis": null,
-            "delay_millis": 30000
+            "delay_millis": 1000
           }
         }
       ]
@@ -18863,7 +18863,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,80,50,82,114,51,97,70,67,48,108,103,118,81,80,108,67,49,56,105,70,84,51,80,106,53,86,69,122,103,84,72,87,71,97,81,88,89,70,74,100,53,81,65,70,74,88,81,99,100,121,86,67,121,100,105,86,65,89,74,55,52,109,81,100,51,104,79,49,113,80,113,85,111,83,101,77,75,67,117,117,114,121,65,70,78,65,78,113,118,81,49,77,52,47,107,110,84,80,115,100,112,68,103,48,65,107,119,57,113,97,110,90,90,65,70,78,53,53,53,43,112,119,98,52,70,78,121,84,89,104,117,120,76,69,76,111,87,48,105,87,57,50,75,53,67,113,73,99,113,104,65,65,65,65,65,71,114,115,104,89,65,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,65,47,114,78,101,118,70,120,98,86,53,52,68,67,49,51,111,67,57,47,98,70,50,86,71,88,99,43,97,108,50,76,53,74,77,111,97,57,90,56,78,89,69,80,97,107,51,119,57,81,100,99,70,68,53,107,104,75,118,72,79,68,100,106,108,67,105,43,108,49,103,111,55,72,89,90,50,73,89,117,104,81,122,111,99,77],
+            "payload": [86,48,74,70,87,65,77,109,76,106,67,105,97,89,85,69,83,113,49,115,54,107,87,103,79,78,98,102,114,77,54,115,118,67,99,111,52,47,108,70,65,56,84,49,111,51,83,54,105,100,56,67,54,104,90,118,50,80,70,87,100,76,50,49,52,104,72,79,43,109,122,99,53,77,57,70,84,69,88,117,89,106,76,75,70,66,75,68,51,70,77,69,103,66,69,84,89,90,120,73,117,53,112,57,111,101,108,102,67,121,104,43,113,68,121,43,53,52,88,85,103,47,74,77,79,99,76,56,77,100,69,111,74,78,78,85,55,109,50,48,57,105,56,52,89,56,115,78,50,113,97,102,100,73,43,101,65,65,65,65,65,71,114,115,115,79,69,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,66,73,83,118,97,79,67,87,114,109,68,50,116,100,50,122,100,99,113,74,107,122,76,105,98,120,87,98,118,120,122,90,80,48,49,70,54,89,73,104,69,102,103,82,108,108,56,73,81,110,109,122,110,78,76,121,122,113,55,50,90,82,98,74,48,85,116,114,86,111,77,122,50,69,116,86,105,114,109,109,110,114,69,75,77,71],
             "is_initiator": true,
             "endpoint": {
               "service_type": "_vauchi-exchange._tcp.local.",
@@ -18951,7 +18951,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI30:0:0:00.0Q/CHZ9J44MC-7LY56BDX69 IFG ULNAM9I360VQ9BK57GBJ 74PGULRB1V-3K-0CVCVOK39PN3VMFVTY9JP$C2GF9Z3EK526TJ761W04WS/G6BEP-I6%*T11Vauchi User00"
+                      "INI30:0:0:0030R7AL4RGNT0UQ99NK8AN*KG+SUUNVB6AAD42%OLUSXQMS-3RZ6R2UC9P$I62R9NFJKZB31CUDU-%UM47B7V%AAIMB.ZSUBSYNEJ:70Y1CV6:27G$VZYBEIE11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -19159,8 +19159,8 @@
             "earliest_secs": 1,
             "deadline_secs": 1,
             "min_interval_secs": 1,
-            "earliest_millis": 106,
-            "delay_millis": 106
+            "earliest_millis": 87,
+            "delay_millis": 87
           }
         }
       ]
@@ -19919,7 +19919,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [222,233,98,88,107,146,163,91,56,151,100,58,131,245,201,95,43,32,183,0,211,228,31,117,0,172,89,135,234,204,250,185]
+            "payload": [63,143,243,120,67,171,231,204,244,42,133,213,186,29,177,169,173,116,240,190,194,229,129,100,60,57,55,238,44,228,147,248]
           }
         },
         {
@@ -20124,7 +20124,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [153,69,192,181,157,106,247,35,69,59,122,177,245,55,51,29,46,102,39,30,227,66,254,183,3,63,174,241,180,221,190,175]
+            "payload": [186,127,147,223,251,145,8,66,84,246,159,31,124,106,136,51,37,20,198,156,151,30,150,119,254,199,88,58,32,72,158,132]
           }
         },
         {
@@ -20329,7 +20329,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [72,154,167,240,188,126,201,29,232,245,156,134,192,188,253,149,175,145,95,101,139,94,188,24,158,189,129,27,103,149,201,89]
+            "payload": [59,72,83,115,35,17,17,190,44,72,73,46,225,72,248,180,136,250,80,185,58,222,53,155,140,198,240,249,185,215,139,245]
           }
         },
         {

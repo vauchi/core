@@ -10,8 +10,12 @@ Core tests own expectations such as whether onboarding offers recovery.
 
 The `check:journey-fixtures` job checks the journeys against the pinned
 contract types and checks deterministic presentation regeneration. The
-catalog's existing structural freshness check remains in place: seeded
-contact keys make full catalog regeneration nondeterministic.
+catalog compares every emitted value after narrowly scoped equivalence
+for seeded field IDs, fingerprints, ephemeral link/QR keys and transport
+payload bytes. It preserves ID relationships, payload lengths, parsed QR
+and link metadata, ordering, actions, labels and accessibility values.
+Only the initial Glance frame's remaining milliseconds may vary within
+its emitted seconds budget; delay and remaining time must agree.
 
 `publish:journey-fixtures` publishes plain JSON files and `manifest.json`
 to the Core generic package registry as `core-journey-fixtures/<full SHA>`.

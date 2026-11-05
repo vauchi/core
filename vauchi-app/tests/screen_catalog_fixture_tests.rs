@@ -7,8 +7,7 @@ mod screen_catalog;
 use std::collections::{BTreeMap, BTreeSet};
 
 use screen_catalog::{
-    build_catalog, entry_surface_id, init_fixture_i18n, node_kinds, replaced_surface,
-    replaced_surface_ids,
+    build_catalog, entry_surface_id, init_fixture_i18n, replaced_surface, replaced_surface_ids,
 };
 use vauchi_app::ui::{ScreenCatalogEntry, ScreenCatalogFixture};
 use vauchi_core::{
@@ -77,20 +76,8 @@ fn checked_in_catalog() -> ScreenCatalogFixture {
         .expect("Core-owned screen catalog fixture must decode")
 }
 
-/// `(code_id, locale) -> (title, node kinds)`: the structure that is stable
-/// across regenerations even though keys and ids are random per run.
-fn structure(catalog: &ScreenCatalogFixture) -> BTreeMap<(String, String), (String, Vec<String>)> {
-    catalog
-        .screens
-        .iter()
-        .map(|entry| {
-            let surface = replaced_surface(&entry.commands, entry_surface_id(entry));
-            (
-                (entry.code_id.clone(), entry.locale.clone()),
-                (surface.title.clone(), node_kinds(&surface.nodes)),
-            )
-        })
-        .collect()
+fn structure(catalog: &ScreenCatalogFixture) -> serde_json::Value {
+    screen_catalog::equivalence::comparable(catalog)
 }
 
 fn assert_single_replacement_then_navigation(entry: &ScreenCatalogEntry) {
@@ -253,23 +240,47 @@ fn screen_catalog_the_sync_chip_renders_in_the_screen_language() {
 
 // @internal
 #[test]
-fn screen_catalog_checked_in_catalog_matches_a_fresh_build_structurally() {
+fn screen_catalog_checked_in_catalog_matches_a_fresh_build_semantically() {
     init_fixture_i18n();
     let recorded = structure(&checked_in_catalog());
     let fresh = structure(&build_catalog());
 
-    let recorded_keys: BTreeSet<_> = recorded.keys().cloned().collect();
-    let fresh_keys: BTreeSet<_> = fresh.keys().cloned().collect();
-    assert_eq!(
-        recorded_keys, fresh_keys,
-        "set of (code_id, locale) drifted"
+    assert!(
+        recorded == fresh,
+        "catalog values drifted; review and run the ignored regenerate_shared_fixture test"
     );
-    for (key, fresh_shape) in &fresh {
-        assert_eq!(
-            &recorded[key], fresh_shape,
-            "{key:?}: surface title or node kinds drifted; run the ignored regenerate_shared_fixture test"
-        );
+}
+
+// @internal
+#[test]
+fn screen_catalog_freshness_rejects_product_value_changes() {
+    let original = checked_in_catalog();
+    let baseline = structure(&original);
+    let raw = serde_json::to_value(&original).expect("catalog serializes");
+    for pointer in [
+        "/screens/0/commands/0/ReplaceSurface/surface/subtitle",
+        "/screens/0/commands/0/ReplaceSurface/surface/accessibility_label",
+        "/screens/0/commands/0/ReplaceSurface/surface/tokens/colors/accent",
+        "/screens/0/commands/0/ReplaceSurface/surface/tokens/fonts/body",
+        "/screens/0/commands/0/ReplaceSurface/surface/nodes/1/Group/children/0/Status/detail",
+        "/screens/0/commands/0/ReplaceSurface/surface/nodes/2/Group/children/0/List/rows/0/title",
+        "/screens/0/commands/0/ReplaceSurface/surface/nodes/2/Group/children/0/List/rows/0/activation/interaction_id",
+    ] {
+        let mut changed = raw.clone();
+        *changed.pointer_mut(pointer).expect("product value exists") =
+            serde_json::Value::String("changed".to_owned());
+        let changed = serde_json::from_value(changed).expect("mutation remains typed");
+        assert_ne!(baseline, structure(&changed), "freshness missed {pointer}");
     }
+    let mut reordered = original.clone();
+    reordered.screens.swap(0, 1);
+    assert_ne!(baseline, structure(&reordered), "screen order matters");
+    let mut missing = original.clone();
+    missing.screens.remove(0);
+    assert_ne!(baseline, structure(&missing), "missing screen matters");
+    let mut commands = original.clone();
+    commands.screens[0].commands.reverse();
+    assert_ne!(baseline, structure(&commands), "command order matters");
 }
 
 // @internal

@@ -28,7 +28,11 @@ python3 journey_fixtures.py fetch evidence \
 ```
 
 The helper fetches only data and checks provenance and integrity before
-installing it. It requires no Rust toolchain, Core library or Core build.
+installing it. It also checks the fixture containers, unique screen IDs
+and exact agreement with the independent screen inventory before writing
+consumer files. Matching hashes alone do not establish screen coverage.
+Typed command/event decoding and product freshness remain Core CI checks.
+It requires no Rust toolchain, Core library or Core build.
 There is no fallback to `main`, a latest catalog, or another contract.
 
 For a Rust app assembly, derive the selection directly from its lockfile:

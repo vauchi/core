@@ -61,6 +61,51 @@ def journey_document(raw):
     return value
 
 
+def message(value):
+    return (isinstance(value, str) and bool(value)) or (
+        type(value) is dict and len(value) == 1 and all(value)
+    )
+
+
+def commands(value, nonempty=False):
+    return type(value) is list and (bool(value) or not nonempty) and all(map(message, value))
+
+
+def validate_journeys(blobs):
+    """Check category envelopes and screen coverage; Core CI owns typed decoding."""
+    documents = {name: journey_document(blobs[name]) for name in FILES}
+    presentation = documents["presentation_contract_v1.json"]
+    require(commands(presentation.get("initial_commands"))
+            and commands(presentation.get("effect_commands"))
+            and type(presentation.get("file_picker_contract")) is dict
+            and type(presentation.get("expected_state")) is dict,
+            "invalid presentation journey envelope")
+    steps = presentation.get("steps")
+    require(type(steps) is list, "journey steps must be an array")
+    for step in steps:
+        require(type(step) is dict and message(step.get("event"))
+                and commands(step.get("commands")), "invalid journey step")
+
+    screens = documents["screen_catalog_v1.json"].get("screens")
+    require(type(screens) is list and bool(screens), "catalog must contain screens")
+    actual = set()
+    for screen in screens:
+        require(type(screen) is dict and isinstance(screen.get("code_id"), str)
+                and bool(screen["code_id"].strip())
+                and isinstance(screen.get("title"), str)
+                and isinstance(screen.get("locale"), str)
+                and commands(screen.get("commands"), nonempty=True), "invalid catalog screen")
+        require(screen["code_id"] not in actual, "duplicate catalog screen id")
+        actual.add(screen["code_id"])
+
+    expected = documents["screen_catalog_inventory_v1.json"].get("screen_ids")
+    require(type(expected) is list and bool(expected)
+            and all(isinstance(value, str) and bool(value.strip()) for value in expected),
+            "screen inventory must contain ids")
+    require(len(set(expected)) == len(expected), "duplicate screen inventory id")
+    require(actual == set(expected), "catalog and screen inventory disagree")
+
+
 def install(destination, blobs):
     destination.mkdir(parents=True, exist_ok=True)
     for name, raw in blobs.items():
@@ -81,8 +126,7 @@ def build(root, destination, core_revision):
             and dependency.get("tag") == match[1] and contract["version"] == match[1][1:],
             "manifest and resolved contract disagree")
     blobs = {name: read(root / "vauchi-app/fixtures/journeys" / name) for name in FILES}
-    for raw in blobs.values():
-        journey_document(raw)
+    validate_journeys(blobs)
     metadata = {
         "artifact_schema_version": 1, "core_revision": core_revision,
         "core_version": manifest["workspace"]["package"]["version"],
@@ -149,8 +193,8 @@ def checked(core_revision, contract_version, request):
         payload = request(core_revision, name)
         require(isinstance(payload, bytes) and len(payload) <= MAX_BYTES
                 and digest(payload) == expected, "artifact integrity mismatch")
-        journey_document(payload)
         blobs[name] = payload
+    validate_journeys(blobs)
     return metadata, blobs
 
 

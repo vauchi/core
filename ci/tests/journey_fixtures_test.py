@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import importlib.util
+import copy
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -12,6 +14,61 @@ journeys = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(journeys)
 SHA = "a" * 40
 CONTRACT_SHA = "b" * 40
+DOCUMENTS = {
+    "presentation_contract_v1.json": {
+        "schema_version": 1, "initial_commands": ["QrRequestScan"],
+        "steps": [{"event": "ImagePickCancelled", "commands": ["QrRequestScan"]}],
+        "effect_commands": [], "file_picker_contract": {}, "expected_state": {},
+    },
+    "screen_catalog_v1.json": {
+        "schema_version": 1,
+        "screens": [{"code_id": "example", "title": "Example", "locale": "en",
+                     "commands": ["QrRequestScan"]}],
+    },
+    "screen_catalog_inventory_v1.json": {"schema_version": 1, "screen_ids": ["example"]},
+}
+
+
+def invalid_corpora():
+    catalog = "screen_catalog_v1.json"
+    inventory = "screen_catalog_inventory_v1.json"
+    presentation = "presentation_contract_v1.json"
+    for key, value in (
+        ("empty-inventory", []), ("unexpected-id", ["other"]),
+        ("additional-id", ["example", "extra"]),
+        ("duplicate-id", ["example", "example"]), ("invalid-id", [42]),
+        ("wrong-id-container", {}),
+    ):
+        data = copy.deepcopy(DOCUMENTS)
+        data[inventory]["screen_ids"] = value
+        yield key, data
+    data = copy.deepcopy(DOCUMENTS)
+    data[catalog]["screens"].append(data[catalog]["screens"][0] | {"code_id": "second"})
+    yield "missing-id", data
+    for key, value in (
+        ("empty-catalog", []), ("wrong-screen-container", {}),
+        ("duplicate-screen", DOCUMENTS[catalog]["screens"] * 2),
+        ("invalid-screen", [None]),
+        ("empty-commands", [DOCUMENTS[catalog]["screens"][0] | {"commands": []}]),
+        ("wrong-command-container", [DOCUMENTS[catalog]["screens"][0] | {"commands": {}}]),
+    ):
+        data = copy.deepcopy(DOCUMENTS)
+        data[catalog]["screens"] = value
+        yield key, data
+    for key, value in (("wrong-steps", {}), ("invalid-step", [None]),
+                       ("missing-event", [{"commands": []}]),
+                       ("wrong-step-commands", [{"event": "ImagePickCancelled", "commands": {}}])):
+        data = copy.deepcopy(DOCUMENTS)
+        data[presentation]["steps"] = value
+        yield key, data
+    data = copy.deepcopy(DOCUMENTS)
+    del data[presentation]["initial_commands"]
+    yield "missing-initial-commands", data
+    for key, value in (("effect_commands", {}), ("file_picker_contract", []),
+                       ("expected_state", [])):
+        data = copy.deepcopy(DOCUMENTS)
+        data[presentation][key] = value
+        yield "wrong-" + key, data
 
 
 class JourneyFixturesTest(unittest.TestCase):
@@ -21,8 +78,7 @@ class JourneyFixturesTest(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.source = self.root / "vauchi-app/fixtures/journeys"
         self.source.mkdir(parents=True)
-        for name in journeys.FILES:
-            (self.source / name).write_text('{"schema_version":1}\n')
+        self.write_documents(DOCUMENTS)
         (self.root / "Cargo.toml").write_text(
             '[workspace.package]\nversion="0.99.1"\n[workspace.dependencies]\n'
             'vauchi-contract={git="https://gitlab.com/vauchi/contract.git",tag="v0.97.2"}\n')
@@ -30,6 +86,18 @@ class JourneyFixturesTest(unittest.TestCase):
             '[[package]]\nname="vauchi-contract"\nversion="0.97.2"\n'
             'source="git+https://gitlab.com/vauchi/contract.git?tag=v0.97.2#' + CONTRACT_SHA + '"\n')
         self.output = self.root / "artifact"
+
+    def write_documents(self, documents):
+        for name, value in documents.items():
+            (self.source / name).write_text(json.dumps(value))
+
+    def rehash_artifact(self, documents):
+        metadata = json.loads((self.output / "manifest.json").read_bytes())
+        for name, value in documents.items():
+            raw = json.dumps(value).encode()
+            (self.output / name).write_bytes(raw)
+            metadata["files"][name] = {"sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)}
+        (self.output / "manifest.json").write_text(json.dumps(metadata))
 
     def download(self, revision, filename):
         self.assertEqual(revision, SHA)
@@ -120,6 +188,66 @@ class JourneyFixturesTest(unittest.TestCase):
         with self.assertRaises(journeys.FixtureError):
             journeys.fetch_assembly(self.root / "wrong-assembly", lock, self.download)
         self.assertFalse((self.root / "wrong-assembly").exists())
+
+    def test_build_rejects_malformed_or_incomplete_corpora_before_installing(self):
+        for name, documents in invalid_corpora():
+            with self.subTest(mutation=name):
+                self.write_documents(documents)
+                destination = self.root / ("build-" + name)
+                with self.assertRaises(journeys.FixtureError):
+                    journeys.build(self.root, destination, SHA)
+                self.assertFalse(destination.exists())
+
+    def test_rehashed_invalid_artifacts_are_rejected_before_fetch_install_or_publish(self):
+        for name, documents in invalid_corpora():
+            with self.subTest(mutation=name):
+                journeys.build(self.root, self.output, SHA)
+                self.rehash_artifact(documents)
+                destination = self.root / ("fetch-" + name)
+                with self.assertRaises(journeys.FixtureError):
+                    journeys.fetch(destination, SHA, "0.97.2", self.download)
+                self.assertFalse(destination.exists())
+                writes = []
+                with self.assertRaises(journeys.FixtureError):
+                    journeys.publish(self.output, SHA, lambda rev, filename: None,
+                                     lambda *args: writes.append(args))
+                self.assertEqual([], writes)
+
+    def test_missing_inventory_entry_is_rejected_for_an_exact_assembly_lock(self):
+        journeys.build(self.root, self.output, SHA)
+        data = copy.deepcopy(DOCUMENTS)
+        data["screen_catalog_inventory_v1.json"]["screen_ids"] = ["other"]
+        self.rehash_artifact(data)
+        lock = self.root / "assembly.lock"
+        lock.write_text((self.root / "Cargo.lock").read_text()
+                       + '\n[[package]]\nname="vauchi-core"\nversion="0.99.1"\n'
+                       + 'source="git+https://gitlab.com/vauchi/core.git?tag=v0.99.1#' + SHA + '"\n')
+        destination = self.root / "assembly-evidence"
+        with self.assertRaises(journeys.FixtureError):
+            journeys.fetch_assembly(destination, lock, self.download)
+        self.assertFalse(destination.exists())
+
+    def test_invalid_fetch_preserves_a_previously_installed_destination(self):
+        journeys.build(self.root, self.output, SHA)
+        destination = self.root / "existing"
+        journeys.fetch(destination, SHA, "0.97.2", self.download)
+        previous = {path.name: path.read_bytes() for path in destination.iterdir()}
+        invalid = copy.deepcopy(DOCUMENTS)
+        invalid["screen_catalog_v1.json"]["screens"] = []
+        self.rehash_artifact(invalid)
+        with self.assertRaises(journeys.FixtureError):
+            journeys.fetch(destination, SHA, "0.97.2", self.download)
+        self.assertEqual(previous, {path.name: path.read_bytes() for path in destination.iterdir()})
+
+    def test_committed_product_fixtures_are_accepted_without_rewriting_their_bytes(self):
+        source = Path(__file__).resolve().parents[2] / "vauchi-app/fixtures/journeys"
+        for name in journeys.FILES:
+            (self.source / name).write_bytes((source / name).read_bytes())
+        journeys.build(self.root, self.output, SHA)
+        destination = self.root / "real-product-evidence"
+        journeys.fetch(destination, SHA, "0.97.2", self.download)
+        for name in journeys.FILES:
+            self.assertEqual((source / name).read_bytes(), (destination / name).read_bytes())
 
 
 if __name__ == "__main__":

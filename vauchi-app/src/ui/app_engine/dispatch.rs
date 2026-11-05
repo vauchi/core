@@ -352,6 +352,15 @@ impl AppEngine {
         &mut self,
         action: &UserAction,
     ) -> Option<ActionResult> {
+        if self.screen == AppScreen::Onboarding
+            && self.engine.current_screen().screen_id == "identity_check"
+            && matches!(action, UserAction::ListItemSelected { component_id, item_id }
+                if matches!(component_id.as_str(), "have_identity_choices" | "have_identity_choices.have_identity")
+                    && item_id == "start_social_recovery")
+        {
+            let screen = self.navigate_to(AppScreen::Recovery);
+            return Some(ActionResult::NavigateTo(screen));
+        }
         // "Go exchange" (empty-state CTA) and "Add contact" (always-visible
         // Primary button on the contact list) share the same target — on
         // MVP we only acquire contacts via in-person exchange, so both

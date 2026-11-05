@@ -3,8 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! The pre-gate onboarding screens: the welcome identity check and the
-//! two "I already have an identity" paths it opens (device-link
-//! instructions, backup password entry).
+//! existing-identity paths (device linking, backup import and recovery).
 
 use super::*;
 
@@ -84,6 +83,12 @@ impl OnboardingEngine {
                         "lock",
                         "onboarding.restore_backup_title",
                         "onboarding.backup_password_subtitle",
+                    ),
+                    self.entry_point(
+                        "start_social_recovery",
+                        "key",
+                        "recovery.start_button",
+                        "recovery.enter_old_key_full_instruction",
                     ),
                 ],
             }],

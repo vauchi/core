@@ -149,7 +149,7 @@ fn start_recovery_works_on_a_new_device_with_no_contacts() {
         button(&engine.current_screen(), "start_recovery_process"),
         Some((
             "Start recovery".into(),
-            Some("Lost every device? Set up Vauchi again, then start here.".into())
+            Some("Enter your OLD public key (from backup or previous device). The key is a 64-character hex string.".into())
         ))
     );
     let result = select(&mut engine, "recovery_actions", "start_recovery_process");

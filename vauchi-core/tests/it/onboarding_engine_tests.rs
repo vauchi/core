@@ -72,9 +72,9 @@ fn identity_check_has_info_panel_one_primary_action_and_the_have_identity_rows()
         screen.contextual_actions[0].style,
         ActionStyle::Primary
     ));
-    // Link and restore are rows of the "I already have an identity"
+    // Existing-identity paths are rows of the "I already have an identity"
     // list, not secondary actions: secondaries fold into the context
-    // bar's overflow and would hide both entry points.
+    // bar's overflow and would hide these entry points.
     let rows: Vec<&str> = screen
         .components
         .iter()
@@ -90,7 +90,10 @@ fn identity_check_has_info_panel_one_primary_action_and_the_have_identity_rows()
             _ => None,
         })
         .expect("welcome lists the have-identity choices");
-    assert_eq!(rows, vec!["link_device", "load_backup"]);
+    assert_eq!(
+        rows,
+        vec!["link_device", "load_backup", "start_social_recovery"]
+    );
 }
 
 // @internal

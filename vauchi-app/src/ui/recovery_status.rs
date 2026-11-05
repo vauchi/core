@@ -300,7 +300,7 @@ impl RecoveryEngine {
                         id: START_ACTION.into(),
                         label: self.t("recovery.start_button"),
                         icon: None,
-                        detail: Some(self.t("recovery.start_detail")),
+                        detail: Some(self.t("recovery.enter_old_key_full_instruction")),
                         a11y: None,
                         info_key: None,
                     },

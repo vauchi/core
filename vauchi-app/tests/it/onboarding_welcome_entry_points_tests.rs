@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! The onboarding welcome screen shows its two "I already have an
+//! The onboarding welcome screen shows its "I already have an
 //! identity" entry points as body rows, not as context-bar overflow.
 //!
 //! The recorded Core batch for `onboarding` used to carry only the
@@ -92,6 +92,11 @@ fn welcome_lists_link_and_restore_under_an_already_have_identity_heading() {
                 "Restore from backup",
                 "The password you set when you exported the backup."
             ),
+            (
+                "start_social_recovery",
+                "Start recovery",
+                "Enter your OLD public key (from backup or previous device). The key is a 64-character hex string."
+            ),
         ]
     );
 }
@@ -151,6 +156,12 @@ fn welcome_initial_batch_carries_the_entry_point_rows() {
             (
                 "Restore from backup",
                 Some("The password you set when you exported the backup.")
+            ),
+            (
+                "Start recovery",
+                Some(
+                    "Enter your OLD public key (from backup or previous device). The key is a 64-character hex string."
+                )
             ),
         ]
     );

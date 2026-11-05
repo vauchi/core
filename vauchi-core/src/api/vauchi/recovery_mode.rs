@@ -123,7 +123,7 @@ impl Vauchi {
         };
         let recovery_key = SigningKeyPair::from_seed(&seed);
         let claim = RecoveryClaim::new(
-            &target,
+            target,
             recovery_key.public_key().as_bytes(),
             self.clock.unix_seconds(),
         );

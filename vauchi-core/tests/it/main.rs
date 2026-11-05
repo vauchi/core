@@ -510,6 +510,7 @@ mod recovery_stolen_device_tests;
 mod recovery_storage_tests;
 mod recovery_tests;
 mod recovery_transfer_property_tests;
+mod recovery_transfer_storage_tests;
 mod recovery_transfer_tests;
 mod recovery_trust_privacy_tests;
 mod recovery_upload_tests;

@@ -227,18 +227,19 @@ impl AppEngine {
     pub(in crate::ui::app_engine) fn intercept_restore_action(&mut self) -> Option<ActionResult> {
         let Some(crate::ui::EngineOutput::Recovery {
             restore_passphrase: Some(passphrase),
+            restore_same_identity,
             ..
         }) = self.engine.engine_output()
         else {
             return None;
         };
         let passphrase = (!passphrase.is_empty()).then_some(passphrase);
-        let restored = if self.vauchi.has_identity() {
-            self.vauchi
-                .restore_from_returned_backups(passphrase.as_deref())
-        } else {
+        let restored = if restore_same_identity {
             self.vauchi
                 .restore_identity_from_hand_backs(passphrase.as_deref())
+        } else {
+            self.vauchi
+                .restore_from_returned_backups(passphrase.as_deref())
         };
         let update = match restored {
             Ok(count) => crate::ui::RecoveryUpdate::Restored(count),

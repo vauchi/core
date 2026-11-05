@@ -510,6 +510,10 @@ impl WorkflowEngine for RecoveryEngine {
     fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
         Some(crate::ui::EngineOutput::Recovery {
             old_key_input: self.old_key_input().to_string(),
+            restore_same_identity: self
+                .restore
+                .as_ref()
+                .is_some_and(|state| state.same_identity),
             voucher_input: (self.step == RecoveryStep::CollectVouchers)
                 .then(|| self.voucher_input.clone()),
             new_passphrase: (self.step == RecoveryStep::Passphrase)

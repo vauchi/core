@@ -4,7 +4,7 @@
 use std::collections::HashSet;
 
 use super::Vauchi;
-use crate::api::VauchiResult;
+use crate::api::error::VauchiResult;
 use crate::backup::{guardian_backup_metadata, open_share_for_guardian, passphrase_layer};
 use crate::crypto::SigningKeyPair;
 

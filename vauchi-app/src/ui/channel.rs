@@ -106,6 +106,7 @@ pub enum EngineOutput {
         voucher_input: Option<String>,
         /// The passphrase typed on the restore step, `Some` only there.
         restore_passphrase: Option<String>,
+        restore_same_identity: bool,
         /// The owner's new passphrase and its repetition, `Some` only on
         /// the passphrase step.
         new_passphrase: Option<(String, String)>,
@@ -744,8 +745,10 @@ impl std::fmt::Debug for EngineOutput {
                 voucher_input,
                 restore_passphrase,
                 new_passphrase,
+                restore_same_identity,
             } => f
                 .debug_struct("Recovery")
+                .field("restore_same_identity", restore_same_identity)
                 .field("old_key_input_len", &old_key_input.len())
                 .field(
                     "voucher_input_len",

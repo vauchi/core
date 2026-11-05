@@ -5,7 +5,9 @@ use serde_json::Value;
 use vauchi_app::i18n::{Locale, get_string};
 use vauchi_app::ui::{AppEngine, AppScreen, Component, WorkflowEngine};
 use vauchi_core::backup::{GuardianGroups, passphrase_layer};
-use vauchi_core::sync::guardian_piece::{HandBackShare, split_backup_for_hand_back};
+use vauchi_core::sync::guardian_piece::{
+    GuardianDelivery, HandBackShare, split_backup_for_hand_back, split_into_pieces,
+};
 use vauchi_core::{
     Command, Contact, ContactCard, Event, Identity, InputValue, SymmetricKey, Vauchi, VauchiConfig,
 };
@@ -348,4 +350,65 @@ fn identity_free_restore_refuses_unreadable_stored_hand_backs() {
         get_string(Locale::ENGLISH, "recovery.load_error")
     );
     assert!(!app.vauchi().has_identity());
+}
+
+// @internal — DC-02: a prepared same-identity restore cannot turn into a legacy import after identity changes.
+#[test]
+fn identity_free_restore_action_keeps_its_prepared_mode_when_an_identity_appears() {
+    let directory = tempfile::tempdir().unwrap();
+    let saved = save_meeting(directory.path(), 3, false, false);
+    let mut app = AppEngine::new(Vauchi::new(saved.config.clone()).unwrap());
+    let commands = app.initial_commands().unwrap();
+    app.vauchi_mut()
+        .create_identity("Unexpected identity")
+        .unwrap();
+    let unexpected = *app.vauchi().identity().unwrap().signing_public_key();
+    let groups = GuardianGroups::new(
+        saved
+            .guardians
+            .iter()
+            .map(|g| vec![*g.identity().unwrap().signing_public_key()])
+            .collect(),
+    )
+    .unwrap();
+    let (backup, sealed) = saved
+        .owner
+        .export_guardian_backup_for_groups(&groups)
+        .unwrap();
+    let backup = hex::decode(backup).unwrap();
+    for (i, guardian) in saved.guardians.iter().enumerate() {
+        let contact = Contact::from_exchange(
+            *guardian.identity().unwrap().signing_public_key(),
+            ContactCard::new(&format!("G{i}")),
+            SymmetricKey::generate(),
+            0,
+        );
+        let id = contact.id().to_owned();
+        app.vauchi().add_contact(contact).unwrap();
+        let share = guardian
+            .respond_to_recovery(&sealed[i][0], &unexpected)
+            .unwrap();
+        let delivery = GuardianDelivery::new(2, share, backup.clone()).unwrap();
+        for piece in split_into_pieces([i as u8; 16], &delivery.encode()).unwrap() {
+            app.vauchi()
+                .storage()
+                .returned_backups()
+                .keep_piece(&id, &piece, 2)
+                .unwrap();
+        }
+    }
+    activate(&mut app, &commands, "recovery.restore_now");
+    assert_eq!(
+        app.vauchi().identity().unwrap().signing_public_key(),
+        &unexpected
+    );
+    assert_eq!(
+        app.vauchi()
+            .get_contact(&saved.contact_id)
+            .unwrap()
+            .map(|contact| contact.display_name().to_owned()),
+        None
+    );
+    assert!(app.current_screen().components.iter().any(|component| matches!(component,
+        Component::Text { id, content, .. } if id == "restore_error" && content == &get_string(Locale::ENGLISH, "recovery.restore_refused"))));
 }

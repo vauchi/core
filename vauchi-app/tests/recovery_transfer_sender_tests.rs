@@ -161,3 +161,93 @@ fn recovery_sender_retries_only_at_its_deadline_and_eventually_disconnects() {
     assert_eq!(sender.state(), TransferState::Failed);
     assert_eq!(sender.poll(200), Vec::<Command>::new());
 }
+
+// @internal — DC-01/DC-02: malformed or never-issued ACKs terminate the transfer.
+#[test]
+fn recovery_sender_refuses_malformed_and_out_of_order_acknowledgements() {
+    for data in [
+        vec![],
+        b"RBA1\0\0\0".to_vec(),
+        b"RBA1\0\0\0\x0a\0".to_vec(),
+        b"RBA1\0\x01\0\x0a".to_vec(),
+        b"RBA1\0\0\0\x14".to_vec(),
+        b"RBA1\0\0\0\x01".to_vec(),
+    ] {
+        let mut sender = sender();
+        let callback = sender.callback();
+        packet(&sender.poll(100));
+        callback.publish(ack(data)).unwrap();
+        assert_eq!(sender.poll(101), disconnect());
+        assert_eq!(sender.state(), TransferState::Failed);
+        assert_eq!(sender.poll(200), Vec::<Command>::new());
+    }
+}
+
+// @internal — DC-02: scoped native failure cannot look like successful delivery.
+#[test]
+fn recovery_sender_stops_on_scoped_hardware_failure_or_link_loss() {
+    for event in [
+        Event::HardwareError {
+            transport: "BLE".into(),
+            error: "private native error".into(),
+        },
+        Event::HardwareUnavailable {
+            transport: "BLE".into(),
+        },
+        Event::PermissionDenied {
+            transport: "BLE".into(),
+        },
+        Event::BleDisconnected {
+            device_id: PEER.into(),
+            direction: BleLinkDirection::Outbound,
+            reason: "private native reason".into(),
+        },
+    ] {
+        let mut sender = sender();
+        let callback = sender.callback();
+        packet(&sender.poll(100));
+        callback.publish(event).unwrap();
+        assert_eq!(sender.poll(101), disconnect());
+        assert_eq!(sender.state(), TransferState::Failed);
+        assert_eq!(
+            callback.publish(ack(vec![])).unwrap_err().reason,
+            DeliveryError::Inactive
+        );
+    }
+}
+
+// @internal — repeated old ACKs cannot renew the deadline for a pending packet.
+#[test]
+fn recovery_sender_duplicate_acknowledgements_do_not_postpone_retry() {
+    let mut sender = sender();
+    let callback = sender.callback();
+    packet(&sender.poll(100));
+    callback.publish(ack(b"RBA1\0\0\0\x0a".to_vec())).unwrap();
+    let second = packet(&sender.poll(101));
+    for now in 102..106 {
+        callback.publish(ack(b"RBA1\0\0\0\x0a".to_vec())).unwrap();
+        assert_eq!(sender.poll(now), Vec::<Command>::new());
+    }
+    assert_eq!(packet(&sender.poll(106)), second);
+}
+
+// @internal — callback budgets bound pending data and preserve rejected ownership.
+#[test]
+fn recovery_sender_callback_applies_backpressure_and_payload_bounds() {
+    let mut sender = sender();
+    let callback = sender.callback();
+    let oversized = ack(vec![0; 4096]);
+    let rejected = callback.publish(oversized.clone()).unwrap_err();
+    assert_eq!(rejected.reason, DeliveryError::PayloadTooLarge);
+    assert_eq!(rejected.event, oversized);
+    for _ in 0..4 {
+        callback.publish(Event::WakeupFired).unwrap();
+    }
+    let rejected = callback.publish(Event::WakeupFired).unwrap_err();
+    assert_eq!(rejected.reason, DeliveryError::Full);
+    assert_eq!(rejected.event, Event::WakeupFired);
+    packet(&sender.poll(100));
+    callback.publish(rejected.event).unwrap();
+    assert_eq!(sender.poll(101), Vec::<Command>::new());
+    assert_eq!(sender.state(), TransferState::Sending);
+}

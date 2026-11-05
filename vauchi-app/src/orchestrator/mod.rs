@@ -42,4 +42,5 @@ pub mod multi_stage_machine;
 /// network-http feature required.
 pub mod ble_handshake_machine;
 
+#[cfg(feature = "storage")]
 pub mod recovery_transfer;

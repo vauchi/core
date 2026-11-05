@@ -20,10 +20,9 @@ use vauchi_core::api::Vauchi;
 // *new* crash window for installs after this commit.
 pub(super) fn initial_screen(vauchi: &Vauchi) -> AppScreen {
     if !vauchi.has_identity() {
-        if vauchi.pending_recovery_claim().ok().flatten().is_some() {
-            AppScreen::Recovery
-        } else {
-            AppScreen::Onboarding
+        match vauchi.pending_recovery_claim() {
+            Ok(None) => AppScreen::Onboarding,
+            Ok(Some(_)) | Err(_) => AppScreen::Recovery,
         }
     } else if vauchi.is_password_enabled().unwrap_or(false)
         && vauchi.auth_mode() == vauchi_core::api::AuthMode::Unauthenticated

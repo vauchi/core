@@ -209,3 +209,59 @@ fn recovery_dispatch_reopens_the_stored_identity_free_claim_after_restart() {
     assert!(commands.iter().any(|command| matches!(command,
         Command::ReplaceSurface { surface } if surface.surface_id.as_str() == "recovery")));
 }
+
+// @internal — DC-02: unreadable recovery stays recoverable through supplied retry actions.
+#[cfg(feature = "testing")]
+#[test]
+fn recovery_dispatch_storage_error_is_retryable_without_entering_onboarding() {
+    let phone = Vauchi::in_memory().unwrap();
+    let original = phone.begin_recovery(&"01".repeat(32)).unwrap();
+    let original = phone.parse_recovery_claim_b64(&original).unwrap();
+    let sealed: Vec<u8> = phone
+        .storage()
+        .connection()
+        .query_row(
+            "SELECT seed_encrypted FROM recovery_mode_key WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    phone
+        .storage()
+        .connection()
+        .execute("UPDATE recovery_mode_key SET seed_encrypted = X'00'", [])
+        .unwrap();
+    let mut app = AppEngine::new(phone);
+    let commands = app.initial_commands().unwrap();
+    assert_eq!(app.current_app_screen(), &AppScreen::Recovery);
+    assert_eq!(
+        app.current_screen().title,
+        get_string(Locale::ENGLISH, "recovery.load_error")
+    );
+    let commands = activate(&mut app, &commands, "action.try_again");
+    assert_eq!(
+        app.current_screen().title,
+        get_string(Locale::ENGLISH, "recovery.load_error")
+    );
+    assert!(!app.vauchi().has_identity());
+
+    app.vauchi()
+        .storage()
+        .connection()
+        .execute("UPDATE recovery_mode_key SET seed_encrypted = ?1", [sealed])
+        .unwrap();
+    activate(&mut app, &commands, "action.try_again");
+    let displayed = app
+        .current_screen()
+        .components
+        .into_iter()
+        .find_map(|component| match component {
+            Component::Text { id, content, .. } if id == "claim_data" => Some(content),
+            _ => None,
+        })
+        .expect("retry reloads the repaired recovery state");
+    let resumed = app.vauchi().parse_recovery_claim_b64(&displayed).unwrap();
+    assert_eq!(resumed.old_pk(), original.old_pk());
+    assert_eq!(resumed.new_pk(), original.new_pk());
+    assert!(!app.vauchi().has_identity());
+}

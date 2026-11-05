@@ -352,6 +352,13 @@ impl AppEngine {
         &mut self,
         action: &UserAction,
     ) -> Option<ActionResult> {
+        if self.screen == AppScreen::Recovery
+            && self.engine.current_screen().screen_id == "recovery_load_error"
+            && matches!(action, UserAction::ActionPressed { action_id } if action_id == "retry_recovery_load")
+        {
+            self.invalidate_screen(&AppScreen::Recovery);
+            return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
+        }
         if self.screen == AppScreen::Onboarding
             && self.engine.current_screen().screen_id == "identity_check"
             && matches!(action, UserAction::ListItemSelected { component_id, item_id }

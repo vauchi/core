@@ -22,6 +22,7 @@ use crate::ui::*;
 /// Steps in the outgoing recovery workflow.
 #[derive(Clone, Debug, PartialEq)]
 enum RecoveryStep {
+    LoadError,
     /// Initial screen: "Lost your device?" intro card + recovery
     /// settings (required vouchers, claim expiry, trusted-contact
     /// readiness) + 4-step instructions + "Start Recovery" button.
@@ -154,6 +155,10 @@ impl RecoveryEngine {
         self.step = RecoveryStep::ShowGeneratedClaim;
     }
 
+    pub(crate) fn set_load_error(&mut self) {
+        self.step = RecoveryStep::LoadError;
+    }
+
     /// Reopens a recovery stored on this device where it was left:
     /// collecting vouchers for `claim_b64` (private#919).
     pub fn resume_collecting(&mut self, claim_b64: impl Into<String>) {
@@ -204,6 +209,18 @@ impl RecoveryEngine {
 
     fn build_screen(&self) -> ScreenModel {
         match &self.step {
+            RecoveryStep::LoadError => ScreenModel {
+                screen_id: "recovery_load_error".into(),
+                title: self.t("recovery.load_error"),
+                contextual_actions: vec![ScreenAction {
+                    id: "retry_recovery_load".into(),
+                    label: self.t("action.try_again"),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: None,
+                }],
+                ..Default::default()
+            },
             RecoveryStep::Intro => self.build_intro_screen(),
             RecoveryStep::EnterOldKey => self.build_enter_old_key_screen(),
             RecoveryStep::ShowGeneratedClaim => self.build_generated_claim_screen(),

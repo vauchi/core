@@ -31,6 +31,15 @@ The helper fetches only data and checks provenance and integrity before
 installing it. It requires no Rust toolchain, Core library or Core build.
 There is no fallback to `main`, a latest catalog, or another contract.
 
+For a Rust app assembly, derive the selection directly from its lockfile:
+
+```sh
+python3 journey_fixtures.py fetch-assembly evidence --assembly-lock Cargo.lock
+```
+
+This rejects evidence from a different Core commit or contract revision,
+even if the human-readable contract version is identical.
+
 App CI selects the SHA from its pinned assembly and records it with the
 render/replay results. Display shells verify that supplied commands render
 and supplied action ids are reported faithfully. Hardware shells verify

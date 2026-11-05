@@ -160,6 +160,23 @@ def fetch(destination, core_revision, contract_version, request=download):
     return metadata
 
 
+def fetch_assembly(destination, lockfile, request=download):
+    packages = tomllib.loads(lockfile.read_text())["package"]
+    cores = [p for p in packages if p["name"] == "vauchi-core"]
+    contracts = [p for p in packages if p["name"] == "vauchi-contract"]
+    require(len(cores) == len(contracts) == 1, "assembly must lock one Core and one contract")
+    core = re.fullmatch(r"git\+https://gitlab.com/vauchi/core.git\?[^#]+#(" + SHA + ")",
+                        cores[0].get("source", ""))
+    contract = re.fullmatch(r"git\+https://gitlab.com/vauchi/contract.git\?[^#]+#(" + SHA + ")",
+                            contracts[0].get("source", ""))
+    require(core is not None and contract is not None, "assembly requires immutable Git pins")
+    metadata, blobs = checked(core[1], contracts[0]["version"], request)
+    require(metadata["contract"]["revision"] == contract[1]
+            and metadata.get("core_version") == cores[0]["version"], "assembly revision mismatch")
+    install(destination, blobs)
+    return metadata
+
+
 def publish(directory, core_revision, get=existing, put=transfer):
     blobs = {name: read(directory / name) for name in (*FILES, "manifest.json")}
     metadata = document(blobs["manifest.json"])
@@ -174,18 +191,24 @@ def publish(directory, core_revision, get=existing, put=transfer):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=("build", "fetch", "publish"))
+    parser.add_argument("operation", choices=("build", "fetch", "fetch-assembly", "publish"))
     parser.add_argument("output", type=Path)
-    parser.add_argument("--core-revision", required=True)
+    parser.add_argument("--core-revision")
+    parser.add_argument("--assembly-lock", type=Path)
     parser.add_argument("--contract-version")
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     args = parser.parse_args()
     try:
+        require(args.operation == "fetch-assembly" or args.core_revision is not None,
+                "an explicit Core revision is required")
         if args.operation == "build":
             build(args.root, args.output, args.core_revision)
         elif args.operation == "fetch":
             require(args.contract_version is not None, "fetch requires an exact contract version")
             fetch(args.output, args.core_revision, args.contract_version)
+        elif args.operation == "fetch-assembly":
+            require(args.assembly_lock is not None, "fetch-assembly requires a pinned lockfile")
+            fetch_assembly(args.output, args.assembly_lock)
         else:
             publish(args.output, args.core_revision)
     except (FixtureError, OSError, ValueError, KeyError, TypeError) as error:

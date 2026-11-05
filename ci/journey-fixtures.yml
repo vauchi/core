@@ -17,8 +17,8 @@ check:journey-fixtures:
     - !reference [.clone-themes, before_script]
   script:
     - python3 -m unittest discover -s ci/tests -p journey_fixtures_test.py
-    - cargo test -p vauchi-app --test presentation_contract_fixture_tests --test screen_catalog_fixture_tests --features testing,network-http
-    - cargo test -p vauchi-app --test presentation_contract_fixture_tests regenerate_shared_fixture -- --ignored
+    - cargo test -p vauchi-app --test presentation_contract_fixture_tests --test screen_catalog_fixture_tests --features test-kdf,testing,network-http
+    - cargo test -p vauchi-app --test presentation_contract_fixture_tests --features test-kdf,testing,network-http regenerate_shared_fixture -- --ignored
     - git diff --exit-code -- vauchi-app/fixtures/journeys/presentation_contract_v1.json
     - python3 ci/journey_fixtures.py build dist/journey-fixtures --core-revision "$CI_COMMIT_SHA"
   artifacts:

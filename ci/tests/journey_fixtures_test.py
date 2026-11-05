@@ -100,10 +100,26 @@ class JourneyFixturesTest(unittest.TestCase):
         self.assertEqual(writes, [*journeys.FILES, "manifest.json"])
         journeys.publish(self.output, SHA, get, put)
         self.assertEqual(len(writes), len(journeys.FILES) + 1)
+
         registry[journeys.FILES[0]] = b"other bytes at the same revision"
         with self.assertRaises(journeys.FixtureError):
             journeys.publish(self.output, SHA, get, put)
         self.assertEqual(len(writes), len(journeys.FILES) + 1)
+
+    def test_assembly_evidence_uses_locked_core_and_contract_revisions(self):
+        journeys.build(self.root, self.output, SHA)
+        lock = self.root / "assembly.lock"
+        lock.write_text((self.root / "Cargo.lock").read_text()
+            + '\n[[package]]\nname="vauchi-core"\nversion="0.99.1"\n'
+            + 'source="git+https://gitlab.com/vauchi/core.git?tag=v0.99.1#' + SHA + '"\n')
+        destination = self.root / "assembly-evidence"
+        journeys.fetch_assembly(destination, lock, self.download)
+        self.assertEqual((destination / "manifest.json").read_bytes(),
+                         (self.output / "manifest.json").read_bytes())
+        lock.write_text(lock.read_text().replace(CONTRACT_SHA, "c" * 40))
+        with self.assertRaises(journeys.FixtureError):
+            journeys.fetch_assembly(self.root / "wrong-assembly", lock, self.download)
+        self.assertFalse((self.root / "wrong-assembly").exists())
 
 
 if __name__ == "__main__":

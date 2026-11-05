@@ -41,3 +41,5 @@ pub mod multi_stage_machine;
 /// from `vauchi-platform/src/mobile_ble.rs`. In-person; no
 /// network-http feature required.
 pub mod ble_handshake_machine;
+
+pub mod recovery_transfer;

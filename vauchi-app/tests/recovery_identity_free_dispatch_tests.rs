@@ -95,3 +95,52 @@ fn recovery_dispatch_starts_an_identity_free_claim() {
             .any(|command| matches!(command, Command::ReplaceSurface { .. }))
     );
 }
+
+// @internal — DC-01/DC-02: invalid input cannot start a recovery or create an identity.
+#[test]
+fn recovery_dispatch_refuses_malformed_old_key_without_initializing_identity() {
+    let mut app = AppEngine::new(Vauchi::in_memory().unwrap());
+    app.set_initial_screen(AppScreen::Recovery);
+    let commands = app.initial_commands().unwrap();
+    let commands = activate(&mut app, &commands, "recovery.start_button");
+    let commands = enter_key(&mut app, &commands, &"zz".repeat(32));
+    activate(&mut app, &commands, "recovery.create_claim_button");
+    assert!(!app.vauchi().has_identity());
+    let screen = app.current_screen();
+    assert!(screen.components.iter().any(|component| matches!(component,
+        Component::TextInput { id, validation_error: Some(error), .. }
+            if id == "old_public_key" && !error.is_empty())));
+    assert!(
+        !screen.components.iter().any(|component| matches!(component,
+        Component::Text { id, .. } if id == "claim_data"))
+    );
+}
+
+// @internal — the existing-identity claim path remains distinct from identity-free restore.
+#[test]
+fn recovery_dispatch_preserves_the_existing_identity_claim_path() {
+    let mut phone = Vauchi::in_memory().unwrap();
+    phone.create_identity("Alice").unwrap();
+    let expected = *phone.identity().unwrap().signing_public_key();
+    let mut app = AppEngine::new(phone);
+    app.set_initial_screen(AppScreen::Recovery);
+    let commands = app.initial_commands().unwrap();
+    let commands = activate(&mut app, &commands, "recovery.start_button");
+    let commands = enter_key(&mut app, &commands, &"01".repeat(32));
+    activate(&mut app, &commands, "recovery.create_claim_button");
+    let displayed = app
+        .current_screen()
+        .components
+        .into_iter()
+        .find_map(|component| match component {
+            Component::Text { id, content, .. } if id == "claim_data" => Some(content),
+            _ => None,
+        })
+        .unwrap();
+    let claim = app.vauchi().parse_recovery_claim_b64(&displayed).unwrap();
+    assert_eq!(claim.new_pk().as_bytes(), &expected);
+    assert_eq!(
+        app.vauchi().identity().unwrap().signing_public_key(),
+        &expected
+    );
+}

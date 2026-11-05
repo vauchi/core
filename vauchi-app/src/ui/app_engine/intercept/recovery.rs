@@ -15,7 +15,8 @@ impl AppEngine {
     /// (EnterOldKey step).
     ///
     /// Reads the engine's `old_key_input` (a hex-encoded public key),
-    /// passes it to `Vauchi::create_recovery_claim_hex_b64`, then either
+    /// starts identity-free recovery or uses the existing identity's claim,
+    /// then either
     /// advances the engine to ShowGeneratedClaim (success) or attaches
     /// a validation error to the input (failure). Returns `UpdateScreen`
     /// so the rendered screen reflects the new engine state.
@@ -29,7 +30,11 @@ impl AppEngine {
             _ => return None,
         };
 
-        let result = self.vauchi.create_recovery_claim_hex_b64(&old_key);
+        let result = if self.vauchi.has_identity() {
+            self.vauchi.create_recovery_claim_hex_b64(&old_key)
+        } else {
+            self.vauchi.begin_recovery(&old_key)
+        };
 
         let update = match result {
             Ok(claim_b64) => crate::ui::RecoveryUpdate::ClaimGenerated(claim_b64),

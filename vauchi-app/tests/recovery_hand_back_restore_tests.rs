@@ -412,3 +412,28 @@ fn identity_free_restore_action_keeps_its_prepared_mode_when_an_identity_appears
     assert!(app.current_screen().components.iter().any(|component| matches!(component,
         Component::Text { id, content, .. } if id == "restore_error" && content == &get_string(Locale::ENGLISH, "recovery.restore_refused"))));
 }
+
+// @internal — DC-02: a stale instance must not overwrite an identity a sibling has persisted.
+#[test]
+fn identity_free_restore_refuses_an_identity_persisted_by_another_instance() {
+    let directory = tempfile::tempdir().unwrap();
+    let saved = save_meeting(directory.path(), 3, false, false);
+    let mut app = AppEngine::new(Vauchi::new(saved.config.clone()).unwrap());
+    let commands = app.initial_commands().unwrap();
+    let mut sibling = Vauchi::new(saved.config.clone()).unwrap();
+    sibling.create_identity("Sibling identity").unwrap();
+    let expected = *sibling.identity().unwrap().signing_public_key();
+    assert_eq!(app.vauchi().hand_back_restore_status().unwrap(), None);
+    activate(&mut app, &commands, "recovery.restore_now");
+    let reopened = Vauchi::new(saved.config.clone()).unwrap();
+    assert_eq!(reopened.identity().unwrap().signing_public_key(), &expected);
+    assert_eq!(
+        reopened
+            .get_contact(&saved.contact_id)
+            .unwrap()
+            .map(|contact| contact.display_name().to_owned()),
+        None
+    );
+    assert!(app.current_screen().components.iter().any(|component| matches!(component,
+        Component::Text { id, content, .. } if id == "restore_error" && content == &get_string(Locale::ENGLISH, "recovery.restore_refused"))));
+}

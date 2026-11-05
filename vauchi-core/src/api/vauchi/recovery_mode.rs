@@ -331,6 +331,10 @@ impl Vauchi {
             now,
         )?;
         let restored = self.storage.with_savepoint(|| -> VauchiResult<usize> {
+            // A sibling may initialize storage while this instance opens the backup (#796).
+            if self.storage.identity().has_identity()? {
+                return Err(VauchiError::AlreadyInitialized);
+            }
             self.storage
                 .identity()
                 .save_identity(&identity.to_storage_bytes())?;

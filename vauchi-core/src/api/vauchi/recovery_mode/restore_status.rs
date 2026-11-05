@@ -26,7 +26,7 @@ impl Vauchi {
     /// # Errors
     /// Storage errors, including unreadable encrypted recovery state.
     pub fn hand_back_restore_status(&self) -> VauchiResult<Option<HandBackRestoreStatus>> {
-        if self.identity.is_some() {
+        if self.identity.is_some() || self.storage.identity().has_identity()? {
             return Ok(None);
         }
         let Some((seed, _)) = self.storage.recovery().load_recovery_mode()? else {

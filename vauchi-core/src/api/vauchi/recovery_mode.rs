@@ -106,6 +106,32 @@ fn restored_registry(
 }
 
 impl Vauchi {
+    /// A fresh presentation claim for an identity-free recovery already
+    /// stored on this phone. Like [`Self::begin_recovery`], the claim's
+    /// lifetime starts now; its target and temporary key stay unchanged.
+    /// Returns `None` when no recovery is stored or an identity exists.
+    /// This query never creates a key or changes stored hand-backs.
+    ///
+    /// # Errors
+    /// Storage errors, including malformed or unreadable recovery state.
+    pub fn pending_recovery_claim(&self) -> VauchiResult<Option<String>> {
+        if self.identity.is_some() {
+            return Ok(None);
+        }
+        let Some((seed, target)) = self.storage.recovery().load_recovery_mode()? else {
+            return Ok(None);
+        };
+        let recovery_key = SigningKeyPair::from_seed(&seed);
+        let claim = RecoveryClaim::new(
+            &target,
+            recovery_key.public_key().as_bytes(),
+            self.clock.unix_seconds(),
+        );
+        Ok(Some(
+            base64::engine::general_purpose::STANDARD.encode(claim.to_bytes()),
+        ))
+    }
+
     /// Begins a social recovery of the identity `old_pk_hex` on this phone,
     /// which has no identity yet: makes the temporary recovery key, or
     /// keeps the one made before, and returns the claim (base64) the

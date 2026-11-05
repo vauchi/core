@@ -48,7 +48,9 @@ impl AppEngine {
                 let mut engine = RecoveryEngine::new(contacts, threshold)
                     .with_locale(render_context.resolved_locale());
                 engine.set_linked_device_count(device_count);
-                if let Ok(Some(progress)) = vauchi.get_recovery_progress()
+                if let Ok(Some(claim)) = vauchi.pending_recovery_claim() {
+                    engine.set_generated_claim(claim);
+                } else if let Ok(Some(progress)) = vauchi.get_recovery_progress()
                     && !progress.claim.is_expired(vauchi.clock().unix_seconds())
                 {
                     use base64::Engine;

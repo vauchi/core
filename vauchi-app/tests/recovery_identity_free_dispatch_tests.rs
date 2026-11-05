@@ -4,7 +4,7 @@
 use serde_json::Value;
 use vauchi_app::i18n::{Locale, get_string};
 use vauchi_app::ui::{AppEngine, AppScreen, Component, WorkflowEngine};
-use vauchi_core::{Command, Event, InputValue, Vauchi};
+use vauchi_core::{Command, Event, InputValue, SymmetricKey, Vauchi, VauchiConfig};
 
 fn find_labeled(value: &Value, label: &str, field: &str) -> Option<Value> {
     match value {
@@ -175,4 +175,37 @@ fn recovery_dispatch_onboarding_reaches_identity_free_claim_creation() {
         &[1; 32]
     );
     assert!(!app.vauchi().has_identity());
+}
+
+// @internal — P32: reopening an identity-free ceremony keeps its target and temporary key.
+#[test]
+fn recovery_dispatch_reopens_the_stored_identity_free_claim_after_restart() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("phone.db");
+    let storage_key = SymmetricKey::generate();
+    let config = || VauchiConfig::with_storage_path(&path).with_storage_key(storage_key.clone());
+    let original = {
+        let phone = Vauchi::new(config()).unwrap();
+        let claim = phone.begin_recovery(&"01".repeat(32)).unwrap();
+        phone.parse_recovery_claim_b64(&claim).unwrap()
+    };
+
+    let mut app = AppEngine::new(Vauchi::new(config()).unwrap());
+    let commands = app.initial_commands().unwrap();
+    assert_eq!(app.current_app_screen(), &AppScreen::Recovery);
+    let displayed = app
+        .current_screen()
+        .components
+        .into_iter()
+        .find_map(|component| match component {
+            Component::Text { id, content, .. } if id == "claim_data" => Some(content),
+            _ => None,
+        })
+        .expect("restart presents the stored recovery claim");
+    let resumed = app.vauchi().parse_recovery_claim_b64(&displayed).unwrap();
+    assert_eq!(resumed.old_pk(), original.old_pk());
+    assert_eq!(resumed.new_pk(), original.new_pk());
+    assert!(!app.vauchi().has_identity());
+    assert!(commands.iter().any(|command| matches!(command,
+        Command::ReplaceSurface { surface } if surface.surface_id.as_str() == "recovery")));
 }

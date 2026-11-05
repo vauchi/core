@@ -499,7 +499,11 @@ impl AppEngine {
         // `create_identity_with_onboarding` helper still closes the
         // *new* crash window for installs after this commit.
         let screen = if !vauchi.has_identity() {
-            AppScreen::Onboarding
+            if vauchi.pending_recovery_claim().ok().flatten().is_some() {
+                AppScreen::Recovery
+            } else {
+                AppScreen::Onboarding
+            }
         } else if vauchi.is_password_enabled().unwrap_or(false)
             && vauchi.auth_mode() == vauchi_core::api::AuthMode::Unauthenticated
         {

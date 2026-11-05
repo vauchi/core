@@ -56,6 +56,7 @@ vauchi-core/locales/
 
 # CI local testing
 .gitlab-ci-local/
+__pycache__/
 
 # Git worktrees
 .worktrees/

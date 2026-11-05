@@ -90,6 +90,7 @@ include:
   # Extracted 2026-04-22 as T2.3 Phase 0 Part 6.
   - local: ci/prebuild.yml
   - local: ci/internal-dev-bindings.yml
+  - local: ci/journey-fixtures.yml
 
 # Temporary containment for the allyson compiler stall (vauchi/private#198).
 # A tiny compile probe passed while real dependency compilation still hung.

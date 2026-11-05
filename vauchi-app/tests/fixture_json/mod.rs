@@ -33,12 +33,6 @@ pub fn collapse_number_arrays(pretty: &str) -> String {
     out.join("\n")
 }
 
-// The contract repository owns the fixture files (ADR-078); Core only
-// regenerates them, into the clone beside core or wherever
-// VAUCHI_CONTRACT_DIR points.
-pub fn contract_fixtures_dir() -> std::path::PathBuf {
-    std::env::var_os("VAUCHI_CONTRACT_DIR")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../contract"))
-        .join("fixtures")
+pub fn journey_fixtures_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/journeys")
 }

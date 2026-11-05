@@ -224,7 +224,7 @@ fn a_content_update_affects_every_main_screen() {
     }
 }
 
-// Feature: remote_content.feature — downloaded themes reach an already-open display.
+// @scenario: remote_content :: Apply downloaded theme
 #[test]
 fn applied_theme_wakeup_publishes_fresh_prepared_colors_once() {
     let dir = tempfile::tempdir().unwrap();

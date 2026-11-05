@@ -205,7 +205,7 @@ fn wakeup_dispatch_preserves_open_overlay() {
     );
 }
 
-// Feature: generic_presentation_protocol.feature — a theme refresh keeps the open overlay.
+// @internal — background theme refresh preserves the open overlay and effect ordering.
 #[test]
 fn theme_wakeup_reopens_the_existing_overlay_after_fresh_surfaces() {
     let mut engine = engine();

@@ -24,6 +24,8 @@ struct Saved {
     temporary: [u8; 32],
     contact_id: String,
     contact_key: [u8; 32],
+    owner: Vauchi,
+    guardians: Vec<Vauchi>,
 }
 
 fn save_meeting(
@@ -91,6 +93,8 @@ fn save_meeting(
         temporary,
         contact_id,
         contact_key,
+        owner: lost,
+        guardians,
     }
 }
 
@@ -114,6 +118,7 @@ fn activate(app: &mut AppEngine, commands: &[Command], key: &str) -> Vec<Command
         .iter()
         .find_map(|command| match command {
             Command::ReplaceSurface { surface } => Some(surface.surface_id.clone()),
+            Command::PresentOverlay { surface_id, .. } => Some(surface_id.clone()),
             _ => None,
         })
         .unwrap();
@@ -122,7 +127,7 @@ fn activate(app: &mut AppEngine, commands: &[Command], key: &str) -> Vec<Command
         &get_string(Locale::ENGLISH, key),
         "interaction_id",
     )
-    .unwrap();
+    .unwrap_or_else(|| panic!("supplied action missing: {key}"));
     app.dispatch(Event::ActionActivated {
         surface_id,
         interaction_id: serde_json::from_value(id).unwrap(),
@@ -220,10 +225,17 @@ fn identity_free_restore_uses_durable_hand_backs_and_finishes_on_my_card() {
         app.current_screen().title,
         get_string(Locale::ENGLISH, "recovery.restore_title")
     );
+    let commands = activate(&mut app, &commands, "action_list.title");
+    let commands = activate(&mut app, &commands, "action.cancel");
+    assert!(!app.vauchi().has_identity());
+    let commands = activate(&mut app, &commands, "recovery.restore_button");
     let commands = activate(&mut app, &commands, "recovery.restore_now");
     assert_restored(&app, &saved);
     activate(&mut app, &commands, "action.done");
     assert_eq!(app.current_app_screen(), &AppScreen::MyInfo);
+    drop(app);
+    let reopened = AppEngine::new(Vauchi::new(saved.config.clone()).unwrap());
+    assert_restored(&reopened, &saved);
 }
 
 // @internal — P32/DC-02: refusal preserves the recovery, and a correct passphrase restores it.
@@ -245,4 +257,95 @@ fn identity_free_restore_requests_passphrase_and_preserves_state_on_refusal() {
     let commands = enter_passphrase(&mut app, &commands, PASSPHRASE);
     activate(&mut app, &commands, "recovery.restore_now");
     assert_restored(&app, &saved);
+}
+
+// @internal — DC-02: shares from separate ceremonies cannot satisfy one backup's threshold.
+#[test]
+fn identity_free_restore_never_combines_groups_from_different_ceremonies() {
+    let directory = tempfile::tempdir().unwrap();
+    let saved = save_meeting(directory.path(), 1, false, false);
+    let groups = GuardianGroups::new(
+        saved
+            .guardians
+            .iter()
+            .map(|g| vec![*g.identity().unwrap().signing_public_key()])
+            .collect(),
+    )
+    .unwrap();
+    let (backup, sealed) = saved
+        .owner
+        .export_guardian_backup_for_groups(&groups)
+        .unwrap();
+    let pieces = split_backup_for_hand_back(&hex::decode(backup).unwrap()).unwrap();
+    let phone = Vauchi::new(saved.config.clone()).unwrap();
+    for (i, guardian) in saved.guardians.iter().enumerate().skip(1) {
+        let resealed = guardian
+            .respond_to_recovery(&sealed[i][0], &saved.temporary)
+            .unwrap();
+        let share = HandBackShare::new(2, resealed, pieces[0].hash()).unwrap();
+        assert_eq!(phone.take_hand_back(&share.encode()).unwrap(), i + 1);
+    }
+    for piece in pieces {
+        phone.take_hand_back_piece(&piece.encode()).unwrap();
+    }
+    let status = phone.hand_back_restore_status().unwrap().unwrap();
+    assert_eq!(status.handed_back, 3);
+    assert!(!status.can_attempt_restore);
+    let mut app = AppEngine::new(phone);
+    app.initial_commands().unwrap();
+    assert!(!app.vauchi().has_identity());
+    assert_eq!(
+        app.current_screen().title,
+        get_string(Locale::ENGLISH, "recovery.claim_created_title")
+    );
+}
+
+// @internal — P32: readiness is a read model and initialized identities stay on their separate path.
+#[cfg(feature = "testing")]
+#[test]
+fn identity_free_restore_readiness_is_read_only_and_scoped_to_recovery() {
+    let mut fresh = Vauchi::in_memory().unwrap();
+    assert_eq!(fresh.hand_back_restore_status().unwrap(), None);
+    fresh.begin_recovery(&"01".repeat(32)).unwrap();
+    fresh.create_identity("Alice").unwrap();
+    assert_eq!(fresh.hand_back_restore_status().unwrap(), None);
+
+    let directory = tempfile::tempdir().unwrap();
+    let saved = save_meeting(directory.path(), 3, false, false);
+    let phone = Vauchi::new(saved.config.clone()).unwrap();
+    phone
+        .storage()
+        .connection()
+        .execute_batch("PRAGMA query_only = ON")
+        .unwrap();
+    let status = phone.hand_back_restore_status().unwrap().unwrap();
+    assert_eq!(status.handed_back, 3);
+    assert!(status.can_attempt_restore);
+    assert!(!status.needs_passphrase);
+    assert!(!phone.has_identity());
+}
+
+// @internal — DC-02: an unreadable hand-back cannot disappear into a claim-only or ready state.
+#[cfg(feature = "testing")]
+#[test]
+fn identity_free_restore_refuses_unreadable_stored_hand_backs() {
+    let directory = tempfile::tempdir().unwrap();
+    let saved = save_meeting(directory.path(), 3, false, false);
+    let phone = Vauchi::new(saved.config.clone()).unwrap();
+    phone
+        .storage()
+        .connection()
+        .execute(
+            "UPDATE recovery_hand_backs SET delivery_encrypted = X'00'",
+            [],
+        )
+        .unwrap();
+    let mut app = AppEngine::new(phone);
+    app.initial_commands().unwrap();
+    assert_eq!(app.current_app_screen(), &AppScreen::Recovery);
+    assert_eq!(
+        app.current_screen().title,
+        get_string(Locale::ENGLISH, "recovery.load_error")
+    );
+    assert!(!app.vauchi().has_identity());
 }

@@ -30,6 +30,10 @@ impl PieceReceipt {
 }
 
 impl HandBackReceiver {
+    pub(crate) fn backup_hash(&self) -> [u8; 32] {
+        self.hash
+    }
+
     pub fn new(accepted_backup_hash: [u8; 32]) -> Self {
         Self {
             hash: accepted_backup_hash,

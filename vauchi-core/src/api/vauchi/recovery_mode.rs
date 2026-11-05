@@ -27,6 +27,8 @@ use crate::sync::guardian_piece::{
     GuardianBackupPiece, HandBackShare, PieceAssembly, split_backup_for_hand_back,
 };
 
+mod transfer;
+
 /// The device name a restored identity takes until the owner renames it.
 const RESTORED_DEVICE_NAME: &str = "Restored device";
 

@@ -71,6 +71,7 @@ mod screens;
 mod screens_contacts;
 mod screens_exchange;
 mod screens_security;
+mod startup;
 
 pub use app_screen::AppScreen;
 use overlays::{
@@ -484,35 +485,7 @@ impl AppEngine {
     }
 
     pub fn new(vauchi: Vauchi) -> Self {
-        // Boot decision (audit
-        // `2026-04-28-app-launch-and-identity-orchestration-in-core`
-        // §2.1). Frontends call `boot()` and trust the returned
-        // `ScreenModel` — they do not duplicate this decision tree.
-        //
-        // The "identity exists but onboarding never marked complete"
-        // resume-path called out by §2.5 is gated behind a future
-        // migration: existing installs ship `OnboardingProgress` at
-        // default (`completed_at == None`) so honouring the flag
-        // today would route every legacy user back through
-        // onboarding. Until the legacy heal lands, "identity exists"
-        // implies "past onboarding"; the atomic
-        // `create_identity_with_onboarding` helper still closes the
-        // *new* crash window for installs after this commit.
-        let screen = if !vauchi.has_identity() {
-            if vauchi.pending_recovery_claim().ok().flatten().is_some() {
-                AppScreen::Recovery
-            } else {
-                AppScreen::Onboarding
-            }
-        } else if vauchi.is_password_enabled().unwrap_or(false)
-            && vauchi.auth_mode() == vauchi_core::api::AuthMode::Unauthenticated
-        {
-            // A Vauchi already opened with the password (the CLI's --pin)
-            // is unlocked; any other starts on the lock screen (#639).
-            AppScreen::Lock
-        } else {
-            AppScreen::MyInfo
-        };
+        let screen = startup::initial_screen(&vauchi);
         let caps = DeviceCapabilities::default();
         let mut initial_render_context = crate::ui::RenderContext::default();
         initial_render_context.apply_saved_appearance(&vauchi);

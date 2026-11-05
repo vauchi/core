@@ -204,3 +204,62 @@ fn wakeup_dispatch_preserves_open_overlay() {
         0
     );
 }
+
+// Feature: generic_presentation_protocol.feature — a theme refresh keeps the open overlay.
+#[test]
+fn theme_wakeup_reopens_the_existing_overlay_after_fresh_surfaces() {
+    let mut engine = engine();
+    let (surface_id, interaction_id) = engine
+        .initial_commands()
+        .unwrap()
+        .into_iter()
+        .find_map(|command| match command {
+            Command::SetContextBar {
+                surface_id, bar, ..
+            } => bar
+                .navigation
+                .map(|action| (surface_id, action.interaction_id)),
+            _ => None,
+        })
+        .unwrap();
+    let opened = engine
+        .dispatch(Event::ActionActivated {
+            surface_id,
+            interaction_id,
+        })
+        .unwrap();
+    let overlay = opened
+        .iter()
+        .find(|command| matches!(command, Command::PresentOverlay { .. }))
+        .unwrap();
+    engine.themes_updated();
+    let commands = wakeup(&mut engine);
+    let surface_index = commands
+        .iter()
+        .position(|command| matches!(command, Command::ReplaceSurface { .. }))
+        .unwrap();
+    let overlay_index = commands
+        .iter()
+        .position(|command| command == overlay)
+        .unwrap();
+    let reload_index = commands
+        .iter()
+        .position(|command| matches!(command, Command::ReloadTheme))
+        .unwrap();
+    assert!(surface_index < overlay_index);
+    assert!(overlay_index < reload_index);
+    assert_eq!(
+        commands
+            .iter()
+            .filter(|command| *command == overlay)
+            .count(),
+        1
+    );
+    assert_eq!(
+        commands
+            .iter()
+            .filter(|command| matches!(command, Command::DismissOverlay { .. }))
+            .count(),
+        0
+    );
+}

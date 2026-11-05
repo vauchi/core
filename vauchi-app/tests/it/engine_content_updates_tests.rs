@@ -18,9 +18,9 @@ use vauchi_app::content::{
 };
 use vauchi_app::i18n::{Locale, try_get_string};
 use vauchi_app::ui::{AppEngine, ContentRunOptions};
-use vauchi_core::Command;
 use vauchi_core::api::{Vauchi, VauchiEvent};
 use vauchi_core::crypto::signing::SigningKeyPair;
+use vauchi_core::{Command, Event};
 
 const GERMAN: &[u8] = br#"{"_meta":{"locale":"de"},"runner.probe":"aus dem Relay"}"#;
 
@@ -119,6 +119,14 @@ fn content_cached_by_an_earlier_run_loads_when_updates_start() {
 /// Starts the runner over a relay serving German strings, and themes when
 /// `with_themes`, and waits until the update announces itself.
 fn engine_after_an_update(dir: &std::path::Path, with_themes: bool) -> AppEngine {
+    engine_after_an_update_with_setup(dir, with_themes, |_| {})
+}
+
+fn engine_after_an_update_with_setup(
+    dir: &std::path::Path,
+    with_themes: bool,
+    setup: impl FnOnce(&mut AppEngine),
+) -> AppEngine {
     let publisher = SigningKeyPair::generate();
     let mut files = HashMap::from([
         (
@@ -131,6 +139,7 @@ fn engine_after_an_update(dir: &std::path::Path, with_themes: bool) -> AppEngine
         files.insert("themes.json".to_string(), THEMES.to_vec());
     }
     let mut engine = engine_picking_german();
+    setup(&mut engine);
     let (updated, announced) = mpsc::channel();
     engine
         .vauchi()
@@ -213,4 +222,57 @@ fn a_content_update_affects_every_main_screen() {
     for screen in ["my_info", "contacts", "settings"] {
         assert!(screens.contains(&screen), "{screen}: {screens:?}");
     }
+}
+
+// Feature: remote_content.feature — downloaded themes reach an already-open display.
+#[test]
+fn applied_theme_wakeup_publishes_fresh_prepared_colors_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut before = Vec::new();
+    let mut engine = engine_after_an_update_with_setup(dir.path(), true, |engine| {
+        engine.set_render_context(vauchi_app::ui::RenderContext {
+            locale: Some("de".into()),
+            theme_id: Some("cdn-only".into()),
+            ..Default::default()
+        });
+        before = engine.initial_commands().unwrap();
+    });
+    let previous: Vec<_> = before
+        .iter()
+        .filter_map(|command| match command {
+            Command::ReplaceSurface { surface } => Some(surface),
+            _ => None,
+        })
+        .collect();
+    assert!(!previous.is_empty());
+    assert!(
+        previous
+            .iter()
+            .all(|surface| surface.tokens.colors.background != "#010203")
+    );
+
+    let commands = engine.dispatch(Event::WakeupFired).unwrap();
+    let refreshed: Vec<_> = commands
+        .iter()
+        .filter_map(|command| match command {
+            Command::ReplaceSurface { surface } => Some(surface),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(refreshed.len(), previous.len(), "{commands:?}");
+    for (next, old) in refreshed.iter().zip(&previous) {
+        assert_eq!(next.surface_id, old.surface_id);
+        assert_eq!(next.revision, old.revision);
+        assert_eq!(next.tokens.colors.background, "#010203");
+        assert_eq!(next.tokens.colors.accent, "#0000ff");
+    }
+    assert_eq!(reload_theme_count(&commands), 1);
+    let next = engine.dispatch(Event::WakeupFired).unwrap();
+    assert_eq!(reload_theme_count(&next), 0);
+    assert_eq!(
+        next.iter()
+            .filter(|command| matches!(command, Command::ReplaceSurface { .. }))
+            .count(),
+        0
+    );
 }

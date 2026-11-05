@@ -144,3 +144,35 @@ fn recovery_dispatch_preserves_the_existing_identity_claim_path() {
         &expected
     );
 }
+
+// @internal — P32: a fresh install reaches recovery using only emitted actions.
+#[test]
+fn recovery_dispatch_onboarding_reaches_identity_free_claim_creation() {
+    let mut app = AppEngine::new(Vauchi::in_memory().unwrap());
+    let commands = app.initial_commands().unwrap();
+    assert_eq!(app.current_screen().screen_id, "identity_check");
+    let commands = activate(&mut app, &commands, "recovery.start_button");
+    assert_eq!(app.current_app_screen(), &AppScreen::Recovery);
+    assert!(!app.vauchi().has_identity());
+    let commands = activate(&mut app, &commands, "recovery.start_button");
+    let commands = enter_key(&mut app, &commands, &"01".repeat(32));
+    activate(&mut app, &commands, "recovery.create_claim_button");
+    let displayed = app
+        .current_screen()
+        .components
+        .into_iter()
+        .find_map(|component| match component {
+            Component::Text { id, content, .. } if id == "claim_data" => Some(content),
+            _ => None,
+        })
+        .expect("onboarding leads to a claim without creating an identity");
+    assert_eq!(
+        app.vauchi()
+            .parse_recovery_claim_b64(&displayed)
+            .unwrap()
+            .old_pk()
+            .as_bytes(),
+        &[1; 32]
+    );
+    assert!(!app.vauchi().has_identity());
+}

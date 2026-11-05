@@ -135,6 +135,8 @@ impl RecoveryTransferReceiver {
             let Ok(progress) = phone.storage().recovery().backup_piece_progress(&self.hash) else {
                 return self.finish(ReceiveState::Failed);
             };
+            // A11: stored progress may predate this replay; finish only at its final frame.
+            let final_frame = ack.get(6..8) == data.get(8..10);
             commands.push(Command::BleWriteCharacteristic {
                 device_id: self.peer.clone(),
                 direction: self.direction,
@@ -145,7 +147,7 @@ impl RecoveryTransferReceiver {
                 .into(),
                 data: ack,
             });
-            if progress.is_some_and(|(received, count)| received == count) {
+            if final_frame && progress.is_some_and(|(received, count)| received == count) {
                 commands.extend(self.finish(ReceiveState::Complete));
                 break;
             }

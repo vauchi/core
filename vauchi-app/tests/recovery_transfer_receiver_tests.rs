@@ -102,6 +102,7 @@ fn recovery_receiver_stores_before_ack_and_refuses_late_callbacks() {
 }
 
 // @internal — DC-02: a database refusal cannot emit the final ACK.
+#[cfg(feature = "testing")]
 #[test]
 fn recovery_receiver_storage_refusal_disconnects_without_final_ack() {
     let (phone, backup, hash) = fixture();
@@ -165,4 +166,78 @@ fn recovery_receiver_cancellation_and_timeout_reject_queued_bytes() {
             Vec::<Vec<u8>>::new()
         );
     }
+}
+
+// @internal — DC-01/DC-02: only the selected peer, role and characteristic feed storage.
+#[test]
+fn recovery_receiver_rejects_unaccepted_or_malformed_frames_and_ignores_other_links() {
+    let (phone, backup, hash) = fixture();
+    let piece = split_backup_for_hand_back(&backup).unwrap().remove(0);
+    let mut sender = HandBackSender::new(&piece, 517).unwrap();
+    let frame = sender.next_packet().unwrap().unwrap();
+    let mut receiver =
+        RecoveryTransferReceiver::new(hash, "peer".into(), BleLinkDirection::Outbound).unwrap();
+    receiver.poll(&phone, 0);
+    for event in [
+        data(frame.clone(), "other"),
+        Event::BleCharacteristicRead {
+            device_id: "peer".into(),
+            direction: BleLinkDirection::Inbound,
+            uuid: CHAR_DATA_NOTIFY.into(),
+            data: frame.clone(),
+        },
+        Event::BleCharacteristicRead {
+            device_id: "peer".into(),
+            direction: BleLinkDirection::Outbound,
+            uuid: CHAR_DATA_WRITE.into(),
+            data: frame.clone(),
+        },
+    ] {
+        receiver.callback().publish(event).unwrap();
+        assert_eq!(receiver.poll(&phone, 1), Vec::<Command>::new());
+        assert_eq!(receiver.state(), ReceiveState::Receiving);
+    }
+    assert_eq!(
+        phone.storage().recovery().backup_pieces(&hash).unwrap(),
+        Vec::<Vec<u8>>::new()
+    );
+    receiver.callback().publish(data(vec![], "peer")).unwrap();
+    assert_eq!(receiver.poll(&phone, 2), vec![disconnect()]);
+    assert_eq!(receiver.state(), ReceiveState::Failed);
+
+    let without_share = Vauchi::in_memory().unwrap();
+    without_share.begin_recovery(&"01".repeat(32)).unwrap();
+    let mut receiver =
+        RecoveryTransferReceiver::new(hash, "peer".into(), BleLinkDirection::Outbound).unwrap();
+    receiver.poll(&without_share, 0);
+    receiver.callback().publish(data(frame, "peer")).unwrap();
+    assert_eq!(receiver.poll(&without_share, 1), vec![disconnect()]);
+    assert_eq!(receiver.state(), ReceiveState::Failed);
+    assert_eq!(
+        without_share
+            .storage()
+            .recovery()
+            .backup_pieces(&hash)
+            .unwrap(),
+        Vec::<Vec<u8>>::new()
+    );
+}
+
+// @internal — A11: an already stored backup does not acknowledge unsent bytes.
+#[test]
+fn recovery_receiver_replayed_piece_waits_for_its_final_frame() {
+    let (phone, backup, hash) = fixture();
+    let piece = split_backup_for_hand_back(&backup).unwrap().remove(0);
+    phone.take_hand_back_piece(&piece.encode()).unwrap();
+    let mut sender = HandBackSender::new(&piece, 23).unwrap();
+    let mut receiver =
+        RecoveryTransferReceiver::new(hash, "peer".into(), BleLinkDirection::Outbound).unwrap();
+    receiver.poll(&phone, 0);
+    receiver
+        .callback()
+        .publish(data(sender.next_packet().unwrap().unwrap(), "peer"))
+        .unwrap();
+    let commands = receiver.poll(&phone, 1);
+    assert_eq!(commands.len(), 1);
+    assert_eq!(receiver.state(), ReceiveState::Receiving);
 }

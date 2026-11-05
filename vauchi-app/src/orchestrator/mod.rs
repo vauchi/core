@@ -44,3 +44,6 @@ pub mod ble_handshake_machine;
 
 #[cfg(feature = "storage")]
 pub mod recovery_transfer;
+
+#[cfg(feature = "storage")]
+pub mod recovery_receiver;

@@ -233,10 +233,14 @@ impl AppEngine {
             return None;
         };
         let passphrase = (!passphrase.is_empty()).then_some(passphrase);
-        let update = match self
-            .vauchi
-            .restore_from_returned_backups(passphrase.as_deref())
-        {
+        let restored = if self.vauchi.has_identity() {
+            self.vauchi
+                .restore_from_returned_backups(passphrase.as_deref())
+        } else {
+            self.vauchi
+                .restore_identity_from_hand_backs(passphrase.as_deref())
+        };
+        let update = match restored {
             Ok(count) => crate::ui::RecoveryUpdate::Restored(count),
             Err(_) => crate::ui::RecoveryUpdate::RestoreRefused(self.t("recovery.restore_refused")),
         };

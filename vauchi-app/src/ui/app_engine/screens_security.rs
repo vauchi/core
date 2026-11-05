@@ -48,6 +48,9 @@ impl AppEngine {
                 let mut engine = RecoveryEngine::new(contacts, threshold)
                     .with_locale(render_context.resolved_locale());
                 engine.set_linked_device_count(device_count);
+                if !vauchi.has_identity() {
+                    engine.set_identity_free_recovery();
+                }
                 let pending_claim = match vauchi.pending_recovery_claim() {
                     Ok(claim) => claim,
                     Err(_) => {
@@ -57,6 +60,20 @@ impl AppEngine {
                 };
                 if let Some(claim) = pending_claim {
                     engine.set_generated_claim(claim);
+                    match vauchi.hand_back_restore_status() {
+                        Ok(Some(status)) => {
+                            if status.can_attempt_restore {
+                                engine.resume_hand_back_restore(
+                                    status.handed_back,
+                                    status.needs_passphrase,
+                                );
+                            }
+                        }
+                        Ok(None) | Err(_) => engine.set_load_error(),
+                    }
+                    return Box::new(engine);
+                } else if !vauchi.has_identity() {
+                    return Box::new(engine);
                 } else if let Ok(Some(progress)) = vauchi.get_recovery_progress()
                     && !progress.claim.is_expired(vauchi.clock().unix_seconds())
                 {

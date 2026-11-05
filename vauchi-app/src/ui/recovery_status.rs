@@ -88,6 +88,7 @@ pub struct RecoveryEngine {
     /// Generated claim payload (base64), populated by the AppEngine
     /// intercept after `Vauchi::create_recovery_claim_hex_b64` succeeds.
     generated_claim_b64: Option<String>,
+    identity_free_recovery: bool,
     /// Voucher pasted on the CollectVouchers step, read by the AppEngine
     /// intercept when the user presses "add_voucher".
     voucher_input: String,
@@ -114,6 +115,7 @@ impl RecoveryEngine {
             old_key_input: String::new(),
             old_key_error: None,
             generated_claim_b64: None,
+            identity_free_recovery: false,
             voucher_input: String::new(),
             voucher_error: None,
             restore: None,
@@ -154,6 +156,22 @@ impl RecoveryEngine {
         self.generated_claim_b64 = Some(claim_b64.into());
         self.old_key_error = None;
         self.step = RecoveryStep::ShowGeneratedClaim;
+    }
+
+    #[cfg(feature = "storage")]
+    pub(crate) fn set_identity_free_recovery(&mut self) {
+        self.identity_free_recovery = true;
+    }
+
+    #[cfg(feature = "storage")]
+    pub(crate) fn resume_hand_back_restore(&mut self, handed_back: usize, needs_passphrase: bool) {
+        self.restore = Some(RestoreState {
+            same_identity: true,
+            handed_back,
+            needs_passphrase,
+            ..RestoreState::default()
+        });
+        self.step = RecoveryStep::Restore;
     }
 
     #[cfg(feature = "storage")]
@@ -420,7 +438,7 @@ impl RecoveryEngine {
             .as_deref()
             .unwrap_or("(claim unavailable)");
 
-        ScreenModel {
+        let mut screen = ScreenModel {
             screen_id: "recovery_status".into(),
             title: self.t("recovery.claim_created_title"),
             subtitle: None,
@@ -466,7 +484,22 @@ impl RecoveryEngine {
             ],
             progress: None,
             ..Default::default()
+        };
+        if self.identity_free_recovery {
+            screen
+                .contextual_actions
+                .retain(|action| action.id != "collect_vouchers");
+            if self.restore.is_some() {
+                screen.contextual_actions.push(ScreenAction {
+                    id: RESTORE_ROW.into(),
+                    label: self.t("recovery.restore_button"),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: None,
+                });
+            }
         }
+        screen
     }
 }
 
@@ -534,6 +567,14 @@ impl WorkflowEngine for RecoveryEngine {
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match (&self.step, action) {
+            (RecoveryStep::ShowGeneratedClaim, UserAction::ActionPressed { ref action_id })
+                if self.identity_free_recovery
+                    && action_id == RESTORE_ROW
+                    && self.restore.is_some() =>
+            {
+                self.step = RecoveryStep::Restore;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
             // Intro → EnterOldKey
             (
                 RecoveryStep::Intro,
@@ -750,7 +791,11 @@ impl WorkflowEngine for RecoveryEngine {
                 if let Some(state) = &mut self.restore {
                     state.refused = None;
                 }
-                self.step = RecoveryStep::Intro;
+                self.step = if self.identity_free_recovery {
+                    RecoveryStep::ShowGeneratedClaim
+                } else {
+                    RecoveryStep::Intro
+                };
                 ActionResult::UpdateScreen(self.build_screen())
             }
             (RecoveryStep::Restore, UserAction::ActionPressed { ref action_id })

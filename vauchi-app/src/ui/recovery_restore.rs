@@ -19,6 +19,7 @@ pub(crate) const PASSPHRASE_INPUT: &str = "restore_passphrase";
 /// returned backups and runs the restore.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct RestoreState {
+    pub same_identity: bool,
     pub handed_back: usize,
     pub needs_passphrase: bool,
     pub passphrase: String,
@@ -121,7 +122,7 @@ pub(crate) fn restore_screen(locale: Locale, state: &RestoreState) -> ScreenMode
                 id: "restore_done".into(),
                 icon: Some("checkmark.circle.fill".into()),
                 title: counted(locale, "recovery.restore_done", count),
-                detail: Some(t("recovery.restore_done_detail")),
+                detail: (!state.same_identity).then(|| t("recovery.restore_done_detail")),
                 status: Status::Success,
                 status_label: t(Status::Success.label_key()),
                 a11y: None,

@@ -537,7 +537,11 @@ impl AppEngine {
             // afresh on the next visit, with what is still waiting
             // (vauchi/private#796).
             AppScreen::Recovery => {
-                let back = self.navigate_back();
+                let back = if self.nav_history.is_empty() && self.vauchi.has_identity() {
+                    self.navigate_to_internal(AppScreen::MyInfo)
+                } else {
+                    self.navigate_back()
+                };
                 self.engine_cache.remove(&AppScreen::Recovery);
                 ActionResult::NavigateTo(back)
             }

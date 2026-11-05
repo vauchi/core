@@ -5,6 +5,28 @@ use proptest::prelude::*;
 use vauchi_core::sync::guardian_piece::split_backup_for_hand_back;
 use vauchi_core::sync::guardian_transfer::{HandBackReceiver, HandBackSender, TransferError};
 
+// @internal — A11 wire vectors freeze magic, field order and big-endian offsets.
+#[test]
+fn data_headers_and_acknowledgements_match_the_published_wire_vectors() {
+    let pieces = split_backup_for_hand_back(&vec![7; 49_101]).unwrap();
+    let piece = &pieces[1];
+    let encoded = piece.encode();
+    assert_eq!(encoded.len(), 53);
+    let mut sender = HandBackSender::new(piece, 23).unwrap();
+    let mut receiver = HandBackReceiver::new(piece.hash());
+
+    let first = sender.next_packet().unwrap().unwrap();
+    assert_eq!(&first[..10], b"RBP1\x00\x01\x00\x00\x00\x35");
+    assert_eq!(&first[10..], &encoded[..10]);
+    let receipt = receiver.receive(&first).unwrap();
+    assert_eq!(receipt.acknowledgement(), b"RBA1\x00\x01\x00\x0a");
+    sender.acknowledge(receipt.acknowledgement()).unwrap();
+
+    let second = sender.next_packet().unwrap().unwrap();
+    assert_eq!(&second[..10], b"RBP1\x00\x01\x00\x0a\x00\x35");
+    assert_eq!(&second[10..], &encoded[10..20]);
+}
+
 proptest! {
     // @internal
     #[test]

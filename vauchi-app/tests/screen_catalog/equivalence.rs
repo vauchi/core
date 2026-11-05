@@ -11,6 +11,7 @@ use vauchi_app::ui::ScreenCatalogFixture;
 use vauchi_core::exchange::ExchangeQR;
 use vauchi_core::exchange::link_mode::parse_link_url;
 use vauchi_core::exchange::multistage::qr_codec::{StageQr, parse_frame};
+use vauchi_core::recovery::RecoveryClaim;
 
 pub fn comparable(catalog: &ScreenCatalogFixture) -> Value {
     let mut value = serde_json::to_value(catalog).expect("catalog serializes");
@@ -118,6 +119,27 @@ fn normalize_field_id(id: &mut Value, fields: &mut BTreeMap<String, usize>) {
 }
 
 fn normalize_text(screen: &str, text: &mut Value) {
+    if screen == "recovery-hand_back_pending" && text["id"] == "claim_data" {
+        let encoded = text["content"].as_str().expect("claim string");
+        let bytes = STANDARD.decode(encoded).expect("base64 claim");
+        let claim = RecoveryClaim::from_bytes(&bytes).expect("valid recovery claim");
+        assert_eq!(
+            STANDARD.encode(claim.to_bytes()),
+            encoded,
+            "canonical claim encoding"
+        );
+        assert_ne!(
+            claim.old_pk(),
+            claim.new_pk(),
+            "recovery uses a temporary key"
+        );
+        assert_eq!(text["content"], text["accessibility"]["label"]);
+        let normalized = json!({"version": bytes[0], "bytes": bytes.len(),
+            "old_pk": "seeded target public key", "new_pk": "seeded temporary public key",
+            "timestamp": claim.timestamp()});
+        text["content"] = normalized.clone();
+        text["accessibility"]["label"] = normalized;
+    }
     if screen == "verify_fingerprint"
         && matches!(
             text["id"].as_str(),

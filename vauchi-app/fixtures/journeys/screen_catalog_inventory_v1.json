@@ -61,6 +61,9 @@
     "onboarding-de",
     "my_info-de",
     "contacts-de",
-    "settings-de"
+    "settings-de",
+    "recovery-hand_back_pending",
+    "recovery-hand_back_restore",
+    "recovery-hand_back_passphrase"
   ]
 }

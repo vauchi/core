@@ -6,6 +6,10 @@
 //! `initial_commands` batch.
 
 pub mod equivalence;
+#[path = "../recovery_hand_back/meeting.rs"]
+// Recovery assertions use fixture fields that catalog generation does not read.
+#[allow(dead_code)]
+mod recovery_meeting;
 pub mod seed;
 
 use vauchi_app::ui::{
@@ -402,6 +406,29 @@ fn record_german(screens: &mut Vec<ScreenCatalogEntry>) {
     }
 }
 
+fn record_hand_back_restore(screens: &mut Vec<ScreenCatalogEntry>) {
+    for (code, shares, passphrase) in [
+        ("recovery-hand_back_pending", 1, false),
+        ("recovery-hand_back_restore", 3, false),
+        ("recovery-hand_back_passphrase", 3, true),
+    ] {
+        let directory = tempfile::tempdir().expect("meeting directory");
+        let saved = recovery_meeting::save_meeting(directory.path(), shares, false, passphrase);
+        let clock = std::sync::Arc::new(vauchi_core::clock::FakeClock::new(
+            std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_700_000_000),
+        ));
+        let phone = Vauchi::new_with(
+            saved.config,
+            clock,
+            vauchi_core::rng::OsSecureRng::shared(),
+            None,
+        )
+        .expect("reopen recovery");
+        let mut recorder = Recorder::new(phone, "en", screens);
+        recorder.record_current(code);
+    }
+}
+
 /// Build the catalog from fresh seeded engines. Call
 /// [`init_fixture_i18n`] first.
 pub fn build_catalog() -> ScreenCatalogFixture {
@@ -411,6 +438,7 @@ pub fn build_catalog() -> ScreenCatalogFixture {
     record_lock("en", &mut screens);
     record_seeded(seed::seeded_world(), "en", &mut screens);
     record_german(&mut screens);
+    record_hand_back_restore(&mut screens);
     ScreenCatalogFixture {
         schema_version: 1,
         screens,

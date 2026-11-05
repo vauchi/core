@@ -288,13 +288,89 @@ fn screen_catalog_freshness_rejects_product_value_changes() {
 #[ignore = "regenerates Core's product screen catalog"]
 fn screen_catalog_regenerate_shared_fixture() {
     init_fixture_i18n();
-    let json = serde_json::to_string_pretty(&build_catalog()).expect("serialize catalog");
-    let path = fixture_json::journey_fixtures_dir().join("screen_catalog_v1.json");
+    let catalog = build_catalog();
+    let json = serde_json::to_string_pretty(&catalog).expect("serialize catalog");
+    let directory = fixture_json::journey_fixtures_dir();
     std::fs::write(
-        path,
+        directory.join("screen_catalog_v1.json"),
         format!("{}\n", fixture_json::collapse_number_arrays(&json)),
     )
     .expect("write screen catalog fixture");
+    let inventory = serde_json::json!({
+        "schema_version": 1,
+        "screen_ids": catalog.screens.iter().map(|entry| &entry.code_id).collect::<Vec<_>>(),
+    });
+    std::fs::write(
+        directory.join("screen_catalog_inventory_v1.json"),
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&inventory).expect("serialize inventory")
+        ),
+    )
+    .expect("write screen catalog inventory");
+}
+
+// @internal — product restore stages travel with Core as renderer-independent journey data.
+#[test]
+fn screen_catalog_records_identity_free_hand_back_restore_states() {
+    init_fixture_i18n();
+    let catalog = build_catalog();
+    for (code, title) in [
+        ("recovery-hand_back_pending", "recovery.claim_created_title"),
+        ("recovery-hand_back_restore", "recovery.restore_title"),
+        ("recovery-hand_back_passphrase", "recovery.restore_title"),
+    ] {
+        let entry = catalog
+            .screens
+            .iter()
+            .find(|entry| entry.code_id == code)
+            .unwrap_or_else(|| panic!("missing Core journey {code}"));
+        let surface = replaced_surface(&entry.commands, "recovery");
+        assert_eq!(
+            serde_json::to_value(surface).unwrap()["title"],
+            serde_json::Value::String(vauchi_app::i18n::get_string(
+                vauchi_app::i18n::Locale::ENGLISH,
+                title
+            ))
+        );
+    }
+}
+
+// @internal — seeded key equivalence must retain claim lifetime semantics.
+#[test]
+fn screen_catalog_hand_back_claim_equivalence_keeps_its_timestamp() {
+    use base64::Engine as _;
+    let catalog = checked_in_catalog();
+    let baseline = structure(&catalog);
+    let mut raw = serde_json::to_value(catalog).unwrap();
+    let entry = raw["screens"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|entry| entry["code_id"] == "recovery-hand_back_pending")
+        .unwrap();
+    let encoded = entry
+        .pointer_mut("/commands/0/ReplaceSurface/surface/nodes/1/Text/content")
+        .unwrap();
+    let codec = base64::engine::general_purpose::STANDARD;
+    let bytes = codec.decode(encoded.as_str().unwrap()).unwrap();
+    let claim = vauchi_core::recovery::RecoveryClaim::from_bytes(&bytes).unwrap();
+    let shifted = vauchi_core::recovery::RecoveryClaim::new_with_timestamp(
+        *claim.old_pk().as_bytes(),
+        *claim.new_pk().as_bytes(),
+        claim.timestamp() + 1,
+    );
+    let shifted_encoded = codec.encode(shifted.to_bytes());
+    *encoded = serde_json::Value::String(shifted_encoded.clone());
+    *entry
+        .pointer_mut("/commands/0/ReplaceSurface/surface/nodes/1/Text/accessibility/label")
+        .unwrap() = serde_json::Value::String(shifted_encoded);
+    let changed = serde_json::from_value(raw).unwrap();
+    assert_ne!(
+        baseline,
+        structure(&changed),
+        "claim timestamp changes are observable"
+    );
 }
 
 fn picker_rows(entry: &ScreenCatalogEntry) -> Vec<&PresentationRow> {

@@ -22,6 +22,7 @@ use crate::ui::*;
 /// Steps in the outgoing recovery workflow.
 #[derive(Clone, Debug, PartialEq)]
 enum RecoveryStep {
+    #[cfg(feature = "storage")]
     LoadError,
     /// Initial screen: "Lost your device?" intro card + recovery
     /// settings (required vouchers, claim expiry, trusted-contact
@@ -155,6 +156,7 @@ impl RecoveryEngine {
         self.step = RecoveryStep::ShowGeneratedClaim;
     }
 
+    #[cfg(feature = "storage")]
     pub(crate) fn set_load_error(&mut self) {
         self.step = RecoveryStep::LoadError;
     }
@@ -209,6 +211,7 @@ impl RecoveryEngine {
 
     fn build_screen(&self) -> ScreenModel {
         match &self.step {
+            #[cfg(feature = "storage")]
             RecoveryStep::LoadError => ScreenModel {
                 screen_id: "recovery_load_error".into(),
                 title: self.t("recovery.load_error"),

@@ -196,6 +196,7 @@ mod device_linking_engine_tests;
 mod device_race_condition_tests;
 mod device_registry_signature_tests;
 mod device_removal_tests;
+mod device_signing_key_tests;
 mod device_store_tests;
 mod device_sync_compatibility_tests;
 mod device_sync_convergence_proptest;

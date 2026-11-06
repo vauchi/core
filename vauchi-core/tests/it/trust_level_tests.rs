@@ -9,11 +9,14 @@
 //!
 //! Feature: contacts_management.feature @contacts
 
-use vauchi_core::contact::Contact;
 use vauchi_core::contact::trust::TrustLevel;
+use vauchi_core::contact::{Contact, ContactError};
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::exchange::{ExchangeTransport, ProximityConfidence};
+use vauchi_core::exchange::{
+    ExchangeTransport, ProximityConfidence, TransportProximity, TrustMetrics,
+};
+use vauchi_core::sync::device_sync::ContactSyncData;
 
 /// Build a base contact and apply a mutation for test setup.
 fn make_contact(mutate: impl FnOnce(&mut Contact)) -> Contact {
@@ -248,4 +251,107 @@ fn legacy_contact_without_metrics_uses_old_logic() {
     contact.set_exchange_transport(ExchangeTransport::Ble);
     contact.set_proximity_confidence(ProximityConfidence::High);
     assert_eq!(contact.trust_level(), TrustLevel::High);
+}
+
+// ============================================================
+// Remote: a link exchange (ADR-034 amendment 2026-11-06, #727)
+// ============================================================
+
+fn link_contact() -> Contact {
+    Contact::from_link_exchange(
+        [42u8; 32],
+        ContactCard::new("Test User"),
+        SymmetricKey::generate(),
+        None,
+        0,
+    )
+}
+
+// @claim: S10
+#[test]
+fn a_link_contact_is_remote() {
+    assert_eq!(link_contact().trust_level(), TrustLevel::Remote);
+}
+
+// @claim: S10
+#[test]
+fn a_qr_contact_stays_standard_not_remote() {
+    assert_eq!(make_contact(|_| {}).trust_level(), TrustLevel::Standard);
+}
+
+// @claim: S10
+#[test]
+fn a_fingerprint_comparison_raises_a_link_contact_to_verified() {
+    let mut contact = link_contact();
+    contact.mark_fingerprint_verified().unwrap();
+    assert_eq!(contact.trust_level(), TrustLevel::Verified);
+}
+
+// @claim: S10
+#[test]
+fn a_recovered_link_contact_is_cautious() {
+    let mut contact = link_contact();
+    contact.set_has_recovered(true);
+    assert_eq!(contact.trust_level(), TrustLevel::Cautious);
+}
+
+// @claim: S10
+#[test]
+fn a_proximity_claim_cannot_raise_a_link_contact() {
+    let mut legacy = link_contact();
+    legacy.set_proximity_confidence(ProximityConfidence::High);
+    assert_eq!(legacy.trust_level(), TrustLevel::Remote);
+
+    let mut with_metrics = link_contact();
+    with_metrics.set_trust_metrics(Some(TrustMetrics {
+        transport: ExchangeTransport::Link,
+        proximity: ProximityConfidence::High,
+        transport_proximity: TransportProximity::Physical,
+        timestamp: 0,
+    }));
+    assert_eq!(with_metrics.trust_level(), TrustLevel::Remote);
+}
+
+// @claim: S10
+#[test]
+fn a_remote_contact_cannot_vouch_for_recovery_until_verified() {
+    let mut contact = link_contact();
+    assert!(matches!(
+        contact.trust_for_recovery(),
+        Err(ContactError::InsufficientTrustLevel(TrustLevel::Remote))
+    ));
+
+    contact.mark_fingerprint_verified().unwrap();
+    contact.trust_for_recovery().unwrap();
+    assert!(contact.is_recovery_trusted());
+}
+
+// @claim: S10
+#[test]
+fn a_linked_device_sees_the_same_remote_level() {
+    let synced = ContactSyncData::from_contact(&link_contact())
+        .unwrap()
+        .to_contact()
+        .unwrap();
+
+    assert_eq!(synced.exchange_transport(), Some(ExchangeTransport::Link));
+    assert_eq!(synced.trust_level(), TrustLevel::Remote);
+}
+
+// @claim: S10
+#[test]
+fn sync_data_from_a_device_without_the_field_still_reads() {
+    let current =
+        serde_json::to_value(ContactSyncData::from_contact(&make_contact(|_| {})).unwrap())
+            .unwrap();
+    let mut older = current.clone();
+    older.as_object_mut().unwrap().remove("exchange_transport");
+    assert!(current.get("exchange_transport").is_some());
+
+    let contact: ContactSyncData = serde_json::from_value(older).unwrap();
+
+    assert_eq!(
+        contact.to_contact().unwrap().trust_level(),
+        TrustLevel::Standard
+    );
 }

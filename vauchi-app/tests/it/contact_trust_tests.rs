@@ -87,6 +87,28 @@ fn the_trust_shown_follows_the_exchange_and_cannot_be_tapped() {
     assert_eq!(trust(&verified), (Some("Verified".to_string()), false));
 }
 
+// @claim: S10
+#[test]
+fn a_link_contact_shows_remote_and_offers_the_fingerprint_comparison() {
+    let peer = Identity::create("Dana", 0);
+    let contact = Contact::from_link_exchange(
+        *peer.signing_public_key(),
+        ContactCard::new("Dana"),
+        SymmetricKey::generate(),
+        None,
+        0,
+    );
+
+    let (_, screen) = screen_of(contact);
+
+    assert_eq!(trust(&screen), (Some("Remote".to_string()), false));
+    let shown = format!("{screen:?}");
+    assert!(
+        shown.contains("verify"),
+        "no way to reach Verified: {shown}"
+    );
+}
+
 // @scenario: navigation :: Toggle proposal trust on a contact
 #[test]
 fn switching_on_can_propose_contacts_trusts_proposals_only() {

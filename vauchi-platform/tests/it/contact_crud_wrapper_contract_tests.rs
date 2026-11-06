@@ -433,6 +433,14 @@ fn test_mobile_contact_has_fingerprint_field() {
 
 // === Trust level enum projection ===
 
+#[test]
+fn a_remote_contact_reads_as_remote_on_the_phones() {
+    assert_eq!(
+        MobileContactTrustLevel::from(vauchi_core::contact::trust::TrustLevel::Remote),
+        MobileContactTrustLevel::Remote
+    );
+}
+
 // @scenario: contact_trust:Standard trust contact has correct fields in MobileContact
 #[test]
 fn test_mobile_contact_trust_level_standard() {

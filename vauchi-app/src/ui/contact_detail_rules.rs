@@ -302,6 +302,12 @@ mod g4_visibility_helpers_tests {
         assert!(verify_button_visible(false, TrustLevel::High));
     }
 
+    // @claim: S10
+    #[test]
+    fn verify_button_visible_unverified_remote_yes() {
+        assert!(verify_button_visible(false, TrustLevel::Remote));
+    }
+
     // @internal
     #[test]
     fn verify_button_visible_already_verified_no() {

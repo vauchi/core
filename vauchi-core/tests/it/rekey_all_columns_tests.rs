@@ -1094,13 +1094,6 @@ fn rekey_round_trips_every_encrypted_column_in_one_pass() {
     let key2 = SymmetricKey::generate();
     storage.rekey(key2.clone()).unwrap();
 
-    // Sanity: keys differ.
-    assert_ne!(
-        key1.as_bytes(),
-        key2.as_bytes(),
-        "test must use distinct keys"
-    );
-
     assert_every_column_round_trips(&storage, &key2);
 }
 

@@ -157,3 +157,14 @@ fn application_reset_allows_a_fresh_permission_request() {
         }]
     );
 }
+
+// @internal — an unsupported permission must not swallow other pending display commands.
+#[test]
+fn unknown_permission_preserves_other_pending_commands() {
+    let mut engine = engine();
+    engine.extend_pending_commands([Command::ReloadTheme]);
+    assert_eq!(
+        required(&mut engine, "unknown"),
+        vec![Command::ReloadTheme, alert("Hardware error")]
+    );
+}

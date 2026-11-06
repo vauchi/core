@@ -173,6 +173,14 @@ fn normalize_text(screen: &str, text: &mut Value) {
         text["content"] = json!("seeded fingerprint");
         text["accessibility"]["label"] = json!("seeded fingerprint");
     }
+    if screen == "link_exchange" && text["id"] == "link_code" {
+        let code = text["content"].as_str().expect("link code");
+        assert!(
+            vauchi_core::exchange::link_pake::LinkCode::parse(code).is_ok(),
+            "code format"
+        );
+        text["content"] = json!("<seeded>");
+    }
     if screen == "link_exchange" && text["id"] == "link_url" {
         let url = text["content"].as_str().expect("link URL");
         let parsed = parse_link_url(url).expect("valid link exchange URL");

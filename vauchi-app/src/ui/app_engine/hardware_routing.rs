@@ -22,7 +22,9 @@ impl AppEngine {
         if crate::ui::exchange::mode_selection::parse_requirement(&key).is_none()
             && self.capability_label(&key).is_none()
         {
-            return vec![self.permission_settings_alert(&key)];
+            let alert = self.permission_settings_alert(&key);
+            self.pending_commands.push_back(alert);
+            return self.drain_pending_commands();
         }
         if self.pending_permission_requests.insert(key) {
             self.pending_commands

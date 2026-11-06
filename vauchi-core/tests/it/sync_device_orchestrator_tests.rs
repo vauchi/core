@@ -540,3 +540,45 @@ fn test_wrong_device_cannot_decrypt() {
 
     assert!(result.is_err(), "expected error");
 }
+
+/// A batch carries contacts' shared keys (Security Claims S11), so recording
+/// it now must not let a later holder of the seed read it (#1090).
+// @internal
+#[test]
+#[ignore = "red until device sync is forward secret (private#1090)"]
+fn a_recorded_device_sync_batch_does_not_open_from_the_identity_seed_alone() {
+    let master_seed = [0x42u8; 32];
+    let signing_key = SigningKeyPair::from_seed(&master_seed);
+    let batch_plaintext = b"batch carrying a contact's shared key";
+
+    let sender_storage = create_test_storage();
+    let device_a = create_test_device(&master_seed, 0, "Device A");
+    let device_a_public_key = *device_a.exchange_public_key();
+    let device_b_public_key =
+        *create_test_device(&master_seed, 1, "Device B").exchange_public_key();
+    let mut sender_registry = create_test_registry(&master_seed, &device_a);
+    sender_registry
+        .add_device(
+            create_test_device(&master_seed, 1, "Device B").to_registered(&master_seed),
+            &signing_key,
+        )
+        .unwrap();
+    let sender = DeviceSyncOrchestrator::new(&sender_storage, device_a, sender_registry);
+    let recorded_batch = sender
+        .encrypt_for_device(&device_b_public_key, batch_plaintext)
+        .unwrap();
+
+    let attacker_storage = create_test_storage();
+    let rederived_device_b = create_test_device(&master_seed, 1, "Device B");
+    let attacker_registry = create_test_registry(&master_seed, &rederived_device_b);
+    let attacker =
+        DeviceSyncOrchestrator::new(&attacker_storage, rederived_device_b, attacker_registry);
+
+    let opened = attacker.decrypt_from_device(&device_a_public_key, &recorded_batch);
+
+    assert!(
+        opened.is_err(),
+        "the seed alone opened a recorded batch: {:?}",
+        opened.map(|plaintext| plaintext == batch_plaintext)
+    );
+}

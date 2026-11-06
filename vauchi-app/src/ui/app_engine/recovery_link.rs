@@ -75,6 +75,7 @@ impl AppEngine {
     /// Starts advertising for a guardian's hand-back; returns the token its
     /// QR carries.
     pub(super) fn begin_hand_back_link(&mut self, pieces: &[Vec<u8>]) -> Option<[u8; 32]> {
+        self.cancel_recovery_link();
         let pieces = pieces
             .iter()
             .map(|piece| GuardianBackupPiece::decode(piece).ok())
@@ -129,6 +130,19 @@ impl AppEngine {
             None => Vec::new(),
         };
         self.extend_pending_commands(commands);
+    }
+
+    /// The link belongs to the screen that started it. Its cached engine forgets
+    /// the transfer too, so coming back shows no stale share or progress.
+    pub(super) fn end_recovery_link_on_leaving(&mut self) {
+        if !matches!(self.screen, AppScreen::Recovery | AppScreen::RecoveryHelp) {
+            return;
+        }
+        self.cancel_recovery_link();
+        self.engine.apply_update(EngineUpdate::RecoveryHelp(
+            RecoveryHelpUpdate::HandBackTransfer(HandBackTransfer::Idle),
+        ));
+        self.show_receiving(HandBackTransfer::Idle);
     }
 
     /// The phone's cancel: the transfer stops and its late parts go nowhere.

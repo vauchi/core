@@ -205,6 +205,9 @@ impl AppEngine {
         self.vauchi.refresh_identity_from_storage();
         self.retained_detail_screen = screen.parent_screen_id().is_some().then(|| screen.clone());
 
+        if screen != self.screen {
+            self.end_recovery_link_on_leaving();
+        }
         // Swap in the new screen, get the old one back
         self.invalidate_file_pick_for_navigation(&screen);
         let old_screen = std::mem::replace(&mut self.screen, screen.clone());

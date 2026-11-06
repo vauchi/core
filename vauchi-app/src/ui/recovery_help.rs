@@ -517,6 +517,12 @@ impl WorkflowEngine for RecoveryHelpEngine {
         match update {
             crate::ui::RecoveryHelpUpdate::HandBackTransfer(transfer) => {
                 self.hand_back_transfer = transfer;
+                if transfer == crate::ui::HandBackTransfer::Idle
+                    && self.step == HelpStep::ShowHandBack
+                {
+                    self.hand_back_share = None;
+                    self.step = HelpStep::Info;
+                }
             }
             crate::ui::RecoveryHelpUpdate::HandBackReady(share) => {
                 self.hand_back_share = Some(share);

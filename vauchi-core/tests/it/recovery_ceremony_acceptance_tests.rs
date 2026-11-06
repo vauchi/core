@@ -579,3 +579,55 @@ fn a_phone_that_finds_nobody_stops_scanning_and_keeps_the_share() {
     let shown = serde_json::to_string(&commands).unwrap();
     assert!(shown.contains(&get_string(Locale::ENGLISH, "recovery.backup_failed")));
 }
+
+// @internal — P33: leaving the screen ends the link, and coming back shows no stale share.
+#[test]
+fn leaving_the_hand_back_stops_advertising_and_forgets_the_share() {
+    let mut owner = lost();
+    let claim = Vauchi::in_memory()
+        .unwrap()
+        .begin_recovery(&alice_pk_hex(&owner))
+        .unwrap();
+    let guardian = owner.guardians.remove(0).into_vauchi();
+    let (mut engine, showing) = guardian_showing_its_share(guardian, claim);
+    assert!(shown_qr(&showing).is_some());
+
+    engine.navigate_to(AppScreen::Settings);
+    let after_leaving = engine.dispatch(Event::WakeupFired).unwrap();
+    assert!(after_leaving.contains(&Command::BleStopAdvertising));
+
+    engine.navigate_to(AppScreen::RecoveryHelp);
+    let back = engine.initial_commands().unwrap();
+    assert_eq!(shown_qr(&back), None, "no share is shown after coming back");
+}
+
+// @internal — P33: a phone leaving the recovery screen stops looking for the guardian.
+#[test]
+fn a_phone_leaving_recovery_stops_scanning() {
+    let mut owner = lost();
+    let guardian = owner.guardians.remove(0).into_vauchi();
+    let mut phone = begin(&owner, Vauchi::in_memory().unwrap());
+    meet(&mut phone, guardian);
+
+    phone.engine.navigate_to(AppScreen::Help);
+    let after_leaving = phone.engine.dispatch(Event::WakeupFired).unwrap();
+
+    assert!(after_leaving.contains(&Command::BleStopScanning));
+}
+
+// @internal — P33: the back button leaves the screen as any other navigation does.
+#[test]
+fn going_back_from_the_hand_back_stops_advertising() {
+    let mut owner = lost();
+    let claim = Vauchi::in_memory()
+        .unwrap()
+        .begin_recovery(&alice_pk_hex(&owner))
+        .unwrap();
+    let guardian = owner.guardians.remove(0).into_vauchi();
+    let (mut engine, _) = guardian_showing_its_share(guardian, claim);
+
+    engine.navigate_back();
+    let after_leaving = engine.dispatch(Event::WakeupFired).unwrap();
+
+    assert!(after_leaving.contains(&Command::BleStopAdvertising));
+}

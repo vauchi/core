@@ -104,6 +104,7 @@ pub mod genesis;
 pub mod key_order;
 pub mod link_initiator;
 pub mod link_mode;
+pub mod link_pake;
 pub mod link_responder;
 pub mod mode;
 pub mod mode_availability;

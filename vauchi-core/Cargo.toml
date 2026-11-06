@@ -53,6 +53,8 @@ ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 sha2 = "0.10"
 hmac = "0.12"
 hkdf = "0.12"
+# Link exchange PAKE; exact pin and accepted risks in the ADR-002 amendment.
+spake2 = "=0.4.0"
 
 # XChaCha20-Poly1305 (spec-mandated cipher, outside RustCrypto primary set but spec-mandated)
 chacha20poly1305 = "0.10.1"

@@ -207,6 +207,20 @@ impl AppEngine {
         if let Event::PermissionGranted { transport } = &event {
             return self.permission_granted(transport);
         }
+        match &event {
+            Event::PermissionDenied { transport } => {
+                self.pending_permission_requests
+                    .remove(&transport.trim().to_ascii_lowercase());
+            }
+            Event::HardwareUnavailable { transport } | Event::HardwareError { transport, .. }
+                if self
+                    .pending_permission_requests
+                    .remove(&transport.trim().to_ascii_lowercase()) =>
+            {
+                return Ok(vec![self.permission_settings_alert(transport)]);
+            }
+            _ => {}
+        }
         if let Event::ApplicationMenuAvailabilityChanged { available } = event {
             return self.set_application_menu_available(available);
         }

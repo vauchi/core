@@ -132,11 +132,11 @@ fn granted_and_denied_requests_clear_pending_prompt_state() {
             })
             .unwrap();
         assert!(!commands.contains(&alert("Camera error")), "{commands:?}");
-        assert!(
-            commands
-                .iter()
-                .any(|command| matches!(command, Command::ShowToast { .. })),
-            "{commands:?}"
+        assert_eq!(
+            required(&mut engine, "camera"),
+            vec![Command::RequestPermission {
+                transport: "camera".into(),
+            }]
         );
     }
 }

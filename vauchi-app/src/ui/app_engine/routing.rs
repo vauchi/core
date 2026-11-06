@@ -67,7 +67,7 @@ impl AppEngine {
         }
     }
 
-    fn capability_label(&self, transport: &str) -> Option<String> {
+    pub(super) fn capability_label(&self, transport: &str) -> Option<String> {
         let token = transport.trim().to_ascii_lowercase();
         NAMEABLE_CAPABILITIES
             .contains(&token.as_str())

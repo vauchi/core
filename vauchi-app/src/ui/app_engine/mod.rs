@@ -83,7 +83,7 @@ pub use {
 };
 
 use glance::GlanceDial;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::mpsc;
 
 use vauchi_core::api::{HandlerId, Vauchi, VauchiEvent};
@@ -128,6 +128,7 @@ pub struct AppEngine {
     /// Transient transport-permission ledger (T2.1b): updated from
     /// `Event::PermissionDenied`, joined with `device_capabilities` by T2.2.
     pub(super) transport_readiness: TransportReadiness,
+    pub(super) pending_permission_requests: HashSet<String>,
     /// What the current network costs, as the shell last reported it
     /// (vauchi/private#733 D6); unknown until it reports.
     pub(super) network_cost: vauchi_core::settings::NetworkCost,
@@ -553,6 +554,7 @@ impl AppEngine {
             #[cfg(feature = "content-updates")]
             content_runner: None,
             transport_readiness: TransportReadiness::default(),
+            pending_permission_requests: HashSet::new(),
             render_context: initial_render_context,
             update_status: AppUpdateStatus::UpToDate,
             update_dismissed: false,

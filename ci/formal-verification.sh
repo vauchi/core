@@ -223,6 +223,14 @@ tamarin_expect "$models/device_link_v2.spthy" falsified "-DNO_DH" \
 # Grinding is that attack: without it the no-commitment design holds.
 tamarin_expect "$models/device_link_v2.spthy" verified "-DNO_COMMITMENT -DNO_GRIND" \
     seed_secrecy initiator_agreement joiner_agreement
+# Candidate forward-secret device sync (#1090, SC-75): an acknowledged batch
+# survives a later seed leak, a retained one does not, and static keys fail.
+tamarin_expect "$models/device_sync.spthy" verified "" \
+    seed_needs_a_reveal prekey_needs_a_reveal ephemeral_needs_a_reveal \
+    executable acked_batch_survives_a_later_seed_leak \
+    batch_stays_secret_with_no_reveal seed_holder_reads_what_is_still_retained
+tamarin_expect "$models/device_sync.spthy" falsified "-DSTATIC_ONLY" \
+    acked_batch_survives_a_later_seed_leak
 # Reciprocity confirmation: signature and asymmetric tokens each stop a
 # reflected confirmation; only the signature covers a leaked shared key.
 tamarin_expect "$models/reciprocity.spthy" verified "" \

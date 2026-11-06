@@ -1,0 +1,210 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Candidate forward-secret device sync for #1090 (SC-75). Core does not run
+ * this protocol: today's sync is static, see S11. The model is design evidence
+ * for _private/docs/designs/2026-11-06-device-sync-forward-secrecy-design.md
+ * and backs no claim until the protocol is built.
+ *
+ *   - Every device of an identity holds the seed, which derives the static part
+ *     of a session's root.
+ *   - Each device has random prekeys. A session mixes a fresh ephemeral with
+ *     the peer's prekey into the first chain; a DH step replaces that chain.
+ *     Prekey and chain are deleted.
+ *   - A sender retains a batch until it is acknowledged, and resends retained
+ *     batches over a newer session. Resync is a new prekey plus that resend.
+ *
+ * Abstraction: signatures are not terms. A device's random signing key is
+ * registered under the seed, so a published prekey or hello is authentic unless
+ * the attacker knows the seed; the Forge rules are that exception. A leak of a
+ * device signing key alone is not modelled. As in ble_handshake.spthy, every
+ * key on the wire is a group element with a known exponent; with free terms the
+ * first version of this model exhausted 8 GB without a verdict.
+ *
+ * State facts are persistent on purpose: a rule that consumes and re-creates
+ * its own fact is a self-loop, and proof search diverged on exactly that.
+ * Deletion is not modelled by consuming them; a lemma that needs a chain gone
+ * rules out RevealFirstChain instead, and one-time prekeys are not enforced.
+ *
+ * The attacker owns the network and may read the seed or a device's current
+ * state at any time. Lemmas name which of those they tolerate.
+ *
+ * -DSTATIC_ONLY: the first chain has no random input, today's property.
+ * acked_batch_survives_a_later_seed_leak is falsified, so it can fail. The
+ * no-reveal lemma still holds there, since the seed stays secret.
+ *
+ * Not modelled: healing after device-state theft, the initiator's DH step,
+ * more than the two parties of a session, and a device signing key leak alone.
+ *
+ * Verdicts observed 2026-11-06 (Tamarin 1.12.0), whole file within seconds.
+ *
+ * Run each lemma on its own: tamarin-prover --prove=<lemma> device_sync.spthy
+ */
+
+theory VauchiDeviceSync
+begin
+
+builtins: diffie-hellman, symmetric-encryption, hashing
+
+#ifdef STATIC_ONLY
+macros:
+  first_chain(root, shared) = root
+#else
+macros:
+  first_chain(root, shared) = h(<'vauchi-device-sync-chain', root, shared>)
+#endif
+
+macros:
+  session_root(seed, a, b) = h(<'vauchi-device-sync-v1', seed, a, b>)
+
+rule Create_identity:
+  [ Fr(~seed) ]
+  --[ Identity($I, ~seed) ]->
+  [ !Seed($I, ~seed) ]
+
+rule Publish_prekey:
+  [ !Seed($I, seed), Fr(~p) ]
+  --[ MadePrekey($I, ~p) ]->
+  [ !Prekey($I, $D, ~p), !PrekeyPub($I, $D, 'g' ^ ~p), Out('g' ^ ~p) ]
+
+/* A seed holder can register a device, so it can publish a prekey for any
+   device name of that identity. */
+rule Forge_prekey:
+  [ !Seed($I, seed), In(seed), Fr(~p) ]
+  --[ Forged($I) ]->
+  [ !PrekeyPub($I, $D, 'g' ^ ~p), Out(~p) ]
+
+rule Initiate:
+  let ge = 'g' ^ ~e
+      chain = first_chain(session_root(seed, $A, $B), gp ^ ~e)
+  in
+  [ !Seed(I, seed), !PrekeyPub(I, $B, gp), Fr(~e), Fr(~sid) ]
+  --[ Started(~sid, I, $A, $B), MadeEphemeral(I, ~e) ]->
+  [ !Hello(I, $A, $B, ge), !InitChain(~sid, I, $A, $B, chain, ~e), Out(ge) ]
+
+rule Forge_hello:
+  [ !Seed($I, seed), In(seed), Fr(~e) ]
+  --[ Forged($I) ]->
+  [ !Hello($I, $A, $B, 'g' ^ ~e), Out(~e) ]
+
+rule Accept:
+  let chain = first_chain(session_root(seed, A, B), ge ^ ~p)
+  in
+  [ !Prekey(I, B, ~p), !Seed(I, seed), !Hello(I, A, B, ge), Fr(~sid) ]
+  --[ Accepted(~sid, I, A, B) ]->
+  [ !RespChain(~sid, I, A, B, chain, ge) ]
+
+rule Send_batch:
+  [ !InitChain(sid, I, A, B, chain, ~e), Fr(~batch) ]
+  --[ SendBatch(sid, I, A, B, ~batch) ]->
+  [ !Retained(I, A, B, ~batch), Out(senc(~batch, chain)) ]
+
+rule Receive_batch:
+  [ !RespChain(sid, I, A, B, chain, ge), In(senc(batch, chain)) ]
+  --[ ReceivedBatch(sid, I, A, B, batch) ]->
+  [ ]
+
+/* A reset is a new session; retained batches go out again over it. */
+rule Resend_retained:
+  [ !Retained(I, A, B, ~batch), !InitChain(sid, I, A, B, chain, ~e) ]
+  --[ Resent(sid, I, ~batch) ]->
+  [ Out(senc(~batch, chain)) ]
+
+rule Acknowledge:
+  [ !Retained(I, A, B, ~batch) ]
+  --[ Acked(I, ~batch) ]->
+  [ ]
+
+restriction Nothing_is_resent_after_its_acknowledgement:
+  "All sid I batch #s #a.
+     Resent(sid, I, batch) @ s & Acked(I, batch) @ a ==> s < a"
+
+/* DH step: the old chain is no longer held. */
+rule Responder_step:
+  let next = h(<'vauchi-device-sync-step', chain, ge ^ ~r>)
+  in
+  [ !RespChain(sid, I, A, B, chain, ge), Fr(~r) ]
+  -->
+  [ !RespStepped(sid, I, A, B, next, ~r), Out('g' ^ ~r) ]
+
+rule Reveal_seed:
+  [ !Seed(I, seed) ]
+  --[ RevealSeed(I) ]->
+  [ Out(seed) ]
+
+rule Reveal_unused_prekey:
+  [ !Prekey(I, D, ~p) ]
+  --[ RevealFirstChain(I) ]->
+  [ Out(~p) ]
+
+rule Reveal_initiator_first_chain:
+  [ !InitChain(sid, I, A, B, chain, ~e) ]
+  --[ RevealFirstChain(I) ]->
+  [ Out(<chain, ~e>) ]
+
+rule Reveal_responder_first_chain:
+  [ !RespChain(sid, I, A, B, chain, ge) ]
+  --[ RevealFirstChain(I) ]->
+  [ Out(chain) ]
+
+rule Reveal_responder_after_step:
+  [ !RespStepped(sid, I, A, B, next, ~r) ]
+  --[ RevealAfterStep(I) ]->
+  [ Out(<next, ~r>) ]
+
+/* Helpers: the seed and honest exponents reach the attacker only by a reveal. */
+lemma seed_needs_a_reveal [reuse]:
+  "All I s #i #k.
+     Identity(I, s) @ i & K(s) @ k
+     ==> Ex #r. RevealSeed(I) @ r & r < k"
+
+lemma prekey_needs_a_reveal [reuse]:
+  "All I p #i #k.
+     MadePrekey(I, p) @ i & K(p) @ k
+     ==> Ex #r. RevealFirstChain(I) @ r & r < k"
+
+lemma ephemeral_needs_a_reveal [reuse]:
+  "All I e #i #k.
+     MadeEphemeral(I, e) @ i & K(e) @ k
+     ==> Ex #r. RevealFirstChain(I) @ r & r < k"
+
+lemma executable:
+  exists-trace
+  "Ex sid sid2 I A B batch #i #j.
+     SendBatch(sid, I, A, B, batch) @ i
+     & ReceivedBatch(sid2, I, A, B, batch) @ j
+     & not (Ex X #r. RevealSeed(X) @ r)
+     & not (Ex X #r. RevealFirstChain(X) @ r)"
+
+/* The settling test's property: an acknowledged batch stays closed however
+   the seed leaks afterwards, a device's stepped state included. */
+lemma acked_batch_survives_a_later_seed_leak:
+  "All sid I A B batch #s #a #x.
+     SendBatch(sid, I, A, B, batch) @ s
+     & Acked(I, batch) @ a
+     & K(batch) @ x
+     ==> (Ex #r. RevealSeed(I) @ r & r < a)
+       | (Ex #r. RevealFirstChain(I) @ r)"
+
+lemma batch_stays_secret_with_no_reveal:
+  "All sid I A B batch #s #x.
+     SendBatch(sid, I, A, B, batch) @ s
+     & K(batch) @ x
+     ==> (Ex #r. RevealSeed(I) @ r)
+       | (Ex #r. RevealFirstChain(I) @ r)"
+
+/* The limit of the design: a seed holder publishes a prekey under a device
+   name, and the sender resends what it still retains over that session. */
+lemma seed_holder_reads_what_is_still_retained:
+  exists-trace
+  "Ex sid I A B batch #s #r #x.
+     SendBatch(sid, I, A, B, batch) @ s
+     & RevealSeed(I) @ r
+     & s < r
+     & K(batch) @ x
+     & not (Ex #a. Acked(I, batch) @ a)
+     & not (Ex #f. RevealFirstChain(I) @ f)"
+
+end

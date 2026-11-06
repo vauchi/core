@@ -486,6 +486,7 @@ mod reciprocity_tokens_tests;
 mod recovery_after_revocation_tests;
 mod recovery_binding_tests;
 mod recovery_boundary_tests;
+mod recovery_ceremony_acceptance_tests;
 mod recovery_claim_review_tests;
 mod recovery_comprehensive_tests;
 mod recovery_continuation_tests;

@@ -376,6 +376,8 @@ pub enum RecoveryUpdate {
 
 /// Results pushed back into the recovery-help engine.
 pub enum RecoveryHelpUpdate {
+    ClaimScanned(String),
+    HandBackReady(String),
     ParsedClaim(super::recovery_help::ParsedClaimSummary),
     ClaimParseError(String),
     VoucherData(String),
@@ -511,6 +513,8 @@ impl EngineUpdate {
                 RecoveryUpdate::RekeyWaiting(_) => "Recovery::RekeyWaiting",
             },
             Self::RecoveryHelp(u) => match u {
+                RecoveryHelpUpdate::ClaimScanned(_) => "RecoveryHelp::ClaimScanned",
+                RecoveryHelpUpdate::HandBackReady(_) => "RecoveryHelp::HandBackReady",
                 RecoveryHelpUpdate::ParsedClaim(_) => "RecoveryHelp::ParsedClaim",
                 RecoveryHelpUpdate::ClaimParseError(_) => "RecoveryHelp::ClaimParseError",
                 RecoveryHelpUpdate::VoucherData(_) => "RecoveryHelp::VoucherData",

@@ -495,6 +495,11 @@ impl AppEngine {
             return Some(self.confirm_session_pin_then(CredentialChange::RecoveryVoucher));
         }
 
+        if self.screen == AppScreen::RecoveryHelp
+            && matches!(action, UserAction::ActionPressed { action_id } if action_id == crate::ui::recovery_help::HAND_BACK_ACTION)
+        {
+            return Some(self.confirm_session_pin_then(CredentialChange::RecoveryHandBack));
+        }
         if self.screen == AppScreen::Recovery
             && matches!(action, UserAction::ActionPressed { action_id } if action_id == "create_claim")
             && let Some(result) = self.intercept_create_claim_action()

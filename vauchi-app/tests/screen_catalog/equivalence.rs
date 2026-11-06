@@ -97,6 +97,16 @@ fn normalize_nodes(screen: &str, nodes: &mut Value, fields: &mut BTreeMap<String
                     "stage": "Init", "display_name": display_name, "relay_url": relay_url});
             }
         }
+        if screen == "recovery-hand_back_pending"
+            && node
+                .pointer("/Qr/id")
+                .and_then(Value::as_str)
+                .is_some_and(|id| id.ends_with("claim_qr"))
+        {
+            for payload in node["Qr"]["payloads"].as_array_mut().expect("QR payloads") {
+                *payload = normalized_claim(payload.as_str().expect("QR string"));
+            }
+        }
         if let Some(children) = node.pointer_mut("/Group/children") {
             normalize_nodes(screen, children, fields);
         }
@@ -118,25 +128,29 @@ fn normalize_field_id(id: &mut Value, fields: &mut BTreeMap<String, usize>) {
     }
 }
 
+fn normalized_claim(encoded: &str) -> Value {
+    let bytes = STANDARD.decode(encoded).expect("base64 claim");
+    let claim = RecoveryClaim::from_bytes(&bytes).expect("valid recovery claim");
+    assert_eq!(
+        STANDARD.encode(claim.to_bytes()),
+        encoded,
+        "canonical claim encoding"
+    );
+    assert_ne!(
+        claim.old_pk(),
+        claim.new_pk(),
+        "recovery uses a temporary key"
+    );
+    json!({"version": bytes[0], "bytes": bytes.len(),
+        "old_pk": "seeded target public key", "new_pk": "seeded temporary public key",
+        "timestamp": claim.timestamp()})
+}
+
 fn normalize_text(screen: &str, text: &mut Value) {
     if screen == "recovery-hand_back_pending" && text["id"] == "claim_data" {
         let encoded = text["content"].as_str().expect("claim string");
-        let bytes = STANDARD.decode(encoded).expect("base64 claim");
-        let claim = RecoveryClaim::from_bytes(&bytes).expect("valid recovery claim");
-        assert_eq!(
-            STANDARD.encode(claim.to_bytes()),
-            encoded,
-            "canonical claim encoding"
-        );
-        assert_ne!(
-            claim.old_pk(),
-            claim.new_pk(),
-            "recovery uses a temporary key"
-        );
+        let normalized = normalized_claim(encoded);
         assert_eq!(text["content"], text["accessibility"]["label"]);
-        let normalized = json!({"version": bytes[0], "bytes": bytes.len(),
-            "old_pk": "seeded target public key", "new_pk": "seeded temporary public key",
-            "timestamp": claim.timestamp()});
         text["content"] = normalized.clone();
         text["accessibility"]["label"] = normalized;
     }

@@ -258,6 +258,23 @@ impl AppEngine {
             }
         }
 
+        if let Event::QrScanned { data } = &event
+            && self.screen == AppScreen::Recovery
+            && !self.vauchi.has_identity()
+        {
+            return Some(self.intercept_take_hand_back(data));
+        }
+        if let Event::QrScanned { data } = &event
+            && self.screen == AppScreen::RecoveryHelp
+            && self
+                .engine
+                .apply_update(crate::ui::EngineUpdate::RecoveryHelp(
+                    crate::ui::RecoveryHelpUpdate::ClaimScanned(data.clone()),
+                ))
+        {
+            return self.intercept_verify_claim_action();
+        }
+
         if !matches!(
             self.screen,
             AppScreen::Exchange

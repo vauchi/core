@@ -19,6 +19,9 @@ use crate::ui::*;
 use vauchi_core::recovery::RECOVERY_CLAIM_MIN_INPUT_LEN;
 
 /// Steps in the helper-side recovery workflow.
+const SCAN_CLAIM_ACTION: &str = "scan_claim";
+pub(in crate::ui) const HAND_BACK_ACTION: &str = "hand_back";
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum HelpStep {
     /// Static info screen with steps + "Vouch for Someone" button.
@@ -31,6 +34,8 @@ enum HelpStep {
     /// Show the generated voucher data + "Done" button. Reached after
     /// the AppEngine intercept creates the voucher from the confirmed claim.
     ShowVoucher,
+    /// Shows the hand-back share as a QR code for the owner's new phone.
+    ShowHandBack,
 }
 
 /// Display-only summary of a parsed `RecoveryClaim`.
@@ -44,12 +49,16 @@ pub struct ParsedClaimSummary {
     pub old_pk_hex: String,
     pub new_pk_hex: String,
     pub is_expired: bool,
+    /// This guardian holds the owner's backup, so it can hand it back in
+    /// person (P33); otherwise it can only vouch.
+    pub keeps_backup: bool,
 }
 
 /// Engine that drives the helper-side social recovery flow.
 #[derive(Clone, Debug)]
 pub struct RecoveryHelpEngine {
     step: HelpStep,
+    hand_back_share: Option<String>,
     /// Pasted claim payload (base64). Updated on `TextChanged`.
     claim_input: String,
     /// Validation error to display on the claim input (set by AppEngine
@@ -74,6 +83,7 @@ impl RecoveryHelpEngine {
     pub fn new() -> Self {
         Self {
             step: HelpStep::Info,
+            hand_back_share: None,
             claim_input: String::new(),
             claim_error: None,
             parsed_claim: None,
@@ -145,6 +155,7 @@ impl RecoveryHelpEngine {
             HelpStep::PasteClaim => self.build_paste_claim_screen(),
             HelpStep::ConfirmVoucher => self.build_confirm_voucher_screen(),
             HelpStep::ShowVoucher => self.build_show_voucher_screen(),
+            HelpStep::ShowHandBack => self.build_show_hand_back_screen(),
         }
     }
 
@@ -252,9 +263,24 @@ impl RecoveryHelpEngine {
             components,
             contextual_actions: vec![
                 ScreenAction {
+                    id: SCAN_CLAIM_ACTION.into(),
+                    label: self.t("exchange.ble.glance_scan"),
+                    style: if verify_enabled {
+                        ActionStyle::Secondary
+                    } else {
+                        ActionStyle::Primary
+                    },
+                    enabled: true,
+                    a11y: Some(A11y::labeled(self.t("exchange.ble.glance_scan"))),
+                },
+                ScreenAction {
                     id: "verify_claim".into(),
                     label: self.t("recovery.verify_button"),
-                    style: ActionStyle::Primary,
+                    style: if verify_enabled {
+                        ActionStyle::Primary
+                    } else {
+                        ActionStyle::Secondary
+                    },
                     enabled: verify_enabled,
                     a11y: Some(A11y::labeled(self.t("recovery.verify_button"))),
                 },
@@ -332,22 +358,74 @@ impl RecoveryHelpEngine {
             title: self.t("recovery.confirm_voucher"),
             subtitle: None,
             components,
-            contextual_actions: vec![
-                ScreenAction {
-                    id: "create_voucher".into(),
-                    label: self.t("recovery.create_voucher_button"),
-                    style: ActionStyle::Primary,
-                    enabled: !is_expired,
-                    a11y: Some(A11y::labeled(self.t("recovery.create_voucher_button"))),
+            contextual_actions: self.confirm_actions(is_expired),
+            progress: None,
+            ..Default::default()
+        }
+    }
+
+    fn confirm_actions(&self, is_expired: bool) -> Vec<ScreenAction> {
+        let keeps_backup = self
+            .parsed_claim
+            .as_ref()
+            .is_some_and(|claim| claim.keeps_backup);
+        let mut actions = Vec::new();
+        if keeps_backup {
+            actions.push(ScreenAction {
+                id: HAND_BACK_ACTION.into(),
+                label: self.t("recovery.hand_back_button"),
+                style: ActionStyle::Primary,
+                enabled: !is_expired,
+                a11y: Some(A11y::labeled(self.t("recovery.hand_back_button"))),
+            });
+        }
+        actions.extend([
+            ScreenAction {
+                id: "create_voucher".into(),
+                label: self.t("recovery.create_voucher_button"),
+                style: if keeps_backup {
+                    ActionStyle::Secondary
+                } else {
+                    ActionStyle::Primary
                 },
-                ScreenAction {
-                    id: "back".into(),
-                    label: self.t("action.back"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("action.back"))),
-                },
-            ],
+                enabled: !is_expired,
+                a11y: Some(A11y::labeled(self.t("recovery.create_voucher_button"))),
+            },
+            ScreenAction {
+                id: "back".into(),
+                label: self.t("action.back"),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: Some(A11y::labeled(self.t("action.back"))),
+            },
+        ]);
+        actions
+    }
+
+    fn build_show_hand_back_screen(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "recovery_help".into(),
+            title: self.t("recovery.hand_back_title"),
+            subtitle: Some(self.t("recovery.hand_back_instruction")),
+            components: vec![Component::QrCode {
+                id: "hand_back_qr".into(),
+                data: self.hand_back_share.clone().unwrap_or_default(),
+                frames: Vec::new(),
+                mode: QrMode::Display,
+                label: Some(self.t("recovery.hand_back_title")),
+                scan_quality: None,
+                placement: None,
+                error_correction: None,
+                size: None,
+                a11y: Some(A11y::labeled(self.t("recovery.hand_back_title"))),
+            }],
+            contextual_actions: vec![ScreenAction {
+                id: "done".into(),
+                label: self.t("action.done"),
+                style: ActionStyle::Primary,
+                enabled: true,
+                a11y: Some(A11y::labeled(self.t("action.done"))),
+            }],
             progress: None,
             ..Default::default()
         }
@@ -414,6 +492,14 @@ impl WorkflowEngine for RecoveryHelpEngine {
             return false;
         };
         match update {
+            crate::ui::RecoveryHelpUpdate::HandBackReady(share) => {
+                self.hand_back_share = Some(share);
+                self.step = HelpStep::ShowHandBack;
+            }
+            crate::ui::RecoveryHelpUpdate::ClaimScanned(claim) => {
+                self.claim_input = claim;
+                self.claim_error = None;
+            }
             crate::ui::RecoveryHelpUpdate::ParsedClaim(claim) => self.set_parsed_claim(claim),
             crate::ui::RecoveryHelpUpdate::ClaimParseError(message) => {
                 self.set_claim_parse_error(message)
@@ -437,6 +523,12 @@ impl WorkflowEngine for RecoveryHelpEngine {
                 self.claim_input.clear();
                 self.claim_error = None;
                 ActionResult::UpdateScreen(self.build_screen())
+            }
+
+            (HelpStep::PasteClaim, UserAction::ActionPressed { ref action_id })
+                if action_id == SCAN_CLAIM_ACTION =>
+            {
+                ActionResult::RequestCamera
             }
 
             // PasteClaim: text input updates
@@ -494,6 +586,11 @@ impl WorkflowEngine for RecoveryHelpEngine {
                 if action_id == "copy_voucher" =>
             {
                 ActionResult::UpdateScreen(self.build_screen())
+            }
+            (HelpStep::ShowHandBack, UserAction::ActionPressed { ref action_id })
+                if action_id == "done" =>
+            {
+                ActionResult::Complete
             }
             (HelpStep::ShowVoucher, UserAction::ActionPressed { ref action_id })
                 if action_id == "done" =>
@@ -631,6 +728,7 @@ mod tests {
             old_pk_hex: "abcd1234".repeat(8),
             new_pk_hex: "ef567890".repeat(8),
             is_expired: false,
+            keeps_backup: false,
         });
         assert!(engine.is_at_confirm_voucher_step());
 
@@ -656,6 +754,7 @@ mod tests {
             old_pk_hex: "00".repeat(32),
             new_pk_hex: "11".repeat(32),
             is_expired: true,
+            keeps_backup: false,
         });
 
         let screen = engine.build_screen();
@@ -727,6 +826,7 @@ mod tests {
             old_pk_hex: "ab".repeat(32),
             new_pk_hex: "cd".repeat(32),
             is_expired: false,
+            keeps_backup: false,
         });
 
         let result = press(&mut engine, "create_voucher");
@@ -780,6 +880,7 @@ mod tests {
             old_pk_hex: "ab".repeat(32),
             new_pk_hex: "cd".repeat(32),
             is_expired: false,
+            keeps_backup: false,
         });
         let _ = press(&mut engine, "back");
 

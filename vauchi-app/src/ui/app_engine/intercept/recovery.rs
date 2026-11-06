@@ -45,6 +45,66 @@ impl AppEngine {
             .then(|| ActionResult::UpdateScreen(self.engine.current_screen()))
     }
 
+    /// A refusal looks the same for every cause (A11), so the alert says only
+    /// that nothing can be handed back.
+    pub(in crate::ui::app_engine) fn intercept_hand_back_action(&mut self) -> ActionResult {
+        use base64::Engine as _;
+        let claim_input = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::RecoveryHelp { claim_input }) => {
+                claim_input.trim().to_string()
+            }
+            _ => String::new(),
+        };
+        match self.vauchi.hand_back_in_person(&claim_input) {
+            Ok(hand_back) => {
+                let share = base64::engine::general_purpose::STANDARD.encode(hand_back.share());
+                self.engine
+                    .apply_update(crate::ui::EngineUpdate::RecoveryHelp(
+                        crate::ui::RecoveryHelpUpdate::HandBackReady(share),
+                    ));
+                ActionResult::UpdateScreen(self.engine.current_screen())
+            }
+            Err(_) => ActionResult::ShowAlert {
+                title: self.t("recovery.hand_back_title"),
+                message: self.t("recovery.hand_back_refused"),
+            },
+        }
+    }
+
+    /// Takes a guardian's share scanned on the identity-free phone. Bytes
+    /// from the camera are untrusted: `take_hand_back` parses and opens them
+    /// or refuses, and a refusal changes nothing.
+    pub(in crate::ui::app_engine) fn intercept_take_hand_back(
+        &mut self,
+        scanned: &str,
+    ) -> ActionResult {
+        use base64::Engine as _;
+        let taken = base64::engine::general_purpose::STANDARD
+            .decode(scanned.trim())
+            .ok()
+            .and_then(|share| self.vauchi.take_hand_back(&share).ok());
+        match taken {
+            Some(1) => ActionResult::ShowToast {
+                message: self.t("recovery.restore_handed_back_one"),
+                undo_action_id: None,
+                undo_label: None,
+            },
+            Some(count) => ActionResult::ShowToast {
+                message: crate::i18n::get_string_with_args(
+                    self.render_context.resolved_locale(),
+                    "recovery.restore_handed_back",
+                    &[("count", &count.to_string())],
+                ),
+                undo_action_id: None,
+                undo_label: None,
+            },
+            None => ActionResult::ShowAlert {
+                title: self.t("recovery.hand_back_title"),
+                message: self.t("recovery.hand_back_share_refused"),
+            },
+        }
+    }
+
     /// Renewal is the one act that extends a claim's lifetime, so a refusal
     /// is shown rather than falling back to the expired claim.
     pub(in crate::ui::app_engine) fn intercept_renew_claim_action(&mut self) -> ActionResult {
@@ -85,6 +145,7 @@ impl AppEngine {
                     old_pk_hex: hex::encode::<&[u8]>(claim.old_pk().as_ref()),
                     new_pk_hex: hex::encode::<&[u8]>(claim.new_pk().as_ref()),
                     is_expired: claim.is_expired(self.vauchi.clock().unix_seconds()),
+                    keeps_backup: self.vauchi.keeps_backup_of(&claim).unwrap_or(false),
                 },
             ),
             Err(vauchi_core::VauchiError::ContactNotFound(_)) => {

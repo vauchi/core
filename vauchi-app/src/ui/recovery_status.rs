@@ -20,6 +20,7 @@ use crate::ui::recovery_restore::{
 use crate::ui::*;
 
 pub(in crate::ui) const RENEW_CLAIM_ACTION: &str = "renew_claim";
+const SCAN_SHARE_ACTION: &str = "scan_share";
 
 /// Steps in the outgoing recovery workflow.
 #[derive(Clone, Debug, PartialEq)]
@@ -542,9 +543,43 @@ impl RecoveryEngine {
             ..Default::default()
         };
         if self.identity_free_recovery {
+            // In person, a guardian scans this rather than receiving it (P32).
+            screen.components.insert(
+                0,
+                Component::QrCode {
+                    id: "claim_qr".into(),
+                    data: claim.into(),
+                    frames: Vec::new(),
+                    mode: QrMode::Display,
+                    label: Some(self.t("recovery.claim_qr_label")),
+                    scan_quality: None,
+                    placement: None,
+                    error_correction: None,
+                    size: None,
+                    a11y: Some(A11y {
+                        label: Some(self.t("recovery.claim_qr_a11y_label")),
+                        hint: Some(self.t("recovery.claim_qr_a11y_hint")),
+                        role: None,
+                    }),
+                },
+            );
             screen
                 .contextual_actions
                 .retain(|action| action.id != "collect_vouchers");
+            screen.contextual_actions.insert(
+                0,
+                ScreenAction {
+                    id: SCAN_SHARE_ACTION.into(),
+                    label: self.t("exchange.ble.glance_scan"),
+                    style: if self.restore.is_some() {
+                        ActionStyle::Secondary
+                    } else {
+                        ActionStyle::Primary
+                    },
+                    enabled: true,
+                    a11y: Some(A11y::labeled(self.t("exchange.ble.glance_scan"))),
+                },
+            );
             if self.restore.is_some() {
                 screen.contextual_actions.push(ScreenAction {
                     id: RESTORE_ROW.into(),
@@ -631,6 +666,11 @@ impl WorkflowEngine for RecoveryEngine {
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match (&self.step, action) {
+            (RecoveryStep::ShowGeneratedClaim, UserAction::ActionPressed { ref action_id })
+                if self.identity_free_recovery && action_id == SCAN_SHARE_ACTION =>
+            {
+                ActionResult::RequestCamera
+            }
             (RecoveryStep::ShowGeneratedClaim, UserAction::ActionPressed { ref action_id })
                 if self.identity_free_recovery
                     && action_id == RESTORE_ROW

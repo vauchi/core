@@ -18,6 +18,7 @@ pub(super) enum CredentialChange {
     DuressPin,
     DeviceRevoke,
     RecoveryVoucher,
+    RecoveryHandBack,
     /// Who receives the emergency alerts, and the message (#781).
     EmergencyBroadcastConfig,
     EmergencyBroadcastDisable,
@@ -41,7 +42,7 @@ impl CredentialChange {
                 "devices.revoke_button",
                 "devices.revoke_confirm_password_hint",
             ),
-            Self::RecoveryVoucher => (
+            Self::RecoveryVoucher | Self::RecoveryHandBack => (
                 "recovery.how_to_vouch",
                 "recovery_help.confirm_password_hint",
             ),
@@ -138,6 +139,7 @@ impl AppEngine {
             CredentialChange::EmergencyBroadcastDisable => {
                 self.complete_emergency_broadcast_disable()
             }
+            CredentialChange::RecoveryHandBack => self.intercept_hand_back_action(),
             CredentialChange::RecoveryVoucher => self
                 .intercept_create_voucher_action()
                 .unwrap_or_else(|| ActionResult::UpdateScreen(self.engine.current_screen())),

@@ -193,6 +193,20 @@ impl Vauchi {
         self.issue_recovery_claim(&old_pk, &recovery_key)
     }
 
+    /// Whether this guardian could hand back a backup for `claim`'s old
+    /// identity. False in a duress session, whose answers must match a
+    /// guardian that keeps nothing (ADR-032).
+    ///
+    /// # Errors
+    /// Storage errors.
+    pub fn keeps_backup_of(&self, claim: &RecoveryClaim) -> VauchiResult<bool> {
+        if self.identity.is_none() || self.in_duress_mode() {
+            return Ok(false);
+        }
+        let old_pk = hex::encode(claim.old_pk().as_bytes());
+        Ok(self.storage.guardian_backups().kept(&old_pk)?.is_some())
+    }
+
     /// The guardian's side, in the recovery meeting: once the owner is
     /// recognized, re-seals this guardian's share of the backup it keeps
     /// for the claim's old identity to the claim's recovery key, naming

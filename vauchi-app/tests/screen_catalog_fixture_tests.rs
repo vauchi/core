@@ -350,7 +350,7 @@ fn screen_catalog_hand_back_claim_equivalence_keeps_its_timestamp() {
         .find(|entry| entry["code_id"] == "recovery-hand_back_pending")
         .unwrap();
     let encoded = entry
-        .pointer_mut("/commands/0/ReplaceSurface/surface/nodes/1/Text/content")
+        .pointer_mut("/commands/0/ReplaceSurface/surface/nodes/2/Text/content")
         .unwrap();
     let codec = base64::engine::general_purpose::STANDARD;
     let bytes = codec.decode(encoded.as_str().unwrap()).unwrap();
@@ -363,7 +363,7 @@ fn screen_catalog_hand_back_claim_equivalence_keeps_its_timestamp() {
     let shifted_encoded = codec.encode(shifted.to_bytes());
     *encoded = serde_json::Value::String(shifted_encoded.clone());
     *entry
-        .pointer_mut("/commands/0/ReplaceSurface/surface/nodes/1/Text/accessibility/label")
+        .pointer_mut("/commands/0/ReplaceSurface/surface/nodes/2/Text/accessibility/label")
         .unwrap() = serde_json::Value::String(shifted_encoded);
     let changed = serde_json::from_value(raw).unwrap();
     assert_ne!(

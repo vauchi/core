@@ -493,6 +493,7 @@ mod recovery_continuation_tests;
 mod recovery_engine_tests;
 mod recovery_guardian_api_tests;
 mod recovery_hand_back_pieces_tests;
+mod recovery_hand_back_screens_tests;
 mod recovery_lost_key_voucher_tests;
 mod recovery_migration_upgrade_tests;
 mod recovery_parsing_bounds_tests;

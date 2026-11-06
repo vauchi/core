@@ -111,13 +111,15 @@ fn meet(phone: &mut RecoveringPhone, guardian: Vauchi) -> Meeting<'_> {
     let mut guardian = AppEngine::new(guardian);
     guardian.navigate_to(AppScreen::RecoveryHelp);
     let opened = guardian.initial_commands().unwrap();
-    let scanning = press_primary(&mut guardian, &opened);
+    let vouching = press_primary(&mut guardian, &opened);
+    let scanning = press_primary(&mut guardian, &vouching);
     let recognized = scan(&mut guardian, &scanning, phone.claim.clone());
     let guardian_commands = press_primary(&mut guardian, &recognized);
 
     let share = shown_qr(&guardian_commands).expect("the guardian shows its share as a QR code");
     let scanning = press_primary(&mut phone.engine, &phone.commands);
-    phone.commands = scan(&mut phone.engine, &scanning, share);
+    scan(&mut phone.engine, &scanning, share);
+    phone.commands = phone.engine.initial_commands().unwrap();
     assert_eq!(
         restore_status(&phone.engine).handed_back,
         shares_before + 1,

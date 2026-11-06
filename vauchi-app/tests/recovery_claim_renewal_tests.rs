@@ -130,6 +130,6 @@ fn an_expired_claim_is_withheld_until_the_owner_renews_it() {
     let parsed = app.vauchi().parse_recovery_claim_b64(&renewed).unwrap();
     assert_eq!(parsed.timestamp(), BEGUN_AT + later);
     assert!(after.contains(&renewed));
-    assert_eq!(action_ids(&app), ["copy_claim", "done"]);
+    assert_eq!(action_ids(&app), ["scan_share", "copy_claim", "done"]);
     assert!(!after.contains(&get_string(Locale::ENGLISH, "recovery.claim_expired_title")));
 }

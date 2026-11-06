@@ -486,6 +486,7 @@ fn test_rekey_preserves_all_encrypted_tables() {
     let device = vauchi_core::identity::RegisteredDevice {
         device_id: [0x42; 32],
         exchange_public_key: [0x43; 32],
+        signing_public_key: None,
         device_name: "Test Device".to_string(),
         created_at: 1000,
         revoked: false,

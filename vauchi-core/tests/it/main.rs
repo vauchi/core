@@ -450,6 +450,7 @@ mod parser_panic_safety_tests;
 mod password_kdf_tests;
 mod payload_bounds_tests;
 mod per_contact_relay_routing_tests;
+mod per_device_signing_tests;
 mod performance_batch_sync_tests;
 mod performance_pagination_tests;
 mod performance_threshold_tests;

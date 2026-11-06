@@ -196,6 +196,7 @@ fn test_registered_device_serialization_snapshot() {
     let device = RegisteredDevice {
         device_id: [1u8; 32],
         exchange_public_key: [2u8; 32],
+        signing_public_key: None,
         device_name: "Test Phone".to_string(),
         created_at: 1700000000,
         revoked: false,
@@ -225,6 +226,7 @@ fn test_registered_device_revoked_serialization_snapshot() {
     let device = RegisteredDevice {
         device_id: [3u8; 32],
         exchange_public_key: [4u8; 32],
+        signing_public_key: None,
         device_name: "Old Tablet".to_string(),
         created_at: 1699000000,
         revoked: true,

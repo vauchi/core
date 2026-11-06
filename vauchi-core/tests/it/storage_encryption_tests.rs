@@ -25,6 +25,7 @@ fn make_test_registry() -> DeviceRegistry {
     let device = RegisteredDevice {
         device_id: [0x42; 32],
         exchange_public_key: [0x43; 32],
+        signing_public_key: None,
         device_name: "Test Device".to_string(),
         created_at: 1000,
         revoked: false,

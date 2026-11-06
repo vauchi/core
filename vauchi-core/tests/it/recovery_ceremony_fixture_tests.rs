@@ -267,7 +267,7 @@ fn the_checked_in_ceremony_fixture_decodes_as_the_contract() {
 #[test]
 #[ignore = "regenerates Core's recovery ceremony fixture"]
 fn regenerate_ceremony_fixture() {
-    let json = serde_json::to_string_pretty(&fresh_fixture()).unwrap();
+    let json = serde_json::to_string_pretty(&fresh_fixture()).expect("serialize fixture");
     let collapsed = fixture_json::collapse_number_arrays(&json);
-    std::fs::write(fixture_path(), format!("{collapsed}\n")).unwrap();
+    std::fs::write(fixture_path(), format!("{collapsed}\n")).expect("write ceremony fixture");
 }

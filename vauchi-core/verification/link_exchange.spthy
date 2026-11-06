@@ -65,7 +65,15 @@ rule Share_link:
   --[ Shared($I, $P) ]->
   [ Sender($I, ~e, ~nonce, ~code), Told($P, ~nonce, ~code), !Code(~nonce, ~code), Out(link) ]
 
-#ifdef CODE_IN_LINK
+/* Whoever holds a link may run the exchange with one guess at its code, and is
+   right about one time in a million. */
+rule Online_guess:
+  [ !Code(nonce, code) ]
+  --[ GuessWon(nonce), OneGuess(nonce) ]->
+  [ Out(code) ]
+#endif
+
+#ifdef PAKE & CODE_IN_LINK
 /* The control: the code reaches the attacker with the link, and no guess is
    recorded, so the lemma must fail. */
 rule Code_travels_with_link:
@@ -73,15 +81,7 @@ rule Code_travels_with_link:
   -->
   [ Out(code) ]
 #endif
-
-/* Whoever holds a link may run the exchange with one guess at its code, and is
-   right about one time in a million. */
-rule Online_guess:
-  [ !Code(nonce, code) ]
-  --[ GuessWon(nonce), OneGuess(nonce) ]->
-  [ Out(code) ]
-#else
-#ifdef PIN_CONFIRMED
+#ifdef PIN_CONFIRMED & not PAKE
 rule Share_link:
   let link = <'link', 'g' ^ ~e, ~nonce>
   in
@@ -95,14 +95,14 @@ rule Offline_guess:
   [ !Pin(pin), In(h(<pin, id, fpk, nonce>)) ]
   --[ OfflineGuess(pin) ]->
   [ Out(pin) ]
-#else
+#endif
+#ifdef not PAKE & not PIN_CONFIRMED
 rule Share_link:
   let link = <'link', 'g' ^ ~e, ~nonce>
   in
   [ !User($I, id_i), !User($P, id_p), Fr(~e), Fr(~nonce) ]
   --[ Shared($I, $P) ]->
   [ Sender($I, ~e, ~nonce), Told($P, ~nonce), Out(link) ]
-#endif
 #endif
 
 /* Whoever holds the link opens it: deposits an ephemeral key and, under
@@ -118,22 +118,22 @@ rule Open_link:
   [ !User($R, id_r), Told($R, nonce, code), In(<'link', blind(X, code), nonce>), Fr(~f) ]
   --[ Opened($R, nonce), ContactR($R, id_r, X) ]->
   [ Out(deposit) ]
-#else
-#ifdef PIN_CONFIRMED
+#endif
+#ifdef PIN_CONFIRMED & not PAKE
 rule Open_link:
   let deposit = <'claim', id_r, 'g' ^ ~f, h(<pin, id_r, 'g' ^ ~f, nonce>)>
   in
   [ !User($R, id_r), Told($R, nonce, pin), In(<'link', epk, nonce>), Fr(~f) ]
   --[ Opened($R, nonce), ContactR($R, id_r, epk) ]->
   [ Out(deposit) ]
-#else
+#endif
+#ifdef not PAKE & not PIN_CONFIRMED
 rule Open_link:
   let deposit = <'claim', id_r, 'g' ^ ~f>
   in
   [ !User($R, id_r), In(<'link', epk, nonce>), Fr(~f) ]
   --[ Opened($R, nonce), ContactR($R, id_r, epk) ]->
   [ Out(deposit) ]
-#endif
 #endif
 
 /* The sender retrieves the deposit and finalizes: the opener's identity
@@ -143,18 +143,18 @@ rule Finalize:
   [ Sender($I, e, nonce, code), !User($I, id_i), In(<'claim', blind(Y, code), senc(id_r, Y ^ e)>) ]
   --[ ContactAdded($I, id_i, id_r), ContactVia($I, id_r, nonce) ]->
   [ ]
-#else
-#ifdef PIN_CONFIRMED
+#endif
+#ifdef PIN_CONFIRMED & not PAKE
 rule Finalize:
   [ Sender($I, e, nonce, pin), !User($I, id_i), In(<'claim', id_r, fpk, proof>) ]
   --[ Eq(proof, h(<pin, id_r, fpk, nonce>)), ContactAdded($I, id_i, id_r) ]->
   [ ]
-#else
+#endif
+#ifdef not PAKE & not PIN_CONFIRMED
 rule Finalize:
   [ Sender($I, e, nonce), !User($I, id_i), In(<'claim', id_r, fpk>) ]
   --[ ContactAdded($I, id_i, id_r) ]->
   [ ]
-#endif
 #endif
 
 lemma executable:

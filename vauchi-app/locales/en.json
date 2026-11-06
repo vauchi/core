@@ -1362,6 +1362,7 @@
   "hardware.error_title_generic": "Hardware error",
   "hardware.permission_denied": "{name} access was denied",
   "hardware.permission_denied_generic": "Access was denied",
+  "hardware.permission_settings_guidance": "This system could not open a permission prompt. Check the app's access in system settings, then try again. On a managed device, ask your administrator for help.",
   "hardware.unavailable": "{name} is not available on this device",
   "hardware.unavailable_generic": "This feature is not available on this device",
   "heirloom.document_title": "Contacts of",

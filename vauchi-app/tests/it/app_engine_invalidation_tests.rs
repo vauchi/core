@@ -159,3 +159,22 @@ fn group_created_after_exchange_was_opened_reaches_the_exchange_flow() {
          group selection, not on a picker built before the group existed"
     );
 }
+
+// @internal
+#[test]
+fn link_responder_success_refreshes_previously_visited_contacts() {
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Contacts);
+    assert_eq!(contact_names(&engine), Vec::<String>::new());
+    let (initiation, _) = vauchi_core::exchange::link_mode::initiator_generate();
+    let payload = vauchi_core::exchange::link_mode::parse_exchange_deep_link(&initiation.url)
+        .expect("valid peer link");
+    engine.navigate_to(AppScreen::DeepLinkResponder { payload });
+    add_contact_named(&engine, "Bob");
+    let completed = engine
+        .link_responder_completed("contact-Bob")
+        .expect("completion screen");
+    assert_eq!(completed.screen_id, "link_responder_completed");
+    engine.navigate_to(AppScreen::Contacts);
+    assert_eq!(contact_names(&engine), vec!["Bob".to_string()]);
+}

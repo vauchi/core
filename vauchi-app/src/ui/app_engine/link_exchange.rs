@@ -179,6 +179,7 @@ impl AppEngine {
         use vauchi_core::api::LinkExchangeProgress;
         match progress {
             LinkExchangeProgress::Completed { contact_id } => {
+                self.engine_cache.remove(&AppScreen::Contacts);
                 // Link mode assigns no group, so group_names is empty.
                 let summary = self.build_exchange_summary(&contact_id, Vec::new());
                 let _ = self.engine.apply_update(EngineUpdate::LinkExchange(

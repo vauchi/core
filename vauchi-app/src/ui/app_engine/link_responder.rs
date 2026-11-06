@@ -28,6 +28,7 @@ impl AppEngine {
     /// it, and transitions the responder engine to
     /// `link_responder_completed`.
     pub fn link_responder_completed(&mut self, contact_id: &str) -> Option<ScreenModel> {
+        self.engine_cache.remove(&AppScreen::Contacts);
         // Build the summary first so the immutable `self.vauchi` borrow ends
         // before the `&mut self` engine borrow. Link mode assigns no group.
         let summary = self.build_exchange_summary(contact_id, Vec::new());

@@ -21,6 +21,7 @@ use crate::ui::*;
 
 pub(in crate::ui) const RENEW_CLAIM_ACTION: &str = "renew_claim";
 const SCAN_SHARE_ACTION: &str = "scan_share";
+pub(in crate::ui) const CANCEL_TRANSFER_ACTION: &str = "cancel_transfer";
 
 /// Steps in the outgoing recovery workflow.
 #[derive(Clone, Debug, PartialEq)]
@@ -92,6 +93,7 @@ pub struct RecoveryEngine {
     /// intercept after `Vauchi::create_recovery_claim_hex_b64` succeeds.
     generated_claim_b64: Option<String>,
     generated_claim_expired: bool,
+    backup_transfer: crate::ui::HandBackTransfer,
     identity_free_recovery: bool,
     /// Voucher pasted on the CollectVouchers step, read by the AppEngine
     /// intercept when the user presses "add_voucher".
@@ -120,6 +122,7 @@ impl RecoveryEngine {
             old_key_error: None,
             generated_claim_b64: None,
             generated_claim_expired: false,
+            backup_transfer: crate::ui::HandBackTransfer::Idle,
             identity_free_recovery: false,
             voucher_input: String::new(),
             voucher_error: None,
@@ -443,6 +446,25 @@ impl RecoveryEngine {
         }
     }
 
+    fn backup_transfer_status(&self) -> Option<Component> {
+        use crate::ui::HandBackTransfer;
+        let (key, status) = match self.backup_transfer {
+            HandBackTransfer::Idle => return None,
+            HandBackTransfer::InProgress => ("recovery.backup_receiving", Status::InProgress),
+            HandBackTransfer::Finished => ("recovery.backup_received", Status::Success),
+            HandBackTransfer::Failed => ("recovery.backup_failed", Status::Failed),
+        };
+        Some(Component::StatusIndicator {
+            id: "backup_transfer".into(),
+            icon: None,
+            title: self.t(key),
+            detail: None,
+            status,
+            status_label: self.t(status.label_key()),
+            a11y: None,
+        })
+    }
+
     fn build_expired_claim_screen(&self) -> ScreenModel {
         let mut contextual_actions = vec![ScreenAction {
             id: RENEW_CLAIM_ACTION.into(),
@@ -566,12 +588,13 @@ impl RecoveryEngine {
             screen
                 .contextual_actions
                 .retain(|action| action.id != "collect_vouchers");
+            let receiving = self.backup_transfer == crate::ui::HandBackTransfer::InProgress;
             screen.contextual_actions.insert(
                 0,
                 ScreenAction {
                     id: SCAN_SHARE_ACTION.into(),
                     label: self.t("exchange.ble.glance_scan"),
-                    style: if self.restore.is_some() {
+                    style: if self.restore.is_some() || receiving {
                         ActionStyle::Secondary
                     } else {
                         ActionStyle::Primary
@@ -580,6 +603,19 @@ impl RecoveryEngine {
                     a11y: Some(A11y::labeled(self.t("exchange.ble.glance_scan"))),
                 },
             );
+            if receiving {
+                screen.contextual_actions.insert(
+                    0,
+                    ScreenAction {
+                        id: CANCEL_TRANSFER_ACTION.into(),
+                        label: self.t("action.cancel"),
+                        style: ActionStyle::Primary,
+                        enabled: true,
+                        a11y: Some(A11y::labeled(self.t("action.cancel"))),
+                    },
+                );
+            }
+            screen.components.extend(self.backup_transfer_status());
             if self.restore.is_some() {
                 screen.contextual_actions.push(ScreenAction {
                     id: RESTORE_ROW.into(),
@@ -621,6 +657,14 @@ impl WorkflowEngine for RecoveryEngine {
         };
         match update {
             crate::ui::RecoveryUpdate::ClaimGenerated(claim) => self.set_generated_claim(claim),
+            crate::ui::RecoveryUpdate::BackupTransfer(transfer) => self.backup_transfer = transfer,
+            #[cfg(feature = "storage")]
+            crate::ui::RecoveryUpdate::HandBackRestoreReady {
+                handed_back,
+                needs_passphrase,
+            } => self.resume_hand_back_restore(handed_back, needs_passphrase),
+            #[cfg(not(feature = "storage"))]
+            crate::ui::RecoveryUpdate::HandBackRestoreReady { .. } => {}
             #[cfg(feature = "storage")]
             crate::ui::RecoveryUpdate::ClaimRenewalFailed => self.set_load_error(),
             #[cfg(not(feature = "storage"))]

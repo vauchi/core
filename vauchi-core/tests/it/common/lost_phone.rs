@@ -6,7 +6,10 @@
 //! holding her backup, for the same-identity restore (vauchi/private#796,
 //! P32).
 
-use vauchi_core::Vauchi;
+use std::sync::Arc;
+
+use vauchi_core::clock::Clock;
+use vauchi_core::{Contact, ContactCard, Identity, SymmetricKey, Vauchi};
 
 use super::helpers::create_vauchi_with_identity;
 use super::meeting::signing_pk;
@@ -21,12 +24,50 @@ pub struct Lost {
 }
 
 pub fn lost() -> Lost {
+    lost_with_extra_contacts(0)
+}
+
+/// As [`lost`], with `extra` more contacts, so the backup can outgrow one
+/// piece.
+pub fn lost_with_extra_contacts(extra: usize) -> Lost {
     let alice = create_vauchi_with_identity("Alice");
+    add_extra_contacts(&alice, extra);
     let alice_pk = signing_pk(&alice);
-    let dave = add_recipient_from(&alice, &alice_pk, create_vauchi_with_identity("Dave"));
-    let mut guardians: Vec<Recipient> = (0..3)
+    let guardians = (0..3)
         .map(|index| add_recipient(&alice, &alice_pk, &format!("G{index}")))
         .collect();
+    finish_lost(alice, guardians)
+}
+
+/// As [`lost`], with the guardians on `clock`, for tests of their timers.
+pub fn lost_with_guardians_on(clock: &Arc<dyn Clock>) -> Lost {
+    let alice = create_vauchi_with_identity("Alice");
+    let alice_pk = signing_pk(&alice);
+    let guardians = (0..3)
+        .map(|index| {
+            let mut guardian = Vauchi::in_memory_with_clock(Arc::clone(clock)).unwrap();
+            guardian.create_identity(&format!("G{index}")).unwrap();
+            add_recipient_from(&alice, &alice_pk, guardian)
+        })
+        .collect();
+    finish_lost(alice, guardians)
+}
+
+fn add_extra_contacts(alice: &Vauchi, extra: usize) {
+    for index in 0..extra {
+        let contact = Contact::from_exchange(
+            *Identity::create(&format!("C{index}"), 0).signing_public_key(),
+            ContactCard::new(&format!("Contact with a long enough name {index}")),
+            SymmetricKey::generate(),
+            0,
+        );
+        alice.add_contact(contact).unwrap();
+    }
+}
+
+fn finish_lost(alice: Vauchi, mut guardians: Vec<Recipient>) -> Lost {
+    let alice_pk = signing_pk(&alice);
+    let dave = add_recipient_from(&alice, &alice_pk, create_vauchi_with_identity("Dave"));
     for guardian in &guardians {
         alice
             .verify_contact_fingerprint(&guardian.id_at_sharer)

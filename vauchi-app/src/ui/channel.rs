@@ -347,6 +347,11 @@ pub enum RecoveryUpdate {
     ClaimGenerated(String),
     ClaimCreateError(String),
     ClaimRenewalFailed,
+    BackupTransfer(HandBackTransfer),
+    HandBackRestoreReady {
+        handed_back: usize,
+        needs_passphrase: bool,
+    },
     /// The stored proof after a voucher was taken in: each signer's
     /// short key fingerprint, and the threshold the proof needs.
     VouchersCollected {
@@ -378,9 +383,20 @@ pub enum RecoveryUpdate {
 pub enum RecoveryHelpUpdate {
     ClaimScanned(String),
     HandBackReady(String),
+    HandBackTransfer(HandBackTransfer),
     ParsedClaim(super::recovery_help::ParsedClaimSummary),
     ClaimParseError(String),
     VoucherData(String),
+}
+
+/// How a hand-back's Bluetooth transfer stands, on either phone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum HandBackTransfer {
+    #[default]
+    Idle,
+    InProgress,
+    Finished,
+    Failed,
 }
 
 /// Updates for the onboarding engine.
@@ -502,6 +518,8 @@ impl EngineUpdate {
                 RecoveryUpdate::ClaimGenerated(_) => "Recovery::ClaimGenerated",
                 RecoveryUpdate::ClaimCreateError(_) => "Recovery::ClaimCreateError",
                 RecoveryUpdate::ClaimRenewalFailed => "Recovery::ClaimRenewalFailed",
+                RecoveryUpdate::BackupTransfer(_) => "Recovery::BackupTransfer",
+                RecoveryUpdate::HandBackRestoreReady { .. } => "Recovery::HandBackRestoreReady",
                 RecoveryUpdate::VouchersCollected { .. } => "Recovery::VouchersCollected",
                 RecoveryUpdate::VoucherRefused(_) => "Recovery::VoucherRefused",
                 RecoveryUpdate::ProofSubmitted => "Recovery::ProofSubmitted",
@@ -515,6 +533,7 @@ impl EngineUpdate {
             Self::RecoveryHelp(u) => match u {
                 RecoveryHelpUpdate::ClaimScanned(_) => "RecoveryHelp::ClaimScanned",
                 RecoveryHelpUpdate::HandBackReady(_) => "RecoveryHelp::HandBackReady",
+                RecoveryHelpUpdate::HandBackTransfer(_) => "RecoveryHelp::HandBackTransfer",
                 RecoveryHelpUpdate::ParsedClaim(_) => "RecoveryHelp::ParsedClaim",
                 RecoveryHelpUpdate::ClaimParseError(_) => "RecoveryHelp::ClaimParseError",
                 RecoveryHelpUpdate::VoucherData(_) => "RecoveryHelp::VoucherData",

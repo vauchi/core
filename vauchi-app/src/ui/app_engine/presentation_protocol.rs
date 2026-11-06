@@ -226,6 +226,7 @@ impl AppEngine {
         }
         if matches!(event, Event::WakeupFired) {
             self.absorb_applied_content();
+            let link_changed_screen = self.poll_recovery_link();
             let notifications = self.on_wakeup();
             let mut commands = Vec::new();
             super::result_commands::append_result_commands(
@@ -233,7 +234,7 @@ impl AppEngine {
                 &mut commands,
             )
             .map_err(|variant| AppPresentationError::UnresolvedActionResult { variant })?;
-            if self.pending_commands.contains(&Command::ReloadTheme) {
+            if link_changed_screen || self.pending_commands.contains(&Command::ReloadTheme) {
                 let screen = self.current_screen();
                 commands.extend(self.surface_commands(&screen)?);
                 commands.extend(self.reopened_overlay(&commands));

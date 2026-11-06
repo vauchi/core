@@ -38,6 +38,7 @@ pub struct RecoveryTransferSender {
     state: TransferState,
     deadline: Option<u64>,
     retries: u8,
+    keep_link_after_ack: bool,
 }
 
 impl RecoveryTransferSender {
@@ -70,7 +71,15 @@ impl RecoveryTransferSender {
             state: TransferState::Sending,
             deadline: None,
             retries: 0,
+            keep_link_after_ack: false,
         })
+    }
+
+    /// A backup spans several pieces on one link, so a piece that is not the
+    /// last must leave the link up when it is acknowledged.
+    pub fn keeping_link_after_ack(mut self, keep: bool) -> Self {
+        self.keep_link_after_ack = keep;
+        self
     }
 
     /// Capture this at native callback creation. Delivery failure is not success:
@@ -210,6 +219,9 @@ impl RecoveryTransferSender {
         self.state = state;
         self.callback.cancel();
         self.sender.cancel();
+        if state == TransferState::Acknowledged && self.keep_link_after_ack {
+            return Vec::new();
+        }
         vec![Command::BleDisconnect {
             device_id: self.device_id.clone(),
             direction: self.direction,

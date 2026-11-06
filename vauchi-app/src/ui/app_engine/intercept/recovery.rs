@@ -10,6 +10,21 @@
 use super::super::AppEngine;
 use crate::ui::action::ActionResult;
 
+/// A scanned hand-back: the share and the attempt token, base64 and joined by
+/// a dot. Bounded before decoding because the camera's bytes are untrusted.
+fn parse_scanned_hand_back(scanned: &str) -> Option<(Vec<u8>, [u8; 32])> {
+    use base64::Engine as _;
+    const MAX_SCANNED_BYTES: usize = 4096;
+    if scanned.len() > MAX_SCANNED_BYTES {
+        return None;
+    }
+    let codec = base64::engine::general_purpose::STANDARD;
+    let (share, token) = scanned.trim().split_once('.')?;
+    let share = codec.decode(share).ok()?;
+    let token = codec.decode(token).ok()?.try_into().ok()?;
+    Some((share, token))
+}
+
 impl AppEngine {
     /// Intercept the "create_claim" action on the Recovery screen
     /// (EnterOldKey step).
@@ -57,7 +72,18 @@ impl AppEngine {
         };
         match self.vauchi.hand_back_in_person(&claim_input) {
             Ok(hand_back) => {
-                let share = base64::engine::general_purpose::STANDARD.encode(hand_back.share());
+                let codec = base64::engine::general_purpose::STANDARD;
+                let Some(token) = self.begin_hand_back_link(hand_back.backup_pieces()) else {
+                    return ActionResult::ShowAlert {
+                        title: self.t("recovery.hand_back_title"),
+                        message: self.t("recovery.hand_back_refused"),
+                    };
+                };
+                let share = format!(
+                    "{}.{}",
+                    codec.encode(hand_back.share()),
+                    codec.encode(token)
+                );
                 self.engine
                     .apply_update(crate::ui::EngineUpdate::RecoveryHelp(
                         crate::ui::RecoveryHelpUpdate::HandBackReady(share),
@@ -78,11 +104,29 @@ impl AppEngine {
         &mut self,
         scanned: &str,
     ) -> ActionResult {
-        use base64::Engine as _;
-        let taken = base64::engine::general_purpose::STANDARD
-            .decode(scanned.trim())
-            .ok()
-            .and_then(|share| self.vauchi.take_hand_back(&share).ok());
+        let Some((share, token)) = parse_scanned_hand_back(scanned) else {
+            return self.share_refused();
+        };
+        let Ok(share_taken) = self.vauchi.take_hand_back(&share) else {
+            return self.share_refused();
+        };
+        let backup_hash = vauchi_core::sync::guardian_piece::HandBackShare::decode(&share)
+            .map(|decoded| decoded.backup_hash());
+        let whole = backup_hash.as_ref().is_ok_and(|hash| {
+            self.vauchi
+                .storage()
+                .recovery()
+                .backup_piece_progress(hash)
+                .ok()
+                .flatten()
+                .is_some_and(|(received, count)| received >= count)
+        });
+        if whole {
+            self.offer_restore_when_ready();
+        } else if let Ok(hash) = backup_hash {
+            self.begin_share_link(&token, hash);
+        }
+        let taken = Some(share_taken);
         match taken {
             Some(1) => ActionResult::ShowToast {
                 message: self.t("recovery.restore_handed_back_one"),
@@ -98,10 +142,14 @@ impl AppEngine {
                 undo_action_id: None,
                 undo_label: None,
             },
-            None => ActionResult::ShowAlert {
-                title: self.t("recovery.hand_back_title"),
-                message: self.t("recovery.hand_back_share_refused"),
-            },
+            None => self.share_refused(),
+        }
+    }
+
+    fn share_refused(&self) -> ActionResult {
+        ActionResult::ShowAlert {
+            title: self.t("recovery.hand_back_title"),
+            message: self.t("recovery.hand_back_share_refused"),
         }
     }
 

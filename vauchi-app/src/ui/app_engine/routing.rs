@@ -258,6 +258,9 @@ impl AppEngine {
             }
         }
 
+        if let Some(result) = self.route_recovery_link_event(&event) {
+            return Some(result);
+        }
         if let Event::QrScanned { data } = &event
             && self.screen == AppScreen::Recovery
             && !self.vauchi.has_identity()

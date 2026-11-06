@@ -99,8 +99,8 @@ pub use change_password::ChangePasswordEngine;
 pub use channel::{
     BackupFormSnapshot, BackupRecoveryUpdate, ContactDetailUpdate, ContactListUpdate,
     DeviceLinkJoinUpdate, DeviceLinkUpdate, DuressPinSetup, EngineOutput, EngineUpdate, FormInput,
-    GdprChoice, GdprExportUpdate, LinkExchangeUpdate, LinkResponderUpdate, MultiStageUpdate,
-    MyInfoEntryDetailUpdate, OnboardingSnapshot, OnboardingUpdate, PendingBackup,
+    GdprChoice, GdprExportUpdate, HandBackTransfer, LinkExchangeUpdate, LinkResponderUpdate,
+    MultiStageUpdate, MyInfoEntryDetailUpdate, OnboardingSnapshot, OnboardingUpdate, PendingBackup,
     RecoveryHelpUpdate, RecoveryUpdate,
 };
 pub use component::{

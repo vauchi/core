@@ -59,6 +59,7 @@ pub struct ParsedClaimSummary {
 pub struct RecoveryHelpEngine {
     step: HelpStep,
     hand_back_share: Option<String>,
+    hand_back_transfer: crate::ui::HandBackTransfer,
     /// Pasted claim payload (base64). Updated on `TextChanged`.
     claim_input: String,
     /// Validation error to display on the claim input (set by AppEngine
@@ -84,6 +85,7 @@ impl RecoveryHelpEngine {
         Self {
             step: HelpStep::Info,
             hand_back_share: None,
+            hand_back_transfer: crate::ui::HandBackTransfer::Idle,
             claim_input: String::new(),
             claim_error: None,
             parsed_claim: None,
@@ -402,23 +404,44 @@ impl RecoveryHelpEngine {
         actions
     }
 
+    fn hand_back_transfer_status(&self) -> Option<Component> {
+        use crate::ui::HandBackTransfer;
+        let (key, status) = match self.hand_back_transfer {
+            HandBackTransfer::Idle => return None,
+            HandBackTransfer::InProgress => ("recovery.hand_back_sending", Status::InProgress),
+            HandBackTransfer::Finished => ("recovery.hand_back_sent", Status::Success),
+            HandBackTransfer::Failed => ("recovery.hand_back_failed", Status::Failed),
+        };
+        Some(Component::StatusIndicator {
+            id: "hand_back_transfer".into(),
+            icon: None,
+            title: self.t(key),
+            detail: None,
+            status,
+            status_label: self.t(status.label_key()),
+            a11y: None,
+        })
+    }
+
     fn build_show_hand_back_screen(&self) -> ScreenModel {
+        let mut components = vec![Component::QrCode {
+            id: "hand_back_qr".into(),
+            data: self.hand_back_share.clone().unwrap_or_default(),
+            frames: Vec::new(),
+            mode: QrMode::Display,
+            label: Some(self.t("recovery.hand_back_title")),
+            scan_quality: None,
+            placement: None,
+            error_correction: None,
+            size: None,
+            a11y: Some(A11y::labeled(self.t("recovery.hand_back_title"))),
+        }];
+        components.extend(self.hand_back_transfer_status());
         ScreenModel {
             screen_id: "recovery_help".into(),
             title: self.t("recovery.hand_back_title"),
             subtitle: Some(self.t("recovery.hand_back_instruction")),
-            components: vec![Component::QrCode {
-                id: "hand_back_qr".into(),
-                data: self.hand_back_share.clone().unwrap_or_default(),
-                frames: Vec::new(),
-                mode: QrMode::Display,
-                label: Some(self.t("recovery.hand_back_title")),
-                scan_quality: None,
-                placement: None,
-                error_correction: None,
-                size: None,
-                a11y: Some(A11y::labeled(self.t("recovery.hand_back_title"))),
-            }],
+            components,
             contextual_actions: vec![ScreenAction {
                 id: "done".into(),
                 label: self.t("action.done"),
@@ -492,6 +515,9 @@ impl WorkflowEngine for RecoveryHelpEngine {
             return false;
         };
         match update {
+            crate::ui::RecoveryHelpUpdate::HandBackTransfer(transfer) => {
+                self.hand_back_transfer = transfer;
+            }
             crate::ui::RecoveryHelpUpdate::HandBackReady(share) => {
                 self.hand_back_share = Some(share);
                 self.step = HelpStep::ShowHandBack;

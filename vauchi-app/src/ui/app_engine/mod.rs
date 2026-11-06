@@ -63,6 +63,7 @@ mod render_context;
 // `engine`/`screen` fields to drive the persist-at-Complete hook.
 #[cfg(test)]
 mod persist_at_complete_tests;
+mod recovery_link;
 mod responsive_surfaces;
 mod result_commands;
 mod result_routing;
@@ -261,6 +262,7 @@ pub struct AppEngine {
     /// Replaces the `MobileBleExchangeSession` cycle thread; T2.2c
     /// routes BLE events through `forward_ble_hardware_event`.
     ble_handshake_session: Option<ble_handshake::BleHandshakeHolder>,
+    recovery_link: Option<recovery_link::RecoveryLink>,
     /// Set when a BLE hardware event routed into the handshake machine
     /// reached a terminal event (Completed/Failed). Drained by the
     /// platform layer via [`Self::take_pending_presentation_invalidation`]
@@ -589,6 +591,7 @@ impl AppEngine {
             multi_stage_session: None,
             last_good_qr_layout: None,
             ble_handshake_session: None,
+            recovery_link: None,
             pending_ble_terminal_invalidation: false,
             needs_storage_unlock: false,
             held_for_unlock: None,

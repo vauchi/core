@@ -337,8 +337,10 @@ package:sbom:
 
       # Ensure all dist artifacts are world-readable — shell runners may have
       # restrictive umask (0077), producing 0600 files that downstream Docker
-      # jobs can't read.
-      chmod 644 dist/*
+      # jobs can't read. Files only: dist/ also holds directories such as
+      # journey-fixtures/, and a mode without x makes them unreadable and
+      # unremovable, which then fails later jobs at checkout (private#1100).
+      find dist -maxdepth 1 -type f -exec chmod 644 {} +
 
       echo "SBOM generation complete"
   artifacts:

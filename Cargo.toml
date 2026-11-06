@@ -13,7 +13,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.99.1"
+version = "0.100.0"
 edition = "2024"
 rust-version = "1.93"
 license = "AGPL-3.0-or-later"
@@ -21,9 +21,9 @@ repository = "https://gitlab.com/vauchi/core"
 authors = ["Vauchi Contributors"]
 
 [workspace.dependencies]
-vauchi-core = { path = "vauchi-core", version = "0.99.1", default-features = false }
-vauchi-app = { path = "vauchi-app", version = "0.99.1", default-features = false }
-vauchi-protocol = { path = "vauchi-protocol", version = "0.99.1" }
+vauchi-core = { path = "vauchi-core", version = "0.100.0", default-features = false }
+vauchi-app = { path = "vauchi-app", version = "0.100.0", default-features = false }
+vauchi-protocol = { path = "vauchi-protocol", version = "0.100.0" }
 # The shell contract (ADR-078): the Command/Event types, their schema and the
 # fixture corpus; a git tag with a declared range, since there is no registry.
 vauchi-contract = { git = "https://gitlab.com/vauchi/contract.git", tag = "v0.97.2", version = "^0.97" }

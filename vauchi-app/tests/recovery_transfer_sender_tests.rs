@@ -251,3 +251,17 @@ fn recovery_sender_callback_applies_backpressure_and_payload_bounds() {
     assert_eq!(sender.poll(101), Vec::<Command>::new());
     assert_eq!(sender.state(), TransferState::Sending);
 }
+
+// @internal — DC-01: a shell reports an inbound link with no id; a dialled link must name its peer.
+#[test]
+fn only_an_inbound_link_may_have_no_id() {
+    let pieces = split_into_pieces([7; 16], b"encrypted recovery backup").unwrap();
+    let accepts = |peer: &str, direction| {
+        RecoveryTransferSender::new(&pieces[0], 23, peer.into(), direction).is_ok()
+    };
+
+    assert!(accepts("", BleLinkDirection::Inbound));
+    assert!(!accepts("", BleLinkDirection::Outbound));
+    assert!(accepts("peer", BleLinkDirection::Outbound));
+    assert!(!accepts(&"x".repeat(129), BleLinkDirection::Inbound));
+}

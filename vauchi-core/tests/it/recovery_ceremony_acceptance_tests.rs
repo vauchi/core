@@ -30,7 +30,9 @@ mod fixture;
 const SMALLEST_MTU: usize = 23;
 const USUAL_MTU: u32 = 185;
 const GUARDIAN_LINK: &str = "guardian-link";
-const PHONE_LINK: &str = "phone-link";
+// A peripheral cannot name its central on every OS, so shells report inbound
+// links with an empty id, as `linux-hw` does.
+const PHONE_LINK: &str = "";
 
 fn shown_qr(commands: &[Command]) -> Option<String> {
     fn walk(value: &Value) -> Option<String> {

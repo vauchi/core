@@ -241,3 +241,16 @@ fn recovery_receiver_replayed_piece_waits_for_its_final_frame() {
     assert_eq!(commands.len(), 1);
     assert_eq!(receiver.state(), ReceiveState::Receiving);
 }
+
+// @internal — DC-01: a shell reports an inbound link with no id; a dialled link must name its peer.
+#[test]
+fn only_an_inbound_link_may_have_no_id() {
+    let accepts = |peer: &str, direction| {
+        RecoveryTransferReceiver::new([7; 32], peer.into(), direction).is_ok()
+    };
+
+    assert!(accepts("", BleLinkDirection::Inbound));
+    assert!(!accepts("", BleLinkDirection::Outbound));
+    assert!(accepts("peer", BleLinkDirection::Outbound));
+    assert!(!accepts(&"x".repeat(129), BleLinkDirection::Inbound));
+}

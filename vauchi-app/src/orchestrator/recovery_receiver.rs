@@ -40,7 +40,9 @@ impl RecoveryTransferReceiver {
         peer: String,
         direction: BleLinkDirection,
     ) -> Result<Self, TransferError> {
-        if peer.is_empty() || peer.len() > 128 {
+        // As for the sender: an inbound link has an empty id on some OSes.
+        let unnamed_dial = peer.is_empty() && direction == BleLinkDirection::Outbound;
+        if unnamed_dial || peer.len() > 128 {
             return Err(TransferError::State);
         }
         let mut inbox = EventInbox::new(InboxLimits {

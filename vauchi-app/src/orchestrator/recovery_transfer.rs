@@ -52,7 +52,10 @@ impl RecoveryTransferSender {
         device_id: String,
         direction: BleLinkDirection,
     ) -> Result<Self, TransferError> {
-        if device_id.is_empty() || device_id.len() > 128 {
+        // A peripheral cannot name its central on every OS, so an inbound link
+        // has an empty id; only a dialled link must name its peer.
+        let unnamed_dial = device_id.is_empty() && direction == BleLinkDirection::Outbound;
+        if unnamed_dial || device_id.len() > 128 {
             return Err(TransferError::State);
         }
         let sender = HandBackSender::new(piece, mtu)?;

@@ -88,6 +88,7 @@ fn the_trust_shown_follows_the_exchange_and_cannot_be_tapped() {
 }
 
 // @claim: S10
+// @internal
 #[test]
 fn a_link_contact_shows_remote_and_offers_the_fingerprint_comparison() {
     let peer = Identity::create("Dana", 0);

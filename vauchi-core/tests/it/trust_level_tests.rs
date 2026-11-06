@@ -268,18 +268,21 @@ fn link_contact() -> Contact {
 }
 
 // @claim: S10
+// @internal
 #[test]
 fn a_link_contact_is_remote() {
     assert_eq!(link_contact().trust_level(), TrustLevel::Remote);
 }
 
 // @claim: S10
+// @internal
 #[test]
 fn a_qr_contact_stays_standard_not_remote() {
     assert_eq!(make_contact(|_| {}).trust_level(), TrustLevel::Standard);
 }
 
 // @claim: S10
+// @internal
 #[test]
 fn a_fingerprint_comparison_raises_a_link_contact_to_verified() {
     let mut contact = link_contact();
@@ -288,6 +291,7 @@ fn a_fingerprint_comparison_raises_a_link_contact_to_verified() {
 }
 
 // @claim: S10
+// @internal
 #[test]
 fn a_recovered_link_contact_is_cautious() {
     let mut contact = link_contact();
@@ -296,6 +300,7 @@ fn a_recovered_link_contact_is_cautious() {
 }
 
 // @claim: S10
+// @internal
 #[test]
 fn a_proximity_claim_cannot_raise_a_link_contact() {
     let mut legacy = link_contact();
@@ -313,6 +318,7 @@ fn a_proximity_claim_cannot_raise_a_link_contact() {
 }
 
 // @claim: S10
+// @internal
 #[test]
 fn a_remote_contact_cannot_vouch_for_recovery_until_verified() {
     let mut contact = link_contact();
@@ -327,6 +333,7 @@ fn a_remote_contact_cannot_vouch_for_recovery_until_verified() {
 }
 
 // @claim: S10
+// @internal
 #[test]
 fn a_linked_device_sees_the_same_remote_level() {
     let synced = ContactSyncData::from_contact(&link_contact())
@@ -339,6 +346,7 @@ fn a_linked_device_sees_the_same_remote_level() {
 }
 
 // @claim: S10
+// @internal
 #[test]
 fn sync_data_from_a_device_without_the_field_still_reads() {
     let current =

@@ -433,6 +433,7 @@ fn test_mobile_contact_has_fingerprint_field() {
 
 // === Trust level enum projection ===
 
+// @internal
 #[test]
 fn a_remote_contact_reads_as_remote_on_the_phones() {
     assert_eq!(

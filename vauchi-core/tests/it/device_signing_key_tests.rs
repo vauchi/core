@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Each device holds a random signing key the identity seed cannot reach
-//! (ADR-079 step 1, SC-62, vauchi/private#970).
+//! Each device holds a random signing key, not derived from the identity seed
+//! and in no backup (ADR-079 step 1, SC-62, vauchi/private#970).
 
 use rusqlite::params;
 use vauchi_core::api::AuthMode;
@@ -88,6 +88,32 @@ fn a_backup_imported_over_another_identity_takes_a_new_key() {
     wb.import_backup(&backup, "correct horse battery").unwrap();
 
     assert_ne!(public_key_of(wb.storage()), before);
+}
+
+/// The app and its background worker open the same database.
+// @internal
+#[test]
+fn two_connections_racing_to_create_the_key_get_the_same_one() {
+    for _ in 0..20 {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("vauchi.db");
+        let key = SymmetricKey::generate();
+        drop(Storage::open(&path, key.clone()).unwrap());
+        let start = std::sync::Barrier::new(2);
+
+        let (first, second) = std::thread::scope(|scope| {
+            let race = || {
+                let storage = Storage::open(&path, key.clone()).unwrap();
+                start.wait();
+                public_key_of(&storage)
+            };
+            let first = scope.spawn(race);
+            let second = scope.spawn(race);
+            (first.join().unwrap(), second.join().unwrap())
+        });
+
+        assert_eq!(first, second);
+    }
 }
 
 // @internal

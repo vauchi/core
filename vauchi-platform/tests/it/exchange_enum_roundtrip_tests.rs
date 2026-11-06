@@ -219,6 +219,13 @@ fn every_mobile_event() -> Vec<MobileEvent> {
             rssi: -61,
             adv_data: vec![0, 255, 7],
         },
+        MobileEvent::BleMtuNegotiated {
+            device_id: "dev-1".into(),
+            mtu: 247,
+        },
+        MobileEvent::BleGattReady {
+            device_id: "dev-1".into(),
+        },
         MobileEvent::BleConnected {
             device_id: "d1".into(),
             direction: Outbound,
@@ -333,6 +340,8 @@ fn variant_name(event: &MobileEvent) -> &'static str {
         MobileEvent::BleCharacteristicRead { .. } => "BleCharacteristicRead",
         MobileEvent::BleCharacteristicNotified { .. } => "BleCharacteristicNotified",
         MobileEvent::BleDisconnected { .. } => "BleDisconnected",
+        MobileEvent::BleMtuNegotiated { .. } => "BleMtuNegotiated",
+        MobileEvent::BleGattReady { .. } => "BleGattReady",
         MobileEvent::NfcDataReceived { .. } => "NfcDataReceived",
         MobileEvent::NfcApduReceived { .. } => "NfcApduReceived",
         MobileEvent::NfcFailed { .. } => "NfcFailed",
@@ -372,7 +381,7 @@ fn hardware_event_json_carries_every_mobile_event_through_the_canonical_reader()
     let covered: std::collections::BTreeSet<_> = events.iter().map(variant_name).collect();
     assert_eq!(
         covered.len(),
-        34,
+        36,
         "a sample for each MobileEvent variant: {covered:?}"
     );
 
@@ -422,4 +431,32 @@ fn hardware_event_json_writes_the_user_presence_events_the_shells_wrote_by_hand(
     for (event, expected) in cases {
         assert_eq!(vauchi_platform::hardware_event_json(event), expected);
     }
+}
+
+// @internal — P33: without these a phone cannot tell Core its MTU or that its peer subscribed.
+#[test]
+fn a_phone_can_report_its_mtu_and_a_ready_link() {
+    let mtu: vauchi_core::Event = MobileEvent::BleMtuNegotiated {
+        device_id: "AA:BB".into(),
+        mtu: 247,
+    }
+    .into();
+    assert_eq!(
+        mtu,
+        vauchi_core::Event::BleMtuNegotiated {
+            device_id: "AA:BB".into(),
+            mtu: 247,
+        }
+    );
+
+    let ready: vauchi_core::Event = MobileEvent::BleGattReady {
+        device_id: "AA:BB".into(),
+    }
+    .into();
+    assert_eq!(
+        ready,
+        vauchi_core::Event::BleGattReady {
+            device_id: "AA:BB".into(),
+        }
+    );
 }

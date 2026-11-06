@@ -335,6 +335,13 @@ pub enum MobileEvent {
         uuid: String,
         data: Vec<u8>,
     },
+    BleMtuNegotiated {
+        device_id: String,
+        mtu: u32,
+    },
+    BleGattReady {
+        device_id: String,
+    },
     BleDisconnected {
         device_id: String,
         direction: MobileBleLinkDirection,
@@ -470,6 +477,10 @@ impl From<MobileEvent> for Event {
                 uuid,
                 data,
             },
+            MobileEvent::BleMtuNegotiated { device_id, mtu } => {
+                Self::BleMtuNegotiated { device_id, mtu }
+            }
+            MobileEvent::BleGattReady { device_id } => Self::BleGattReady { device_id },
             MobileEvent::BleCharacteristicNotified {
                 device_id,
                 direction,

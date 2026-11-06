@@ -323,8 +323,12 @@ tamarin_diff_expect "$models/mailbox_token.spthy" verified ""
 tamarin_diff_expect "$models/mailbox_token.spthy" falsified "-DSTABLE_TOKEN"
 tamarin_expect "$models/link_exchange.spthy" falsified "" \
     contact_only_after_approval
-tamarin_expect "$models/link_exchange.spthy" verified "-DPIN_CONFIRMED" \
+tamarin_expect "$models/link_exchange.spthy" falsified "-DPIN_CONFIRMED" \
+    contact_only_after_approval
+tamarin_expect "$models/link_exchange.spthy" verified "-DPAKE" \
     executable contact_only_after_approval
+tamarin_expect "$models/link_exchange.spthy" falsified "-DPAKE -DCODE_IN_LINK" \
+    contact_only_after_approval
 fi # wants models
 # The six capped runs took 18 minutes on CI (job 17540297472): extended.
 if wants extended; then

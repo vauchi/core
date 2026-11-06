@@ -19,19 +19,35 @@
  * Run: tamarin-prover --prove link_exchange.spthy
  *   contact_only_after_approval must be FALSIFIED: the first opener,
  *   here the attacker, becomes the sender's contact (#727 as it stands).
- * Owner decision 2026-10-20: tamarin-prover --prove -DPIN_CONFIRMED
- *   link_exchange.spthy  (the sender gives the intended person a PIN over
- *   another channel and finalizes only on proof of it; the lemma must
- *   then be verified — the target for #727's fix)
+ * tamarin-prover --prove -DPIN_CONFIRMED link_exchange.spthy
+ *   The 2026-10-20 design: a hash of a PIN in the deposit. FALSIFIED: a short
+ *   PIN can be tested offline against the hash the attacker sees, which rule
+ *   Offline_guess states. A model without that rule called this design safe.
+ * tamarin-prover --prove -DPAKE link_exchange.spthy
+ *   The owner's design of 2026-11-06 (#727, SC-74): SPAKE2 over a short code,
+ *   its key protecting the opener's identity. VERIFIED, except for the one
+ *   online guess per link the design accepts, which rule Online_guess states.
+ *   The model assumes SPAKE2's messages offer no offline test; it does not
+ *   prove that, and blind/unblind is an abstraction of the primitive.
+ * Prove it can fail: -DPAKE -DCODE_IN_LINK  (the code travels with the link;
+ *   the lemma must be falsified)
  */
 
 theory VauchiLinkExchange
 begin
 
-builtins: diffie-hellman, hashing
+builtins: diffie-hellman, hashing, symmetric-encryption
+
+#ifdef PAKE
+functions: blind/2, unblind/2
+equations: unblind(blind(x, c), c) = x
+#endif
 
 restriction Equality:
   "All x y #i. Eq(x, y) @ i ==> x = y"
+
+restriction One_guess_per_link:
+  "All n #i #j. OneGuess(n) @ i & OneGuess(n) @ j ==> #i = #j"
 
 rule Register:
   [ Fr(~id) ]
@@ -41,13 +57,44 @@ rule Register:
 /* The sender means the link for one person and tells them so out of
    band; under the PIN design that word includes a PIN, which the attacker
    on the link's channel never sees. */
+#ifdef PAKE
+rule Share_link:
+  let link = <'link', blind('g' ^ ~e, ~code), ~nonce>
+  in
+  [ !User($I, id_i), !User($P, id_p), Fr(~e), Fr(~nonce), Fr(~code) ]
+  --[ Shared($I, $P) ]->
+  [ Sender($I, ~e, ~nonce, ~code), Told($P, ~nonce, ~code), !Code(~nonce, ~code), Out(link) ]
+
+#ifdef CODE_IN_LINK
+/* The control: the code reaches the attacker with the link, and no guess is
+   recorded, so the lemma must fail. */
+rule Code_travels_with_link:
+  [ !Code(nonce, code) ]
+  -->
+  [ Out(code) ]
+#endif
+
+/* Whoever holds a link may run the exchange with one guess at its code, and is
+   right about one time in a million. */
+rule Online_guess:
+  [ !Code(nonce, code) ]
+  --[ GuessWon(nonce), OneGuess(nonce) ]->
+  [ Out(code) ]
+#else
 #ifdef PIN_CONFIRMED
 rule Share_link:
   let link = <'link', 'g' ^ ~e, ~nonce>
   in
   [ !User($I, id_i), !User($P, id_p), Fr(~e), Fr(~nonce), Fr(~pin) ]
   --[ Shared($I, $P), PinGiven($I, id_p, ~pin) ]->
-  [ Sender($I, ~e, ~nonce, ~pin), Told($P, ~nonce, ~pin), Out(link) ]
+  [ Sender($I, ~e, ~nonce, ~pin), Told($P, ~nonce, ~pin), !Pin(~pin), Out(link) ]
+
+/* A six-digit PIN is a million hashes: a value that lets an attacker test a
+   guess gives the PIN away, without touching the protocol again. */
+rule Offline_guess:
+  [ !Pin(pin), In(h(<pin, id, fpk, nonce>)) ]
+  --[ OfflineGuess(pin) ]->
+  [ Out(pin) ]
 #else
 rule Share_link:
   let link = <'link', 'g' ^ ~e, ~nonce>
@@ -56,6 +103,7 @@ rule Share_link:
   --[ Shared($I, $P) ]->
   [ Sender($I, ~e, ~nonce), Told($P, ~nonce), Out(link) ]
 #endif
+#endif
 
 /* Whoever holds the link opens it: deposits an ephemeral key and, under
    the PIN design, proof of the PIN bound to the opener's identity and key.
@@ -63,6 +111,14 @@ rule Share_link:
    transit (7 steps): the proof must cover what the sender will store. An
    honest opener is the person the sender told; the attacker opens from
    the channel. */
+#ifdef PAKE
+rule Open_link:
+  let deposit = <'claim', blind('g' ^ ~f, code), senc(id_r, X ^ ~f)>
+  in
+  [ !User($R, id_r), Told($R, nonce, code), In(<'link', blind(X, code), nonce>), Fr(~f) ]
+  --[ Opened($R, nonce), ContactR($R, id_r, X) ]->
+  [ Out(deposit) ]
+#else
 #ifdef PIN_CONFIRMED
 rule Open_link:
   let deposit = <'claim', id_r, 'g' ^ ~f, h(<pin, id_r, 'g' ^ ~f, nonce>)>
@@ -78,9 +134,16 @@ rule Open_link:
   --[ Opened($R, nonce), ContactR($R, id_r, epk) ]->
   [ Out(deposit) ]
 #endif
+#endif
 
 /* The sender retrieves the deposit and finalizes: the opener's identity
    becomes a contact. */
+#ifdef PAKE
+rule Finalize:
+  [ Sender($I, e, nonce, code), !User($I, id_i), In(<'claim', blind(Y, code), senc(id_r, Y ^ e)>) ]
+  --[ ContactAdded($I, id_i, id_r), ContactVia($I, id_r, nonce) ]->
+  [ ]
+#else
 #ifdef PIN_CONFIRMED
 rule Finalize:
   [ Sender($I, e, nonce, pin), !User($I, id_i), In(<'claim', id_r, fpk, proof>) ]
@@ -92,6 +155,7 @@ rule Finalize:
   --[ ContactAdded($I, id_i, id_r) ]->
   [ ]
 #endif
+#endif
 
 lemma executable:
   exists-trace
@@ -100,9 +164,17 @@ lemma executable:
 
 /* The sender's new contact is the person the sender meant the link for. */
 // @claim: S9
+#ifdef PAKE
+lemma contact_only_after_approval:
+  "All I idi idr n #c #v.
+     ContactAdded(I, idi, idr) @ c & ContactVia(I, idr, n) @ v
+     ==> (Ex P #s #r. Shared(I, P) @ s & Registered(P, idr) @ r)
+         | (Ex #g. GuessWon(n) @ g)"
+#else
 lemma contact_only_after_approval:
   "All I idi idr #c.
      ContactAdded(I, idi, idr) @ c
      ==> Ex P #s #r. Shared(I, P) @ s & Registered(P, idr) @ r"
+#endif
 
 end

@@ -11,7 +11,6 @@ description = "App-layer modules for Vauchi — themes, UI, content, i18n, help"
 
 [dependencies]
 vauchi-core = { workspace = true, default-features = false }
-vauchi-contract.workspace = true
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"

@@ -4124,7 +4124,6 @@ dependencies = [
  "tokio",
  "tracing",
  "ureq",
- "vauchi-contract",
  "vauchi-core",
  "zeroize",
 ]

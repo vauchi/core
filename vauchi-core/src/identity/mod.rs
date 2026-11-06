@@ -21,7 +21,8 @@ pub mod password_config;
 pub use backup::IdentityBackup;
 pub use device::{
     BroadcastDevice, DeviceError, DeviceInfo, DeviceRegistry, DeviceType, MAX_DEVICES,
-    RegisteredDevice, RegistryBroadcast, check_identity_collision, classify_device_type,
+    PinnedDeviceKeys, RegisteredDevice, RegistryBroadcast, check_identity_collision,
+    classify_device_type,
 };
 
 use crate::crypto::X3DHKeyPair;

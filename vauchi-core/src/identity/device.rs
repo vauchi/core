@@ -531,6 +531,26 @@ pub struct RegistryBroadcast {
     device_signature: Option<Vec<u8>>,
 }
 
+/// Every device key a contact has seen for one identity.
+///
+/// Grow-only: a pin outlives the device leaving the registry, otherwise a seed
+/// holder removes a device and adds it back under its own key (ADR-079).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PinnedDeviceKeys {
+    keys: std::collections::BTreeMap<[u8; 32], [u8; 32]>,
+}
+
+impl PinnedDeviceKeys {
+    /// Pins the keys a broadcast names, keeping any pin already held.
+    pub fn remember(&mut self, broadcast: &RegistryBroadcast) {
+        for device in &broadcast.active_devices {
+            if let Some(key) = device.signing_public_key {
+                self.keys.entry(device.device_id).or_insert(key);
+            }
+        }
+    }
+}
+
 /// A device entry in the broadcast (minimal info for contacts).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BroadcastDevice {
@@ -638,16 +658,13 @@ impl RegistryBroadcast {
     pub fn verify_against_pinned(
         &self,
         identity_key: &crate::crypto::PublicKey,
-        held: &RegistryBroadcast,
+        pins: &PinnedDeviceKeys,
     ) -> Result<(), DeviceError> {
         self.verify_device_signed(identity_key)?;
         for device in &self.active_devices {
-            let pinned = held
-                .active_devices
-                .iter()
-                .find(|known| known.device_id == device.device_id)
-                .and_then(|known| known.signing_public_key);
-            if pinned.is_some() && pinned != device.signing_public_key {
+            if let Some(pinned) = pins.keys.get(&device.device_id)
+                && Some(*pinned) != device.signing_public_key
+            {
                 return Err(DeviceError::DeviceKeyChanged);
             }
         }

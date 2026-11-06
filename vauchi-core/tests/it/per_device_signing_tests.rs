@@ -10,9 +10,17 @@
 
 use crate::common::device_sync::create_test_device;
 use vauchi_core::crypto::SigningKeyPair;
-use vauchi_core::identity::{DeviceError, DeviceRegistry, RegistryBroadcast};
+use vauchi_core::identity::{DeviceError, DeviceRegistry, PinnedDeviceKeys, RegistryBroadcast};
 
 const NOW: u64 = 1_000;
+
+fn pins_after(seen: &[&RegistryBroadcast]) -> PinnedDeviceKeys {
+    let mut pins = PinnedDeviceKeys::default();
+    for broadcast in seen {
+        pins.remember(broadcast);
+    }
+    pins
+}
 
 struct Fixture {
     seed: [u8; 32],
@@ -127,7 +135,54 @@ fn rewriting_another_devices_key_with_the_seed_is_refused_by_the_pin() {
         "without a pin the seed holder's rewrite verifies, which is why the pin exists"
     );
     assert_eq!(
-        forged.verify_against_pinned(&f.identity_key.public_key(), &held),
+        forged.verify_against_pinned(&f.identity_key.public_key(), &pins_after(&[&held])),
+        Err(DeviceError::DeviceKeyChanged)
+    );
+}
+
+// The seed holder drops B from the registry, then adds B back under its own key:
+// a pin that lives only in the last broadcast has forgotten B by then.
+// @internal
+#[test]
+fn removing_a_device_and_adding_it_back_cannot_change_its_pinned_key() {
+    let f = two_devices();
+    let first =
+        RegistryBroadcast::signed_by_device(&f.registry, &f.identity_key, f.id_a, &f.key_a, NOW);
+    let without_b = DeviceRegistry::new(
+        create_test_device(&f.seed, 0, "A")
+            .to_registered(&f.seed)
+            .with_signing_key(public_bytes(&f.key_a)),
+        &f.identity_key,
+    );
+    let held_after_removal =
+        RegistryBroadcast::signed_by_device(&without_b, &f.identity_key, f.id_a, &f.key_a, NOW);
+    assert_eq!(
+        held_after_removal
+            .verify_against_pinned(&f.identity_key.public_key(), &pins_after(&[&first])),
+        Ok(())
+    );
+    let mut b_again = DeviceRegistry::new(
+        create_test_device(&f.seed, 0, "A")
+            .to_registered(&f.seed)
+            .with_signing_key(public_bytes(&f.key_a)),
+        &f.identity_key,
+    );
+    b_again
+        .add_device(
+            create_test_device(&f.seed, 1, "B")
+                .to_registered(&f.seed)
+                .with_signing_key(public_bytes(&f.key_a)),
+            &f.identity_key,
+        )
+        .unwrap();
+    let forged =
+        RegistryBroadcast::signed_by_device(&b_again, &f.identity_key, f.id_b, &f.key_a, NOW);
+
+    assert_eq!(
+        forged.verify_against_pinned(
+            &f.identity_key.public_key(),
+            &pins_after(&[&first, &held_after_removal])
+        ),
         Err(DeviceError::DeviceKeyChanged)
     );
 }
@@ -148,11 +203,11 @@ fn revoking_one_device_invalidates_only_that_devices_signatures() {
         RegistryBroadcast::signed_by_device(&f.registry, &f.identity_key, f.id_a, &f.key_a, NOW);
 
     assert_eq!(
-        by_revoked.verify_against_pinned(&f.identity_key.public_key(), &held),
+        by_revoked.verify_against_pinned(&f.identity_key.public_key(), &pins_after(&[&held])),
         Err(DeviceError::SignerNotActive)
     );
     assert_eq!(
-        by_remaining.verify_against_pinned(&f.identity_key.public_key(), &held),
+        by_remaining.verify_against_pinned(&f.identity_key.public_key(), &pins_after(&[&held])),
         Ok(())
     );
 }
@@ -214,7 +269,7 @@ fn a_seed_holder_can_still_mint_a_new_device_of_its_own() {
     );
 
     assert_eq!(
-        by_attacker.verify_against_pinned(&f.identity_key.public_key(), &held),
+        by_attacker.verify_against_pinned(&f.identity_key.public_key(), &pins_after(&[&held])),
         Ok(())
     );
 }

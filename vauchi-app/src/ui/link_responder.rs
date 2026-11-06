@@ -5,8 +5,9 @@
 //! Engine for the post-grant link-mode responder flow.
 //!
 //! Renders the responder screens for the engine-owned `LinkResponder`
-//! state machine (in `vauchi-platform`): a waiting screen while
-//! Polling/Retrieving, then a terminal completed / failed screen. The
+//! state machine (in `vauchi-platform`): a screen asking for the code the
+//! sender passed on another way (#727), a waiting screen while the exchange
+//! runs, then a terminal completed / failed screen. The
 //! engine is a humble object — it forwards a `cancel` user action via
 //! `was_cancelled` and exposes `transition_to_completed` /
 //! `transition_to_failed` for the platform layer to drive on terminal
@@ -27,6 +28,13 @@ use vauchi_core::exchange::link_mode::DeepLinkPayload;
 pub const ACTION_CANCEL: &str = "cancel";
 /// Action id for the Done button on the terminal screens.
 pub const ACTION_DONE: &str = "done";
+/// Submits the typed code; the app engine intercepts it and starts the exchange.
+pub const ACTION_CONFIRM_CODE: &str = "confirm_code";
+/// Text input on the code screen.
+pub const LINK_CODE_INPUT_ID: &str = "link_code_input";
+/// Fits `123 456`; [`vauchi_core::exchange::link_pake::LinkCode::parse`] decides
+/// what is valid.
+const LINK_CODE_INPUT_MAX_LENGTH: usize = 7;
 
 /// Terminal outcome of the responder flow. `None` while waiting.
 #[derive(Clone, Debug)]
@@ -35,7 +43,7 @@ enum ResponderTerminal {
     Completed,
     /// The flow failed. `reason` is the stable `LinkResponder` failure
     /// id (`polling_timed_out` / `deposit_rejected` / `link_already_used` /
-    /// `decrypt_error` / `cancelled`).
+    /// `handshake_failed` / `decrypt_error` / `cancelled`).
     Failed { reason: String },
 }
 
@@ -43,6 +51,12 @@ enum ResponderTerminal {
 #[derive(Clone, Debug)]
 pub struct LinkResponderEngine {
     payload: DeepLinkPayload,
+    /// The code as typed so far; re-rendered into the input.
+    typed_code: String,
+    code_invalid: bool,
+    /// Nothing reaches the relay before this, so opening a link and not
+    /// entering a code uses nothing up.
+    code_accepted: bool,
     cancelled: bool,
     terminal: Option<ResponderTerminal>,
     /// Rich success-screen content, attached by the responder lifecycle
@@ -58,6 +72,9 @@ impl LinkResponderEngine {
     pub fn new(payload: DeepLinkPayload) -> Self {
         Self {
             payload,
+            typed_code: String::new(),
+            code_invalid: false,
+            code_accepted: false,
             cancelled: false,
             terminal: None,
             success_summary: None,
@@ -114,9 +131,57 @@ impl LinkResponderEngine {
 
     fn build_screen(&self) -> ScreenModel {
         match &self.terminal {
-            None => self.build_waiting_screen(),
+            None if self.code_accepted => self.build_waiting_screen(),
+            None => self.build_code_screen(),
             Some(ResponderTerminal::Completed) => self.build_completed_screen(),
             Some(ResponderTerminal::Failed { reason }) => self.build_failed_screen(reason),
+        }
+    }
+
+    fn build_code_screen(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "link_responder_code".into(),
+            title: self.t("link_responder.code_title"),
+            subtitle: Some(self.t("link_responder.code_subtitle")),
+            components: vec![
+                Component::TextInput {
+                    id: LINK_CODE_INPUT_ID.into(),
+                    label: self.t("link_responder.code_label"),
+                    value: self.typed_code.clone(),
+                    placeholder: None,
+                    max_length: Some(LINK_CODE_INPUT_MAX_LENGTH),
+                    validation_error: self
+                        .code_invalid
+                        .then(|| self.t("link_responder.code_invalid")),
+                    input_type: InputType::Text,
+                    a11y: None,
+                    info_key: None,
+                },
+                Component::Text {
+                    id: "code_one_try".into(),
+                    content: self.t("link_responder.code_one_try"),
+                    style: TextStyle::Caption,
+                    a11y: None,
+                },
+            ],
+            contextual_actions: vec![
+                ScreenAction {
+                    id: ACTION_CONFIRM_CODE.into(),
+                    label: self.t("action.continue"),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: None,
+                },
+                ScreenAction {
+                    id: ACTION_CANCEL.into(),
+                    label: self.t("action.cancel"),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: None,
+                },
+            ],
+            progress: None,
+            ..Default::default()
         }
     }
 
@@ -243,6 +308,12 @@ impl WorkflowEngine for LinkResponderEngine {
             return false;
         };
         match update {
+            crate::ui::LinkResponderUpdate::CodeAccepted => {
+                self.typed_code.clear();
+                self.code_invalid = false;
+                self.code_accepted = true;
+            }
+            crate::ui::LinkResponderUpdate::CodeInvalid => self.code_invalid = true,
             crate::ui::LinkResponderUpdate::Completed(summary) => {
                 self.set_success_summary(summary);
                 self.transition_to_completed();
@@ -278,6 +349,14 @@ impl WorkflowEngine for LinkResponderEngine {
             UserAction::ActionPressed { action_id } if action_id == ACTION_CANCEL => {
                 self.cancelled = true;
                 ActionResult::Complete
+            }
+            UserAction::TextChanged {
+                component_id,
+                value,
+            } if component_id == LINK_CODE_INPUT_ID && !self.code_accepted => {
+                self.typed_code = value;
+                self.code_invalid = false;
+                ActionResult::UpdateScreen(self.build_screen())
             }
             _ => ActionResult::UpdateScreen(self.build_screen()),
         }

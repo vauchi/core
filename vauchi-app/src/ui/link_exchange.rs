@@ -26,6 +26,7 @@ use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 use vauchi_core::Command;
 use vauchi_core::Event;
+use vauchi_core::exchange::link_pake::LinkCode;
 
 /// Action id for the Share button on the share-url screen.
 pub const ACTION_SHARE: &str = "share";
@@ -74,6 +75,9 @@ pub struct LinkExchangeEngine {
     /// lifecycle builds the `LinkInitiatorSession` and calls
     /// `set_share_url`.
     share_url: String,
+    /// The code to send another way than the link (#727). Stays on screen
+    /// after sharing, which is when the person sends it.
+    code: Option<LinkCode>,
     /// The peer's link as typed so far; re-rendered into the input.
     peer_link: String,
     cancelled: bool,
@@ -100,6 +104,7 @@ impl LinkExchangeEngine {
         Self {
             state: InitiatorScreen::ShareUrl,
             share_url: String::new(),
+            code: None,
             peer_link: String::new(),
             cancelled: false,
             success_summary: None,
@@ -139,6 +144,35 @@ impl LinkExchangeEngine {
             return;
         }
         self.share_url = url;
+    }
+
+    /// Set the code the share and waiting screens show. Inert once cancelled
+    /// or terminal, like [`Self::set_share_url`].
+    pub fn set_code(&mut self, code: LinkCode) {
+        if self.cancelled || self.state.is_terminal() {
+            return;
+        }
+        self.code = Some(code);
+    }
+
+    fn code_components(&self) -> Vec<Component> {
+        let Some(code) = &self.code else {
+            return Vec::new();
+        };
+        vec![
+            Component::Text {
+                id: "link_code".into(),
+                content: code.grouped(),
+                style: TextStyle::Title,
+                a11y: Some(A11y::labeled(self.t("link_exchange.code_label"))),
+            },
+            Component::Text {
+                id: "link_code_hint".into(),
+                content: self.t("link_exchange.code_hint"),
+                style: TextStyle::Caption,
+                a11y: None,
+            },
+        ]
     }
 
     /// Transition to the waiting screen. Inert once cancelled or terminal.
@@ -189,38 +223,38 @@ impl LinkExchangeEngine {
     }
 
     fn build_share_url_screen(&self) -> ScreenModel {
+        let mut components = vec![Component::Text {
+            id: "link_url".into(),
+            content: self.share_url.clone(),
+            style: TextStyle::Body,
+            // The URL carries a public key. Rendering it is necessary
+            // — the user has to share it — but reciting 43 characters
+            // of base64 to everyone in earshot is not, and
+            // `logging-rules.md` already forbids the same material
+            // reaching a log.
+            a11y: Some(A11y {
+                label: Some(self.t("link_exchange.share_link_a11y")),
+                hint: Some(self.t("link_exchange.share_link_a11y_hint")),
+                role: None,
+            }),
+        }];
+        components.extend(self.code_components());
+        components.push(Component::TextInput {
+            id: PEER_LINK_INPUT_ID.into(),
+            label: self.t("link_exchange.peer_link_label"),
+            value: self.peer_link.clone(),
+            placeholder: Some(self.t("link_exchange.peer_link_placeholder")),
+            max_length: None,
+            validation_error: None,
+            input_type: InputType::Text,
+            a11y: None,
+            info_key: None,
+        });
         ScreenModel {
             screen_id: "exchange_share_url".into(),
             title: self.t("link_exchange.share_link_title"),
             subtitle: Some(self.t("link_exchange.share_link_subtitle")),
-            components: vec![
-                Component::Text {
-                    id: "link_url".into(),
-                    content: self.share_url.clone(),
-                    style: TextStyle::Body,
-                    // The URL carries a public key. Rendering it is necessary
-                    // — the user has to share it — but reciting 43 characters
-                    // of base64 to everyone in earshot is not, and
-                    // `logging-rules.md` already forbids the same material
-                    // reaching a log.
-                    a11y: Some(A11y {
-                        label: Some(self.t("link_exchange.share_link_a11y")),
-                        hint: Some(self.t("link_exchange.share_link_a11y_hint")),
-                        role: None,
-                    }),
-                },
-                Component::TextInput {
-                    id: PEER_LINK_INPUT_ID.into(),
-                    label: self.t("link_exchange.peer_link_label"),
-                    value: self.peer_link.clone(),
-                    placeholder: Some(self.t("link_exchange.peer_link_placeholder")),
-                    max_length: None,
-                    validation_error: None,
-                    input_type: InputType::Text,
-                    a11y: None,
-                    info_key: None,
-                },
-            ],
+            components,
             contextual_actions: vec![
                 ScreenAction {
                     id: ACTION_SHARE.into(),
@@ -249,23 +283,25 @@ impl LinkExchangeEngine {
     }
 
     fn build_waiting_screen(&self) -> ScreenModel {
+        let mut components = vec![Component::StatusIndicator {
+            id: "waiting_status".into(),
+            icon: None,
+            title: self.t("link_exchange.waiting_status"),
+            detail: Some(self.t("link_exchange.waiting_detail")),
+            status: Status::InProgress,
+            status_label: self.t(Status::InProgress.label_key()),
+            a11y: Some(A11y {
+                label: Some(self.t("link_exchange.waiting_a11y")),
+                hint: Some(self.t("link_exchange.waiting_a11y_hint")),
+                role: None,
+            }),
+        }];
+        components.extend(self.code_components());
         ScreenModel {
             screen_id: "exchange_link_waiting".into(),
             title: self.t("link_exchange.waiting_title"),
             subtitle: Some(self.t("link_exchange.waiting_subtitle")),
-            components: vec![Component::StatusIndicator {
-                id: "waiting_status".into(),
-                icon: None,
-                title: self.t("link_exchange.waiting_status"),
-                detail: Some(self.t("link_exchange.waiting_detail")),
-                status: Status::InProgress,
-                status_label: self.t(Status::InProgress.label_key()),
-                a11y: Some(A11y {
-                    label: Some(self.t("link_exchange.waiting_a11y")),
-                    hint: Some(self.t("link_exchange.waiting_a11y_hint")),
-                    role: None,
-                }),
-            }],
+            components,
             contextual_actions: vec![ScreenAction {
                 id: ACTION_CANCEL.into(),
                 label: self.t("action.cancel"),
@@ -405,6 +441,7 @@ impl WorkflowEngine for LinkExchangeEngine {
         };
         match update {
             U::ShareUrl(url) => self.set_share_url(url),
+            U::Code(code) => self.set_code(code),
             U::Waiting => self.transition_to_waiting(),
             U::Retrieving => self.transition_to_retrieving(),
             U::Succeeded(summary) => {

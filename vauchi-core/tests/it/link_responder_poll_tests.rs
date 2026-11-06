@@ -14,13 +14,19 @@
 //! The responder's escrow `card_key` is symmetric (escrow.rs), so the
 //! peer blob the success test replays is the responder's own card deposit
 //! captured off the mock — the only key-free way to mint a decryptable
-//! blob now that the session keys are encapsulated. Poll 1 holds the gate
-//! half-full (so the deposit can be captured); poll 2 returns `Count{2}`
+//! blob now that the session keys are encapsulated. Poll 1 holds the handshake
+//! gate half-full; poll 2 fills it and returns the sender's deposit, which
+//! gives the keys and the card deposit to capture; poll 3 returns `Count{2}`
 //! and the blob, and the Ready cascades through the Retrieve in one tick.
 
 #![cfg(all(feature = "network-http", feature = "storage"))]
 
-use vauchi_app::ui::{AppEngine, AppScreen, UserAction, WorkflowEngine};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use vauchi_app::ui::{
+    AppEngine, AppScreen, LINK_RESPONDER_ACTION_CONFIRM_CODE, LINK_RESPONDER_CODE_INPUT_ID,
+    UserAction, WorkflowEngine,
+};
+use vauchi_core::Command;
 use vauchi_core::api::VauchiConfig;
 use vauchi_core::api::vauchi::VauchiBuilder;
 use vauchi_core::exchange::link_mode::{initiator_generate, parse_exchange_deep_link};
@@ -50,10 +56,11 @@ fn onboarded_engine_at(mock: &MockRelay) -> (AppEngine, tempfile::TempDir) {
     (engine, dir)
 }
 
-/// Navigate to the consent gate for a fresh link URL and grant it, landing
-/// on the responder waiting screen.
-fn grant_into_responder(engine: &mut AppEngine) {
-    let (init, _) = initiator_generate();
+/// Navigate to the consent gate for a fresh link URL, grant it, and type the
+/// code, landing on the responder waiting screen. Returns the sender's deposit
+/// in the handshake gate, as the relay would hand it over.
+fn grant_into_responder(engine: &mut AppEngine) -> String {
+    let (init, presence) = initiator_generate();
     let payload = parse_exchange_deep_link(&init.url).expect("parse deep link");
     engine.navigate_to(AppScreen::DeepLinkConsent { payload });
     let _ = engine.handle_action(UserAction::ActionPressed {
@@ -61,13 +68,42 @@ fn grant_into_responder(engine: &mut AppEngine) {
     });
     assert_eq!(
         engine.current_screen().screen_id,
-        "link_responder_waiting",
-        "grant must land on the responder waiting screen"
+        "link_responder_code",
+        "grant must ask for the code"
     );
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: LINK_RESPONDER_CODE_INPUT_ID.to_string(),
+        value: init.code.as_str().to_string(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: LINK_RESPONDER_ACTION_CONFIRM_CODE.to_string(),
+    });
+    assert_eq!(
+        engine.current_screen().screen_id,
+        "link_responder_waiting",
+        "a well-formed code must land on the responder waiting screen"
+    );
+    match &presence[0] {
+        Command::RelayEscrowDeposit { encrypted_card, .. } => {
+            URL_SAFE_NO_PAD.encode(encrypted_card)
+        }
+        other => panic!("expected the presence deposit, got {other:?}"),
+    }
+}
+
+/// Polls through the handshake: a half-full gate first, then the gate fills
+/// and the relay hands over the sender's deposit. Leaves the keys derived, the
+/// card deposited and the escrow gate half-full.
+fn run_handshake(mock: &MockRelay, engine: &mut AppEngine, presence: String) {
+    engine.poll_notifications();
+    mock.queue("escrow", canned(&EscrowResponse::Count { count: 2 }));
+    mock.queue("escrow", canned(&EscrowResponse::Blob { blob: presence }));
+    engine.poll_notifications();
 }
 
 /// The blob of the `n`-th `Put` the engine has sent to the mock so far.
-/// Deposit 0 is the handshake (epk); deposit 1 is the encrypted card.
+/// Deposit 0 is the handshake (epk and PAKE message); deposit 1 is the
+/// encrypted card.
 fn nth_put_blob(mock: &MockRelay, n: usize) -> String {
     let puts: Vec<String> = mock
         .received()
@@ -96,18 +132,18 @@ fn poll_drives_retrieve_then_rejects_a_self_bootstrap() {
     // A genuine two-party persist (different identities) is covered by
     // `complete_link_exchange_tests` + `link_two_party_exchange_tests`.
     let mock = MockRelay::start();
-    // Poll 1: deposits + Check all see a half-full gate → stays Polling.
+    // Every deposit and Check sees a half-full gate unless queued otherwise.
     mock.set_default(canned(&EscrowResponse::Count { count: 1 }));
 
     let (mut engine, _dir) = onboarded_engine_at(&mock);
-    grant_into_responder(&mut engine);
+    let presence = grant_into_responder(&mut engine);
     assert_contact_count(engine.vauchi(), 0);
 
-    engine.poll_notifications();
+    run_handshake(&mock, &mut engine, presence);
     assert_eq!(engine.current_screen().screen_id, "link_responder_waiting");
 
     // Replay the responder's own card deposit as the peer blob (symmetric
-    // card_key → it decrypts). Queue the ready sequence for poll 2: the
+    // card_key → it decrypts). Queue the ready sequence for the next poll: the
     // active Check sees both slots, then the Retrieve fetches the blob.
     let card_blob = nth_put_blob(&mock, 1);
     mock.queue("escrow", canned(&EscrowResponse::Count { count: 2 }));
@@ -160,9 +196,9 @@ fn poll_drives_to_failed_on_undecryptable_blob() {
     mock.set_default(canned(&EscrowResponse::Count { count: 1 }));
 
     let (mut engine, _dir) = onboarded_engine_at(&mock);
-    grant_into_responder(&mut engine);
+    let presence = grant_into_responder(&mut engine);
 
-    engine.poll_notifications();
+    run_handshake(&mock, &mut engine, presence);
     mock.queue("escrow", canned(&EscrowResponse::Count { count: 2 }));
     mock.queue(
         "escrow",

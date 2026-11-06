@@ -98,7 +98,10 @@ fn link_responder_waiting_badge_is_catalog_resolved() {
     let waiting_badge = |locale: Locale| {
         let (init, _) = initiator_generate();
         let payload = parse_exchange_deep_link(&init.url).expect("canonical URL parses");
-        let engine = LinkResponderEngine::new(payload).with_locale(locale);
+        let mut engine = LinkResponderEngine::new(payload).with_locale(locale);
+        engine.apply_update(vauchi_app::ui::EngineUpdate::LinkResponder(
+            vauchi_app::ui::LinkResponderUpdate::CodeAccepted,
+        ));
         engine
             .current_screen()
             .components

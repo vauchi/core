@@ -322,7 +322,7 @@ pub(crate) fn compute_link_exchange() -> LinkExchangeVector {
     let initiator = X3DHKeyPair::from_bytes(seed(0x71));
     let responder = X3DHKeyPair::from_bytes(seed(0x72));
     let url = format!(
-        "https://vauchi.app/x#pk={}&n={}",
+        "https://vauchi.app/x#pk={}&n={}&v=2",
         base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(initiator.public_key()),
         base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(nonce),
     );

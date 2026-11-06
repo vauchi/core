@@ -5,9 +5,10 @@
 //! Link-mode responder lifecycle on `AppEngine`.
 //!
 //! While the active screen is `AppScreen::DeepLinkResponder` (a link whose
-//! consent was granted), the engine holds a Core
-//! [`LinkExchange`](vauchi_core::api::LinkExchange) accepted with
-//! `Vauchi::accept_link_exchange_payload` and advances it on each heartbeat
+//! consent was granted), the person first types the code the sender passed on
+//! another way. Only then does the engine hold a Core
+//! [`LinkExchange`](vauchi_core::api::LinkExchange), accepted with
+//! `Vauchi::accept_link_exchange_payload`, and advance it on each heartbeat
 //! with `Vauchi::advance_link_exchange`, which runs the relay escrow and
 //! completes the contact (ADR-049, ADR-050 T5b). The engine only maps the
 //! outcome to `link_responder_completed` or `link_responder_failed`. The
@@ -52,26 +53,91 @@ impl AppEngine {
             .then(|| self.engine.current_screen())
     }
 
-    /// Accept / drop the responder exchange as navigation enters or leaves
+    /// Drop the responder exchange as navigation leaves
     /// `AppScreen::DeepLinkResponder`. Called from `navigate_to_internal`.
     pub(super) fn sync_link_responder_lifecycle(&mut self, old: &AppScreen, new: &AppScreen) {
         let was = matches!(old, AppScreen::DeepLinkResponder { .. });
         let is = matches!(new, AppScreen::DeepLinkResponder { .. });
         #[cfg(all(feature = "network-http", feature = "storage"))]
-        match (was, is) {
-            (true, false) => self.link_responder = None,
-            (false, true) => {
-                if let AppScreen::DeepLinkResponder { payload } = new {
-                    // No identity or a key-derive failure leaves the screen
-                    // on its waiting state; both are rare and non-fatal here.
-                    self.link_responder = self.vauchi.accept_link_exchange_payload(payload).ok();
-                    self.reschedule_wakeup_for_new_session();
-                }
-            }
-            _ => {}
+        if was && !is {
+            self.link_responder = None;
         }
         #[cfg(not(all(feature = "network-http", feature = "storage")))]
         let _ = (was, is);
+    }
+
+    /// A code submitted on the responder's code screen: a well-formed one
+    /// starts the exchange, anything else asks again and sends nothing. Reads
+    /// the typed value from the rendered screen, which has the input only while
+    /// the code is still owed.
+    pub(super) fn intercept_link_code(
+        &mut self,
+        action: &crate::ui::UserAction,
+    ) -> Option<ActionResult> {
+        use crate::ui::link_responder::{ACTION_CONFIRM_CODE, LINK_CODE_INPUT_ID};
+        use crate::ui::{EngineUpdate, LinkResponderUpdate, UserAction};
+
+        let AppScreen::DeepLinkResponder { payload } = self.current_app_screen() else {
+            return None;
+        };
+        let requested = match action {
+            UserAction::ActionPressed { action_id } => action_id == ACTION_CONFIRM_CODE,
+            UserAction::TextSubmitted { component_id } => component_id == LINK_CODE_INPUT_ID,
+            _ => false,
+        };
+        if !requested {
+            return None;
+        }
+        let payload = payload.clone();
+        let typed = self
+            .engine
+            .current_screen()
+            .components
+            .iter()
+            .find_map(|c| match c {
+                crate::ui::Component::TextInput { id, value, .. } if id == LINK_CODE_INPUT_ID => {
+                    Some(zeroize::Zeroizing::new(value.clone()))
+                }
+                _ => None,
+            })?;
+        let update = match vauchi_core::exchange::link_pake::LinkCode::parse(&typed) {
+            Ok(code) => {
+                self.start_link_responder(&payload, &code);
+                LinkResponderUpdate::CodeAccepted
+            }
+            Err(_) => LinkResponderUpdate::CodeInvalid,
+        };
+        let _ = self
+            .engine
+            .apply_update(EngineUpdate::LinkResponder(update));
+        Some(ActionResult::UpdateScreen(self.engine.current_screen()))
+    }
+
+    #[cfg(all(feature = "network-http", feature = "storage"))]
+    fn start_link_responder(
+        &mut self,
+        payload: &vauchi_core::exchange::link_mode::DeepLinkPayload,
+        code: &vauchi_core::exchange::link_pake::LinkCode,
+    ) {
+        match self.vauchi.accept_link_exchange_payload(payload, code) {
+            Ok(exchange) => {
+                self.link_responder = Some(exchange);
+                self.reschedule_wakeup_for_new_session();
+            }
+            // Only a missing identity or a small-order key in the link get
+            // here; the waiting screen would otherwise never end.
+            Err(_) => {
+                self.link_responder_failed("handshake_failed".to_string());
+            }
+        }
+    }
+
+    #[cfg(not(all(feature = "network-http", feature = "storage")))]
+    fn start_link_responder(
+        &mut self,
+        _payload: &vauchi_core::exchange::link_mode::DeepLinkPayload,
+        _code: &vauchi_core::exchange::link_pake::LinkCode,
+    ) {
     }
 
     /// Hand a relay hardware event to the responder exchange and reconcile

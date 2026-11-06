@@ -85,29 +85,37 @@ impl AppEngine {
     /// shown. No-op without an identity (rare, non-fatal here).
     fn build_link_initiator(&mut self) {
         #[cfg(all(feature = "network-http", feature = "storage"))]
-        let share_url = match self.vauchi.start_link_exchange() {
+        let (share_url, code) = match self.vauchi.start_link_exchange() {
             Ok((url, exchange)) => {
+                let code = exchange.code().cloned();
                 self.link_initiator = Some(exchange);
-                url
+                (url, code)
             }
             Err(_) => return,
         };
         #[cfg(not(all(feature = "network-http", feature = "storage")))]
-        let share_url = {
+        let (share_url, code) = {
             let display_name = self
                 .vauchi
                 .identity()
                 .map(|identity| identity.display_name().to_string())
                 .unwrap_or_default();
-            vauchi_core::exchange::link_mode::initiator_generate_named(&display_name)
-                .0
-                .url
+            let initiation =
+                vauchi_core::exchange::link_mode::initiator_generate_named(&display_name).0;
+            (initiation.url.clone(), Some(initiation.code.clone()))
         };
         let _ = self
             .engine
             .apply_update(crate::ui::EngineUpdate::LinkExchange(
                 crate::ui::LinkExchangeUpdate::ShareUrl(share_url),
             ));
+        if let Some(code) = code {
+            let _ = self
+                .engine
+                .apply_update(crate::ui::EngineUpdate::LinkExchange(
+                    crate::ui::LinkExchangeUpdate::Code(code),
+                ));
+        }
         self.reschedule_wakeup_for_new_session();
     }
 

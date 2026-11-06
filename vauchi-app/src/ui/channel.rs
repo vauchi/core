@@ -294,6 +294,10 @@ pub enum DeviceLinkJoinUpdate {
 
 /// Terminal updates for the deep-link responder engine.
 pub enum LinkResponderUpdate {
+    /// The typed code was well formed; the exchange has started.
+    CodeAccepted,
+    /// The typed code is not six digits; nothing has started.
+    CodeInvalid,
     Completed(ExchangeSuccessSummary),
     Failed(String),
 }
@@ -301,6 +305,8 @@ pub enum LinkResponderUpdate {
 /// State updates for the link-exchange initiator engine.
 pub enum LinkExchangeUpdate {
     ShareUrl(String),
+    /// The code the sender passes on another way than the link.
+    Code(vauchi_core::exchange::link_pake::LinkCode),
     Waiting,
     Retrieving,
     Succeeded(ExchangeSuccessSummary),
@@ -477,11 +483,14 @@ impl EngineUpdate {
                 DeviceLinkJoinUpdate::Failed(_) => "DeviceLinkJoin::Failed",
             },
             Self::LinkResponder(u) => match u {
+                LinkResponderUpdate::CodeAccepted => "LinkResponder::CodeAccepted",
+                LinkResponderUpdate::CodeInvalid => "LinkResponder::CodeInvalid",
                 LinkResponderUpdate::Completed(_) => "LinkResponder::Completed",
                 LinkResponderUpdate::Failed(_) => "LinkResponder::Failed",
             },
             Self::LinkExchange(u) => match u {
                 LinkExchangeUpdate::ShareUrl(_) => "LinkExchange::ShareUrl",
+                LinkExchangeUpdate::Code(_) => "LinkExchange::Code",
                 LinkExchangeUpdate::Waiting => "LinkExchange::Waiting",
                 LinkExchangeUpdate::Retrieving => "LinkExchange::Retrieving",
                 LinkExchangeUpdate::Succeeded(_) => "LinkExchange::Succeeded",

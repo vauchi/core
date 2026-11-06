@@ -90,6 +90,13 @@ impl LinkCode {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// The digits in two groups, which is easier to read out: `123 456`.
+    /// [`Self::parse`] takes this form back.
+    pub fn grouped(&self) -> String {
+        let (first, second) = self.0.split_at(CODE_DIGITS / 2);
+        format!("{first} {second}")
+    }
 }
 
 impl fmt::Debug for LinkCode {

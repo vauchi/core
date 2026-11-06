@@ -4,7 +4,7 @@
 
 //! Platform-level entry into the engine-owned link-mode responder
 //! (ADR-049). Onboarding → `UserAction::LinkOpened { uri }` → grant must
-//! navigate to `link_responder_waiting`, and — now that core drives the
+//! navigate to `link_responder_code`, and — now that core drives the
 //! relay escrow round-trip itself (`AppEngine::advance_link_responder_session`),
 //! since no frontend ever executed the `RelayEscrow*` commands — the grant
 //! envelope must carry **no** escrow commands.
@@ -204,8 +204,8 @@ fn grant_navigates_to_responder_with_no_frontend_escrow_commands() {
         )
         .expect("grant activation");
     assert!(
-        surface_titles(&engine).contains(&"Waiting for Response".to_string()),
-        "grant must route to the responder waiting screen — action returned {grant_json}",
+        surface_titles(&engine).contains(&"Enter the code".to_string()),
+        "grant must ask for the code — action returned {grant_json}",
     );
 
     // ADR-049: the responder's escrow deposits stay in the engine-owned

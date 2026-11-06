@@ -801,6 +801,11 @@ impl WorkflowEngine for AppEngine {
             return result;
         }
 
+        // The code typed on the link responder's code screen (#727).
+        if let Some(result) = self.intercept_link_code(&action) {
+            return result;
+        }
+
         if let Some(result) = self.intercept_device_link_pin(&action) {
             return result;
         }

@@ -5,9 +5,10 @@
 //! Link mode: asynchronous exchange via URL + relay escrow.
 //!
 //! The initiator generates a URL containing an ephemeral X25519 public key
-//! and a random nonce. The responder opens the URL, performs ECDH, and
-//! deposits their card. Both sides derive escrow hashes from the shared
-//! secret using [`EscrowKeys`].
+//! and a random nonce, and shows a code to send another way (#727, SC-74). The
+//! responder opens the URL and types the code; each side deposits its key and
+//! SPAKE2 message, and derives [`EscrowKeys`] from the ECDH secret and the PAKE
+//! key, so without the code the two sides sit in different gates.
 //!
 //! Core produces [`Command`]s — frontends execute relay calls and
 //! report results via `Event`s (ADR-031).
@@ -16,7 +17,7 @@ use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
+use x25519_dalek::{EphemeralSecret, PublicKey, SharedSecret, StaticSecret};
 use zeroize::Zeroizing;
 
 use crate::card::ContactCard;
@@ -25,6 +26,7 @@ use crate::crypto::kdf::HKDF;
 use crate::crypto::signing::{Signature, SigningKeyPair, verify_signature};
 use crate::crypto::x3dh::X3DHKeyPair;
 use crate::exchange::escrow::{EscrowKeys, EscrowRole};
+use crate::exchange::link_pake::{LINK_PAKE_MESSAGE_LEN, LinkCode, LinkPake, LinkPakeError};
 use crate::platform::Command;
 
 /// Payload version for the symmetric, updatable exchange (ADR-050): the
@@ -58,9 +60,16 @@ const DEFAULT_TTL_SECONDS: u32 = 604_800;
 /// never send to the server, so vauchi.app learns nothing about it.
 const LINK_URL_PREFIX: &str = "https://vauchi.app/x#";
 
-/// Links shared before #277; still accepted while their escrow (7 days)
-/// can complete.
-const LEGACY_LINK_URL_PREFIX: &str = "vauchi://exchange?";
+/// The form the landing page's Open button hands to an installed app.
+const APP_LINK_URL_PREFIX: &str = "vauchi://exchange?";
+
+/// The only link version a client takes. A link without it has no code behind
+/// it, and accepting one would keep the attack the code removes (#727).
+const LINK_VERSION: &str = "2";
+
+/// An ephemeral X25519 key and a SPAKE2 message: the deposit each side makes in
+/// the link's handshake gate.
+const HANDSHAKE_BLOB_LEN: usize = 32 + LINK_PAKE_MESSAGE_LEN;
 
 /// Error from Link mode operations.
 #[derive(Debug, thiserror::Error)]
@@ -68,9 +77,15 @@ pub enum LinkModeError {
     /// The peer's public key is a small-order point (non-contributory DH).
     #[error("non-contributory Diffie-Hellman output (small-order point)")]
     NonContributoryDh,
-    /// The peer's public key has invalid length (expected 32 bytes).
-    #[error("malformed peer public key: expected 32 bytes, got {received}")]
-    MalformedPeerKey { received: usize },
+    /// The peer's handshake deposit has the wrong length.
+    #[error("malformed handshake deposit: expected {HANDSHAKE_BLOB_LEN} bytes, got {received}")]
+    MalformedHandshakeBlob { received: usize },
+    /// The sender's deposit names another key than the link does.
+    #[error("the sender's deposit does not match the link")]
+    PresenceKeyMismatch,
+    /// The peer's SPAKE2 message was refused.
+    #[error(transparent)]
+    Pake(#[from] LinkPakeError),
     /// Card encryption or decryption failed.
     #[error("card crypto failed: {0}")]
     CardCryptoFailed(String),
@@ -99,6 +114,10 @@ pub struct LinkInitiation {
     /// Initiator's presence slot hash (hex) within the handshake gate.
     /// Used for GET authentication when retrieving the responder's epk.
     pub presence_slot: String,
+    /// The code to send to the responder another way than the link.
+    pub code: LinkCode,
+    /// Our side of the PAKE run, taken when the responder's message arrives.
+    pub pake: Option<LinkPake>,
 }
 
 /// Generate a Link mode URL, ephemeral keypair, and presence deposit command.
@@ -109,7 +128,7 @@ pub struct LinkInitiation {
 /// handshake gate so that GET works after the responder deposits their epk.
 ///
 /// The caller must persist `secret_key_bytes` and `nonce` for later
-/// use in [`initiator_complete`].
+/// use in [`initiator_derive_keys`].
 pub fn initiator_generate() -> (LinkInitiation, Vec<Command>) {
     initiator_generate_named("")
 }
@@ -130,7 +149,7 @@ pub fn initiator_generate_named(display_name: &str) -> (LinkInitiation, Vec<Comm
 
     let pk_b64 = URL_SAFE_NO_PAD.encode(public.as_bytes());
     let nonce_b64 = URL_SAFE_NO_PAD.encode(nonce);
-    let mut url = format!("{LINK_URL_PREFIX}pk={pk_b64}&n={nonce_b64}");
+    let mut url = format!("{LINK_URL_PREFIX}pk={pk_b64}&n={nonce_b64}&v={LINK_VERSION}");
     let name = truncate_to_char_boundary(display_name, LINK_NAME_MAX_BYTES);
     if !name.is_empty() {
         url.push_str("&nm=");
@@ -140,6 +159,8 @@ pub fn initiator_generate_named(display_name: &str) -> (LinkInitiation, Vec<Comm
     let handshake_slot = derive_handshake_slot(&nonce);
     let presence_slot = derive_initiator_presence_slot(&nonce);
     let secret_bytes = Zeroizing::new(secret.to_bytes());
+    let code = LinkCode::generate();
+    let (pake, pake_message) = LinkPake::start(&code, &nonce, public.as_bytes());
 
     // Deposit initiator's public key as presence in the handshake gate.
     // This creates the initiator's slot so GET(handshake, presence_slot)
@@ -147,7 +168,7 @@ pub fn initiator_generate_named(display_name: &str) -> (LinkInitiation, Vec<Comm
     let commands = vec![Command::RelayEscrowDeposit {
         gate_hash: hex::decode(&handshake_slot).expect("hex from hex::encode is always valid"),
         slot_hash: hex::decode(&presence_slot).expect("hex from hex::encode is always valid"),
-        encrypted_card: public.as_bytes().to_vec(),
+        encrypted_card: handshake_blob(public.as_bytes(), &pake_message),
         ttl_seconds: DEFAULT_TTL_SECONDS,
     }];
 
@@ -158,34 +179,61 @@ pub fn initiator_generate_named(display_name: &str) -> (LinkInitiation, Vec<Comm
         secret_key_bytes: secret_bytes,
         handshake_slot,
         presence_slot,
+        code,
+        pake: Some(pake),
     };
 
     (initiation, commands)
 }
 
-/// Perform ECDH and derive escrow keys from the shared secret.
+fn handshake_blob(public_key: &[u8; 32], pake_message: &[u8]) -> Vec<u8> {
+    let mut blob = Vec::with_capacity(HANDSHAKE_BLOB_LEN);
+    blob.extend_from_slice(public_key);
+    blob.extend_from_slice(pake_message);
+    blob
+}
+
+fn split_handshake_blob(blob: &[u8]) -> Result<([u8; 32], &[u8]), LinkModeError> {
+    if blob.len() != HANDSHAKE_BLOB_LEN {
+        return Err(LinkModeError::MalformedHandshakeBlob {
+            received: blob.len(),
+        });
+    }
+    let (public_key, pake_message) = blob.split_at(32);
+    let mut key = [0u8; 32];
+    key.copy_from_slice(public_key);
+    Ok((key, pake_message))
+}
+
+/// Takes the responder's handshake deposit and derives the escrow keys from the
+/// ECDH secret and the PAKE key. Returns the responder's epk with them.
 ///
-/// This is the first step after receiving the responder's public key.
-/// The returned `EscrowKeys` contains the `card_key` needed to encrypt
-/// the initiator's card before calling [`build_initiator_deposit`].
+/// A wrong code is not an error: it yields keys the responder does not hold.
 ///
-/// Returns `LinkModeError::NonContributoryDh` if the peer's public key is
-/// a small-order point (attack mitigation — matches all other DH sites).
+/// # Errors
+///
+/// - [`LinkModeError::MalformedHandshakeBlob`] if the deposit has the wrong
+///   length.
+/// - [`LinkModeError::NonContributoryDh`] if the responder's key is a
+///   small-order point (attack mitigation; matches all other DH sites).
+/// - [`LinkModeError::Pake`] if the SPAKE2 message is invalid or our own.
 pub fn initiator_derive_keys(
     secret_key_bytes: &[u8; 32],
-    peer_public_key: &[u8; 32],
-) -> Result<EscrowKeys, LinkModeError> {
+    pake: LinkPake,
+    responder_blob: &[u8],
+) -> Result<([u8; 32], EscrowKeys), LinkModeError> {
+    let (responder_epk, pake_message) = split_handshake_blob(responder_blob)?;
     let our_secret = StaticSecret::from(*secret_key_bytes);
-    let their_public = PublicKey::from(*peer_public_key);
-    let shared_secret = our_secret.diffie_hellman(&their_public);
+    let shared_secret = our_secret.diffie_hellman(&PublicKey::from(responder_epk));
 
     if !shared_secret.was_contributory() {
         return Err(LinkModeError::NonContributoryDh);
     }
 
-    Ok(EscrowKeys::derive(
-        shared_secret.as_bytes(),
-        EscrowRole::Initiator,
+    let pake_key = pake.finish(pake_message)?;
+    Ok((
+        responder_epk,
+        EscrowKeys::derive_with_pake(shared_secret.as_bytes(), &pake_key, EscrowRole::Initiator),
     ))
 }
 
@@ -193,26 +241,13 @@ pub fn initiator_derive_keys(
 ///
 /// Call after [`initiator_derive_keys`] and encrypting the card with
 /// `EscrowKeys::encrypt_card`.
-pub fn build_initiator_deposit(keys: &EscrowKeys, encrypted_card: Vec<u8>) -> Vec<Command> {
+pub fn build_escrow_deposit(keys: &EscrowKeys, encrypted_card: Vec<u8>) -> Vec<Command> {
     vec![Command::RelayEscrowDeposit {
         gate_hash: hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid"),
         slot_hash: hex::decode(&keys.our_slot).expect("hex from hex::encode is always valid"),
         encrypted_card,
         ttl_seconds: DEFAULT_TTL_SECONDS,
     }]
-}
-
-/// Convenience: derive keys + build deposit in one call (for pre-encrypted cards).
-///
-/// Combines [`initiator_derive_keys`] + [`build_initiator_deposit`].
-pub fn initiator_complete(
-    secret_key_bytes: &[u8; 32],
-    peer_public_key: &[u8; 32],
-    encrypted_card: Vec<u8>,
-) -> Result<(EscrowKeys, Vec<Command>), LinkModeError> {
-    let keys = initiator_derive_keys(secret_key_bytes, peer_public_key)?;
-    let commands = build_initiator_deposit(&keys, encrypted_card);
-    Ok((keys, commands))
 }
 
 /// Parsed Link URL components.
@@ -274,12 +309,14 @@ fn truncate_to_char_boundary(text: &str, max_bytes: usize) -> &str {
 
 /// Parse a link exchange URL.
 ///
-/// Returns None if the URL format is invalid.
+/// Returns None if the URL format is invalid or it is not a [`LINK_VERSION`]
+/// link.
 pub fn parse_link_url(url: &str) -> Option<ParsedLinkUrl> {
     let query = url
         .strip_prefix(LINK_URL_PREFIX)
-        .or_else(|| url.strip_prefix(LEGACY_LINK_URL_PREFIX))?;
+        .or_else(|| url.strip_prefix(APP_LINK_URL_PREFIX))?;
 
+    let mut supported_version = false;
     let mut pk_bytes = None;
     let mut nonce_bytes = None;
     let mut sender_name = None;
@@ -306,9 +343,14 @@ pub fn parse_link_url(url: &str) -> Option<ParsedLinkUrl> {
                     nonce_bytes = Some(arr);
                 }
                 "nm" => sender_name = decode_sender_name(value),
+                "v" => supported_version = value == LINK_VERSION,
                 _ => {}
             }
         }
+    }
+
+    if !supported_version {
+        return None;
     }
 
     Some(ParsedLinkUrl {
@@ -326,8 +368,8 @@ pub fn parse_link_url(url: &str) -> Option<ParsedLinkUrl> {
 /// Parsed payload from a deep-link URI handed in by the OS.
 ///
 /// Wraps [`ParsedLinkUrl`]; held by the consent screen until the user
-/// grants or denies, at which point the gate's grant action drives
-/// [`responder_respond`].
+/// grants or denies. A grant leads to the code screen, and the typed code to
+/// [`responder_open`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DeepLinkPayload {
     inner: ParsedLinkUrl,
@@ -375,18 +417,18 @@ pub enum DeepLinkParseError {
     /// form. This shape was a placeholder in the original frontend
     /// handlers; it never lit up in production and the live core
     /// link-mode generator emits the query form
-    /// `vauchi://exchange?pk=<b64>&n=<b64>`. Distinguished from
+    /// `vauchi://exchange?pk=<b64>&n=<b64>&v=2`. Distinguished from
     /// `MalformedQuery` so a future frontend can show "this link uses
     /// an old format — ask the sender for a fresh one" if useful.
     #[error("legacy path form")]
     LegacyPathForm,
-    /// Query parameters are missing, malformed (bad base64), or have
-    /// wrong-length keys.
+    /// Query parameters are missing, malformed (bad base64), have
+    /// wrong-length keys, or name no supported link version.
     #[error("malformed query")]
     MalformedQuery,
 }
 
-/// Parse a `vauchi://exchange?pk=<b64>&n=<b64>` URI into a
+/// Parse a `vauchi://exchange?pk=<b64>&n=<b64>&v=2` URI into a
 /// [`DeepLinkPayload`] suitable for handing to the consent screen.
 ///
 /// Returns a typed [`DeepLinkParseError`] for every rejection reason;
@@ -422,7 +464,7 @@ pub fn parse_exchange_deep_link(uri: &str) -> Result<DeepLinkPayload, DeepLinkPa
 
     // 3. Distinguish path-form from query-form. The legacy frontend
     //    handlers parsed `vauchi://exchange/<payload>`; the live core
-    //    generator emits `vauchi://exchange?pk=...&n=...`.
+    //    generator emits `vauchi://exchange?pk=...&n=...&v=2`.
     let after_host = &after_scheme[host_end..];
     if after_host.starts_with('/') {
         return Err(DeepLinkParseError::LegacyPathForm);
@@ -436,132 +478,107 @@ pub fn parse_exchange_deep_link(uri: &str) -> Result<DeepLinkPayload, DeepLinkPa
     Ok(DeepLinkPayload { inner: parsed })
 }
 
-/// Commands for the responder after parsing the link URL.
+/// The responder's side of a link, from the typed code until the sender's
+/// deposit gives the PAKE key.
 ///
-/// Performs ECDH, derives escrow keys, and produces commands to:
-/// 1. Deposit our ephemeral public key to the handshake slot
-/// 2. Deposit our encrypted card to the escrow gate
-///
-/// Returns `LinkModeError::NonContributoryDh` if the initiator's public key
-/// is a small-order point.
-pub fn responder_respond(
-    parsed: &ParsedLinkUrl,
-    encrypted_card: Vec<u8>,
-) -> Result<(EscrowKeys, Vec<Command>), LinkModeError> {
-    let secret = EphemeralSecret::random_from_rng(OsRng);
-    let our_public = PublicKey::from(&secret);
-    let their_public = PublicKey::from(parsed.initiator_public_key);
-    let shared_secret = secret.diffie_hellman(&their_public);
+/// The responder deposits before it holds the escrow keys, because the relay
+/// serves the sender's deposit only once the gate holds two slots.
+pub struct LinkOpening {
+    shared_secret: SharedSecret,
+    pake: LinkPake,
+    public_key: [u8; 32],
+    pake_message: Vec<u8>,
+    binding: LinkExchangeBinding,
+}
 
-    if !shared_secret.was_contributory() {
-        return Err(LinkModeError::NonContributoryDh);
+impl LinkOpening {
+    /// The exchange both bootstraps are signed for.
+    pub fn binding(&self) -> &LinkExchangeBinding {
+        &self.binding
     }
 
-    let keys = EscrowKeys::derive(shared_secret.as_bytes(), EscrowRole::Responder);
+    /// The link's handshake gate.
+    pub fn handshake_gate(&self) -> Vec<u8> {
+        handshake_gate(&self.binding.nonce)
+    }
 
-    let handshake_slot = derive_handshake_slot(&parsed.nonce);
-    let epk_slot = derive_epk_slot(&parsed.nonce);
+    /// Our slot in the handshake gate: the one the relay writes once, which is
+    /// what limits guessing to one per link.
+    pub fn epk_slot(&self) -> Vec<u8> {
+        hex::decode(derive_epk_slot(&self.binding.nonce))
+            .expect("hex from hex::encode is always valid")
+    }
 
-    let commands = vec![
-        // 1. Bootstrap: deposit our public key to handshake slot
+    /// Our deposit in the handshake gate: `pk_r || msg_r`.
+    pub fn deposit_command(&self) -> Command {
         Command::RelayEscrowDeposit {
-            gate_hash: hex::decode(&handshake_slot).expect("hex from hex::encode is always valid"),
-            slot_hash: hex::decode(&epk_slot).expect("hex from hex::encode is always valid"),
-            encrypted_card: our_public.as_bytes().to_vec(),
+            gate_hash: self.handshake_gate(),
+            slot_hash: self.epk_slot(),
+            encrypted_card: handshake_blob(&self.public_key, &self.pake_message),
             ttl_seconds: DEFAULT_TTL_SECONDS,
-        },
-        // 2. Deposit encrypted card to escrow gate
-        Command::RelayEscrowDeposit {
-            gate_hash: hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid"),
-            slot_hash: hex::decode(&keys.our_slot).expect("hex from hex::encode is always valid"),
-            encrypted_card,
-            ttl_seconds: DEFAULT_TTL_SECONDS,
-        },
-    ];
+        }
+    }
 
-    Ok((keys, commands))
+    /// Takes the sender's handshake deposit and derives the escrow keys.
+    ///
+    /// A wrong code is not an error: it yields keys the sender does not hold.
+    ///
+    /// # Errors
+    ///
+    /// - [`LinkModeError::MalformedHandshakeBlob`] if the deposit has the wrong
+    ///   length.
+    /// - [`LinkModeError::PresenceKeyMismatch`] if it names another key than
+    ///   the link.
+    /// - [`LinkModeError::Pake`] if the SPAKE2 message is invalid or our own.
+    pub fn finish(self, presence_blob: &[u8]) -> Result<EscrowKeys, LinkModeError> {
+        let (initiator_epk, pake_message) = split_handshake_blob(presence_blob)?;
+        if initiator_epk != self.binding.initiator_epk {
+            return Err(LinkModeError::PresenceKeyMismatch);
+        }
+        let pake_key = self.pake.finish(pake_message)?;
+        Ok(EscrowKeys::derive_with_pake(
+            self.shared_secret.as_bytes(),
+            &pake_key,
+            EscrowRole::Responder,
+        ))
+    }
 }
 
-/// What the responder deposits after opening a link, and what it needs to
-/// finish the exchange.
-pub struct LinkResponse {
-    /// Escrow keys derived from the ECDH with the link's key.
-    pub keys: EscrowKeys,
-    /// The exchange both bootstraps are signed for.
-    pub binding: LinkExchangeBinding,
-    /// The link's handshake gate, where the responder's epk is deposited.
-    pub handshake_gate: Vec<u8>,
-    /// The epk deposit, then the encrypted card deposit.
-    pub commands: Vec<Command>,
-}
-
-/// Responder side of a link: ECDH with a fresh ephemeral key, derive the
-/// escrow keys, have `sign_card` produce our card payload for this
-/// exchange's [`LinkExchangeBinding`], encrypt it, and produce the two
-/// deposit commands of [`responder_respond`].
-///
-/// The card is signed here, not before, because the binding includes the
-/// ephemeral key this function generates (#942).
+/// Responder side of a link, once the person has typed the code: ECDH with a
+/// fresh ephemeral key and the start of the PAKE run. Nothing has reached the
+/// relay yet; the deposit is [`LinkOpening::deposit_command`].
 ///
 /// # Errors
 ///
-/// - [`LinkModeError::NonContributoryDh`] if the initiator's public
-///   key is a small-order point.
-/// - [`LinkModeError::CardCryptoFailed`] if encryption fails (e.g.,
-///   the AEAD nonce RNG fails — extremely rare but typed for the
-///   cycle thread to surface as `on_failed(DecryptError)`).
-pub fn responder_respond_with_signed_card(
+/// [`LinkModeError::NonContributoryDh`] if the initiator's public key is a
+/// small-order point.
+pub fn responder_open(
     parsed: &ParsedLinkUrl,
-    sign_card: impl FnOnce(&LinkExchangeBinding) -> Vec<u8>,
-) -> Result<LinkResponse, LinkModeError> {
+    code: &LinkCode,
+) -> Result<LinkOpening, LinkModeError> {
     let secret = EphemeralSecret::random_from_rng(OsRng);
     let our_public = PublicKey::from(&secret);
-    let their_public = PublicKey::from(parsed.initiator_public_key);
-    let shared_secret = secret.diffie_hellman(&their_public);
+    let shared_secret = secret.diffie_hellman(&PublicKey::from(parsed.initiator_public_key));
     if !shared_secret.was_contributory() {
         return Err(LinkModeError::NonContributoryDh);
     }
-    let keys = EscrowKeys::derive(shared_secret.as_bytes(), EscrowRole::Responder);
-    let binding = LinkExchangeBinding {
-        nonce: parsed.nonce,
-        initiator_epk: parsed.initiator_public_key,
-        responder_epk: *our_public.as_bytes(),
-    };
-
-    let encrypted = keys
-        .encrypt_card(&sign_card(&binding))
-        .map_err(|e| LinkModeError::CardCryptoFailed(e.to_string()))?;
-
-    let handshake_gate = handshake_gate(&parsed.nonce);
-    let epk_slot = derive_epk_slot(&parsed.nonce);
-
-    let commands = vec![
-        Command::RelayEscrowDeposit {
-            gate_hash: handshake_gate.clone(),
-            slot_hash: hex::decode(&epk_slot).expect("hex from hex::encode is always valid"),
-            encrypted_card: our_public.as_bytes().to_vec(),
-            ttl_seconds: DEFAULT_TTL_SECONDS,
+    let (pake, pake_message) = LinkPake::start(code, &parsed.nonce, &parsed.initiator_public_key);
+    Ok(LinkOpening {
+        shared_secret,
+        pake,
+        public_key: *our_public.as_bytes(),
+        pake_message,
+        binding: LinkExchangeBinding {
+            nonce: parsed.nonce,
+            initiator_epk: parsed.initiator_public_key,
+            responder_epk: *our_public.as_bytes(),
         },
-        Command::RelayEscrowDeposit {
-            gate_hash: hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid"),
-            slot_hash: hex::decode(&keys.our_slot).expect("hex from hex::encode is always valid"),
-            encrypted_card: encrypted,
-            ttl_seconds: DEFAULT_TTL_SECONDS,
-        },
-    ];
-
-    Ok(LinkResponse {
-        keys,
-        binding,
-        handshake_gate,
-        commands,
     })
 }
 
 /// Decrypt the initiator's encrypted card retrieved from escrow.
 ///
-/// Symmetric counterpart to [`responder_respond`]: after the responder
-/// polls the relay and the initiator's deposit lands at
+/// After the responder polls the relay and the initiator's deposit lands at
 /// `(keys.gate_hash, keys.their_slot)`, this function turns the
 /// retrieved blob into plaintext bytes ready for parsing as a contact
 /// card payload.

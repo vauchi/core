@@ -209,6 +209,26 @@ fn the_sub_second_wakeup_survives_json() {
 /// cadence two terminals needed ~90 s to converge — past every 60 s wait in
 /// `integration_tui_to_tui_link_exchange` — while the escrow phase is
 /// designed to poll about once a second.
+fn enter_link_code(engine: &mut vauchi_app::ui::AppEngine, code: &str) {
+    use vauchi_app::ui::{
+        LINK_RESPONDER_ACTION_CONFIRM_CODE, LINK_RESPONDER_CODE_INPUT_ID, UserAction,
+        WorkflowEngine,
+    };
+    let _ = WorkflowEngine::handle_action(
+        engine,
+        UserAction::TextChanged {
+            component_id: LINK_RESPONDER_CODE_INPUT_ID.to_string(),
+            value: code.to_string(),
+        },
+    );
+    let _ = WorkflowEngine::handle_action(
+        engine,
+        UserAction::ActionPressed {
+            action_id: LINK_RESPONDER_ACTION_CONFIRM_CODE.to_string(),
+        },
+    );
+}
+
 // @internal
 #[test]
 fn a_live_link_session_schedules_a_far_shorter_wakeup_than_the_idle_heartbeat() {
@@ -234,6 +254,11 @@ fn a_live_link_session_schedules_a_far_shorter_wakeup_than_the_idle_heartbeat() 
         .expect("a generated link parses");
     let mut responding = engine_with_identity();
     responding.navigate_to(vauchi_app::ui::AppScreen::DeepLinkResponder { payload });
+    assert!(
+        !responding.link_session_active(),
+        "nothing runs until the code is typed"
+    );
+    enter_link_code(&mut responding, initiation.code.as_str());
     assert!(
         responding.link_session_active(),
         "precondition: the responder machine is live"
@@ -433,6 +458,7 @@ fn opening_a_link_session_reschedules_the_wakeup_in_the_same_batch() {
     let _ = responding.on_wakeup();
     let _ = responding.drain_pending_commands();
     responding.navigate_to(vauchi_app::ui::AppScreen::DeepLinkResponder { payload });
+    enter_link_code(&mut responding, initiation.code.as_str());
     assert!(
         responding.link_session_active(),
         "precondition: the responder machine is live"

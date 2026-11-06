@@ -19,11 +19,19 @@
 //! deterministically by stateful property tests (CC-13) and by a
 //! mock-relay integration test in `vauchi-platform/tests/it/`.
 //!
+//! Two gates, as on the initiator's side. In the handshake gate the session
+//! deposits its key and SPAKE2 message and retrieves the sender's, which gives
+//! the [`EscrowKeys`]. In the escrow gate it deposits its signed card and
+//! retrieves the sender's. A wrong code leaves the two sides in different
+//! escrow gates, so the session ends at its deadline.
+//!
 //! See `_private/docs/problems/2026-04-27-deep-link-responder-flow/`
 //! for the full design + risk register.
 
 use crate::exchange::escrow::{EscrowKeys, SLOT_TAKEN_REASON};
-use crate::exchange::link_mode::{LinkModeError, responder_complete};
+use crate::exchange::link_mode::{
+    LinkExchangeBinding, LinkModeError, LinkOpening, build_escrow_deposit, responder_complete,
+};
 use crate::platform::{Command, Event};
 
 /// Suggested initial polling interval (ms) for the responder's
@@ -54,8 +62,11 @@ pub enum LinkResponderFailureReason {
     /// previously accepted).
     DepositRejected,
     /// Our epk deposit found the link's epk slot taken: the link was opened
-    /// before, by someone else (who became the contact, S9) or by us.
+    /// before, by someone else or by us.
     LinkAlreadyUsed,
+    /// The sender's handshake deposit was malformed, named another key than
+    /// the link, or carried an invalid SPAKE2 message.
+    HandshakeFailed { detail: String },
     /// User-initiated cancel via the Polling screen's Cancel action
     /// (or the engine's `Drop` impl on navigate-back).
     Cancelled,
@@ -64,7 +75,13 @@ pub enum LinkResponderFailureReason {
 /// State of a link-mode responder cycle.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LinkResponderState {
-    /// Deposits dispatched, waiting for `RelayEscrowReady` on our gate
+    /// Our handshake deposit dispatched; waiting for the sender's, which the
+    /// relay serves once the gate holds two slots.
+    AwaitingPresence,
+    /// The escrow keys are derived; waiting for our card signed for the
+    /// exchange binding.
+    AwaitingCard,
+    /// Our card deposited, waiting for `RelayEscrowReady` on the escrow gate
     /// or for the deadline to expire.
     Polling,
     /// `RelayEscrowReady` fired; `RelayEscrowRetrieve` dispatched;
@@ -80,19 +97,21 @@ pub enum LinkResponderState {
 /// Pure-Rust state machine for the responder side of link mode.
 pub struct LinkResponderSession {
     state: LinkResponderState,
-    keys: EscrowKeys,
+    /// Our side of the handshake, until the sender's deposit turns it into
+    /// `keys`.
+    opening: Option<LinkOpening>,
+    keys: Option<EscrowKeys>,
+    /// The exchange both cards are signed for.
+    binding: LinkExchangeBinding,
     /// Unix-seconds deadline for the whole exchange. Once reached before
-    /// the card arrives (polling or retrieving), transitions to
-    /// `Failed(PollingTimedOut)`. Unix-secs (not `Instant`) so the
-    /// deadline is injectable from the engine's `Clock` seam and
-    /// deterministic in tests (slice 32l Phase 2 R1).
+    /// the card arrives, transitions to `Failed(PollingTimedOut)`. Unix-secs
+    /// (not `Instant`) so the deadline is injectable from the engine's `Clock`
+    /// seam and deterministic in tests (slice 32l Phase 2 R1).
     poll_deadline_unix: u64,
-    /// Bytes of `keys.gate_hash` decoded from hex once at construction
-    /// time, so per-event comparisons are O(32) byte equality rather
-    /// than re-decoding the hex string.
-    gate_hash_bytes: Vec<u8>,
-    /// The link's handshake gate, where our epk is deposited.
+    /// The link's handshake gate, where our deposit goes.
     handshake_gate: Vec<u8>,
+    /// Our slot in the handshake gate.
+    epk_slot: Vec<u8>,
     /// Commands queued for `drain_pending_commands`. One-shot per call.
     pending: Vec<Command>,
 }
@@ -100,38 +119,69 @@ pub struct LinkResponderSession {
 impl LinkResponderSession {
     /// Construct a new responder session.
     ///
-    /// `keys`, `handshake_gate` and `deposit_commands` come from
-    /// `responder_respond_with_signed_card` (link_mode.rs). The session adds a `RelayEscrowCheck` so the
-    /// relay starts watching the gate; the cycle thread drains all
-    /// three commands on the first call to `drain_pending_commands`.
+    /// `opening` comes from `responder_open` (link_mode.rs). The first drain
+    /// holds our handshake deposit and a `RelayEscrowCheck` on that gate.
     ///
     /// `poll_deadline_unix` is the unix-seconds time after which the
-    /// session transitions to `Failed(PollingTimedOut)` if no
-    /// `RelayEscrowReady` event has arrived.
-    pub fn new(
-        keys: EscrowKeys,
-        handshake_gate: Vec<u8>,
-        deposit_commands: Vec<Command>,
-        poll_deadline_unix: u64,
-    ) -> Self {
-        let gate_hash_bytes =
-            hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid");
-
-        let mut pending = deposit_commands;
-        // Tell the relay to start watching the gate so the deposit
-        // count crossing 2 fires `RelayEscrowReady`.
-        pending.push(Command::RelayEscrowCheck {
-            gate_hash: gate_hash_bytes.clone(),
-            suggested_interval_ms: RESPONDER_POLL_INTERVAL_MS,
-        });
+    /// session transitions to `Failed(PollingTimedOut)` if it has not
+    /// reached a terminal state.
+    pub fn new(opening: LinkOpening, poll_deadline_unix: u64) -> Self {
+        let handshake_gate = opening.handshake_gate();
+        let pending = vec![
+            opening.deposit_command(),
+            Command::RelayEscrowCheck {
+                gate_hash: handshake_gate.clone(),
+                suggested_interval_ms: RESPONDER_POLL_INTERVAL_MS,
+            },
+        ];
 
         Self {
-            state: LinkResponderState::Polling,
-            keys,
+            state: LinkResponderState::AwaitingPresence,
+            binding: *opening.binding(),
+            epk_slot: opening.epk_slot(),
+            opening: Some(opening),
+            keys: None,
             poll_deadline_unix,
-            gate_hash_bytes,
             handshake_gate,
             pending,
+        }
+    }
+
+    /// The exchange our card must be signed for; also the binding the sender's
+    /// card is verified against.
+    pub fn binding(&self) -> &LinkExchangeBinding {
+        &self.binding
+    }
+
+    /// The link's handshake gate, watched until the sender's deposit arrives.
+    pub fn handshake_gate_bytes(&self) -> Vec<u8> {
+        self.handshake_gate.clone()
+    }
+
+    /// Encrypt and deposit our card, signed for [`Self::binding`], and start
+    /// polling the escrow gate. Ignored unless the session is
+    /// [`LinkResponderState::AwaitingCard`].
+    pub fn deposit_card(&mut self, signed_card: &[u8]) {
+        if !matches!(self.state, LinkResponderState::AwaitingCard) {
+            return;
+        }
+        let Some(keys) = &self.keys else {
+            return;
+        };
+        match keys.encrypt_card(signed_card) {
+            Ok(encrypted) => {
+                let mut commands = build_escrow_deposit(keys, encrypted);
+                commands.push(Command::RelayEscrowCheck {
+                    gate_hash: hex::decode(&keys.gate_hash)
+                        .expect("hex from hex::encode is always valid"),
+                    suggested_interval_ms: RESPONDER_POLL_INTERVAL_MS,
+                });
+                self.state = LinkResponderState::Polling;
+                self.pending.extend(commands);
+            }
+            Err(e) => self.fail(LinkResponderFailureReason::HandshakeFailed {
+                detail: e.to_string(),
+            }),
         }
     }
 
@@ -156,28 +206,46 @@ impl LinkResponderSession {
 
         match event {
             Event::RelayEscrowReady { gate_hash } => {
-                if gate_hash != self.gate_hash_bytes {
-                    return;
-                }
-                if matches!(self.state, LinkResponderState::Polling) {
+                if gate_hash == self.handshake_gate {
+                    if matches!(self.state, LinkResponderState::AwaitingPresence) {
+                        // The relay answers with the other slot's blob.
+                        self.pending.push(Command::RelayEscrowRetrieve {
+                            gate_hash,
+                            slot_hash: self.epk_slot.clone(),
+                        });
+                    }
+                } else if Some(gate_hash) == self.escrow_gate_bytes()
+                    && matches!(self.state, LinkResponderState::Polling)
+                {
                     self.transition_to_retrieving();
                 }
             }
             Event::RelayEscrowFailed { gate_hash, reason } => {
                 if gate_hash == self.handshake_gate && reason == SLOT_TAKEN_REASON {
                     self.fail(LinkResponderFailureReason::LinkAlreadyUsed);
-                } else if gate_hash == self.gate_hash_bytes || gate_hash == self.handshake_gate {
+                } else if gate_hash == self.handshake_gate
+                    || Some(gate_hash) == self.escrow_gate_bytes()
+                {
                     self.fail(LinkResponderFailureReason::DepositRejected);
                 }
             }
             Event::RelayEscrowBlobReceived { gate_hash, blob } => {
-                if gate_hash != self.gate_hash_bytes {
+                if gate_hash == self.handshake_gate {
+                    if matches!(self.state, LinkResponderState::AwaitingPresence) {
+                        self.handle_presence(&blob);
+                    }
+                    return;
+                }
+                if Some(gate_hash) != self.escrow_gate_bytes() {
                     return;
                 }
                 if !matches!(self.state, LinkResponderState::Retrieving) {
                     return;
                 }
-                match responder_complete(&self.keys, &blob) {
+                let Some(keys) = &self.keys else {
+                    return;
+                };
+                match responder_complete(keys, &blob) {
                     Ok(card_bytes) => {
                         self.state = LinkResponderState::Finalized { card_bytes };
                     }
@@ -225,16 +293,18 @@ impl LinkResponderSession {
         self.fail(LinkResponderFailureReason::Cancelled);
     }
 
-    /// Decoded gate-hash bytes — exposed for the cycle thread and tests
-    /// so they can build `RelayEscrowReady` / `RelayEscrowBlobReceived`
-    /// events without re-decoding the hex string.
-    pub fn gate_hash_bytes(&self) -> Vec<u8> {
-        self.gate_hash_bytes.clone()
+    /// Decoded escrow-gate bytes once the keys are derived — exposed for the
+    /// cycle thread and tests. `None` before that.
+    pub fn escrow_gate_bytes(&self) -> Option<Vec<u8>> {
+        self.keys
+            .as_ref()
+            .map(|keys| hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid"))
     }
 
     /// Test-only helper: encrypt bytes with the session's card_key so
     /// tests can construct round-trip blobs without exposing the
-    /// `EscrowKeys::encrypt_card` method through a non-test path.
+    /// `EscrowKeys::encrypt_card` method through a non-test path. `None`
+    /// before the keys are derived.
     ///
     /// Marked `#[cfg(any(test, feature = "testing"))]` so it is not
     /// part of the production surface.
@@ -242,8 +312,23 @@ impl LinkResponderSession {
     pub fn test_encrypt_card(
         &self,
         plaintext: &[u8],
-    ) -> Result<Vec<u8>, crate::crypto::encryption::EncryptionError> {
-        self.keys.encrypt_card(plaintext)
+    ) -> Option<Result<Vec<u8>, crate::crypto::encryption::EncryptionError>> {
+        self.keys.as_ref().map(|keys| keys.encrypt_card(plaintext))
+    }
+
+    fn handle_presence(&mut self, presence_blob: &[u8]) {
+        let Some(opening) = self.opening.take() else {
+            return;
+        };
+        match opening.finish(presence_blob) {
+            Ok(keys) => {
+                self.keys = Some(keys);
+                self.state = LinkResponderState::AwaitingCard;
+            }
+            Err(e) => self.fail(LinkResponderFailureReason::HandshakeFailed {
+                detail: e.to_string(),
+            }),
+        }
     }
 
     fn is_terminal(&self) -> bool {
@@ -254,15 +339,18 @@ impl LinkResponderSession {
     }
 
     fn transition_to_retrieving(&mut self) {
-        self.state = LinkResponderState::Retrieving;
-        self.pending.push(Command::RelayEscrowRetrieve {
-            gate_hash: self.gate_hash_bytes.clone(),
+        let Some(keys) = &self.keys else {
+            return;
+        };
+        let command = Command::RelayEscrowRetrieve {
+            gate_hash: hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid"),
             // Our own slot, not the peer's: the relay authenticates the
             // requester by the slot it names and answers with the *other*
             // slot's blob (`relay/src/escrow.rs::get`).
-            slot_hash: hex::decode(&self.keys.our_slot)
-                .expect("hex from hex::encode is always valid"),
-        });
+            slot_hash: hex::decode(&keys.our_slot).expect("hex from hex::encode is always valid"),
+        };
+        self.state = LinkResponderState::Retrieving;
+        self.pending.push(command);
     }
 
     fn fail(&mut self, reason: LinkResponderFailureReason) {

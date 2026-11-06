@@ -40,6 +40,22 @@ fn advance_until_done(
     progress
 }
 
+fn shown_code(exchange: &LinkExchange) -> String {
+    exchange
+        .code()
+        .expect("the sender has a code")
+        .as_str()
+        .to_string()
+}
+
+fn a_wrong_code(right: &str) -> &'static str {
+    if right == "000000" {
+        "000001"
+    } else {
+        "000000"
+    }
+}
+
 fn contact_id(vauchi: &vauchi_core::Vauchi) -> String {
     hex::encode(vauchi.identity().unwrap().signing_public_key())
 }
@@ -54,7 +70,8 @@ fn a_shared_link_accepted_by_the_peer_completes_on_both_sides() {
     let (bob, _b) = user_at(&mock, "Bob");
 
     let (link, mut alice_exchange) = alice.start_link_exchange().expect("share");
-    let mut bob_exchange = bob.accept_link_exchange(&link).expect("accept");
+    let code = shown_code(&alice_exchange);
+    let mut bob_exchange = bob.accept_link_exchange(&link, &code).expect("accept");
     let progress = advance_until_done([(&alice, &mut alice_exchange), (&bob, &mut bob_exchange)]);
 
     assert_eq!(
@@ -70,6 +87,76 @@ fn a_shared_link_accepted_by_the_peer_completes_on_both_sides() {
     );
     assert!(alice.get_contact(&contact_id(&bob)).unwrap().is_some());
     assert!(bob.get_contact(&contact_id(&alice)).unwrap().is_some());
+}
+
+// Whoever holds only the link gets no contact and no card, on either side, and
+// the slot is spent, so a second guess has to come from a new link (#727, SC-74).
+// @claim: S9
+// @internal
+#[test]
+fn a_wrong_code_makes_no_contact_on_either_side_and_uses_up_the_link() {
+    let mock = MockRelay::start();
+    mock.enable_escrow_store();
+    let (alice, _a) = user_at(&mock, "Alice");
+    let (mallory, _m) = user_at(&mock, "Mallory");
+    let (bob, _b) = user_at(&mock, "Bob");
+    let (link, mut alice_exchange) = alice.start_link_exchange().expect("share");
+    let code = shown_code(&alice_exchange);
+    let mut mallory_exchange = mallory
+        .accept_link_exchange(&link, a_wrong_code(&code))
+        .expect("accept");
+
+    let progress = advance_until_done([
+        (&alice, &mut alice_exchange),
+        (&mallory, &mut mallory_exchange),
+    ]);
+
+    assert_eq!(
+        progress,
+        [LinkExchangeProgress::Waiting, LinkExchangeProgress::Waiting]
+    );
+    assert!(alice.list_contacts().unwrap().is_empty());
+    assert!(mallory.list_contacts().unwrap().is_empty());
+
+    let mut bob_exchange = bob.accept_link_exchange(&link, &code).expect("accept");
+    assert_eq!(
+        bob.advance_link_exchange(&mut bob_exchange)
+            .expect("advance"),
+        LinkExchangeProgress::Failed {
+            reason: "link_already_used".to_string()
+        }
+    );
+    assert!(bob.list_contacts().unwrap().is_empty());
+}
+
+// @internal
+#[test]
+fn only_the_sender_of_a_link_has_a_code_to_show() {
+    let mock = MockRelay::start();
+    let (alice, _a) = user_at(&mock, "Alice");
+    let (bob, _b) = user_at(&mock, "Bob");
+    let (link, sharing) = alice.start_link_exchange().expect("share");
+
+    let accepting = bob
+        .accept_link_exchange(&link, &shown_code(&sharing))
+        .expect("accept");
+
+    assert!(accepting.code().is_none());
+}
+
+// CC-14: the typed code is untrusted input, refused before anything reaches
+// the relay.
+// @internal
+#[test]
+fn accepting_with_anything_but_six_digits_is_refused() {
+    let mock = MockRelay::start();
+    let (alice, _a) = user_at(&mock, "Alice");
+    let (bob, _b) = user_at(&mock, "Bob");
+    let (link, _sharing) = alice.start_link_exchange().expect("share");
+
+    for typed in ["", "12345", "1234567", "abcdef", "١٢٣٤٥٦", "12 34 56"] {
+        assert!(bob.accept_link_exchange(&link, typed).is_err(), "{typed:?}");
+    }
 }
 
 // @internal
@@ -100,7 +187,10 @@ fn accepting_anything_but_an_exchange_link_is_refused() {
         "https://example.com/x#pk=a&n=b",
         "https://vauchi.app/x#",
     ] {
-        assert!(bob.accept_link_exchange(junk).is_err(), "{junk:?}");
+        assert!(
+            bob.accept_link_exchange(junk, "123456").is_err(),
+            "{junk:?}"
+        );
     }
 }
 
@@ -111,7 +201,8 @@ fn accepting_your_own_link_never_completes_an_exchange_with_yourself() {
     mock.enable_escrow_store();
     let (alice, _a) = user_at(&mock, "Alice");
     let (link, mut sharing) = alice.start_link_exchange().expect("share");
-    let mut accepting = alice.accept_link_exchange(&link).expect("accept");
+    let code = shown_code(&sharing);
+    let mut accepting = alice.accept_link_exchange(&link, &code).expect("accept");
 
     let progress = advance_until_done([(&alice, &mut sharing), (&alice, &mut accepting)]);
 
@@ -124,8 +215,8 @@ fn accepting_your_own_link_never_completes_an_exchange_with_yourself() {
     assert!(alice.get_contact(&contact_id(&alice)).unwrap().is_none());
 }
 
-// Whoever opens a link first becomes the contact (S9); a second opener is
-// told the link was used instead of waiting out the deadline (#942).
+// A link is good for one attempt; a second opener is told it was used instead
+// of waiting out the deadline (#942).
 // @claim: S9
 // @internal
 #[test]
@@ -136,10 +227,13 @@ fn a_second_person_opening_a_used_link_is_told_it_was_used() {
     let (bob, _b) = user_at(&mock, "Bob");
     let (carol, _c) = user_at(&mock, "Carol");
     let (link, mut alice_exchange) = alice.start_link_exchange().expect("share");
-    let mut bob_exchange = bob.accept_link_exchange(&link).expect("bob accepts");
+    let code = shown_code(&alice_exchange);
+    let mut bob_exchange = bob.accept_link_exchange(&link, &code).expect("bob accepts");
     advance_until_done([(&alice, &mut alice_exchange), (&bob, &mut bob_exchange)]);
 
-    let mut carol_exchange = carol.accept_link_exchange(&link).expect("carol accepts");
+    let mut carol_exchange = carol
+        .accept_link_exchange(&link, &code)
+        .expect("carol accepts");
     let progress = carol
         .advance_link_exchange(&mut carol_exchange)
         .expect("advance");
@@ -164,8 +258,11 @@ fn a_parsed_link_accepted_by_the_peer_completes_on_both_sides() {
     let (bob, _b) = user_at(&mock, "Bob");
     let (link, mut alice_exchange) = alice.start_link_exchange().expect("share");
     let payload = vauchi_core::exchange::link_mode::parse_exchange_deep_link(&link).expect("parse");
+    let code = alice_exchange.code().expect("the sender's code").clone();
 
-    let mut bob_exchange = bob.accept_link_exchange_payload(&payload).expect("accept");
+    let mut bob_exchange = bob
+        .accept_link_exchange_payload(&payload, &code)
+        .expect("accept");
     let progress = advance_until_done([(&alice, &mut alice_exchange), (&bob, &mut bob_exchange)]);
 
     assert!(

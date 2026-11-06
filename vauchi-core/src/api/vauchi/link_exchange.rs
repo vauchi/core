@@ -17,9 +17,10 @@ use crate::exchange::link_initiator::{
     LinkInitiatorFailureReason, LinkInitiatorSession, LinkInitiatorState,
 };
 use crate::exchange::link_mode::{
-    LinkExchangeBinding, initiator_generate_named, parse_exchange_deep_link,
-    responder_respond_with_signed_card, serialize_link_card_payload,
+    LinkExchangeBinding, initiator_generate_named, parse_exchange_deep_link, responder_open,
+    serialize_link_card_payload,
 };
+use crate::exchange::link_pake::LinkCode;
 use crate::exchange::link_responder::{
     LinkResponderFailureReason, LinkResponderSession, LinkResponderState,
 };
@@ -35,12 +36,9 @@ pub struct LinkExchange {
     /// Fresh per exchange: its public half is signed into our bootstrap,
     /// its secret completes the exchange (ADR-050).
     x3dh: X3DHKeyPair,
-    /// Our card as it was when the exchange started; the initiator signs it
-    /// only once the responder's epk is known (#942).
+    /// Our card as it was when the exchange started; each side signs it only
+    /// once its escrow keys exist (#942).
     card: ContactCard,
-    /// The responder's binding, known from the start; the initiator's comes
-    /// from its session.
-    responder_binding: Option<LinkExchangeBinding>,
     finished: Option<LinkExchangeProgress>,
 }
 
@@ -64,6 +62,15 @@ impl LinkExchange {
     /// Still waiting on the other side or the relay.
     pub fn is_live(&self) -> bool {
         self.finished.is_none() && matches!(outcome(&self.role), Outcome::Waiting)
+    }
+
+    /// The code the initiator sends another way than the link. `None` for the
+    /// responder, who typed it.
+    pub fn code(&self) -> Option<&LinkCode> {
+        match &self.role {
+            Role::Initiator(session) => Some(session.code()),
+            Role::Responder(_) => None,
+        }
     }
 
     /// The other side's card is being fetched.
@@ -99,50 +106,36 @@ impl Vauchi {
                 role: Role::Initiator(Box::new(session)),
                 x3dh,
                 card,
-                responder_binding: None,
                 finished: None,
             },
         ))
     }
 
-    /// Accept another person's exchange link as the responder.
-    pub fn accept_link_exchange(&self, link: &str) -> VauchiResult<LinkExchange> {
+    /// Accept another person's exchange link as the responder, with the code
+    /// they sent another way.
+    pub fn accept_link_exchange(&self, link: &str, code: &str) -> VauchiResult<LinkExchange> {
         let payload = parse_exchange_deep_link(link.trim())
             .map_err(|e| VauchiError::InvalidState(format!("not an exchange link: {e}")))?;
-        self.accept_link_exchange_payload(&payload)
+        let code = LinkCode::parse(code)
+            .map_err(|e| VauchiError::InvalidState(format!("link exchange: {e}")))?;
+        self.accept_link_exchange_payload(&payload, &code)
     }
 
     /// Accept an already parsed (and consented) exchange link.
     pub fn accept_link_exchange_payload(
         &self,
         payload: &crate::exchange::link_mode::DeepLinkPayload,
+        code: &LinkCode,
     ) -> VauchiResult<LinkExchange> {
         let x3dh = X3DHKeyPair::generate();
         let card = self.link_card()?;
-        let identity = self
-            .identity()
-            .ok_or_else(|| VauchiError::InvalidState("no identity".into()))?;
-        let response = responder_respond_with_signed_card(payload.as_parsed(), |binding| {
-            serialize_link_card_payload(
-                identity.signing_keypair(),
-                x3dh.public_key(),
-                self.relay_server_url(),
-                &card,
-                binding,
-            )
-        })
-        .map_err(|e| VauchiError::InvalidState(format!("link exchange: {e}")))?;
+        let opening = responder_open(payload.as_parsed(), code)
+            .map_err(|e| VauchiError::InvalidState(format!("link exchange: {e}")))?;
         let deadline = self.clock().unix_seconds() + LINK_EXCHANGE_DEADLINE_SECS;
         Ok(LinkExchange {
-            role: Role::Responder(Box::new(LinkResponderSession::new(
-                response.keys,
-                response.handshake_gate,
-                response.commands,
-                deadline,
-            ))),
+            role: Role::Responder(Box::new(LinkResponderSession::new(opening, deadline))),
             x3dh,
             card,
-            responder_binding: Some(response.binding),
             finished: None,
         })
     }
@@ -239,39 +232,25 @@ impl Vauchi {
     }
 
     /// Run one escrow command, feed its event to the machine, and run the
-    /// follow-ups it queues. The initiator's handshake-gate blob is the
-    /// responder's ephemeral key, which it takes as `LinkOpened`.
+    /// follow-ups it queues.
     fn run_and_feed(&self, exchange: &mut LinkExchange, command: &Command) {
         if let Some(event) = self.run_escrow_command(command) {
             self.apply_and_follow(exchange, event);
         }
     }
 
-    /// Apply one event to the machine and run the follow-ups it queues. An
-    /// initiator that has just learned the responder's epk gets our card
-    /// signed for the exchange binding (#942).
-    fn apply_and_follow(&self, exchange: &mut LinkExchange, mut event: Event) {
+    /// Apply one event to the machine and run the follow-ups it queues. A side
+    /// that has just derived its escrow keys gets our card signed for the
+    /// exchange binding (#942).
+    fn apply_and_follow(&self, exchange: &mut LinkExchange, event: Event) {
         let follow_ups = match &mut exchange.role {
             Role::Initiator(session) => {
-                if let Event::RelayEscrowBlobReceived { gate_hash, blob } = &event
-                    && *gate_hash == session.handshake_gate_bytes()
-                {
-                    event = Event::LinkOpened {
-                        peer_public_key: blob.clone(),
-                    };
-                }
                 session.apply_hardware_event(event);
                 if let Some(binding) = session.binding().copied()
                     && matches!(session.current_state(), LinkInitiatorState::AwaitingCard)
                 {
-                    match self.identity() {
-                        Some(identity) => session.deposit_card(&serialize_link_card_payload(
-                            identity.signing_keypair(),
-                            exchange.x3dh.public_key(),
-                            self.relay_server_url(),
-                            &exchange.card,
-                            &binding,
-                        )),
+                    match self.signed_card(&exchange.x3dh, &exchange.card, &binding) {
+                        Some(signed) => session.deposit_card(&signed),
                         // The identity was removed mid-exchange: nothing can
                         // sign our card, so the exchange ends here.
                         None => session.cancel(),
@@ -281,6 +260,13 @@ impl Vauchi {
             }
             Role::Responder(session) => {
                 session.apply_hardware_event(event);
+                if matches!(session.current_state(), LinkResponderState::AwaitingCard) {
+                    let binding = *session.binding();
+                    match self.signed_card(&exchange.x3dh, &exchange.card, &binding) {
+                        Some(signed) => session.deposit_card(&signed),
+                        None => session.cancel(),
+                    }
+                }
                 session.drain_pending_commands()
             }
         };
@@ -288,13 +274,29 @@ impl Vauchi {
             self.run_and_feed(exchange, &command);
         }
     }
+
+    fn signed_card(
+        &self,
+        x3dh: &X3DHKeyPair,
+        card: &ContactCard,
+        binding: &LinkExchangeBinding,
+    ) -> Option<Vec<u8>> {
+        let identity = self.identity()?;
+        Some(serialize_link_card_payload(
+            identity.signing_keypair(),
+            x3dh.public_key(),
+            self.relay_server_url(),
+            card,
+            binding,
+        ))
+    }
 }
 
 /// The exchange both cards are signed for, once it is known.
 fn binding(exchange: &LinkExchange) -> Option<LinkExchangeBinding> {
     match &exchange.role {
         Role::Initiator(session) => session.binding().copied(),
-        Role::Responder(_) => exchange.responder_binding,
+        Role::Responder(session) => Some(*session.binding()),
     }
 }
 
@@ -305,8 +307,11 @@ fn watched_gate(role: &Role) -> Option<Vec<u8>> {
             LinkInitiatorState::Retrieving => session.escrow_gate_bytes(),
             _ => None,
         },
-        Role::Responder(session) => matches!(session.current_state(), LinkResponderState::Polling)
-            .then(|| session.gate_hash_bytes()),
+        Role::Responder(session) => match session.current_state() {
+            LinkResponderState::AwaitingPresence => Some(session.handshake_gate_bytes()),
+            LinkResponderState::Polling => session.escrow_gate_bytes(),
+            _ => None,
+        },
     }
 }
 
@@ -347,6 +352,7 @@ fn responder_failure(reason: &LinkResponderFailureReason) -> String {
         LinkResponderFailureReason::PollingTimedOut => "polling_timed_out",
         LinkResponderFailureReason::DepositRejected => "deposit_rejected",
         LinkResponderFailureReason::LinkAlreadyUsed => "link_already_used",
+        LinkResponderFailureReason::HandshakeFailed { .. } => "handshake_failed",
         LinkResponderFailureReason::DecryptError { .. } => "decrypt_error",
         LinkResponderFailureReason::Cancelled => "cancelled",
     }

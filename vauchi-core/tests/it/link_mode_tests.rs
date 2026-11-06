@@ -7,7 +7,45 @@
 use base64::Engine as _;
 use proptest::prelude::any;
 use vauchi_core::Command;
+use vauchi_core::exchange::escrow::EscrowKeys;
 use vauchi_core::exchange::link_mode::*;
+use vauchi_core::exchange::link_pake::{LinkCode, LinkPakeError};
+
+fn deposit_blob(command: &Command) -> Vec<u8> {
+    match command {
+        Command::RelayEscrowDeposit { encrypted_card, .. } => encrypted_card.clone(),
+        other => panic!("expected a deposit, got {other:?}"),
+    }
+}
+
+/// Runs both sides of a fresh link, the responder holding `typed_code` or, with
+/// `None`, the code the sender shows. Returns the initiator's and the
+/// responder's escrow keys.
+fn run_both_sides(typed_code: Option<&LinkCode>) -> (EscrowKeys, EscrowKeys) {
+    let (mut init, presence) = initiator_generate();
+    let parsed = parse_link_url(&init.url).expect("a generated link parses");
+    let code = typed_code.unwrap_or(&init.code);
+    let opening = responder_open(&parsed, code).expect("a generated link opens");
+    let responder_blob = deposit_blob(&opening.deposit_command());
+    let responder_keys = opening
+        .finish(&deposit_blob(&presence[0]))
+        .expect("the sender's deposit matches the link");
+    let (_, initiator_keys) = initiator_derive_keys(
+        &init.secret_key_bytes,
+        init.pake.take().expect("a fresh initiation has its PAKE"),
+        &responder_blob,
+    )
+    .expect("the responder's deposit is well formed");
+    (initiator_keys, responder_keys)
+}
+
+fn responder_keys() -> EscrowKeys {
+    run_both_sides(None).1
+}
+
+fn a_code_other_than_any_shown() -> LinkCode {
+    LinkCode::parse("000000").expect("six digits")
+}
 
 // ================================================================
 // Card payload codec ([version][pubkey][card])
@@ -132,17 +170,49 @@ fn long_sender_name_is_cut_on_a_character_boundary() {
     assert_eq!(carried, "é".repeat(32));
 }
 
-// Links shared before the https form still complete during the 7-day
-// escrow TTL (vauchi/private#277, plan D2).
+// The landing page's Open button hands this form to an installed app.
 // @internal
 #[test]
-fn legacy_vauchi_scheme_links_still_parse() {
+fn app_form_links_parse() {
     let (pk, n) = ([7u8; 32], [9u8; 32]);
-    let legacy = format!("vauchi://exchange?pk={}&n={}", b64(&pk), b64(&n));
-    let parsed = parse_link_url(&legacy).expect("legacy link parses");
+    let link = format!("vauchi://exchange?pk={}&n={}&v=2", b64(&pk), b64(&n));
+    let parsed = parse_link_url(&link).expect("app-form link parses");
     assert_eq!(parsed.initiator_public_key, pk);
     assert_eq!(parsed.nonce, n);
-    assert!(parse_exchange_deep_link(&legacy).is_ok());
+    assert!(parse_exchange_deep_link(&link).is_ok());
+}
+
+// A link with no code behind it would keep the attack the code removes: the
+// first person to open it becomes a contact (#727).
+// @claim: S9
+// @internal
+#[test]
+fn a_link_of_no_supported_version_is_refused() {
+    let params = format!("pk={}&n={}", b64(&[7u8; 32]), b64(&[9u8; 32]));
+    for suffix in ["", "&v=", "&v=1", "&v=3", "&v=2x", "&v=20", "&V=2"] {
+        for prefix in ["https://vauchi.app/x#", "vauchi://exchange?"] {
+            let link = format!("{prefix}{params}{suffix}");
+            assert_eq!(parse_link_url(&link), None, "{link}");
+            assert_eq!(
+                parse_exchange_deep_link(&link),
+                Err(DeepLinkParseError::MalformedQuery),
+                "{link}"
+            );
+        }
+    }
+}
+
+// @claim: S9
+// @internal
+#[test]
+fn the_link_holds_nothing_but_its_key_nonce_version_and_name() {
+    let (init, _) = initiator_generate_named("Alice");
+    let (_, fragment) = init.url.split_once('#').expect("fragment");
+    let names: Vec<&str> = fragment
+        .split('&')
+        .filter_map(|param| param.split_once('=').map(|(name, _)| name))
+        .collect();
+    assert_eq!(names, ["pk", "n", "v", "nm"]);
 }
 
 // @internal
@@ -157,7 +227,7 @@ fn https_link_opens_through_the_deep_link_parser() {
 // @internal
 #[test]
 fn https_links_outside_the_fragment_or_off_domain_are_rejected() {
-    let params = format!("pk={}&n={}", b64(&[1u8; 32]), b64(&[2u8; 32]));
+    let params = format!("pk={}&n={}&v=2", b64(&[1u8; 32]), b64(&[2u8; 32]));
     for url in [
         format!("https://vauchi.app/x?{params}"),
         format!("https://evil.example/x#{params}"),
@@ -179,7 +249,7 @@ proptest::proptest! {
     // @internal
     #[test]
     fn both_link_forms_roundtrip(pk in any::<[u8; 32]>(), n in any::<[u8; 32]>()) {
-        let params = format!("pk={}&n={}", b64(&pk), b64(&n));
+        let params = format!("pk={}&n={}&v=2", b64(&pk), b64(&n));
         for url in [format!("https://vauchi.app/x#{params}"), format!("vauchi://exchange?{params}")] {
             let parsed = parse_link_url(&url).expect("well-formed link parses");
             proptest::prop_assert_eq!(parsed.initiator_public_key, pk);
@@ -239,50 +309,44 @@ fn parse_rejects_missing_pk() {
 fn parse_rejects_short_pk() {
     let short = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([0u8; 16]);
     let n = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([0u8; 32]);
-    let url = format!("vauchi://exchange?pk={short}&n={n}");
+    let url = format!("vauchi://exchange?pk={short}&n={n}&v=2");
     assert!(parse_link_url(&url).is_none());
 }
 
 // @internal
 #[test]
 fn parse_rejects_invalid_base64() {
-    let url = "vauchi://exchange?pk=!!!invalid!!!&n=!!!also!!!";
+    let url = "vauchi://exchange?pk=!!!invalid!!!&n=!!!also!!!&v=2";
     assert!(parse_link_url(url).is_none());
 }
 
 // ================================================================
 // ================================================================
 
+// The responder deposits before it holds the escrow keys, because the relay
+// serves the sender's deposit only once the gate holds two slots; its card
+// waits for the keys (#727).
 // @internal
 #[test]
-fn responder_produces_two_deposit_commands() {
+fn the_responder_deposits_its_key_and_pake_message_in_the_handshake_gate() {
     let (init, _) = initiator_generate();
     let parsed = parse_link_url(&init.url).unwrap();
 
-    let (_, commands) = responder_respond(&parsed, b"encrypted_card".to_vec()).unwrap();
-    assert_eq!(commands.len(), 2, "responder emits 2 deposits");
+    let opening = responder_open(&parsed, &init.code).unwrap();
 
-    // First command: handshake slot deposit (epk)
-    assert!(matches!(&commands[0], Command::RelayEscrowDeposit { .. }));
-    // Second command: card deposit
-    assert!(matches!(&commands[1], Command::RelayEscrowDeposit { .. }));
-}
-
-// @internal
-#[test]
-fn responder_handshake_deposit_contains_32_byte_epk() {
-    let (init, _) = initiator_generate();
-    let parsed = parse_link_url(&init.url).unwrap();
-    let (_, commands) = responder_respond(&parsed, b"card".to_vec()).unwrap();
-
-    if let Command::RelayEscrowDeposit { encrypted_card, .. } = &commands[0] {
-        assert_eq!(
-            encrypted_card.len(),
-            32,
-            "handshake deposit must be 32-byte epk"
-        );
-    } else {
-        panic!("expected RelayEscrowDeposit");
+    match opening.deposit_command() {
+        Command::RelayEscrowDeposit {
+            gate_hash,
+            slot_hash,
+            encrypted_card,
+            ..
+        } => {
+            assert_eq!(gate_hash, handshake_gate(&parsed.nonce));
+            assert_eq!(slot_hash, opening.epk_slot());
+            assert_eq!(encrypted_card.len(), 32 + 33);
+            assert_eq!(&encrypted_card[..32], &opening.binding().responder_epk);
+        }
+        other => panic!("expected a deposit, got {other:?}"),
     }
 }
 
@@ -291,19 +355,26 @@ fn responder_handshake_deposit_contains_32_byte_epk() {
 
 // @internal
 #[test]
-fn initiator_complete_produces_one_deposit() {
-    // Simulate: responder generated an epk, initiator retrieves it
-    let peer_epk = [0x42u8; 32]; // fake responder public key
-    let (init, _) = initiator_generate();
+fn an_escrow_deposit_goes_to_our_slot_in_the_escrow_gate() {
+    let keys = responder_keys();
 
-    let (_, commands) = initiator_complete(
-        &init.secret_key_bytes,
-        &peer_epk,
-        b"encrypted_card".to_vec(),
-    )
-    .unwrap();
-    assert_eq!(commands.len(), 1);
-    assert!(matches!(&commands[0], Command::RelayEscrowDeposit { .. }));
+    let commands = build_escrow_deposit(&keys, b"encrypted_card".to_vec());
+
+    match &commands[..] {
+        [
+            Command::RelayEscrowDeposit {
+                gate_hash,
+                slot_hash,
+                encrypted_card,
+                ..
+            },
+        ] => {
+            assert_eq!(*gate_hash, hex::decode(&keys.gate_hash).unwrap());
+            assert_eq!(*slot_hash, hex::decode(&keys.our_slot).unwrap());
+            assert_eq!(encrypted_card, b"encrypted_card");
+        }
+        other => panic!("expected one deposit, got {other:?}"),
+    }
 }
 
 // ================================================================
@@ -315,25 +386,7 @@ fn initiator_complete_produces_one_deposit() {
 fn initiator_and_responder_derive_same_gate_hash() {
     // This is the critical security property: both sides agree on
     // the escrow gate despite using different code paths.
-
-    // Step 1: Initiator generates URL
-    let (init, _) = initiator_generate();
-    let parsed = parse_link_url(&init.url).unwrap();
-
-    // Step 2: Responder responds (produces commands + keys)
-    let (resp_keys, resp_commands) = responder_respond(&parsed, b"bob_card".to_vec()).unwrap();
-
-    // Step 3: Extract responder's epk from handshake deposit
-    let resp_epk: [u8; 32] =
-        if let Command::RelayEscrowDeposit { encrypted_card, .. } = &resp_commands[0] {
-            encrypted_card.as_slice().try_into().unwrap()
-        } else {
-            panic!("expected deposit");
-        };
-
-    // Step 4: Initiator completes with responder's epk
-    let (init_keys, _) =
-        initiator_complete(&init.secret_key_bytes, &resp_epk, b"alice_card".to_vec()).unwrap();
+    let (init_keys, resp_keys) = run_both_sides(None);
 
     // Critical assertion: same gate, swapped slots
     assert_eq!(
@@ -350,6 +403,143 @@ fn initiator_and_responder_derive_same_gate_hash() {
     );
 }
 
+// Whoever holds only the link cannot reach the sender's card: without the code
+// the two sides sit in different gates, and neither key opens the other's
+// deposit (#727, SC-74).
+// @claim: S9
+// @internal
+#[test]
+fn a_wrong_code_leaves_the_two_sides_in_different_gates() {
+    let (init_keys, resp_keys) = run_both_sides(Some(&a_code_other_than_any_shown()));
+
+    assert_ne!(init_keys.gate_hash, resp_keys.gate_hash);
+    assert_ne!(init_keys.our_slot, resp_keys.their_slot);
+
+    let from_initiator = init_keys.encrypt_card(b"alice's card").expect("encrypt");
+    assert!(matches!(
+        responder_complete(&resp_keys, &from_initiator),
+        Err(LinkModeError::CardCryptoFailed(_))
+    ));
+    let from_responder = resp_keys.encrypt_card(b"bob's card").expect("encrypt");
+    assert!(init_keys.decrypt_card(&from_responder).is_err());
+}
+
+// @internal
+#[test]
+fn a_person_typing_the_code_as_grouped_on_screen_reaches_the_same_gate() {
+    let (mut init, presence) = initiator_generate();
+    let parsed = parse_link_url(&init.url).unwrap();
+    let typed = LinkCode::parse(&init.code.grouped()).expect("the shown form parses");
+
+    let opening = responder_open(&parsed, &typed).unwrap();
+    let blob = deposit_blob(&opening.deposit_command());
+    let resp_keys = opening.finish(&deposit_blob(&presence[0])).unwrap();
+    let (_, init_keys) =
+        initiator_derive_keys(&init.secret_key_bytes, init.pake.take().unwrap(), &blob).unwrap();
+
+    assert_eq!(init_keys.gate_hash, resp_keys.gate_hash);
+}
+
+// A relay answering with another exchange's deposit must not get the responder
+// to run the PAKE against a key the link does not name (DC-01).
+// @internal
+#[test]
+fn a_sender_deposit_naming_another_key_than_the_link_is_refused() {
+    let (init, _) = initiator_generate();
+    let (_, foreign_presence) = initiator_generate();
+    let parsed = parse_link_url(&init.url).unwrap();
+
+    let result = responder_open(&parsed, &init.code)
+        .unwrap()
+        .finish(&deposit_blob(&foreign_presence[0]));
+
+    assert!(matches!(result, Err(LinkModeError::PresenceKeyMismatch)));
+}
+
+// Symmetric SPAKE2 would complete against itself: a relay handing the sender
+// its own deposit back must not get it past the handshake without a code.
+// @internal
+#[test]
+fn the_initiator_refuses_its_own_deposit_back() {
+    let (mut init, presence) = initiator_generate();
+
+    let result = initiator_derive_keys(
+        &init.secret_key_bytes,
+        init.pake.take().unwrap(),
+        &deposit_blob(&presence[0]),
+    );
+
+    assert!(matches!(
+        result,
+        Err(LinkModeError::Pake(LinkPakeError::ReflectedMessage))
+    ));
+}
+
+proptest::proptest! {
+    // CC-14: the other side's deposit is untrusted. Anything but its exact
+    // length is refused before any crypto runs.
+    // @internal
+    #[test]
+    fn a_handshake_deposit_of_the_wrong_length_is_refused(
+        blob in proptest::collection::vec(any::<u8>(), 0..128),
+    ) {
+        proptest::prop_assume!(blob.len() != 32 + 33);
+        let (mut init, _) = initiator_generate();
+        let parsed = parse_link_url(&init.url).unwrap();
+
+        let from_responder = initiator_derive_keys(
+            &init.secret_key_bytes,
+            init.pake.take().unwrap(),
+            &blob,
+        );
+        let from_sender = responder_open(&parsed, &init.code).unwrap().finish(&blob);
+
+        let refused_with_its_length = |result: Result<_, LinkModeError>| {
+            result.is_err_and(|error| {
+                matches!(
+                    error,
+                    LinkModeError::MalformedHandshakeBlob { received } if received == blob.len()
+                )
+            })
+        };
+        proptest::prop_assert!(refused_with_its_length(from_responder.map(|_| ())));
+        proptest::prop_assert!(refused_with_its_length(from_sender.map(|_| ())));
+    }
+
+    // CC-14: the PAKE message inside a well-sized deposit is untrusted too. It
+    // either fails as invalid or yields keys nobody else holds; it never panics.
+    // @internal
+    #[test]
+    fn a_garbage_pake_message_never_reaches_the_senders_gate(
+        message in proptest::collection::vec(any::<u8>(), 33..=33),
+        pk in any::<[u8; 32]>(),
+    ) {
+        let (mut init, presence) = initiator_generate();
+        let parsed = parse_link_url(&init.url).unwrap();
+        let mut blob = pk.to_vec();
+        blob.extend_from_slice(&message);
+
+        let genuine = responder_open(&parsed, &init.code)
+            .unwrap()
+            .finish(&deposit_blob(&presence[0]))
+            .unwrap();
+        let forged = initiator_derive_keys(
+            &init.secret_key_bytes,
+            init.pake.take().unwrap(),
+            &blob,
+        );
+
+        match forged {
+            Ok((_, keys)) => proptest::prop_assert_ne!(&keys.gate_hash, &genuine.gate_hash),
+            Err(error) => proptest::prop_assert!(matches!(
+                error,
+                LinkModeError::Pake(LinkPakeError::InvalidMessage)
+                    | LinkModeError::NonContributoryDh
+            ), "{error:?}"),
+        }
+    }
+}
+
 // ================================================================
 // Security: handshake slot unrelated to gate hash
 // ================================================================
@@ -358,8 +548,7 @@ fn initiator_and_responder_derive_same_gate_hash() {
 #[test]
 fn handshake_slot_unrelated_to_gate_hash() {
     let (init, _) = initiator_generate();
-    let parsed = parse_link_url(&init.url).unwrap();
-    let (keys, _) = responder_respond(&parsed, b"card".to_vec()).unwrap();
+    let keys = responder_keys();
 
     assert_ne!(
         init.handshake_slot, keys.gate_hash,
@@ -375,10 +564,10 @@ fn handshake_slot_derived_from_nonce_not_secret() {
 
     let pk_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([0x11; 32]);
     let n_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(nonce);
-    let url1 = format!("vauchi://exchange?pk={pk_b64}&n={n_b64}");
+    let url1 = format!("vauchi://exchange?pk={pk_b64}&n={n_b64}&v=2");
 
     let pk_b64_2 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([0x22; 32]);
-    let url2 = format!("vauchi://exchange?pk={pk_b64_2}&n={n_b64}");
+    let url2 = format!("vauchi://exchange?pk={pk_b64_2}&n={n_b64}&v=2");
 
     let parsed1 = parse_link_url(&url1).unwrap();
     let parsed2 = parse_link_url(&url2).unwrap();
@@ -388,18 +577,9 @@ fn handshake_slot_derived_from_nonce_not_secret() {
     // We can't call derive_handshake_slot directly (private), but we
     // can verify through the responder flow that the handshake deposits
     // go to the same gate.
-    let (_, cmds1) = responder_respond(&parsed1, b"a".to_vec()).unwrap();
-    let (_, cmds2) = responder_respond(&parsed2, b"b".to_vec()).unwrap();
-
-    // Extract handshake gate_hash from first command of each
-    let gate1 = match &cmds1[0] {
-        Command::RelayEscrowDeposit { gate_hash, .. } => gate_hash.clone(),
-        _ => panic!(),
-    };
-    let gate2 = match &cmds2[0] {
-        Command::RelayEscrowDeposit { gate_hash, .. } => gate_hash.clone(),
-        _ => panic!(),
-    };
+    let code = a_code_other_than_any_shown();
+    let gate1 = responder_open(&parsed1, &code).unwrap().handshake_gate();
+    let gate2 = responder_open(&parsed2, &code).unwrap().handshake_gate();
 
     assert_eq!(
         gate1, gate2,
@@ -441,16 +621,10 @@ fn presence_deposit_targets_handshake_gate() {
 // @internal
 #[test]
 fn presence_deposit_uses_initiator_epk_as_blob() {
-    let (_init, commands) = initiator_generate();
-    if let Command::RelayEscrowDeposit { encrypted_card, .. } = &commands[0] {
-        assert_eq!(
-            encrypted_card.len(),
-            32,
-            "presence blob must be 32-byte public key"
-        );
-    } else {
-        panic!("expected RelayEscrowDeposit");
-    }
+    let (init, commands) = initiator_generate();
+    let blob = deposit_blob(&commands[0]);
+    assert_eq!(blob.len(), 32 + 33, "presence blob is pk_i || msg_i");
+    assert_eq!(&blob[..32], &init.public_key);
 }
 
 // @internal
@@ -458,14 +632,8 @@ fn presence_deposit_uses_initiator_epk_as_blob() {
 fn presence_and_responder_epk_use_different_slots() {
     let (init, init_cmds) = initiator_generate();
     let parsed = parse_link_url(&init.url).unwrap();
-    let (_, resp_cmds) = responder_respond(&parsed, b"card".to_vec()).unwrap();
-
-    // Extract slot hashes from handshake deposits
+    let resp_slot = responder_open(&parsed, &init.code).unwrap().epk_slot();
     let init_slot = match &init_cmds[0] {
-        Command::RelayEscrowDeposit { slot_hash, .. } => slot_hash.clone(),
-        _ => panic!(),
-    };
-    let resp_slot = match &resp_cmds[0] {
         Command::RelayEscrowDeposit { slot_hash, .. } => slot_hash.clone(),
         _ => panic!(),
     };
@@ -491,12 +659,13 @@ fn presence_slot_is_64_hex_chars() {
 // @internal
 #[test]
 fn initiator_rejects_small_order_point() {
-    let (init, _) = initiator_generate();
+    let (mut init, presence) = initiator_generate();
     // All-zeros is a small-order point on Curve25519
-    let zero_key = [0u8; 32];
-    let result = initiator_complete(&init.secret_key_bytes, &zero_key, b"card".to_vec());
+    let mut blob = vec![0u8; 32];
+    blob.extend_from_slice(&deposit_blob(&presence[0])[32..]);
+    let result = initiator_derive_keys(&init.secret_key_bytes, init.pake.take().unwrap(), &blob);
     assert!(
-        result.is_err(),
+        matches!(result, Err(LinkModeError::NonContributoryDh)),
         "DH with small-order point must be rejected"
     );
 }
@@ -507,12 +676,12 @@ fn responder_rejects_small_order_point_in_url() {
     // Craft a URL containing an all-zeros public key (small-order point)
     let zero_pk = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([0u8; 32]);
     let nonce = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([0xAA; 32]);
-    let url = format!("vauchi://exchange?pk={zero_pk}&n={nonce}");
+    let url = format!("vauchi://exchange?pk={zero_pk}&n={nonce}&v=2");
     let parsed = parse_link_url(&url).unwrap();
-    let result = responder_respond(&parsed, b"card".to_vec());
+    let result = responder_open(&parsed, &a_code_other_than_any_shown());
     assert!(
-        result.is_err(),
-        "Responder DH with small-order point must be rejected"
+        matches!(result, Err(LinkModeError::NonContributoryDh)),
+        "Responder DH with small-order point must be rejected before any deposit"
     );
 }
 
@@ -604,7 +773,7 @@ fn parse_deep_link_rejects_malformed_query() {
     let short = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([0u8; 16]);
     let nonce = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([0u8; 32]);
     assert_eq!(
-        parse_exchange_deep_link(&format!("vauchi://exchange?pk={short}&n={nonce}")),
+        parse_exchange_deep_link(&format!("vauchi://exchange?pk={short}&n={nonce}&v=2")),
         Err(DeepLinkParseError::MalformedQuery),
     );
 }
@@ -683,26 +852,7 @@ proptest::proptest! {
 // @scenario: link_exchange :: the responder decrypts the initiator's deposit
 #[test]
 fn responder_decrypts_a_card_encrypted_with_independently_derived_initiator_keys() {
-    let (init, _) = initiator_generate();
-    let parsed = parse_link_url(&init.url).expect("a freshly generated url must parse");
-
-    let LinkResponse {
-        keys: responder_keys,
-        commands: responder_commands,
-        ..
-    } = responder_respond_with_signed_card(&parsed, |_| b"bob serialized card".to_vec())
-        .expect("responder_respond_with_signed_card must succeed");
-
-    // The responder's epk reaches the initiator through the handshake gate.
-    let responder_epk = match &responder_commands[0] {
-        Command::RelayEscrowDeposit { encrypted_card, .. } => {
-            <[u8; 32]>::try_from(encrypted_card.as_slice()).expect("an epk is 32 bytes")
-        }
-        other => panic!("expected the epk deposit at index 0, got {other:?}"),
-    };
-
-    let initiator_keys = initiator_derive_keys(&init.secret_key_bytes, &responder_epk)
-        .expect("initiator_derive_keys must succeed for a well-formed epk");
+    let (initiator_keys, responder_keys) = run_both_sides(None);
 
     let plaintext = b"alice serialized card";
     let ciphertext = initiator_keys
@@ -711,7 +861,7 @@ fn responder_decrypts_a_card_encrypted_with_independently_derived_initiator_keys
 
     let recovered = responder_complete(&responder_keys, &ciphertext).expect(
         "the responder must decrypt what the initiator encrypted — both sides \
-         derive from the same ECDH, so a failure here means the two derivations \
+         derive from the same ECDH and code, so a failure here means the two derivations \
          disagree and only the initiator ever completes",
     );
     assert_eq!(recovered.as_slice(), plaintext);
@@ -729,9 +879,7 @@ fn responder_decrypts_a_card_encrypted_with_independently_derived_initiator_keys
 // @internal
 #[test]
 fn responder_complete_round_trips_initiator_payload() {
-    let (init, _) = initiator_generate();
-    let parsed = parse_link_url(&init.url).unwrap();
-    let (keys, _) = responder_respond(&parsed, b"_".to_vec()).unwrap();
+    let keys = responder_keys();
 
     let plaintext = b"Alice's serialized contact card";
     let ciphertext = keys.encrypt_card(plaintext).expect("encrypt");
@@ -747,9 +895,7 @@ fn responder_complete_round_trips_initiator_payload() {
 // @internal
 #[test]
 fn responder_complete_rejects_truncated_ciphertext() {
-    let (init, _) = initiator_generate();
-    let parsed = parse_link_url(&init.url).unwrap();
-    let (keys, _) = responder_respond(&parsed, b"_".to_vec()).unwrap();
+    let keys = responder_keys();
 
     // Empty blob — fails the AEAD nonce-length check inside decrypt_card.
     let err = responder_complete(&keys, &[]).expect_err("empty ciphertext must error");
@@ -772,13 +918,9 @@ fn responder_complete_rejects_truncated_ciphertext() {
 // @internal
 #[test]
 fn responder_complete_rejects_wrong_key() {
-    let (init_a, _) = initiator_generate();
-    let parsed_a = parse_link_url(&init_a.url).unwrap();
-    let (keys_a, _) = responder_respond(&parsed_a, b"_".to_vec()).unwrap();
+    let keys_a = responder_keys();
 
-    let (init_b, _) = initiator_generate();
-    let parsed_b = parse_link_url(&init_b.url).unwrap();
-    let (keys_b, _) = responder_respond(&parsed_b, b"_".to_vec()).unwrap();
+    let keys_b = responder_keys();
 
     let ciphertext = keys_a.encrypt_card(b"secret").expect("encrypt");
 
@@ -791,52 +933,30 @@ fn responder_complete_rejects_wrong_key() {
 }
 
 // ================================================================
-// Responder-side: responder_respond_with_signed_card
+// Responder-side: the binding its card is signed for
 // ================================================================
 
-/// The responder signs its card for this exchange: the binding handed to
-/// the signer is the link's nonce and key plus the responder's fresh epk,
-/// the same binding returned for verifying the initiator's card (#942).
-/// The signed bytes are what the second deposit encrypts.
+/// The binding both cards are signed for is the link's nonce and key plus the
+/// responder's fresh epk (#942).
 // @internal
 #[test]
-fn responder_signs_its_card_for_the_link_and_its_own_epk() {
+fn the_responders_binding_is_the_link_and_its_own_epk() {
     let (init, _) = initiator_generate();
     let parsed = parse_link_url(&init.url).unwrap();
 
-    let raw = b"alice serialized card";
-    let mut signed_for = None;
-    let response = responder_respond_with_signed_card(&parsed, |binding| {
-        signed_for = Some(*binding);
-        raw.to_vec()
-    })
-    .unwrap();
+    let opening = responder_open(&parsed, &init.code).unwrap();
 
-    let (epk_gate, epk) = match &response.commands[0] {
-        Command::RelayEscrowDeposit {
-            gate_hash,
-            encrypted_card,
-            ..
-        } => (gate_hash.clone(), encrypted_card.clone()),
-        other => panic!("expected the epk deposit at index 0, got {other:?}"),
-    };
-    let expected = LinkExchangeBinding {
-        nonce: parsed.nonce,
-        initiator_epk: parsed.initiator_public_key,
-        responder_epk: epk.try_into().expect("an epk is 32 bytes"),
-    };
-    assert_eq!(signed_for, Some(expected));
-    assert_eq!(response.binding, expected);
-    assert_eq!(response.handshake_gate, epk_gate);
-    assert_eq!(response.handshake_gate, handshake_gate(&parsed.nonce));
-
-    let encrypted_blob = match &response.commands[1] {
-        Command::RelayEscrowDeposit { encrypted_card, .. } => encrypted_card.clone(),
-        other => panic!("expected RelayEscrowDeposit at index 1, got {other:?}"),
-    };
-    let recovered =
-        responder_complete(&response.keys, &encrypted_blob).expect("decrypt round-trip");
-    assert_eq!(recovered.as_slice(), raw);
+    let epk: [u8; 32] = deposit_blob(&opening.deposit_command())[..32]
+        .try_into()
+        .expect("an epk is 32 bytes");
+    assert_eq!(
+        *opening.binding(),
+        LinkExchangeBinding {
+            nonce: parsed.nonce,
+            initiator_epk: parsed.initiator_public_key,
+            responder_epk: epk,
+        }
+    );
 }
 
 // @internal
@@ -848,9 +968,7 @@ proptest::proptest! {
     // @internal
     #[test]
     fn responder_complete_never_panics(blob in proptest::collection::vec(any::<u8>(), 0..512)) {
-        let (init, _) = initiator_generate();
-        let parsed = parse_link_url(&init.url).unwrap();
-        let (keys, _) = responder_respond(&parsed, b"_".to_vec()).unwrap();
+        let keys = responder_keys();
 
         let result = responder_complete(&keys, &blob);
         if let Err(e) = result {

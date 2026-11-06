@@ -6,7 +6,7 @@
 //!
 //! The pure-Rust state machine (no threads, no sleeps) drives the
 //! responder side of link-mode contact exchange after the consent
-//! gate grants. Inputs are `apply_hardware_event` (relay events
+//! gate grants and the code is typed. Inputs are `apply_hardware_event` (relay events
 //! arriving from the cycle thread) and `tick(now_unix)` (deadline
 //! checks); outputs are `drain_pending_commands` (commands the cycle
 //! thread should dispatch) and `current_state`.
@@ -21,22 +21,38 @@ use vauchi_core::{Command, Event};
 /// Fixed unix-seconds base for deterministic deadline tests.
 const NOW: u64 = 1_700_000_000;
 
-/// Synthetic responder session — derives keys + commands the same way
-/// the production cycle thread will, but stays inside the test.
-fn make_session(deadline_unix: u64) -> LinkResponderSession {
-    make_session_for_link(deadline_unix).0
+fn deposit_blob(command: &Command) -> Vec<u8> {
+    match command {
+        Command::RelayEscrowDeposit { encrypted_card, .. } => encrypted_card.clone(),
+        other => panic!("expected a deposit, got {other:?}"),
+    }
 }
 
-/// Like [`make_session`], also returning the link's handshake gate.
-fn make_session_for_link(deadline_unix: u64) -> (LinkResponderSession, Vec<u8>) {
-    let (init, _) = initiator_generate();
+/// A responder session past the handshake: its keys are derived and its card
+/// deposited, so it polls the escrow gate. The state most tests start from.
+fn make_session(deadline_unix: u64) -> LinkResponderSession {
+    let (init, presence) = initiator_generate();
     let parsed = parse_link_url(&init.url).unwrap();
-    // `responder_respond` returns the keys + 2 RelayEscrowDeposit commands.
-    let (keys, deposits) = responder_respond(&parsed, b"responder_card".to_vec()).unwrap();
-    let handshake = handshake_gate(&parsed.nonce);
+    let opening = responder_open(&parsed, &init.code).unwrap();
+    let mut session = LinkResponderSession::new(opening, deadline_unix);
+    session.apply_hardware_event(Event::RelayEscrowBlobReceived {
+        gate_hash: handshake_gate(&parsed.nonce),
+        blob: deposit_blob(&presence[0]),
+    });
+    session.deposit_card(b"responder_card");
+    session
+}
+
+/// A responder session that has only just opened the link, with the sender's
+/// deposit and the link's handshake gate.
+fn make_session_for_link(deadline_unix: u64) -> (LinkResponderSession, Vec<u8>, Vec<u8>) {
+    let (init, presence) = initiator_generate();
+    let parsed = parse_link_url(&init.url).unwrap();
+    let opening = responder_open(&parsed, &init.code).unwrap();
     (
-        LinkResponderSession::new(keys, handshake.clone(), deposits, deadline_unix),
-        handshake,
+        LinkResponderSession::new(opening, deadline_unix),
+        deposit_blob(&presence[0]),
+        handshake_gate(&parsed.nonce),
     )
 }
 
@@ -50,17 +66,27 @@ fn make_session_for_link(deadline_unix: u64) -> (LinkResponderSession, Vec<u8>) 
 // @scenario: link_exchange :: the responder retrieves the initiator's deposit
 #[test]
 fn responder_retrieves_using_its_own_slot_so_the_relay_returns_the_peers_blob() {
-    let (init, _) = initiator_generate();
+    let (mut init, presence) = initiator_generate();
     let parsed = parse_link_url(&init.url).expect("a freshly generated url must parse");
-    let (keys, deposits) =
-        responder_respond(&parsed, b"responder_card".to_vec()).expect("responder_respond");
+    let opening = responder_open(&parsed, &init.code).unwrap();
+    let responder_deposit = deposit_blob(&opening.deposit_command());
+    // The sender's keys name the two slots from the other side.
+    let (_, sender_keys) = initiator_derive_keys(
+        &init.secret_key_bytes,
+        init.pake.take().unwrap(),
+        &responder_deposit,
+    )
+    .unwrap();
+    let gate_hash = hex_bytes(&sender_keys.gate_hash);
+    let our_slot = hex_bytes(&sender_keys.their_slot);
+    let their_slot = hex_bytes(&sender_keys.our_slot);
 
-    let gate_hash = hex_bytes(&keys.gate_hash);
-    let our_slot = hex_bytes(&keys.our_slot);
-    let their_slot = hex_bytes(&keys.their_slot);
-
-    let mut session =
-        LinkResponderSession::new(keys, handshake_gate(&parsed.nonce), deposits, NOW + 300);
+    let mut session = LinkResponderSession::new(opening, NOW + 300);
+    session.apply_hardware_event(Event::RelayEscrowBlobReceived {
+        gate_hash: handshake_gate(&parsed.nonce),
+        blob: deposit_blob(&presence[0]),
+    });
+    session.deposit_card(b"responder_card");
     let _ = session.drain_pending_commands();
 
     session.apply_hardware_event(Event::RelayEscrowReady {
@@ -103,40 +129,149 @@ fn hex_bytes(hex_string: &str) -> Vec<u8> {
 
 // @internal
 #[test]
-fn fresh_session_emits_deposit_and_check_commands() {
-    let now = NOW;
-    let mut session = make_session(now + 300);
+fn a_fresh_session_deposits_its_handshake_blob_and_no_card() {
+    let (mut session, _presence, handshake) = make_session_for_link(NOW + 300);
 
-    // Initial state is Polling — deposits are fire-and-forget; the
-    // responder waits for the gate-count `RelayEscrowReady` ack rather
-    // than per-deposit confirmation.
-    assert!(
-        matches!(session.current_state(), LinkResponderState::Polling),
-        "fresh session must start in Polling, got {:?}",
-        session.current_state()
+    assert_eq!(
+        session.current_state(),
+        &LinkResponderState::AwaitingPresence
     );
 
     let cmds = session.drain_pending_commands();
-    // Two RelayEscrowDeposit (handshake epk + encrypted card) plus
-    // one RelayEscrowCheck so the relay starts watching the gate.
-    let deposits = cmds
-        .iter()
-        .filter(|c| matches!(c, Command::RelayEscrowDeposit { .. }))
-        .count();
-    let checks = cmds
-        .iter()
-        .filter(|c| matches!(c, Command::RelayEscrowCheck { .. }))
-        .count();
-    assert_eq!(deposits, 2, "expected 2 deposits, got {deposits}");
-    assert_eq!(checks, 1, "expected 1 check, got {checks}");
-
-    // Drain is one-shot — second drain is empty.
-    let cmds_again = session.drain_pending_commands();
+    match &cmds[..] {
+        [
+            Command::RelayEscrowDeposit {
+                gate_hash,
+                encrypted_card,
+                ..
+            },
+            Command::RelayEscrowCheck {
+                gate_hash: checked, ..
+            },
+        ] => {
+            assert_eq!(*gate_hash, handshake);
+            assert_eq!(*checked, handshake);
+            assert_eq!(encrypted_card.len(), 32 + 33);
+        }
+        other => panic!("expected the handshake deposit and a check, got {other:?}"),
+    }
     assert!(
-        cmds_again.is_empty(),
-        "drain_pending_commands must be one-shot, got {} extras",
-        cmds_again.len()
+        session.drain_pending_commands().is_empty(),
+        "drain_pending_commands must be one-shot"
     );
+}
+
+// ================================================================
+// The handshake: AwaitingPresence → AwaitingCard → Polling
+// ================================================================
+
+// The relay answers with the other slot's blob, so the session names its own.
+// @internal
+#[test]
+fn a_ready_handshake_gate_retrieves_the_senders_deposit_with_our_slot() {
+    let (mut session, _presence, handshake) = make_session_for_link(NOW + 300);
+    let deposited_to = match &session.drain_pending_commands()[0] {
+        Command::RelayEscrowDeposit { slot_hash, .. } => slot_hash.clone(),
+        other => panic!("expected the deposit, got {other:?}"),
+    };
+
+    session.apply_hardware_event(Event::RelayEscrowReady {
+        gate_hash: handshake.clone(),
+    });
+
+    let cmds = session.drain_pending_commands();
+    assert!(
+        matches!(
+            &cmds[..],
+            [Command::RelayEscrowRetrieve { gate_hash, slot_hash }]
+                if *gate_hash == handshake && *slot_hash == deposited_to
+        ),
+        "{cmds:?}"
+    );
+}
+
+// @internal
+#[test]
+fn the_senders_deposit_derives_keys_and_waits_for_the_signed_card() {
+    let (mut session, presence, handshake) = make_session_for_link(NOW + 300);
+    let _ = session.drain_pending_commands();
+
+    session.apply_hardware_event(Event::RelayEscrowBlobReceived {
+        gate_hash: handshake,
+        blob: presence,
+    });
+
+    assert_eq!(session.current_state(), &LinkResponderState::AwaitingCard);
+    assert!(session.escrow_gate_bytes().is_some());
+    assert!(
+        session.drain_pending_commands().is_empty(),
+        "nothing is deposited before the card is signed"
+    );
+}
+
+// @internal
+#[test]
+fn the_signed_card_is_deposited_and_the_escrow_gate_polled() {
+    let (mut session, presence, handshake) = make_session_for_link(NOW + 300);
+    let _ = session.drain_pending_commands();
+    session.apply_hardware_event(Event::RelayEscrowBlobReceived {
+        gate_hash: handshake,
+        blob: presence,
+    });
+
+    session.deposit_card(b"responder_card");
+
+    assert_eq!(session.current_state(), &LinkResponderState::Polling);
+    let escrow_gate = session.escrow_gate_bytes().unwrap();
+    let cmds = session.drain_pending_commands();
+    assert!(
+        matches!(
+            &cmds[..],
+            [
+                Command::RelayEscrowDeposit { gate_hash, .. },
+                Command::RelayEscrowCheck { gate_hash: checked, .. },
+            ] if *gate_hash == escrow_gate && *checked == escrow_gate
+        ),
+        "{cmds:?}"
+    );
+}
+
+// @internal
+#[test]
+fn a_card_before_the_senders_deposit_is_ignored() {
+    let (mut session, _presence, _handshake) = make_session_for_link(NOW + 300);
+    let _ = session.drain_pending_commands();
+
+    session.deposit_card(b"responder_card");
+
+    assert_eq!(
+        session.current_state(),
+        &LinkResponderState::AwaitingPresence
+    );
+    assert!(session.drain_pending_commands().is_empty());
+}
+
+// @internal
+#[test]
+fn a_sender_deposit_naming_another_key_fails_the_handshake() {
+    let (mut session, _presence, handshake) = make_session_for_link(NOW + 300);
+    let (_, foreign_presence, _) = make_session_for_link(NOW + 300);
+    let _ = session.drain_pending_commands();
+
+    session.apply_hardware_event(Event::RelayEscrowBlobReceived {
+        gate_hash: handshake,
+        blob: foreign_presence,
+    });
+
+    assert!(
+        matches!(
+            session.current_state(),
+            LinkResponderState::Failed(LinkResponderFailureReason::HandshakeFailed { .. })
+        ),
+        "got {:?}",
+        session.current_state()
+    );
+    assert!(session.drain_pending_commands().is_empty());
 }
 
 // ================================================================
@@ -150,7 +285,7 @@ fn relay_escrow_ready_on_our_gate_transitions_to_retrieving() {
     let mut session = make_session(now + 300);
     let _ = session.drain_pending_commands();
 
-    let our_gate = session.gate_hash_bytes();
+    let our_gate = session.escrow_gate_bytes().unwrap();
     session.apply_hardware_event(Event::RelayEscrowReady {
         gate_hash: our_gate,
     });
@@ -203,7 +338,7 @@ fn blob_received_with_valid_ciphertext_transitions_to_finalized() {
     let _ = session.drain_pending_commands();
 
     // Drive into Retrieving first.
-    let our_gate = session.gate_hash_bytes();
+    let our_gate = session.escrow_gate_bytes().unwrap();
     session.apply_hardware_event(Event::RelayEscrowReady {
         gate_hash: our_gate.clone(),
     });
@@ -214,7 +349,10 @@ fn blob_received_with_valid_ciphertext_transitions_to_finalized() {
     // initiator's deposit, which was encrypted with the same card_key
     // both sides derived.
     let plaintext = b"alice card bytes";
-    let ciphertext = session.test_encrypt_card(plaintext).expect("encrypt");
+    let ciphertext = session
+        .test_encrypt_card(plaintext)
+        .unwrap()
+        .expect("encrypt");
 
     session.apply_hardware_event(Event::RelayEscrowBlobReceived {
         gate_hash: our_gate,
@@ -240,7 +378,7 @@ fn blob_received_with_garbage_ciphertext_transitions_to_failed_decrypt() {
     let mut session = make_session(now + 300);
     let _ = session.drain_pending_commands();
 
-    let our_gate = session.gate_hash_bytes();
+    let our_gate = session.escrow_gate_bytes().unwrap();
     session.apply_hardware_event(Event::RelayEscrowReady {
         gate_hash: our_gate.clone(),
     });
@@ -271,7 +409,7 @@ fn relay_escrow_failed_on_our_gate_transitions_to_failed_deposit_rejected() {
     let mut session = make_session(now + 300);
     let _ = session.drain_pending_commands();
 
-    let our_gate = session.gate_hash_bytes();
+    let our_gate = session.escrow_gate_bytes().unwrap();
     session.apply_hardware_event(Event::RelayEscrowFailed {
         gate_hash: our_gate,
         reason: "slot already occupied".into(),
@@ -292,7 +430,7 @@ fn relay_escrow_failed_on_our_gate_transitions_to_failed_deposit_rejected() {
 // @internal
 #[test]
 fn a_taken_epk_slot_fails_as_link_already_used() {
-    let (mut session, handshake) = make_session_for_link(NOW + 300);
+    let (mut session, _presence, handshake) = make_session_for_link(NOW + 300);
     let _ = session.drain_pending_commands();
 
     session.apply_hardware_event(Event::RelayEscrowFailed {
@@ -310,7 +448,7 @@ fn a_taken_epk_slot_fails_as_link_already_used() {
 // @internal
 #[test]
 fn any_other_epk_deposit_failure_is_a_rejected_deposit() {
-    let (mut session, handshake) = make_session_for_link(NOW + 300);
+    let (mut session, _presence, handshake) = make_session_for_link(NOW + 300);
     let _ = session.drain_pending_commands();
 
     session.apply_hardware_event(Event::RelayEscrowFailed {
@@ -361,7 +499,7 @@ fn tick_past_deadline_fails_a_responder_stuck_retrieving() {
     let deadline = now + 1;
     let mut session = make_session(deadline);
     let _ = session.drain_pending_commands();
-    let our_gate = session.gate_hash_bytes();
+    let our_gate = session.escrow_gate_bytes().unwrap();
     session.apply_hardware_event(Event::RelayEscrowReady {
         gate_hash: our_gate,
     });
@@ -412,13 +550,13 @@ fn finalized_is_terminal() {
     let mut session = make_session(now + 300);
     let _ = session.drain_pending_commands();
 
-    let our_gate = session.gate_hash_bytes();
+    let our_gate = session.escrow_gate_bytes().unwrap();
     session.apply_hardware_event(Event::RelayEscrowReady {
         gate_hash: our_gate.clone(),
     });
     let _ = session.drain_pending_commands();
     let plaintext = b"x";
-    let ciphertext = session.test_encrypt_card(plaintext).unwrap();
+    let ciphertext = session.test_encrypt_card(plaintext).unwrap().unwrap();
     session.apply_hardware_event(Event::RelayEscrowBlobReceived {
         gate_hash: our_gate.clone(),
         blob: ciphertext,
@@ -457,7 +595,7 @@ fn failed_is_terminal() {
     ));
 
     // Subsequent events do not flip the variant.
-    let our_gate = session.gate_hash_bytes();
+    let our_gate = session.escrow_gate_bytes().unwrap();
     session.apply_hardware_event(Event::RelayEscrowReady {
         gate_hash: our_gate,
     });
@@ -497,7 +635,7 @@ proptest::proptest! {
         let mut session = make_session(now + 300);
         let _ = session.drain_pending_commands();
 
-        let our_gate = session.gate_hash_bytes();
+        let our_gate = session.escrow_gate_bytes().unwrap();
         let mut transitioned_terminal: Option<bool> = None;
 
         for ev in events {
@@ -574,4 +712,31 @@ enum EventKind {
     TickPast,
     Cancel,
     BlobOurs(u8),
+}
+
+proptest::proptest! {
+    // CC-14: the relay's answer on the handshake gate is untrusted. Whatever
+    // it holds, the session never panics and never moves on with a deposit
+    // that is not the sender's.
+    // @internal
+    #[test]
+    fn a_garbage_sender_deposit_never_derives_keys(
+        blob in proptest::collection::vec(any::<u8>(), 0..128),
+    ) {
+        let (mut session, presence, handshake) = make_session_for_link(NOW + 300);
+        proptest::prop_assume!(blob != presence);
+        let _ = session.drain_pending_commands();
+
+        session.apply_hardware_event(Event::RelayEscrowBlobReceived {
+            gate_hash: handshake,
+            blob,
+        });
+
+        proptest::prop_assert!(session.escrow_gate_bytes().is_none());
+        let is_handshake_failure = matches!(
+            session.current_state(),
+            LinkResponderState::Failed(LinkResponderFailureReason::HandshakeFailed { .. })
+        );
+        proptest::prop_assert!(is_handshake_failure, "got {:?}", session.current_state());
+    }
 }

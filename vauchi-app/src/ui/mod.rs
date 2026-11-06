@@ -183,7 +183,11 @@ pub use link_exchange::{
     ACTION_RETRY as LINK_EXCHANGE_ACTION_RETRY, ACTION_SHARE as LINK_EXCHANGE_ACTION_SHARE,
     LinkExchangeEngine,
 };
-pub use link_responder::{ACTION_CANCEL as LINK_RESPONDER_ACTION_CANCEL, LinkResponderEngine};
+pub use link_responder::{
+    ACTION_CANCEL as LINK_RESPONDER_ACTION_CANCEL,
+    ACTION_CONFIRM_CODE as LINK_RESPONDER_ACTION_CONFIRM_CODE,
+    LINK_CODE_INPUT_ID as LINK_RESPONDER_CODE_INPUT_ID, LinkResponderEngine,
+};
 pub use lock_screen::{DEFAULT_LOCK_MAX_ATTEMPTS, LockScreenEngine};
 pub use multi_stage_exchange::{
     CANCEL_ACTION_ID as MULTI_STAGE_CANCEL_ACTION_ID, DONE_ACTION_ID as MULTI_STAGE_DONE_ACTION_ID,

@@ -137,7 +137,7 @@
     "confirmation_slot_resp": "93f8bf28a5c6ff79e1982718f8e15f3bde5cae2419236b44511787a366e885b2"
   },
   "link_exchange": {
-    "url": "https://vauchi.app/x#pk=0hRyOv3-LN29ySmxil5DAX5ERF_F1sj8-IsYaMU_OVw&n=cHFyc3R1dnd4eXp7fH1-f4CBgoOEhYaHiImKi4yNjo8",
+    "url": "https://vauchi.app/x#pk=0hRyOv3-LN29ySmxil5DAX5ERF_F1sj8-IsYaMU_OVw&n=cHFyc3R1dnd4eXp7fH1-f4CBgoOEhYaHiImKi4yNjo8&v=2",
     "nonce": "707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f",
     "initiator_secret": "7172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f90",
     "initiator_public": "d214723afdfe2cddbdc929b18a5e43017e44445fc5d6c8fcf88b1868c53f395c",

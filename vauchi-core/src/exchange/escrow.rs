@@ -12,6 +12,7 @@
 //! (ADR-002, ADR-007). Card encryption uses XChaCha20-Poly1305 (ADR-002).
 
 use sha2::{Digest, Sha256};
+use zeroize::Zeroizing;
 
 use crate::crypto::encryption::{self, EncryptionError, SymmetricKey};
 use crate::crypto::kdf::HKDF;
@@ -25,6 +26,11 @@ const DOMAIN_GATE: &[u8] = b"vauchi-escrow-gate-v1";
 const DOMAIN_SLOT_INIT: &[u8] = b"vauchi-escrow-slot-init-v1";
 const DOMAIN_SLOT_RESP: &[u8] = b"vauchi-escrow-slot-resp-v1";
 const DOMAIN_CARD_KEY: &[u8] = b"vauchi-escrow-card-key-v1";
+
+const DOMAIN_PAKE_GATE: &[u8] = b"vauchi-escrow-pake-gate-v1";
+const DOMAIN_PAKE_SLOT_INIT: &[u8] = b"vauchi-escrow-pake-slot-init-v1";
+const DOMAIN_PAKE_SLOT_RESP: &[u8] = b"vauchi-escrow-pake-slot-resp-v1";
+const DOMAIN_PAKE_CARD_KEY: &[u8] = b"vauchi-escrow-pake-card-key-v1";
 
 /// `RelayEscrowFailed` reason for a deposit into a slot that already holds a
 /// blob. Each flow writes a slot once, so the blob is someone else's.
@@ -61,11 +67,49 @@ impl EscrowKeys {
     /// The shared secret is typically the output of an X25519 ECDH.
     /// Both parties must use the same shared secret but opposite roles.
     pub fn derive(shared_secret: &[u8], role: EscrowRole) -> Self {
+        Self::from_input(
+            shared_secret,
+            [
+                DOMAIN_GATE,
+                DOMAIN_SLOT_INIT,
+                DOMAIN_SLOT_RESP,
+                DOMAIN_CARD_KEY,
+            ],
+            role,
+        )
+    }
+
+    /// Derive the keys of a confirmed link exchange (#727, SC-74).
+    ///
+    /// The PAKE key enters every value, so a wrong code leaves the two sides
+    /// in different gates: there is no separate check to forget, and each
+    /// side's card stays out of the other's reach.
+    pub fn derive_with_pake(shared_secret: &[u8], pake_key: &[u8; 32], role: EscrowRole) -> Self {
+        let mut input = Zeroizing::new(Vec::with_capacity(shared_secret.len() + pake_key.len()));
+        input.extend_from_slice(shared_secret);
+        input.extend_from_slice(pake_key);
+        Self::from_input(
+            &input,
+            [
+                DOMAIN_PAKE_GATE,
+                DOMAIN_PAKE_SLOT_INIT,
+                DOMAIN_PAKE_SLOT_RESP,
+                DOMAIN_PAKE_CARD_KEY,
+            ],
+            role,
+        )
+    }
+
+    fn from_input(
+        input: &[u8],
+        [gate, slot_init, slot_resp, card_key]: [&[u8]; 4],
+        role: EscrowRole,
+    ) -> Self {
         // Derive raw 32-byte keys via HKDF with domain separation.
-        let gate_raw = HKDF::derive_key(None, shared_secret, DOMAIN_GATE);
-        let slot_init_raw = HKDF::derive_key(None, shared_secret, DOMAIN_SLOT_INIT);
-        let slot_resp_raw = HKDF::derive_key(None, shared_secret, DOMAIN_SLOT_RESP);
-        let card_key_raw = HKDF::derive_key(None, shared_secret, DOMAIN_CARD_KEY);
+        let gate_raw = HKDF::derive_key(None, input, gate);
+        let slot_init_raw = HKDF::derive_key(None, input, slot_init);
+        let slot_resp_raw = HKDF::derive_key(None, input, slot_resp);
+        let card_key_raw = HKDF::derive_key(None, input, card_key);
 
         // Hash the HKDF outputs to produce the relay-visible identifiers.
         // The relay sees only H(HKDF(...)), never the HKDF output itself.

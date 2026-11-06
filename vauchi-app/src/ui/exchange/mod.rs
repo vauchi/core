@@ -421,7 +421,13 @@ impl ExchangeEngine {
     /// engine-owned `LinkInitiatorSession`; this engine never enters a Link
     /// sub-flow. AppEngine routes `StartLinkExchange` to construct the new
     /// engine and build its `LinkInitiatorSession`.
-    fn start_link_mode(&self) -> ActionResult {
+    fn start_link_mode(&mut self) -> ActionResult {
+        self.mode_selection = Some(ModeSelectionEngine::new(
+            self.config.device_capabilities.clone(),
+            self.config.transport_readiness.clone(),
+            self.config.last_used_mode,
+            self.config.locale,
+        ));
         ActionResult::StartLinkExchange
     }
 
@@ -1470,6 +1476,24 @@ mod tests {
             )),
             "minimal success screen keeps its StatusIndicator",
         );
+    }
+
+    // @internal
+    #[test]
+    fn link_picker_remains_usable_after_handing_off_to_the_link_flow() {
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        for _ in 0..2 {
+            let result = engine.handle_action(UserAction::ListItemSelected {
+                component_id: "category:quick".into(),
+                item_id: "mode:link".into(),
+            });
+            assert!(matches!(result, ActionResult::StartLinkExchange));
+            assert_eq!(engine.current_screen().screen_id, "exchange_mode_selection");
+            assert_eq!(engine.current_screen().title, "Exchange Mode");
+        }
     }
 
     fn config_mode_selection() -> ExchangeConfig {

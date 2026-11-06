@@ -15,6 +15,7 @@ use vauchi_app::orchestrator::ble_handshake_machine::{BleMachinePhase, BleRole};
 use vauchi_app::ui::AppEngine;
 use vauchi_core::Event;
 use vauchi_core::api::Vauchi;
+use vauchi_core::contact::TrustLevel;
 use vauchi_core::crypto::X3DHKeyPair;
 use vauchi_core::exchange::BleCardPayload;
 use vauchi_core::platform::BleLinkDirection;
@@ -364,6 +365,44 @@ fn two_party_ble_exchange_persists_each_others_contact() {
             .any(|c| matches!(c, vauchi_core::Command::LocationRequest { .. })),
         "BLE finalize should queue Command::LocationRequest, got {alice_emitted:?}"
     );
+}
+
+// The displayer does not pin the scanner (Security Claims S8, Tamarin
+// `displayer_binds_the_scanner` falsified), so an identity this handshake
+// delivered must not earn High trust on either side (#1091).
+// @internal
+#[test]
+fn a_ble_handshake_contact_stays_at_standard_trust_on_both_sides() {
+    let mut alice = engine_named("Alice");
+    let mut bob = engine_named("Bob");
+    let alice_token = token_of(&alice);
+    let bob_token = token_of(&bob);
+    alice.start_ble_handshake_on_discovery(&bob_token);
+    bob.start_ble_handshake_on_discovery(&alice_token);
+    let ea = alice.forward_ble_hardware_event(&Event::BleConnected {
+        device_id: "bob".into(),
+        direction: BleLinkDirection::Outbound,
+    });
+    alice.apply_ble_machine_event(ea);
+    let eb = bob.forward_ble_hardware_event(&Event::BleConnected {
+        device_id: "alice".into(),
+        direction: BleLinkDirection::Inbound,
+    });
+    bob.apply_ble_machine_event(eb);
+    for _ in 0..50 {
+        let routed = pump(&mut alice, &mut bob) + pump(&mut bob, &mut alice);
+        if routed == 0 {
+            break;
+        }
+    }
+
+    let alice_contacts = alice.vauchi().list_contacts().expect("list");
+    let bob_contacts = bob.vauchi().list_contacts().expect("list");
+
+    assert_eq!(alice_contacts.len(), 1, "Alice should have exactly Bob");
+    assert_eq!(bob_contacts.len(), 1, "Bob should have exactly Alice");
+    assert_eq!(alice_contacts[0].trust_level(), TrustLevel::Standard);
+    assert_eq!(bob_contacts[0].trust_level(), TrustLevel::Standard);
 }
 
 // P1 step 2a+2b (full loop): a BLE exchange stamps the contact Pending, emits

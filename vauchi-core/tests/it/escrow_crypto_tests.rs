@@ -216,3 +216,65 @@ fn each_encryption_produces_different_ciphertext() {
     let ct2 = keys.encrypt_card(b"same").unwrap();
     assert_ne!(ct1, ct2, "Random nonce must produce different ciphertext");
 }
+
+// ============================================================
+// The link code in the keys (#727): a wrong code finds nothing
+// ============================================================
+
+const PAKE_KEY: [u8; 32] = [0x5A; 32];
+const OTHER_PAKE_KEY: [u8; 32] = [0xA5; 32];
+
+// @internal
+#[test]
+fn both_roles_agree_when_they_hold_the_same_pake_key() {
+    let init =
+        EscrowKeys::derive_with_pake(&test_shared_secret(), &PAKE_KEY, EscrowRole::Initiator);
+    let resp =
+        EscrowKeys::derive_with_pake(&test_shared_secret(), &PAKE_KEY, EscrowRole::Responder);
+
+    assert_eq!(init.gate_hash, resp.gate_hash);
+    assert_eq!(init.our_slot, resp.their_slot);
+    assert_eq!(init.their_slot, resp.our_slot);
+    let blob = init.encrypt_card(b"card").unwrap();
+    assert_eq!(resp.decrypt_card(&blob).unwrap(), b"card");
+}
+
+// @internal
+#[test]
+fn a_different_pake_key_shares_no_gate_slot_or_card_key() {
+    let right =
+        EscrowKeys::derive_with_pake(&test_shared_secret(), &PAKE_KEY, EscrowRole::Initiator);
+    let wrong = EscrowKeys::derive_with_pake(
+        &test_shared_secret(),
+        &OTHER_PAKE_KEY,
+        EscrowRole::Responder,
+    );
+
+    assert_ne!(right.gate_hash, wrong.gate_hash);
+    assert_ne!(right.our_slot, wrong.their_slot);
+    assert_ne!(right.their_slot, wrong.our_slot);
+    let blob = right.encrypt_card(b"card").unwrap();
+    assert!(wrong.decrypt_card(&blob).is_err());
+}
+
+// @internal
+#[test]
+fn the_pake_derivation_shares_nothing_with_the_plain_one() {
+    let plain = EscrowKeys::derive(&test_shared_secret(), EscrowRole::Initiator);
+    let with_pake =
+        EscrowKeys::derive_with_pake(&test_shared_secret(), &PAKE_KEY, EscrowRole::Initiator);
+
+    assert_ne!(plain.gate_hash, with_pake.gate_hash);
+    assert_ne!(plain.our_slot, with_pake.our_slot);
+    let blob = plain.encrypt_card(b"card").unwrap();
+    assert!(with_pake.decrypt_card(&blob).is_err());
+}
+
+// @internal
+#[test]
+fn the_shared_secret_still_matters_with_the_same_pake_key() {
+    let one = EscrowKeys::derive_with_pake(&test_shared_secret(), &PAKE_KEY, EscrowRole::Initiator);
+    let other = EscrowKeys::derive_with_pake(&[0x77; 32], &PAKE_KEY, EscrowRole::Initiator);
+
+    assert_ne!(one.gate_hash, other.gate_hash);
+}

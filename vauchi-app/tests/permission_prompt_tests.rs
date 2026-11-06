@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use vauchi_app::ui::AppEngine;
+use vauchi_app::ui::{AppEngine, AppScreen};
 use vauchi_core::exchange::DeviceRequirement;
 use vauchi_core::exchange::capability::PermissionState;
-use vauchi_core::{AlertSpec, Command, Event, Vauchi};
+use vauchi_core::{AlertSpec, Command, Event, InteractionId, PresentationNode, Vauchi};
 
 const GUIDANCE: &str = "This system could not open a permission prompt. Check the app's access in system settings, then try again. On a managed device, ask your administrator for help.";
 fn engine() -> AppEngine {
@@ -166,5 +166,101 @@ fn unknown_permission_preserves_other_pending_commands() {
     assert_eq!(
         required(&mut engine, "unknown"),
         vec![Command::ReloadTheme, alert("Hardware error")]
+    );
+}
+
+fn camera_action(nodes: &[PresentationNode]) -> Option<InteractionId> {
+    nodes.iter().find_map(|node| match node {
+        PresentationNode::Group { children, .. } => camera_action(children),
+        PresentationNode::List { rows, .. } => rows
+            .iter()
+            .find(|row| row.title == "Glance")
+            .and_then(|row| {
+                row.activation
+                    .as_ref()
+                    .map(|action| action.interaction_id.clone())
+            }),
+        _ => None,
+    })
+}
+fn activate_camera_row(commands: &[Command]) -> Event {
+    commands
+        .iter()
+        .find_map(|command| match command {
+            Command::ReplaceSurface { surface } => {
+                camera_action(&surface.nodes).map(|interaction_id| Event::ActionActivated {
+                    surface_id: surface.surface_id.clone(),
+                    interaction_id,
+                })
+            }
+            _ => None,
+        })
+        .expect("the denied picker must offer the Glance permission action")
+}
+
+// @internal — a prepared picker tap requests OS access and never grants it itself.
+#[test]
+fn picker_permission_tap_waits_for_the_os_result() {
+    let mut engine = engine();
+    engine.set_device_capabilities(vauchi_core::exchange_types::DeviceCapabilities {
+        has_camera: true,
+        has_ble: true,
+        ..Default::default()
+    });
+    engine.navigate_to(AppScreen::Exchange);
+    engine.initial_commands().unwrap();
+    let denied = engine
+        .dispatch(Event::PermissionDenied {
+            transport: "camera".into(),
+        })
+        .unwrap();
+    let requested = engine.dispatch(activate_camera_row(&denied)).unwrap();
+    assert!(requested.contains(&Command::RequestPermission {
+        transport: "camera".into()
+    }));
+    assert_eq!(
+        engine
+            .transport_readiness()
+            .permission(DeviceRequirement::Camera),
+        PermissionState::Denied
+    );
+    assert_eq!(
+        requested
+            .iter()
+            .filter(|command| matches!(command, Command::CameraCapture { .. }))
+            .count(),
+        0
+    );
+    let retry = activate_camera_row(&requested);
+    let unavailable = engine
+        .dispatch(Event::HardwareUnavailable {
+            transport: "camera".into(),
+        })
+        .unwrap();
+    assert!(unavailable.contains(&alert("Camera error")));
+    assert_eq!(
+        engine
+            .transport_readiness()
+            .permission(DeviceRequirement::Camera),
+        PermissionState::Denied
+    );
+    assert!(
+        engine
+            .dispatch(retry)
+            .unwrap()
+            .contains(&Command::RequestPermission {
+                transport: "camera".into()
+            })
+    );
+    engine
+        .dispatch(Event::PermissionGranted {
+            transport: "camera".into(),
+        })
+        .unwrap();
+    assert_eq!(
+        engine
+            .transport_readiness()
+            .permission(DeviceRequirement::Camera),
+        PermissionState::Granted
     );
 }

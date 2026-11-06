@@ -13,11 +13,11 @@
 use vauchi_app::ui::{
     ActionResult, AppEngine, AppScreen, Component, ScreenModel, UserAction, WorkflowEngine,
 };
-use vauchi_core::Event;
 use vauchi_core::api::Vauchi;
 use vauchi_core::exchange::capability::PermissionState;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::mode::DeviceRequirement;
+use vauchi_core::{Command, Event};
 
 fn engine() -> AppEngine {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -151,7 +151,7 @@ fn denied_camera_turns_glance_into_a_grant_affordance_on_the_live_picker() {
 
 // @internal
 #[test]
-fn tapping_grant_affordance_relearns_permission_and_restores_the_mode() {
+fn tapping_grant_affordance_requests_permission_before_restoring_the_mode() {
     let mut engine = engine();
     engine.set_device_capabilities(caps_camera_and_ble());
     let _ = engine.navigate_to(AppScreen::Exchange);
@@ -165,19 +165,35 @@ fn tapping_grant_affordance_relearns_permission_and_restores_the_mode() {
         item_id: "grant:glance:camera".into(),
     });
 
-    // The device-wide ledger re-learns the permission as granted (no OS
-    // "granted" event exists — ADR-030/031 — so the affordance is the seam).
+    assert_eq!(
+        engine
+            .transport_readiness()
+            .permission(DeviceRequirement::Camera),
+        PermissionState::Denied
+    );
+    match result {
+        ActionResult::Commands { commands } => assert_eq!(
+            commands,
+            vec![Command::RequestPermission {
+                transport: "camera".into()
+            }]
+        ),
+        other => panic!("grant tap should request OS access, got {other:?}"),
+    }
+    let denied_ids = item_ids(&engine.current_screen());
+    assert!(denied_ids.iter().any(|id| id == "grant:glance:camera"));
+    engine
+        .dispatch(Event::PermissionGranted {
+            transport: "camera".into(),
+        })
+        .unwrap();
     assert_eq!(
         engine
             .transport_readiness()
             .permission(DeviceRequirement::Camera),
         PermissionState::Granted
     );
-    // ...and the re-rendered picker offers Glance as a selectable mode again.
-    let screen = match result {
-        ActionResult::UpdateScreen(s) => s,
-        other => panic!("grant tap should return UpdateScreen, got {other:?}"),
-    };
+    let screen = engine.current_screen();
     let ids = item_ids(&screen);
     assert!(
         ids.iter().any(|id| id == "mode:glance"),

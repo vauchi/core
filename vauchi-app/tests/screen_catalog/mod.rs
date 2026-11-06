@@ -424,6 +424,11 @@ fn record_hand_back_restore(screens: &mut Vec<ScreenCatalogEntry>) {
             None,
         )
         .expect("reopen recovery");
+        // The meeting began on the system clock; a claim keeps its issue time,
+        // so reissue it on the catalog's clock to keep the fixture stable.
+        phone
+            .renew_pending_recovery_claim()
+            .expect("issue claim on the catalog clock");
         let mut recorder = Recorder::new(phone, "en", screens);
         recorder.record_current(code);
     }

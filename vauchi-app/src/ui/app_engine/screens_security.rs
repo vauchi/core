@@ -59,7 +59,15 @@ impl AppEngine {
                     }
                 };
                 if let Some(claim) = pending_claim {
+                    let expired = vauchi
+                        .parse_recovery_claim_b64(&claim)
+                        .map_or(true, |parsed| {
+                            parsed.is_expired(vauchi.clock().unix_seconds())
+                        });
                     engine.set_generated_claim(claim);
+                    if expired {
+                        engine.mark_generated_claim_expired();
+                    }
                     match vauchi.hand_back_restore_status() {
                         Ok(Some(status)) => {
                             if status.can_attempt_restore {

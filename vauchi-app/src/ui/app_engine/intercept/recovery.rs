@@ -45,6 +45,18 @@ impl AppEngine {
             .then(|| ActionResult::UpdateScreen(self.engine.current_screen()))
     }
 
+    /// Renewal is the one act that extends a claim's lifetime, so a refusal
+    /// is shown rather than falling back to the expired claim.
+    pub(in crate::ui::app_engine) fn intercept_renew_claim_action(&mut self) -> ActionResult {
+        let update = match self.vauchi.renew_pending_recovery_claim() {
+            Ok(claim_b64) => crate::ui::RecoveryUpdate::ClaimGenerated(claim_b64),
+            Err(_) => crate::ui::RecoveryUpdate::ClaimRenewalFailed,
+        };
+        self.engine
+            .apply_update(crate::ui::EngineUpdate::Recovery(update));
+        ActionResult::UpdateScreen(self.engine.current_screen())
+    }
+
     /// Intercept the "verify_claim" action on the RecoveryHelp screen.
     ///
     /// Reads the user-pasted claim payload from the engine, base64-decodes

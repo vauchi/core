@@ -60,6 +60,41 @@ impl RecoveryStore<'_> {
         Ok(Some((zeroize::Zeroizing::new(seed), target)))
     }
 
+    /// Records when the pending claim was issued.
+    pub fn save_recovery_claim_issued_at(&self, issued_at: u64) -> Result<(), StorageError> {
+        let issued_at = i64::try_from(issued_at)
+            .map_err(|_| StorageError::InvalidData("recovery claim time".into()))?;
+        self.conn.execute(
+            "UPDATE recovery_mode_key SET claim_issued_at = ?1 WHERE id = 1",
+            params![issued_at],
+        )?;
+        Ok(())
+    }
+
+    /// When the pending claim was issued; `None` when no recovery is under
+    /// way or the recovery predates this record.
+    ///
+    /// # Errors
+    /// Storage errors; [`StorageError::InvalidData`] for a negative time.
+    pub fn load_recovery_claim_issued_at(&self) -> Result<Option<u64>, StorageError> {
+        use rusqlite::OptionalExtension;
+        let issued_at: Option<Option<i64>> = self
+            .conn
+            .query_row(
+                "SELECT claim_issued_at FROM recovery_mode_key WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        issued_at
+            .flatten()
+            .map(|time| {
+                u64::try_from(time)
+                    .map_err(|_| StorageError::InvalidData("recovery claim time".into()))
+            })
+            .transpose()
+    }
+
     /// Discards the hand-backs taken so far (the recovery's target
     /// changed).
     pub fn clear_hand_backs(&self) -> Result<(), StorageError> {

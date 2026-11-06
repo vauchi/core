@@ -19,6 +19,8 @@ use crate::ui::recovery_restore::{
 };
 use crate::ui::*;
 
+pub(in crate::ui) const RENEW_CLAIM_ACTION: &str = "renew_claim";
+
 /// Steps in the outgoing recovery workflow.
 #[derive(Clone, Debug, PartialEq)]
 enum RecoveryStep {
@@ -88,6 +90,7 @@ pub struct RecoveryEngine {
     /// Generated claim payload (base64), populated by the AppEngine
     /// intercept after `Vauchi::create_recovery_claim_hex_b64` succeeds.
     generated_claim_b64: Option<String>,
+    generated_claim_expired: bool,
     identity_free_recovery: bool,
     /// Voucher pasted on the CollectVouchers step, read by the AppEngine
     /// intercept when the user presses "add_voucher".
@@ -115,6 +118,7 @@ impl RecoveryEngine {
             old_key_input: String::new(),
             old_key_error: None,
             generated_claim_b64: None,
+            generated_claim_expired: false,
             identity_free_recovery: false,
             voucher_input: String::new(),
             voucher_error: None,
@@ -154,8 +158,14 @@ impl RecoveryEngine {
     /// `Vauchi::create_recovery_claim_hex_b64`.
     pub fn set_generated_claim(&mut self, claim_b64: impl Into<String>) {
         self.generated_claim_b64 = Some(claim_b64.into());
+        self.generated_claim_expired = false;
         self.old_key_error = None;
         self.step = RecoveryStep::ShowGeneratedClaim;
+    }
+
+    #[cfg(feature = "storage")]
+    pub(crate) fn mark_generated_claim_expired(&mut self) {
+        self.generated_claim_expired = true;
     }
 
     #[cfg(feature = "storage")]
@@ -432,7 +442,53 @@ impl RecoveryEngine {
         }
     }
 
+    fn build_expired_claim_screen(&self) -> ScreenModel {
+        let mut contextual_actions = vec![ScreenAction {
+            id: RENEW_CLAIM_ACTION.into(),
+            label: self.t("recovery.create_claim_button"),
+            style: ActionStyle::Primary,
+            enabled: true,
+            a11y: Some(A11y::labeled(self.t("recovery.create_claim_button"))),
+        }];
+        if self.restore.is_some() {
+            contextual_actions.push(ScreenAction {
+                id: RESTORE_ROW.into(),
+                label: self.t("recovery.restore_button"),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: None,
+            });
+        }
+        contextual_actions.push(ScreenAction {
+            id: "done".into(),
+            label: self.t("action.done"),
+            style: ActionStyle::Secondary,
+            enabled: true,
+            a11y: Some(A11y::labeled(self.t("action.done"))),
+        });
+        ScreenModel {
+            screen_id: "recovery_status".into(),
+            title: self.t("recovery.claim_expired_title"),
+            subtitle: None,
+            components: vec![Component::StatusIndicator {
+                id: "claim_expired".into(),
+                icon: None,
+                title: self.t("recovery.claim_expired_title"),
+                detail: None,
+                status: Status::Warning,
+                status_label: self.t(Status::Warning.label_key()),
+                a11y: None,
+            }],
+            contextual_actions,
+            progress: None,
+            ..Default::default()
+        }
+    }
+
     fn build_generated_claim_screen(&self) -> ScreenModel {
+        if self.generated_claim_expired {
+            return self.build_expired_claim_screen();
+        }
         let claim = self
             .generated_claim_b64
             .as_deref()
@@ -530,6 +586,10 @@ impl WorkflowEngine for RecoveryEngine {
         };
         match update {
             crate::ui::RecoveryUpdate::ClaimGenerated(claim) => self.set_generated_claim(claim),
+            #[cfg(feature = "storage")]
+            crate::ui::RecoveryUpdate::ClaimRenewalFailed => self.set_load_error(),
+            #[cfg(not(feature = "storage"))]
+            crate::ui::RecoveryUpdate::ClaimRenewalFailed => {}
             crate::ui::RecoveryUpdate::ClaimCreateError(message) => {
                 self.set_create_claim_error(message)
             }

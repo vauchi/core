@@ -107,12 +107,18 @@ fn restored_registry(
     Ok(registry)
 }
 
+fn encoded_claim(target: &[u8; 32], recovery_key: &SigningKeyPair, issued_at: u64) -> String {
+    let claim = RecoveryClaim::new(*target, recovery_key.public_key().as_bytes(), issued_at);
+    base64::engine::general_purpose::STANDARD.encode(claim.to_bytes())
+}
+
 impl Vauchi {
-    /// A fresh presentation claim for an identity-free recovery already
-    /// stored on this phone. Like [`Self::begin_recovery`], the claim's
-    /// lifetime starts now; its target and temporary key stay unchanged.
+    /// The claim as issued for an identity-free recovery stored on this
+    /// phone, which may have expired: reading never extends its lifetime;
+    /// [`Self::renew_pending_recovery_claim`] does. A recovery from before
+    /// issue times were recorded reads as expired, since its age is unknown.
     /// Returns `None` when no recovery is stored or an identity exists.
-    /// This query never creates a key or changes stored hand-backs.
+    /// This query writes nothing.
     ///
     /// # Errors
     /// Storage errors, including malformed or unreadable recovery state.
@@ -123,15 +129,48 @@ impl Vauchi {
         let Some((seed, target)) = self.storage.recovery().load_recovery_mode()? else {
             return Ok(None);
         };
-        let recovery_key = SigningKeyPair::from_seed(&seed);
-        let claim = RecoveryClaim::new(
-            target,
-            recovery_key.public_key().as_bytes(),
-            self.clock.unix_seconds(),
-        );
-        Ok(Some(
-            base64::engine::general_purpose::STANDARD.encode(claim.to_bytes()),
-        ))
+        let issued_at = self
+            .storage
+            .recovery()
+            .load_recovery_claim_issued_at()?
+            .unwrap_or(0);
+        Ok(Some(encoded_claim(
+            &target,
+            &SigningKeyPair::from_seed(&seed),
+            issued_at,
+        )))
+    }
+
+    /// Issues a new claim for the identity-free recovery stored on this
+    /// phone, its lifetime starting now. The target, temporary key and
+    /// hand-backs stay as they are.
+    ///
+    /// # Errors
+    /// [`VauchiError::InvalidState`] when no recovery is under way; storage
+    /// errors.
+    pub fn renew_pending_recovery_claim(&self) -> VauchiResult<String> {
+        let no_recovery = || VauchiError::InvalidState("No recovery under way".into());
+        if self.identity.is_some() {
+            return Err(no_recovery());
+        }
+        let (seed, target) = self
+            .storage
+            .recovery()
+            .load_recovery_mode()?
+            .ok_or_else(no_recovery)?;
+        self.issue_recovery_claim(&target, &SigningKeyPair::from_seed(&seed))
+    }
+
+    fn issue_recovery_claim(
+        &self,
+        target: &[u8; 32],
+        recovery_key: &SigningKeyPair,
+    ) -> VauchiResult<String> {
+        let issued_at = self.clock.unix_seconds();
+        self.storage
+            .recovery()
+            .save_recovery_claim_issued_at(issued_at)?;
+        Ok(encoded_claim(target, recovery_key, issued_at))
     }
 
     /// Begins a social recovery of the identity `old_pk_hex` on this phone,
@@ -151,12 +190,7 @@ impl Vauchi {
             .and_then(|bytes| bytes.try_into().ok())
             .ok_or_else(|| VauchiError::Serialization("public key must be 32 bytes".into()))?;
         let recovery_key = self.recovery_mode_key(&old_pk)?;
-        let claim = RecoveryClaim::new(
-            old_pk,
-            recovery_key.public_key().as_bytes(),
-            self.clock.unix_seconds(),
-        );
-        Ok(base64::engine::general_purpose::STANDARD.encode(claim.to_bytes()))
+        self.issue_recovery_claim(&old_pk, &recovery_key)
     }
 
     /// The guardian's side, in the recovery meeting: once the owner is

@@ -502,6 +502,11 @@ impl AppEngine {
             return Some(result);
         }
         if self.screen == AppScreen::Recovery
+            && matches!(action, UserAction::ActionPressed { action_id } if action_id == crate::ui::recovery_status::RENEW_CLAIM_ACTION)
+        {
+            return Some(self.intercept_renew_claim_action());
+        }
+        if self.screen == AppScreen::Recovery
             && matches!(action, UserAction::ActionPressed { action_id } if action_id == "add_voucher")
             && let Some(result) = self.intercept_add_voucher_action()
         {

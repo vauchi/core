@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 111] = [
+const MIGRATIONS: [Migration; 112] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -827,6 +827,11 @@ const MIGRATIONS: [Migration; 111] = [
         name: "recovery_backup_pieces",
         action: MigrationAction::Sql(MIGRATION_V111_RECOVERY_BACKUP_PIECES),
     },
+    Migration {
+        version: 112,
+        name: "recovery_claim_issued_at",
+        action: MigrationAction::Callback(migrate_v112_recovery_claim_issued_at),
+    },
 ];
 
 /// Migration v111 (vauchi/private#796, P33): a guardian hands back its
@@ -866,6 +871,16 @@ const MIGRATION_V110_RECOVERY_MODE_KEY: &str = "
         received_at INTEGER NOT NULL
     );
 ";
+
+/// Migration v112 (vauchi/private#796): when the pending claim was issued, so
+/// reading it cannot extend what guardians accept. NULL on a row from before
+/// this column: its age is unknown, so it reads as expired until renewed.
+fn migrate_v112_recovery_claim_issued_at(
+    conn: &Connection,
+    _key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    add_column_if_not_exists(conn, "recovery_mode_key", "claim_issued_at", "INTEGER")
+}
 
 /// Migration v109 (vauchi/private#796, D26): a waiting contact records
 /// whether it was met again in person, which a session on one device

@@ -67,9 +67,9 @@ mod claim_lifetime {
     use std::sync::Arc;
     use std::time::{Duration, UNIX_EPOCH};
 
-    use vauchi_core::Vauchi;
     use vauchi_core::clock::FakeClock;
     use vauchi_core::recovery::RecoveryClaim;
+    use vauchi_core::{Vauchi, VauchiError};
 
     const BEGUN_AT: u64 = 1_800_000_000;
 
@@ -114,5 +114,73 @@ mod claim_lifetime {
         let past_limit = read_at(&phone);
         assert_eq!(past_limit.timestamp(), BEGUN_AT);
         assert!(past_limit.is_expired(BEGUN_AT + RecoveryClaim::MAX_AGE_SECS + 1));
+    }
+
+    // @internal — P32: renewal restarts the lifetime and keeps the target, the key and the hand-backs.
+    #[test]
+    fn renewal_restarts_the_lifetime_and_keeps_the_recovery() {
+        let (phone, clock, issued) = recovering_phone();
+        let issued = phone.parse_recovery_claim_b64(&issued).unwrap();
+        phone
+            .storage()
+            .connection()
+            .execute(
+                "INSERT INTO recovery_hand_backs (share_digest, delivery_encrypted, received_at)
+                 VALUES (zeroblob(32), X'00', 1)",
+                [],
+            )
+            .unwrap();
+        let later = RecoveryClaim::MAX_AGE_SECS + 1;
+        clock.advance(Duration::from_secs(later));
+
+        let renewed = phone.renew_pending_recovery_claim().unwrap();
+
+        assert_eq!(
+            phone.pending_recovery_claim().unwrap().as_deref(),
+            Some(renewed.as_str())
+        );
+        let renewed = phone.parse_recovery_claim_b64(&renewed).unwrap();
+        assert_eq!(renewed.timestamp(), BEGUN_AT + later);
+        assert!(!renewed.is_expired(BEGUN_AT + later));
+        assert_eq!(renewed.old_pk(), issued.old_pk());
+        assert_eq!(renewed.new_pk(), issued.new_pk());
+        assert_eq!(phone.storage().recovery().hand_back_count().unwrap(), 1);
+    }
+
+    // @internal — DC-02: renewal needs a recovery under way and no identity.
+    #[test]
+    fn renewal_is_refused_without_an_identity_free_recovery() {
+        let idle = Vauchi::in_memory().unwrap();
+        assert!(matches!(
+            idle.renew_pending_recovery_claim(),
+            Err(VauchiError::InvalidState(_))
+        ));
+        assert_eq!(idle.pending_recovery_claim().unwrap(), None);
+
+        let (mut restored, _, _) = recovering_phone();
+        restored.create_identity("Alice").unwrap();
+        assert!(matches!(
+            restored.renew_pending_recovery_claim(),
+            Err(VauchiError::InvalidState(_))
+        ));
+    }
+
+    // @internal — DC-02: a recovery from before issue times were kept has an unknown age, so it fails closed.
+    #[test]
+    fn a_recovery_with_no_recorded_issue_time_reads_as_expired_until_renewed() {
+        let (phone, _, _) = recovering_phone();
+        phone
+            .storage()
+            .connection()
+            .execute("UPDATE recovery_mode_key SET claim_issued_at = NULL", [])
+            .unwrap();
+
+        let claim = phone.pending_recovery_claim().unwrap().unwrap();
+        let claim = phone.parse_recovery_claim_b64(&claim).unwrap();
+        assert!(claim.is_expired(BEGUN_AT));
+
+        let renewed = phone.renew_pending_recovery_claim().unwrap();
+        let renewed = phone.parse_recovery_claim_b64(&renewed).unwrap();
+        assert_eq!(renewed.timestamp(), BEGUN_AT);
     }
 }

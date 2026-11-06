@@ -346,6 +346,7 @@ pub enum ContactListUpdate {
 pub enum RecoveryUpdate {
     ClaimGenerated(String),
     ClaimCreateError(String),
+    ClaimRenewalFailed,
     /// The stored proof after a voucher was taken in: each signer's
     /// short key fingerprint, and the threshold the proof needs.
     VouchersCollected {
@@ -498,6 +499,7 @@ impl EngineUpdate {
             Self::Recovery(u) => match u {
                 RecoveryUpdate::ClaimGenerated(_) => "Recovery::ClaimGenerated",
                 RecoveryUpdate::ClaimCreateError(_) => "Recovery::ClaimCreateError",
+                RecoveryUpdate::ClaimRenewalFailed => "Recovery::ClaimRenewalFailed",
                 RecoveryUpdate::VouchersCollected { .. } => "Recovery::VouchersCollected",
                 RecoveryUpdate::VoucherRefused(_) => "Recovery::VoucherRefused",
                 RecoveryUpdate::ProofSubmitted => "Recovery::ProofSubmitted",

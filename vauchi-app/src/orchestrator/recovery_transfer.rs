@@ -167,14 +167,20 @@ impl RecoveryTransferSender {
                 direction,
                 uuid,
                 data,
-            } if device_id == &self.device_id
-                && direction == &self.direction
-                && uuid == self.ack_uuid() =>
-            {
+            } if self.names_this_link(device_id, *direction) && uuid == self.ack_uuid() => {
                 Some(data)
             }
             _ => None,
         }
+    }
+
+    /// An unnamed inbound link was reported without an id, but a shell may
+    /// name the central on later events. Acknowledgements are flow control,
+    /// not authentication (A11), so the direction is enough to match it.
+    fn names_this_link(&self, device_id: &str, direction: BleLinkDirection) -> bool {
+        direction == self.direction
+            && (device_id == self.device_id
+                || (self.device_id.is_empty() && direction == BleLinkDirection::Inbound))
     }
 
     fn ack_uuid(&self) -> &str {
@@ -190,7 +196,7 @@ impl RecoveryTransferSender {
                 device_id,
                 direction,
                 ..
-            } => device_id == &self.device_id && direction == &self.direction,
+            } => self.names_this_link(device_id, *direction),
             Event::HardwareError { transport, .. }
             | Event::HardwareUnavailable { transport }
             | Event::PermissionDenied { transport } => transport == "BLE",

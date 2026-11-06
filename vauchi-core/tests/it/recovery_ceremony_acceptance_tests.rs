@@ -30,9 +30,10 @@ mod fixture;
 const SMALLEST_MTU: usize = 23;
 const USUAL_MTU: u32 = 185;
 const GUARDIAN_LINK: &str = "guardian-link";
-// A peripheral cannot name its central on every OS, so shells report inbound
-// links with an empty id, as `linux-hw` does.
+// What `linux-hw` reports for a peripheral: a link event has no id, while a
+// write names the central that made it.
 const PHONE_LINK: &str = "";
+const PHONE_ADDRESS: &str = "AA:BB:CC:DD:EE:FF";
 
 fn shown_qr(commands: &[Command]) -> Option<String> {
     fn walk(value: &Value) -> Option<String> {
@@ -243,6 +244,12 @@ impl Meeting<'_> {
             },
         ] {
             self.guardian_commands = self.guardian.dispatch(event).unwrap();
+            assert!(
+                !self
+                    .guardian_commands
+                    .contains(&Command::BleStopAdvertising),
+                "on Linux this releases the GATT server the transfer needs"
+            );
         }
     }
 
@@ -271,8 +278,8 @@ impl Meeting<'_> {
             };
             self.guardian_commands = self
                 .guardian
-                .dispatch(Event::BleCharacteristicRead {
-                    device_id: PHONE_LINK.into(),
+                .dispatch(Event::BleCharacteristicNotified {
+                    device_id: PHONE_ADDRESS.into(),
                     direction: BleLinkDirection::Inbound,
                     uuid: CHAR_DATA_WRITE.into(),
                     data: acknowledgement,
@@ -505,6 +512,44 @@ fn a_backup_of_several_pieces_crosses_one_link() {
     meeting.carry_backup(usize::MAX);
 
     assert!(backup_is_whole(meeting.phone, &hash));
+    assert!(
+        meeting
+            .guardian_commands
+            .contains(&Command::BleStopAdvertising),
+        "the finished guardian withdraws its GATT server"
+    );
+}
+
+// @internal — P33: a peripheral learns its MTU only from a write, so it applies to the next piece.
+#[test]
+fn an_mtu_learned_during_a_piece_serves_the_next_piece() {
+    let mut owner = lost_with_extra_contacts(400);
+    let target = own_key(&owner.alice);
+    let guardian = owner.guardians.remove(0).into_vauchi();
+    let hash = kept_backup_hash(&guardian, &target);
+    let mut phone = begin(&owner, Vauchi::in_memory().unwrap());
+    let mut meeting = meet(&mut phone, guardian);
+    meeting.connect(SMALLEST_MTU as u32);
+    let first_piece_write = meeting.carry_backup(1);
+    assert!(first_piece_write <= SMALLEST_MTU - 3);
+
+    // The reply may hold the next write, so keep it across the report.
+    let held = std::mem::take(&mut meeting.guardian_commands);
+    meeting
+        .guardian
+        .dispatch(Event::BleMtuNegotiated {
+            device_id: PHONE_ADDRESS.into(),
+            mtu: 517,
+        })
+        .unwrap();
+    meeting.guardian_commands = held;
+    let largest_write = meeting.carry_backup(usize::MAX);
+
+    assert!(backup_is_whole(meeting.phone, &hash));
+    assert!(
+        largest_write > SMALLEST_MTU - 3,
+        "later pieces use the larger MTU, largest write was {largest_write}"
+    );
 }
 
 // @internal — P33: the phone dials only the advertiser matching the token it scanned.

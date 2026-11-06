@@ -3744,7 +3744,6 @@
                 "surface_id": "recovery_help"
               }
             },
-            "BleStopAdvertising",
             {
               "ScheduleWakeup": {
                 "deadline_secs": 2,
@@ -5277,9 +5276,9 @@
             }
           ],
           "event": {
-            "BleCharacteristicRead": {
+            "BleCharacteristicNotified": {
               "data": [82,66,65,49,0,0,0,172],
-              "device_id": "",
+              "device_id": "AA:BB:CC:DD:EE:FF",
               "direction": "Inbound",
               "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567896"
             }
@@ -5910,9 +5909,9 @@
             }
           ],
           "event": {
-            "BleCharacteristicRead": {
+            "BleCharacteristicNotified": {
               "data": [82,66,65,49,0,0,1,88],
-              "device_id": "",
+              "device_id": "AA:BB:CC:DD:EE:FF",
               "direction": "Inbound",
               "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567896"
             }
@@ -6543,9 +6542,9 @@
             }
           ],
           "event": {
-            "BleCharacteristicRead": {
+            "BleCharacteristicNotified": {
               "data": [82,66,65,49,0,0,2,4],
-              "device_id": "",
+              "device_id": "AA:BB:CC:DD:EE:FF",
               "direction": "Inbound",
               "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567896"
             }
@@ -16210,7 +16209,6 @@
                 "surface_id": "recovery_help"
               }
             },
-            "BleStopAdvertising",
             {
               "ScheduleWakeup": {
                 "deadline_secs": 2,
@@ -17743,9 +17741,9 @@
             }
           ],
           "event": {
-            "BleCharacteristicRead": {
+            "BleCharacteristicNotified": {
               "data": [82,66,65,49,0,0,0,10],
-              "device_id": "",
+              "device_id": "AA:BB:CC:DD:EE:FF",
               "direction": "Inbound",
               "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567896"
             }
@@ -18376,9 +18374,9 @@
             }
           ],
           "event": {
-            "BleCharacteristicRead": {
+            "BleCharacteristicNotified": {
               "data": [82,66,65,49,0,0,0,20],
-              "device_id": "",
+              "device_id": "AA:BB:CC:DD:EE:FF",
               "direction": "Inbound",
               "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567896"
             }
@@ -19009,9 +19007,9 @@
             }
           ],
           "event": {
-            "BleCharacteristicRead": {
+            "BleCharacteristicNotified": {
               "data": [82,66,65,49,0,0,0,30],
-              "device_id": "",
+              "device_id": "AA:BB:CC:DD:EE:FF",
               "direction": "Inbound",
               "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567896"
             }
@@ -22766,7 +22764,6 @@
                 "surface_id": "recovery_help"
               }
             },
-            "BleStopAdvertising",
             {
               "ScheduleWakeup": {
                 "deadline_secs": 2,
@@ -24299,9 +24296,9 @@
             }
           ],
           "event": {
-            "BleCharacteristicRead": {
+            "BleCharacteristicNotified": {
               "data": [82,66,65,49,0,0,0,172],
-              "device_id": "",
+              "device_id": "AA:BB:CC:DD:EE:FF",
               "direction": "Inbound",
               "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567896"
             }
@@ -24741,7 +24738,8 @@
                 "device_id": "",
                 "direction": "Inbound"
               }
-            }
+            },
+            "BleStopAdvertising"
           ],
           "event": {
             "BleDisconnected": {
@@ -28497,7 +28495,6 @@
                 "surface_id": "recovery_help"
               }
             },
-            "BleStopAdvertising",
             {
               "ScheduleWakeup": {
                 "deadline_secs": 2,
@@ -30030,9 +30027,9 @@
             }
           ],
           "event": {
-            "BleCharacteristicRead": {
+            "BleCharacteristicNotified": {
               "data": [82,66,65,49,0,0,0,172],
-              "device_id": "",
+              "device_id": "AA:BB:CC:DD:EE:FF",
               "direction": "Inbound",
               "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567896"
             }
@@ -33779,7 +33776,6 @@
                 "surface_id": "recovery_help"
               }
             },
-            "BleStopAdvertising",
             {
               "ScheduleWakeup": {
                 "deadline_secs": 2,
@@ -35312,9 +35308,9 @@
             }
           ],
           "event": {
-            "BleCharacteristicRead": {
+            "BleCharacteristicNotified": {
               "data": [82,66,65,49,0,0,0,172],
-              "device_id": "",
+              "device_id": "AA:BB:CC:DD:EE:FF",
               "direction": "Inbound",
               "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567896"
             }
@@ -35945,9 +35941,9 @@
             }
           ],
           "event": {
-            "BleCharacteristicRead": {
+            "BleCharacteristicNotified": {
               "data": [82,66,65,49,0,0,1,88],
-              "device_id": "",
+              "device_id": "AA:BB:CC:DD:EE:FF",
               "direction": "Inbound",
               "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567896"
             }
@@ -36578,9 +36574,9 @@
             }
           ],
           "event": {
-            "BleCharacteristicRead": {
+            "BleCharacteristicNotified": {
               "data": [82,66,65,49,0,0,2,4],
-              "device_id": "",
+              "device_id": "AA:BB:CC:DD:EE:FF",
               "direction": "Inbound",
               "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567896"
             }
@@ -43122,7 +43118,6 @@
                 "surface_id": "recovery_help"
               }
             },
-            "BleStopAdvertising",
             {
               "ScheduleWakeup": {
                 "deadline_secs": 2,

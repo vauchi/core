@@ -117,15 +117,22 @@ impl AppEngine {
         let commands = match self.recovery_link.take() {
             Some(RecoveryLink::Advertising { .. }) => vec![Command::BleStopAdvertising],
             Some(RecoveryLink::Seeking { .. }) => vec![Command::BleStopScanning],
-            Some(RecoveryLink::Connected { device_id, .. }) => vec![Command::BleDisconnect {
-                device_id,
-                direction: BleLinkDirection::Inbound,
-            }],
+            Some(RecoveryLink::Connected { device_id, .. }) => vec![
+                Command::BleDisconnect {
+                    device_id,
+                    direction: BleLinkDirection::Inbound,
+                },
+                Command::BleStopAdvertising,
+            ],
             Some(RecoveryLink::Dialling { device_id, .. }) => vec![Command::BleDisconnect {
                 device_id,
                 direction: BleLinkDirection::Outbound,
             }],
-            Some(RecoveryLink::Sending { mut sender, .. }) => sender.cancel(),
+            Some(RecoveryLink::Sending { mut sender, .. }) => {
+                let mut commands = sender.cancel();
+                commands.push(Command::BleStopAdvertising);
+                commands
+            }
             Some(RecoveryLink::Receiving(mut receiver)) => receiver.cancel(),
             None => Vec::new(),
         };
@@ -172,10 +179,14 @@ impl AppEngine {
                         mtu: SMALLEST_MTU,
                         start_at: self.link_now() + u64::from(READY_GRACE_SECS),
                     });
-                    self.extend_pending_commands([
-                        Command::BleStopAdvertising,
-                        Command::schedule_wakeup(READY_GRACE_SECS, READY_GRACE_SECS, 0, None),
-                    ]);
+                    // Advertising continues: on Linux, stopping it releases the
+                    // GATT server this link depends on.
+                    self.extend_pending_commands([Command::schedule_wakeup(
+                        READY_GRACE_SECS,
+                        READY_GRACE_SECS,
+                        0,
+                        None,
+                    )]);
                     Some(self.show_sending(HandBackTransfer::InProgress))
                 }
                 failure if is_ble_failure(failure) => {
@@ -192,23 +203,27 @@ impl AppEngine {
                 mtu,
                 start_at,
             } => match event {
-                Event::BleMtuNegotiated { device_id: id, mtu } if id == &device_id => {
+                Event::BleMtuNegotiated { device_id: id, mtu }
+                    if device_id.is_empty() || id == &device_id =>
+                {
                     self.recovery_link = Some(RecoveryLink::Connected {
                         device_id,
                         pieces,
-                        mtu: u16::try_from(*mtu)
-                            .unwrap_or(LARGEST_MTU)
-                            .clamp(SMALLEST_MTU, LARGEST_MTU),
+                        mtu: clamped_mtu(*mtu),
                         start_at,
                     });
                     Some(ActionResult::Commands {
                         commands: Vec::new(),
                     })
                 }
-                Event::BleGattReady { device_id: id } if id == &device_id => {
+                Event::BleGattReady { device_id: id }
+                    if device_id.is_empty() || id == &device_id =>
+                {
                     Some(self.start_next_piece(device_id, pieces, mtu))
                 }
-                Event::BleDisconnected { device_id: id, .. } if id == &device_id => {
+                Event::BleDisconnected { device_id: id, .. }
+                    if device_id.is_empty() || id == &device_id =>
+                {
                     Some(self.show_sending(HandBackTransfer::Failed))
                 }
                 failure if is_ble_failure(failure) => {
@@ -234,6 +249,12 @@ impl AppEngine {
                 rest,
                 mtu,
             } => {
+                // BlueZ names a peripheral's MTU only on a write, so it arrives with
+                // the first acknowledgement and can only serve the next piece.
+                let mtu = match event {
+                    Event::BleMtuNegotiated { mtu: reported, .. } => clamped_mtu(*reported),
+                    _ => mtu,
+                };
                 if !is_link_observation(event) {
                     self.recovery_link = Some(RecoveryLink::Sending {
                         device_id,
@@ -339,7 +360,6 @@ impl AppEngine {
         };
         let result = match link {
             RecoveryLink::Advertising { deadline, .. } if now >= deadline => {
-                self.extend_pending_commands([Command::BleStopAdvertising]);
                 self.show_sending(HandBackTransfer::Failed)
             }
             RecoveryLink::Connected {
@@ -453,7 +473,15 @@ impl AppEngine {
         }
     }
 
+    /// Ending the guardian's side withdraws its advertisement, which is also
+    /// what ends an inbound link on a shell that cannot disconnect one.
     fn show_sending(&mut self, transfer: HandBackTransfer) -> ActionResult {
+        if matches!(
+            transfer,
+            HandBackTransfer::Finished | HandBackTransfer::Failed
+        ) {
+            self.extend_pending_commands([Command::BleStopAdvertising]);
+        }
         self.engine.apply_update(EngineUpdate::RecoveryHelp(
             RecoveryHelpUpdate::HandBackTransfer(transfer),
         ));
@@ -485,6 +513,12 @@ impl AppEngine {
             ));
         }
     }
+}
+
+fn clamped_mtu(reported: u32) -> u16 {
+    u16::try_from(reported)
+        .unwrap_or(LARGEST_MTU)
+        .clamp(SMALLEST_MTU, LARGEST_MTU)
 }
 
 fn is_link_observation(event: &Event) -> bool {

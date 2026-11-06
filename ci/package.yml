@@ -299,8 +299,10 @@ package:sbom:
       VERSION="${CI_COMMIT_TAG#v}"
       echo "Generating SBOM for vauchi v${VERSION}..."
 
-      # Install cargo-cyclonedx (prefer pre-built binary, fall back to source)
-      cargo binstall cargo-cyclonedx --no-confirm 2>/dev/null || cargo install cargo-cyclonedx --locked
+      # Install cargo-cyclonedx (prefer pre-built binary, fall back to source).
+      # The shell runner keeps .cargo/ between jobs; installing over a binary
+      # cargo has no record of fails with "already exists in destination".
+      cargo cyclonedx --version >/dev/null 2>&1 || cargo binstall cargo-cyclonedx --no-confirm 2>/dev/null || cargo install cargo-cyclonedx --locked
 
       # Generate CycloneDX JSON for all workspace crates in one pass
       # cargo-cyclonedx v0.5.7 outputs {crate}/{crate}.cdx.json

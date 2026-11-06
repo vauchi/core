@@ -254,3 +254,88 @@ fn only_an_inbound_link_may_have_no_id() {
     assert!(accepts("peer", BleLinkDirection::Outbound));
     assert!(!accepts(&"x".repeat(129), BleLinkDirection::Inbound));
 }
+
+fn write_payload(commands: &[Command]) -> Vec<u8> {
+    commands
+        .iter()
+        .find_map(|command| match command {
+            Command::BleWriteCharacteristic { data, .. } => Some(data.clone()),
+            _ => None,
+        })
+        .expect("an acknowledgement")
+}
+
+// @internal — P33: at the smallest MTU a piece takes minutes; only silence ends a slow transfer.
+#[test]
+fn a_transfer_that_keeps_progressing_outlives_the_attempt_limit() {
+    let (phone, backup, hash) = fixture();
+    let piece = split_backup_for_hand_back(&backup).unwrap().remove(0);
+    let mut sender = HandBackSender::new(&piece, 23).unwrap();
+    let mut receiver =
+        RecoveryTransferReceiver::new(hash, "peer".into(), BleLinkDirection::Outbound).unwrap();
+    let callback = receiver.callback();
+    receiver.poll(&phone, 0);
+
+    let mut now = 0;
+    while !sender.is_complete() {
+        now += 200;
+        callback
+            .publish(data(sender.next_packet().unwrap().unwrap(), "peer"))
+            .unwrap();
+        let acknowledgement = write_payload(&receiver.poll(&phone, now));
+        sender.acknowledge(&acknowledgement).unwrap();
+    }
+
+    assert!(now > 300, "the fixture must outlast the limit, took {now}");
+    assert_eq!(receiver.state(), ReceiveState::Complete);
+}
+
+// @internal — P33: the timer armed at the start fires early once progress moved the limit.
+#[test]
+fn a_wakeup_before_the_moved_limit_rearms_for_the_time_left() {
+    let (phone, backup, hash) = fixture();
+    let piece = split_backup_for_hand_back(&backup).unwrap().remove(0);
+    let mut sender = HandBackSender::new(&piece, 23).unwrap();
+    let mut receiver =
+        RecoveryTransferReceiver::new(hash, "peer".into(), BleLinkDirection::Outbound).unwrap();
+    let callback = receiver.callback();
+    receiver.poll(&phone, 0);
+    callback
+        .publish(data(sender.next_packet().unwrap().unwrap(), "peer"))
+        .unwrap();
+    receiver.poll(&phone, 200);
+
+    assert_eq!(
+        receiver.poll(&phone, 300),
+        vec![Command::schedule_wakeup(200, 200, 0, None)]
+    );
+    assert_eq!(receiver.state(), ReceiveState::Receiving);
+
+    assert_eq!(receiver.poll(&phone, 500), vec![disconnect()]);
+    assert_eq!(receiver.state(), ReceiveState::Failed);
+}
+
+// @internal — DC-02: a replayed frame is answered but is no progress, or a peer could hold the link open forever.
+#[test]
+fn a_replayed_frame_does_not_move_the_limit() {
+    let (phone, backup, hash) = fixture();
+    let piece = split_backup_for_hand_back(&backup).unwrap().remove(0);
+    let mut sender = HandBackSender::new(&piece, 23).unwrap();
+    let frame = sender.next_packet().unwrap().unwrap();
+    let mut receiver =
+        RecoveryTransferReceiver::new(hash, "peer".into(), BleLinkDirection::Outbound).unwrap();
+    let callback = receiver.callback();
+    receiver.poll(&phone, 0);
+    callback.publish(data(frame.clone(), "peer")).unwrap();
+    receiver.poll(&phone, 100);
+
+    callback.publish(data(frame, "peer")).unwrap();
+    assert_eq!(
+        write_payload(&receiver.poll(&phone, 350)).len(),
+        8,
+        "the replay is still acknowledged"
+    );
+
+    assert_eq!(receiver.poll(&phone, 400), vec![disconnect()]);
+    assert_eq!(receiver.state(), ReceiveState::Failed);
+}

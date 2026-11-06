@@ -12,6 +12,11 @@ use vauchi_core::platform::executor::{EventInbox, InboxLimits, Operation};
 use vauchi_core::sync::guardian_transfer::{HandBackReceiver, TransferError};
 use vauchi_core::{Command, Event, Vauchi};
 
+const SILENCE_LIMIT_SECS: u32 = 300;
+/// An `RBA1` acknowledgement's piece index and end offset, both big-endian, so
+/// comparing the bytes orders positions through the backup.
+const ACK_POSITION: std::ops::Range<usize> = 4..8;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ReceiveState {
     Receiving,
@@ -29,6 +34,7 @@ pub struct RecoveryTransferReceiver {
     callback: Operation,
     state: ReceiveState,
     deadline: Option<u64>,
+    furthest: Option<[u8; 4]>,
 }
 
 impl RecoveryTransferReceiver {
@@ -60,6 +66,7 @@ impl RecoveryTransferReceiver {
             callback,
             state: ReceiveState::Receiving,
             deadline: None,
+            furthest: None,
         })
     }
 
@@ -71,8 +78,10 @@ impl RecoveryTransferReceiver {
         self.state
     }
 
-    /// Core monotonic seconds bound an attempt to five minutes, including queued work.
-    /// A refusal terminates the link; retry starts the unfinished piece afresh.
+    /// Core monotonic seconds end an attempt after five minutes without forward
+    /// progress, including queued work. A whole attempt has no limit, because a
+    /// piece at the smallest MTU can take minutes and restarts if cut short. A
+    /// refusal terminates the link; retry starts the unfinished piece afresh.
     pub fn poll(&mut self, phone: &Vauchi, now: u64) -> Vec<Command> {
         if self.state != ReceiveState::Receiving {
             return Vec::new();
@@ -81,18 +90,25 @@ impl RecoveryTransferReceiver {
         match self.deadline {
             Some(deadline) if now >= deadline => return self.finish(ReceiveState::Failed),
             None => {
-                let Some(deadline) = now.checked_add(300) else {
+                let Some(deadline) = now.checked_add(u64::from(SILENCE_LIMIT_SECS)) else {
                     return self.finish(ReceiveState::Failed);
                 };
                 self.deadline = Some(deadline);
-                commands.push(Command::schedule_wakeup(300, 300, 0, None));
+                commands.push(Command::schedule_wakeup(
+                    SILENCE_LIMIT_SECS,
+                    SILENCE_LIMIT_SECS,
+                    0,
+                    None,
+                ));
             }
             _ => {}
         }
+        let mut observed = false;
         for _ in 0..4 {
             let Some(event) = self.inbox.pop() else {
                 break;
             };
+            observed = true;
             let data = match &event {
                 Event::BleCharacteristicRead {
                     device_id,
@@ -134,6 +150,7 @@ impl RecoveryTransferReceiver {
             let Ok(ack) = phone.take_hand_back_frame(&mut self.receiver, data) else {
                 return self.finish(ReceiveState::Failed);
             };
+            self.note_progress(&ack, now);
             let Ok(progress) = phone.storage().recovery().backup_piece_progress(&self.hash) else {
                 return self.finish(ReceiveState::Failed);
             };
@@ -154,7 +171,30 @@ impl RecoveryTransferReceiver {
                 break;
             }
         }
+        // The timer armed earlier fires before a limit that progress moved.
+        if !observed
+            && commands.is_empty()
+            && let Some(left) = self.deadline.map(|deadline| deadline.saturating_sub(now))
+        {
+            let left = u32::try_from(left).unwrap_or(SILENCE_LIMIT_SECS);
+            commands.push(Command::schedule_wakeup(left, left, 0, None));
+        }
         commands
+    }
+
+    /// Only a new furthest position counts: a replay is answered but moves
+    /// nothing, or a peer could hold the link open for ever.
+    fn note_progress(&mut self, ack: &[u8], now: u64) {
+        let Some(position) = ack
+            .get(ACK_POSITION)
+            .and_then(|bytes| <[u8; 4]>::try_from(bytes).ok())
+        else {
+            return;
+        };
+        if self.furthest.is_none_or(|furthest| position > furthest) {
+            self.furthest = Some(position);
+            self.deadline = now.checked_add(u64::from(SILENCE_LIMIT_SECS));
+        }
     }
 
     pub fn cancel(&mut self) -> Vec<Command> {

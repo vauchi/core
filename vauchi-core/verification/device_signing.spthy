@@ -1,0 +1,159 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Per-device signing of registry broadcasts and pinned device keys (ADR-079,
+ * SC-62, #970). Core carries the verification code, but no production path uses
+ * it yet, so this model is design evidence and backs no claim.
+ *
+ *   - The seed signs registry entries binding a device name to its key. Every
+ *     device holds the seed, so an attacker who has it can sign any entry.
+ *   - A device signs its own messages with a random key the seed cannot reach.
+ *   - A contact pins the key in the first entry it accepts for a device, and
+ *     accepts a message only under that key. The pin is never forgotten.
+ *
+ * The attacker owns the network and may read the seed or one device's key.
+ *
+ * -DFORGET_PIN: removing a device forgets its pin, the hole a test found in the
+ * first version. -DNO_PRESENCE: a keyless entry signs the same bytes as an entry
+ * naming the all-zero key, the hole review found. Each falsifies its lemma, so
+ * the lemmas can fail.
+ *
+ * Not modelled: revocation by a signer list, freshness and replay of broadcasts
+ * (the caller's verify_with_freshness), and more than one contact state per
+ * device. State facts are persistent where they can be: a rule that consumes and
+ * re-creates its own fact makes proof search diverge.
+ *
+ * Run each lemma on its own: tamarin-prover --prove=<lemma> device_signing.spthy
+ */
+
+theory VauchiDeviceSigning
+begin
+
+builtins: signing
+
+#ifdef NO_PRESENCE
+macros:
+  keyless_entry(i, d) = <'entry', i, d, 'zero'>
+#else
+macros:
+  keyless_entry(i, d) = <'keyless-entry', i, d>
+#endif
+
+restriction Equality:
+  "All x y #i. Eq(x, y) @ i ==> x = y"
+
+rule Create_identity:
+  [ Fr(~seed) ]
+  --[ Identity($I, ~seed) ]->
+  [ !Seed($I, ~seed), Out(pk(~seed)) ]
+
+rule Register_device:
+  [ !Seed(I, seed), Fr(~sk) ]
+  --[ HonestKey(I, $D, pk(~sk)), Named(I, $D, pk(~sk)), MadeDeviceKey(I, $D, ~sk) ]->
+  [ !DeviceKey(I, $D, ~sk)
+  , Out(pk(~sk))
+  , Out(sign(<'entry', I, $D, pk(~sk)>, seed))
+  ]
+
+/* A device that has not generated a key yet: the entry names none. */
+rule Register_keyless_device:
+  [ !Seed(I, seed) ]
+  --[ Keyless(I, $D) ]->
+  [ Out(sign(keyless_entry(I, $D), seed)) ]
+
+rule Device_sends:
+  [ !DeviceKey(I, D, sk), Fr(~m) ]
+  --[ DeviceSent(I, D, ~m) ]->
+  [ Out(~m), Out(sign(<'msg', I, D, ~m>, sk)) ]
+
+rule Contact_meets_device:
+  [ Fr(~c) ]
+  -->
+  [ NoPin(~c, $I, $D) ]
+
+rule Contact_pins_first_key:
+  [ NoPin(c, I, D), !Seed(I, seed), In(k), In(signature) ]
+  --[ Eq(verify(signature, <'entry', I, D, k>, pk(seed)), true)
+    , Pin(c, I, D, k)
+    ]->
+  [ !Pinned(c, I, D, k) ]
+
+#ifdef FORGET_PIN
+/* Removing a device loses what was known about it. */
+rule Contact_forgets_removed_device:
+  [ !Pinned(c, I, D, k), !Seed(I, seed), In(signature) ]
+  --[ Eq(verify(signature, <'remove', I, D>, pk(seed)), true)
+    , Forgot(c, I, D)
+    ]->
+  [ NoPin(c, I, D) ]
+#endif
+
+rule Contact_accepts_message:
+  [ !Pinned(c, I, D, k), In(m), In(signature) ]
+  --[ Eq(verify(signature, <'msg', I, D, m>, k), true)
+    , Accepted(c, I, D, m)
+    ]->
+  [ ]
+
+rule Reveal_seed:
+  [ !Seed(I, seed) ]
+  --[ RevealSeed(I) ]->
+  [ Out(seed) ]
+
+rule Reveal_device_key:
+  [ !DeviceKey(I, D, sk) ]
+  --[ RevealDeviceKey(I, D) ]->
+  [ Out(sk) ]
+
+/* Helpers: a seed or device key reaches the attacker only by a reveal. */
+lemma seed_needs_a_reveal [reuse]:
+  "All I s #i #k.
+     Identity(I, s) @ i & K(s) @ k
+     ==> Ex #r. RevealSeed(I) @ r & r < k"
+
+lemma device_key_needs_a_reveal [reuse]:
+  "All I D sk #i #k.
+     MadeDeviceKey(I, D, sk) @ i & K(sk) @ k
+     ==> Ex #r. RevealDeviceKey(I, D) @ r & r < k"
+
+lemma executable:
+  exists-trace
+  "Ex c I D k m #p #a.
+     Pin(c, I, D, k) @ p & Accepted(c, I, D, m) @ a
+     & not (Ex X #r. RevealSeed(X) @ r)
+     & not (Ex X Y #r. RevealDeviceKey(X, Y) @ r)"
+
+/* The pin holds even against a seed holder: a contact never changes a key. */
+lemma a_pinned_key_never_changes:
+  "All c I D k1 k2 #i #j.
+     Pin(c, I, D, k1) @ i & Pin(c, I, D, k2) @ j ==> k1 = k2"
+
+/* SC-62's attribution: once a contact pinned a device's real key, a message
+   under that device's name came from it, whoever holds the seed. */
+lemma a_seed_holder_cannot_sign_as_a_pinned_device:
+  "All c I D k m #p #h #a.
+     Pin(c, I, D, k) @ p & HonestKey(I, D, k) @ h & Accepted(c, I, D, m) @ a
+     ==> (Ex #s. DeviceSent(I, D, m) @ s)
+       | (Ex #r. RevealDeviceKey(I, D) @ r)"
+
+/* Without the seed, an attacker cannot make a contact pin a key the identity
+   never named. Holding the seed it can sign any entry, which is residual D-10. */
+lemma only_a_named_key_is_ever_pinned:
+  "All c I D k #p.
+     Pin(c, I, D, k) @ p
+     ==> (Ex #n. Named(I, D, k) @ n & n < p)
+       | (Ex #r. RevealSeed(I) @ r & r < p)"
+
+/* The limit, residual D-10: a seed holder gets a new device of its own accepted. */
+lemma a_seed_holder_can_mint_a_new_device:
+  exists-trace
+  "Ex c I D k m #p #a.
+     Pin(c, I, D, k) @ p
+     & Accepted(c, I, D, m) @ a
+     & not (Ex #h. HonestKey(I, D, k) @ h)
+     & not (Ex #s. DeviceSent(I, D, m) @ s)
+     & not (Ex #r. RevealDeviceKey(I, D) @ r)"
+
+end

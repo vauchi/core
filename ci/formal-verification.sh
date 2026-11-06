@@ -231,6 +231,16 @@ tamarin_expect "$models/device_sync.spthy" verified "" \
     batch_stays_secret_with_no_reveal seed_holder_reads_what_is_still_retained
 tamarin_expect "$models/device_sync.spthy" falsified "-DSTATIC_ONLY" \
     acked_batch_survives_a_later_seed_leak
+# Per-device signing (#970, SC-62): a seed holder cannot sign as a pinned device,
+# and can still mint a new one. Each flag reintroduces a hole found in review.
+tamarin_expect "$models/device_signing.spthy" verified "" \
+    seed_needs_a_reveal device_key_needs_a_reveal executable \
+    a_pinned_key_never_changes a_seed_holder_cannot_sign_as_a_pinned_device \
+    only_a_named_key_is_ever_pinned a_seed_holder_can_mint_a_new_device
+tamarin_expect "$models/device_signing.spthy" falsified "-DFORGET_PIN" \
+    a_pinned_key_never_changes a_seed_holder_cannot_sign_as_a_pinned_device
+tamarin_expect "$models/device_signing.spthy" falsified "-DNO_PRESENCE" \
+    only_a_named_key_is_ever_pinned
 # Reciprocity confirmation: signature and asymmetric tokens each stop a
 # reflected confirmation; only the signature covers a leaked shared key.
 tamarin_expect "$models/reciprocity.spthy" verified "" \

@@ -15,11 +15,65 @@ use vauchi_core::identity::{DeviceError, DeviceRegistry, PinnedDeviceKeys, Regis
 const NOW: u64 = 1_000;
 
 fn pins_after(seen: &[&RegistryBroadcast]) -> PinnedDeviceKeys {
+    let identity_key = SigningKeyPair::from_seed(&[0x42u8; 32]).public_key();
     let mut pins = PinnedDeviceKeys::default();
     for broadcast in seen {
-        pins.remember(broadcast);
+        pins.accept(&identity_key, broadcast).unwrap();
     }
     pins
+}
+
+// A network attacker has no seed. With no presence marker in the signed bytes it
+// could flip a keyless entry to an all-zero key, then poison the pin with it.
+// @internal
+#[test]
+fn a_keyless_entry_cannot_be_rewritten_to_name_a_key() {
+    let seed = [0x42u8; 32];
+    let identity_key = SigningKeyPair::from_seed(&seed);
+    let key_a = SigningKeyPair::generate();
+    let device_a = create_test_device(&seed, 0, "A");
+    let id_a = *device_a.device_id();
+    let mut registry = DeviceRegistry::new(
+        device_a
+            .to_registered(&seed)
+            .with_signing_key(public_bytes(&key_a)),
+        &identity_key,
+    );
+    registry
+        .add_device(
+            create_test_device(&seed, 1, "B").to_registered(&seed),
+            &identity_key,
+        )
+        .unwrap();
+    let honest = RegistryBroadcast::signed_by_device(&registry, &identity_key, id_a, &key_a, NOW);
+    let mut wire: serde_json::Value = serde_json::from_str(&honest.to_json()).unwrap();
+    wire["active_devices"][1]["signing_public_key"] = serde_json::to_value([0u8; 32]).unwrap();
+    let rewritten = RegistryBroadcast::from_json(&wire.to_string()).unwrap();
+
+    assert_eq!(
+        honest.verify_device_signed(&identity_key.public_key()),
+        Ok(())
+    );
+    assert_eq!(
+        rewritten.verify_device_signed(&identity_key.public_key()),
+        Err(DeviceError::InvalidRegistrySignature)
+    );
+}
+
+// @internal
+#[test]
+fn a_refused_broadcast_pins_nothing() {
+    let f = two_devices();
+    let stranger_identity = SigningKeyPair::generate();
+    let refused =
+        RegistryBroadcast::signed_by_device(&f.registry, &stranger_identity, f.id_a, &f.key_a, NOW);
+    let mut pins = PinnedDeviceKeys::default();
+
+    assert_eq!(
+        pins.accept(&f.identity_key.public_key(), &refused),
+        Err(DeviceError::InvalidRegistrySignature)
+    );
+    assert_eq!(pins, PinnedDeviceKeys::default());
 }
 
 struct Fixture {

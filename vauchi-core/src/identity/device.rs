@@ -413,6 +413,8 @@ impl DeviceRegistry {
             data.extend_from_slice(&device.exchange_public_key);
             data.push(if device.revoked { 1 } else { 0 });
             if names_keys {
+                // The marker keeps a missing key distinct from an all-zero one.
+                data.push(u8::from(device.signing_public_key.is_some()));
                 data.extend_from_slice(&device.signing_public_key.unwrap_or([0u8; 32]));
             }
         }
@@ -541,13 +543,23 @@ pub struct PinnedDeviceKeys {
 }
 
 impl PinnedDeviceKeys {
-    /// Pins the keys a broadcast names, keeping any pin already held.
-    pub fn remember(&mut self, broadcast: &RegistryBroadcast) {
+    /// Verifies a broadcast against these pins, then pins the keys it names.
+    ///
+    /// One call on purpose: pinning before verifying would let an attacker
+    /// choose a device's key. It does not check freshness, which stays with
+    /// [`RegistryBroadcast::verify_with_freshness`] at the caller.
+    pub fn accept(
+        &mut self,
+        identity_key: &crate::crypto::PublicKey,
+        broadcast: &RegistryBroadcast,
+    ) -> Result<(), DeviceError> {
+        broadcast.verify_against_pinned(identity_key, self)?;
         for device in &broadcast.active_devices {
             if let Some(key) = device.signing_public_key {
                 self.keys.entry(device.device_id).or_insert(key);
             }
         }
+        Ok(())
     }
 }
 
@@ -785,6 +797,8 @@ impl RegistryBroadcast {
             data.extend_from_slice(&device.device_id);
             data.extend_from_slice(&device.exchange_public_key);
             if names_keys {
+                // The marker keeps a missing key distinct from an all-zero one.
+                data.push(u8::from(device.signing_public_key.is_some()));
                 data.extend_from_slice(&device.signing_public_key.unwrap_or([0u8; 32]));
             }
         }

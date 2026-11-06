@@ -230,9 +230,15 @@ impl Vauchi {
         // Persisting the password-encrypted backup bytes locked the
         // user out on restart: no startup loader has the backup
         // password (2026-06-11-restore-identity-unloadable-after-restart).
-        self.storage
-            .identity()
-            .save_identity(&identity.to_storage_bytes())?;
+        // One step, or the new identity could start signing with the device key
+        // of the identity it replaced (ADR-079): a backup carries no device key.
+        self.storage.with_savepoint(|| -> VauchiResult<()> {
+            self.storage
+                .identity()
+                .save_identity(&identity.to_storage_bytes())?;
+            self.storage.device().clear_device_signing_key()?;
+            Ok(())
+        })?;
 
         // Create contact card if none exists
         if self.storage.contacts().load_own_card()?.is_none() {

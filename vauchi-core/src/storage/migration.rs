@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 112] = [
+const MIGRATIONS: [Migration; 113] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -832,7 +832,21 @@ const MIGRATIONS: [Migration; 112] = [
         name: "recovery_claim_issued_at",
         action: MigrationAction::Callback(migrate_v112_recovery_claim_issued_at),
     },
+    Migration {
+        version: 113,
+        name: "device_signing_key",
+        action: MigrationAction::Sql(MIGRATION_V113_DEVICE_SIGNING_KEY),
+    },
 ];
+
+/// Migration v113 (ADR-079, vauchi/private#970): this device's random signing
+/// key. It has its own row because no backup or linked device may carry it.
+const MIGRATION_V113_DEVICE_SIGNING_KEY: &str = "
+    CREATE TABLE IF NOT EXISTS device_signing_key (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        key_encrypted BLOB NOT NULL
+    );
+";
 
 /// Migration v111 (vauchi/private#796, P33): a guardian hands back its
 /// share by QR and its backup in pieces over Bluetooth, so the recovering

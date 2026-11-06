@@ -73,6 +73,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("visibility_labels", "visible_fields_json_encrypted"),
     // V15 medium-priority
     ("device_info", "device_info_encrypted"),
+    // V113 per-device signing key
+    ("device_signing_key", "key_encrypted"),
     ("version_vector", "vector_json_encrypted"),
     ("receive_checkpoints", "checkpoint_json_encrypted"),
     ("contact_sync_timestamps", "last_sync_at_encrypted"),
@@ -326,6 +328,9 @@ impl Storage {
 
             self.rekey_device_info(old_key, &new_key)?;
             report(&mut completed, "device_info");
+
+            self.rekey_device_signing_key(old_key, &new_key)?;
+            report(&mut completed, "device_signing_key");
 
             self.rekey_version_vector(old_key, &new_key)?;
             report(&mut completed, "version_vector");

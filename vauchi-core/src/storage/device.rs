@@ -20,6 +20,7 @@ impl Storage {
     /// during identity deletion or device unlinking.
     pub fn wipe_device_data(&self) -> Result<(), StorageError> {
         self.device().clear_device_info()?;
+        self.device().clear_device_signing_key()?;
         self.sync().wipe_for_device_reset()
     }
 }

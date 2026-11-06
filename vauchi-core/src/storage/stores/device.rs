@@ -13,10 +13,11 @@
 use std::sync::Arc;
 
 use rusqlite::{Connection, params};
+use zeroize::Zeroizing;
 
 use super::super::{Storage, StorageError};
 use crate::clock::Clock;
-use crate::crypto::{PublicKey, SymmetricKey};
+use crate::crypto::{PublicKey, SigningKeyPair, SymmetricKey};
 use crate::identity::device::{BroadcastDevice, DeviceRegistry, MAX_DEVICES, RegistryBroadcast};
 
 /// Scoped persistence view for the device domain: this device's info record and
@@ -118,6 +119,57 @@ impl DeviceStore<'_> {
     /// Deletes this device's info row (used during device reset / unlink).
     pub fn clear_device_info(&self) -> Result<(), StorageError> {
         self.conn.execute("DELETE FROM device_info", [])?;
+        Ok(())
+    }
+
+    /// This device's random signing key, generated on first use (ADR-079).
+    ///
+    /// Contacts pin the public half and accept no other for this device, so a
+    /// stored key that does not open is an error and is never replaced.
+    pub fn load_or_create_device_signing_key(&self) -> Result<SigningKeyPair, StorageError> {
+        let stored = match self.stored_device_signing_key()? {
+            Some(stored) => stored,
+            None => {
+                let candidate = Zeroizing::new(crate::crypto::random_bytes::<32>());
+                let sealed = crate::crypto::encrypt(self.key, candidate.as_slice())
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                // IGNORE, then read back: the app and its background worker can
+                // both get here, and only one key may ever exist.
+                self.conn.execute(
+                    "INSERT OR IGNORE INTO device_signing_key (id, key_encrypted) VALUES (1, ?1)",
+                    params![sealed],
+                )?;
+                self.stored_device_signing_key()?.ok_or_else(|| {
+                    StorageError::InvalidData("device signing key was not stored".into())
+                })?
+            }
+        };
+        let opened = Zeroizing::new(
+            crate::crypto::decrypt(self.key, &stored)
+                .map_err(|e| StorageError::Encryption(e.to_string()))?,
+        );
+        let seed: Zeroizing<[u8; 32]> =
+            Zeroizing::new(opened.as_slice().try_into().map_err(|_| {
+                StorageError::InvalidData("device signing key has invalid length".into())
+            })?);
+        Ok(SigningKeyPair::from_seed(&seed))
+    }
+
+    fn stored_device_signing_key(&self) -> Result<Option<Vec<u8>>, StorageError> {
+        match self.conn.query_row(
+            "SELECT key_encrypted FROM device_signing_key WHERE id = 1",
+            [],
+            |row| row.get(0),
+        ) {
+            Ok(stored) => Ok(Some(stored)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
+    /// Forgets this device's signing key.
+    pub fn clear_device_signing_key(&self) -> Result<(), StorageError> {
+        self.conn.execute("DELETE FROM device_signing_key", [])?;
         Ok(())
     }
 

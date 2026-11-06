@@ -317,6 +317,7 @@ impl Vauchi {
             .consent()
             .save_deletion_state(&crate::storage::DeletionState::Executed { executed_at: now })?;
 
+        self.storage.device().clear_device_signing_key()?;
         self.storage.identity().delete_identity()?;
         Ok(())
     }

@@ -213,6 +213,41 @@ impl Storage {
         Ok(())
     }
 
+    /// Re-encrypt device_signing_key: key_encrypted
+    pub(super) fn rekey_device_signing_key(
+        &self,
+        old_key: &SymmetricKey,
+        new_key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        let stored = self.conn.query_row(
+            "SELECT key_encrypted FROM device_signing_key WHERE id = 1",
+            [],
+            |row| row.get::<_, Vec<u8>>(0),
+        );
+        let enc = match stored {
+            Ok(enc) => enc,
+            Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(()),
+            Err(e) => {
+                return Err(StorageError::Migration(format!(
+                    "Read device signing key: {e}"
+                )));
+            }
+        };
+        let plain =
+            zeroize::Zeroizing::new(decrypt(old_key, &enc).map_err(|e| {
+                StorageError::Migration(format!("Decrypt device signing key: {e}"))
+            })?);
+        let new_enc = encrypt(new_key, &plain)
+            .map_err(|e| StorageError::Migration(format!("Encrypt device signing key: {e}")))?;
+        self.conn
+            .execute(
+                "UPDATE device_signing_key SET key_encrypted = ?1 WHERE id = 1",
+                params![new_enc],
+            )
+            .map_err(|e| StorageError::Migration(format!("Update device signing key: {e}")))?;
+        Ok(())
+    }
+
     /// Re-encrypt identity: password_hash_encrypted, duress_hash_encrypted (nullable)
     pub(super) fn rekey_identity_passwords(
         &self,

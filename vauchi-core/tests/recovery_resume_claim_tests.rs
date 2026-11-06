@@ -61,3 +61,58 @@ fn pending_recovery_claim_propagates_corrupt_storage_refusal() {
     ));
     assert!(!phone.has_identity());
 }
+
+#[cfg(feature = "testing")]
+mod claim_lifetime {
+    use std::sync::Arc;
+    use std::time::{Duration, UNIX_EPOCH};
+
+    use vauchi_core::Vauchi;
+    use vauchi_core::clock::FakeClock;
+    use vauchi_core::recovery::RecoveryClaim;
+
+    const BEGUN_AT: u64 = 1_800_000_000;
+
+    fn recovering_phone() -> (Vauchi, Arc<FakeClock>, String) {
+        let clock = Arc::new(FakeClock::new(UNIX_EPOCH + Duration::from_secs(BEGUN_AT)));
+        let phone = Vauchi::in_memory_with_clock(clock.clone()).unwrap();
+        let claim = phone.begin_recovery(&"01".repeat(32)).unwrap();
+        (phone, clock, claim)
+    }
+
+    // @internal — P32: presenting a claim is a read; only an explicit act extends what guardians will accept.
+    #[test]
+    fn reading_a_pending_claim_returns_the_issued_claim_unchanged() {
+        let (phone, clock, issued) = recovering_phone();
+        clock.advance(Duration::from_secs(3_600));
+        assert_eq!(
+            phone.pending_recovery_claim().unwrap().as_deref(),
+            Some(issued.as_str())
+        );
+        clock.advance(Duration::from_secs(3_600));
+        assert_eq!(
+            phone.pending_recovery_claim().unwrap().as_deref(),
+            Some(issued.as_str())
+        );
+    }
+
+    // @internal — P32: repeated reads cannot keep a claim alive past its lifetime.
+    #[test]
+    fn a_pending_claim_expires_on_schedule_however_often_it_is_read() {
+        let (phone, clock, _) = recovering_phone();
+        let read_at = |phone: &Vauchi| {
+            let claim = phone.pending_recovery_claim().unwrap().unwrap();
+            phone.parse_recovery_claim_b64(&claim).unwrap()
+        };
+
+        clock.advance(Duration::from_secs(RecoveryClaim::MAX_AGE_SECS));
+        let at_limit = read_at(&phone);
+        assert_eq!(at_limit.timestamp(), BEGUN_AT);
+        assert!(!at_limit.is_expired(BEGUN_AT + RecoveryClaim::MAX_AGE_SECS));
+
+        clock.advance(Duration::from_secs(1));
+        let past_limit = read_at(&phone);
+        assert_eq!(past_limit.timestamp(), BEGUN_AT);
+        assert!(past_limit.is_expired(BEGUN_AT + RecoveryClaim::MAX_AGE_SECS + 1));
+    }
+}

@@ -13,7 +13,7 @@ use std::time::{Duration, SystemTime};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use vauchi_app::i18n::{Locale, get_string};
-use vauchi_app::ui::{AppEngine, AppScreen};
+use vauchi_app::ui::{AppEngine, AppPresentationError, AppScreen};
 use vauchi_core::api::HandBackRestoreStatus;
 use vauchi_core::clock::{Clock, FakeClock};
 use vauchi_core::exchange::{CHAR_DATA_NOTIFY, CHAR_DATA_WRITE};
@@ -23,6 +23,9 @@ use vauchi_core::{Command, Event, SymmetricKey, Vauchi, VauchiConfig};
 use crate::common::lost_phone::{
     Lost, alice_pk_hex, lost, lost_with_extra_contacts, lost_with_guardians_on,
 };
+
+#[path = "recovery_ceremony_fixture_tests.rs"]
+mod fixture;
 
 const SMALLEST_MTU: usize = 23;
 const USUAL_MTU: u32 = 185;
@@ -47,7 +50,7 @@ fn shown_qr(commands: &[Command]) -> Option<String> {
     walk(&serde_json::to_value(commands).unwrap())
 }
 
-fn press_primary(engine: &mut AppEngine, commands: &[Command]) -> Vec<Command> {
+fn press_primary(engine: &mut Actor, commands: &[Command]) -> Vec<Command> {
     let (surface_id, interaction_id) = commands
         .iter()
         .find_map(|command| match command {
@@ -68,7 +71,7 @@ fn press_primary(engine: &mut AppEngine, commands: &[Command]) -> Vec<Command> {
         .unwrap()
 }
 
-fn scan(engine: &mut AppEngine, commands: &[Command], data: String) -> Vec<Command> {
+fn scan(engine: &mut Actor, commands: &[Command], data: String) -> Vec<Command> {
     assert!(
         commands.contains(&Command::QrRequestScan),
         "the screen asks the hardware shell for a scan"
@@ -76,9 +79,52 @@ fn scan(engine: &mut AppEngine, commands: &[Command], data: String) -> Vec<Comma
     engine.dispatch(Event::QrScanned { data }).unwrap()
 }
 
+/// An app engine whose traffic the fixture can record. `dispatch` and
+/// `initial_commands` shadow the engine's, so scenarios read as they would
+/// without recording.
+struct Actor {
+    name: &'static str,
+    engine: AppEngine,
+}
+
+impl Actor {
+    fn new(name: &'static str, vauchi: Vauchi) -> Self {
+        Self {
+            name,
+            engine: AppEngine::new(vauchi),
+        }
+    }
+
+    fn dispatch(&mut self, event: Event) -> Result<Vec<Command>, AppPresentationError> {
+        let commands = self.engine.dispatch(event.clone())?;
+        fixture::record(self.name, Some(&event), &commands);
+        Ok(commands)
+    }
+
+    fn initial_commands(&mut self) -> Result<Vec<Command>, AppPresentationError> {
+        let commands = self.engine.initial_commands()?;
+        fixture::record(self.name, None, &commands);
+        Ok(commands)
+    }
+}
+
+impl std::ops::Deref for Actor {
+    type Target = AppEngine;
+
+    fn deref(&self) -> &AppEngine {
+        &self.engine
+    }
+}
+
+impl std::ops::DerefMut for Actor {
+    fn deref_mut(&mut self) -> &mut AppEngine {
+        &mut self.engine
+    }
+}
+
 /// Alice's new phone in recovery mode, showing its claim.
 struct RecoveringPhone {
-    engine: AppEngine,
+    engine: Actor,
     claim: String,
 }
 
@@ -92,7 +138,11 @@ fn begin_for(target: &[u8; 32], phone: Vauchi) -> RecoveringPhone {
 
 fn begin_recovery_of(target_hex: &str, phone: Vauchi) -> RecoveringPhone {
     let claim = phone.begin_recovery(target_hex).unwrap();
-    let mut engine = AppEngine::new(phone);
+    fixture::register_secret(&claim, "RECOVERY-CLAIM");
+    fixture::register_key(target_hex, "OLD-KEY");
+    let temporary = phone.parse_recovery_claim_b64(&claim).unwrap();
+    fixture::register_key(&hex::encode(temporary.new_pk().as_bytes()), "TEMPORARY-KEY");
+    let mut engine = Actor::new("phone", phone);
     let commands = engine.initial_commands().unwrap();
     assert_eq!(engine.current_app_screen(), &AppScreen::Recovery);
     assert_eq!(
@@ -105,14 +155,14 @@ fn begin_recovery_of(target_hex: &str, phone: Vauchi) -> RecoveringPhone {
 
 /// The phone and one guardian, face to face, once the share has crossed.
 struct Meeting<'phone> {
-    phone: &'phone mut AppEngine,
-    guardian: AppEngine,
+    phone: &'phone mut Actor,
+    guardian: Actor,
     guardian_commands: Vec<Command>,
 }
 
 fn meet(phone: &mut RecoveringPhone, guardian: Vauchi) -> Meeting<'_> {
     let shares_before = restore_status(&phone.engine).handed_back;
-    let mut guardian = AppEngine::new(guardian);
+    let mut guardian = Actor::new("guardian", guardian);
     guardian.navigate_to(AppScreen::RecoveryHelp);
     let opened = guardian.initial_commands().unwrap();
     let vouching = press_primary(&mut guardian, &opened);
@@ -121,6 +171,7 @@ fn meet(phone: &mut RecoveringPhone, guardian: Vauchi) -> Meeting<'_> {
     let guardian_commands = press_primary(&mut guardian, &recognized);
 
     let share = shown_qr(&guardian_commands).expect("the guardian shows its share as a QR code");
+    fixture::register_secret(&share, "HAND-BACK-SHARE-AND-TOKEN");
     let showing = phone.engine.initial_commands().unwrap();
     let scanning = press_primary(&mut phone.engine, &showing);
     scan(&mut phone.engine, &scanning, share);
@@ -197,7 +248,9 @@ impl Meeting<'_> {
     /// acknowledgements back, at most `limit` packets; returns the largest.
     fn carry_backup(&mut self, limit: usize) -> usize {
         let mut largest = 0;
-        for _ in 0..limit {
+        let _elision = fixture::Elision::begin();
+        for packet in 0..limit {
+            fixture::note_packet(packet);
             let Some(data) = take_write(&mut self.guardian_commands, CHAR_DATA_NOTIFY) else {
                 break;
             };
@@ -485,8 +538,8 @@ fn the_phone_ignores_an_advertiser_with_another_token() {
     );
 }
 
-fn guardian_showing_its_share(guardian: Vauchi, claim: String) -> (AppEngine, Vec<Command>) {
-    let mut engine = AppEngine::new(guardian);
+fn guardian_showing_its_share(guardian: Vauchi, claim: String) -> (Actor, Vec<Command>) {
+    let mut engine = Actor::new("guardian", guardian);
     engine.navigate_to(AppScreen::RecoveryHelp);
     let opened = engine.initial_commands().unwrap();
     let vouching = press_primary(&mut engine, &opened);

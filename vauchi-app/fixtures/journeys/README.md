@@ -17,6 +17,15 @@ and link metadata, ordering, actions, labels and accessibility values.
 Only the initial Glance frame's remaining milliseconds may vary within
 its emitted seconds budget; delay and remaining time must agree.
 
+`recovery_ceremony_v1.json` is the in-person recovery ceremony as two
+engines exchange it, one transcript per scenario, each step naming its
+actor, the event and the commands it produced. Real crypto makes each run's
+bytes differ, so random bytes become fixed fill of the same length and
+secrets become placeholders such as `HAND-BACK-SHARE-AND-TOKEN`, keeping
+framing and all presentation. Long transfers keep their first packets and
+mark the rest as `elided_packets`. Regeneration is byte-identical, which
+CI checks. It proves Core's translation; it is no evidence of a radio.
+
 `publish:journey-fixtures` publishes plain JSON files and `manifest.json`
 to the Core generic package registry as `core-journey-fixtures/<full SHA>`.
 The manifest names the exact Core revision/version and resolved contract

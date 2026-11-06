@@ -13,7 +13,12 @@ import tomllib
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from urllib.error import HTTPError
 
-FILES = ("presentation_contract_v1.json", "screen_catalog_v1.json", "screen_catalog_inventory_v1.json")
+FILES = (
+    "presentation_contract_v1.json",
+    "screen_catalog_v1.json",
+    "screen_catalog_inventory_v1.json",
+    "recovery_ceremony_v1.json",
+)
 MAX_BYTES = 8 * 1024 * 1024
 SHA = r"[a-f0-9]{40}"
 VERSION = r"[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.]+)?"
@@ -104,6 +109,18 @@ def validate_journeys(blobs):
             "screen inventory must contain ids")
     require(len(set(expected)) == len(expected), "duplicate screen inventory id")
     require(actual == set(expected), "catalog and screen inventory disagree")
+
+    scenarios = documents["recovery_ceremony_v1.json"].get("scenarios")
+    require(type(scenarios) is list and bool(scenarios), "ceremony must contain scenarios")
+    for scenario in scenarios:
+        require(type(scenario) is dict and isinstance(scenario.get("scenario"), str)
+                and type(scenario.get("steps")) is list and bool(scenario["steps"]),
+                "invalid ceremony scenario")
+        for step in scenario["steps"]:
+            if type(step) is dict and step.get("elided_packets") is True:
+                continue
+            require(type(step) is dict and step.get("actor") in ("phone", "guardian")
+                    and commands(step.get("commands")), "invalid ceremony step")
 
 
 def install(destination, blobs):

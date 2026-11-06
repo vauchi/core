@@ -26,6 +26,13 @@ DOCUMENTS = {
                      "commands": ["QrRequestScan"]}],
     },
     "screen_catalog_inventory_v1.json": {"schema_version": 1, "screen_ids": ["example"]},
+    "recovery_ceremony_v1.json": {
+        "schema_version": 1,
+        "scenarios": [{"scenario": "Example", "steps": [
+            {"actor": "phone", "event": None, "commands": ["QrRequestScan"]},
+            {"elided_packets": True},
+        ]}],
+    },
 }
 
 
@@ -45,6 +52,18 @@ def invalid_corpora():
     data = copy.deepcopy(DOCUMENTS)
     data[catalog]["screens"].append(data[catalog]["screens"][0] | {"code_id": "second"})
     yield "missing-id", data
+    ceremony = "recovery_ceremony_v1.json"
+    for key, value in (
+        ("empty-ceremony", []), ("wrong-ceremony-container", {}),
+        ("ceremony-without-steps", [{"scenario": "Example", "steps": []}]),
+        ("ceremony-unknown-actor",
+         [{"scenario": "Example", "steps": [{"actor": "relay", "commands": []}]}]),
+        ("ceremony-step-without-commands",
+         [{"scenario": "Example", "steps": [{"actor": "phone"}]}]),
+    ):
+        data = copy.deepcopy(DOCUMENTS)
+        data[ceremony]["scenarios"] = value
+        yield key, data
     for key, value in (
         ("empty-catalog", []), ("wrong-screen-container", {}),
         ("duplicate-screen", DOCUMENTS[catalog]["screens"] * 2),

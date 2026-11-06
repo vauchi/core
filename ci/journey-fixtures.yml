@@ -21,6 +21,9 @@ check:journey-fixtures:
     - cargo test -p vauchi-app --test presentation_contract_fixture_tests --test screen_catalog_fixture_tests --features test-kdf,testing,network-http
     - cargo test -p vauchi-app --test presentation_contract_fixture_tests --features test-kdf,testing,network-http regenerate_shared_fixture -- --ignored
     - git diff --exit-code -- vauchi-app/fixtures/journeys/presentation_contract_v1.json
+    - cargo test -p vauchi-core --features testing --test it recovery_ceremony_acceptance_tests::fixture
+    - cargo test -p vauchi-core --features testing --test it regenerate_ceremony_fixture -- --ignored
+    - git diff --exit-code -- vauchi-app/fixtures/journeys/recovery_ceremony_v1.json
     - python3 ci/journey_fixtures.py build dist/journey-fixtures --core-revision "$CI_COMMIT_SHA"
   artifacts:
     paths: [dist/journey-fixtures/]

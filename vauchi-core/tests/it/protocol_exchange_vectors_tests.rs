@@ -31,10 +31,10 @@ const RECIPROCITY_CONFIRM_INFO: &str = "vauchi-reciprocity-confirm-v1";
 const CONFIRM_GATE_INFO: &str = "vauchi-confirm-escrow-gate-v1";
 const CONFIRM_SLOT_INIT_INFO: &str = "vauchi-confirm-escrow-slot-init-v1";
 const CONFIRM_SLOT_RESP_INFO: &str = "vauchi-confirm-escrow-slot-resp-v1";
-const ESCROW_GATE_INFO: &str = "vauchi-escrow-gate-v1";
-const ESCROW_SLOT_INIT_INFO: &str = "vauchi-escrow-slot-init-v1";
-const ESCROW_SLOT_RESP_INFO: &str = "vauchi-escrow-slot-resp-v1";
-const ESCROW_CARD_KEY_INFO: &str = "vauchi-escrow-card-key-v1";
+const LINK_ESCROW_GATE_INFO: &str = "vauchi-escrow-pake-gate-v1";
+const LINK_ESCROW_SLOT_INIT_INFO: &str = "vauchi-escrow-pake-slot-init-v1";
+const LINK_ESCROW_SLOT_RESP_INFO: &str = "vauchi-escrow-pake-slot-resp-v1";
+const LINK_ESCROW_CARD_KEY_INFO: &str = "vauchi-escrow-pake-card-key-v1";
 const LINK_BOOTSTRAP_DOMAIN: &str = "vauchi-link-bootstrap-v3";
 const LINK_SHARED_KEY_INFO: &str = "vauchi-link-shared-key-v1";
 const VECTOR_NOW: u64 = 1_793_100_000;
@@ -85,6 +85,7 @@ pub(crate) struct LinkExchangeVector {
     presence_slot: String,
     epk_slot: String,
     dh: String,
+    pake_key: String,
     gate_info: String,
     slot_init_info: String,
     slot_resp_info: String,
@@ -329,8 +330,13 @@ pub(crate) fn compute_link_exchange() -> LinkExchangeVector {
     let dh = responder
         .diffie_hellman(initiator.public_key())
         .expect("escrow dh");
-    let keys = EscrowKeys::derive(&dh[..], EscrowRole::Initiator);
-    let card_key = HKDF::derive_key(None, &dh[..], ESCROW_CARD_KEY_INFO.as_bytes());
+    let pake_key = seed(0x76);
+    let keys = EscrowKeys::derive_with_pake(&dh[..], &pake_key, EscrowRole::Initiator);
+    let card_key = HKDF::derive_key(
+        None,
+        &[&dh[..], &pake_key[..]].concat(),
+        LINK_ESCROW_CARD_KEY_INFO.as_bytes(),
+    );
 
     let identity = vector_identity(0x73, "Vector Link");
     let x3dh_i = X3DHKeyPair::from_bytes(seed(0x74));
@@ -363,10 +369,11 @@ pub(crate) fn compute_link_exchange() -> LinkExchangeVector {
         presence_slot: sha256_hex(&[&nonce, b"initiator_presence"]),
         epk_slot: sha256_hex(&[&nonce, b"epk"]),
         dh: hex::encode(*dh),
-        gate_info: ESCROW_GATE_INFO.to_string(),
-        slot_init_info: ESCROW_SLOT_INIT_INFO.to_string(),
-        slot_resp_info: ESCROW_SLOT_RESP_INFO.to_string(),
-        card_key_info: ESCROW_CARD_KEY_INFO.to_string(),
+        pake_key: hex::encode(pake_key),
+        gate_info: LINK_ESCROW_GATE_INFO.to_string(),
+        slot_init_info: LINK_ESCROW_SLOT_INIT_INFO.to_string(),
+        slot_resp_info: LINK_ESCROW_SLOT_RESP_INFO.to_string(),
+        card_key_info: LINK_ESCROW_CARD_KEY_INFO.to_string(),
         escrow_gate: keys.gate_hash.clone(),
         escrow_slot_initiator: keys.our_slot.clone(),
         escrow_slot_responder: keys.their_slot.clone(),
@@ -425,15 +432,17 @@ fn link_exchange_vector_matches_the_url_slots_escrow_payload_and_shared_key() {
         .diffie_hellman(&hex32(&v.initiator_public))
         .expect("dh");
     assert_eq!(hex::encode(*dh), v.dh);
-    let as_initiator = EscrowKeys::derive(&dh[..], EscrowRole::Initiator);
-    let as_responder = EscrowKeys::derive(&dh[..], EscrowRole::Responder);
+    let pake_key = hex32(&v.pake_key);
+    let ikm = [&dh[..], &pake_key[..]].concat();
+    let as_initiator = EscrowKeys::derive_with_pake(&dh[..], &pake_key, EscrowRole::Initiator);
+    let as_responder = EscrowKeys::derive_with_pake(&dh[..], &pake_key, EscrowRole::Responder);
     assert_eq!(as_initiator.gate_hash, v.escrow_gate);
     assert_eq!(as_responder.gate_hash, v.escrow_gate);
     assert_eq!(as_initiator.our_slot, v.escrow_slot_initiator);
     assert_eq!(as_initiator.their_slot, v.escrow_slot_responder);
     assert_eq!(as_responder.our_slot, v.escrow_slot_responder);
     let gate_by_hand = hex::encode(Sha256::digest(
-        HKDF::derive_key(None, &dh[..], v.gate_info.as_bytes()).as_ref(),
+        HKDF::derive_key(None, &ikm, v.gate_info.as_bytes()).as_ref(),
     ));
     assert_eq!(gate_by_hand, v.escrow_gate);
     let sealed = as_initiator.encrypt_card(b"vector card").expect("encrypt");
@@ -443,7 +452,7 @@ fn link_exchange_vector_matches_the_url_slots_escrow_payload_and_shared_key() {
         b"vector card"
     );
     assert_eq!(
-        hex::encode(*HKDF::derive_key(None, &dh[..], v.card_key_info.as_bytes())),
+        hex::encode(*HKDF::derive_key(None, &ikm, v.card_key_info.as_bytes())),
         v.card_key
     );
 

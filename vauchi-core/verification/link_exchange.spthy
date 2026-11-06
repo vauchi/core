@@ -5,11 +5,10 @@
  *
  * The link exchange (ADR-050; `exchange/link_initiator.rs`,
  * `link_responder.rs`): the sender shares a link carrying an ephemeral key
- * and a nonce over a channel of their choosing; whoever opens it deposits
- * their own ephemeral key in the relay's two-slot handshake gate, both
- * sides derive the escrow keys and swap cards, and each becomes the
- * other's contact. Nothing in the flow asks the sender who opened the
- * link (vauchi/private#727).
+ * and a nonce over a channel of their choosing, and gives the person it is
+ * for a short code another way. Whoever opens it runs SPAKE2 over that code
+ * in the relay's two-slot handshake gate, both sides derive the escrow keys
+ * and swap cards, and each becomes the other's contact (vauchi/private#727).
  *
  * The attacker owns the network and whatever channel carried the link.
  * The relay is the untrusted store the escrow slots live in. Cards and
@@ -17,20 +16,20 @@
  * whose contact.
  *
  * Run: tamarin-prover --prove link_exchange.spthy
- *   contact_only_after_approval must be FALSIFIED: the first opener,
- *   here the attacker, becomes the sender's contact (#727 as it stands).
+ *   The protocol as shipped (#727, SC-74): SPAKE2 over a short code, its key
+ *   protecting the opener's identity. VERIFIED, except for the one online
+ *   guess per link the design accepts, which rule Online_guess states. The
+ *   model assumes SPAKE2's messages offer no offline test; it does not prove
+ *   that, and blind/unblind is an abstraction of the primitive.
+ * tamarin-prover --prove -DFIRST_OPENER link_exchange.spthy
+ *   The protocol before the code. FALSIFIED: the first opener, here the
+ *   attacker, becomes the sender's contact.
  * tamarin-prover --prove -DPIN_CONFIRMED link_exchange.spthy
  *   The 2026-10-20 design: a hash of a PIN in the deposit. FALSIFIED: a short
  *   PIN can be tested offline against the hash the attacker sees, which rule
  *   Offline_guess states. A model without that rule called this design safe.
- * tamarin-prover --prove -DPAKE link_exchange.spthy
- *   The owner's design of 2026-11-06 (#727, SC-74): SPAKE2 over a short code,
- *   its key protecting the opener's identity. VERIFIED, except for the one
- *   online guess per link the design accepts, which rule Online_guess states.
- *   The model assumes SPAKE2's messages offer no offline test; it does not
- *   prove that, and blind/unblind is an abstraction of the primitive.
- * Prove it can fail: -DPAKE -DCODE_IN_LINK  (the code travels with the link;
- *   the lemma must be falsified)
+ * Prove it can fail: -DCODE_IN_LINK  (the code travels with the link; the
+ *   lemma must be falsified)
  */
 
 theory VauchiLinkExchange
@@ -38,7 +37,7 @@ begin
 
 builtins: diffie-hellman, hashing, symmetric-encryption
 
-#ifdef PAKE
+#ifdef not FIRST_OPENER & not PIN_CONFIRMED
 functions: blind/2, unblind/2
 equations: unblind(blind(x, c), c) = x
 #endif
@@ -57,7 +56,7 @@ rule Register:
 /* The sender means the link for one person and tells them so out of
    band; under the PIN design that word includes a PIN, which the attacker
    on the link's channel never sees. */
-#ifdef PAKE
+#ifdef not FIRST_OPENER & not PIN_CONFIRMED
 rule Share_link:
   let link = <'link', blind('g' ^ ~e, ~code), ~nonce>
   in
@@ -73,7 +72,7 @@ rule Online_guess:
   [ Out(code) ]
 #endif
 
-#ifdef PAKE & CODE_IN_LINK
+#ifdef CODE_IN_LINK
 /* The control: the code reaches the attacker with the link, and no guess is
    recorded, so the lemma must fail. */
 rule Code_travels_with_link:
@@ -81,7 +80,7 @@ rule Code_travels_with_link:
   -->
   [ Out(code) ]
 #endif
-#ifdef PIN_CONFIRMED & not PAKE
+#ifdef PIN_CONFIRMED
 rule Share_link:
   let link = <'link', 'g' ^ ~e, ~nonce>
   in
@@ -96,7 +95,7 @@ rule Offline_guess:
   --[ OfflineGuess(pin) ]->
   [ Out(pin) ]
 #endif
-#ifdef not PAKE & not PIN_CONFIRMED
+#ifdef FIRST_OPENER
 rule Share_link:
   let link = <'link', 'g' ^ ~e, ~nonce>
   in
@@ -111,7 +110,7 @@ rule Share_link:
    transit (7 steps): the proof must cover what the sender will store. An
    honest opener is the person the sender told; the attacker opens from
    the channel. */
-#ifdef PAKE
+#ifdef not FIRST_OPENER & not PIN_CONFIRMED
 rule Open_link:
   let deposit = <'claim', blind('g' ^ ~f, code), senc(id_r, X ^ ~f)>
   in
@@ -119,7 +118,7 @@ rule Open_link:
   --[ Opened($R, nonce), ContactR($R, id_r, X) ]->
   [ Out(deposit) ]
 #endif
-#ifdef PIN_CONFIRMED & not PAKE
+#ifdef PIN_CONFIRMED
 rule Open_link:
   let deposit = <'claim', id_r, 'g' ^ ~f, h(<pin, id_r, 'g' ^ ~f, nonce>)>
   in
@@ -127,7 +126,7 @@ rule Open_link:
   --[ Opened($R, nonce), ContactR($R, id_r, epk) ]->
   [ Out(deposit) ]
 #endif
-#ifdef not PAKE & not PIN_CONFIRMED
+#ifdef FIRST_OPENER
 rule Open_link:
   let deposit = <'claim', id_r, 'g' ^ ~f>
   in
@@ -138,19 +137,19 @@ rule Open_link:
 
 /* The sender retrieves the deposit and finalizes: the opener's identity
    becomes a contact. */
-#ifdef PAKE
+#ifdef not FIRST_OPENER & not PIN_CONFIRMED
 rule Finalize:
   [ Sender($I, e, nonce, code), !User($I, id_i), In(<'claim', blind(Y, code), senc(id_r, Y ^ e)>) ]
   --[ ContactAdded($I, id_i, id_r), ContactVia($I, id_r, nonce) ]->
   [ ]
 #endif
-#ifdef PIN_CONFIRMED & not PAKE
+#ifdef PIN_CONFIRMED
 rule Finalize:
   [ Sender($I, e, nonce, pin), !User($I, id_i), In(<'claim', id_r, fpk, proof>) ]
   --[ Eq(proof, h(<pin, id_r, fpk, nonce>)), ContactAdded($I, id_i, id_r) ]->
   [ ]
 #endif
-#ifdef not PAKE & not PIN_CONFIRMED
+#ifdef FIRST_OPENER
 rule Finalize:
   [ Sender($I, e, nonce), !User($I, id_i), In(<'claim', id_r, fpk>) ]
   --[ ContactAdded($I, id_i, id_r) ]->
@@ -164,7 +163,7 @@ lemma executable:
 
 /* The sender's new contact is the person the sender meant the link for. */
 // @claim: S9
-#ifdef PAKE
+#ifdef not FIRST_OPENER & not PIN_CONFIRMED
 lemma contact_only_after_approval:
   "All I idi idr n #c #v.
      ContactAdded(I, idi, idr) @ c & ContactVia(I, idr, n) @ v

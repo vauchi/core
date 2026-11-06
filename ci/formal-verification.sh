@@ -321,13 +321,13 @@ tamarin_diff_expect "$models/ble_advertisement.spthy" verified "-DUNLINKABILITY"
 tamarin_diff_expect "$models/ble_advertisement.spthy" falsified "-DUNLINKABILITY -DKEY_DERIVED_TOKEN"
 tamarin_diff_expect "$models/mailbox_token.spthy" verified ""
 tamarin_diff_expect "$models/mailbox_token.spthy" falsified "-DSTABLE_TOKEN"
-tamarin_expect "$models/link_exchange.spthy" falsified "" \
+tamarin_expect "$models/link_exchange.spthy" verified "" \
+    executable contact_only_after_approval
+tamarin_expect "$models/link_exchange.spthy" falsified "-DFIRST_OPENER" \
     contact_only_after_approval
 tamarin_expect "$models/link_exchange.spthy" falsified "-DPIN_CONFIRMED" \
     contact_only_after_approval
-tamarin_expect "$models/link_exchange.spthy" verified "-DPAKE" \
-    executable contact_only_after_approval
-tamarin_expect "$models/link_exchange.spthy" falsified "-DPAKE -DCODE_IN_LINK" \
+tamarin_expect "$models/link_exchange.spthy" falsified "-DCODE_IN_LINK" \
     contact_only_after_approval
 fi # wants models
 # The six capped runs took 18 minutes on CI (job 17540297472): extended.

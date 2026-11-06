@@ -12,9 +12,11 @@ use serde::{Deserialize, Serialize};
 /// Computed trust level derived from cryptographic exchange facts.
 ///
 /// Derived deterministically from `Contact` fields; not user-editable.
-/// Priority order (highest wins): Cautious > Verified > High > Standard.
+/// Evaluated in order: Cautious, Verified, Remote, High, Standard.
+///
+/// Exhaustive on purpose: every consumer must place a new level, or a level
+/// falls through a catch-all and reads as a stronger one (ADR-034).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[non_exhaustive]
 pub enum TrustLevel {
     /// Identity was recovered — ratchet may have reset. Highest priority.
     Cautious,
@@ -24,6 +26,9 @@ pub enum TrustLevel {
     High,
     /// Normal exchange, no special indicators. Default.
     Standard,
+    /// Exchanged over a link, so nobody met. Ranks below `Standard`; only a
+    /// fingerprint comparison raises it (ADR-034 amendment 2026-11-06).
+    Remote,
 }
 
 impl std::fmt::Display for TrustLevel {
@@ -33,6 +38,7 @@ impl std::fmt::Display for TrustLevel {
             TrustLevel::Verified => write!(f, "Verified"),
             TrustLevel::High => write!(f, "High"),
             TrustLevel::Standard => write!(f, "Standard"),
+            TrustLevel::Remote => write!(f, "Remote"),
         }
     }
 }

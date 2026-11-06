@@ -24,6 +24,8 @@ pub enum MobileContactTrustLevel {
     High,
     /// Normal exchange, no special indicators. Default.
     Standard,
+    /// Exchanged over a link, so nobody met. Ranks below `Standard`.
+    Remote,
 }
 
 impl From<TrustLevel> for MobileContactTrustLevel {
@@ -33,7 +35,7 @@ impl From<TrustLevel> for MobileContactTrustLevel {
             TrustLevel::Verified => MobileContactTrustLevel::Verified,
             TrustLevel::High => MobileContactTrustLevel::High,
             TrustLevel::Standard => MobileContactTrustLevel::Standard,
-            _ => MobileContactTrustLevel::Standard,
+            TrustLevel::Remote => MobileContactTrustLevel::Remote,
         }
     }
 }

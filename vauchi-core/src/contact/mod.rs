@@ -837,8 +837,10 @@ impl Contact {
     /// Priority order (highest wins):
     /// 1. `Cautious` — identity was recovered (ratchet may have reset)
     /// 2. `Verified` — fingerprint manually confirmed out-of-band
-    /// 3. `High`     — strong transport proximity or high verifier confidence
-    /// 4. `Standard` — all other cases
+    /// 3. `Remote`   — exchanged over a link; checked before proximity so a
+    ///    proximity claim cannot raise it
+    /// 4. `High`     — strong transport proximity or high verifier confidence
+    /// 5. `Standard` — all other cases
     pub fn trust_level(&self) -> TrustLevel {
         let data = match self.kind.exchanged_data() {
             Some(d) => d,
@@ -859,7 +861,12 @@ impl Contact {
             return TrustLevel::Verified;
         }
 
-        // Priority 3: Use TrustMetrics if available (new path)
+        // Priority 3: nobody met, whatever proximity data says.
+        if data.exchange_transport == ExchangeTransport::Link {
+            return TrustLevel::Remote;
+        }
+
+        // Priority 4: Use TrustMetrics if available (new path)
         if let Some(ref metrics) = data.trust_metrics {
             let strong_transport = metrics.transport_proximity.is_strong();
             let strong_verifier = metrics.proximity == ProximityConfidence::High;

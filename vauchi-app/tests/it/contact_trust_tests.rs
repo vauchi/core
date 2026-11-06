@@ -5,7 +5,7 @@
 //! The trust a contact's screen shows and the proposal trust it lets me
 //! grant, driven through the events the shells report.
 
-use crate::event_path_support::{activate, row, surfaces};
+use crate::event_path_support::{action, activate, row, surfaces};
 use vauchi_app::ui::{AppEngine, AppScreen};
 use vauchi_core::api::Vauchi;
 use vauchi_core::{
@@ -99,13 +99,14 @@ fn a_link_contact_shows_remote_and_offers_the_fingerprint_comparison() {
         0,
     );
 
-    let (_, screen) = screen_of(contact);
+    let (mut engine, screen) = screen_of(contact);
 
     assert_eq!(trust(&screen), (Some("Remote".to_string()), false));
-    let shown = format!("{screen:?}");
+    let (surface_id, actions) = action(&screen, "Actions").expect("Actions on the contact");
+    let menu = activate(&mut engine, surface_id, &actions);
     assert!(
-        shown.contains("verify"),
-        "no way to reach Verified: {shown}"
+        action(&menu, "Verify Fingerprint").is_some(),
+        "no way to reach Verified: {menu:#?}"
     );
 }
 

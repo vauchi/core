@@ -130,6 +130,7 @@ fn contact_sync_data_public_key_is_base64_string() {
         favorite: false,
         archived_at: None,
         ignored_at: None,
+        exchange_transport: vauchi_core::exchange::ExchangeTransport::Qr,
     };
     let json: serde_json::Value =
         serde_json::from_str(&serde_json::to_string(&data).unwrap()).unwrap();

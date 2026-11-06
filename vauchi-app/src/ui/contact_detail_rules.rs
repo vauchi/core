@@ -149,7 +149,11 @@ pub fn footer_action_id(is_imported: bool) -> &'static str {
 /// the divergence: a contact must satisfy both for Verify to appear.
 /// One frontend's behavior changes when this lands (see Risk R5).
 pub fn verify_button_visible(is_verified: bool, trust_level: TrustLevel) -> bool {
-    !is_verified && matches!(trust_level, TrustLevel::Standard | TrustLevel::High)
+    !is_verified
+        && matches!(
+            trust_level,
+            TrustLevel::Standard | TrustLevel::High | TrustLevel::Remote
+        )
 }
 
 /// Whether the "Verified" badge should be shown next to the contact name.

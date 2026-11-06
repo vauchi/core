@@ -333,6 +333,7 @@ mod tests {
             favorite: false,
             archived_at: None,
             ignored_at: None,
+            exchange_transport: crate::exchange_types::ExchangeTransport::Qr,
         }
     }
 

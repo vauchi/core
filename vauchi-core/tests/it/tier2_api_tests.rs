@@ -241,6 +241,7 @@ fn make_contact_sync_data(seed_byte: u8, name: &str) -> ContactSyncData {
         favorite: false,
         archived_at: None,
         ignored_at: None,
+        exchange_transport: vauchi_core::exchange::ExchangeTransport::Qr,
     }
 }
 

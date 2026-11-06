@@ -16,6 +16,7 @@ use super::DeviceSyncError;
 use crate::card::ContactCard;
 use crate::contact::{Contact, Group, ImportSource};
 use crate::crypto::SymmetricKey;
+use crate::exchange_types::ExchangeTransport;
 use crate::identifiers::IdentityKey;
 
 /// A contact recovered to a new identity, as the device that accepted the
@@ -139,6 +140,11 @@ pub struct ContactSyncData {
     /// When this contact was ignored (None = not ignored, ADR-072).
     #[serde(default)]
     pub ignored_at: Option<u64>,
+    /// How this contact was established: trust derives from it, so a linked
+    /// device must not read a link contact as `Standard` (ADR-034).
+    #[serde(default)]
+    #[zeroize(skip)]
+    pub exchange_transport: ExchangeTransport,
 }
 
 impl ContactSyncData {
@@ -172,6 +178,7 @@ impl ContactSyncData {
             favorite: contact.is_favorite(),
             archived_at: contact.archived_at(),
             ignored_at: contact.ignored_at(),
+            exchange_transport: ex.exchange_transport,
         })
     }
 
@@ -212,6 +219,7 @@ impl ContactSyncData {
         if let Some(at) = self.ignored_at {
             contact.ignore(at);
         }
+        contact.set_exchange_transport(self.exchange_transport);
         Ok(contact)
     }
 }

@@ -347,8 +347,8 @@ impl AppEngine {
     /// Re-evaluate the exchange mode picker against the current readiness
     /// ledger. Always drops the cached `Exchange` engine so the next visit
     /// rebuilds from the ledger; when the picker is the *active* screen, also
-    /// rebuilds `self.engine` in place so a permission change (a grant-affordance
-    /// tap, or a live `PermissionDenied`) shows without a navigate-away round
+    /// rebuilds `self.engine` in place so a live `PermissionGranted` or
+    /// `PermissionDenied` shows without a navigate-away round
     /// trip. Guarded on `AppScreen::Exchange` so an in-flight transport screen
     /// (`BleExchange`, `NfcExchange`, …) is never clobbered.
     pub(super) fn rebuild_exchange_engine(&mut self) {
@@ -376,14 +376,9 @@ impl AppEngine {
         }
     }
 
-    /// Intercept a grant-affordance tap (`grant:<mode>:<requirement>`) the mode
-    /// picker renders for a present-but-denied transport. Records the
-    /// requirement as granted on the device-wide ledger — the source of truth,
-    /// from which the picker's snapshot is rebuilt — then re-renders the picker
-    /// so the mode becomes selectable. There is no OS "permission granted" event
-    /// (ADR-030/031), so the affordance is how the ledger re-learns; if the OS
-    /// still withholds the permission, the next attempt re-emits
-    /// `PermissionDenied` and the affordance returns.
+    /// Ask the display for OS access without changing the permission ledger.
+    /// A tap alone cannot grant access; only PermissionGranted re-enables
+    /// the requirement (ADR-077).
     pub(super) fn intercept_grant_permission(
         &mut self,
         action: &UserAction,
@@ -395,9 +390,9 @@ impl AppEngine {
             return None;
         };
         let token = item_id.strip_prefix("grant:")?.rsplit_once(':')?.1;
-        let requirement = crate::ui::exchange::mode_selection::parse_requirement(token)?;
-        self.transport_readiness.note_granted(requirement);
-        self.rebuild_exchange_engine();
-        Some(ActionResult::UpdateScreen(self.engine.current_screen()))
+        crate::ui::exchange::mode_selection::parse_requirement(token)?;
+        Some(ActionResult::Commands {
+            commands: self.permission_required(token.to_owned()),
+        })
     }
 }

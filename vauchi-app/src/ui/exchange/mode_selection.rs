@@ -163,7 +163,7 @@ impl ModeSelectionEngine {
         let is_recommended = mode == self.hero;
         // A present-but-permission-denied transport is recoverable: render the
         // row as a grant affordance with its own id prefix (`grant:<mode>:<req>`,
-        // intercepted by AppEngine to re-enable the requirement and rebuild)
+        // intercepted by AppEngine to request OS access)
         // rather than a `mode:` selection that would enter a wait it can't win.
         // See `_private/docs/problems/2026-06-11-exchange-waits-forever-without-capabilities/`.
         if let ModeAvailability::PermissionRequired { requirement } = &availability {

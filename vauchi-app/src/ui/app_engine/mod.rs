@@ -798,9 +798,6 @@ impl WorkflowEngine for AppEngine {
             return result;
         }
 
-        // Mode-picker grant affordance (`grant:<mode>:<requirement>`): re-learn
-        // a denied OS permission and re-render the picker. See
-        // `screens_exchange::intercept_grant_permission`.
         if let Some(result) = self.intercept_device_link_pin(&action) {
             return result;
         }
@@ -809,6 +806,7 @@ impl WorkflowEngine for AppEngine {
             return result;
         }
 
+        // A grant-row tap requests OS access; only its result changes readiness (ADR-077).
         if let Some(result) = self.intercept_grant_permission(&action) {
             return result;
         }

@@ -69,9 +69,15 @@ const DEVICE_EXCHANGE_INFO: &[u8] = b"Vauchi_Device_Exchange_v2";
 pub const MAX_DEVICES: usize = 10;
 
 /// Device-related errors.
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum DeviceError {
+    #[error("Invalid device signature")]
+    InvalidDeviceSignature,
+    #[error("Signer is not an active device")]
+    SignerNotActive,
+    #[error("A known device's signing key changed")]
+    DeviceKeyChanged,
     #[error("Maximum devices ({MAX_DEVICES}) reached")]
     MaxDevicesReached,
     #[error("Device not found")]
@@ -189,6 +195,7 @@ impl DeviceInfo {
             revoked: false,
             revoked_at: None,
             last_sync_at: None,
+            signing_public_key: None,
         }
     }
 }
@@ -200,6 +207,10 @@ pub struct RegisteredDevice {
     pub device_id: [u8; 32],
     /// Device's X25519 public key for receiving messages.
     pub exchange_public_key: [u8; 32],
+    /// Public half of the device's random signing key, not derived from the
+    /// seed (ADR-079). `None` until the device has generated one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signing_public_key: Option<[u8; 32]>,
     /// Human-readable name.
     pub device_name: String,
     /// Creation timestamp.
@@ -214,6 +225,13 @@ pub struct RegisteredDevice {
 }
 
 impl RegisteredDevice {
+    /// Names the device's own signing key.
+    #[must_use]
+    pub fn with_signing_key(mut self, signing_public_key: [u8; 32]) -> Self {
+        self.signing_public_key = Some(signing_public_key);
+        self
+    }
+
     /// Returns the device ID as hex string.
     pub fn device_id_hex(&self) -> String {
         hex::encode(self.device_id)
@@ -382,12 +400,21 @@ impl DeviceRegistry {
     fn signing_data(&self) -> Vec<u8> {
         // Sign: version || device_count || [device_id || exchange_public_key || revoked]*
         let mut data = Vec::new();
+        // Once any device names a key, every entry is fixed-width behind a
+        // versioned prefix, so an entry with a key cannot parse as one without.
+        let names_keys = self.devices.iter().any(|d| d.signing_public_key.is_some());
+        if names_keys {
+            data.extend_from_slice(b"REGISTRY-V2:");
+        }
         data.extend_from_slice(&self.version.to_le_bytes());
         data.extend_from_slice(&(self.devices.len() as u32).to_le_bytes());
         for device in &self.devices {
             data.extend_from_slice(&device.device_id);
             data.extend_from_slice(&device.exchange_public_key);
             data.push(if device.revoked { 1 } else { 0 });
+            if names_keys {
+                data.extend_from_slice(&device.signing_public_key.unwrap_or([0u8; 32]));
+            }
         }
         data
     }
@@ -496,6 +523,12 @@ pub struct RegistryBroadcast {
     /// Signature over the broadcast.
     #[serde(with = "signature_serde")]
     signature: [u8; 64],
+    /// The device that signed this broadcast with its own key (ADR-079).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    signer_device_id: Option<[u8; 32]>,
+    /// That device's signature over the broadcast and its identity signature.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    device_signature: Option<Vec<u8>>,
 }
 
 /// A device entry in the broadcast (minimal info for contacts).
@@ -505,6 +538,9 @@ pub struct BroadcastDevice {
     pub device_id: [u8; 32],
     /// Device exchange public key for sending messages.
     pub exchange_public_key: [u8; 32],
+    /// Public half of the device's own signing key (ADR-079).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signing_public_key: Option<[u8; 32]>,
 }
 
 impl RegistryBroadcast {
@@ -519,6 +555,7 @@ impl RegistryBroadcast {
             .map(|d| BroadcastDevice {
                 device_id: d.device_id,
                 exchange_public_key: d.exchange_public_key,
+                signing_public_key: d.signing_public_key,
             })
             .collect();
 
@@ -527,10 +564,102 @@ impl RegistryBroadcast {
             active_devices,
             timestamp: now,
             signature: [0u8; 64],
+            signer_device_id: None,
+            device_signature: None,
         };
 
         broadcast.sign(signing_key);
         broadcast
+    }
+
+    /// Creates a broadcast that also names, and is signed by, one device.
+    ///
+    /// The identity signature says the registry is this person's; the device
+    /// signature says which device of theirs produced it (ADR-079).
+    pub fn signed_by_device(
+        registry: &DeviceRegistry,
+        identity_key: &SigningKeyPair,
+        signer_device_id: [u8; 32],
+        device_key: &SigningKeyPair,
+        now: u64,
+    ) -> Self {
+        let mut broadcast = Self::new(registry, identity_key, now);
+        broadcast.signer_device_id = Some(signer_device_id);
+        let signature = device_key.sign(&broadcast.device_signing_data(&signer_device_id));
+        broadcast.device_signature = Some(signature.as_bytes().to_vec());
+        broadcast
+    }
+
+    /// Returns the device that signed this broadcast, if one did.
+    pub fn signer_device_id(&self) -> Option<[u8; 32]> {
+        self.signer_device_id
+    }
+
+    /// Verifies the identity signature, then the named device's signature.
+    pub fn verify_device_signed(
+        &self,
+        identity_key: &crate::crypto::PublicKey,
+    ) -> Result<(), DeviceError> {
+        if !self.verify(identity_key) {
+            return Err(DeviceError::InvalidRegistrySignature);
+        }
+        let signer_id = self
+            .signer_device_id
+            .ok_or(DeviceError::InvalidDeviceSignature)?;
+        let signer = self
+            .active_devices
+            .iter()
+            .find(|device| device.device_id == signer_id)
+            .ok_or(DeviceError::SignerNotActive)?;
+        let signer_key = signer
+            .signing_public_key
+            .ok_or(DeviceError::InvalidDeviceSignature)?;
+        let signature_bytes: [u8; 64] = self
+            .device_signature
+            .as_deref()
+            .and_then(|bytes| bytes.try_into().ok())
+            .ok_or(DeviceError::InvalidDeviceSignature)?;
+        let verified = crate::crypto::PublicKey::from_bytes(signer_key).verify(
+            &self.device_signing_data(&signer_id),
+            &Signature::from_bytes(signature_bytes),
+        );
+        if verified {
+            Ok(())
+        } else {
+            Err(DeviceError::InvalidDeviceSignature)
+        }
+    }
+
+    /// Verifies as [`Self::verify_device_signed`] and refuses a changed key.
+    ///
+    /// A device holding the seed can re-sign the registry with another device's
+    /// entry pointing at its own key, so the identity signature cannot catch
+    /// that: only a key pinned on first sight can.
+    pub fn verify_against_pinned(
+        &self,
+        identity_key: &crate::crypto::PublicKey,
+        held: &RegistryBroadcast,
+    ) -> Result<(), DeviceError> {
+        self.verify_device_signed(identity_key)?;
+        for device in &self.active_devices {
+            let pinned = held
+                .active_devices
+                .iter()
+                .find(|known| known.device_id == device.device_id)
+                .and_then(|known| known.signing_public_key);
+            if pinned.is_some() && pinned != device.signing_public_key {
+                return Err(DeviceError::DeviceKeyChanged);
+            }
+        }
+        Ok(())
+    }
+
+    fn device_signing_data(&self, signer_device_id: &[u8; 32]) -> Vec<u8> {
+        let mut data = b"BROADCAST-DEVICE-V1:".to_vec();
+        data.extend_from_slice(signer_device_id);
+        data.extend_from_slice(&self.signature);
+        data.extend_from_slice(&self.signing_data());
+        data
     }
 
     /// Returns the registry version.
@@ -621,14 +750,26 @@ impl RegistryBroadcast {
 
     /// Returns the data to be signed.
     fn signing_data(&self) -> Vec<u8> {
+        // Same rule as the registry: fixed-width entries once any key is named.
+        let names_keys = self
+            .active_devices
+            .iter()
+            .any(|d| d.signing_public_key.is_some());
         let mut data = Vec::new();
-        data.extend_from_slice(b"BROADCAST:");
+        data.extend_from_slice(if names_keys {
+            b"BROADCAST-V2:".as_slice()
+        } else {
+            b"BROADCAST:".as_slice()
+        });
         data.extend_from_slice(&self.version.to_le_bytes());
         data.extend_from_slice(&self.timestamp.to_le_bytes());
         data.extend_from_slice(&(self.active_devices.len() as u32).to_le_bytes());
         for device in &self.active_devices {
             data.extend_from_slice(&device.device_id);
             data.extend_from_slice(&device.exchange_public_key);
+            if names_keys {
+                data.extend_from_slice(&device.signing_public_key.unwrap_or([0u8; 32]));
+            }
         }
         data
     }

@@ -160,14 +160,20 @@ proptest! {
 
     // @internal
     #[test]
-    fn any_bytes_as_a_peer_message_never_panic(bytes in proptest::collection::vec(any::<u8>(), 0..64)) {
+    fn a_peer_message_of_any_other_length_is_refused(bytes in proptest::collection::vec(any::<u8>(), 0..64)) {
         let (side, _) = LinkPake::start(&code("123456"), &NONCE, &PK_I);
-        let _outcome = side.finish(&bytes);
+        let outcome = side.finish(&bytes);
+        if bytes.len() != LINK_PAKE_MESSAGE_LEN {
+            prop_assert_eq!(outcome.err(), Some(LinkPakeError::InvalidMessage));
+        }
     }
 
     // @internal
     #[test]
-    fn any_text_as_a_code_never_panics(typed in ".{0,32}") {
-        let _outcome = LinkCode::parse(&typed);
+    fn any_text_that_parses_is_six_digits(typed in ".{0,32}") {
+        if let Ok(parsed) = LinkCode::parse(&typed) {
+            prop_assert_eq!(parsed.as_str().len(), 6);
+            prop_assert!(parsed.as_str().bytes().all(|b| b.is_ascii_digit()));
+        }
     }
 }

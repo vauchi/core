@@ -2433,7 +2433,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_6adf41de42e50c0a",
+                    "id": "field_da2fb0d530d12e16",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2471,13 +2471,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:6adf41de42e50c0a",
+                    "id": "field_note:da2fb0d530d12e16",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:6adf41de42e50c0a",
+                          "id": "field_note:da2fb0d530d12e16",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2517,7 +2517,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_70f0e8bc5e7543ea",
+                    "id": "field_4cffe528ef12d347",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2555,13 +2555,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:70f0e8bc5e7543ea",
+                    "id": "field_note:4cffe528ef12d347",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:70f0e8bc5e7543ea",
+                          "id": "field_note:4cffe528ef12d347",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2601,7 +2601,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_e67045f04868210b",
+                    "id": "field_91a10860265adcef",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2639,13 +2639,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:e67045f04868210b",
+                    "id": "field_note:91a10860265adcef",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:e67045f04868210b",
+                          "id": "field_note:91a10860265adcef",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -5008,10 +5008,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "73AF F198 F2B5 664B 9A58 45AF 4DD4 7A36 02A8 E01C 4B5D 0EFB 52E2 0B15 0C4A 2B25",
+                    "content": "BBBE 294F A4AF 613A 5EB4 1897 A74E 7CE7 6E12 40D6 5AB9 EDDB 5C03 9121 5234 282B",
                     "style": "body",
                     "accessibility": {
-                      "label": "73AF F198 F2B5 664B 9A58 45AF 4DD4 7A36 02A8 E01C 4B5D 0EFB 52E2 0B15 0C4A 2B25",
+                      "label": "BBBE 294F A4AF 613A 5EB4 1897 A74E 7CE7 6E12 40D6 5AB9 EDDB 5C03 9121 5234 282B",
                       "description": null
                     }
                   }
@@ -5030,10 +5030,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "FD50 F0C7 AB81 86E7 DABB A77B 2279 44C8 AD3E 2B26 E1EB 1FC8 65AA FD23 8AE3 0BA6",
+                    "content": "BA59 CDAB 0194 0280 D60B A7A1 4019 F9CB 8B66 2309 C815 02F3 76D9 C762 7E3C 21EC",
                     "style": "body",
                     "accessibility": {
-                      "label": "FD50 F0C7 AB81 86E7 DABB A77B 2279 44C8 AD3E 2B26 E1EB 1FC8 65AA FD23 8AE3 0BA6",
+                      "label": "BA59 CDAB 0194 0280 D60B A7A1 4019 F9CB 8B66 2309 C815 02F3 76D9 C762 7E3C 21EC",
                       "description": null
                     }
                   }
@@ -18297,7 +18297,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "https://vauchi.app/x#pk=KPwdHHPFgqlaBkDEflwhCvYh2q5t9qilKebOXdy1Im8&n=6uQTUN412LE8XemIAYPnO5mzOjFDOYbZOLrMhFlByDw&nm=QWRhIExvdmVsYWNl",
+                    "content": "https://vauchi.app/x#pk=ezzNvD7vPPTD9L_BI_77-5U-V2qMqfztQQE9Tw92TQ0&n=AGk3KtnJyQZ-_Knu4pEB2bza27Ie1tD2Il6Wl1De8AE&nm=QWRhIExvdmVsYWNl",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -18863,7 +18863,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,80,57,85,80,68,72,113,52,71,71,53,57,113,55,112,51,115,105,101,85,84,73,114,84,52,114,74,117,72,114,72,56,104,108,113,118,48,106,105,117,77,76,112,114,112,47,75,69,49,56,67,43,52,88,76,43,89,76,83,73,108,70,79,73,67,104,81,97,49,78,119,55,88,54,121,47,87,68,89,43,49,111,120,117,119,97,81,87,113,79,69,70,82,117,106,75,73,43,74,74,98,87,90,75,65,80,69,98,101,119,75,56,87,113,81,87,103,114,71,77,84,53,74,101,102,75,56,84,74,69,90,81,97,104,53,122,106,97,99,50,113,67,120,97,78,118,103,101,108,107,65,65,65,65,65,71,114,116,65,71,111,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,67,47,43,107,65,49,121,52,75,82,81,43,71,110,55,114,102,101,88,49,83,118,97,83,75,83,89,77,117,103,78,87,101,106,90,49,73,75,55,55,82,82,76,87,108,71,90,88,119,90,105,88,100,100,54,68,77,74,73,89,81,69,116,48,55,71,68,89,119,89,116,82,112,48,71,78,85,86,51,81,101,85,81,87,119,78],
+            "payload": [86,48,74,70,87,65,79,54,87,99,50,114,65,90,81,67,103,78,89,76,112,54,70,65,71,102,110,76,105,50,89,106,67,99,103,86,65,118,78,50,50,99,100,105,102,106,119,104,55,70,88,104,78,109,99,119,89,117,65,72,100,99,78,56,98,107,111,76,70,99,65,43,51,107,72,69,120,107,55,113,71,114,55,118,121,87,55,118,71,88,66,108,78,52,75,118,80,55,111,103,99,103,51,110,89,104,100,79,111,54,65,120,86,49,68,48,71,87,71,87,115,101,43,72,110,118,113,57,111,75,79,49,87,117,76,115,55,114,43,101,56,81,121,105,104,76,81,82,77,82,57,113,55,55,103,121,65,65,65,65,65,71,114,116,88,78,111,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,66,77,106,86,51,90,49,81,77,79,116,109,71,84,79,74,82,67,68,69,109,116,54,76,112,97,88,109,75,104,98,43,103,114,43,55,72,83,68,68,74,99,116,122,71,122,109,79,78,100,47,76,68,76,97,49,67,116,70,107,103,101,122,85,108,68,51,101,70,89,69,80,103,119,107,113,55,80,107,53,73,89,51,81,119,68],
             "is_initiator": true,
             "endpoint": {
               "service_type": "_vauchi-exchange._tcp.local.",
@@ -18951,7 +18951,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI30:0:0:0083Q*+P$4VH%MU 2N5UE1UWVLCQBQGEGGOISQ4ICP$9-/7BYDLFE%UK%4I-DK 0S8%KPQ98-LGV6M88IRP+-7EKEXKDO5HDCM2B2DYIE 1GKLIL3GL9OJ48UM11Vauchi User00"
+                      "INI30:0:0:001VM7FM.SGO9LADI4OHU1Q3CLU33*-2HB2KRUYS0O3ENS1SYP-Y48LD+P0PC5FZ4VBVBFDR0VOJB389-X6.MUPT75UQF+0*M3XGUHSMSC1*C0TF40/J7L0 MV11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -19159,8 +19159,8 @@
             "earliest_secs": 1,
             "deadline_secs": 1,
             "min_interval_secs": 1,
-            "earliest_millis": 102,
-            "delay_millis": 102
+            "earliest_millis": 100,
+            "delay_millis": 100
           }
         }
       ]
@@ -19919,7 +19919,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [183,18,158,110,133,117,153,4,158,3,117,225,206,41,50,204,81,64,219,111,45,151,237,216,27,10,109,74,29,151,240,16]
+            "payload": [38,149,190,123,35,236,200,197,192,226,81,255,99,238,18,74,186,244,198,189,50,15,26,26,131,11,77,110,30,191,100,216]
           }
         },
         {
@@ -20124,7 +20124,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [61,13,103,31,98,81,39,235,85,208,16,14,243,79,132,183,108,156,213,113,121,124,132,211,87,54,125,155,122,26,216,138]
+            "payload": [132,140,212,186,57,85,4,97,73,43,158,62,121,146,123,105,170,245,42,245,42,69,22,60,140,51,187,215,170,208,126,25]
           }
         },
         {
@@ -20329,7 +20329,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [63,27,98,21,118,220,45,255,178,24,120,96,78,62,165,201,23,212,211,181,25,206,247,129,0,140,7,136,103,212,119,42]
+            "payload": [34,43,155,195,57,155,169,129,192,137,69,180,228,219,19,185,194,197,46,255,117,87,230,222,41,162,107,43,27,70,240,106]
           }
         },
         {
@@ -24195,6 +24195,20 @@
               },
               "nodes": [
                 {
+                  "Qr": {
+                    "id": "surface.1.claim_qr",
+                    "payloads": [
+                      "ATWeKeAfjrHe9Y4Vy8dkiOw8rgJSv5Eyxj27lDwfZO5fhWuwCDiRXYcoVcsZHcxAalqDnARnA1SuYLg39BO5hREA8VNlAAAAAA=="
+                    ],
+                    "purpose": "display",
+                    "label": "Recovery claim — scan to vouch",
+                    "accessibility": {
+                      "label": "Recovery claim QR code",
+                      "description": "Show this to trusted contacts so they can vouch for you"
+                    }
+                  }
+                },
+                {
                   "Status": {
                     "id": "claim_ready",
                     "title": "Share with trusted contacts",
@@ -24212,10 +24226,10 @@
                 {
                   "Text": {
                     "id": "claim_data",
-                    "content": "AefPUXPAVcYsNw2yh4+xkrVDvcGHLaoHvo0l3oaNa/JZR0uwcJqKaui1dzDIvW6JanUi+3KJchrsvDMpWe7UlTUA8VNlAAAAAA==",
+                    "content": "ATWeKeAfjrHe9Y4Vy8dkiOw8rgJSv5Eyxj27lDwfZO5fhWuwCDiRXYcoVcsZHcxAalqDnARnA1SuYLg39BO5hREA8VNlAAAAAA==",
                     "style": "caption",
                     "accessibility": {
-                      "label": "AefPUXPAVcYsNw2yh4+xkrVDvcGHLaoHvo0l3oaNa/JZR0uwcJqKaui1dzDIvW6JanUi+3KJchrsvDMpWe7UlTUA8VNlAAAAAA==",
+                      "label": "ATWeKeAfjrHe9Y4Vy8dkiOw8rgJSv5Eyxj27lDwfZO5fhWuwCDiRXYcoVcsZHcxAalqDnARnA1SuYLg39BO5hREA8VNlAAAAAA==",
                       "description": null
                     }
                   }
@@ -24238,7 +24252,14 @@
                 "enabled": true,
                 "shortcut": null
               },
-              "primary": null,
+              "primary": {
+                "interaction_id": "surface.1.context.scan_share",
+                "label": "Scan their code",
+                "accessibility_label": "Scan their code",
+                "icon_token": null,
+                "enabled": true,
+                "shortcut": "activate_primary"
+              },
               "secondary": {
                 "interaction_id": "surface.1.context.presentation.secondary",
                 "label": "Actions",

@@ -8,14 +8,23 @@
 //! SPAKE2 turns it into a shared key, so whoever holds only the link gets one
 //! guess and cannot test guesses offline.
 //!
-//! `spake2` does not zeroize its internal state: an accepted exception, with
-//! its containment, in the ADR-002 amendment of 2026-11-06.
+//! `spake2` comes from the fork in `vauchi/utils/spake2`, which wipes its
+//! secrets on drop: the ADR-002 amendment of 2026-11-06.
 
 use std::fmt;
 
 use spake2::{Ed25519Group, Identity, Password, Spake2};
 use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
+
+// The crates.io 0.4.0 holds the same API without the wiping, so resolving to it
+// would build and run while leaving the code and scalar in memory. This fails
+// that build in every consumer, whose lock files Core's tests cannot read.
+const _: fn() = || {
+    fn wipes_on_drop<T: ZeroizeOnDrop>() {}
+    wipes_on_drop::<Spake2<Ed25519Group>>();
+    wipes_on_drop::<Password>();
+};
 
 const IDENTITY_DOMAIN: &[u8] = b"vauchi-link-pake-v1";
 const CODE_DIGITS: usize = 6;

@@ -53,8 +53,11 @@ ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 sha2 = "0.10"
 hmac = "0.12"
 hkdf = "0.12"
-# Link exchange PAKE; exact pin and accepted risks in the ADR-002 amendment.
-spake2 = "=0.4.0"
+# Link exchange PAKE, from our fork so it wipes its secrets. A direct git
+# dependency because a [patch] here would not reach Core's consumers. Accepted
+# risks in the ADR-002 amendment; src/exchange/link_pake.rs fails the build if
+# this ever resolves to the crates.io crate.
+spake2 = { git = "https://gitlab.com/vauchi/utils/spake2.git", tag = "v0.4.0+vauchi.1", version = "=0.4.0" }
 
 # XChaCha20-Poly1305 (spec-mandated cipher, outside RustCrypto primary set but spec-mandated)
 chacha20poly1305 = "0.10.1"

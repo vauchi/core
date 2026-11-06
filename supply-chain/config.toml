@@ -34,6 +34,9 @@ url = "https://raw.githubusercontent.com/zcash/rust-ecosystem/main/supply-chain/
 [policy.rqrr]
 audit-as-crates-io = true
 
+[policy.spake2]
+audit-as-crates-io = true
+
 [[exemptions.ab_glyph]]
 version = "0.2.32"
 criteria = "safe-to-deploy"
@@ -655,7 +658,7 @@ version = "0.3.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.spake2]]
-version = "0.4.0"
+version = "0.4.0@git:e4a91c40930ecd645427094ce99f8238e01a78da"
 criteria = "safe-to-deploy"
 
 [[exemptions.spki]]

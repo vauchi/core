@@ -34,7 +34,7 @@ fn new_link_attempt_after_a_terminal_flow_presents_share_again() {
 
         app.navigate_to(AppScreen::Contacts);
         app.navigate_to(AppScreen::Exchange);
-        app.select_exchange_mode_for_testing(ExchangeMode::Link);
+        let _ = app.select_exchange_mode_for_testing(ExchangeMode::Link);
 
         assert_eq!(
             app.current_screen()

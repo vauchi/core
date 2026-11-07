@@ -37,6 +37,8 @@ mod guardian_group_picker_tests;
 mod guardian_restore_screen_tests;
 mod help_encryption_answer_tests;
 mod kept_pick_tests;
+#[cfg(feature = "testing")]
+mod missed_background_run_tests;
 mod network_cost_tests;
 mod recovery_passphrase_screen_tests;
 mod schedule_wakeup_tests;

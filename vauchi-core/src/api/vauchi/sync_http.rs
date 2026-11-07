@@ -1770,4 +1770,38 @@ mod tests {
             "update_timing_after_sync must capture clock().unix_seconds() so MyInfoEngine can render the relative caption"
         );
     }
+
+    // @scenario: sync_updates :: A later successful sync clears the missed-check note
+    #[test]
+    fn a_missed_background_run_shows_until_a_sync_succeeds() {
+        use crate::clock::FakeClock;
+        use std::time::{Duration, SystemTime};
+
+        let clock = std::sync::Arc::new(FakeClock::new(
+            SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
+        ));
+        let mut v = Vauchi::in_memory_with_clock(clock.clone()).unwrap();
+        v.note_missed_background_run(1_699_999_000);
+        assert_eq!(v.missed_background_run(), Some(1_699_999_000));
+
+        clock.advance(Duration::from_secs(60));
+        v.update_timing_after_sync();
+
+        assert_eq!(v.missed_background_run(), None);
+    }
+
+    // @internal
+    #[test]
+    fn a_sync_before_the_missed_run_does_not_hide_it() {
+        use crate::clock::FakeClock;
+        use std::time::{Duration, SystemTime};
+
+        let clock = FakeClock::new(SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000));
+        let mut v = Vauchi::in_memory_with_clock(clock.shared()).unwrap();
+        v.update_timing_after_sync();
+
+        v.note_missed_background_run(1_700_000_600);
+
+        assert_eq!(v.missed_background_run(), Some(1_700_000_600));
+    }
 }

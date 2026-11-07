@@ -185,6 +185,28 @@ fn test_my_info_emits_last_sync_caption() {
 
 // @internal
 #[test]
+fn my_info_says_when_a_background_check_was_missed_while_locked() {
+    let now = 1_700_000_000u64;
+    let engine = MyInfoEngine::new(MyInfoProgress::default())
+        .with_missed_background_run_seconds(Some(now - 2 * 3600))
+        .with_now_seconds(now);
+    let screen = engine.current_screen();
+    assert_eq!(
+        caption_content(&screen, "missed_run_caption").as_deref(),
+        Some("Couldn't check for updates while your phone was locked (2 hours ago)"),
+    );
+}
+
+// @internal
+#[test]
+fn my_info_omits_the_missed_run_caption_when_none_was_missed() {
+    let engine = MyInfoEngine::new(MyInfoProgress::default()).with_now_seconds(1_700_000_000);
+    let screen = engine.current_screen();
+    assert!(caption_content(&screen, "missed_run_caption").is_none());
+}
+
+// @internal
+#[test]
 fn test_my_info_omits_last_sync_caption_when_none() {
     let engine = MyInfoEngine::new(MyInfoProgress::default()).with_now_seconds(1_700_000_000);
     let screen = engine.current_screen();
@@ -198,6 +220,7 @@ fn test_my_info_preview_mode_omits_sync_status_captions() {
     let engine = MyInfoEngine::new(MyInfoProgress::default())
         .with_pending_updates(5)
         .with_last_sync_seconds(Some(now - 60))
+        .with_missed_background_run_seconds(Some(now - 60))
         .with_now_seconds(now)
         .with_view_mode(MyInfoViewMode::PreviewAs {
             contact_name: "Alice".into(),
@@ -208,6 +231,7 @@ fn test_my_info_preview_mode_omits_sync_status_captions() {
         "PreviewAs renders the card as the contact sees it — owner-only sync status must not leak"
     );
     assert!(caption_content(&screen, "last_sync_caption").is_none());
+    assert!(caption_content(&screen, "missed_run_caption").is_none());
     assert!(
         screen.subtitle.is_none(),
         "the sharing summary is owner-only and must not leak into the preview"

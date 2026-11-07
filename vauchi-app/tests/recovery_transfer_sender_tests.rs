@@ -216,6 +216,43 @@ fn recovery_sender_stops_on_scoped_hardware_failure_or_link_loss() {
     }
 }
 
+// @internal — Android reports `ble` where iOS reports `BLE`; both must end the transfer.
+#[test]
+fn recovery_sender_stops_on_a_failure_named_in_any_casing() {
+    for event in [
+        Event::HardwareError {
+            transport: "ble".into(),
+            error: "private native error".into(),
+        },
+        Event::HardwareUnavailable {
+            transport: "ble".into(),
+        },
+        Event::PermissionDenied {
+            transport: "Ble".into(),
+        },
+    ] {
+        let mut sender = sender();
+        let callback = sender.callback();
+        packet(&sender.poll(100));
+        callback.publish(event).unwrap();
+        assert_eq!(sender.poll(101), disconnect());
+        assert_eq!(sender.state(), TransferState::Failed);
+    }
+}
+
+// @internal — another transport's failure says nothing about this link.
+#[test]
+fn recovery_sender_ignores_another_transports_failure() {
+    let mut sender = sender();
+    let callback = sender.callback();
+    packet(&sender.poll(100));
+    let _ = callback.publish(Event::HardwareUnavailable {
+        transport: "camera".into(),
+    });
+    assert_eq!(sender.poll(101), Vec::<Command>::new());
+    assert_eq!(sender.state(), TransferState::Sending);
+}
+
 // @internal — repeated old ACKs cannot renew the deadline for a pending packet.
 #[test]
 fn recovery_sender_duplicate_acknowledgements_do_not_postpone_retry() {

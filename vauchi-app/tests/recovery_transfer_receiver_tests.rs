@@ -168,6 +168,25 @@ fn recovery_receiver_cancellation_and_timeout_reject_queued_bytes() {
     }
 }
 
+// @internal — Android reports `ble` where iOS reports `BLE`; both must end the transfer.
+#[test]
+fn recovery_receiver_stops_on_a_failure_named_in_any_casing() {
+    for transport in ["BLE", "ble", "Ble"] {
+        let (phone, _backup, hash) = fixture();
+        let mut receiver =
+            RecoveryTransferReceiver::new(hash, "peer".into(), BleLinkDirection::Outbound).unwrap();
+        let callback = receiver.callback();
+        receiver.poll(&phone, 0);
+        callback
+            .publish(Event::HardwareUnavailable {
+                transport: transport.into(),
+            })
+            .unwrap();
+        assert_eq!(receiver.poll(&phone, 1), vec![disconnect()]);
+        assert_eq!(receiver.state(), ReceiveState::Failed);
+    }
+}
+
 // @internal — DC-01/DC-02: only the selected peer, role and characteristic feed storage.
 #[test]
 fn recovery_receiver_rejects_unaccepted_or_malformed_frames_and_ignores_other_links() {

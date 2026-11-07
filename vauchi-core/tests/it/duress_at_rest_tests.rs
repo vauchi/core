@@ -141,6 +141,15 @@ fn disabling_the_duress_pin_leaves_the_rows_shaped_as_without_one() {
     }
 }
 
+/// The file's duress own-card table, which v93 fills and v114 drops.
+const DURESS_OWN_CARD_BEFORE_V114: &str = "
+    CREATE TABLE duress_own_card (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        card_json TEXT NOT NULL,
+        card_json_encrypted BLOB,
+        updated_at INTEGER NOT NULL
+    );";
+
 /// Rewrites Alice's password columns as core stored them before v93: the
 /// duress hash alone under the key and a plain `duress_enabled` flag.
 fn store_as_before_v93(disk: &OnDisk, with_duress_pin: bool) {
@@ -162,17 +171,7 @@ fn store_as_before_v93(disk: &OnDisk, with_duress_pin: bool) {
         ],
     )
     .unwrap();
-    // v93 fills the file's duress own-card table, which v114 dropped.
-    conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS duress_own_card (
-             id INTEGER PRIMARY KEY CHECK (id = 1),
-             card_json TEXT NOT NULL,
-             card_json_encrypted BLOB,
-             updated_at INTEGER NOT NULL
-         );
-         DELETE FROM duress_own_card;",
-    )
-    .unwrap();
+    conn.execute_batch(DURESS_OWN_CARD_BEFORE_V114).unwrap();
     conn.execute("DELETE FROM schema_version WHERE version >= 93", [])
         .unwrap();
 }

@@ -18,7 +18,7 @@
 //! database: `Connection::deserialize` needs `unsafe`, which core forbids.
 
 use rusqlite::types::Value;
-use rusqlite::{Connection, OptionalExtension, params_from_iter};
+use rusqlite::{Connection, params_from_iter};
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::{SymmetricKey, decrypt, encrypt, kdf::HKDF};
@@ -328,51 +328,6 @@ impl Storage {
             return Err(under_mask_key);
         }
         self.move_duress_content_to_mask_key()
-    }
-
-    /// An install from before ADR-080 kept the duress own card as a row of
-    /// the file, under the SEK. It moves into the mask database under the
-    /// mask key; the file's row goes in the same transaction as the new seal,
-    /// so a failed move leaves it for the next open.
-    pub(super) fn move_duress_own_card_into_mask(&self) -> Result<(), StorageError> {
-        let legacy: Option<(Option<Vec<u8>>, i64)> = self
-            .conn
-            .query_row(
-                "SELECT card_json_encrypted, updated_at FROM duress_own_card WHERE id = 1",
-                [],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .optional()?;
-        let Some((encrypted, updated_at)) = legacy else {
-            return Ok(());
-        };
-        if let Some(encrypted) = encrypted.filter(|e| !e.is_empty()) {
-            let card = zeroize::Zeroizing::new(
-                decrypt(&self.encryption_key, &encrypted)
-                    .map_err(|e| StorageError::Encryption(e.to_string()))?,
-            );
-            let under_mask_key = encrypt(self.mask.key(), &card)
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
-            self.mask.conn().execute(
-                "INSERT OR REPLACE INTO duress_own_card (id, card_json, card_json_encrypted, updated_at)
-                 VALUES (1, '', ?1, ?2)",
-                rusqlite::params![under_mask_key, updated_at],
-            )?;
-        }
-        self.conn.execute_batch("BEGIN IMMEDIATE")?;
-        let moved = self
-            .mask
-            .seal_into(SealedSlot::of(&self.conn))
-            .and_then(|()| Ok(self.conn.execute("DELETE FROM duress_own_card", [])?));
-        match moved {
-            Ok(_) => Ok(self.conn.execute_batch("COMMIT")?),
-            Err(e) => {
-                if let Err(rollback) = self.conn.execute_batch("ROLLBACK") {
-                    tracing::error!(%rollback, "[Storage] rolling back the own-card move failed");
-                }
-                Err(e)
-            }
-        }
     }
 
     /// A seal that opens under the SEK and not the mask key was written

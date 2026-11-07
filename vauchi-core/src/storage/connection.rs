@@ -142,7 +142,6 @@ impl Storage {
         )?;
         key_check::record_if_missing(&self.conn, &self.encryption_key)?;
         self.load_duress_content()?;
-        self.move_duress_own_card_into_mask()?;
         // An app password set before mask seeds existed (ADR-080).
         if self.identity().load_password_config()?.is_some() {
             self.mask_seed().ensure()?;

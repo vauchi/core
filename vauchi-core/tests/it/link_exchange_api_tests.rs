@@ -71,7 +71,9 @@ fn a_shared_link_accepted_by_the_peer_completes_on_both_sides() {
 
     let (link, mut alice_exchange) = alice.start_link_exchange().expect("share");
     let code = shown_code(&alice_exchange);
-    let mut bob_exchange = bob.accept_link_exchange(&link, &code).expect("accept");
+    let mut bob_exchange = bob
+        .accept_link_exchange_with_code(&link, &code)
+        .expect("accept");
     let progress = advance_until_done([(&alice, &mut alice_exchange), (&bob, &mut bob_exchange)]);
 
     assert_eq!(
@@ -103,7 +105,7 @@ fn a_wrong_code_makes_no_contact_on_either_side_and_uses_up_the_link() {
     let (link, mut alice_exchange) = alice.start_link_exchange().expect("share");
     let code = shown_code(&alice_exchange);
     let mut mallory_exchange = mallory
-        .accept_link_exchange(&link, a_wrong_code(&code))
+        .accept_link_exchange_with_code(&link, a_wrong_code(&code))
         .expect("accept");
 
     let progress = advance_until_done([
@@ -118,7 +120,9 @@ fn a_wrong_code_makes_no_contact_on_either_side_and_uses_up_the_link() {
     assert!(alice.list_contacts().unwrap().is_empty());
     assert!(mallory.list_contacts().unwrap().is_empty());
 
-    let mut bob_exchange = bob.accept_link_exchange(&link, &code).expect("accept");
+    let mut bob_exchange = bob
+        .accept_link_exchange_with_code(&link, &code)
+        .expect("accept");
     assert_eq!(
         bob.advance_link_exchange(&mut bob_exchange)
             .expect("advance"),
@@ -138,10 +142,28 @@ fn only_the_sender_of_a_link_has_a_code_to_show() {
     let (link, sharing) = alice.start_link_exchange().expect("share");
 
     let accepting = bob
-        .accept_link_exchange(&link, &shown_code(&sharing))
+        .accept_link_exchange_with_code(&link, &shown_code(&sharing))
         .expect("accept");
 
     assert!(accepting.code().is_none());
+}
+
+// A shell still pinned to the one-argument call compiles, and fails closed.
+// @claim: S9
+// @internal
+#[test]
+fn accepting_a_valid_link_without_a_code_is_refused() {
+    let mock = MockRelay::start();
+    let (alice, _a) = user_at(&mock, "Alice");
+    let (bob, _b) = user_at(&mock, "Bob");
+    let (link, _sharing) = alice.start_link_exchange().expect("share");
+
+    let refusal = bob
+        .accept_link_exchange(&link)
+        .err()
+        .expect("a link without a code is refused");
+
+    assert!(refusal.to_string().contains("needs the code"), "{refusal}");
 }
 
 // CC-14: the typed code is untrusted input, refused before anything reaches
@@ -155,7 +177,10 @@ fn accepting_with_anything_but_six_digits_is_refused() {
     let (link, _sharing) = alice.start_link_exchange().expect("share");
 
     for typed in ["", "12345", "1234567", "abcdef", "١٢٣٤٥٦", "12 34 56"] {
-        assert!(bob.accept_link_exchange(&link, typed).is_err(), "{typed:?}");
+        assert!(
+            bob.accept_link_exchange_with_code(&link, typed).is_err(),
+            "{typed:?}"
+        );
     }
 }
 
@@ -188,7 +213,7 @@ fn accepting_anything_but_an_exchange_link_is_refused() {
         "https://vauchi.app/x#",
     ] {
         assert!(
-            bob.accept_link_exchange(junk, "123456").is_err(),
+            bob.accept_link_exchange_with_code(junk, "123456").is_err(),
             "{junk:?}"
         );
     }
@@ -202,7 +227,9 @@ fn accepting_your_own_link_never_completes_an_exchange_with_yourself() {
     let (alice, _a) = user_at(&mock, "Alice");
     let (link, mut sharing) = alice.start_link_exchange().expect("share");
     let code = shown_code(&sharing);
-    let mut accepting = alice.accept_link_exchange(&link, &code).expect("accept");
+    let mut accepting = alice
+        .accept_link_exchange_with_code(&link, &code)
+        .expect("accept");
 
     let progress = advance_until_done([(&alice, &mut sharing), (&alice, &mut accepting)]);
 
@@ -228,11 +255,13 @@ fn a_second_person_opening_a_used_link_is_told_it_was_used() {
     let (carol, _c) = user_at(&mock, "Carol");
     let (link, mut alice_exchange) = alice.start_link_exchange().expect("share");
     let code = shown_code(&alice_exchange);
-    let mut bob_exchange = bob.accept_link_exchange(&link, &code).expect("bob accepts");
+    let mut bob_exchange = bob
+        .accept_link_exchange_with_code(&link, &code)
+        .expect("bob accepts");
     advance_until_done([(&alice, &mut alice_exchange), (&bob, &mut bob_exchange)]);
 
     let mut carol_exchange = carol
-        .accept_link_exchange(&link, &code)
+        .accept_link_exchange_with_code(&link, &code)
         .expect("carol accepts");
     let progress = carol
         .advance_link_exchange(&mut carol_exchange)

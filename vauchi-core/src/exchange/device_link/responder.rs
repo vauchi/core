@@ -42,6 +42,28 @@ impl DeviceLinkResponder {
         })
     }
 
+    /// Picks up a link in a later process, for a frontend that sends the request
+    /// and reads the response in separate runs. Only `process_response` is of
+    /// use here. Skips the QR's expiry, because the request has already gone.
+    pub fn resume(
+        qr: DeviceLinkQR,
+        device_name: String,
+        device_signing_seed: Zeroizing<[u8; 32]>,
+    ) -> Self {
+        DeviceLinkResponder {
+            qr,
+            device_name,
+            last_request_nonce: None,
+            device_signing_seed,
+        }
+    }
+
+    /// This device's own signing key, to save for [`Self::resume`]. It is as
+    /// sensitive as a device's stored signing key.
+    pub fn device_signing_seed(&self) -> &Zeroizing<[u8; 32]> {
+        &self.device_signing_seed
+    }
+
     /// Creates a request to send to the existing device.
     pub fn create_request(&mut self, now: u64) -> Result<Vec<u8>, ExchangeError> {
         let device_key = SigningKeyPair::from_seed(&self.device_signing_seed);

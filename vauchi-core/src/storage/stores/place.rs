@@ -43,7 +43,7 @@ impl Storage {
     pub fn duress_places(&self) -> PlaceStore<'_> {
         self.places_in(
             self.duress_conn(),
-            &self.mask_key,
+            self.mask.key(),
             "duress_places",
             Some(SealOnDrop::new(self)),
         )

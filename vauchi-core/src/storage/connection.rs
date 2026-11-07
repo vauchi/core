@@ -10,7 +10,7 @@ use std::path::Path;
 use crate::crypto::SymmetricKey;
 
 use super::{Storage, StorageError};
-use super::{duress_content, key_check, migration};
+use super::{key_check, migration};
 
 impl Storage {
     /// Opens or creates a storage database at the given path.
@@ -47,8 +47,7 @@ impl Storage {
         key_check::verify(&conn, &encryption_key)?;
         let storage = Storage {
             conn,
-            duress_db: duress_content::open_duress_db()?,
-            mask_key: duress_content::mask_key(&encryption_key),
+            mask: super::mask::MaskStorage::new(&encryption_key)?,
             encryption_key,
             db_path: Some(path_buf),
             clock: crate::clock::SystemClock::shared(),
@@ -79,8 +78,7 @@ impl Storage {
         Self::configure_pragmas(&conn)?;
         let storage = Storage {
             conn,
-            duress_db: duress_content::open_duress_db()?,
-            mask_key: duress_content::mask_key(&encryption_key),
+            mask: super::mask::MaskStorage::new(&encryption_key)?,
             encryption_key,
             db_path: None,
             clock: crate::clock::SystemClock::shared(),
@@ -262,13 +260,13 @@ impl Storage {
     /// duress session's groups, tags and places (vauchi/private#813,
     /// vauchi/private#1003).
     pub(crate) fn duress_conn(&self) -> &Connection {
-        &self.duress_db
+        self.mask.conn()
     }
 
     /// The in-memory duress database (testing only).
     #[cfg(any(test, feature = "testing"))]
     pub fn duress_connection(&self) -> &Connection {
-        &self.duress_db
+        self.mask.conn()
     }
 
     /// Returns a reference to the underlying connection (testing only).

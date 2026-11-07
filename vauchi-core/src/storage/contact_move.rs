@@ -155,24 +155,23 @@ impl Storage {
         operation: impl FnOnce() -> Result<(), StorageError>,
     ) -> Result<(), StorageError> {
         let begin = format!("SAVEPOINT {MOVE_SAVEPOINT}");
-        self.duress_db.execute_batch(&begin)?;
+        self.mask.conn().execute_batch(&begin)?;
         if let Err(error) = self.conn.execute_batch(&begin) {
-            rollback(&self.duress_db);
+            rollback(self.mask.conn());
             return Err(error.into());
         }
-        let moved = operation().and_then(|()| {
-            super::duress_content::write_sealed(&self.conn, &self.duress_db, &self.mask_key)
-        });
+        let moved =
+            operation().and_then(|()| self.mask.seal_into(super::mask::SealedSlot::of(&self.conn)));
         match moved {
             Ok(()) => {
                 let release = format!("RELEASE {MOVE_SAVEPOINT}");
                 self.conn.execute_batch(&release)?;
-                self.duress_db.execute_batch(&release)?;
+                self.mask.conn().execute_batch(&release)?;
                 Ok(())
             }
             Err(error) => {
                 rollback(&self.conn);
-                rollback(&self.duress_db);
+                rollback(self.mask.conn());
                 Err(error)
             }
         }
@@ -345,7 +344,7 @@ impl Storage {
 
     fn table_key_for_move(&self, table: &str) -> &SymmetricKey {
         if DURESS_TABLES.contains(&table) {
-            &self.mask_key
+            self.mask.key()
         } else {
             &self.encryption_key
         }
@@ -353,7 +352,7 @@ impl Storage {
 
     fn table_conn_for_move(&self, table: &str) -> &Connection {
         if DURESS_TABLES.contains(&table) {
-            &self.duress_db
+            self.mask.conn()
         } else {
             &self.conn
         }

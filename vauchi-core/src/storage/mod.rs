@@ -15,6 +15,7 @@ mod device;
 pub(crate) mod duress_content;
 mod key_check;
 mod lookup;
+mod mask;
 
 mod contact_row;
 
@@ -91,13 +92,11 @@ use rusqlite::Connection;
 pub struct Storage {
     conn: Connection,
     /// Decoy contacts and the duress session's groups, tags and places,
-    /// sealed into the file's `duress_content` row (vauchi/private#1003).
-    duress_db: Connection,
+    /// sealed into the file's `duress_content` row (vauchi/private#1003),
+    /// with the mask key they are under (ADR-080).
+    mask: mask::MaskStorage,
     /// Encryption key derived from user's master key
     encryption_key: SymmetricKey,
-    /// The key the duress content and its fields are under, derived from
-    /// `encryption_key` (ADR-080, `duress_content::mask_key`).
-    mask_key: SymmetricKey,
     /// Database file path (None for in-memory databases).
     db_path: Option<std::path::PathBuf>,
     /// Explicit-time seam for the storage subsystem (Phase 1 /

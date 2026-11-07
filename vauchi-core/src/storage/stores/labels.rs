@@ -83,7 +83,7 @@ impl Storage {
     pub fn duress_labels(&self) -> LabelStore<'_> {
         self.labels_in(
             self.duress_conn(),
-            &self.mask_key,
+            self.mask.key(),
             "duress_visibility_labels",
             "duress_contact_visibility_overrides",
             Some(SealOnDrop::new(self)),

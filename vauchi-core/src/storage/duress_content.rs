@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::crypto::{SymmetricKey, decrypt, encrypt, kdf::HKDF};
 
+use super::mask::{MaskStorage, SealedSlot};
 use super::{Storage, StorageError};
 
 /// The five tables as of v93. A change to one is a change here and a
@@ -236,36 +237,29 @@ pub(super) fn unseal_into(
     load_dump(duress_db, body)
 }
 
-/// Seals `duress_db` into the file's `duress_content` row.
+/// Seals `duress_db` into the file's `duress_content` row under `key`.
 pub(crate) fn write_sealed(
     conn: &Connection,
     duress_db: &Connection,
-    mask_key: &SymmetricKey,
+    key: &SymmetricKey,
 ) -> Result<(), StorageError> {
-    conn.execute(
-        "INSERT INTO duress_content (id, content_encrypted) VALUES (1, ?1)
-         ON CONFLICT(id) DO UPDATE SET content_encrypted = excluded.content_encrypted",
-        [seal(mask_key, duress_db)?],
-    )?;
-    Ok(())
+    SealedSlot::of(conn).write(&seal(key, duress_db)?)
 }
 
 /// Re-seals the blob when a store that holds it has changed the duress
 /// database, so every write path persists without naming it.
 pub(crate) struct SealOnDrop<'a> {
-    conn: &'a Connection,
-    duress_db: &'a Connection,
-    key: &'a SymmetricKey,
+    slot: SealedSlot<'a>,
+    mask: &'a MaskStorage,
     changes_before: std::cell::Cell<u64>,
 }
 
 impl<'a> SealOnDrop<'a> {
     pub(crate) fn new(storage: &'a Storage) -> Self {
         SealOnDrop {
-            conn: &storage.conn,
-            duress_db: &storage.duress_db,
-            key: &storage.mask_key,
-            changes_before: std::cell::Cell::new(storage.duress_db.total_changes()),
+            slot: SealedSlot::of(&storage.conn),
+            mask: &storage.mask,
+            changes_before: std::cell::Cell::new(storage.mask.conn().total_changes()),
         }
     }
 }
@@ -273,8 +267,8 @@ impl<'a> SealOnDrop<'a> {
 impl SealOnDrop<'_> {
     /// Seals now and returns the error, for a store's write paths.
     pub(crate) fn seal_now(&self) -> Result<(), StorageError> {
-        write_sealed(self.conn, self.duress_db, self.key)?;
-        self.changes_before.set(self.duress_db.total_changes());
+        self.mask.seal_into(self.slot)?;
+        self.changes_before.set(self.mask.conn().total_changes());
         Ok(())
     }
 }
@@ -282,10 +276,10 @@ impl SealOnDrop<'_> {
 /// A backstop for a write that did not seal through [`SealOnDrop::seal_now`].
 impl Drop for SealOnDrop<'_> {
     fn drop(&mut self) {
-        if self.duress_db.total_changes() == self.changes_before.get() {
+        if self.mask.conn().total_changes() == self.changes_before.get() {
             return;
         }
-        if let Err(error) = write_sealed(self.conn, self.duress_db, self.key) {
+        if let Err(error) = self.mask.seal_into(self.slot) {
             tracing::error!(%error, "[Storage] sealing the duress content failed");
         }
     }
@@ -295,22 +289,15 @@ impl Storage {
     /// Loads the duress content from the file, writing an empty seal first
     /// when there is none.
     pub(super) fn load_duress_content(&self) -> Result<(), StorageError> {
-        let sealed: Option<Vec<u8>> = match self.conn.query_row(
-            "SELECT content_encrypted FROM duress_content WHERE id = 1",
-            [],
-            |row| row.get(0),
-        ) {
-            Ok(sealed) => Some(sealed),
-            Err(rusqlite::Error::QueryReturnedNoRows) => None,
-            Err(e) => return Err(e.into()),
-        };
+        let slot = SealedSlot::of(&self.conn);
+        let sealed = slot.read()?;
         let Some(sealed) = sealed else {
-            return write_sealed(&self.conn, &self.duress_db, &self.mask_key);
+            return self.mask.seal_into(slot);
         };
-        let Err(under_mask_key) = unseal_into(&self.mask_key, &sealed, &self.duress_db) else {
+        let Err(under_mask_key) = unseal_into(self.mask.key(), &sealed, self.mask.conn()) else {
             return Ok(());
         };
-        if unseal_into(&self.encryption_key, &sealed, &self.duress_db).is_err() {
+        if unseal_into(&self.encryption_key, &sealed, self.mask.conn()).is_err() {
             return Err(under_mask_key);
         }
         self.move_duress_content_to_mask_key()
@@ -320,17 +307,17 @@ impl Storage {
     /// before the mask key (ADR-080): its fields move to the mask key and it
     /// is sealed again. A seal that opens under neither is refused above.
     fn move_duress_content_to_mask_key(&self) -> Result<(), StorageError> {
-        self.duress_db.execute_batch("BEGIN")?;
+        self.mask.conn().execute_batch("BEGIN")?;
         let moved = self
-            .rekey_duress_tables(&self.encryption_key, &self.mask_key)
-            .and_then(|()| write_sealed(&self.conn, &self.duress_db, &self.mask_key));
+            .rekey_duress_tables(&self.encryption_key, self.mask.key())
+            .and_then(|()| self.mask.seal_into(SealedSlot::of(&self.conn)));
         match moved {
-            Ok(()) => Ok(self.duress_db.execute_batch("COMMIT")?),
+            Ok(()) => Ok(self.mask.conn().execute_batch("COMMIT")?),
             Err(e) => {
                 // best-effort: the seal in the file was not replaced, so the
                 // next open moves it again from the same state
                 #[allow(clippy::let_underscore_must_use)]
-                let _ = self.duress_db.execute_batch("ROLLBACK");
+                let _ = self.mask.conn().execute_batch("ROLLBACK");
                 Err(e)
             }
         }

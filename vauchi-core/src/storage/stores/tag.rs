@@ -43,7 +43,7 @@ impl Storage {
     pub fn duress_tags(&self) -> TagStore<'_> {
         self.tags_in(
             self.duress_conn(),
-            &self.mask_key,
+            self.mask.key(),
             "duress_tags",
             Some(SealOnDrop::new(self)),
         )

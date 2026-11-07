@@ -228,7 +228,7 @@ impl Storage {
     /// duress database (vauchi/private#1003), every other one in the file.
     fn table_conn(&self, table: &str) -> &rusqlite::Connection {
         if super::duress_content::DURESS_TABLES.contains(&table) {
-            &self.duress_db
+            self.mask.conn()
         } else {
             &self.conn
         }
@@ -283,7 +283,7 @@ impl Storage {
         self.wal_checkpoint()?;
 
         let old_key = &self.encryption_key;
-        let old_mask_key = &self.mask_key;
+        let old_mask_key = self.mask.key();
         let new_mask_key = super::duress_content::mask_key(&new_key);
         const TOTAL_TABLES: u32 = 46;
         let mut completed: u32 = 0;
@@ -297,9 +297,9 @@ impl Storage {
 
         // The duress database begins first: if it cannot, no file
         // transaction is left open.
-        self.duress_db.execute_batch("BEGIN")?;
+        self.mask.conn().execute_batch("BEGIN")?;
         if let Err(e) = self.conn.execute_batch("BEGIN EXCLUSIVE TRANSACTION") {
-            self.duress_db.execute_batch("ROLLBACK")?;
+            self.mask.conn().execute_batch("ROLLBACK")?;
             return Err(e.into());
         }
 
@@ -547,15 +547,15 @@ impl Storage {
             report(&mut completed, "exchange_location");
 
             super::key_check::rewrite(&self.conn, &new_key)?;
-            super::duress_content::write_sealed(&self.conn, &self.duress_db, &new_mask_key)
+            super::duress_content::write_sealed(&self.conn, self.mask.conn(), &new_mask_key)
         })()
         .and_then(|()| self.commit());
 
         match result {
             Ok(()) => {
-                self.duress_db.execute_batch("COMMIT")?;
+                self.mask.conn().execute_batch("COMMIT")?;
                 self.encryption_key = new_key;
-                self.mask_key = new_mask_key;
+                self.mask.replace_key(new_mask_key);
                 Ok(())
             }
             Err(e) => {
@@ -567,7 +567,7 @@ impl Storage {
                 let _ = self
                     .conn
                     .execute_batch("ROLLBACK")
-                    .and(self.duress_db.execute_batch("ROLLBACK"));
+                    .and(self.mask.conn().execute_batch("ROLLBACK"));
                 Err(e)
             }
         }

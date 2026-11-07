@@ -269,6 +269,10 @@ impl Vauchi {
             return Err(VauchiError::AlreadyInitialized);
         }
 
+        let device_signing_seed = response.device_signing_seed().ok_or_else(|| {
+            VauchiError::InvalidState("device link response has no device key".into())
+        })?;
+
         let now = self.clock.unix_seconds();
         let device_index = response.device_index();
         let identity = Identity::from_device_link(
@@ -281,15 +285,21 @@ impl Vauchi {
 
         // Same plaintext storage format as `create_identity`; the DB
         // encrypts at rest (ADR-015).
-        self.storage
-            .identity()
-            .save_identity(&identity.to_storage_bytes())?;
+        self.storage.with_savepoint(|| -> VauchiResult<()> {
+            self.storage
+                .identity()
+                .save_identity(&identity.to_storage_bytes())?;
+            self.storage
+                .device()
+                .adopt_device_signing_key(device_signing_seed)?;
 
-        // Persist the registry from the linking device so sync can address
-        // the peer devices.
-        self.storage
-            .device()
-            .save_device_registry(response.registry())?;
+            // Persist the registry from the linking device so sync can address
+            // the peer devices.
+            self.storage
+                .device()
+                .save_device_registry(response.registry())?;
+            Ok(())
+        })?;
 
         if response.sync_payload_json().is_empty() {
             // No sync payload — seed a default own card from the display name.

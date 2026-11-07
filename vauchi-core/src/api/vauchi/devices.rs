@@ -113,11 +113,7 @@ impl Vauchi {
                 "device linking unavailable".into(),
             ));
         }
-        let registry = self
-            .storage
-            .device()
-            .load_device_registry()?
-            .unwrap_or_else(|| identity.initial_device_registry());
+        let registry = self.storage.device().own_device_registry(identity)?;
         Ok(identity.create_device_link_initiator(registry, self.clock.unix_seconds()))
     }
 

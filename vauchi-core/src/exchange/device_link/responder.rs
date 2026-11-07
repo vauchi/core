@@ -11,6 +11,8 @@ use super::request::DeviceLinkRequest;
 use super::response::DeviceLinkResponse;
 use super::types::derive_confirmation_code;
 use crate::crypto::SigningKeyPair;
+use crate::identity::DeviceInfo;
+use zeroize::Zeroizing;
 
 /// State machine for device linking from the new device's perspective.
 pub struct DeviceLinkResponder {
@@ -20,6 +22,9 @@ pub struct DeviceLinkResponder {
     device_name: String,
     /// Nonce from the last created request (for confirmation code computation).
     last_request_nonce: Option<[u8; 32]>,
+    /// This device's own signing key, kept here until the seed arrives and
+    /// storage can hold it (ADR-079).
+    device_signing_seed: Zeroizing<[u8; 32]>,
 }
 
 impl DeviceLinkResponder {
@@ -33,12 +38,18 @@ impl DeviceLinkResponder {
             qr,
             device_name,
             last_request_nonce: None,
+            device_signing_seed: Zeroizing::new(crate::crypto::random_bytes()),
         })
     }
 
     /// Creates a request to send to the existing device.
     pub fn create_request(&mut self, now: u64) -> Result<Vec<u8>, ExchangeError> {
-        let request = DeviceLinkRequest::new(self.device_name.clone(), now);
+        let device_key = SigningKeyPair::from_seed(&self.device_signing_seed);
+        let request = DeviceLinkRequest::new(
+            self.device_name.clone(),
+            *device_key.public_key().as_bytes(),
+            now,
+        );
         self.last_request_nonce = Some(request.nonce);
         request.encrypt(self.qr.link_key())
     }
@@ -65,16 +76,33 @@ impl DeviceLinkResponder {
     ///
     /// Returns the master seed, display name, device index, and registry.
     /// Refuses a seed whose identity key is not the QR's: anyone with a
-    /// copy of the QR holds the link key (vauchi/private#789).
+    /// copy of the QR holds the link key (vauchi/private#789). Refuses a
+    /// registry that does not name this device's own key, because contacts
+    /// would pin whatever it names.
     pub fn process_response(
         &self,
         encrypted_response: &[u8],
     ) -> Result<DeviceLinkResponse, ExchangeError> {
-        let response = DeviceLinkResponse::decrypt(encrypted_response, self.qr.link_key())?;
+        let mut response = DeviceLinkResponse::decrypt(encrypted_response, self.qr.link_key())?;
         let seed_identity_key = SigningKeyPair::from_seed(response.master_seed()).public_key();
         if seed_identity_key.as_bytes() != self.qr.identity_public_key() {
             return Err(ExchangeError::IdentityMismatch);
         }
+        let device_key = SigningKeyPair::from_seed(&self.device_signing_seed);
+        let this_device = DeviceInfo::derive(
+            response.master_seed(),
+            response.device_index(),
+            self.device_name.clone(),
+            0,
+        );
+        let named_key = response
+            .registry()
+            .find_device(this_device.device_id())
+            .and_then(|entry| entry.signing_public_key);
+        if named_key != Some(*device_key.public_key().as_bytes()) {
+            return Err(ExchangeError::DeviceKeyRefused);
+        }
+        response.set_device_signing_seed(self.device_signing_seed.clone());
         Ok(response)
     }
 

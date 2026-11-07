@@ -68,6 +68,11 @@ pub enum ExchangeError {
     #[error("Identity mismatch: signing key does not match QR public key")]
     IdentityMismatch,
 
+    /// A device link named a device signing key that cannot be used, or the
+    /// wrong one for this device (ADR-079).
+    #[error("Device signing key refused")]
+    DeviceKeyRefused,
+
     #[error("OOB nonce echo missing or mismatched")]
     OobNonceMismatch,
 
@@ -249,6 +254,7 @@ impl ExchangeError {
 
             Self::InvalidSignature
             | Self::IdentityMismatch
+            | Self::DeviceKeyRefused
             | Self::OobNonceMismatch
             | Self::OobNonceReplayed
             | Self::ExchangeKeyMismatch

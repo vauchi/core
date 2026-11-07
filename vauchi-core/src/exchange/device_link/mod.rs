@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn test_device_link_request_roundtrip() {
-        let request = DeviceLinkRequest::new("My New Phone".to_string(), 0u64);
+        let request = DeviceLinkRequest::new("My New Phone".to_string(), [0x07; 32], 0u64);
         let bytes = request.to_bytes();
         let restored = DeviceLinkRequest::from_bytes(&bytes).unwrap();
 
@@ -116,7 +116,7 @@ mod tests {
 
     #[test]
     fn test_device_link_request_encryption() {
-        let request = DeviceLinkRequest::new("My New Phone".to_string(), 0u64);
+        let request = DeviceLinkRequest::new("My New Phone".to_string(), [0x07; 32], 0u64);
         let link_key = [0x42u8; 32];
 
         let encrypted = request.encrypt(&link_key).unwrap();
@@ -213,7 +213,7 @@ mod tests {
 
     #[test]
     fn test_device_link_request_wrong_key() {
-        let request = DeviceLinkRequest::new("My Phone".to_string(), 0u64);
+        let request = DeviceLinkRequest::new("My Phone".to_string(), [0x07; 32], 0u64);
         let correct_key = [0x42u8; 32];
         let wrong_key = [0x99u8; 32];
 
@@ -230,7 +230,7 @@ mod tests {
     #[test]
     fn test_device_link_request_all_zeros_key_errors_not_panics() {
         let zero_key = [0u8; 32];
-        let request = DeviceLinkRequest::new("dev".to_string(), 1);
+        let request = DeviceLinkRequest::new("dev".to_string(), [0x07; 32], 1);
         assert!(
             matches!(request.encrypt(&zero_key), Err(ExchangeError::CryptoError)),
             "all-zeros key must error on encrypt, not panic"
@@ -375,6 +375,7 @@ mod tests {
         let request = DeviceLinkRequest {
             device_name: "".to_string(),
             nonce: [0u8; 32],
+            device_signing_public_key: [0x07; 32],
             timestamp: 0u64, /* test now */
         };
         let encrypted = request.encrypt(initiator.qr().link_key()).unwrap();

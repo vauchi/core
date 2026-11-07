@@ -186,6 +186,15 @@ pub fn verify_signature(public_key: &[u8; 32], message: &[u8], signature: &Signa
     vk.verify_strict(message, &sig).is_ok()
 }
 
+/// Whether `public_key` is a curve point only its private key holder can sign
+/// for: anyone can forge a signature that a small-order point verifies. The
+/// encoding must be canonical, because keys are compared and pinned by their
+/// bytes and a second encoding of one point would look like a different key.
+pub fn is_usable_public_key(public_key: &[u8; 32]) -> bool {
+    ed25519_dalek::VerifyingKey::from_bytes(public_key)
+        .is_ok_and(|key| !key.is_weak() && key.to_edwards().compress().to_bytes() == *public_key)
+}
+
 // INLINE_TEST_REQUIRED: the guardian seal/open key contract is validated
 // against crate-internal derivations (HKDF Vauchi_Exchange_Seed_v2 negative
 // case via crypto::X3DHKeyPair) and the raw x25519_dalek primitive, neither of

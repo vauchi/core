@@ -304,10 +304,7 @@ impl Vauchi {
         &self,
         identity: &crate::identity::Identity,
     ) -> VauchiResult<crate::identity::RegistryBroadcast> {
-        let registry = match self.storage.device().load_device_registry()? {
-            Some(registry) => registry,
-            None => identity.initial_device_registry(),
-        };
+        let registry = self.storage.device().own_device_registry(identity)?;
         Ok(crate::identity::RegistryBroadcast::new(
             &registry,
             identity.signing_keypair(),

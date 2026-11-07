@@ -18,6 +18,7 @@ use zeroize::Zeroizing;
 use super::super::{Storage, StorageError};
 use crate::clock::Clock;
 use crate::crypto::{PublicKey, SigningKeyPair, SymmetricKey};
+use crate::identity::Identity;
 use crate::identity::device::{BroadcastDevice, DeviceRegistry, MAX_DEVICES, RegistryBroadcast};
 
 /// Scoped persistence view for the device domain: this device's info record and
@@ -153,6 +154,34 @@ impl DeviceStore<'_> {
                 StorageError::InvalidData("device signing key has invalid length".into())
             })?);
         Ok(SigningKeyPair::from_seed(&seed))
+    }
+
+    /// Keeps the key a joining device generated before it had storage. A
+    /// different key already here is refused: contacts accept only one.
+    pub fn adopt_device_signing_key(&self, seed: &Zeroizing<[u8; 32]>) -> Result<(), StorageError> {
+        let sealed = crate::crypto::encrypt(self.key, seed.as_slice())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO device_signing_key (id, key_encrypted) VALUES (1, ?1)",
+            params![sealed],
+        )?;
+        let kept = self.load_or_create_device_signing_key()?;
+        if kept.public_key().as_bytes() != SigningKeyPair::from_seed(seed).public_key().as_bytes() {
+            return Err(StorageError::InvalidData(
+                "a different device signing key is already stored".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// The saved registry, or a new one naming this device and its key. Takes
+    /// the identity so the key is only ever created while one is loaded.
+    pub fn own_device_registry(&self, identity: &Identity) -> Result<DeviceRegistry, StorageError> {
+        if let Some(saved) = self.load_device_registry()? {
+            return Ok(saved);
+        }
+        let device_key = self.load_or_create_device_signing_key()?;
+        Ok(identity.initial_device_registry_naming(*device_key.public_key().as_bytes()))
     }
 
     fn stored_device_signing_key(&self) -> Result<Option<Vec<u8>>, StorageError> {

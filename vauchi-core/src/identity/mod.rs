@@ -258,6 +258,16 @@ impl Identity {
         )
     }
 
+    /// The initial registry, naming this device's own signing key (ADR-079).
+    pub fn initial_device_registry_naming(&self, signing_public_key: [u8; 32]) -> DeviceRegistry {
+        DeviceRegistry::new(
+            self.device_info
+                .to_registered(&self.master_seed)
+                .with_signing_key(signing_public_key),
+            &self.signing_keypair,
+        )
+    }
+
     /// Serializes the identity to bytes for storage persistence.
     ///
     /// Unlike `export_backup`, this does NOT password-encrypt the data.

@@ -66,7 +66,7 @@ fn confirm(
     initiator: &DeviceLinkInitiator,
     encrypted_request: &[u8],
 ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-    let (confirmation, request) = initiator.prepare_confirmation(encrypted_request).unwrap();
+    let (confirmation, request) = initiator.prepare_confirmation(encrypted_request)?;
     let proof = ProximityProof::manual_confirmation(
         initiator.qr().link_key(),
         &confirmation.confirmation_code,
@@ -181,11 +181,18 @@ fn a_host_refuses_a_key_no_device_could_use_or_own() {
     let identity_key = *host.identity.signing_keypair().public_key().as_bytes();
     let mut small_order_identity_point = [0u8; 32];
     small_order_identity_point[0] = 1;
+    let mut off_curve = [0u8; 32];
+    off_curve[0] = 2;
+    let mut second_encoding = [0xff; 32];
+    second_encoding[0] = 0xf0;
+    second_encoding[31] = 0x7f;
 
     for (case, key) in [
         ("zero, a small-order point", [0u8; 32]),
         ("the identity point", small_order_identity_point),
-        ("not a curve point", [0xff; 32]),
+        ("not a curve point", off_curve),
+        ("a second encoding of y = 3", second_encoding),
+        ("all ones, non-canonical", [0xff; 32]),
         ("the identity key", identity_key),
         ("a registered device's key", host.own_key),
     ] {

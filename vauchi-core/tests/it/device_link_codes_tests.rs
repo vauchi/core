@@ -98,11 +98,11 @@ fn confirmation_codes_are_ddd_ddd_across_the_full_range() {
 // @internal
 #[test]
 fn a_link_request_needs_its_full_declared_length() {
-    let empty_name = DeviceLinkRequest::new(String::new(), T0).to_bytes();
-    assert_eq!(empty_name.len(), 4 + 32 + 8);
+    let empty_name = DeviceLinkRequest::new(String::new(), [0x07; 32], T0).to_bytes();
+    assert_eq!(empty_name.len(), 4 + 32 + 32 + 8);
     assert!(DeviceLinkRequest::from_bytes(&empty_name).is_ok());
 
-    let named = DeviceLinkRequest::new("Phone".into(), T0).to_bytes();
+    let named = DeviceLinkRequest::new("Phone".into(), [0x07; 32], T0).to_bytes();
     assert_eq!(
         DeviceLinkRequest::from_bytes(&named).unwrap().device_name,
         "Phone"

@@ -20,7 +20,7 @@ fn with_name_len(mut bytes: Vec<u8>, len: u32) -> Vec<u8> {
 // @internal
 #[test]
 fn a_link_request_with_a_maximal_name_length_is_refused() {
-    let bytes = DeviceLinkRequest::new("Phone".into(), 1_700_000_000).to_bytes();
+    let bytes = DeviceLinkRequest::new("Phone".into(), [0x07; 32], 1_700_000_000).to_bytes();
     for len in [u32::MAX, u32::MAX - 3, u32::MAX - 35] {
         assert!(matches!(
             DeviceLinkRequest::from_bytes(&with_name_len(bytes.clone(), len)),
@@ -60,7 +60,7 @@ proptest! {
     // @internal
     #[test]
     fn a_link_request_round_trips(name in "[a-zA-Z0-9 ]{0,40}", ts in any::<u64>()) {
-        let request = DeviceLinkRequest::new(name.clone(), ts);
+        let request = DeviceLinkRequest::new(name.clone(), [0x07; 32], ts);
         let parsed = DeviceLinkRequest::from_bytes(&request.to_bytes()).unwrap();
         prop_assert_eq!(parsed.device_name, name);
     }

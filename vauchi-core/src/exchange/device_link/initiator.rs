@@ -89,6 +89,11 @@ impl DeviceLinkInitiator {
         // Before the code is shown, so the user is never asked to confirm a
         // link that `build_response` would refuse (vauchi/private#671).
         refuse_a_taken_device_name(&self.registry, &request.device_name)?;
+        refuse_an_unusable_device_key(
+            &self.registry,
+            &self.master_seed,
+            &request.device_signing_public_key,
+        )?;
 
         let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
         let identity_fingerprint = self.qr.identity_fingerprint();
@@ -148,6 +153,11 @@ impl DeviceLinkInitiator {
         now: u64,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
         refuse_a_taken_device_name(&self.registry, &request.device_name)?;
+        refuse_an_unusable_device_key(
+            &self.registry,
+            &self.master_seed,
+            &request.device_signing_public_key,
+        )?;
 
         let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
         validate_proximity_proof(self.qr.link_key(), proof, &confirmation_code, now)?;
@@ -165,7 +175,9 @@ impl DeviceLinkInitiator {
         let signing_key = SigningKeyPair::from_seed(&self.master_seed);
         updated_registry
             .add_device(
-                new_device_info.to_registered(&self.master_seed),
+                new_device_info
+                    .to_registered(&self.master_seed)
+                    .with_signing_key(request.device_signing_public_key),
                 &signing_key,
             )
             .map_err(|_| ExchangeError::CryptoError)?;
@@ -255,6 +267,11 @@ impl DeviceLinkInitiatorRestored {
         // Before the code is shown, so the user is never asked to confirm a
         // link that `build_response` would refuse (vauchi/private#671).
         refuse_a_taken_device_name(&self.registry, &request.device_name)?;
+        refuse_an_unusable_device_key(
+            &self.registry,
+            &self.master_seed,
+            &request.device_signing_public_key,
+        )?;
 
         let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
         let identity_fingerprint = self.qr.identity_fingerprint();
@@ -303,6 +320,11 @@ impl DeviceLinkInitiatorRestored {
         now: u64,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
         refuse_a_taken_device_name(&self.registry, &request.device_name)?;
+        refuse_an_unusable_device_key(
+            &self.registry,
+            &self.master_seed,
+            &request.device_signing_public_key,
+        )?;
 
         let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
         validate_proximity_proof(self.qr.link_key(), proof, &confirmation_code, now)?;
@@ -320,7 +342,9 @@ impl DeviceLinkInitiatorRestored {
         let signing_key = SigningKeyPair::from_seed(&self.master_seed);
         updated_registry
             .add_device(
-                new_device_info.to_registered(&self.master_seed),
+                new_device_info
+                    .to_registered(&self.master_seed)
+                    .with_signing_key(request.device_signing_public_key),
                 &signing_key,
             )
             .map_err(|_| ExchangeError::CryptoError)?;
@@ -390,6 +414,26 @@ fn validate_proximity_proof(
 
 /// DL-6: rejects self-linking. Name-based, because the request carries no
 /// device id; proper enforcement needs that protocol change.
+/// Contacts pin what the registry names, so a bad key here would stay.
+fn refuse_an_unusable_device_key(
+    registry: &DeviceRegistry,
+    master_seed: &[u8; 32],
+    key: &[u8; 32],
+) -> Result<(), ExchangeError> {
+    let identity_key = SigningKeyPair::from_seed(master_seed).public_key();
+    let already_named = registry
+        .all_devices()
+        .iter()
+        .any(|device| device.signing_public_key.as_ref() == Some(key));
+    if !crate::crypto::signing::is_usable_public_key(key)
+        || key == identity_key.as_bytes()
+        || already_named
+    {
+        return Err(ExchangeError::DeviceKeyRefused);
+    }
+    Ok(())
+}
+
 fn refuse_a_taken_device_name(
     registry: &DeviceRegistry,
     device_name: &str,

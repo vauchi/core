@@ -26,13 +26,17 @@ pub struct DeviceLinkRequest {
     pub device_name: String,
     /// Random nonce to prevent replay attacks
     pub nonce: [u8; 32],
+    /// Public half of the signing key the new device generated for itself
+    /// (ADR-079). It goes here because the device has no storage until the
+    /// seed arrives, and the registry must name the key from its first version.
+    pub device_signing_public_key: [u8; 32],
     /// Timestamp of request
     pub timestamp: u64,
 }
 
 impl DeviceLinkRequest {
     /// Creates a new device link request.
-    pub fn new(device_name: String, now: u64) -> Self {
+    pub fn new(device_name: String, device_signing_public_key: [u8; 32], now: u64) -> Self {
         let nonce: [u8; 32] = crate::crypto::random_bytes();
 
         let timestamp = now;
@@ -40,6 +44,7 @@ impl DeviceLinkRequest {
         DeviceLinkRequest {
             device_name,
             nonce,
+            device_signing_public_key,
             timestamp,
         }
     }
@@ -53,6 +58,7 @@ impl DeviceLinkRequest {
         data.extend_from_slice(&name_len);
         data.extend_from_slice(name_bytes);
         data.extend_from_slice(&self.nonce);
+        data.extend_from_slice(&self.device_signing_public_key);
         data.extend_from_slice(&self.timestamp.to_le_bytes());
         data
     }
@@ -65,11 +71,13 @@ impl DeviceLinkRequest {
         let device_name = String::from_utf8(reader.prefixed().ok_or_else(invalid)?.to_vec())
             .map_err(|_| invalid())?;
         let nonce: [u8; 32] = reader.array().ok_or_else(invalid)?;
+        let device_signing_public_key: [u8; 32] = reader.array().ok_or_else(invalid)?;
         let timestamp = u64::from_le_bytes(reader.array().ok_or_else(invalid)?);
 
         Ok(DeviceLinkRequest {
             device_name,
             nonce,
+            device_signing_public_key,
             timestamp,
         })
     }

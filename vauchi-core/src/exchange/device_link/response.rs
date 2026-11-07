@@ -16,7 +16,7 @@
 )]
 
 use crate::byte_reader::ByteReader;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::crypto::{SymmetricKey, decrypt, encrypt};
 use crate::identity::DeviceRegistry;
@@ -46,6 +46,9 @@ pub struct DeviceLinkResponse {
     /// Sync payload containing contacts, own card, owner-private tags/places,
     /// exchange locations, and ratchet states (optional, may be empty).
     sync_payload_json: String,
+    /// The joining device's own signing key, set on that device and never on
+    /// the wire.
+    device_signing_seed: Option<Zeroizing<[u8; 32]>>,
 }
 
 impl DeviceLinkResponse {
@@ -65,6 +68,7 @@ impl DeviceLinkResponse {
             device_index,
             registry,
             sync_payload_json: String::new(),
+            device_signing_seed: None,
         }
     }
 
@@ -82,7 +86,18 @@ impl DeviceLinkResponse {
             device_index,
             registry,
             sync_payload_json,
+            device_signing_seed: None,
         }
+    }
+
+    pub(super) fn set_device_signing_seed(&mut self, seed: Zeroizing<[u8; 32]>) {
+        self.device_signing_seed = Some(seed);
+    }
+
+    /// The joining device's own signing key, from the responder that checked
+    /// the registry names it. `None` on a response that did not come through one.
+    pub fn device_signing_seed(&self) -> Option<&Zeroizing<[u8; 32]>> {
+        self.device_signing_seed.as_ref()
     }
 
     /// Returns the master seed.
@@ -161,6 +176,7 @@ impl DeviceLinkResponse {
             device_index,
             registry,
             sync_payload_json,
+            device_signing_seed: None,
         })
     }
 

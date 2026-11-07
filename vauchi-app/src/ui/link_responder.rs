@@ -153,7 +153,7 @@ impl LinkResponderEngine {
                     validation_error: self
                         .code_invalid
                         .then(|| self.t("link_responder.code_invalid")),
-                    input_type: InputType::Text,
+                    input_type: InputType::Number,
                     a11y: None,
                     info_key: None,
                 },

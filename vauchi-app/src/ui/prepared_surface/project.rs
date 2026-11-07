@@ -270,6 +270,7 @@ fn input_kind(input_type: &InputType) -> PresentationInputKind {
         InputType::Phone => PresentationInputKind::Phone,
         InputType::Email => PresentationInputKind::Email,
         InputType::Password => PresentationInputKind::Password,
+        InputType::Number => PresentationInputKind::Number,
     }
 }
 

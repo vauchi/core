@@ -82,4 +82,13 @@ else
     fail "$job must compare the vectors fixture with the spec's copy, exit 3 on a difference, and allow exit code 3"
 fi
 
+# A pending name reaching Core main is the spec's list to update, and no Core
+# change can fix it, so it must not fail Core (private#1113). Spec's own CI
+# keeps the ratchet: it checks against Core main on MRs, main and nightly.
+if printf '%s\n' "$block" | grep -q '^    - export CLAIM_NAMES_SOURCES_MAY_LAND=1$'; then
+    echo "PASS: $job leaves the pending-list ratchet to the spec's CI, on every pipeline"
+else
+    fail "$job must set CLAIM_NAMES_SOURCES_MAY_LAND=1 on every pipeline, not only on MRs"
+fi
+
 [ "$failures" -eq 0 ]

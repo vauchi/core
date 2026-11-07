@@ -139,6 +139,42 @@ fn scanner_queues_initial_push_that_the_peer_can_open() {
     }
 }
 
+// @internal
+#[test]
+fn a_pushed_registry_names_the_senders_device_signing_key() {
+    let (alice_wb, bob_wb, bob_contact_id, _) = setup_two_party();
+    bob_wb.queue_registry_pushes().unwrap();
+    let pending = bob_wb
+        .storage()
+        .pending()
+        .get_all_pending_updates()
+        .unwrap();
+
+    process_single_card_update(
+        alice_wb.identity().unwrap(),
+        alice_wb.storage(),
+        &bob_contact_id,
+        &pending[0].payload,
+    )
+    .unwrap();
+
+    let received = alice_wb
+        .storage()
+        .device()
+        .load_contact_device_registry(&bob_contact_id)
+        .unwrap()
+        .unwrap();
+    let bob_key = bob_wb
+        .storage()
+        .device()
+        .load_or_create_device_signing_key()
+        .unwrap();
+    assert_eq!(
+        received.active_devices()[0].signing_public_key,
+        Some(*bob_key.public_key().as_bytes())
+    );
+}
+
 // @scenario: multi_device_sync :: The bootstrap push is a single identity-mailbox cold-start
 // @internal
 #[test]

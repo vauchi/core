@@ -9,8 +9,8 @@
 use vauchi_core::Vauchi;
 use vauchi_core::crypto::SigningKeyPair;
 use vauchi_core::exchange::{
-    DeviceLinkInitiator, DeviceLinkQR, DeviceLinkRequest, DeviceLinkResponder, DeviceLinkResponse,
-    ExchangeError, ProximityProof,
+    DeviceLinkInitiator, DeviceLinkInitiatorRestored, DeviceLinkQR, DeviceLinkRequest,
+    DeviceLinkResponder, DeviceLinkResponse, ExchangeError, ProximityProof,
 };
 use vauchi_core::identity::{DeviceInfo, DeviceRegistry, Identity};
 
@@ -392,5 +392,82 @@ fn a_link_started_on_a_first_device_offers_its_key() {
     assert_eq!(
         registry.find_device(&device_id).unwrap().signing_public_key,
         Some(public_key_of_stored_key(&wb))
+    );
+}
+
+const ZERO_KEY: [u8; 32] = [0u8; 32];
+
+fn restored_initiator(host: &Host) -> DeviceLinkInitiatorRestored {
+    let qr = DeviceLinkQR::from_data_string(&host.initiator.qr().to_data_string()).unwrap();
+    DeviceLinkInitiatorRestored::new(SEED, &host.identity, host.registry.clone(), qr)
+}
+
+// @internal
+#[test]
+fn a_bad_key_is_refused_before_the_user_is_asked_to_confirm() {
+    let host = host();
+    let restored = restored_initiator(&host);
+    let request = request_naming(&host.initiator, ZERO_KEY);
+
+    assert!(matches!(
+        host.initiator.prepare_confirmation(&request),
+        Err(ExchangeError::DeviceKeyRefused)
+    ));
+    assert!(matches!(
+        restored.prepare_confirmation(&request),
+        Err(ExchangeError::DeviceKeyRefused)
+    ));
+}
+
+// @internal
+#[test]
+fn a_key_changed_after_confirmation_is_refused() {
+    let host = host();
+    let restored = restored_initiator(&host);
+    let usable = *SigningKeyPair::from_seed(&[0x0d; 32])
+        .public_key()
+        .as_bytes();
+    let encrypted = request_naming(&host.initiator, usable);
+    let link_key = *host.initiator.qr().link_key();
+
+    let (confirmation, mut request) = host.initiator.prepare_confirmation(&encrypted).unwrap();
+    request.device_signing_public_key = ZERO_KEY;
+    let proof =
+        ProximityProof::manual_confirmation(&link_key, &confirmation.confirmation_code, now());
+
+    assert!(matches!(
+        host.initiator.confirm_link(&request, &proof, now()),
+        Err(ExchangeError::DeviceKeyRefused)
+    ));
+    assert!(matches!(
+        restored.confirm_link(&request, &proof, now()),
+        Err(ExchangeError::DeviceKeyRefused)
+    ));
+}
+
+// @internal
+#[test]
+fn a_restored_host_names_the_joiners_key() {
+    let host = host();
+    let restored = restored_initiator(&host);
+    let key = *SigningKeyPair::from_seed(&[0x0e; 32])
+        .public_key()
+        .as_bytes();
+    let encrypted = request_naming(&host.initiator, key);
+    let (confirmation, request) = restored.prepare_confirmation(&encrypted).unwrap();
+    let proof = ProximityProof::manual_confirmation(
+        host.initiator.qr().link_key(),
+        &confirmation.confirmation_code,
+        now(),
+    );
+
+    let (_, registry, new_device) = restored.confirm_link(&request, &proof, now()).unwrap();
+
+    assert_eq!(
+        registry
+            .find_device(new_device.device_id())
+            .unwrap()
+            .signing_public_key,
+        Some(key)
     );
 }

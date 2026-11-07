@@ -18,7 +18,9 @@ use vauchi_core::{Command, Event};
 
 use super::{AppEngine, AppScreen};
 use crate::orchestrator::recovery_receiver::{ReceiveState, RecoveryTransferReceiver};
-use crate::orchestrator::recovery_transfer::{RecoveryTransferSender, TransferState};
+use crate::orchestrator::recovery_transfer::{
+    RecoveryTransferSender, TransferState, is_ble_failure,
+};
 use crate::ui::{ActionResult, EngineUpdate, HandBackTransfer, RecoveryHelpUpdate, RecoveryUpdate};
 
 const LINK_WAIT_SECS: u32 = 120;
@@ -56,15 +58,6 @@ pub(super) enum RecoveryLink {
         deadline: u64,
     },
     Receiving(RecoveryTransferReceiver),
-}
-
-fn is_ble_failure(event: &Event) -> bool {
-    matches!(
-        event,
-        Event::HardwareError { transport, .. }
-        | Event::HardwareUnavailable { transport }
-        | Event::PermissionDenied { transport } if transport == "BLE"
-    )
 }
 
 impl AppEngine {

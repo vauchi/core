@@ -17,6 +17,16 @@ use vauchi_core::sync::guardian_piece::GuardianBackupPiece;
 use vauchi_core::sync::guardian_transfer::{HandBackSender, TransferError};
 use vauchi_core::{Command, Event};
 
+/// Case-insensitive because shells differ: Android reports `ble`, iOS `BLE`.
+pub(crate) fn is_ble_failure(event: &Event) -> bool {
+    matches!(
+        event,
+        Event::HardwareError { transport, .. }
+        | Event::HardwareUnavailable { transport }
+        | Event::PermissionDenied { transport } if transport.eq_ignore_ascii_case("ble")
+    )
+}
+
 const ACK_TIMEOUT_SECS: u32 = 5;
 const MAX_RETRIES: u8 = 3;
 
@@ -197,10 +207,7 @@ impl RecoveryTransferSender {
                 direction,
                 ..
             } => self.names_this_link(device_id, *direction),
-            Event::HardwareError { transport, .. }
-            | Event::HardwareUnavailable { transport }
-            | Event::PermissionDenied { transport } => transport == "BLE",
-            _ => false,
+            other => is_ble_failure(other),
         }
     }
 

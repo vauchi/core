@@ -5,6 +5,7 @@
 //! The native owner captures the handle at link creation and executes teardown.
 //! This orchestrator does not establish native links or restore an identity.
 
+use super::recovery_transfer::is_ble_failure;
 use std::num::NonZeroUsize;
 use vauchi_core::exchange::{CHAR_DATA_NOTIFY, CHAR_DATA_WRITE};
 use vauchi_core::platform::BleLinkDirection;
@@ -138,11 +139,7 @@ impl RecoveryTransferReceiver {
                 } if device_id == &self.peer && direction == &self.direction => {
                     return self.finish(ReceiveState::Failed);
                 }
-                Event::HardwareError { transport, .. }
-                | Event::HardwareUnavailable { transport }
-                | Event::PermissionDenied { transport }
-                    if transport == "BLE" =>
-                {
+                failure if is_ble_failure(failure) => {
                     return self.finish(ReceiveState::Failed);
                 }
                 _ => continue,

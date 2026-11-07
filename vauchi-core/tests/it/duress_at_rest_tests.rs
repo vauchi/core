@@ -88,15 +88,16 @@ fn identity_rows_with_and_without_a_duress_pin_are_indistinguishable_without_the
         row_shapes(&without.path, "identity"),
         "the identity row tells a duress PIN apart"
     );
+    // The own-card copy and the mask seed are inside the sealed row
+    // (ADR-080), so its size says nothing either.
     assert_eq!(
-        row_shapes(&with.path, "duress_own_card"),
-        row_shapes(&without.path, "duress_own_card"),
-        "the duress own-card row tells a duress PIN apart"
+        row_shapes(&with.path, "duress_content"),
+        row_shapes(&without.path, "duress_content"),
+        "the sealed duress row tells a duress PIN apart"
     );
     assert_eq!(
-        row_shapes(&without.path, "duress_own_card").len(),
-        1,
-        "every identity with an app password has the duress own-card row"
+        row_shapes(&without.path, "duress_own_card"),
+        Vec::<String>::new()
     );
 }
 
@@ -111,7 +112,7 @@ fn a_duress_session_leaves_the_rows_shaped_as_without_a_duress_pin() {
         vauchi.own_card().unwrap();
     }
 
-    for table in ["identity", "duress_own_card"] {
+    for table in ["identity", "duress_content"] {
         assert_eq!(
             row_shapes(&with.path, table),
             row_shapes(&without.path, table),
@@ -135,7 +136,7 @@ fn disabling_the_duress_pin_leaves_the_rows_shaped_as_without_one() {
         );
     }
 
-    for table in ["identity", "duress_own_card"] {
+    for table in ["identity", "duress_content"] {
         assert_eq!(
             row_shapes(&with.path, table),
             row_shapes(&without.path, table),
@@ -188,7 +189,7 @@ fn a_database_from_before_v93_is_sealed_and_keeps_its_duress_pin() {
     assert_eq!(vauchi.authenticate(APP_PASSWORD).unwrap(), AuthMode::Normal);
     drop(vauchi);
 
-    for table in ["identity", "duress_own_card"] {
+    for table in ["identity", "duress_content"] {
         assert_eq!(
             row_shapes(&legacy_with.path, table),
             row_shapes(&without.path, table),

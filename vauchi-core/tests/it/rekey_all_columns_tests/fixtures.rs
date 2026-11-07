@@ -56,6 +56,17 @@ pub(super) fn fixtures() -> Vec<(&'static str, &'static str, &'static [u8])> {
             b"{\"name\":\"Alicia\"}",
         ),
         (
+            "duress_emergency_config",
+            "trusted_contact_ids_encrypted",
+            b"[\"decoy-1\"]",
+        ),
+        (
+            "duress_emergency_config",
+            "message_encrypted",
+            b"decoy-emergency-msg",
+        ),
+        ("mask_seed", "seed_encrypted", &[0x5a; 32]),
+        (
             "device_registry",
             "registry_json_encrypted",
             b"{\"devices\":[]}",

@@ -202,14 +202,6 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     )
     .unwrap();
 
-    // ── duress_own_card (singleton; the duress session's copy, #811) ──
-    conn.execute(
-        "INSERT OR REPLACE INTO duress_own_card (id, card_json, card_json_encrypted, updated_at) \
-         VALUES (1, '', ?1, ?2)",
-        params![enc("duress_own_card", "card_json_encrypted"), now],
-    )
-    .unwrap();
-
     // ── device_registry (singleton) ───────────────────────────
     conn.execute(
         "INSERT OR REPLACE INTO device_registry \
@@ -471,6 +463,32 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
             params![enc("duress_places", "data_encrypted"), now],
         )
         .unwrap();
+    // The mask profile's own card, emergency config and seed (ADR-080).
+    duress
+        .execute(
+            "INSERT OR REPLACE INTO duress_own_card \
+             (id, card_json, card_json_encrypted, updated_at) VALUES (1, '', ?1, ?2)",
+            params![enc("duress_own_card", "card_json_encrypted"), now],
+        )
+        .unwrap();
+    duress
+        .execute(
+            "INSERT INTO duress_emergency_config \
+             (id, trusted_contact_ids_encrypted, message_encrypted, created_at, updated_at) \
+             VALUES (1, ?1, ?2, ?3, ?3)",
+            params![
+                enc("duress_emergency_config", "trusted_contact_ids_encrypted"),
+                enc("duress_emergency_config", "message_encrypted"),
+                now
+            ],
+        )
+        .unwrap();
+    duress
+        .execute(
+            "INSERT OR REPLACE INTO mask_seed (id, seed_encrypted) VALUES (1, ?1)",
+            params![enc("mask_seed", "seed_encrypted")],
+        )
+        .unwrap();
 
     let enc = |table: &str, column: &str| -> Vec<u8> { encrypt(key, &fx(table, column)).unwrap() };
 
@@ -554,12 +572,15 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
 
 #[allow(clippy::too_many_lines)]
 /// The duress tables live in the sealed duress database (vauchi/private#1003).
-const DURESS_TABLES: [&str; 5] = [
+const DURESS_TABLES: [&str; 8] = [
     "decoy_contacts",
     "duress_tags",
     "duress_places",
     "duress_visibility_labels",
     "duress_contact_visibility_overrides",
+    "duress_own_card",
+    "duress_emergency_config",
+    "mask_seed",
 ];
 
 fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
@@ -642,6 +663,11 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
     );
     check_one("duress_tags", "name_encrypted", "id = 'dt1'", id_eq_1);
     check_one("duress_places", "data_encrypted", "id = 'dp1'", id_eq_1);
+    check_one("duress_own_card", "card_json_encrypted", "id = 1", id_eq_1);
+    for col in ["trusted_contact_ids_encrypted", "message_encrypted"] {
+        check_one("duress_emergency_config", col, "id = 1", id_eq_1);
+    }
+    check_one("mask_seed", "seed_encrypted", "id = 1", id_eq_1);
 
     // ── identity (3 columns, singleton) ─────────────────────
     for col in [

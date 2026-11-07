@@ -92,6 +92,46 @@ include:
   - local: ci/internal-dev-bindings.yml
   - local: ci/journey-fixtures.yml
 
+# rust-base.yml cancels every job once one fails (on_job_failure: all).
+# Neither interruptible: false (core!2251) nor a child pipeline (core!2252)
+# exempts a job, so a pipeline that runs test:formal-models turns
+# fail-fast off: a merge request changing the models, the nightly and
+# release tags (vauchi/private#1115). A rules list replaces the
+# template's, so the other rules repeat rust-base.yml's at the pinned ref;
+# check:formal-triggers holds the first rule's paths to the job's.
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - vauchi-core/verification/**/*
+          - vauchi-app/verification/**/*
+          - ci/formal-verification.sh
+      auto_cancel:
+        on_job_failure: none
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"
+      when: never
+    # main's merge guard (VCI05) stays: a merge must not cancel the
+    # pipeline that ends in the release tag.
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "schedule"
+      auto_cancel:
+        on_new_commit: none
+        on_job_failure: none
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      auto_cancel:
+        on_new_commit: none
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+      auto_cancel:
+        on_job_failure: none
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "pipeline"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+    - if: $CI_PIPELINE_SOURCE == "api"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+
 # Temporary containment for the allyson compiler stall (vauchi/private#198).
 # A tiny compile probe passed while real dependency compilation still hung.
 .self-hosted:

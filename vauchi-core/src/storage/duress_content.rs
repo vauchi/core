@@ -206,8 +206,11 @@ fn table_columns(conn: &Connection, table: &str) -> Result<Vec<String>, StorageE
     Ok(columns)
 }
 
-/// `Enc_mask(len || dump || zeros)`, padded to a bucket; `key` is the SEK.
-pub(super) fn seal(key: &SymmetricKey, duress_db: &Connection) -> Result<Vec<u8>, StorageError> {
+/// `Enc_mask(len || dump || zeros)`, padded to a bucket.
+pub(super) fn seal(
+    mask_key: &SymmetricKey,
+    duress_db: &Connection,
+) -> Result<Vec<u8>, StorageError> {
     let body = dump(duress_db)?;
     let len = u32::try_from(body.len())
         .map_err(|_| StorageError::Serialization("duress content over 4 GiB".into()))?;
@@ -215,17 +218,16 @@ pub(super) fn seal(key: &SymmetricKey, duress_db: &Connection) -> Result<Vec<u8>
     framed.extend_from_slice(&len.to_le_bytes());
     framed.extend_from_slice(&body);
     framed.resize(bucket_for(framed.len()), 0);
-    encrypt(&mask_key(key), &framed).map_err(|e| StorageError::Encryption(e.to_string()))
+    encrypt(mask_key, &framed).map_err(|e| StorageError::Encryption(e.to_string()))
 }
 
 /// Opens `sealed` and loads its rows into `duress_db`.
 pub(super) fn unseal_into(
-    key: &SymmetricKey,
+    mask_key: &SymmetricKey,
     sealed: &[u8],
     duress_db: &Connection,
 ) -> Result<(), StorageError> {
-    let framed =
-        decrypt(&mask_key(key), sealed).map_err(|e| StorageError::Encryption(e.to_string()))?;
+    let framed = decrypt(mask_key, sealed).map_err(|e| StorageError::Encryption(e.to_string()))?;
     let (prefix, rest) = framed.split_first_chunk::<LENGTH_PREFIX>().ok_or_else(|| {
         StorageError::Serialization("duress content shorter than its length".into())
     })?;
@@ -241,12 +243,12 @@ pub(super) fn unseal_into(
 pub(crate) fn write_sealed(
     conn: &Connection,
     duress_db: &Connection,
-    key: &SymmetricKey,
+    mask_key: &SymmetricKey,
 ) -> Result<(), StorageError> {
     conn.execute(
         "INSERT INTO duress_content (id, content_encrypted) VALUES (1, ?1)
          ON CONFLICT(id) DO UPDATE SET content_encrypted = excluded.content_encrypted",
-        [seal(key, duress_db)?],
+        [seal(mask_key, duress_db)?],
     )?;
     Ok(())
 }
@@ -265,7 +267,7 @@ impl<'a> SealOnDrop<'a> {
         SealOnDrop {
             conn: &storage.conn,
             duress_db: &storage.duress_db,
-            key: &storage.encryption_key,
+            key: &storage.mask_key,
             changes_before: std::cell::Cell::new(storage.duress_db.total_changes()),
         }
     }
@@ -305,9 +307,35 @@ impl Storage {
             Err(rusqlite::Error::QueryReturnedNoRows) => None,
             Err(e) => return Err(e.into()),
         };
-        match sealed {
-            Some(sealed) => unseal_into(&self.encryption_key, &sealed, &self.duress_db),
-            None => write_sealed(&self.conn, &self.duress_db, &self.encryption_key),
+        let Some(sealed) = sealed else {
+            return write_sealed(&self.conn, &self.duress_db, &self.mask_key);
+        };
+        let Err(under_mask_key) = unseal_into(&self.mask_key, &sealed, &self.duress_db) else {
+            return Ok(());
+        };
+        if unseal_into(&self.encryption_key, &sealed, &self.duress_db).is_err() {
+            return Err(under_mask_key);
+        }
+        self.move_duress_content_to_mask_key()
+    }
+
+    /// A seal that opens under the SEK and not the mask key was written
+    /// before the mask key (ADR-080): its fields move to the mask key and it
+    /// is sealed again. A seal that opens under neither is refused above.
+    fn move_duress_content_to_mask_key(&self) -> Result<(), StorageError> {
+        self.duress_db.execute_batch("BEGIN")?;
+        let moved = self
+            .rekey_duress_tables(&self.encryption_key, &self.mask_key)
+            .and_then(|()| write_sealed(&self.conn, &self.duress_db, &self.mask_key));
+        match moved {
+            Ok(()) => Ok(self.duress_db.execute_batch("COMMIT")?),
+            Err(e) => {
+                // best-effort: the seal in the file was not replaced, so the
+                // next open moves it again from the same state
+                #[allow(clippy::let_underscore_must_use)]
+                let _ = self.duress_db.execute_batch("ROLLBACK");
+                Err(e)
+            }
         }
     }
 }

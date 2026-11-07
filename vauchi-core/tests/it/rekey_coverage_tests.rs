@@ -166,14 +166,24 @@ fn test_rekey_preserves_password_hash() {
     assert_eq!(plain, b"argon2id-hash-placeholder");
 }
 
+/// The key the duress tables' fields are under (ADR-080, vauchi/private#1117).
+fn duress_mask_key(storage_key: &SymmetricKey) -> SymmetricKey {
+    SymmetricKey::from_bytes(*vauchi_core::crypto::HKDF::derive_key(
+        None,
+        storage_key.as_bytes(),
+        b"Vauchi_Duress_Mask_Key_v1",
+    ))
+}
+
 // @scenario: security :: Rekey preserves decoy_contacts
 #[test]
 fn test_rekey_preserves_decoy_contacts() {
     let (_dir, mut storage) = open_storage();
     let key1 = storage.key().clone();
+    let mask1 = duress_mask_key(&key1);
 
-    let card_enc = vauchi_core::crypto::encrypt(&key1, b"{\"name\":\"Decoy\"}").unwrap();
-    let name_enc = vauchi_core::crypto::encrypt(&key1, b"Decoy").unwrap();
+    let card_enc = vauchi_core::crypto::encrypt(&mask1, b"{\"name\":\"Decoy\"}").unwrap();
+    let name_enc = vauchi_core::crypto::encrypt(&mask1, b"Decoy").unwrap();
     storage.duress_connection().execute(
         "INSERT INTO decoy_contacts (id, display_name_encrypted, card_encrypted, created_at, updated_at) VALUES ('d1', ?1, ?2, 1000, 1000)",
         [&name_enc, &card_enc],
@@ -191,7 +201,7 @@ fn test_rekey_preserves_decoy_contacts() {
         )
         .unwrap();
     assert_eq!(
-        vauchi_core::crypto::decrypt(&key2, &loaded).unwrap(),
+        vauchi_core::crypto::decrypt(&duress_mask_key(&key2), &loaded).unwrap(),
         b"{\"name\":\"Decoy\"}"
     );
     let loaded_name: Vec<u8> = storage
@@ -203,7 +213,7 @@ fn test_rekey_preserves_decoy_contacts() {
         )
         .unwrap();
     assert_eq!(
-        vauchi_core::crypto::decrypt(&key2, &loaded_name).unwrap(),
+        vauchi_core::crypto::decrypt(&duress_mask_key(&key2), &loaded_name).unwrap(),
         b"Decoy"
     );
 }

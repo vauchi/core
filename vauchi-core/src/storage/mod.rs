@@ -95,6 +95,9 @@ pub struct Storage {
     duress_db: Connection,
     /// Encryption key derived from user's master key
     encryption_key: SymmetricKey,
+    /// The key the duress content and its fields are under, derived from
+    /// `encryption_key` (ADR-080, `duress_content::mask_key`).
+    mask_key: SymmetricKey,
     /// Database file path (None for in-memory databases).
     db_path: Option<std::path::PathBuf>,
     /// Explicit-time seam for the storage subsystem (Phase 1 /

@@ -48,6 +48,7 @@ impl Storage {
         let storage = Storage {
             conn,
             duress_db: duress_content::open_duress_db()?,
+            mask_key: duress_content::mask_key(&encryption_key),
             encryption_key,
             db_path: Some(path_buf),
             clock: crate::clock::SystemClock::shared(),
@@ -79,6 +80,7 @@ impl Storage {
         let storage = Storage {
             conn,
             duress_db: duress_content::open_duress_db()?,
+            mask_key: duress_content::mask_key(&encryption_key),
             encryption_key,
             db_path: None,
             clock: crate::clock::SystemClock::shared(),

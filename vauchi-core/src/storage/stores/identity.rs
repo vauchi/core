@@ -19,6 +19,7 @@ pub struct IdentityStore<'a> {
     conn: &'a Connection,
     duress_conn: &'a Connection,
     key: &'a SymmetricKey,
+    mask_key: &'a SymmetricKey,
     clock: &'a Arc<dyn Clock>,
 }
 
@@ -29,6 +30,7 @@ impl Storage {
             conn: &self.conn,
             duress_conn: self.duress_conn(),
             key: &self.encryption_key,
+            mask_key: &self.mask_key,
             clock: &self.clock,
         }
     }
@@ -203,7 +205,7 @@ impl IdentityStore<'_> {
             self.duress_conn
                 .execute(&format!("DELETE FROM {table}"), [])?;
         }
-        crate::storage::duress_content::write_sealed(self.conn, self.duress_conn, self.key)?;
+        crate::storage::duress_content::write_sealed(self.conn, self.duress_conn, self.mask_key)?;
 
         Ok(())
     }

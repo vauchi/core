@@ -36,13 +36,14 @@ pub struct PlaceStore<'a> {
 impl Storage {
     /// Scoped persistence view for the place domain.
     pub fn places(&self) -> PlaceStore<'_> {
-        self.places_in(&self.conn, "places", None)
+        self.places_in(&self.conn, &self.encryption_key, "places", None)
     }
 
     /// The duress session's places, persistent and never the real ones.
     pub fn duress_places(&self) -> PlaceStore<'_> {
         self.places_in(
             self.duress_conn(),
+            &self.mask_key,
             "duress_places",
             Some(SealOnDrop::new(self)),
         )
@@ -51,12 +52,13 @@ impl Storage {
     fn places_in<'a>(
         &'a self,
         conn: &'a Connection,
+        key: &'a SymmetricKey,
         table: &'static str,
         seal: Option<SealOnDrop<'a>>,
     ) -> PlaceStore<'a> {
         PlaceStore {
             conn,
-            key: &self.encryption_key,
+            key,
             clock: &self.clock,
             table,
             seal,

@@ -71,6 +71,7 @@ impl Storage {
     pub fn labels(&self) -> LabelStore<'_> {
         self.labels_in(
             &self.conn,
+            &self.encryption_key,
             "visibility_labels",
             "contact_visibility_overrides",
             None,
@@ -82,6 +83,7 @@ impl Storage {
     pub fn duress_labels(&self) -> LabelStore<'_> {
         self.labels_in(
             self.duress_conn(),
+            &self.mask_key,
             "duress_visibility_labels",
             "duress_contact_visibility_overrides",
             Some(SealOnDrop::new(self)),
@@ -91,13 +93,14 @@ impl Storage {
     fn labels_in<'a>(
         &'a self,
         conn: &'a Connection,
+        key: &'a SymmetricKey,
         labels_table: &'static str,
         overrides_table: &'static str,
         seal: Option<SealOnDrop<'a>>,
     ) -> LabelStore<'a> {
         LabelStore {
             conn,
-            key: &self.encryption_key,
+            key,
             clock: &self.clock,
             labels_table,
             overrides_table,

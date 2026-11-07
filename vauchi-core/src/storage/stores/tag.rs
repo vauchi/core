@@ -36,13 +36,14 @@ pub struct TagStore<'a> {
 impl Storage {
     /// Scoped persistence view for the tag domain.
     pub fn tags(&self) -> TagStore<'_> {
-        self.tags_in(&self.conn, "tags", None)
+        self.tags_in(&self.conn, &self.encryption_key, "tags", None)
     }
 
     /// The duress session's tags, persistent and never the real ones.
     pub fn duress_tags(&self) -> TagStore<'_> {
         self.tags_in(
             self.duress_conn(),
+            &self.mask_key,
             "duress_tags",
             Some(SealOnDrop::new(self)),
         )
@@ -51,12 +52,13 @@ impl Storage {
     fn tags_in<'a>(
         &'a self,
         conn: &'a Connection,
+        key: &'a SymmetricKey,
         table: &'static str,
         seal: Option<SealOnDrop<'a>>,
     ) -> TagStore<'a> {
         TagStore {
             conn,
-            key: &self.encryption_key,
+            key,
             clock: &self.clock,
             table,
             seal,

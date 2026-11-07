@@ -30,7 +30,7 @@ impl Storage {
     pub fn decoy(&self) -> DecoyStore<'_> {
         DecoyStore {
             conn: self.duress_conn(),
-            key: &self.encryption_key,
+            key: &self.mask_key,
             clock: &self.clock,
             seal: Some(SealOnDrop::new(self)),
         }

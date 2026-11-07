@@ -290,6 +290,16 @@ const LABEL_ID: &str = "l1";
 const DURESS_LABEL_ID: &str = "dl1";
 
 #[allow(clippy::too_many_lines)]
+/// The key the duress tables' fields are under, derived from the storage key
+/// (ADR-080, vauchi/private#1117).
+fn mask_key(storage_key: &SymmetricKey) -> SymmetricKey {
+    SymmetricKey::from_bytes(*vauchi_core::crypto::HKDF::derive_key(
+        None,
+        storage_key.as_bytes(),
+        b"Vauchi_Duress_Mask_Key_v1",
+    ))
+}
+
 fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     let conn = storage.connection();
     let now = 1_700_000_000i64;
@@ -651,7 +661,10 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     )
     .unwrap();
 
-    // ── the duress twins (vauchi/private#813) ───────────────────
+    // ── the duress twins (vauchi/private#813), under the mask key ───────
+    let mask = mask_key(key);
+    let enc =
+        |table: &str, column: &str| -> Vec<u8> { encrypt(&mask, &fx(table, column)).unwrap() };
     let duress_label_name_plain = fx("duress_visibility_labels", "name_encrypted");
     let duress = storage.duress_connection();
     duress
@@ -666,7 +679,7 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
                 enc("duress_visibility_labels", "contacts_json_encrypted"),
                 enc("duress_visibility_labels", "visible_fields_json_encrypted"),
                 enc("duress_visibility_labels", "name_encrypted"),
-                label_hmac(key, &duress_label_name_plain),
+                label_hmac(&mask, &duress_label_name_plain),
                 enc(
                     "duress_visibility_labels",
                     "display_name_override_encrypted"
@@ -691,6 +704,8 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
         )
         .unwrap();
 
+    let enc = |table: &str, column: &str| -> Vec<u8> { encrypt(key, &fx(table, column)).unwrap() };
+
     // ── audit_log ────────────────────────────────────────────
     conn.execute(
         "INSERT INTO audit_log (event_type, details, details_encrypted, timestamp) \
@@ -699,15 +714,17 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     )
     .unwrap();
 
-    // ── decoy_contacts ───────────────────────────────────────
+    // ── decoy_contacts, under the mask key ──────────────────
+    let enc_mask =
+        |table: &str, column: &str| -> Vec<u8> { encrypt(&mask, &fx(table, column)).unwrap() };
     duress
         .execute(
             "INSERT INTO decoy_contacts \
          (id, display_name_encrypted, card_encrypted, created_at, updated_at) \
          VALUES ('d1', ?1, ?2, ?3, ?4)",
             params![
-                enc("decoy_contacts", "display_name_encrypted"),
-                enc("decoy_contacts", "card_encrypted"),
+                enc_mask("decoy_contacts", "display_name_encrypted"),
+                enc_mask("decoy_contacts", "card_encrypted"),
                 now,
                 now
             ],
@@ -787,13 +804,19 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
         }
     };
 
+    let new_mask_key = mask_key(new_key);
     let check_one =
         |table: &str, column: &str, where_clause: &str, params_: &[&dyn rusqlite::ToSql]| {
             let sql = format!("SELECT {} FROM {} WHERE {}", column, table, where_clause);
             let blob: Vec<u8> = conn_for(table)
                 .query_row(&sql, params_, |row| row.get(0))
                 .unwrap_or_else(|e| panic!("read {}.{}: {}", table, column, e));
-            let plain = decrypt(new_key, &blob)
+            let table_key = if DURESS_TABLES.contains(&table) {
+                &new_mask_key
+            } else {
+                new_key
+            };
+            let plain = decrypt(table_key, &blob)
                 .unwrap_or_else(|e| panic!("decrypt {}.{} with new key: {}", table, column, e));
             assert_eq!(plain, fx(table, column), "{}.{} plaintext", table, column);
         };
@@ -843,7 +866,10 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
         .unwrap();
     assert_eq!(
         duress_hmac,
-        label_hmac(new_key, &fx("duress_visibility_labels", "name_encrypted")),
+        label_hmac(
+            &new_mask_key,
+            &fx("duress_visibility_labels", "name_encrypted")
+        ),
         "duress label hmac rekeyed"
     );
     check_one("duress_tags", "name_encrypted", "id = 'dt1'", id_eq_1);

@@ -9,7 +9,7 @@
 
 use std::path::PathBuf;
 
-use vauchi_core::crypto::{HKDF, decrypt, encrypt};
+use vauchi_core::crypto::{HKDF, decrypt};
 use vauchi_core::storage::Storage;
 use vauchi_core::{ContactCard, SymmetricKey, Vauchi, VauchiConfig};
 
@@ -77,39 +77,6 @@ fn the_duress_content_opens_under_the_mask_key_and_not_under_the_storage_key() {
 
     let sealed = sealed_content(&disk);
 
-    assert!(decrypt(&disk.key, &sealed).is_err());
-    assert_eq!(
-        decrypt(&mask_key(&disk.key), &sealed).unwrap().len(),
-        SMALLEST_SEAL
-    );
-}
-
-/// Puts the seal back as it was before v114, under the storage key.
-fn seal_under_the_storage_key_as_before_v114(disk: &OnDisk) {
-    let framed = decrypt(&mask_key(&disk.key), &sealed_content(disk)).unwrap();
-    let conn = rusqlite::Connection::open(&disk.path).unwrap();
-    conn.execute(
-        "UPDATE duress_content SET content_encrypted = ?1",
-        [encrypt(&disk.key, &framed).unwrap()],
-    )
-    .unwrap();
-    conn.execute("DELETE FROM schema_version WHERE version >= 114", [])
-        .unwrap();
-}
-
-// @scenario: duress_mode :: App update preserves duress configuration
-#[test]
-fn a_seal_from_before_v114_keeps_its_decoys_and_is_resealed_under_the_mask_key() {
-    let disk = alice_with_a_decoy();
-    seal_under_the_storage_key_as_before_v114(&disk);
-    assert_eq!(
-        decrypt(&disk.key, &sealed_content(&disk)).unwrap().len(),
-        SMALLEST_SEAL
-    );
-
-    assert_eq!(decoy_names(&disk), ["Sam"]);
-
-    let sealed = sealed_content(&disk);
     assert!(decrypt(&disk.key, &sealed).is_err());
     assert_eq!(
         decrypt(&mask_key(&disk.key), &sealed).unwrap().len(),

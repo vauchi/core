@@ -16,6 +16,7 @@ use rusqlite::{Connection, params};
 
 use super::duress_content::DURESS_TABLES;
 use super::{Storage, StorageError};
+use crate::crypto::SymmetricKey;
 
 /// How a move treats a column that names a contact without a foreign key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -160,7 +161,7 @@ impl Storage {
             return Err(error.into());
         }
         let moved = operation().and_then(|()| {
-            super::duress_content::write_sealed(&self.conn, &self.duress_db, &self.encryption_key)
+            super::duress_content::write_sealed(&self.conn, &self.duress_db, &self.mask_key)
         });
         match moved {
             Ok(()) => {
@@ -309,7 +310,7 @@ impl Storage {
         for (rowid, stored) in rows {
             let Some(stored) = stored else { continue };
             let json = if encrypted {
-                crate::crypto::decrypt(&self.encryption_key, &stored)
+                crate::crypto::decrypt(self.table_key_for_move(table), &stored)
                     .map_err(|e| StorageError::Encryption(e.to_string()))?
             } else {
                 stored
@@ -324,7 +325,7 @@ impl Storage {
             let json =
                 serde_json::to_vec(&ids).map_err(|e| StorageError::Serialization(e.to_string()))?;
             if encrypted {
-                let sealed = crate::crypto::encrypt(&self.encryption_key, &json)
+                let sealed = crate::crypto::encrypt(self.table_key_for_move(table), &json)
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 conn.execute(
                     &format!("UPDATE {table} SET {column} = ?1 WHERE rowid = ?2"),
@@ -340,6 +341,14 @@ impl Storage {
             }
         }
         Ok(())
+    }
+
+    fn table_key_for_move(&self, table: &str) -> &SymmetricKey {
+        if DURESS_TABLES.contains(&table) {
+            &self.mask_key
+        } else {
+            &self.encryption_key
+        }
     }
 
     fn table_conn_for_move(&self, table: &str) -> &Connection {

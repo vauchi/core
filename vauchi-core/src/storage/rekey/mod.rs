@@ -234,6 +234,21 @@ impl Storage {
         }
     }
 
+    /// Re-encrypts the fields of the duress tables, the ones inside the sealed
+    /// duress content. `rekey_with_progress` makes the same four calls,
+    /// interleaved with its progress reports; a new duress table goes in both.
+    pub(super) fn rekey_duress_tables(
+        &self,
+        old_key: &SymmetricKey,
+        new_key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        self.rekey_visibility_labels(old_key, new_key, "duress_visibility_labels")?;
+        self.rekey_decoy_contacts(old_key, new_key)?;
+        self.rekey_nullable_column(old_key, new_key, "decoy_contacts", "display_name_encrypted")?;
+        self.rekey_tags(old_key, new_key, "duress_tags")?;
+        self.rekey_places(old_key, new_key, "duress_places")
+    }
+
     /// Re-encrypts all encrypted columns from the current key to a new key.
     ///
     /// This is used during SMK migration: the database was opened with the old
@@ -268,6 +283,8 @@ impl Storage {
         self.wal_checkpoint()?;
 
         let old_key = &self.encryption_key;
+        let old_mask_key = &self.mask_key;
+        let new_mask_key = super::duress_content::mask_key(&new_key);
         const TOTAL_TABLES: u32 = 46;
         let mut completed: u32 = 0;
 
@@ -323,7 +340,7 @@ impl Storage {
             self.rekey_visibility_labels(old_key, &new_key, "visibility_labels")?;
             report(&mut completed, "visibility_labels");
 
-            self.rekey_visibility_labels(old_key, &new_key, "duress_visibility_labels")?;
+            self.rekey_visibility_labels(old_mask_key, &new_mask_key, "duress_visibility_labels")?;
             report(&mut completed, "duress_visibility_labels");
 
             self.rekey_device_info(old_key, &new_key)?;
@@ -479,10 +496,10 @@ impl Storage {
             self.rekey_identity_passwords(old_key, &new_key)?;
             report(&mut completed, "identity_passwords");
 
-            self.rekey_decoy_contacts(old_key, &new_key)?;
+            self.rekey_decoy_contacts(old_mask_key, &new_mask_key)?;
             self.rekey_nullable_column(
-                old_key,
-                &new_key,
+                old_mask_key,
+                &new_mask_key,
                 "decoy_contacts",
                 "display_name_encrypted",
             )?;
@@ -509,13 +526,13 @@ impl Storage {
             self.rekey_tags(old_key, &new_key, "tags")?;
             report(&mut completed, "tags");
 
-            self.rekey_tags(old_key, &new_key, "duress_tags")?;
+            self.rekey_tags(old_mask_key, &new_mask_key, "duress_tags")?;
             report(&mut completed, "duress_tags");
 
             self.rekey_places(old_key, &new_key, "places")?;
             report(&mut completed, "places");
 
-            self.rekey_places(old_key, &new_key, "duress_places")?;
+            self.rekey_places(old_mask_key, &new_mask_key, "duress_places")?;
             report(&mut completed, "duress_places");
 
             self.rekey_exchange_location(old_key, &new_key)?;
@@ -530,7 +547,7 @@ impl Storage {
             report(&mut completed, "exchange_location");
 
             super::key_check::rewrite(&self.conn, &new_key)?;
-            super::duress_content::write_sealed(&self.conn, &self.duress_db, &new_key)
+            super::duress_content::write_sealed(&self.conn, &self.duress_db, &new_mask_key)
         })()
         .and_then(|()| self.commit());
 
@@ -538,6 +555,7 @@ impl Storage {
             Ok(()) => {
                 self.duress_db.execute_batch("COMMIT")?;
                 self.encryption_key = new_key;
+                self.mask_key = new_mask_key;
                 Ok(())
             }
             Err(e) => {

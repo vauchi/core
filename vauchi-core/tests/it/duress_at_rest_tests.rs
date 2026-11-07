@@ -410,6 +410,30 @@ fn a_database_from_before_v94_keeps_its_duress_content_in_the_seal() {
     assert_eq!(overrides.get("phone"), Some(&true));
     drop(storage);
 
+    // Its seal and fields were under the storage key; the first open moves
+    // both to the mask key (ADR-080, vauchi/private#1117).
+    let sealed: Vec<u8> = rusqlite::Connection::open(&legacy.path)
+        .unwrap()
+        .query_row("SELECT content_encrypted FROM duress_content", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert!(vauchi_core::crypto::decrypt(&legacy.key, &sealed).is_err());
+    let mask_key = SymmetricKey::from_bytes(*vauchi_core::crypto::HKDF::derive_key(
+        None,
+        legacy.key.as_bytes(),
+        b"Vauchi_Duress_Mask_Key_v1",
+    ));
+    assert_eq!(
+        vauchi_core::crypto::decrypt(&mask_key, &sealed)
+            .unwrap()
+            .len(),
+        4096
+    );
+    let reopened = Storage::open(&legacy.path, legacy.key.clone()).unwrap();
+    assert_eq!(reopened.decoy().load_decoy_contacts().unwrap().len(), 1);
+    drop(reopened);
+
     assert_eq!(row_counts(&legacy.path), row_counts(&without.path));
     assert_eq!(
         row_shapes(&legacy.path, "duress_content"),

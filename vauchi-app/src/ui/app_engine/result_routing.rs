@@ -69,6 +69,7 @@ impl AppEngine {
                     ExchangeMode::Link,
                     self.pending_exchange_groups.clone(),
                 );
+                self.engine_cache.remove(&AppScreen::LinkExchange);
                 self.enter_exchange_screen(AppScreen::LinkExchange)
             }
             // M5 B3 Slice 3: start the device-link join (responder) machine

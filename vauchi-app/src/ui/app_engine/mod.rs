@@ -46,6 +46,10 @@ mod file_picker;
 mod intercept;
 mod intercept_annotations;
 mod link_exchange;
+// INLINE_TEST_REQUIRED: seeds the private engine with terminal updates while
+// observing reentry through AppEngine's public navigation and actions.
+#[cfg(test)]
+mod link_reentry_tests;
 mod link_responder;
 mod multi_stage_exchange;
 mod native_menu;

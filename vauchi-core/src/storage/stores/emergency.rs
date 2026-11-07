@@ -13,12 +13,15 @@ use std::sync::Arc;
 
 use super::super::{Storage, StorageError};
 use crate::emergency::EmergencyBroadcastConfig;
+use crate::storage::duress_content::SealOnDrop;
 
 /// Scoped persistence view for the emergency domain.
 pub struct EmergencyStore<'a> {
     conn: &'a Connection,
     key: &'a SymmetricKey,
     clock: &'a Arc<dyn Clock>,
+    table: &'static str,
+    seal: Option<SealOnDrop<'a>>,
 }
 
 impl Storage {
@@ -28,6 +31,21 @@ impl Storage {
             conn: &self.conn,
             key: &self.encryption_key,
             clock: &self.clock,
+            table: "emergency_config",
+            seal: None,
+        }
+    }
+
+    /// The mask profile's emergency config, in the sealed mask database
+    /// (ADR-080). It starts not set up, as on a fresh install: nothing of the
+    /// real one is copied.
+    pub fn duress_emergency(&self) -> EmergencyStore<'_> {
+        EmergencyStore {
+            conn: self.mask.conn(),
+            key: self.mask.key(),
+            clock: &self.clock,
+            table: "duress_emergency_config",
+            seal: Some(SealOnDrop::new(self)),
         }
     }
 }
@@ -35,6 +53,10 @@ impl Storage {
 impl EmergencyStore<'_> {
     fn now_secs(&self) -> u64 {
         self.clock.unix_seconds()
+    }
+
+    fn seal_if_mask(&self) -> Result<(), StorageError> {
+        self.seal.as_ref().map_or(Ok(()), SealOnDrop::seal_now)
     }
     /// Saves emergency broadcast configuration.
     ///
@@ -55,7 +77,7 @@ impl EmergencyStore<'_> {
         let now = self.now_secs();
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO emergency_config (id, trusted_contact_ids_encrypted, message_encrypted, include_location, created_at, updated_at) VALUES (1, ?1, ?2, ?3, ?4, ?5)",
+            &format!("INSERT OR REPLACE INTO {} (id, trusted_contact_ids_encrypted, message_encrypted, include_location, created_at, updated_at) VALUES (1, ?1, ?2, ?3, ?4, ?5)", self.table),
             params![
                 contact_ids_encrypted,
                 message_encrypted,
@@ -65,14 +87,14 @@ impl EmergencyStore<'_> {
             ],
         )?;
 
-        Ok(())
+        self.seal_if_mask()
     }
     /// Loads emergency broadcast configuration.
     ///
     /// Returns `None` if no configuration has been set.
     pub fn load_emergency_config(&self) -> Result<Option<EmergencyBroadcastConfig>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT trusted_contact_ids_encrypted, message_encrypted, include_location FROM emergency_config WHERE id = 1",
+            &format!("SELECT trusted_contact_ids_encrypted, message_encrypted, include_location FROM {} WHERE id = 1", self.table),
             [],
             |row| {
                 Ok((
@@ -108,7 +130,7 @@ impl EmergencyStore<'_> {
     /// Deletes emergency broadcast configuration.
     pub fn delete_emergency_config(&self) -> Result<(), StorageError> {
         self.conn
-            .execute("DELETE FROM emergency_config WHERE id = 1", [])?;
-        Ok(())
+            .execute(&format!("DELETE FROM {} WHERE id = 1", self.table), [])?;
+        self.seal_if_mask()
     }
 }

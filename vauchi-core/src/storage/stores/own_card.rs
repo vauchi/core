@@ -17,6 +17,8 @@ use super::contact::ContactStore;
 use crate::card::ContactCard;
 use crate::clock::Clock;
 use crate::crypto::SymmetricKey;
+use crate::storage::Storage;
+use crate::storage::duress_content::SealOnDrop;
 
 /// One own-card row: `table` has `id = 1`, `card_json`,
 /// `card_json_encrypted` and `updated_at`.
@@ -25,25 +27,31 @@ pub struct OwnCardStore<'a> {
     key: &'a SymmetricKey,
     clock: &'a Arc<dyn Clock>,
     table: &'static str,
+    seal: Option<SealOnDrop<'a>>,
 }
 
 impl<'a> ContactStore<'a> {
     /// The real own card.
     pub fn own_card(&self) -> OwnCardStore<'a> {
-        self.own_card_in("own_card")
-    }
-
-    /// The copy a duress session shows and edits (vauchi/private#811).
-    pub fn duress_own_card(&self) -> OwnCardStore<'a> {
-        self.own_card_in("duress_own_card")
-    }
-
-    fn own_card_in(&self, table: &'static str) -> OwnCardStore<'a> {
         OwnCardStore {
             conn: self.conn,
             key: self.key,
             clock: self.clock,
-            table,
+            table: "own_card",
+            seal: None,
+        }
+    }
+}
+
+impl Storage {
+    /// The copy a duress session shows and edits (vauchi/private#811).
+    pub fn duress_own_card(&self) -> OwnCardStore<'_> {
+        OwnCardStore {
+            conn: self.mask.conn(),
+            key: self.mask.key(),
+            clock: &self.clock,
+            table: "duress_own_card",
+            seal: Some(SealOnDrop::new(self)),
         }
     }
 }
@@ -66,6 +74,9 @@ impl OwnCardStore<'_> {
             ),
             params![card_encrypted, now as i64],
         )?;
+        if let Some(seal) = &self.seal {
+            seal.seal_now()?;
+        }
 
         Ok(())
     }

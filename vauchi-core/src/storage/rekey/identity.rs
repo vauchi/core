@@ -88,7 +88,7 @@ impl Storage {
         Ok(())
     }
 
-    /// Re-encrypt an own-card table (`own_card`, `duress_own_card`):
+    /// Re-encrypt the real own card:
     /// card_json_encrypted
     pub(super) fn rekey_own_card(
         &self,

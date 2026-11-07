@@ -136,7 +136,7 @@ impl Vauchi {
     /// `self.storage.contacts().own_card()`.
     pub(super) fn own_card_slot(&self) -> crate::storage::OwnCardStore<'_> {
         if self.in_duress_mode() {
-            self.storage.contacts().duress_own_card()
+            self.storage.duress_own_card()
         } else {
             self.storage.contacts().own_card()
         }
@@ -159,7 +159,7 @@ impl Vauchi {
     pub(super) fn restart_duress_own_card(&self) -> VauchiResult<()> {
         let contacts = self.storage.contacts();
         if let Some(real) = contacts.own_card().load()? {
-            contacts.duress_own_card().save(&real)?;
+            self.storage.duress_own_card().save(&real)?;
         }
         Ok(())
     }

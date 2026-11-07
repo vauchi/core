@@ -80,6 +80,11 @@ pub const CONTACT_REFERENCES: &[(&str, &str, ContactReference)] = &[
         "trusted_contact_ids_encrypted",
         ContactReference::EncryptedIdList,
     ),
+    (
+        "duress_emergency_config",
+        "trusted_contact_ids_encrypted",
+        ContactReference::EncryptedIdList,
+    ),
     ("contacts", "id", ContactReference::NotAnId),
     ("contacts", "contact_kind", ContactReference::NotAnId),
     ("contact_limits", "max_contacts", ContactReference::NotAnId),

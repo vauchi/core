@@ -87,7 +87,6 @@ impl Vauchi {
             .ok_or(VauchiError::IdentityNotInitialized)?;
         let duress_card = self
             .storage
-            .contacts()
             .duress_own_card()
             .load()?
             .ok_or(VauchiError::IdentityNotInitialized)?;

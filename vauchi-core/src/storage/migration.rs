@@ -1214,7 +1214,16 @@ fn migrate_v94_sealed_duress_content(
     conn: &Connection,
     key: &SymmetricKey,
 ) -> Result<(), StorageError> {
-    use super::duress_content::{DURESS_TABLES, dump, load_dump, open_duress_db, write_sealed};
+    use super::duress_content::{dump_tables, load_dump, open_duress_db, write_sealed};
+    // The tables as of v93; the mask database has gained more since, which
+    // the file never had (ADR-080).
+    const V93_DURESS_TABLES: [&str; 5] = [
+        "decoy_contacts",
+        "duress_tags",
+        "duress_places",
+        "duress_visibility_labels",
+        "duress_contact_visibility_overrides",
+    ];
 
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS duress_content (
@@ -1231,11 +1240,11 @@ fn migrate_v94_sealed_duress_content(
         return Ok(());
     }
     let duress_db = open_duress_db()?;
-    load_dump(&duress_db, &dump(conn)?)?;
+    load_dump(&duress_db, &dump_tables(conn, &V93_DURESS_TABLES)?)?;
     // Under the SEK, as its fields still are: the first open moves both to
     // the mask key (ADR-080, `load_duress_content`).
     write_sealed(conn, &duress_db, key)?;
-    for table in DURESS_TABLES {
+    for table in V93_DURESS_TABLES {
         conn.execute_batch(&format!("DROP TABLE {table};"))?;
     }
     Ok(())

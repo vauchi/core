@@ -95,7 +95,7 @@ impl IdentityStore<'_> {
     /// The hash is encrypted with the storage key before persisting. The
     /// first save also writes a duress cover, so the row has a duress salt
     /// and seal whether or not a duress PIN is ever set (ADR-032,
-    /// vauchi/private#947).
+    /// vauchi/private#947), and a mask seed (ADR-080).
     pub fn save_app_password(&self, hash: &[u8; 32], salt: &[u8; 16]) -> Result<(), StorageError> {
         let encrypted_hash = crate::crypto::encrypt(self.key, hash)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
@@ -107,8 +107,8 @@ impl IdentityStore<'_> {
         if self.load_duress_seal()?.is_none() {
             self.write_duress_cover()?;
         }
-
-        Ok(())
+        super::MaskSeedStore::new(self.mask, crate::storage::mask::SealedSlot::of(self.conn))
+            .ensure()
     }
     /// Saves the duress password hash and salt, and enables duress mode.
     ///

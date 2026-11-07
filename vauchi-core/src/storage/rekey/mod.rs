@@ -64,6 +64,9 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     // V14 high-priority
     ("own_card", "card_json_encrypted"),
     ("duress_own_card", "card_json_encrypted"),
+    ("duress_emergency_config", "trusted_contact_ids_encrypted"),
+    ("duress_emergency_config", "message_encrypted"),
+    ("mask_seed", "seed_encrypted"),
     ("device_registry", "registry_json_encrypted"),
     ("contact_device_registries", "broadcast_encrypted"),
     // V62 received safety-alert facts
@@ -235,7 +238,7 @@ impl Storage {
     }
 
     /// Re-encrypts the fields of the duress tables, the ones inside the sealed
-    /// duress content. `rekey_with_progress` makes the same four calls,
+    /// duress content. `rekey_with_progress` makes the same calls,
     /// interleaved with its progress reports; a new duress table goes in both.
     pub(super) fn rekey_duress_tables(
         &self,
@@ -246,7 +249,25 @@ impl Storage {
         self.rekey_decoy_contacts(old_key, new_key)?;
         self.rekey_nullable_column(old_key, new_key, "decoy_contacts", "display_name_encrypted")?;
         self.rekey_tags(old_key, new_key, "duress_tags")?;
-        self.rekey_places(old_key, new_key, "duress_places")
+        self.rekey_places(old_key, new_key, "duress_places")?;
+        self.rekey_mask_profile(old_key, new_key)
+    }
+
+    /// The mask profile's own card, emergency config and seed (ADR-080).
+    fn rekey_mask_profile(
+        &self,
+        old_key: &SymmetricKey,
+        new_key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        for (table, column) in [
+            ("duress_own_card", "card_json_encrypted"),
+            ("duress_emergency_config", "trusted_contact_ids_encrypted"),
+            ("duress_emergency_config", "message_encrypted"),
+            ("mask_seed", "seed_encrypted"),
+        ] {
+            self.rekey_nullable_column(old_key, new_key, table, column)?;
+        }
+        Ok(())
     }
 
     /// Re-encrypts all encrypted columns from the current key to a new key.
@@ -322,8 +343,8 @@ impl Storage {
             self.rekey_own_card(old_key, &new_key, "own_card")?;
             report(&mut completed, "own_card");
 
-            self.rekey_own_card(old_key, &new_key, "duress_own_card")?;
-            report(&mut completed, "duress_own_card");
+            self.rekey_mask_profile(old_mask_key, &new_mask_key)?;
+            report(&mut completed, "mask_profile");
 
             self.rekey_device_registry(old_key, &new_key)?;
             report(&mut completed, "device_registry");

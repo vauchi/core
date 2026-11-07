@@ -18,7 +18,7 @@
 //! database: `Connection::deserialize` needs `unsafe`, which core forbids.
 
 use rusqlite::types::Value;
-use rusqlite::{Connection, params_from_iter};
+use rusqlite::{Connection, OptionalExtension, params_from_iter};
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::{SymmetricKey, decrypt, encrypt, kdf::HKDF};
@@ -26,8 +26,9 @@ use crate::crypto::{SymmetricKey, decrypt, encrypt, kdf::HKDF};
 use super::mask::{MaskStorage, SealedSlot};
 use super::{Storage, StorageError};
 
-/// The five tables as of v93. A change to one is a change here and a
-/// migration that re-seals the blob.
+/// The mask database's tables. A new table needs no migration: a seal from
+/// before it loads with the table empty. A change to an existing one is a
+/// change here and a migration that re-seals the blob.
 const DURESS_TABLES_SCHEMA: &str = "
     CREATE TABLE decoy_contacts (
         id TEXT PRIMARY KEY,
@@ -65,14 +66,35 @@ const DURESS_TABLES_SCHEMA: &str = "
         is_visible INTEGER NOT NULL,
         PRIMARY KEY (contact_id, field_id)
     );
+    CREATE TABLE duress_own_card (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        card_json TEXT NOT NULL,
+        card_json_encrypted BLOB,
+        updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE duress_emergency_config (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        trusted_contact_ids_encrypted BLOB,
+        message_encrypted BLOB,
+        include_location INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE mask_seed (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        seed_encrypted BLOB NOT NULL
+    );
 ";
 
-pub(super) const DURESS_TABLES: [&str; 5] = [
+pub(super) const DURESS_TABLES: [&str; 8] = [
     "decoy_contacts",
     "duress_tags",
     "duress_places",
     "duress_visibility_labels",
     "duress_contact_visibility_overrides",
+    "duress_own_card",
+    "duress_emergency_config",
+    "mask_seed",
 ];
 
 const MASK_KEY_INFO: &[u8] = b"Vauchi_Duress_Mask_Key_v1";
@@ -103,7 +125,7 @@ struct TableRows {
     rows: Vec<Vec<Cell>>,
 }
 
-/// An in-memory database holding the five tables, empty.
+/// An in-memory database holding the mask tables, empty.
 pub(super) fn open_duress_db() -> Result<Connection, StorageError> {
     let conn = Connection::open_in_memory()?;
     conn.execute_batch(DURESS_TABLES_SCHEMA)?;
@@ -119,10 +141,15 @@ pub(crate) fn bucket_for(len: usize) -> usize {
     bucket
 }
 
-/// Every row of the five tables on `conn`, encoded.
+/// Every row of the mask tables on `conn`, encoded.
 pub(super) fn dump(conn: &Connection) -> Result<Vec<u8>, StorageError> {
-    let mut tables = Vec::with_capacity(DURESS_TABLES.len());
-    for name in DURESS_TABLES {
+    dump_tables(conn, &DURESS_TABLES)
+}
+
+/// Every row of `names` on `conn`, encoded as [`dump`] does.
+pub(super) fn dump_tables(conn: &Connection, names: &[&str]) -> Result<Vec<u8>, StorageError> {
+    let mut tables = Vec::with_capacity(names.len());
+    for name in names {
         let mut stmt = conn.prepare(&format!("SELECT * FROM {name} ORDER BY rowid"))?;
         let columns: Vec<String> = stmt.column_names().iter().map(|c| c.to_string()).collect();
         let width = columns.len();
@@ -150,7 +177,7 @@ pub(super) fn dump(conn: &Connection) -> Result<Vec<u8>, StorageError> {
     postcard::to_allocvec(&tables).map_err(|e| StorageError::Serialization(e.to_string()))
 }
 
-/// Replaces the rows of the five tables on `conn` with `bytes` from [`dump`].
+/// Replaces the rows of the mask tables on `conn` with `bytes` from [`dump`].
 pub(super) fn load_dump(conn: &Connection, bytes: &[u8]) -> Result<(), StorageError> {
     let tables: Vec<TableRows> =
         postcard::from_bytes(bytes).map_err(|e| StorageError::Serialization(e.to_string()))?;
@@ -301,6 +328,51 @@ impl Storage {
             return Err(under_mask_key);
         }
         self.move_duress_content_to_mask_key()
+    }
+
+    /// An install from before ADR-080 kept the duress own card as a row of
+    /// the file, under the SEK. It moves into the mask database under the
+    /// mask key; the file's row goes in the same transaction as the new seal,
+    /// so a failed move leaves it for the next open.
+    pub(super) fn move_duress_own_card_into_mask(&self) -> Result<(), StorageError> {
+        let legacy: Option<(Option<Vec<u8>>, i64)> = self
+            .conn
+            .query_row(
+                "SELECT card_json_encrypted, updated_at FROM duress_own_card WHERE id = 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        let Some((encrypted, updated_at)) = legacy else {
+            return Ok(());
+        };
+        if let Some(encrypted) = encrypted.filter(|e| !e.is_empty()) {
+            let card = zeroize::Zeroizing::new(
+                decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?,
+            );
+            let under_mask_key = encrypt(self.mask.key(), &card)
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+            self.mask.conn().execute(
+                "INSERT OR REPLACE INTO duress_own_card (id, card_json, card_json_encrypted, updated_at)
+                 VALUES (1, '', ?1, ?2)",
+                rusqlite::params![under_mask_key, updated_at],
+            )?;
+        }
+        self.conn.execute_batch("BEGIN IMMEDIATE")?;
+        let moved = self
+            .mask
+            .seal_into(SealedSlot::of(&self.conn))
+            .and_then(|()| Ok(self.conn.execute("DELETE FROM duress_own_card", [])?));
+        match moved {
+            Ok(_) => Ok(self.conn.execute_batch("COMMIT")?),
+            Err(e) => {
+                if let Err(rollback) = self.conn.execute_batch("ROLLBACK") {
+                    tracing::error!(%rollback, "[Storage] rolling back the own-card move failed");
+                }
+                Err(e)
+            }
+        }
     }
 
     /// A seal that opens under the SEK and not the mask key was written

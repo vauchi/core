@@ -176,6 +176,7 @@ mod identity_deletion_purge_tests;
 mod inline_confirm_action_id_tests;
 mod last_pins_i18n_tests;
 mod legacy_projection_matrix_tests;
+mod link_code_input_tests;
 mod link_exchange_i18n_tests;
 mod link_exchange_tests;
 mod link_paste_app_engine_tests;

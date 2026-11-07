@@ -314,10 +314,11 @@ impl Storage {
         match moved {
             Ok(()) => Ok(self.mask.conn().execute_batch("COMMIT")?),
             Err(e) => {
-                // best-effort: the seal in the file was not replaced, so the
-                // next open moves it again from the same state
-                #[allow(clippy::let_underscore_must_use)]
-                let _ = self.mask.conn().execute_batch("ROLLBACK");
+                // The seal in the file was not replaced, so the next open
+                // moves it again from the same state.
+                if let Err(rollback) = self.mask.conn().execute_batch("ROLLBACK") {
+                    tracing::error!(%rollback, "[Storage] rolling back the duress database failed");
+                }
                 Err(e)
             }
         }

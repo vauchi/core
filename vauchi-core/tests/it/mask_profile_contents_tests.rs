@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::emergency::EmergencyBroadcastConfig;
 use vauchi_core::storage::Storage;
+use vauchi_core::storage::migration::{MigrationRunner, all_migrations};
 use vauchi_core::{SymmetricKey, Vauchi, VauchiConfig};
 
 struct OnDisk {
@@ -46,6 +47,54 @@ impl OnDisk {
             })
             .unwrap()
     }
+
+    fn file_has_table(&self, table: &str) -> bool {
+        rusqlite::Connection::open(&self.path)
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = ?1",
+                [table],
+                |row| row.get(0),
+            )
+            .unwrap()
+    }
+}
+
+/// The duress own card as v87 to v113 kept it: a row of the file, under the
+/// SEK.
+const LEGACY_DURESS_OWN_CARD: &str = "
+    CREATE TABLE IF NOT EXISTS duress_own_card (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        card_json TEXT NOT NULL,
+        card_json_encrypted BLOB,
+        updated_at INTEGER NOT NULL
+    );";
+
+fn insert_legacy_duress_own_card(conn: &rusqlite::Connection, key: &SymmetricKey, name: &str) {
+    let card = serde_json::to_vec(&ContactCard::new(name)).unwrap();
+    conn.execute(
+        "INSERT INTO duress_own_card (id, card_json, card_json_encrypted, updated_at)
+         VALUES (1, '', ?1, 0)",
+        [vauchi_core::crypto::encrypt(key, &card).unwrap()],
+    )
+    .unwrap();
+}
+
+fn migrate_to(conn: &rusqlite::Connection, key: &SymmetricKey, version: u32) {
+    let subset: Vec<_> = all_migrations()
+        .iter()
+        .filter(|m| m.version <= version)
+        .copied()
+        .collect();
+    MigrationRunner::run(conn, key, &subset, None, 0).unwrap();
+}
+
+fn duress_own_card_name(storage: &Storage) -> Option<String> {
+    storage
+        .duress_own_card()
+        .load()
+        .unwrap()
+        .map(|c| c.display_name().to_string())
 }
 
 /// Alice with an app password; no duress PIN.
@@ -67,16 +116,13 @@ fn real_alert() -> EmergencyBroadcastConfig {
 
 // @scenario: duress_mode :: Decoy profile has separate database
 #[test]
-fn the_duress_own_card_copy_is_sealed_and_not_a_row_of_the_real_file() {
+fn the_duress_own_card_copy_is_sealed_and_the_file_has_no_table_for_it() {
     let disk = alice_with_an_app_password();
 
-    let copy = disk.storage().duress_own_card().load().unwrap();
+    let name = duress_own_card_name(&disk.storage());
 
-    assert_eq!(
-        copy.map(|c| c.display_name().to_string()),
-        Some("Alice".into())
-    );
-    assert_eq!(disk.rows_in_file("duress_own_card"), 0);
+    assert_eq!(name, Some("Alice".into()));
+    assert!(!disk.file_has_table("duress_own_card"));
 }
 
 // @scenario: duress_mode :: Decoy profile has separate database
@@ -88,36 +134,41 @@ fn an_edit_to_the_duress_own_card_survives_a_reopen() {
         .save(&ContactCard::new("Cover Name"))
         .unwrap();
 
-    let copy = disk.storage().duress_own_card().load().unwrap();
+    let name = duress_own_card_name(&disk.storage());
 
-    assert_eq!(
-        copy.map(|c| c.display_name().to_string()),
-        Some("Cover Name".into())
-    );
+    assert_eq!(name, Some("Cover Name".into()));
 }
 
 // @scenario: duress_mode :: Decoy profile has separate database
 #[test]
-fn an_upgraded_install_keeps_the_duress_own_card_it_had_in_the_real_file() {
+fn an_install_upgraded_from_before_the_sealed_duress_content_keeps_its_duress_own_card() {
+    let disk = OnDisk::new();
+    let conn = rusqlite::Connection::open(&disk.path).unwrap();
+    migrate_to(&conn, &disk.key, 93);
+    insert_legacy_duress_own_card(&conn, &disk.key, "Old Cover");
+    drop(conn);
+
+    let name = duress_own_card_name(&disk.storage());
+
+    assert_eq!(name, Some("Old Cover".into()));
+    assert!(!disk.file_has_table("duress_own_card"));
+}
+
+// @scenario: duress_mode :: Decoy profile has separate database
+#[test]
+fn an_install_upgraded_with_its_duress_content_sealed_keeps_its_duress_own_card() {
     let disk = alice_with_an_app_password();
-    let legacy = serde_json::to_vec(&ContactCard::new("Old Cover")).unwrap();
-    let legacy = vauchi_core::crypto::encrypt(&disk.key, &legacy).unwrap();
-    rusqlite::Connection::open(&disk.path)
-        .unwrap()
-        .execute(
-            "INSERT INTO duress_own_card (id, card_json, card_json_encrypted, updated_at)
-             VALUES (1, '', ?1, 0)",
-            [legacy],
-        )
+    let conn = rusqlite::Connection::open(&disk.path).unwrap();
+    conn.execute_batch(LEGACY_DURESS_OWN_CARD).unwrap();
+    insert_legacy_duress_own_card(&conn, &disk.key, "Old Cover");
+    conn.execute("DELETE FROM schema_version WHERE version >= 114", [])
         .unwrap();
+    drop(conn);
 
-    let copy = disk.storage().duress_own_card().load().unwrap();
+    let name = duress_own_card_name(&disk.storage());
 
-    assert_eq!(
-        copy.map(|c| c.display_name().to_string()),
-        Some("Old Cover".into())
-    );
-    assert_eq!(disk.rows_in_file("duress_own_card"), 0);
+    assert_eq!(name, Some("Old Cover".into()));
+    assert!(!disk.file_has_table("duress_own_card"));
 }
 
 // @scenario: duress_mode :: Settings reflect decoy state
@@ -241,14 +292,7 @@ fn the_mask_contents_survive_a_storage_rekey() {
     drop(storage);
     let storage = Storage::open(&disk.path, new_key).unwrap();
 
-    assert_eq!(
-        storage
-            .duress_own_card()
-            .load()
-            .unwrap()
-            .map(|c| c.display_name().to_string()),
-        Some("Alice".into())
-    );
+    assert_eq!(duress_own_card_name(&storage), Some("Alice".into()));
     assert!(
         storage
             .duress_emergency()

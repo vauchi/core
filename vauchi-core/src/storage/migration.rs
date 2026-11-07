@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 113] = [
+const MIGRATIONS: [Migration; 114] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -837,7 +837,41 @@ const MIGRATIONS: [Migration; 113] = [
         name: "device_signing_key",
         action: MigrationAction::Sql(MIGRATION_V113_DEVICE_SIGNING_KEY),
     },
+    Migration {
+        version: 114,
+        name: "duress_content_under_mask_key",
+        action: MigrationAction::Callback(migrate_v114_duress_content_under_mask_key),
+    },
 ];
+
+/// v114 (ADR-080, vauchi/private#1117): the duress content moves from the
+/// SEK to the mask key. A seal that does not open under the SEK is already
+/// under the mask key, because v94 seals that way when it runs in the same
+/// upgrade, and is left as it is.
+fn migrate_v114_duress_content_under_mask_key(
+    conn: &Connection,
+    key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    use rusqlite::OptionalExtension;
+
+    let sealed: Option<Vec<u8>> = conn
+        .query_row(
+            "SELECT content_encrypted FROM duress_content WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let Some(framed) = sealed.and_then(|sealed| crate::crypto::decrypt(key, &sealed).ok()) else {
+        return Ok(());
+    };
+    let resealed = crate::crypto::encrypt(&super::duress_content::mask_key(key), &framed)
+        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+    conn.execute(
+        "UPDATE duress_content SET content_encrypted = ?1 WHERE id = 1",
+        [resealed],
+    )?;
+    Ok(())
+}
 
 /// Migration v113 (ADR-079, vauchi/private#970): this device's random signing
 /// key. It has its own row because no backup or linked device may carry it.

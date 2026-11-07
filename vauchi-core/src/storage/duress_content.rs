@@ -7,9 +7,12 @@
 //! Decoy contacts and the duress session's groups, tags and places live in
 //! an in-memory database with the tables they had in the file up to v93.
 //! The file holds only `duress_content`, one row every database has: the
-//! rows of those tables, sealed under the SEK and padded to a size bucket,
-//! so a reader without the SMK cannot tell whether there are any. With no
-//! content the row seals empty tables, the same way.
+//! rows of those tables, sealed under the mask key and padded to a size
+//! bucket, so a reader without the SMK cannot tell whether there are any.
+//! With no content the row seals empty tables, the same way.
+//!
+//! The mask key is derived from the SEK, one way, so the mask profile can be
+//! handed its key without the one that opens the real database (ADR-080).
 //!
 //! The rows travel as a dump of SQLite values rather than as a serialized
 //! database: `Connection::deserialize` needs `unsafe`, which core forbids.
@@ -18,7 +21,7 @@ use rusqlite::types::Value;
 use rusqlite::{Connection, params_from_iter};
 use serde::{Deserialize, Serialize};
 
-use crate::crypto::{SymmetricKey, decrypt, encrypt};
+use crate::crypto::{SymmetricKey, decrypt, encrypt, kdf::HKDF};
 
 use super::{Storage, StorageError};
 
@@ -70,6 +73,17 @@ pub(super) const DURESS_TABLES: [&str; 5] = [
     "duress_visibility_labels",
     "duress_contact_visibility_overrides",
 ];
+
+const MASK_KEY_INFO: &[u8] = b"Vauchi_Duress_Mask_Key_v1";
+
+/// The key the duress content is sealed under, derived from the SEK.
+pub(crate) fn mask_key(storage_key: &SymmetricKey) -> SymmetricKey {
+    SymmetricKey::from_bytes(*HKDF::derive_key(
+        None,
+        storage_key.as_bytes(),
+        MASK_KEY_INFO,
+    ))
+}
 
 /// The smallest sealed size; larger content doubles it until it fits.
 const BASE_BUCKET: usize = 4096;
@@ -192,7 +206,7 @@ fn table_columns(conn: &Connection, table: &str) -> Result<Vec<String>, StorageE
     Ok(columns)
 }
 
-/// `Enc_key(len || dump || zeros)`, padded to a bucket.
+/// `Enc_mask(len || dump || zeros)`, padded to a bucket; `key` is the SEK.
 pub(super) fn seal(key: &SymmetricKey, duress_db: &Connection) -> Result<Vec<u8>, StorageError> {
     let body = dump(duress_db)?;
     let len = u32::try_from(body.len())
@@ -201,7 +215,7 @@ pub(super) fn seal(key: &SymmetricKey, duress_db: &Connection) -> Result<Vec<u8>
     framed.extend_from_slice(&len.to_le_bytes());
     framed.extend_from_slice(&body);
     framed.resize(bucket_for(framed.len()), 0);
-    encrypt(key, &framed).map_err(|e| StorageError::Encryption(e.to_string()))
+    encrypt(&mask_key(key), &framed).map_err(|e| StorageError::Encryption(e.to_string()))
 }
 
 /// Opens `sealed` and loads its rows into `duress_db`.
@@ -210,7 +224,8 @@ pub(super) fn unseal_into(
     sealed: &[u8],
     duress_db: &Connection,
 ) -> Result<(), StorageError> {
-    let framed = decrypt(key, sealed).map_err(|e| StorageError::Encryption(e.to_string()))?;
+    let framed =
+        decrypt(&mask_key(key), sealed).map_err(|e| StorageError::Encryption(e.to_string()))?;
     let (prefix, rest) = framed.split_first_chunk::<LENGTH_PREFIX>().ok_or_else(|| {
         StorageError::Serialization("duress content shorter than its length".into())
     })?;

@@ -283,29 +283,10 @@ impl Vauchi {
             now,
         );
 
-        // Same plaintext storage format as `create_identity`; the DB
-        // encrypts at rest (ADR-015).
-        self.storage.with_savepoint(|| -> VauchiResult<()> {
-            self.storage
-                .identity()
-                .save_identity(&identity.to_storage_bytes())?;
-            self.storage
-                .device()
-                .adopt_device_signing_key(device_signing_seed)?;
-
-            // Persist the registry from the linking device so sync can address
-            // the peer devices.
-            self.storage
-                .device()
-                .save_device_registry(response.registry())?;
-            Ok(())
-        })?;
-
-        if response.sync_payload_json().is_empty() {
-            // No sync payload — seed a default own card from the display name.
-            let card = ContactCard::new(identity.display_name());
-            self.storage.contacts().save_own_card(&card)?;
-        } else {
+        // The import runs first because it opens its own transaction, which a
+        // savepoint cannot hold. If it fails no identity or key is stored, so a
+        // retry's new key is not refused by a stranded one.
+        if !response.sync_payload_json().is_empty() {
             let payload: crate::sync::DeviceSyncPayload =
                 serde_json::from_str(response.sync_payload_json()).map_err(|e| {
                     VauchiError::Configuration(format!(
@@ -329,6 +310,30 @@ impl Vauchi {
                 VauchiError::Configuration(format!("Device-link sync apply failed: {e}"))
             })?;
         }
+
+        self.storage.with_savepoint(|| -> VauchiResult<()> {
+            // Same plaintext storage format as `create_identity`; the DB
+            // encrypts at rest (ADR-015).
+            self.storage
+                .identity()
+                .save_identity(&identity.to_storage_bytes())?;
+            self.storage
+                .device()
+                .adopt_device_signing_key(device_signing_seed)?;
+
+            // Persist the registry from the linking device so sync can address
+            // the peer devices.
+            self.storage
+                .device()
+                .save_device_registry(response.registry())?;
+
+            if response.sync_payload_json().is_empty() {
+                // No sync payload — seed a default own card from the display name.
+                let card = ContactCard::new(identity.display_name());
+                self.storage.contacts().save_own_card(&card)?;
+            }
+            Ok(())
+        })?;
 
         self.identity = Some(identity);
         Ok(())

@@ -59,7 +59,11 @@ mod tests {
     /// both screens show for this request.
     fn create_valid_proof(qr: &DeviceLinkQR, request: &DeviceLinkRequest) -> ProximityProof {
         let link_key = qr.link_key();
-        let code = super::types::derive_confirmation_code(link_key, &request.nonce);
+        let code = super::types::derive_confirmation_code(
+            link_key,
+            &request.nonce,
+            &request.device_signing_public_key,
+        );
         ProximityProof::manual_confirmation(link_key, &code, 0u64)
     }
 
@@ -251,8 +255,9 @@ mod tests {
     fn test_confirmation_code_is_deterministic() {
         let link_key = [0x42u8; 32];
         let nonce = [0x07u8; 32];
-        let a = super::types::derive_confirmation_code(&link_key, &nonce);
-        let b = super::types::derive_confirmation_code(&link_key, &nonce);
+        let device_key = [0x09u8; 32];
+        let a = super::types::derive_confirmation_code(&link_key, &nonce, &device_key);
+        let b = super::types::derive_confirmation_code(&link_key, &nonce, &device_key);
         assert_eq!(a, b, "same (link_key, nonce) must yield the same code");
         assert_eq!(a.len(), 7, "code is formatted XXX-XXX");
         assert_eq!(a.as_bytes()[3], b'-');

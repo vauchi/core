@@ -110,7 +110,11 @@ pub fn generate_numeric_code() -> String {
 /// share the link key (from QR) and the nonce (from the request). Uses
 /// HMAC-SHA256 with the link key as the signing key and the nonce as the
 /// message, then takes the first 3 bytes modulo 1_000_000 for a 6-digit code.
-pub(super) fn derive_confirmation_code(link_key: &[u8; 32], request_nonce: &[u8; 32]) -> String {
+pub(super) fn derive_confirmation_code(
+    link_key: &[u8; 32],
+    request_nonce: &[u8; 32],
+    device_signing_public_key: &[u8; 32],
+) -> String {
     // Domain-separate the key derivation (ADR-007), matching the sibling
     // `compute_confirmation_mac`. The raw `link_key` must not be used
     // directly as an HMAC key: every derivation path off the link key gets
@@ -120,6 +124,8 @@ pub(super) fn derive_confirmation_code(link_key: &[u8; 32], request_nonce: &[u8;
         .expect("32 bytes is valid HKDF output length");
     let mut mac = HmacSha256::new_from_slice(&derived_key).expect("HMAC accepts any key length");
     mac.update(request_nonce);
+    // Contacts will pin this key, so the code the user compares must cover it.
+    mac.update(device_signing_public_key);
     let tag = mac.finalize().into_bytes();
     let bytes: &[u8] = tag.as_ref();
 

@@ -95,7 +95,11 @@ impl DeviceLinkInitiator {
             &request.device_signing_public_key,
         )?;
 
-        let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
+        let confirmation_code = derive_confirmation_code(
+            self.qr.link_key(),
+            &request.nonce,
+            &request.device_signing_public_key,
+        );
         let identity_fingerprint = self.qr.identity_fingerprint();
 
         let confirmation = DeviceLinkConfirmation {
@@ -159,7 +163,11 @@ impl DeviceLinkInitiator {
             &request.device_signing_public_key,
         )?;
 
-        let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
+        let confirmation_code = derive_confirmation_code(
+            self.qr.link_key(),
+            &request.nonce,
+            &request.device_signing_public_key,
+        );
         validate_proximity_proof(self.qr.link_key(), proof, &confirmation_code, now)?;
 
         let device_index = self.registry.next_device_index();
@@ -273,7 +281,11 @@ impl DeviceLinkInitiatorRestored {
             &request.device_signing_public_key,
         )?;
 
-        let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
+        let confirmation_code = derive_confirmation_code(
+            self.qr.link_key(),
+            &request.nonce,
+            &request.device_signing_public_key,
+        );
         let identity_fingerprint = self.qr.identity_fingerprint();
 
         let confirmation = DeviceLinkConfirmation {
@@ -326,7 +338,11 @@ impl DeviceLinkInitiatorRestored {
             &request.device_signing_public_key,
         )?;
 
-        let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
+        let confirmation_code = derive_confirmation_code(
+            self.qr.link_key(),
+            &request.nonce,
+            &request.device_signing_public_key,
+        );
         validate_proximity_proof(self.qr.link_key(), proof, &confirmation_code, now)?;
 
         let device_index = self.registry.next_device_index();

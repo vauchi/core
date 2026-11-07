@@ -541,8 +541,9 @@ fn full_sync_payload(ctx: &DeviceLinkPersistence, now: u64) -> Result<String, St
     let identity = Identity::from_storage_bytes(&identity_bytes, now).map_err(|e| e.to_string())?;
     let registry = storage
         .device()
-        .own_device_registry(&identity)
-        .map_err(|e| e.to_string())?;
+        .load_device_registry()
+        .map_err(|e| e.to_string())?
+        .unwrap_or_else(|| identity.initial_device_registry());
     let payload = DeviceSyncOrchestrator::new(&storage, identity.create_device_info(now), registry)
         .create_full_sync_payload(vauchi_core::sync::DeviceLinkIntent::AddDevice)
         .map_err(|e| e.to_string())?;

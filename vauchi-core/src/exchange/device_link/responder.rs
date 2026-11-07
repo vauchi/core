@@ -57,12 +57,17 @@ impl DeviceLinkResponder {
     /// Computes the confirmation code that should match the initiator's display.
     ///
     /// Must be called after `create_request()`. Both devices derive the same code
-    /// from the shared link key and request nonce.
+    /// from the shared link key, request nonce and this device's public key.
     pub fn compute_confirmation_code(&self) -> Result<String, ExchangeError> {
         let nonce = self
             .last_request_nonce
             .ok_or(ExchangeError::InvalidQRFormat)?;
-        Ok(derive_confirmation_code(self.qr.link_key(), &nonce))
+        let device_key = SigningKeyPair::from_seed(&self.device_signing_seed);
+        Ok(derive_confirmation_code(
+            self.qr.link_key(),
+            &nonce,
+            device_key.public_key().as_bytes(),
+        ))
     }
 
     /// Returns the identity fingerprint from the QR code.
@@ -98,8 +103,11 @@ impl DeviceLinkResponder {
         let named_key = response
             .registry()
             .find_device(this_device.device_id())
+            .filter(|entry| entry.is_active())
             .and_then(|entry| entry.signing_public_key);
-        if named_key != Some(*device_key.public_key().as_bytes()) {
+        if named_key != Some(*device_key.public_key().as_bytes())
+            || !response.registry().verify(&seed_identity_key)
+        {
             return Err(ExchangeError::DeviceKeyRefused);
         }
         response.set_device_signing_seed(self.device_signing_seed.clone());

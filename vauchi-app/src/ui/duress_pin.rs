@@ -266,6 +266,12 @@ impl DuressPinEngine {
                     style: TextStyle::Caption,
                     a11y: None,
                 },
+                Component::Text {
+                    id: "forensic_note".into(),
+                    content: self.t("resistance.duress.forensic_note"),
+                    style: TextStyle::Caption,
+                    a11y: None,
+                },
             ],
             contextual_actions: vec![
                 ScreenAction {

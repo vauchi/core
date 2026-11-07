@@ -225,7 +225,7 @@ fn an_upgraded_install_with_an_app_password_gets_a_mask_seed_on_open() {
     assert_eq!(first, second);
 }
 
-// @scenario: security :: Rekey covers all encrypted columns
+// @scenario: duress_mode :: Decoy profile has separate database
 #[test]
 fn the_mask_contents_survive_a_storage_rekey() {
     let disk = alice_with_an_app_password();

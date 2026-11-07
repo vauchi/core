@@ -12,9 +12,10 @@
 # in .gitlab-ci.yml and ci/publish-and-trigger.yml:
 #
 # - test:e2e-smoke clones e2e, points e2e's own Core at this checkout
-#   (ci/point-core-at.sh), builds e2e's pinned relay and CLI against it
-#   (E2E_CORE_DIR with ci/build-pinned-binaries.sh) and runs smoke_ with
-#   those binaries;
+#   (ci/point-core-at.sh), builds e2e's pinned relays against it
+#   (E2E_CORE_DIR with ci/build-pinned-binaries.sh) and runs smoke_ on
+#   e2e's Core device (E2E_DEVICE_BACKEND=core), so no CLI is built
+#   (vauchi/private#1118);
 # - it runs on merge requests that touch the protocol paths VGT12 names,
 #   vauchi-protocol and the lockfile;
 # - neither downstream trigger matrix lists vauchi/e2e any more.
@@ -83,8 +84,8 @@ fi
 fake=$(mktemp -d)
 mkdir -p "$fake/e2e/ci" "$fake/bin" "$fake/mr" "$fake/target"
 printf '#!/bin/sh\nexit 0\n' > "$fake/e2e/ci/point-core-at.sh"
-printf '#!/bin/sh\n[ ! -f "$E2E_CORE_DIR/BROKEN" ]\n' > "$fake/e2e/ci/build-pinned-binaries.sh"
-printf '#!/bin/sh\nexit 0\n' > "$fake/bin/cargo"
+printf '#!/bin/sh\n[ "${E2E_DEVICE_BACKEND:-}" = core ] || exit 9\n[ ! -f "$E2E_CORE_DIR/BROKEN" ]\n' > "$fake/e2e/ci/build-pinned-binaries.sh"
+printf '#!/bin/sh\n[ "${E2E_DEVICE_BACKEND:-}" = core ] || exit 9\nexit 0\n' > "$fake/bin/cargo"
 chmod +x "$fake/bin/cargo"
 attribution() { # mr-broken target-broken expected
     rm -f "$fake/mr/BROKEN" "$fake/target/BROKEN"

@@ -1086,8 +1086,10 @@ test:formal-extended:
 
 # e2e's smoke suite against this merge request's own Core (vauchi/private#1032,
 # decision D8). The job clones e2e at main, points e2e's Core dependency at
-# this checkout and builds e2e's pinned relay and CLI against it, then runs
-# smoke_ with those binaries. A [patch] cannot do this: the exact
+# this checkout and builds e2e's pinned relays against it, then runs smoke_
+# on e2e's Core device, which calls this Core in-process: no CLI is built,
+# so a change the CLI must follow can merge first (vauchi/private#1118).
+# A [patch] cannot do this: the exact
 # `version = "=X"` pins refuse a Core of another version, so
 # ci/point-core-at.sh rewrites the job's own clones and nothing is committed.
 # Replaced verify:downstream-rust's e2e leg (that job is gone, private#1051),

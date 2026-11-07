@@ -16,6 +16,11 @@
 
 set -eu
 
+# e2e's Core device calls this Core in-process and no CLI is built, so a
+# Core change the CLI has yet to follow can still merge; the CLI's own
+# pipeline runs the suite on the CLI at its pin bump (vauchi/private#1118).
+export E2E_DEVICE_BACKEND=core
+
 e2e=${1:?usage: e2e-smoke.sh <e2e-checkout> <mr-core-dir> <target-core-dir>}
 mr_core=${2:?mr core dir}
 target_core=${3:?target core dir}

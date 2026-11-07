@@ -276,3 +276,14 @@ pub fn assert_card_has_field(card: &ContactCard, label: &str, expected_value: &s
         expected_value
     );
 }
+
+/// The key the duress content and the fields inside it are under: the
+/// storage key through HKDF (ADR-080, vauchi/private#1117).
+pub fn duress_mask_key(storage_key: &vauchi_core::SymmetricKey) -> vauchi_core::SymmetricKey {
+    let derived = vauchi_core::crypto::HKDF::derive_key(
+        None,
+        storage_key.as_bytes(),
+        b"Vauchi_Duress_Mask_Key_v1",
+    );
+    vauchi_core::SymmetricKey::from_bytes(*derived)
+}

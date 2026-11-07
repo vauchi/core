@@ -9,11 +9,12 @@
 
 use std::path::PathBuf;
 
-use vauchi_core::crypto::{HKDF, decrypt};
+use vauchi_core::crypto::decrypt;
+
+use crate::common::helpers::duress_mask_key as mask_key;
 use vauchi_core::storage::Storage;
 use vauchi_core::{ContactCard, SymmetricKey, Vauchi, VauchiConfig};
 
-const MASK_KEY_INFO: &[u8] = b"Vauchi_Duress_Mask_Key_v1";
 /// The padded length one decoy seals to: the first size bucket.
 const SMALLEST_SEAL: usize = 4096;
 
@@ -40,14 +41,6 @@ fn alice_with_a_decoy() -> OnDisk {
         .add_decoy_contact("decoy-1", "Sam", &ContactCard::new("Sam"))
         .unwrap();
     disk
-}
-
-fn mask_key(storage_key: &SymmetricKey) -> SymmetricKey {
-    SymmetricKey::from_bytes(*HKDF::derive_key(
-        None,
-        storage_key.as_bytes(),
-        MASK_KEY_INFO,
-    ))
 }
 
 fn sealed_content(disk: &OnDisk) -> Vec<u8> {

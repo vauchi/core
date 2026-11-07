@@ -289,17 +289,6 @@ const CONTACT_PK: &[u8; 32] = b"\x01\x01\x01\x01\x01\x01\x01\x01\
 const LABEL_ID: &str = "l1";
 const DURESS_LABEL_ID: &str = "dl1";
 
-#[allow(clippy::too_many_lines)]
-/// The key the duress tables' fields are under, derived from the storage key
-/// (ADR-080, vauchi/private#1117).
-fn mask_key(storage_key: &SymmetricKey) -> SymmetricKey {
-    SymmetricKey::from_bytes(*vauchi_core::crypto::HKDF::derive_key(
-        None,
-        storage_key.as_bytes(),
-        b"Vauchi_Duress_Mask_Key_v1",
-    ))
-}
-
 fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     let conn = storage.connection();
     let now = 1_700_000_000i64;
@@ -662,7 +651,7 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     .unwrap();
 
     // ── the duress twins (vauchi/private#813), under the mask key ───────
-    let mask = mask_key(key);
+    let mask = crate::common::helpers::duress_mask_key(key);
     let enc =
         |table: &str, column: &str| -> Vec<u8> { encrypt(&mask, &fx(table, column)).unwrap() };
     let duress_label_name_plain = fx("duress_visibility_labels", "name_encrypted");
@@ -804,7 +793,7 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
         }
     };
 
-    let new_mask_key = mask_key(new_key);
+    let new_mask_key = crate::common::helpers::duress_mask_key(new_key);
     let check_one =
         |table: &str, column: &str, where_clause: &str, params_: &[&dyn rusqlite::ToSql]| {
             let sql = format!("SELECT {} FROM {} WHERE {}", column, table, where_clause);
@@ -1198,24 +1187,4 @@ fn the_fixtures_cover_every_registered_encrypted_column() {
         .collect();
 
     assert!(missing.is_empty(), "{missing:?}");
-}
-
-// @internal
-#[test]
-fn rekey_reports_progress_one_table_at_a_time() {
-    let (_dir, mut storage, _key) = open_storage();
-    let seen = std::sync::Mutex::new(Vec::new());
-
-    storage
-        .rekey_with_progress(
-            SymmetricKey::generate(),
-            Some(&|done: u32, total: u32, _table: &str| seen.lock().unwrap().push((done, total))),
-        )
-        .unwrap();
-
-    let seen = seen.into_inner().unwrap();
-    assert!(!seen.is_empty());
-    for (step, (done, total)) in seen.iter().enumerate() {
-        assert_eq!((*done, *total), (step as u32 + 1, 46));
-    }
 }

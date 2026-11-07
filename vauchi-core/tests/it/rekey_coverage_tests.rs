@@ -166,21 +166,12 @@ fn test_rekey_preserves_password_hash() {
     assert_eq!(plain, b"argon2id-hash-placeholder");
 }
 
-/// The key the duress tables' fields are under (ADR-080, vauchi/private#1117).
-fn duress_mask_key(storage_key: &SymmetricKey) -> SymmetricKey {
-    SymmetricKey::from_bytes(*vauchi_core::crypto::HKDF::derive_key(
-        None,
-        storage_key.as_bytes(),
-        b"Vauchi_Duress_Mask_Key_v1",
-    ))
-}
-
 // @scenario: security :: Rekey preserves decoy_contacts
 #[test]
 fn test_rekey_preserves_decoy_contacts() {
     let (_dir, mut storage) = open_storage();
     let key1 = storage.key().clone();
-    let mask1 = duress_mask_key(&key1);
+    let mask1 = crate::common::helpers::duress_mask_key(&key1);
 
     let card_enc = vauchi_core::crypto::encrypt(&mask1, b"{\"name\":\"Decoy\"}").unwrap();
     let name_enc = vauchi_core::crypto::encrypt(&mask1, b"Decoy").unwrap();
@@ -201,7 +192,8 @@ fn test_rekey_preserves_decoy_contacts() {
         )
         .unwrap();
     assert_eq!(
-        vauchi_core::crypto::decrypt(&duress_mask_key(&key2), &loaded).unwrap(),
+        vauchi_core::crypto::decrypt(&crate::common::helpers::duress_mask_key(&key2), &loaded)
+            .unwrap(),
         b"{\"name\":\"Decoy\"}"
     );
     let loaded_name: Vec<u8> = storage
@@ -213,7 +205,11 @@ fn test_rekey_preserves_decoy_contacts() {
         )
         .unwrap();
     assert_eq!(
-        vauchi_core::crypto::decrypt(&duress_mask_key(&key2), &loaded_name).unwrap(),
+        vauchi_core::crypto::decrypt(
+            &crate::common::helpers::duress_mask_key(&key2),
+            &loaded_name
+        )
+        .unwrap(),
         b"Decoy"
     );
 }
@@ -480,4 +476,24 @@ fn rekey_keeps_a_contact_with_a_cek() {
         .unwrap()
         .unwrap();
     assert_eq!(loaded.display_name(), "Cara");
+}
+
+// @internal
+#[test]
+fn rekey_reports_progress_one_table_at_a_time() {
+    let (_dir, mut storage) = open_storage();
+    let seen = std::sync::Mutex::new(Vec::new());
+
+    storage
+        .rekey_with_progress(
+            SymmetricKey::generate(),
+            Some(&|done: u32, total: u32, _table: &str| seen.lock().unwrap().push((done, total))),
+        )
+        .unwrap();
+
+    let seen = seen.into_inner().unwrap();
+    assert!(!seen.is_empty());
+    for (step, (done, total)) in seen.iter().enumerate() {
+        assert_eq!((*done, *total), (step as u32 + 1, 46));
+    }
 }

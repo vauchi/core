@@ -419,11 +419,7 @@ fn a_database_from_before_v94_keeps_its_duress_content_in_the_seal() {
         })
         .unwrap();
     assert!(vauchi_core::crypto::decrypt(&legacy.key, &sealed).is_err());
-    let mask_key = SymmetricKey::from_bytes(*vauchi_core::crypto::HKDF::derive_key(
-        None,
-        legacy.key.as_bytes(),
-        b"Vauchi_Duress_Mask_Key_v1",
-    ));
+    let mask_key = crate::common::helpers::duress_mask_key(&legacy.key);
     assert_eq!(
         vauchi_core::crypto::decrypt(&mask_key, &sealed)
             .unwrap()

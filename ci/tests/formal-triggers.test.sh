@@ -19,6 +19,10 @@
 # - both also run on the nightly schedule and on release tags.
 # - every Kani harness is named in the script, run or listed as run by
 #   hand, and every harness the script runs exists.
+# - a pipeline that runs test:formal-models keeps running when another job
+#   fails: the workflow turns off rust-base.yml's on_job_failure: all for a
+#   merge request changing the models' paths, the nightly and release tags,
+#   in rules that come before the ones they shadow (vauchi/private#1115).
 #
 # Usage: ci/tests/formal-triggers.test.sh [ci-config] [formal-script]
 #        (from the core repo root)
@@ -129,6 +133,59 @@ if check_job "test:formal-models" models; then
             *.rs | */src/*) fail "test:formal-models triggers on Rust ($p); the models read none" ;;
         esac
     done
+fi
+
+# The first workflow rule whose `if:` line contains $1.
+first_rule() {
+    awk -v pat="$1" '
+        $0 == "workflow:" { in_wf = 1; next }
+        in_wf && /^[^[:space:]#]/ { exit }
+        in_wf && /^    - / { if (done) exit; in_rule = index($0, pat) > 0; if (in_rule) done = 1 }
+        in_wf && in_rule { print }
+    ' "$ci_config"
+}
+
+# The line of the first workflow rule whose `if:` line is exactly $1.
+# Through the environment: awk -v would read the regex's \d as an escape.
+rule_line() {
+    RULE="$1" awk '
+        $0 == "workflow:" { in_wf = 1; next }
+        in_wf && /^[^[:space:]#]/ { exit }
+        in_wf && $0 == "    - if: " ENVIRON["RULE"] { print NR; exit }
+    ' "$ci_config"
+}
+
+mr_rule=$(first_rule 'CI_PIPELINE_SOURCE == "merge_request_event"')
+if printf '%s\n' "$mr_rule" | grep -q 'on_job_failure: none'; then
+    echo "PASS: the first merge request rule turns off fail-fast"
+else
+    fail "the first merge request workflow rule must set on_job_failure: none, or a failing job cancels test:formal-models"
+fi
+if job_block test:formal-models | grep -q .; then
+    # From the rules only: trigger_paths also matches the script line.
+    wanted=$(trigger_paths "$(job_block test:formal-models | sed -n '/^  rules:/,$p')" | sort -u)
+    got=$(trigger_paths "$mr_rule" | sort -u)
+    [ "$wanted" = "$got" ] ||
+        fail "the workflow's fail-fast rule must name exactly test:formal-models' paths; job: $(echo $wanted) workflow: $(echo $got)"
+fi
+
+nightly_rule=$(first_rule '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH')
+if printf '%s\n' "$nightly_rule" | grep -q 'CI_PIPELINE_SOURCE == "schedule"' &&
+    printf '%s\n' "$nightly_rule" | grep -q 'on_job_failure: none' &&
+    printf '%s\n' "$nightly_rule" | grep -q 'on_new_commit: none'; then
+    echo "PASS: the nightly on main turns off fail-fast and keeps main's merge guard"
+else
+    fail "the first default-branch workflow rule must be the schedule, with on_job_failure: none and on_new_commit: none"
+fi
+
+tag_rule=$(first_rule 'CI_COMMIT_TAG')
+tag_line=$(rule_line '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/')
+push_line=$(rule_line '$CI_PIPELINE_SOURCE == "push"')
+if printf '%s\n' "$tag_rule" | grep -q 'on_job_failure: none' &&
+    [ -n "$tag_line" ] && [ -n "$push_line" ] && [ "$tag_line" -lt "$push_line" ]; then
+    echo "PASS: a release tag turns off fail-fast before the push rule"
+else
+    fail "a release-tag workflow rule with on_job_failure: none must come before the push rule"
 fi
 
 # shellcheck disable=SC2086 # word list of repository paths

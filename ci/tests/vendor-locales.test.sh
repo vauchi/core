@@ -6,8 +6,8 @@
 
 # Behaviour of scripts/vendor-locales.sh (#432). An MR checks that the
 # vendored catalogue is exactly the locales revision it names, so a locales
-# merge does not turn every open core MR red; main keeps the freshness check.
-# A local git repo stands in for the locales checkout.
+# merge does not turn every open core MR red; a commit that cuts a release keeps
+# the freshness check. A local git repo stands in for the locales checkout.
 
 set -eu
 

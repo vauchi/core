@@ -201,6 +201,7 @@ check:vendor-locales:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - scripts/vendor-locales.sh
+        - ci/check-vendored-locales.sh
         - ci/tests/vendor-locales.test.sh
         - .gitlab-ci.yml
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -549,23 +550,9 @@ lint:cross-cutting-blocking:
     # lint:locale-key-coverage
     - bash ../locales/scripts/check-locale-key-coverage.sh
         vauchi-app/src ../locales '*.rs'
-    # lint:vendored-locales — the copy consumers build against must not
-    # drift from locales, or a build without a checkout ships stale copy.
-    # An MR only has to carry exactly the revision it names: a locales merge
-    # stales every open MR at once, and sync:vendor-locales refreshes main
-    # (#432). The locales-triggered pipeline is that merge arriving on main,
-    # so it gets the same check while sync:vendor-locales opens the refresh
-    # (private#557). Main pushes and tags still require locales HEAD.
-    - |
-      if [ "${CI_PIPELINE_SOURCE}" = "merge_request_event" ] \
-        || { [ "${CI_PIPELINE_SOURCE}" = "pipeline" ] && [ "${CONTENT_TRIGGER_REPO:-}" = "locales" ]; }; then
-        if [ "$(git -C ../locales rev-parse --is-shallow-repository)" = true ]; then
-          git -C ../locales fetch --quiet --unshallow origin main
-        fi
-        sh scripts/vendor-locales.sh --check-revision
-      else
-        sh scripts/vendor-locales.sh --check
-      fi
+    # lint:vendored-locales — a commit that cuts a release needs locales HEAD;
+    # any other needs the revision its copy names (private#1112).
+    - sh ci/check-vendored-locales.sh
     # lint:portable-content-links
     - |
       set -eu
@@ -624,11 +611,13 @@ lint:cross-cutting-blocking:
           - "Cargo.toml"
           - "**/*.rs"
           - ".gitlab-ci.yml"
-          # This job runs `vendor-locales.sh --check`, so a change to
-          # the vendored copy itself has to trigger it. Without these
-          # paths a re-vendor MR skipped the very gate that polices it,
-          # and hand-edited drift stayed green until it turned main red.
+          # This job checks the vendored copy, so a change to the copy
+          # itself has to trigger it. Without these paths a re-vendor MR
+          # skipped the very gate that polices it, and hand-edited drift
+          # stayed green until it turned main red.
           - "vauchi-app/locales/**"
+          - "ci/check-vendored-locales.sh"
+          - "scripts/vendor-locales.sh"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 # Exact-zero release gate (ADR-066, vauchi/private#11). Unlike

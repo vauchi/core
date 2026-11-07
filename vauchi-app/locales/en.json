@@ -2245,6 +2245,7 @@
   "resistance.duress.error_empty": "Please enter a PIN",
   "resistance.duress.error_mismatch": "PINs do not match",
   "resistance.duress.error_too_short": "PIN must be at least {min} characters",
+  "resistance.duress.forensic_note": "A duress PIN fools someone watching you unlock the app. It can't protect your contacts from someone with forensic tools who extracts your device's storage and keys.",
   "resistance.duress.how_it_looks_body": "The duress PIN opens Vauchi with your decoy contacts instead of your real ones and sends nothing to anyone. In that mode these settings look as if no duress PIN was ever set up.",
   "resistance.duress.how_it_looks_button": "How duress mode looks",
   "resistance.duress.not_set": "Not set",

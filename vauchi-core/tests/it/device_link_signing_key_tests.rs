@@ -662,3 +662,50 @@ fn a_sync_payload_does_not_take_the_joiners_key_out_of_the_registry() {
         Some(public_key_of_stored_key(&joiner))
     );
 }
+
+// @internal
+#[test]
+fn a_link_finished_by_a_later_process_keeps_the_key_and_the_checks() {
+    let host = host();
+    let qr_data = host.initiator.qr().to_data_string();
+    let mut responder = responder_for(&host.initiator);
+    let sent_key = joiner_entry_key(&host, &mut responder);
+    let saved_seed = responder.device_signing_seed().clone();
+    let (encrypted, _, _) =
+        confirm(&host.initiator, &responder.create_request(now()).unwrap()).unwrap();
+    drop(responder);
+
+    let resumed = DeviceLinkResponder::resume(
+        DeviceLinkQR::from_data_string(&qr_data).unwrap(),
+        "My Phone".into(),
+        saved_seed,
+    );
+    let response = resumed.process_response(&encrypted).unwrap();
+    let mut joiner = Vauchi::in_memory().unwrap();
+    joiner
+        .adopt_device_link_response(&response, "My Phone".into())
+        .unwrap();
+
+    assert_eq!(public_key_of_stored_key(&joiner), sent_key);
+}
+
+// @internal
+#[test]
+fn a_resumed_responder_with_another_key_is_refused() {
+    let host = host();
+    let qr_data = host.initiator.qr().to_data_string();
+    let mut responder = responder_for(&host.initiator);
+    let (encrypted, _, _) =
+        confirm(&host.initiator, &responder.create_request(now()).unwrap()).unwrap();
+
+    let resumed = DeviceLinkResponder::resume(
+        DeviceLinkQR::from_data_string(&qr_data).unwrap(),
+        "My Phone".into(),
+        zeroize::Zeroizing::new([0x14; 32]),
+    );
+
+    assert!(matches!(
+        resumed.process_response(&encrypted),
+        Err(ExchangeError::DeviceKeyRefused)
+    ));
+}

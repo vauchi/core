@@ -133,3 +133,32 @@ fn the_duress_content_survives_a_storage_rekey_under_the_new_mask_key() {
     );
     assert!(decrypt(&new_key, &sealed).is_err());
 }
+
+fn duress_column(storage: &Storage, sql: &str) -> Vec<u8> {
+    storage
+        .duress_connection()
+        .query_row(sql, [], |row| row.get(0))
+        .unwrap()
+}
+
+// @scenario: duress_mode :: Decoy profile has separate database
+#[test]
+fn the_fields_inside_the_duress_content_open_under_the_mask_key_only() {
+    let key = SymmetricKey::generate();
+    let storage = Storage::in_memory(key.clone()).unwrap();
+    storage
+        .decoy()
+        .save_decoy_contact("decoy-1", "Sam", &ContactCard::new("Sam"))
+        .unwrap();
+    storage.duress_tags().create_tag("Work").unwrap();
+
+    let card = duress_column(&storage, "SELECT card_encrypted FROM decoy_contacts");
+    let tag = duress_column(&storage, "SELECT name_encrypted FROM duress_tags");
+
+    assert!(decrypt(&key, &card).is_err());
+    assert!(decrypt(&key, &tag).is_err());
+    assert_eq!(decrypt(&mask_key(&key), &tag).unwrap(), b"Work");
+    let opened: ContactCard =
+        serde_json::from_slice(&decrypt(&mask_key(&key), &card).unwrap()).unwrap();
+    assert_eq!(opened.display_name(), "Sam");
+}

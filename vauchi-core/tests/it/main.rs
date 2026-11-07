@@ -232,6 +232,7 @@ mod duress_contact_reads_by_id_tests;
 mod duress_cover_device_sync_tests;
 mod duress_cover_tests;
 mod duress_mask_foreground_tests;
+mod duress_mask_key_tests;
 mod duress_mode_concealment_tests;
 mod duress_mode_device_tests;
 mod duress_mode_vocabulary_tests;

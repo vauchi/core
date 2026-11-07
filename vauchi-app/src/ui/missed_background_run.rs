@@ -27,7 +27,8 @@ pub fn record_missed_background_run(data_dir: &Path, at_unix_seconds: u64) -> st
 }
 
 /// The recorded time, if a whole one is there. Whatever is on disk under
-/// the record's name is removed.
+/// the record's name is removed; a record that cannot be removed is not
+/// shown, so it is never shown twice.
 // Its caller in `ui::app_engine` is compiled out of the no-default-features
 // build.
 #[cfg_attr(not(feature = "network-rustls"), allow(dead_code))]
@@ -35,9 +36,7 @@ pub(crate) fn take_missed_background_run(data_dir: &Path) -> Option<u64> {
     let path = data_dir.join(FILE_NAME);
     let at = read_record(&path);
     if path.is_file() {
-        // Best effort: a record left behind is shown once more, at worst.
-        #[allow(clippy::let_underscore_must_use)]
-        let _ = std::fs::remove_file(&path);
+        std::fs::remove_file(&path).ok()?;
     }
     at
 }

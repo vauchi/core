@@ -147,10 +147,11 @@ impl PlatformAppEngine {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |since| since.as_secs());
-        // Best effort: an unwritable data directory fails the open anyway.
-        #[allow(clippy::let_underscore_must_use)]
-        let _ = vauchi_app::ui::record_missed_background_run(data_dir, now);
-        Ok(())
+        vauchi_app::ui::record_missed_background_run(data_dir, now).map_err(|_| {
+            MobileError::StorageError {
+                detail: "Could not record the missed background run".into(),
+            }
+        })
     }
 
     /// The release of a handed-over secret, once, after storage opened.

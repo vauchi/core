@@ -236,7 +236,7 @@ fn a_lost_key_shows_recovery_and_deletes_nothing_until_confirmed() {
     assert_eq!(surface(&confirm), "storage_lock.confirm_start_over");
 
     assert_eq!(std::fs::metadata(&db).unwrap().len(), db_before);
-    assert_eq!(keychain.store.names(), ["smk"]);
+    assert_eq!(keychain.store.names(), ["brk", "smk"]);
 }
 
 // @internal
@@ -267,7 +267,7 @@ fn data_no_stored_key_opens_shows_recovery() {
 
     let batch = parse(engine.initial_commands_json().unwrap());
     assert_eq!(surface(&batch), "storage_lock.unreadable");
-    assert_eq!(keychain.store.names(), ["smk"]);
+    assert_eq!(keychain.store.names(), ["brk", "smk"]);
     assert_eq!(empty.store.names(), Vec::<String>::new());
 }
 
@@ -324,7 +324,7 @@ fn a_start_over_that_cannot_remove_a_companion_file_keeps_the_database() {
         db.exists(),
         "the database must not be deleted while its WAL stays"
     );
-    assert_eq!(keychain.store.names(), ["smk"]);
+    assert_eq!(keychain.store.names(), ["brk", "smk"]);
 }
 
 // @internal
@@ -483,7 +483,7 @@ fn a_handed_over_key_is_not_released_while_storage_is_locked() {
     let opened = prompt_succeeded(&engine);
 
     assert_eq!(released(&opened), ["legacy-storage-key"]);
-    assert_eq!(keychain.store.names(), ["smk"]);
+    assert_eq!(keychain.store.names(), ["brk", "smk"]);
 }
 
 /// The shell reports its window once, as it does when it first lays out.
@@ -733,7 +733,7 @@ fn the_unlock_finishes_the_upgrade_the_locked_keychain_held_up() {
     );
     assert!(engine.has_identity().unwrap());
     assert_eq!(contact_count(&engine), 1);
-    assert_eq!(keychain.store.names(), ["smk"]);
+    assert_eq!(keychain.store.names(), ["brk", "smk"]);
 }
 
 // @internal
@@ -757,7 +757,7 @@ fn an_upgrade_whose_keychain_fails_the_smk_for_another_reason_offers_try_again()
 
 // @internal
 #[test]
-fn an_upgrade_whose_keychain_answers_keeps_everything_and_leaves_only_the_smk() {
+fn an_upgrade_whose_keychain_answers_keeps_everything_and_leaves_only_the_smk_and_brk() {
     let dir = tempfile::tempdir().unwrap();
     let keychain = installed_before_with_its_key_as_bootstrap(&dir);
 
@@ -773,7 +773,7 @@ fn an_upgrade_whose_keychain_answers_keeps_everything_and_leaves_only_the_smk() 
     assert!(!surface(&batch).starts_with("storage_lock"), "got {batch}");
     assert!(engine.has_identity().unwrap());
     assert_eq!(contact_count(&engine), 1);
-    assert_eq!(keychain.store.names(), ["smk"]);
+    assert_eq!(keychain.store.names(), ["brk", "smk"]);
 }
 
 fn report(engine: &PlatformAppEngine) -> Value {

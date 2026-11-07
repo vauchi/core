@@ -22,6 +22,9 @@ const SMK_KEY_NAME: &str = "smk";
 /// Secure-storage name of the key the database is under before an identity
 /// exists (vauchi/private#580).
 pub(crate) const BOOTSTRAP_KEY_NAME: &str = "storage_bootstrap";
+/// Secure-storage name of the Background Receive Key, kept in the
+/// after-first-unlock class (ADR-033 amendment 2026-11-07).
+pub(crate) const BRK_KEY_NAME: &str = "brk";
 
 /// Trait for sending relay purge requests during shred operations.
 ///
@@ -113,6 +116,9 @@ pub struct ShredVerification {
     /// Whether the storage bootstrap key is absent from SecureStorage
     /// (expected: true after shred).
     pub bootstrap_key_absent: bool,
+    /// Whether the Background Receive Key is absent from SecureStorage
+    /// (expected: true after shred).
+    pub brk_absent: bool,
     /// Whether the database file is absent (expected: true after shred).
     pub database_absent: bool,
     /// Whether the data directory is absent (expected: true after shred).

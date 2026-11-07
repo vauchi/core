@@ -68,7 +68,7 @@ fn a_shell_key_is_adopted_and_moved_to_the_smk_for_an_existing_identity() {
 
     let engine = start(&dir, Some(&shell_key), &keychain);
 
-    assert_eq!(keychain.names(), ["smk"]);
+    assert_eq!(keychain.names(), ["brk", "smk"]);
     assert!(engine.initial_commands_json().unwrap().contains("commands"));
 }
 
@@ -79,7 +79,7 @@ fn after_onboarding_a_panic_shred_leaves_no_key_in_the_keychain() {
     let keychain = SharedKeychain::new();
     let engine = start(&dir, None, &keychain);
     drive_onboarding(&engine);
-    assert_eq!(keychain.names(), ["smk"]);
+    assert_eq!(keychain.names(), ["brk", "smk"]);
 
     let result = engine
         .dispatch_domain_command(DomainCommand::PanicShred)

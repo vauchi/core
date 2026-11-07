@@ -8,7 +8,8 @@
 use std::path::{Path, PathBuf};
 
 use crate::api::legacy_pre_signed_file;
-use crate::storage::{SecureStorage, StorageError};
+use crate::api::shred::BRK_KEY_NAME;
+use crate::storage::{KeyAccess, SecureStorage, StorageError};
 
 /// Every secure-storage name that holds a key opening the database.
 const STORAGE_KEY_NAMES: [&str; 2] = ["smk", "storage_bootstrap"];
@@ -70,5 +71,6 @@ pub fn delete_unreadable_data(
     for name in STORAGE_KEY_NAMES {
         secure.secure_delete_key(name)?;
     }
+    secure.secure_delete_key_with_access(BRK_KEY_NAME, KeyAccess::AfterFirstUnlock)?;
     Ok(())
 }

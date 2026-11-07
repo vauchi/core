@@ -15,12 +15,12 @@
 use std::path::Path;
 
 use crate::crypto::{ShreddingMasterKey, SymmetricKey};
-use crate::storage::{SecureStorage, Storage, StorageError};
+use crate::storage::{KeyAccess, SecureStorage, Storage, StorageError};
 
 use super::super::{VauchiError, VauchiResult};
 use super::SMK_KEY_NAME;
 
-use crate::api::shred::BOOTSTRAP_KEY_NAME;
+use crate::api::shred::{BOOTSTRAP_KEY_NAME, BRK_KEY_NAME};
 
 /// Keeps every keychain failure typed, so Core can choose the unlock,
 /// recovery or try-again screen (ADR-045). The platform's message is
@@ -73,6 +73,40 @@ pub(super) fn delete_bootstrap_key(secure: &dyn SecureStorage) {
     }
 }
 
+/// Makes the Background Receive Key for an identity that has an SMK and no
+/// BRK yet; an existing one is never replaced (ADR-033 amendment
+/// 2026-11-07). Random rather than derived, because the SMK it would come
+/// from cannot be read on a locked phone.
+///
+/// Best-effort: nothing is under the BRK until a receive needs it, so a
+/// failed read or save must not stop the app from starting, and the next
+/// open retries. A failed read makes nothing, so a key that is there but
+/// unreadable is not replaced.
+pub(super) fn ensure_background_receive_key(secure: &dyn SecureStorage) {
+    match secure.load_key_with_access(BRK_KEY_NAME, KeyAccess::AfterFirstUnlock) {
+        Ok(Some(_)) => return,
+        Ok(None) => {}
+        Err(e) => {
+            tracing::warn!(
+                target: "vauchi.storage.keys",
+                error = %e,
+                "could not read the background receive key; the next open retries"
+            );
+            return;
+        }
+    }
+    let brk = SymmetricKey::generate();
+    if let Err(e) =
+        secure.save_key_with_access(BRK_KEY_NAME, brk.as_bytes(), KeyAccess::AfterFirstUnlock)
+    {
+        tracing::warn!(
+            target: "vauchi.storage.keys",
+            error = %e,
+            "could not store the background receive key; the next open retries"
+        );
+    }
+}
+
 /// Opens storage under secure-storage keys and returns the key the data is
 /// under. `shell_key` is a storage key a shell kept itself before keys moved
 /// to secure storage; it is adopted, so the shell can drop it once Core has
@@ -97,6 +131,7 @@ pub(super) fn open_storage(
         match Storage::open(path, sek.clone()) {
             Ok(storage) => {
                 delete_bootstrap_key(secure);
+                ensure_background_receive_key(secure);
                 return Ok((storage, sek));
             }
             Err(StorageError::WrongKey) => {}
@@ -106,6 +141,7 @@ pub(super) fn open_storage(
             open_with_first(path, bootstrap.into_iter().chain(shell_key).collect())?;
         storage.rekey(sek.clone())?;
         delete_bootstrap_key(secure);
+        ensure_background_receive_key(secure);
         return Ok((storage, sek));
     }
 

@@ -17,13 +17,13 @@ use std::path::PathBuf;
 use crate::api::deletion::{DeletionError, DeletionManager};
 use crate::api::pre_signed::{PreSignedPurgeRequest, legacy_pre_signed_file};
 use crate::identity::Identity;
-use crate::storage::secure::SecureStorage;
+use crate::storage::secure::{KeyAccess, SecureStorage};
 use crate::storage::{DeletionState, Storage};
 
 use super::storage::{destroy_storage_keys, secure_overwrite_file};
 use super::{
-    BOOTSTRAP_KEY_NAME, PurgeSender, RevocationSender, SMK_KEY_NAME, ShredError, ShredReport,
-    ShredToken, ShredVerification,
+    BOOTSTRAP_KEY_NAME, BRK_KEY_NAME, PurgeSender, RevocationSender, SMK_KEY_NAME, ShredError,
+    ShredReport, ShredToken, ShredVerification,
 };
 
 /// Orchestrates cryptographic shredding of all identity data.
@@ -181,12 +181,18 @@ impl<'a> ShredManager<'a> {
             .load_key(BOOTSTRAP_KEY_NAME)
             .map(|k| k.is_none())
             .unwrap_or(true);
+        let brk_absent = self
+            .secure_storage
+            .load_key_with_access(BRK_KEY_NAME, KeyAccess::AfterFirstUnlock)
+            .map(|k| k.is_none())
+            .unwrap_or(true);
         let database_absent = !self.data_dir.join("vauchi.db").exists();
         let data_dir_absent = !self.data_dir.exists();
         let pre_signed_absent = !legacy_pre_signed_file(&self.data_dir).exists();
 
         let all_clear = smk_absent
             && bootstrap_key_absent
+            && brk_absent
             && database_absent
             && pre_signed_absent
             && data_dir_absent;
@@ -194,6 +200,7 @@ impl<'a> ShredManager<'a> {
         ShredVerification {
             smk_absent,
             bootstrap_key_absent,
+            brk_absent,
             database_absent,
             data_dir_absent,
             pre_signed_absent,

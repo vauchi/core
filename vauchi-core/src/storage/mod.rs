@@ -52,7 +52,7 @@ pub use error::{
     DeviceDeliveryStatus, OfflineQueue, PendingUpdate, RetryEntry, RetryQueue, StorageError,
     UpdateStatus,
 };
-pub use secure::{FileKeyStorage, SecureStorage};
+pub use secure::{FileKeyStorage, KeyAccess, SecureStorage};
 pub use stores::RevokedSender;
 pub use stores::{
     ActivityLogStore, ConsentStore, ContactStore, DecoyStore, DeliveryStore, DeviceDeliveryStore,

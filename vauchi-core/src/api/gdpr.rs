@@ -214,6 +214,7 @@ fn filter_audit_details(details: &str) -> String {
                 "encryption_key",
                 "cek",
                 "smk",
+                "brk",
                 "sek",
                 "fkek",
                 "ratchet_state",
@@ -427,12 +428,13 @@ mod tests {
 
     #[test]
     fn test_filter_audit_details_strips_cek_smk_sek() {
-        let input = r#"{"cek":"abc","smk":"def","sek":"ghi","contact_id":"123"}"#;
+        let input = r#"{"cek":"abc","smk":"def","brk":"jkl","sek":"ghi","contact_id":"123"}"#;
         let result = filter_audit_details(input);
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
         parsed.get("contact_id").expect("expected Some");
         assert!(parsed.get("cek").is_none());
         assert!(parsed.get("smk").is_none());
+        assert!(parsed.get("brk").is_none());
         assert!(parsed.get("sek").is_none());
     }
 

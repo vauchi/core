@@ -11,6 +11,17 @@
 use crate::storage::StorageError;
 use std::path::PathBuf;
 
+/// When a key in secure storage can be read: the platform class it is kept
+/// in (ADR-033 amendment 2026-11-07).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyAccess {
+    /// Only after the person authenticates; every key but the BRK.
+    AfterAuthentication,
+    /// From the first unlock after boot, without authenticating, so a
+    /// background run on a locked phone can read it.
+    AfterFirstUnlock,
+}
+
 /// Trait for secure storage of cryptographic keys.
 ///
 /// Implementations should use platform-native secure storage when available:
@@ -40,6 +51,35 @@ pub trait SecureStorage: Send + Sync {
     /// since hardware-backed storage handles secure erasure internally.
     fn secure_delete_key(&self, name: &str) -> Result<(), StorageError> {
         self.delete_key(name)
+    }
+
+    /// Saves a key in the class `access` names. A store with one class
+    /// (a desktop keyring, a key file) keeps every key the same way.
+    fn save_key_with_access(
+        &self,
+        name: &str,
+        key: &[u8],
+        _access: KeyAccess,
+    ) -> Result<(), StorageError> {
+        self.save_key(name, key)
+    }
+
+    /// Loads a key from the class `access` names.
+    fn load_key_with_access(
+        &self,
+        name: &str,
+        _access: KeyAccess,
+    ) -> Result<Option<Vec<u8>>, StorageError> {
+        self.load_key(name)
+    }
+
+    /// Securely deletes a key from the class `access` names.
+    fn secure_delete_key_with_access(
+        &self,
+        name: &str,
+        _access: KeyAccess,
+    ) -> Result<(), StorageError> {
+        self.secure_delete_key(name)
     }
 }
 

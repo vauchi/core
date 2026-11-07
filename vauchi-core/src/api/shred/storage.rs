@@ -10,9 +10,9 @@
 use std::path::Path;
 
 use crate::api::pre_signed::legacy_pre_signed_file;
-use crate::storage::secure::SecureStorage;
+use crate::storage::secure::{KeyAccess, SecureStorage};
 
-use super::{BOOTSTRAP_KEY_NAME, SMK_KEY_NAME, ShredError, ShredReport};
+use super::{BOOTSTRAP_KEY_NAME, BRK_KEY_NAME, SMK_KEY_NAME, ShredError, ShredReport};
 
 /// Public entry point for secure file overwrite, callable from other modules.
 pub(crate) fn secure_overwrite_file_public(path: &Path) -> Result<(), std::io::Error> {
@@ -57,12 +57,16 @@ pub(super) fn secure_overwrite_file(path: &Path) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-/// Deletes every key in secure storage that opens the database; true when
-/// both deletes succeeded.
+/// Deletes every key in secure storage that opens stored data, the BRK
+/// with the SMK (ADR-033 amendment 2026-11-07); true when every delete
+/// succeeded.
 pub(super) fn destroy_storage_keys(secure_storage: &dyn SecureStorage) -> bool {
     let smk = secure_storage.secure_delete_key(SMK_KEY_NAME).is_ok();
     let bootstrap = secure_storage.secure_delete_key(BOOTSTRAP_KEY_NAME).is_ok();
-    smk && bootstrap
+    let brk = secure_storage
+        .secure_delete_key_with_access(BRK_KEY_NAME, KeyAccess::AfterFirstUnlock)
+        .is_ok();
+    smk && bootstrap && brk
 }
 
 /// Panic shred callable from a widget without full Vauchi initialization.

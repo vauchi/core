@@ -111,9 +111,22 @@ impl Vauchi {
         ))
     }
 
+    /// Always refuses: a link cannot be opened without its code. Kept so that
+    /// shells pinned to this call still build and fail closed until their
+    /// bump moves them to [`Self::accept_link_exchange_with_code`] (private#727).
+    pub fn accept_link_exchange(&self, _link: &str) -> VauchiResult<LinkExchange> {
+        Err(VauchiError::InvalidState(
+            "link exchange needs the code the sender shared".to_string(),
+        ))
+    }
+
     /// Accept another person's exchange link as the responder, with the code
     /// they sent another way.
-    pub fn accept_link_exchange(&self, link: &str, code: &str) -> VauchiResult<LinkExchange> {
+    pub fn accept_link_exchange_with_code(
+        &self,
+        link: &str,
+        code: &str,
+    ) -> VauchiResult<LinkExchange> {
         let payload = parse_exchange_deep_link(link.trim())
             .map_err(|e| VauchiError::InvalidState(format!("not an exchange link: {e}")))?;
         let code = LinkCode::parse(code)

@@ -78,11 +78,8 @@ const MASK_KEY_INFO: &[u8] = b"Vauchi_Duress_Mask_Key_v1";
 
 /// The key the duress content is sealed under, derived from the SEK.
 pub(crate) fn mask_key(storage_key: &SymmetricKey) -> SymmetricKey {
-    SymmetricKey::from_bytes(*HKDF::derive_key(
-        None,
-        storage_key.as_bytes(),
-        MASK_KEY_INFO,
-    ))
+    let derived = HKDF::derive_key(None, storage_key.as_bytes(), MASK_KEY_INFO);
+    SymmetricKey::from_bytes(*derived)
 }
 
 /// The smallest sealed size; larger content doubles it until it fits.

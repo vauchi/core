@@ -67,6 +67,31 @@ fn setup_counts_two_steps() {
     assert_eq!((progress.current_step, progress.total_steps), (1, 2));
 }
 
+// @claim: S14
+// @internal
+#[test]
+fn setup_says_a_duress_pin_does_not_stop_a_forensic_extraction() {
+    let mut engine = DuressPinEngine::new(DuressConfig::default(), Locale::ENGLISH);
+    let _ = select(&mut engine, "duress_actions", "set_up");
+
+    let screen = engine.current_screen();
+
+    assert_eq!(screen.screen_id, "duress_enter_pin");
+    let note = screen
+        .components
+        .iter()
+        .find_map(|component| match component {
+            Component::Text { id, content, .. } if id == "forensic_note" => Some(content.clone()),
+            _ => None,
+        })
+        .expect("the setup screen states the limit");
+    assert_eq!(
+        note,
+        "A duress PIN fools someone watching you unlock the app. It can't protect your contacts \
+         from someone with forensic tools who extracts your device's storage and keys."
+    );
+}
+
 // @scenario: duress_mode :: A duress unlock sends nothing
 #[test]
 fn an_enabled_duress_pin_lists_no_alerts_row() {

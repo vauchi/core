@@ -83,6 +83,7 @@ mod archived_contacts_engine_tests;
 mod avatar_generate_tests;
 mod avatar_normalize_proptest;
 mod avatar_normalize_tests;
+mod background_receive_key_tests;
 mod background_sync_schedule_tests;
 mod backup_boundary_tests;
 mod backup_format_versioning_tests;

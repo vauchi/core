@@ -2595,6 +2595,7 @@
   "sync.last_sync": "Last sync",
   "sync.last_synced": "Last synced {time}",
   "sync.message_format": "Synced: {cards_updated} cards updated, {updates_sent} sent",
+  "sync.missed_while_locked": "Couldn't check for updates while your phone was locked ({time})",
   "sync.no_changes": "No changes",
   "sync.offline_banner": "You're offline",
   "sync.offline_detail": "Changes will sync automatically when connected. Check your internet connection.",

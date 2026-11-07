@@ -471,3 +471,194 @@ fn a_restored_host_names_the_joiners_key() {
         Some(key)
     );
 }
+
+fn usable_key(seed_byte: u8) -> [u8; 32] {
+    *SigningKeyPair::from_seed(&[seed_byte; 32])
+        .public_key()
+        .as_bytes()
+}
+
+// @internal
+#[test]
+fn the_code_the_user_compares_covers_the_key() {
+    let host = host();
+    let mut request = DeviceLinkRequest::decrypt(
+        &request_naming(&host.initiator, usable_key(0x10)),
+        host.initiator.qr().link_key(),
+    )
+    .unwrap();
+    let encrypted = request.encrypt(host.initiator.qr().link_key()).unwrap();
+    let (confirmation, _) = host.initiator.prepare_confirmation(&encrypted).unwrap();
+
+    request.device_signing_public_key = usable_key(0x11);
+    let swapped = request.encrypt(host.initiator.qr().link_key()).unwrap();
+    let (swapped_confirmation, _) = host.initiator.prepare_confirmation(&swapped).unwrap();
+
+    assert_ne!(
+        confirmation.confirmation_code,
+        swapped_confirmation.confirmation_code
+    );
+}
+
+// @internal
+#[test]
+fn a_usable_key_swapped_after_confirmation_is_refused() {
+    let host = host();
+    let restored = restored_initiator(&host);
+    let encrypted = request_naming(&host.initiator, usable_key(0x12));
+    let link_key = *host.initiator.qr().link_key();
+    let (confirmation, mut request) = host.initiator.prepare_confirmation(&encrypted).unwrap();
+    let proof =
+        ProximityProof::manual_confirmation(&link_key, &confirmation.confirmation_code, now());
+
+    request.device_signing_public_key = usable_key(0x13);
+
+    assert!(matches!(
+        host.initiator.confirm_link(&request, &proof, now()),
+        Err(ExchangeError::ProximityNotVerified)
+    ));
+    assert!(matches!(
+        restored.confirm_link(&request, &proof, now()),
+        Err(ExchangeError::ProximityNotVerified)
+    ));
+}
+
+// @internal
+#[test]
+fn both_devices_show_the_same_code() {
+    let host = host();
+    let mut responder = responder_for(&host.initiator);
+    let request = responder.create_request(now()).unwrap();
+
+    let (confirmation, _) = host.initiator.prepare_confirmation(&request).unwrap();
+
+    assert_eq!(
+        responder.compute_confirmation_code().unwrap(),
+        confirmation.confirmation_code
+    );
+}
+
+fn joiner_entry_key(host: &Host, responder: &mut DeviceLinkResponder) -> [u8; 32] {
+    let encrypted = responder.create_request(now()).unwrap();
+    DeviceLinkRequest::decrypt(&encrypted, host.initiator.qr().link_key())
+        .unwrap()
+        .device_signing_public_key
+}
+
+// @internal
+#[test]
+fn a_joiner_refuses_a_registry_where_its_entry_is_revoked() {
+    let host = host();
+    let mut responder = responder_for(&host.initiator);
+    let key = joiner_entry_key(&host, &mut responder);
+    let new_device = DeviceInfo::derive(&SEED, 1, "My Phone".into(), now());
+    let signing = host.identity.signing_keypair();
+    let mut registry = host.registry.clone();
+    registry
+        .add_device(
+            new_device.to_registered(&SEED).with_signing_key(key),
+            signing,
+        )
+        .unwrap();
+    registry
+        .revoke_device(new_device.device_id(), signing, now())
+        .unwrap();
+
+    let result = responder.process_response(&response_with_registry(&host, registry));
+
+    assert!(matches!(result, Err(ExchangeError::DeviceKeyRefused)));
+}
+
+// @internal
+#[test]
+fn a_joiner_refuses_a_registry_the_identity_did_not_sign() {
+    let host = host();
+    let mut responder = responder_for(&host.initiator);
+    let key = joiner_entry_key(&host, &mut responder);
+    let new_device = DeviceInfo::derive(&SEED, 1, "My Phone".into(), now());
+    let mut registry = host.registry.clone();
+    registry
+        .add_device_unsigned(new_device.to_registered(&SEED).with_signing_key(key))
+        .unwrap();
+
+    let result = responder.process_response(&response_with_registry(&host, registry));
+
+    assert!(matches!(result, Err(ExchangeError::DeviceKeyRefused)));
+}
+
+fn response_with_sync(host: &Host, sync_json: &str) -> DeviceLinkResponse {
+    let mut responder = responder_for(&host.initiator);
+    let encrypted = responder.create_request(now()).unwrap();
+    let (confirmation, request) = host.initiator.prepare_confirmation(&encrypted).unwrap();
+    let proof = ProximityProof::manual_confirmation(
+        host.initiator.qr().link_key(),
+        &confirmation.confirmation_code,
+        now(),
+    );
+    let (encrypted_response, _, _) = host
+        .initiator
+        .confirm_link_with_sync(&request, sync_json, &proof, now())
+        .unwrap();
+    responder.process_response(&encrypted_response).unwrap()
+}
+
+fn stored_device_key_rows(vauchi: &Vauchi) -> i64 {
+    vauchi
+        .storage()
+        .connection()
+        .query_row("SELECT COUNT(*) FROM device_signing_key", [], |row| {
+            row.get(0)
+        })
+        .unwrap()
+}
+
+// @internal
+#[test]
+fn a_failed_sync_import_leaves_nothing_and_a_new_link_can_finish() {
+    let host = host();
+    let bad = response_with_sync(&host, "not a sync payload");
+    let mut joiner = Vauchi::in_memory().unwrap();
+
+    let failed = joiner.adopt_device_link_response(&bad, "My Phone".into());
+
+    assert!(failed.is_err());
+    assert!(!joiner.has_identity());
+    assert_eq!(joiner.storage().identity().load_identity().unwrap(), None);
+    assert_eq!(stored_device_key_rows(&joiner), 0);
+
+    let good = response_with_sync(&host, &sync_payload());
+    joiner
+        .adopt_device_link_response(&good, "My Phone".into())
+        .unwrap();
+    assert!(joiner.has_identity());
+    assert_eq!(stored_device_key_rows(&joiner), 1);
+}
+
+fn sync_payload() -> String {
+    let card = vauchi_core::contact_card::ContactCard::new("Alice");
+    serde_json::to_string(&vauchi_core::sync::DeviceSyncPayload::new(&[], &card, 1)).unwrap()
+}
+
+// @internal
+#[test]
+fn a_sync_payload_does_not_take_the_joiners_key_out_of_the_registry() {
+    let host = host();
+    let response = response_with_sync(&host, &sync_payload());
+    let mut joiner = Vauchi::in_memory().unwrap();
+
+    joiner
+        .adopt_device_link_response(&response, "My Phone".into())
+        .unwrap();
+
+    let device_id = *joiner.identity().unwrap().device_info().device_id();
+    let stored = joiner
+        .storage()
+        .device()
+        .load_device_registry()
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        stored.find_device(&device_id).unwrap().signing_public_key,
+        Some(public_key_of_stored_key(&joiner))
+    );
+}

@@ -45,6 +45,7 @@ impl PlatformAppEngine {
     /// One scheduler tick, returning the `on_wakeup` envelope with the
     /// scheduler's next run (#603).
     pub(crate) fn scheduler_tick(&self) -> Result<String, MobileError> {
+        self.record_missed_run_if_locked()?;
         let mut engine_slot = self.lock_engine()?;
         let engine = open_engine(&mut engine_slot)?;
         let (_outcome, next_run) =

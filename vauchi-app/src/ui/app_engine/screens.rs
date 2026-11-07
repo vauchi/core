@@ -158,6 +158,7 @@ impl AppEngine {
                         .with_avatar_data(avatar_data)
                         .with_pending_updates(pending_updates)
                         .with_last_sync_seconds(last_sync_seconds)
+                        .with_missed_background_run_seconds(vauchi.missed_background_run())
                         .with_now_seconds(now_seconds),
                 )
             }

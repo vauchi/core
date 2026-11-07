@@ -82,6 +82,9 @@ pub struct MyInfoEngine {
     /// Wall-clock unix seconds of the last successful sync (per
     /// `Vauchi::last_sync_time`). Rendered as a caption when present.
     last_sync_seconds: Option<u64>,
+    /// A scheduler run that found storage locked, while no sync has
+    /// succeeded since (`Vauchi::missed_background_run`).
+    missed_background_run_seconds: Option<u64>,
     /// Wall-clock unix seconds at render time, used to compute the
     /// `last_sync_seconds` relative-time caption.
     now_seconds: u64,
@@ -101,6 +104,7 @@ impl MyInfoEngine {
             avatar_data: None,
             pending_updates: 0,
             last_sync_seconds: None,
+            missed_background_run_seconds: None,
             now_seconds: 0,
             locale: Locale::ENGLISH,
         }
@@ -169,6 +173,11 @@ impl MyInfoEngine {
     /// Set the wall-clock unix timestamp of the last successful sync.
     pub fn with_last_sync_seconds(mut self, seconds: Option<u64>) -> Self {
         self.last_sync_seconds = seconds;
+        self
+    }
+
+    pub fn with_missed_background_run_seconds(mut self, seconds: Option<u64>) -> Self {
+        self.missed_background_run_seconds = seconds;
         self
     }
 
@@ -242,6 +251,19 @@ impl MyInfoEngine {
                 content: get_string_with_args(
                     self.locale,
                     "sync.last_synced",
+                    &[("time", &relative)],
+                ),
+                style: TextStyle::Caption,
+            });
+        }
+        if let Some(missed) = self.missed_background_run_seconds {
+            let relative = format_relative_time(self.now_seconds, missed, self.locale);
+            out.push(Component::Text {
+                a11y: None,
+                id: "missed_run_caption".into(),
+                content: get_string_with_args(
+                    self.locale,
+                    "sync.missed_while_locked",
                     &[("time", &relative)],
                 ),
                 style: TextStyle::Caption,

@@ -48,9 +48,13 @@ impl AppEngine {
     }
 
     /// Keeps the language and theme pick in `data_dir`, outside the vault,
-    /// so no shell stores it (vauchi/private#814).
+    /// so no shell stores it (vauchi/private#814), and takes the record a
+    /// scheduler run left there while storage was locked (#1093).
     pub fn keep_restorable_state_in(&mut self, data_dir: &std::path::Path) {
         self.kept_state_file = Some(crate::ui::restorable_state::KeptStateFile::in_dir(data_dir));
+        if let Some(at) = crate::ui::missed_background_run::take_missed_background_run(data_dir) {
+            self.vauchi.note_missed_background_run(at);
+        }
         let ctx = crate::ui::RenderContext {
             restorable_state: None,
             ..self.render_context.clone()

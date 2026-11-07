@@ -300,6 +300,10 @@ pub struct Vauchi {
     /// so MyInfoEngine can render "Last synced X ago" without the frontend
     /// owning the timestamp (humble-UI follow-up to ios!472).
     last_sync_unix_seconds: Option<u64>,
+    /// When a scheduler run last found storage locked, taken from the
+    /// record it left beside the database (vauchi/private#1093). In-memory
+    /// only, like `last_sync_unix_seconds`, which a later sync supersedes.
+    missed_background_run_unix_seconds: Option<u64>,
     /// Wall-clock unix seconds of the last emergency broadcast. In-memory
     /// only; resets on process restart. Used to enforce
     /// `BROADCAST_COOLDOWN_SECS` without adding a new storage column for a
@@ -459,6 +463,7 @@ impl Vauchi {
             #[cfg(feature = "network-http")]
             last_exchange_time: None,
             last_sync_unix_seconds: None,
+            missed_background_run_unix_seconds: None,
             last_emergency_broadcast_unix_seconds: None,
         };
         if wb.identity.is_some() && wb.secure_storage.is_some() {
@@ -485,6 +490,21 @@ impl Vauchi {
     /// storage migration). Returns `None` in builds without `network-http`.
     pub fn last_sync_time(&self) -> Option<u64> {
         self.last_sync_unix_seconds
+    }
+
+    /// Remembers that a scheduler run at `at_unix_seconds` could not open
+    /// storage.
+    pub fn note_missed_background_run(&mut self, at_unix_seconds: u64) {
+        self.missed_background_run_unix_seconds = Some(at_unix_seconds);
+    }
+
+    /// The missed scheduler run, while no sync has succeeded since.
+    pub fn missed_background_run(&self) -> Option<u64> {
+        let missed = self.missed_background_run_unix_seconds?;
+        match self.last_sync_unix_seconds {
+            Some(synced) if synced >= missed => None,
+            _ => Some(missed),
+        }
     }
 
     /// Borrow the explicit-randomness seam. Tests pass a
@@ -670,6 +690,7 @@ impl Vauchi {
             #[cfg(feature = "network-http")]
             last_exchange_time: None,
             last_sync_unix_seconds: None,
+            missed_background_run_unix_seconds: None,
             last_emergency_broadcast_unix_seconds: None,
         })
     }

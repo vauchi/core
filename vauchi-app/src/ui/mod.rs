@@ -57,6 +57,7 @@ pub mod invocation;
 pub mod link_exchange;
 mod link_responder;
 mod lock_screen;
+mod missed_background_run;
 pub mod multi_stage_exchange;
 mod multi_stage_status;
 mod my_info;
@@ -189,6 +190,7 @@ pub use link_responder::{
     LINK_CODE_INPUT_ID as LINK_RESPONDER_CODE_INPUT_ID, LinkResponderEngine,
 };
 pub use lock_screen::{DEFAULT_LOCK_MAX_ATTEMPTS, LockScreenEngine};
+pub use missed_background_run::record_missed_background_run;
 pub use multi_stage_exchange::{
     CANCEL_ACTION_ID as MULTI_STAGE_CANCEL_ACTION_ID, DONE_ACTION_ID as MULTI_STAGE_DONE_ACTION_ID,
     GRANT_CAMERA_PERMISSION_ACTION_ID as MULTI_STAGE_GRANT_CAMERA_PERMISSION_ACTION_ID,

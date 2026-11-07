@@ -133,6 +133,26 @@ impl PlatformAppEngine {
         }
     }
 
+    /// A scheduler run that finds storage locked leaves a record the next
+    /// open shows (vauchi/private#1093); the run itself still fails, so the
+    /// shell's retry and its chain of runs stay as they are (#603).
+    pub(crate) fn record_missed_run_if_locked(&self) -> Result<(), MobileError> {
+        let locked = self.lock_locked_start()?;
+        let Some(data_dir) = locked
+            .as_ref()
+            .and_then(|start| start.params.storage_path.parent())
+        else {
+            return Ok(());
+        };
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_secs());
+        // Best effort: an unwritable data directory fails the open anyway.
+        #[allow(clippy::let_underscore_must_use)]
+        let _ = vauchi_app::ui::record_missed_background_run(data_dir, now);
+        Ok(())
+    }
+
     /// The release of a handed-over secret, once, after storage opened.
     pub(crate) fn take_release(&self) -> Result<Option<Command>, MobileError> {
         let mut release = self

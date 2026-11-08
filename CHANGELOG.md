@@ -8,6 +8,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Removed
+
+- `Vauchi::accept_link_exchange(link)`, which since 0.101.0 always
+  refused a link opened without its code. Every consumer now calls
+  `accept_link_exchange_with_code` (vauchi/private#727). A consumer still
+  calling the one-argument form stops compiling.
+
 ### Security
 
 - `Vauchi::new` refuses a plaintext relay or OHTTP relay URL from

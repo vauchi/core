@@ -111,15 +111,6 @@ impl ProfileEngine {
         ))
     }
 
-    /// Always refuses: a link cannot be opened without its code. Kept so that
-    /// shells pinned to this call still build and fail closed until their
-    /// bump moves them to [`Self::accept_link_exchange_with_code`] (private#727).
-    pub fn accept_link_exchange(&self, _link: &str) -> VauchiResult<LinkExchange> {
-        Err(VauchiError::InvalidState(
-            "link exchange needs the code the sender shared".to_string(),
-        ))
-    }
-
     /// Accept another person's exchange link as the responder, with the code
     /// they sent another way.
     pub fn accept_link_exchange_with_code(

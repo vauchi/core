@@ -148,24 +148,6 @@ fn only_the_sender_of_a_link_has_a_code_to_show() {
     assert!(accepting.code().is_none());
 }
 
-// A shell still pinned to the one-argument call compiles, and fails closed.
-// @claim: S9
-// @internal
-#[test]
-fn accepting_a_valid_link_without_a_code_is_refused() {
-    let mock = MockRelay::start();
-    let (alice, _a) = user_at(&mock, "Alice");
-    let (bob, _b) = user_at(&mock, "Bob");
-    let (link, _sharing) = alice.start_link_exchange().expect("share");
-
-    let refusal = bob
-        .accept_link_exchange(&link)
-        .err()
-        .expect("a link without a code is refused");
-
-    assert!(refusal.to_string().contains("needs the code"), "{refusal}");
-}
-
 // CC-14: the typed code is untrusted input, refused before anything reaches
 // the relay.
 // @internal

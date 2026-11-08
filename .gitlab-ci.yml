@@ -729,18 +729,34 @@ lint:semver:
     # rustdoc JSON is nightly-only; semver-checks invokes nightly itself.
     - rustup toolchain install nightly --profile minimal --component rustdoc 2>/dev/null || true
     - git fetch origin main
+    - python3 ci/tests/semver-baseline.test.py
+    # #1173: queued merged results must use their own target snapshot.
+    - baseline_ref="$(sh ci/semver-baseline.sh)"
+    - git fetch origin "$baseline_ref"
     # Not --baseline-rev: since 0.51.0 it extracts the rev as an archive and
     # rejects the repo-root locales/themes symlinks (../locales) as pointing
     # outside the tree. A worktree checks the symlinks out as plain links.
     - BASELINE="$(mktemp -d)/core"
     # Shell runners keep .git across jobs; drop worktrees a failed run left.
     - git worktree prune
-    - git worktree add -f --detach "$BASELINE" origin/main
+    - git worktree add -f --detach "$BASELINE" "$baseline_ref"
     - cargo semver-checks check-release -p vauchi-protocol --baseline-root "$BASELINE"
     - cargo semver-checks check-release -p vauchi-core --baseline-root "$BASELINE"
     - git worktree remove --force "$BASELINE"
     # vauchi-platform: include_bytes! references sibling themes/ repo —
     # skipped until themes are vendored or a similar workaround is applied
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - "**/*.rs"
+          - "**/Cargo.toml"
+          - "**/Cargo.lock"
+          - ".gitlab-ci.yml"
+          - "rust-toolchain.toml"
+          - "ci/semver-baseline.sh"
+          - "ci/tests/semver-baseline.test.py"
 
 # Duplicate dependency check (advisory — detects multiple versions of same crate)
 lint:duplicates:

@@ -109,3 +109,19 @@ fn a_rename_under_duress_leaves_the_real_name_in_the_mask() {
         Some((public_id, "Alice".to_string()))
     );
 }
+
+// @scenario: duress_mode :: Decoy profile has separate database
+#[test]
+fn an_emergency_wipe_leaves_the_mask_without_the_real_public_values() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let held = vauchi.storage().mask_public_values().load().unwrap();
+    assert_eq!(
+        held.map(|v| v.public_id()),
+        Some(vauchi.public_id().unwrap())
+    );
+
+    vauchi.perform_emergency_wipe(true).unwrap();
+
+    assert_eq!(vauchi.storage().mask_public_values().load().unwrap(), None);
+}

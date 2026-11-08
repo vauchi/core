@@ -59,9 +59,7 @@ impl ProfileEngine {
         self.storage.begin_transaction()?;
         let restored = (|| -> VauchiResult<()> {
             // Startup loads the storage encoding without the user's backup password.
-            self.storage
-                .identity()
-                .save_identity(&identity.to_storage_bytes())?;
+            self.storage.identity().save(&identity)?;
             self.storage.contacts().save_own_card(own_card)?;
             for contact in &contacts {
                 self.storage.contacts().save_contact(contact)?;

@@ -319,6 +319,7 @@ impl ProfileEngine {
 
         self.storage.device().clear_device_signing_key()?;
         self.storage.identity().delete_identity()?;
+        self.storage.mask_public_values().clear()?;
         Ok(())
     }
 

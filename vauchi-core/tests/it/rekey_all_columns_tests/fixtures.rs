@@ -52,6 +52,8 @@ pub(super) fn fixtures() -> Vec<(&'static str, &'static str, &'static [u8])> {
         ("own_card", "card_json_encrypted", b"{\"name\":\"Alice\"}"),
         ("mask_seed", "seed_encrypted", &[0x5a; 32]),
         ("decoy_ids", "display_name_encrypted", b"Decoy"),
+        ("public_values", "signing_public_key_encrypted", &[0x7b; 32]),
+        ("public_values", "display_name_encrypted", b"Alice"),
         (
             "device_registry",
             "registry_json_encrypted",

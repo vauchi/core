@@ -446,6 +446,16 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
             params![enc("decoy_ids", "display_name_encrypted"), now],
         )
         .unwrap();
+    duress
+        .execute(
+            "INSERT INTO public_values \
+             (id, signing_public_key_encrypted, display_name_encrypted) VALUES (1, ?1, ?2)",
+            params![
+                enc("public_values", "signing_public_key_encrypted"),
+                enc("public_values", "display_name_encrypted")
+            ],
+        )
+        .unwrap();
 
     let enc = |table: &str, column: &str| -> Vec<u8> { encrypt(key, &fx(table, column)).unwrap() };
 
@@ -512,7 +522,7 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
 
 #[allow(clippy::too_many_lines)]
 /// The tables only the mask profile has (ADR-080).
-const MASK_ONLY_TABLES: [&str; 2] = ["mask_seed", "decoy_ids"];
+const MASK_ONLY_TABLES: [&str; 3] = ["mask_seed", "decoy_ids", "public_values"];
 
 fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
     let conn = storage.connection();
@@ -586,6 +596,9 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
         "contact_id = 'c-d1'",
         id_eq_1,
     );
+    for col in ["signing_public_key_encrypted", "display_name_encrypted"] {
+        check_one("public_values", col, "id = 1", id_eq_1);
+    }
 
     // ── identity (3 columns, singleton) ─────────────────────
     for col in [

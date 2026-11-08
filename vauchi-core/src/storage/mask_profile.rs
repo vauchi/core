@@ -25,6 +25,11 @@ const MASK_ONLY_SCHEMA: &str = "
         id INTEGER PRIMARY KEY CHECK (id = 1),
         seed_encrypted BLOB NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS public_values (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        signing_public_key_encrypted BLOB NOT NULL,
+        display_name_encrypted BLOB NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS decoy_ids (
         contact_id TEXT PRIMARY KEY,
         decoy_id TEXT NOT NULL UNIQUE,

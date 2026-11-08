@@ -81,9 +81,7 @@ impl ProfileEngine {
         }
 
         // Persist identity to storage so it survives restart
-        self.storage
-            .identity()
-            .save_identity(&identity.to_storage_bytes())?;
+        self.storage.identity().save(&identity)?;
         self.start_receiving_today(&identity)?;
 
         self.identity = Some(identity);
@@ -235,9 +233,7 @@ impl ProfileEngine {
         // One step, or the new identity could start signing with the device key
         // of the identity it replaced (ADR-079): a backup carries no device key.
         self.storage.with_savepoint(|| -> VauchiResult<()> {
-            self.storage
-                .identity()
-                .save_identity(&identity.to_storage_bytes())?;
+            self.storage.identity().save(&identity)?;
             self.storage.device().clear_device_signing_key()?;
             Ok(())
         })?;
@@ -316,9 +312,7 @@ impl ProfileEngine {
         self.storage.with_savepoint(|| -> VauchiResult<()> {
             // Same plaintext storage format as `create_identity`; the DB
             // encrypts at rest (ADR-015).
-            self.storage
-                .identity()
-                .save_identity(&identity.to_storage_bytes())?;
+            self.storage.identity().save(&identity)?;
             self.storage
                 .device()
                 .adopt_device_signing_key(device_signing_seed)?;
@@ -461,8 +455,8 @@ impl ProfileEngine {
             .as_mut()
             .ok_or(VauchiError::IdentityNotInitialized)?;
 
-        // Update identity display name
         identity.set_display_name(name);
+        self.storage.identity().save(identity)?;
 
         // Update contact card display name
         let mut card = self

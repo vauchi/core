@@ -245,9 +245,18 @@ fn screen_catalog_checked_in_catalog_matches_a_fresh_build_semantically() {
     let recorded = structure(&checked_in_catalog());
     let fresh = structure(&build_catalog());
 
+    let changed: Vec<_> = recorded["screens"]
+        .as_array()
+        .expect("recorded screens")
+        .iter()
+        .zip(fresh["screens"].as_array().expect("fresh screens"))
+        .filter(|(before, after)| before != after)
+        .map(|(before, _)| before["code_id"].as_str().expect("screen code"))
+        .collect();
+
     assert!(
         recorded == fresh,
-        "catalog values drifted; review and run the ignored regenerate_shared_fixture test"
+        "catalog values drifted in {changed:?}; review and run the ignored regenerate_shared_fixture test"
     );
 }
 
@@ -485,9 +494,9 @@ fn screen_catalog_my_info_rows_carry_a_realistic_visibility_mix() {
     let visibility = my_info_visibility_by_label(entry);
 
     let expected: BTreeMap<String, String> = [
-        ("mobile", "All contacts"),
-        ("work", "All contacts"),
-        ("homepage", "All contacts"),
+        ("mobile", "All contacts by default"),
+        ("work", "All contacts by default"),
+        ("homepage", "All contacts by default"),
         ("home", "Family"),
         ("birthday", "Cycling club, Family"),
     ]

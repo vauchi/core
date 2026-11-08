@@ -14302,6 +14302,17 @@
                   }
                 },
                 {
+                  "Text": {
+                    "id": "entry_visibility_guidance",
+                    "content": "Open an entry to review who can see it.",
+                    "style": "caption",
+                    "accessibility": {
+                      "label": "Open an entry to review who can see it.",
+                      "description": null
+                    }
+                  }
+                },
+                {
                   "List": {
                     "id": "own_entries",
                     "label": null,
@@ -14309,7 +14320,7 @@
                       {
                         "title": "+44 20 7946 0958",
                         "subtitle": "mobile",
-                        "detail": "All contacts",
+                        "detail": "All contacts by default",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "M",
@@ -14333,7 +14344,7 @@
                       {
                         "title": "ada@analytical.example.org",
                         "subtitle": "work",
-                        "detail": "All contacts",
+                        "detail": "All contacts by default",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "W",
@@ -14357,7 +14368,7 @@
                       {
                         "title": "https://ada.example.org",
                         "subtitle": "homepage",
-                        "detail": "All contacts",
+                        "detail": "All contacts by default",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "H",
@@ -22961,6 +22972,17 @@
                   }
                 },
                 {
+                  "Text": {
+                    "id": "entry_visibility_guidance",
+                    "content": "Öffne einen Eintrag, um zu prüfen, wer ihn sehen kann.",
+                    "style": "caption",
+                    "accessibility": {
+                      "label": "Öffne einen Eintrag, um zu prüfen, wer ihn sehen kann.",
+                      "description": null
+                    }
+                  }
+                },
+                {
                   "List": {
                     "id": "own_entries",
                     "label": null,
@@ -22968,7 +22990,7 @@
                       {
                         "title": "+44 20 7946 0958",
                         "subtitle": "mobile",
-                        "detail": "Alle Kontakte",
+                        "detail": "Standardmäßig alle Kontakte",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "M",
@@ -22992,7 +23014,7 @@
                       {
                         "title": "ada@analytical.example.org",
                         "subtitle": "work",
-                        "detail": "Alle Kontakte",
+                        "detail": "Standardmäßig alle Kontakte",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "W",
@@ -23016,7 +23038,7 @@
                       {
                         "title": "https://ada.example.org",
                         "subtitle": "homepage",
-                        "detail": "Alle Kontakte",
+                        "detail": "Standardmäßig alle Kontakte",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "H",

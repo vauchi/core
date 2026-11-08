@@ -66,8 +66,12 @@ impl MigrationRunner {
     /// All pending migrations run within a single transaction — if any migration
     /// fails, all changes are rolled back.
     ///
-    /// If `db_path` is provided and there are pending migrations, a backup is
-    /// created at `<db_path>.pre-migration-v<current>.bak` before applying (#17).
+    /// If `db_path` is provided and there are pending migrations, a recovery
+    /// snapshot is attempted before applying them (#17). Its filename replaces
+    /// the database extension with `pre-migration-v<current>.bak`.
+    /// Backup failure is nonfatal and emits a path-free warning to any configured
+    /// tracing subscriber. The runner does not install a diagnostic backend.
+    /// Transaction rollback does not establish that a backup was created.
     /// `now` is the Unix-epoch-seconds timestamp stamped into the
     /// `schema_version` table when a migration completes. Production
     /// callers (`Storage::open` / `Storage::in_memory`) route it
@@ -116,12 +120,16 @@ impl MigrationRunner {
         if let Some(path) = db_path {
             let backup_path =
                 path.with_extension(format!("pre-migration-v{}.bak", current_version));
-            // Backup failure is non-fatal — the transaction provides rollback safety.
-            #[allow(clippy::let_underscore_must_use)]
-            let _ = conn.execute(
+            if let Err(error) = conn.execute(
                 "VACUUM INTO ?1",
                 rusqlite::params![backup_path.to_string_lossy().as_ref()],
-            );
+            ) {
+                tracing::warn!(
+                    target: "vauchi.storage.migration",
+                    sqlite_error_code = ?error.sqlite_error().map(|error| error.extended_code),
+                    "pre-migration backup unavailable; continuing transactionally"
+                );
+            }
         }
 
         // Verify migrations are in order

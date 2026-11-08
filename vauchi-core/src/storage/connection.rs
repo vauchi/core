@@ -139,8 +139,8 @@ impl Storage {
 
     /// Runs all pending schema migrations.
     ///
-    /// For file-based databases, creates a pre-migration backup before
-    /// applying pending migrations (#17).
+    /// For file-based databases, attempts a best-effort recovery snapshot before
+    /// applying pending migrations (#17). Failure does not prevent migration.
     fn run_migrations(&self) -> Result<(), StorageError> {
         let migrations = migration::all_migrations();
         migration::MigrationRunner::run(

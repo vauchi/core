@@ -93,7 +93,22 @@ fn backup_failure_keeps_best_effort_migration_and_emits_only_a_redacted_diagnost
     let conn = Connection::open(&path).unwrap();
     seed(&conn);
     let backup = path.with_extension("pre-migration-v1.bak");
-    std::fs::write(&backup, b"existing recovery copy").unwrap();
+    let recovery = Connection::open(&backup).unwrap();
+    seed(&recovery);
+    drop(recovery);
+    let recovery_bytes = std::fs::read(&backup).unwrap();
+    let backend_error = conn
+        .execute(
+            "VACUUM INTO ?1",
+            rusqlite::params![backup.to_string_lossy().as_ref()],
+        )
+        .unwrap_err();
+    let backend_code = match backend_error {
+        rusqlite::Error::SqliteFailure(error, _) | rusqlite::Error::SqlInputError { error, .. } => {
+            error.extended_code
+        }
+        other => panic!("expected a SQLite backup error, got {other:?}"),
+    };
     let diagnostics = Diagnostics::default();
     let key = SymmetricKey::generate();
 
@@ -103,17 +118,51 @@ fn backup_failure_keeps_best_effort_migration_and_emits_only_a_redacted_diagnost
 
     assert_eq!(data(&conn), "migrated");
     assert_eq!(MigrationRunner::current_version(&conn).unwrap(), 2);
-    assert_eq!(std::fs::read(&backup).unwrap(), b"existing recovery copy");
+    assert_eq!(std::fs::read(&backup).unwrap(), recovery_bytes);
     let expected = BTreeMap::from([
         ("level".into(), "WARN".into()),
         ("target".into(), "vauchi.storage.migration".into()),
-        ("sqlite_error_code".into(), "1".into()),
+        ("sqlite_error_code".into(), format!("Some({backend_code})")),
         (
             "message".into(),
             "pre-migration backup unavailable; continuing transactionally".into(),
         ),
     ]);
     assert_eq!(*diagnostics.0.lock().unwrap(), vec![expected]);
+}
+
+// @internal
+#[test]
+fn rollback_preserves_data_even_when_no_recovery_snapshot_can_be_created() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("history.db");
+    let conn = Connection::open(&path).unwrap();
+    seed(&conn);
+    let backup = path.with_extension("pre-migration-v1.bak");
+    std::fs::create_dir(&backup).unwrap();
+    let fail = Migration {
+        version: 3,
+        name: "controlled failure without a backup",
+        action: MigrationAction::Sql("INSERT INTO missing_table VALUES (1)"),
+    };
+    let error = MigrationRunner::run(
+        &conn,
+        &SymmetricKey::generate(),
+        &[update(), fail],
+        Some(&path),
+        11,
+    )
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        vauchi_core::storage::StorageError::Migration(_)
+    ));
+    drop(conn);
+    let reopened = Connection::open(&path).unwrap();
+    assert_eq!(data(&reopened), "kept");
+    assert_eq!(MigrationRunner::current_version(&reopened).unwrap(), 1);
+    assert!(backup.is_dir());
+    assert_eq!(std::fs::read_dir(&backup).unwrap().count(), 0);
 }
 
 // @internal

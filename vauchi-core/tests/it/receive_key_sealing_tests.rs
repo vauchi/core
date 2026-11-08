@@ -74,6 +74,7 @@ fn db(dir: &tempfile::TempDir) -> std::path::PathBuf {
     dir.path().join("vauchi.db")
 }
 
+// @claim: S12
 // @internal
 #[test]
 fn a_ratchet_saved_under_the_receive_key_needs_that_key_to_load() {

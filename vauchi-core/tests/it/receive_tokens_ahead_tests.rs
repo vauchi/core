@@ -286,6 +286,7 @@ fn without_a_receive_key_nothing_is_stored_ahead() {
     );
 }
 
+// @claim: S12
 // @internal
 #[test]
 fn no_stored_token_is_readable_on_disk() {

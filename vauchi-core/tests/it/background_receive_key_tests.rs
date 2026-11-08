@@ -179,6 +179,7 @@ fn keys_and_data(dir: &Path) -> (ClassedKeychain, Storage, Identity) {
     (keychain, storage, identity)
 }
 
+// @claim: S12
 // @scenario: emergency_shred :: Every shred destroys the background receive key
 #[test]
 fn every_shred_destroys_the_brk_with_the_smk() {

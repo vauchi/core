@@ -386,6 +386,7 @@ mod mailbox_token_shape_tests;
 mod mailbox_token_tests;
 mod mask_profile_contents_tests;
 mod mask_profile_storage_tests;
+mod mask_public_values_tests;
 mod migration_history_error_tests;
 mod migration_tests;
 mod migration_v37_test;

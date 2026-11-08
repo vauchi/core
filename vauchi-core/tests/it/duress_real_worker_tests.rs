@@ -21,6 +21,7 @@ use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::network::OhttpClient;
 use vauchi_core::rng::OsSecureRng;
 use vauchi_core::sleeper::FakeSleeper;
+use vauchi_core::storage::{MemoryKeyStorage, SecureStorage};
 use vauchi_protocol::ohttp_key::window_of;
 
 const APP_PIN: &str = "real-pin-2468";
@@ -49,6 +50,9 @@ impl Relays {
 struct Install {
     dir: tempfile::TempDir,
     key: SymmetricKey,
+    /// With a keychain the install keeps its keys there, the Background
+    /// Receive Key among them, as a phone does (vauchi/private#1093).
+    keychain: Option<Arc<MemoryKeyStorage>>,
 }
 
 impl Install {
@@ -56,18 +60,36 @@ impl Install {
         Install {
             dir: tempfile::tempdir().unwrap(),
             key: SymmetricKey::generate(),
+            keychain: None,
+        }
+    }
+
+    fn with_keychain() -> Self {
+        Install {
+            keychain: Some(Arc::new(MemoryKeyStorage::new())),
+            ..Install::new()
         }
     }
 
     fn open(&self, relays: &Relays) -> Vauchi {
-        let config = VauchiConfig::with_storage_path(self.dir.path().join("vauchi.db"))
-            .with_storage_key(self.key.clone())
+        let mut config = VauchiConfig::with_storage_path(self.dir.path().join("vauchi.db"))
             .with_relay_url(relays.application.url())
             .with_ohttp_relay_url(relays.outer.url());
-        let mut client =
-            Vauchi::new_with(config, relays.clock.clone(), OsSecureRng::shared(), None)
-                .unwrap()
-                .with_sleeper(Arc::new(FakeSleeper::new()));
+        if self.keychain.is_none() {
+            config = config.with_storage_key(self.key.clone());
+        }
+        let keychain = self
+            .keychain
+            .clone()
+            .map(|keychain| keychain as Arc<dyn SecureStorage>);
+        let mut client = Vauchi::new_with(
+            config,
+            relays.clock.clone(),
+            OsSecureRng::shared(),
+            keychain,
+        )
+        .unwrap()
+        .with_sleeper(Arc::new(FakeSleeper::new()));
         client
             .set_ohttp_key_for_testing(OhttpClient::new(relays.outer.ohttp_key_config()).unwrap());
         client
@@ -120,8 +142,11 @@ struct World {
 }
 
 fn world(credential: &str, expected_mode: AuthMode) -> World {
+    world_on(Install::new(), credential, expected_mode)
+}
+
+fn world_on(alice_install: Install, credential: &str, expected_mode: AuthMode) -> World {
     let relays = Relays::start();
-    let alice_install = Install::new();
     let mut alice = alice_install.open(&relays);
     alice.create_identity("Alice").unwrap();
     let bob_install = Install::new();
@@ -144,7 +169,43 @@ fn world(credential: &str, expected_mode: AuthMode) -> World {
 // @scenario: duress_mode :: Duress mode with notification
 #[test]
 fn a_real_update_received_under_duress_is_applied_and_reaches_no_foreground_event() {
-    let mut world = world(DURESS_PIN, AuthMode::Duress);
+    let seen = a_real_update_received_under_duress(world(DURESS_PIN, AuthMode::Duress));
+
+    assert_eq!(seen, UpdateUnderDuress::applied_unseen());
+}
+
+// @scenario: duress_mode :: Duress mode with notification
+#[test]
+fn the_worker_applies_a_real_update_whose_ratchet_is_under_the_receive_key() {
+    let seen = a_real_update_received_under_duress(world_on(
+        Install::with_keychain(),
+        DURESS_PIN,
+        AuthMode::Duress,
+    ));
+
+    assert_eq!(seen, UpdateUnderDuress::applied_unseen());
+}
+
+/// What a real update received under duress left behind: the foreground
+/// events it raised, and the real profile's view after a normal unlock.
+#[derive(Debug, PartialEq)]
+struct UpdateUnderDuress {
+    foreground_events: Vec<String>,
+    real_unlock: AuthMode,
+    real_card_values: Vec<String>,
+}
+
+impl UpdateUnderDuress {
+    fn applied_unseen() -> Self {
+        UpdateUnderDuress {
+            foreground_events: Vec::new(),
+            real_unlock: AuthMode::Normal,
+            real_card_values: vec!["bob@example.invalid".to_string()],
+        }
+    }
+}
+
+fn a_real_update_received_under_duress(mut world: World) -> UpdateUnderDuress {
     let seen = Arc::new(Mutex::new(Vec::new()));
     let sink = seen.clone();
     world.alice.events().add_handler(Arc::new(move |event| {
@@ -155,13 +216,14 @@ fn a_real_update_received_under_duress_is_applied_and_reaches_no_foreground_even
     sync(&mut world.alice);
     drop(world.alice);
 
-    assert_eq!(*seen.lock().unwrap(), Vec::<String>::new());
+    let foreground_events = seen.lock().unwrap().clone();
     let mut real = world.alice_install.open(&world.relays);
-    assert_eq!(real.authenticate(APP_PIN).unwrap(), AuthMode::Normal);
-    assert_eq!(
-        card_values(&real, &world.linked.peer_contact_id),
-        vec!["bob@example.invalid".to_string()]
-    );
+    let real_unlock = real.authenticate(APP_PIN).unwrap();
+    UpdateUnderDuress {
+        foreground_events,
+        real_unlock,
+        real_card_values: card_values(&real, &world.linked.peer_contact_id),
+    }
 }
 
 /// How many messages Alice's next sync sends after she adds a public field,

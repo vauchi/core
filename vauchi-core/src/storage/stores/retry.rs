@@ -20,11 +20,13 @@ pub struct RetryStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for the retries domain.
-    pub fn retries(&self) -> RetryStore<'_> {
-        RetryStore {
-            conn: &self.conn,
-            key: &self.encryption_key,
-        }
+    pub fn retries(&self) -> crate::storage::Sealed<'_, RetryStore<'_>> {
+        self.sealed({
+            RetryStore {
+                conn: &self.conn,
+                key: &self.encryption_key,
+            }
+        })
     }
 }
 

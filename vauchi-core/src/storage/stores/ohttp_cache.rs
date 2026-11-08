@@ -22,11 +22,13 @@ pub struct OhttpCacheStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for the ohttp_cache domain.
-    pub fn ohttp_cache(&self) -> OhttpCacheStore<'_> {
-        OhttpCacheStore {
-            conn: &self.conn,
-            clock: &self.clock,
-        }
+    pub fn ohttp_cache(&self) -> crate::storage::Sealed<'_, OhttpCacheStore<'_>> {
+        self.sealed({
+            OhttpCacheStore {
+                conn: &self.conn,
+                clock: &self.clock,
+            }
+        })
     }
 }
 

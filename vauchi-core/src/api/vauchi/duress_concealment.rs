@@ -75,7 +75,7 @@ impl ProfileEngine {
     /// coercer sees none of the real ones, what they make never reaches
     /// them, and it is still there after a lock. Engine internals that
     /// decide what real contacts receive keep using `self.storage.labels()`.
-    pub(super) fn labels_slot(&self) -> crate::storage::LabelStore<'_> {
+    pub(super) fn labels_slot(&self) -> crate::storage::Sealed<'_, crate::storage::LabelStore<'_>> {
         if self.in_duress_mode() {
             self.storage.duress_labels()
         } else {
@@ -83,7 +83,7 @@ impl ProfileEngine {
         }
     }
 
-    pub(super) fn tags_slot(&self) -> crate::storage::TagStore<'_> {
+    pub(super) fn tags_slot(&self) -> crate::storage::Sealed<'_, crate::storage::TagStore<'_>> {
         if self.in_duress_mode() {
             self.storage.duress_tags()
         } else {
@@ -91,7 +91,7 @@ impl ProfileEngine {
         }
     }
 
-    pub(super) fn places_slot(&self) -> crate::storage::PlaceStore<'_> {
+    pub(super) fn places_slot(&self) -> crate::storage::Sealed<'_, crate::storage::PlaceStore<'_>> {
         if self.in_duress_mode() {
             self.storage.duress_places()
         } else {

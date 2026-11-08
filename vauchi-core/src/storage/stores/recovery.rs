@@ -35,12 +35,14 @@ impl Storage {
     /// The returned [`RecoveryStore`] borrows this storage's connection,
     /// encryption key, and clock — it cannot outlive `self` and cannot reach
     /// any other domain's tables.
-    pub fn recovery(&self) -> RecoveryStore<'_> {
-        RecoveryStore {
-            conn: &self.conn,
-            key: &self.encryption_key,
-            clock: &self.clock,
-        }
+    pub fn recovery(&self) -> crate::storage::Sealed<'_, RecoveryStore<'_>> {
+        self.sealed({
+            RecoveryStore {
+                conn: &self.conn,
+                key: &self.encryption_key,
+                clock: &self.clock,
+            }
+        })
     }
 }
 

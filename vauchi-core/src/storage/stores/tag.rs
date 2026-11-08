@@ -35,18 +35,18 @@ pub struct TagStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for the tag domain.
-    pub fn tags(&self) -> TagStore<'_> {
-        self.tags_in(&self.conn, &self.encryption_key, "tags", None)
+    pub fn tags(&self) -> crate::storage::Sealed<'_, TagStore<'_>> {
+        self.sealed(self.tags_in(&self.conn, &self.encryption_key, "tags", None))
     }
 
     /// The duress session's tags, persistent and never the real ones.
-    pub fn duress_tags(&self) -> TagStore<'_> {
-        self.tags_in(
+    pub fn duress_tags(&self) -> crate::storage::Sealed<'_, TagStore<'_>> {
+        self.sealed(self.tags_in(
             self.duress_conn(),
             self.mask.key(),
             "duress_tags",
             Some(SealOnDrop::new(self)),
-        )
+        ))
     }
 
     fn tags_in<'a>(

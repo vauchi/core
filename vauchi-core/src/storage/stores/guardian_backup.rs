@@ -98,22 +98,26 @@ pub struct GuardianBackupStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for the guardian backups this device keeps.
-    pub fn guardian_backups(&self) -> GuardianBackupStore<'_> {
-        GuardianBackupStore {
-            conn: &self.conn,
-            key: &self.encryption_key,
-            tables: &KEPT_FOR_DESIGNATORS,
-        }
+    pub fn guardian_backups(&self) -> crate::storage::Sealed<'_, GuardianBackupStore<'_>> {
+        self.sealed({
+            GuardianBackupStore {
+                conn: &self.conn,
+                key: &self.encryption_key,
+                tables: &KEPT_FOR_DESIGNATORS,
+            }
+        })
     }
 
     /// Scoped persistence view for the backups guardians returned to this
     /// recovering identity, kept per guardian like the guardian's own.
-    pub fn returned_backups(&self) -> GuardianBackupStore<'_> {
-        GuardianBackupStore {
-            conn: &self.conn,
-            key: &self.encryption_key,
-            tables: &RETURNED_BY_GUARDIANS,
-        }
+    pub fn returned_backups(&self) -> crate::storage::Sealed<'_, GuardianBackupStore<'_>> {
+        self.sealed({
+            GuardianBackupStore {
+                conn: &self.conn,
+                key: &self.encryption_key,
+                tables: &RETURNED_BY_GUARDIANS,
+            }
+        })
     }
 }
 

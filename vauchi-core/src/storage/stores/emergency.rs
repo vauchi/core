@@ -26,14 +26,16 @@ pub struct EmergencyStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for the emergency domain.
-    pub fn emergency(&self) -> EmergencyStore<'_> {
-        EmergencyStore {
-            conn: &self.conn,
-            key: &self.encryption_key,
-            clock: &self.clock,
-            table: "emergency_config",
-            seal: None,
-        }
+    pub fn emergency(&self) -> crate::storage::Sealed<'_, EmergencyStore<'_>> {
+        self.sealed({
+            EmergencyStore {
+                conn: &self.conn,
+                key: &self.encryption_key,
+                clock: &self.clock,
+                table: "emergency_config",
+                seal: None,
+            }
+        })
     }
 
     /// The mask profile's emergency config, in the sealed mask database

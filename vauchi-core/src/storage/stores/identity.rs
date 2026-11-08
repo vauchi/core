@@ -24,13 +24,15 @@ pub struct IdentityStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for the identity domain.
-    pub fn identity(&self) -> IdentityStore<'_> {
-        IdentityStore {
-            conn: &self.conn,
-            mask: &self.mask,
-            key: &self.encryption_key,
-            clock: &self.clock,
-        }
+    pub fn identity(&self) -> crate::storage::Sealed<'_, IdentityStore<'_>> {
+        self.sealed({
+            IdentityStore {
+                conn: &self.conn,
+                mask: &self.mask,
+                key: &self.encryption_key,
+                clock: &self.clock,
+            }
+        })
     }
 }
 

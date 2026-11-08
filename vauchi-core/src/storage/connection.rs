@@ -49,6 +49,7 @@ impl Storage {
             conn,
             mask: super::mask::MaskStorage::new(&encryption_key)?,
             encryption_key,
+            seal_target: None,
             db_path: Some(path_buf),
             clock: crate::clock::SystemClock::shared(),
             #[cfg(any(test, feature = "testing"))]
@@ -67,12 +68,12 @@ impl Storage {
         Ok(storage)
     }
 
-    /// Creates an in-memory storage (for testing).
     /// The database file, or `None` for an in-memory database.
     pub fn db_path(&self) -> Option<&Path> {
         self.db_path.as_deref()
     }
 
+    /// Creates an in-memory storage (for testing).
     pub fn in_memory(encryption_key: SymmetricKey) -> Result<Self, StorageError> {
         let conn = Connection::open_in_memory()?;
         Self::configure_pragmas(&conn)?;
@@ -80,6 +81,7 @@ impl Storage {
             conn,
             mask: super::mask::MaskStorage::new(&encryption_key)?,
             encryption_key,
+            seal_target: None,
             db_path: None,
             clock: crate::clock::SystemClock::shared(),
             #[cfg(any(test, feature = "testing"))]
@@ -186,9 +188,20 @@ impl Storage {
         if self.commit_fault.replace(false) {
             return Err(StorageError::Database(rusqlite::Error::QueryReturnedNoRows));
         }
-        self.conn
-            .execute_batch("COMMIT")
-            .map_err(StorageError::from)
+        self.conn.execute_batch("COMMIT")?;
+        self.reseal()
+    }
+
+    /// Writes this database into its seal target's row; nothing for a
+    /// database that is its own file.
+    pub(super) fn reseal(&self) -> Result<(), StorageError> {
+        let Some(file) = &self.seal_target else {
+            return Ok(());
+        };
+        super::mask::SealedSlot::of(file).write(&super::duress_content::seal(
+            &self.encryption_key,
+            &self.conn,
+        )?)
     }
 
     /// Arm a one-shot commit fault: the next [`Self::commit`] fails with the

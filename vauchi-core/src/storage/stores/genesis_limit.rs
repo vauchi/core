@@ -39,11 +39,13 @@ pub struct GenesisLimitStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for genesis-decrypt rate limiting.
-    pub fn genesis_limits(&self) -> GenesisLimitStore<'_> {
-        GenesisLimitStore {
-            conn: &self.conn,
-            clock: &self.clock,
-        }
+    pub fn genesis_limits(&self) -> crate::storage::Sealed<'_, GenesisLimitStore<'_>> {
+        self.sealed({
+            GenesisLimitStore {
+                conn: &self.conn,
+                clock: &self.clock,
+            }
+        })
     }
 }
 

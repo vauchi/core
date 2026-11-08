@@ -18,8 +18,8 @@ pub struct ActivityLogStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for the activity_log domain.
-    pub fn activity_log(&self) -> ActivityLogStore<'_> {
-        ActivityLogStore { conn: &self.conn }
+    pub fn activity_log(&self) -> crate::storage::Sealed<'_, ActivityLogStore<'_>> {
+        self.sealed(ActivityLogStore { conn: &self.conn })
     }
 }
 

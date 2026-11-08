@@ -68,26 +68,28 @@ impl EncryptedLabelRow {
 }
 impl Storage {
     /// Scoped persistence view for the visibility-label domain.
-    pub fn labels(&self) -> LabelStore<'_> {
-        self.labels_in(
-            &self.conn,
-            &self.encryption_key,
-            "visibility_labels",
-            "contact_visibility_overrides",
-            None,
-        )
+    pub fn labels(&self) -> crate::storage::Sealed<'_, LabelStore<'_>> {
+        self.sealed({
+            self.labels_in(
+                &self.conn,
+                &self.encryption_key,
+                "visibility_labels",
+                "contact_visibility_overrides",
+                None,
+            )
+        })
     }
 
     /// The duress session's groups and overrides: a persistent twin the
     /// real vocabulary never sees (vauchi/private#813).
-    pub fn duress_labels(&self) -> LabelStore<'_> {
-        self.labels_in(
+    pub fn duress_labels(&self) -> crate::storage::Sealed<'_, LabelStore<'_>> {
+        self.sealed(self.labels_in(
             self.duress_conn(),
             self.mask.key(),
             "duress_visibility_labels",
             "duress_contact_visibility_overrides",
             Some(SealOnDrop::new(self)),
-        )
+        ))
     }
 
     fn labels_in<'a>(

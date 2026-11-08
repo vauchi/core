@@ -22,12 +22,14 @@ pub struct ConsentStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for the consent domain.
-    pub fn consent(&self) -> ConsentStore<'_> {
-        ConsentStore {
-            conn: &self.conn,
-            key: &self.encryption_key,
-            clock: &self.clock,
-        }
+    pub fn consent(&self) -> crate::storage::Sealed<'_, ConsentStore<'_>> {
+        self.sealed({
+            ConsentStore {
+                conn: &self.conn,
+                key: &self.encryption_key,
+                clock: &self.clock,
+            }
+        })
     }
 }
 

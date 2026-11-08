@@ -28,12 +28,14 @@ pub struct ContactStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for the contact domain.
-    pub fn contacts(&self) -> ContactStore<'_> {
-        ContactStore {
-            conn: &self.conn,
-            key: &self.encryption_key,
-            clock: &self.clock,
-        }
+    pub fn contacts(&self) -> crate::storage::Sealed<'_, ContactStore<'_>> {
+        self.sealed({
+            ContactStore {
+                conn: &self.conn,
+                key: &self.encryption_key,
+                clock: &self.clock,
+            }
+        })
     }
 }
 

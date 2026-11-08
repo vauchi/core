@@ -16,6 +16,8 @@ pub(crate) mod duress_content;
 mod key_check;
 mod lookup;
 mod mask;
+mod sealing;
+pub use sealing::Sealed;
 
 mod contact_row;
 
@@ -97,6 +99,9 @@ pub struct Storage {
     mask: mask::MaskStorage,
     /// Encryption key derived from user's master key
     encryption_key: SymmetricKey,
+    /// The file holding this database sealed in one row, for a database that
+    /// lives only in memory and in that seal (the mask profile, ADR-080).
+    seal_target: Option<Connection>,
     /// Database file path (None for in-memory databases).
     db_path: Option<std::path::PathBuf>,
     /// Explicit-time seam for the storage subsystem (Phase 1 /

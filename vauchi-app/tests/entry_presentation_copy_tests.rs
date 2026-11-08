@@ -146,5 +146,9 @@ fn entry_rows_put_the_label_before_the_value_and_visibility() {
         assert_eq!(row.name, expected);
         assert_eq!(row.subtitle.as_deref(), Some("ada@example.invalid"));
         assert_eq!(row.status.as_deref(), Some("Hidden by default"));
+        assert_eq!(
+            row.a11y.as_ref().and_then(|a| a.label.as_deref()),
+            Some(format!("{expected}: ada@example.invalid").as_str())
+        );
     }
 }

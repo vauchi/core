@@ -238,7 +238,11 @@ impl MyInfoEngine {
             subtitle: Some(field.value.clone()),
             status: Some(self.visibility_chip(field)),
             actions: Vec::new(),
-            a11y: None,
+            a11y: Some(A11y::labeled(get_string_with_args(
+                self.locale,
+                "my_info.entry_a11y_label",
+                &[("label", &label), ("value", &field.value)],
+            ))),
         }
     }
 

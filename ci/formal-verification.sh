@@ -69,8 +69,21 @@ if wants code && ! cargo kani --version 2>/dev/null | grep -q "$KANI_VERSION"; t
     cargo kani setup
 fi
 if wants code; then
+python3 ci/tests/check-kani-result.test.py
+mkdir -p .formal-results
+padding_report=.formal-results/padding.json
+padding_harness=crypto::padding_proofs::unpad_never_panics_and_only_accepts_a_prefixed_plaintext
+rm -f "$padding_report"
+padding_status=0
+cargo kani -p vauchi-core --harness "$padding_harness" --exact \
+    -Z unstable-options --export-json "$padding_report" || padding_status=$?
+python3 ci/check-kani-result.py "$padding_report" \
+    --harness "$padding_harness" --backend-exit "$padding_status" \
+    --verifier-version "$KANI_VERSION" \
+    --require-cover "maximum modeled input length is reachable" \
+    --require-cover "accepted nonempty plaintext is reachable" \
+    --require-cover "rejected input is reachable"
 for harness in \
-    unpad_never_panics_and_only_accepts_a_prefixed_plaintext \
     parse_exchange_payload_never_panics_and_reads_each_field_at_its_offset \
     ble_advertisement_parse_never_panics_and_reads_each_field_at_its_offset \
     recovery_claim_parse_never_panics_and_reads_each_field_at_its_offset \

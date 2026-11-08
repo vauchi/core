@@ -21,12 +21,16 @@ fn unpad_never_panics_and_only_accepts_a_prefixed_plaintext() {
     let bytes: [u8; MAX_PROVEN_INPUT_LEN] = kani::any();
     let input_len: usize = kani::any_where(|len| *len <= MAX_PROVEN_INPUT_LEN);
     let input = &bytes[..input_len];
-
     match unpad(input) {
         Some(plaintext) => {
             let encoded_len = u32::try_from(plaintext.len()).expect("plaintext fits u32");
             assert_eq!(input[..LENGTH_PREFIX_SIZE], encoded_len.to_be_bytes());
             assert!(input[LENGTH_PREFIX_SIZE..].starts_with(&plaintext));
+            // #1169: reachability must include the assertions, not just branch entry.
+            kani::cover!(
+                !plaintext.is_empty(),
+                "accepted nonempty plaintext is reachable"
+            );
         }
         None => {
             let prefix_missing = input.len() < LENGTH_PREFIX_SIZE;
@@ -35,6 +39,11 @@ fn unpad_never_panics_and_only_accepts_a_prefixed_plaintext() {
                 declared as usize > input.len() - LENGTH_PREFIX_SIZE
             };
             assert!(prefix_missing || declared_len_overruns);
+            kani::cover!(true, "rejected input is reachable");
         }
     }
+    kani::cover!(
+        input_len == MAX_PROVEN_INPUT_LEN,
+        "maximum modeled input length is reachable"
+    );
 }

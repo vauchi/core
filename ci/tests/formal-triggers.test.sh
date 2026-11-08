@@ -117,7 +117,7 @@ if check_job "test:formal-code" code; then
     # shellcheck disable=SC2086 # word lists of repository paths
     require_covered test:formal-code "$code_paths" $harness_files $proved_modules \
         vauchi-core/tests/wipe_on_drop_tests.rs vauchi-core/tests/heap_wipe_on_drop_tests.rs \
-        Cargo.lock "$formal_script"
+        Cargo.lock "$formal_script" ci/check-kani-result.py ci/tests/check-kani-result.test.py
 fi
 
 model_files=$(find vauchi-core/verification vauchi-app/verification \

@@ -126,9 +126,16 @@ class KaniResultContract(unittest.TestCase):
         self.assert_verdict(document, (2, "inconclusive"), backend_exit=1)
 
     def test_missing_malformed_or_partial_results_are_inconclusive(self):
-        for document in [None, "{", {}, {"verification_results": {}}]:
+        for document in [None, "{", {}, {"verification_results": {}},
+                         {"metadata": None}, {"metadata": []}]:
             with self.subTest(document=document):
                 self.assert_verdict(document, (2, "inconclusive"))
+
+    def test_cover_only_report_cannot_claim_a_verified_property(self):
+        document = healthy_report()
+        result = document["verification_results"]["results"][0]
+        result["checks"] = [check for check in result["checks"] if check["category"] == "cover"]
+        self.assert_verdict(document, (2, "invalid_harness"))
 
     def test_changed_schema_or_verifier_version_is_not_silently_accepted(self):
         for key, value in [("version", "2.0"), ("kani_version", "0.69.0")]:

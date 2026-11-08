@@ -11,6 +11,8 @@ from pathlib import Path
 
 def assess(document, harness, witnesses, backend_exit, version):
     metadata = document["metadata"]
+    if not isinstance(metadata, dict):
+        raise ValueError("metadata must be an object")
     base = {"harness": harness, "backend_exit": backend_exit,
             "verifier_version": metadata.get("kani_version"), "target": metadata.get("target")}
 
@@ -60,6 +62,9 @@ def assess(document, harness, witnesses, backend_exit, version):
     if any(check["status"] not in ("Success", "Unreachable")
            for check in checks if check["category"] != "cover"):
         return result("inconclusive", "unexpected_property_status")
+    if not any(check["category"] == "assertion" and check["status"] == "Success"
+               for check in checks):
+        return result("invalid_harness", "no_reachable_assertions")
     return dict(base, verdict="verified_conditional", witnesses=witnesses,
                 source=harnesses[0]["source"]["file"])
 

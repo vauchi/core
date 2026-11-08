@@ -416,7 +416,7 @@
                 },
                 {
                   "List": {
-                    "id": "empty_card_actions",
+                    "id": "card_actions",
                     "label": null,
                     "rows": [
                       {
@@ -449,7 +449,8 @@
                     "accessibility": {
                       "label": "",
                       "description": null
-                    }
+                    },
+                    "style": "buttons"
                   }
                 }
               ]

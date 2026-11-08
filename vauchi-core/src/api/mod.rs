@@ -152,6 +152,8 @@ pub use config::{
 };
 
 // Events
+mod activity_log_writer;
+pub use activity_log_writer::ActivityLogWriter;
 pub use events::{EventCallback, EventDispatcher, EventOrigin, HandlerId, VauchiEvent};
 
 // Contact Manager

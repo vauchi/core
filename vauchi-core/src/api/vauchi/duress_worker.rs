@@ -10,8 +10,7 @@
 use std::sync::{Arc, Mutex};
 
 use super::{AuthMode, ProfileEngine, Vauchi, VauchiSyncOutcome};
-use crate::activity_log::ActivityLogWriter;
-use crate::api::{BackgroundBudget, EventDispatcher, VauchiEvent, VauchiResult};
+use crate::api::{ActivityLogWriter, BackgroundBudget, EventDispatcher, VauchiEvent, VauchiResult};
 use crate::identity::Identity;
 use crate::storage::Storage;
 
@@ -94,6 +93,7 @@ impl ProfileEngine {
             wipe_requested: std::sync::atomic::AtomicBool::new(false),
             wiped_by_another_device: false,
             last_sync_unix_seconds: self.last_sync_unix_seconds,
+            missed_background_run_unix_seconds: None,
             last_emergency_broadcast_unix_seconds: None,
         }))
     }

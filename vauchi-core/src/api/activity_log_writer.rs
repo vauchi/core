@@ -1,0 +1,169 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! Converts [`VauchiEvent`]s into activity log rows and writes them to storage.
+//!
+//! `ActivityLogWriter` is stateless — callers pass storage and events in. The
+//! writer maps each relevant event to an [`ActivityLogEntry`], serialises the
+//! entry as JSON, inserts it with `INSERT OR IGNORE` (deduplication via
+//! `event_key`), prunes entries older than 7 days, and returns only the
+//! newly inserted entries.
+
+use super::VauchiEvent;
+use crate::activity_log::{ActivityLogEntry, RETENTION_SECS};
+use crate::storage::{ActivityLogRow, Storage, StorageError};
+
+/// Stateless writer that converts `VauchiEvent`s into activity log rows.
+pub struct ActivityLogWriter;
+
+impl ActivityLogWriter {
+    /// Process `events`, write log entries, prune old entries.
+    ///
+    /// Returns the `(event_key, ActivityLogEntry)` pairs for entries that were
+    /// newly inserted. Duplicate keys (already in the log) are silently skipped
+    /// and not included in the return value.
+    ///
+    /// `now_secs` is the caller-supplied Unix timestamp (seconds) used for
+    /// `created_at` and for computing the prune cutoff.  Passing an explicit
+    /// value keeps tests deterministic (no `SystemTime::now` in tests).
+    pub fn write(
+        storage: &Storage,
+        events: &[VauchiEvent],
+        now_secs: u64,
+    ) -> Result<Vec<(String, ActivityLogEntry)>, StorageError> {
+        Self::write_rows(storage, events, now_secs, false)
+    }
+
+    /// [`Self::write`] for events no notification may announce: what a
+    /// profile's worker received while another profile was in the
+    /// foreground (ADR-080, owner 2026-11-08).
+    pub fn write_without_notifying(
+        storage: &Storage,
+        events: &[VauchiEvent],
+        now_secs: u64,
+    ) -> Result<Vec<(String, ActivityLogEntry)>, StorageError> {
+        Self::write_rows(storage, events, now_secs, true)
+    }
+
+    fn write_rows(
+        storage: &Storage,
+        events: &[VauchiEvent],
+        now_secs: u64,
+        claimed: bool,
+    ) -> Result<Vec<(String, ActivityLogEntry)>, StorageError> {
+        let mut inserted = Vec::new();
+
+        for event in events {
+            if let Some((event_key, entry)) = Self::event_to_entry(event, now_secs) {
+                let payload = serde_json::to_string(&entry)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+                let row = ActivityLogRow {
+                    event_key: event_key.clone(),
+                    category: entry.category_str().to_owned(),
+                    contact_id: Some(entry.contact_id().to_owned()),
+                    payload,
+                    created_at: now_secs,
+                };
+
+                let log = storage.activity_log();
+                let was_inserted = if claimed {
+                    log.activity_log_insert_claimed(&row)?
+                } else {
+                    log.activity_log_insert(&row)?
+                };
+                if was_inserted {
+                    inserted.push((event_key, entry));
+                }
+            }
+        }
+
+        storage
+            .activity_log()
+            .activity_log_prune(now_secs, RETENTION_SECS)?;
+
+        Ok(inserted)
+    }
+
+    /// Maps a single `VauchiEvent` to an `(event_key, ActivityLogEntry)` pair.
+    ///
+    /// Returns `None` for event variants that are not tracked in the activity
+    /// log.
+    fn event_to_entry(event: &VauchiEvent, now_secs: u64) -> Option<(String, ActivityLogEntry)> {
+        match event {
+            VauchiEvent::ContactAdded {
+                contact_id, origin, ..
+            } => {
+                let key = format!("contact_added:{contact_id}");
+                let entry = ActivityLogEntry::ContactAdded {
+                    contact_id: contact_id.clone(),
+                    origin: *origin,
+                };
+                Some((key, entry))
+            }
+
+            VauchiEvent::IncomingUpdate { contact_id } => {
+                let key = format!("card_received:{contact_id}:{now_secs}");
+                let entry = ActivityLogEntry::CardUpdateReceived {
+                    contact_id: contact_id.clone(),
+                    changed_fields: vec![],
+                };
+                Some((key, entry))
+            }
+
+            VauchiEvent::MessageDelivered {
+                contact_id,
+                message_id,
+            } => {
+                let key = format!("card_delivered:{contact_id}:{message_id}");
+                let entry = ActivityLogEntry::CardUpdateDelivered {
+                    contact_id: contact_id.clone(),
+                };
+                Some((key, entry))
+            }
+
+            VauchiEvent::MessageFailed { contact_id, error } => {
+                let key = format!("card_failed:{contact_id}:{now_secs}");
+                let entry = ActivityLogEntry::CardUpdateFailed {
+                    contact_id: contact_id.clone(),
+                    reason: error.clone(),
+                };
+                Some((key, entry))
+            }
+
+            // Alert keys use the signed nonce, never local time: surfacing is
+            // at-least-once from durable facts, so a time-based key would log
+            // every re-dispatch as a new entry (delivery-axis findings,
+            // 2026-07-21-per-device-ratchet-registry-dormant).
+            VauchiEvent::EmergencyAlertReceived {
+                contact_id,
+                alert_nonce,
+                ..
+            } => {
+                let key = format!("alert:{contact_id}:{}", hex::encode(alert_nonce));
+                let entry = ActivityLogEntry::EmergencyAlertReceived {
+                    contact_id: contact_id.clone(),
+                };
+                Some((key, entry))
+            }
+            VauchiEvent::OwnCardUpdated { changed_fields } => {
+                let fields_tag = changed_fields.join(",");
+                let key = format!("own_card_updated:{fields_tag}:{now_secs}");
+                let entry = ActivityLogEntry::OwnCardUpdated {
+                    changed_fields: changed_fields.clone(),
+                };
+                Some((key, entry))
+            }
+            VauchiEvent::ContactRemoved { contact_id } => {
+                let key = format!("contact_removed:{contact_id}:{now_secs}");
+                let entry = ActivityLogEntry::ContactRemoved {
+                    contact_id: contact_id.clone(),
+                };
+                Some((key, entry))
+            }
+
+            _ => None,
+        }
+    }
+}

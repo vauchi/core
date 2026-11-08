@@ -43,6 +43,7 @@
     "vauchi-cabi/lib": 0,
     "vauchi-cabi/logging": 0,
     "vauchi-cabi/platform_event": 0,
+    "vauchi-core/activity_log": 1,
     "vauchi-core/aha_moments": 3,
     "vauchi-core/api": 5,
     "vauchi-core/avatar": 1,

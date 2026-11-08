@@ -10,7 +10,8 @@
 use vauchi_core::EventOrigin;
 use vauchi_core::Storage;
 use vauchi_core::VauchiEvent;
-use vauchi_core::activity_log::{ActivityLogEntry, ActivityLogWriter};
+use vauchi_core::activity_log::ActivityLogEntry;
+use vauchi_core::api::ActivityLogWriter;
 use vauchi_core::crypto::SymmetricKey;
 
 fn test_storage() -> Storage {

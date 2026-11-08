@@ -73,18 +73,35 @@ pub(super) fn delete_bootstrap_key(secure: &dyn SecureStorage) {
     }
 }
 
-/// Makes the Background Receive Key for an identity that has an SMK and no
-/// BRK yet; an existing one is never replaced (ADR-033 amendment
-/// 2026-11-07). Random rather than derived, because the SMK it would come
-/// from cannot be read on a locked phone.
+/// Gives `storage` the Background Receive Key, first making one for an
+/// identity that has an SMK and no BRK yet; an existing one is never
+/// replaced (ADR-033 amendment 2026-11-07). Random rather than derived,
+/// because the SMK it would come from cannot be read on a locked phone.
 ///
-/// Best-effort: nothing is under the BRK until a receive needs it, so a
-/// failed read or save must not stop the app from starting, and the next
-/// open retries. A failed read makes nothing, so a key that is there but
-/// unreadable is not replaced.
-pub(super) fn ensure_background_receive_key(secure: &dyn SecureStorage) {
+/// Best-effort: without the key the app still opens, receive state written
+/// meanwhile stays under the storage key, and the next open retries. A
+/// failed read makes nothing, so a key that is there but unreadable is not
+/// replaced, and a key that could not be saved seals nothing, because data
+/// under it would be lost with it.
+pub(super) fn attach_background_receive_key(storage: &mut Storage, secure: &dyn SecureStorage) {
+    let Some(brk) = background_receive_key(secure) else {
+        return;
+    };
+    if let Err(e) = storage.set_receive_key(brk) {
+        tracing::warn!(
+            target: "vauchi.storage.keys",
+            error = %e,
+            "the background receive key does not open this file's receive state"
+        );
+    }
+}
+
+fn background_receive_key(secure: &dyn SecureStorage) -> Option<SymmetricKey> {
     match secure.load_key_with_access(BRK_KEY_NAME, KeyAccess::AfterFirstUnlock) {
-        Ok(Some(_)) => return,
+        Ok(Some(bytes)) => {
+            let bytes = zeroize::Zeroizing::new(bytes);
+            return SymmetricKey::try_from_bytes(bytes.as_slice().try_into().ok()?).ok();
+        }
         Ok(None) => {}
         Err(e) => {
             tracing::warn!(
@@ -92,18 +109,20 @@ pub(super) fn ensure_background_receive_key(secure: &dyn SecureStorage) {
                 error = %e,
                 "could not read the background receive key; the next open retries"
             );
-            return;
+            return None;
         }
     }
     let brk = SymmetricKey::generate();
-    if let Err(e) =
-        secure.save_key_with_access(BRK_KEY_NAME, brk.as_bytes(), KeyAccess::AfterFirstUnlock)
-    {
-        tracing::warn!(
-            target: "vauchi.storage.keys",
-            error = %e,
-            "could not store the background receive key; the next open retries"
-        );
+    match secure.save_key_with_access(BRK_KEY_NAME, brk.as_bytes(), KeyAccess::AfterFirstUnlock) {
+        Ok(()) => Some(brk),
+        Err(e) => {
+            tracing::warn!(
+                target: "vauchi.storage.keys",
+                error = %e,
+                "could not store the background receive key; the next open retries"
+            );
+            None
+        }
     }
 }
 
@@ -129,9 +148,9 @@ pub(super) fn open_storage(
     if let Some(smk) = load_key(secure, SMK_KEY_NAME)? {
         let sek = ShreddingMasterKey::from_bytes(smk).derive_sek();
         match Storage::open(path, sek.clone()) {
-            Ok(storage) => {
+            Ok(mut storage) => {
                 delete_bootstrap_key(secure);
-                ensure_background_receive_key(secure);
+                attach_background_receive_key(&mut storage, secure);
                 return Ok((storage, sek));
             }
             Err(StorageError::WrongKey) => {}
@@ -141,7 +160,7 @@ pub(super) fn open_storage(
             open_with_first(path, bootstrap.into_iter().chain(shell_key).collect())?;
         storage.rekey(sek.clone())?;
         delete_bootstrap_key(secure);
-        ensure_background_receive_key(secure);
+        attach_background_receive_key(&mut storage, secure);
         return Ok((storage, sek));
     }
 

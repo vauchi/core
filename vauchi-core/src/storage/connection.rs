@@ -53,6 +53,7 @@ impl Storage {
             )?)),
             encryption_key,
             seal_target: None,
+            receive_key: None,
             db_path: Some(path_buf),
             clock: crate::clock::SystemClock::shared(),
             #[cfg(any(test, feature = "testing"))]
@@ -88,6 +89,7 @@ impl Storage {
             )?)),
             encryption_key,
             seal_target: None,
+            receive_key: None,
             db_path: None,
             clock: crate::clock::SystemClock::shared(),
             #[cfg(any(test, feature = "testing"))]

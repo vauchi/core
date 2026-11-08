@@ -77,7 +77,7 @@ impl ProfileEngine {
             })?;
             self.config.storage_key = Some(sek);
             storage_keys::delete_bootstrap_key(ss.as_ref());
-            storage_keys::ensure_background_receive_key(ss.as_ref());
+            storage_keys::attach_background_receive_key(&mut self.storage, ss.as_ref());
         }
 
         // Persist identity to storage so it survives restart
@@ -181,7 +181,7 @@ impl ProfileEngine {
             .map_err(|e| VauchiError::Configuration(format!("Failed to rekey storage: {}", e)))?;
         self.config.storage_key = Some(sek);
         storage_keys::delete_bootstrap_key(ss.as_ref());
-        storage_keys::ensure_background_receive_key(ss.as_ref());
+        storage_keys::attach_background_receive_key(&mut self.storage, ss.as_ref());
 
         Ok(())
     }

@@ -271,7 +271,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 114] = [
+const MIGRATIONS: [Migration; 115] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -842,7 +842,36 @@ const MIGRATIONS: [Migration; 114] = [
         name: "duress_own_card_into_mask",
         action: MigrationAction::Callback(migrate_v114_duress_own_card_into_mask),
     },
+    Migration {
+        version: 115,
+        name: "receive_key_sealing",
+        action: MigrationAction::Callback(migrate_v115_receive_key_sealing),
+    },
 ];
+
+/// v115 (ADR-033 amendment 2026-11-07, vauchi/private#1093): a ratchet row
+/// records whether the Background Receive Key sealed it, and the receive
+/// key gets its own check row, so a different key is refused rather than
+/// read as garbage. A callback, because a database replayed from an earlier
+/// version row may already carry the column.
+fn migrate_v115_receive_key_sealing(
+    conn: &Connection,
+    _key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    add_column_if_not_exists(
+        conn,
+        "contact_ratchets",
+        "sealed_with_receive_key",
+        "INTEGER NOT NULL DEFAULT 0",
+    )?;
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS receive_key_check (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            sealed_label BLOB NOT NULL
+        );",
+    )?;
+    Ok(())
+}
 
 /// v114 (ADR-080, vauchi/private#1117): the duress own card moves from its
 /// table in the file into the sealed mask database, and the table goes, so

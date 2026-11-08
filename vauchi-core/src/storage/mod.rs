@@ -23,6 +23,7 @@ mod mask_profile;
 mod mask_profile_tests;
 mod sealing;
 pub use sealing::Sealed;
+mod receive_key;
 
 mod contact_row;
 
@@ -106,6 +107,10 @@ pub struct Storage {
     /// The file holding this database sealed in one row, for a database that
     /// lives only in memory and in that seal (the mask profile, ADR-080).
     seal_target: Option<Connection>,
+    /// The Background Receive Key, once the caller sets it: receive state
+    /// is sealed under it so a locked phone can advance it (ADR-033
+    /// amendment 2026-11-07).
+    receive_key: Option<SymmetricKey>,
     /// Database file path (None for in-memory databases).
     db_path: Option<std::path::PathBuf>,
     /// Explicit-time seam for the storage subsystem (Phase 1 /

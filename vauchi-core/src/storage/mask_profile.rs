@@ -82,6 +82,7 @@ impl Storage {
             mask: None,
             encryption_key: mask_key,
             seal_target,
+            receive_key: None,
             db_path: None,
             clock: crate::clock::SystemClock::shared(),
             #[cfg(any(test, feature = "testing"))]

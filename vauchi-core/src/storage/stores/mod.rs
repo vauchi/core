@@ -35,7 +35,7 @@ mod own_card;
 mod pending;
 mod pin_cache;
 mod place;
-mod ratchet;
+pub(super) mod ratchet;
 mod recovery;
 mod registry_activation;
 mod replay;

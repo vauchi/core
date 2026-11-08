@@ -34,7 +34,9 @@ impl Storage {
         Ok(())
     }
 
-    /// Re-encrypt ratchet state with per-contact derived keys (#126)
+    /// Re-encrypt ratchet state with per-contact derived keys (#126). Rows
+    /// under the Background Receive Key do not depend on the storage key
+    /// and stay as they are (vauchi/private#1093).
     pub(super) fn rekey_ratchets(
         &self,
         old_key: &SymmetricKey,
@@ -44,7 +46,7 @@ impl Storage {
             .conn
             .prepare(
                 "SELECT contact_id, peer_device_id, ratchet_state_encrypted
-                 FROM contact_ratchets",
+                 FROM contact_ratchets WHERE sealed_with_receive_key = 0",
             )
             .map_err(|e| StorageError::Migration(format!("Read ratchets: {}", e)))?;
 

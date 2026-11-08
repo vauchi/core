@@ -88,6 +88,11 @@ pub enum StorageError {
     #[error("The storage key does not open this database")]
     WrongKey,
 
+    /// The row is sealed under the Background Receive Key, which this
+    /// storage was not given (vauchi/private#1093).
+    #[error("Receive state needs the background receive key")]
+    ReceiveKeyUnavailable,
+
     /// Secure storage cannot be read until the user authenticates or the
     /// device unlocks; the keys are intact (vauchi/private#580).
     #[error("Secure storage is locked")]

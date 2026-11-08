@@ -24,7 +24,33 @@ pub const SHARED_PEER_DEVICE_ID: [u8; 32] = [0; 32];
 pub struct RatchetStore<'a> {
     conn: &'a Connection,
     key: &'a SymmetricKey,
+    receive_key: Option<&'a SymmetricKey>,
     clock: &'a Arc<dyn Clock>,
+}
+
+/// The per-contact key for ratchet state under the storage key, so that
+/// compromising one contact's state exposes neither the storage key nor
+/// another contact's state.
+pub(in crate::storage) fn ratchet_key_under_storage_key(
+    storage_key: &SymmetricKey,
+    contact_id: &str,
+) -> SymmetricKey {
+    per_contact_key(storage_key, b"vauchi-ratchet-storage-v1:", contact_id)
+}
+
+/// The per-contact key for ratchet state under the Background Receive Key
+/// (vauchi/private#1093).
+pub(in crate::storage) fn ratchet_key_under_receive_key(
+    receive_key: &SymmetricKey,
+    contact_id: &str,
+) -> SymmetricKey {
+    per_contact_key(receive_key, b"vauchi-ratchet-receive-key-v1:", contact_id)
+}
+
+fn per_contact_key(root: &SymmetricKey, label: &[u8], contact_id: &str) -> SymmetricKey {
+    let mut info = label.to_vec();
+    info.extend_from_slice(contact_id.as_bytes());
+    SymmetricKey::from_bytes(*HKDF::derive_key(None, root.as_bytes(), &info))
 }
 
 impl Storage {
@@ -34,6 +60,7 @@ impl Storage {
             RatchetStore {
                 conn: &self.conn,
                 key: &self.encryption_key,
+                receive_key: self.receive_key(),
                 clock: &self.clock,
             }
         })
@@ -44,16 +71,25 @@ impl RatchetStore<'_> {
     fn now_secs(&self) -> u64 {
         self.clock.unix_seconds()
     }
-    /// Derives a per-contact encryption key for ratchet state storage.
-    ///
-    /// Uses HKDF with the storage master key as IKM and the contact ID
-    /// as domain separator. This ensures that compromising one contact's
-    /// ratchet state does not expose the SMK or other contacts' states.
-    fn derive_ratchet_key(&self, contact_id: &str) -> SymmetricKey {
-        let mut info = b"vauchi-ratchet-storage-v1:".to_vec();
-        info.extend_from_slice(contact_id.as_bytes());
-        let key_bytes = HKDF::derive_key(None, self.key.as_bytes(), &info);
-        SymmetricKey::from_bytes(*key_bytes)
+    /// The key a new row is sealed with: the receive key once the storage
+    /// has it, the storage key before.
+    fn sealing_key(&self, contact_id: &str) -> (SymmetricKey, bool) {
+        match self.receive_key {
+            Some(receive_key) => (ratchet_key_under_receive_key(receive_key, contact_id), true),
+            None => (ratchet_key_under_storage_key(self.key, contact_id), false),
+        }
+    }
+
+    fn opening_key(
+        &self,
+        contact_id: &str,
+        sealed_with_receive_key: bool,
+    ) -> Result<SymmetricKey, StorageError> {
+        match (sealed_with_receive_key, self.receive_key) {
+            (false, _) => Ok(ratchet_key_under_storage_key(self.key, contact_id)),
+            (true, Some(receive_key)) => Ok(ratchet_key_under_receive_key(receive_key, contact_id)),
+            (true, None) => Err(StorageError::ReceiveKeyUnavailable),
+        }
     }
     /// Saves a Double Ratchet state for a contact.
     pub fn save_ratchet_state(
@@ -77,7 +113,7 @@ impl RatchetStore<'_> {
         let state_json = serde_json::to_vec(&serialized)
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
-        let ratchet_key = self.derive_ratchet_key(contact_id);
+        let (ratchet_key, sealed_with_receive_key) = self.sealing_key(contact_id);
         let state_encrypted = crate::crypto::encrypt(&ratchet_key, &state_json)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
@@ -85,14 +121,16 @@ impl RatchetStore<'_> {
 
         self.conn.execute(
             "INSERT OR REPLACE INTO contact_ratchets
-             (contact_id, peer_device_id, ratchet_state_encrypted, is_initiator, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+             (contact_id, peer_device_id, ratchet_state_encrypted, is_initiator, updated_at,
+              sealed_with_receive_key)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 contact_id,
                 peer_device_id,
                 state_encrypted,
                 is_initiator as i32,
                 now as i64,
+                sealed_with_receive_key,
             ],
         )?;
 
@@ -115,16 +153,22 @@ impl RatchetStore<'_> {
         peer_device_id: &[u8; 32],
     ) -> Result<Option<(DoubleRatchetState, bool)>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT ratchet_state_encrypted, is_initiator
+            "SELECT ratchet_state_encrypted, is_initiator, sealed_with_receive_key
              FROM contact_ratchets
              WHERE contact_id = ?1 AND peer_device_id = ?2",
             params![contact_id, peer_device_id],
-            |row| Ok((row.get::<_, Vec<u8>>(0)?, row.get::<_, i32>(1)? != 0)),
+            |row| {
+                Ok((
+                    row.get::<_, Vec<u8>>(0)?,
+                    row.get::<_, i32>(1)? != 0,
+                    row.get::<_, bool>(2)?,
+                ))
+            },
         );
 
         match result {
-            Ok((encrypted, is_initiator)) => {
-                let ratchet_key = self.derive_ratchet_key(contact_id);
+            Ok((encrypted, is_initiator, sealed_with_receive_key)) => {
+                let ratchet_key = self.opening_key(contact_id, sealed_with_receive_key)?;
                 // F6 audit fix: wrap in Zeroizing — contains root_key, DH secrets, chain keys
                 let mut state_json = crate::crypto::decrypt(&ratchet_key, &encrypted)
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;

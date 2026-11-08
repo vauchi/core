@@ -22,6 +22,13 @@ impl tracing::field::Visit for Fields {
 }
 
 impl Subscriber for Diagnostics {
+    // #1175: scoped observers change during parallel tests; keep interest dynamic.
+    fn register_callsite(&self, _: &'static Metadata<'static>) -> tracing::subscriber::Interest {
+        tracing::subscriber::Interest::sometimes()
+    }
+    fn max_level_hint(&self) -> Option<tracing::metadata::LevelFilter> {
+        Some(tracing::metadata::LevelFilter::TRACE)
+    }
     fn enabled(&self, _: &Metadata<'_>) -> bool {
         true
     }
@@ -70,7 +77,17 @@ fn update() -> Migration {
 
 // @internal
 #[test]
-fn successful_migration_backup_reopens_with_the_previous_data_and_version() {
+fn backup_diagnostics_are_silent_on_success_and_redacted_on_failure() {
+    let diagnostics = Diagnostics::default();
+    // #1175: one observer lifetime avoids concurrent subscription registration.
+    tracing::subscriber::with_default(diagnostics.clone(), || {
+        assert_successful_snapshot();
+        assert_eq!(*diagnostics.0.lock().unwrap(), Vec::new());
+        assert_backup_failure(&diagnostics);
+    });
+}
+
+fn assert_successful_snapshot() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("history.db");
     let conn = Connection::open(&path).unwrap();
@@ -80,14 +97,16 @@ fn successful_migration_backup_reopens_with_the_previous_data_and_version() {
     assert_eq!(data(&conn), "migrated");
     assert_eq!(MigrationRunner::current_version(&conn).unwrap(), 2);
 
-    let snapshot = Connection::open(path.with_extension("pre-migration-v1.bak")).unwrap();
+    let snapshot = Connection::open_with_flags(
+        path.with_extension("pre-migration-v1.bak"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .unwrap();
     assert_eq!(data(&snapshot), "kept");
     assert_eq!(MigrationRunner::current_version(&snapshot).unwrap(), 1);
 }
 
-// @internal
-#[test]
-fn backup_failure_keeps_best_effort_migration_and_emits_only_a_redacted_diagnostic() {
+fn assert_backup_failure(diagnostics: &Diagnostics) {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("private-person-name.db");
     let conn = Connection::open(&path).unwrap();
@@ -109,12 +128,8 @@ fn backup_failure_keeps_best_effort_migration_and_emits_only_a_redacted_diagnost
         }
         other => panic!("expected a SQLite backup error, got {other:?}"),
     };
-    let diagnostics = Diagnostics::default();
     let key = SymmetricKey::generate();
-
-    tracing::subscriber::with_default(diagnostics.clone(), || {
-        MigrationRunner::run(&conn, &key, &[update()], Some(&path), 11).unwrap();
-    });
+    MigrationRunner::run(&conn, &key, &[update()], Some(&path), 11).unwrap();
 
     assert_eq!(data(&conn), "migrated");
     assert_eq!(MigrationRunner::current_version(&conn).unwrap(), 2);
@@ -188,7 +203,11 @@ fn migration_failure_rolls_back_data_and_version_independently_of_the_backup() {
     let reopened = Connection::open(&path).unwrap();
     assert_eq!(data(&reopened), "kept");
     assert_eq!(MigrationRunner::current_version(&reopened).unwrap(), 1);
-    let snapshot = Connection::open(path.with_extension("pre-migration-v1.bak")).unwrap();
+    let snapshot = Connection::open_with_flags(
+        path.with_extension("pre-migration-v1.bak"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .unwrap();
     assert_eq!(data(&snapshot), "kept");
     assert_eq!(MigrationRunner::current_version(&snapshot).unwrap(), 1);
 }

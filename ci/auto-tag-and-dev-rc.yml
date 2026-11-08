@@ -11,8 +11,9 @@
 #
 # Contents:
 #   - auto-tag:version    — main-branch only; auto-creates v-tag or v-dev-N
-#   - dev:verify / dev:lint:format / dev:lint:clippy / dev:test
-#                         — lightweight dev-tag pipeline (no build/publish)
+#   - dev:verify          — dev-tag pipeline (no build/publish); its lint
+#                           and test ran on main, on the same commit
+#                           (ci/tests/dev-tag-no-retest.test.sh)
 #   - rc:verify / rc:lint:format / rc:lint:clippy / rc:test / rc:mutation
 #     / rc:security:audit — full rc-tag pipeline
 
@@ -126,22 +127,15 @@ auto-tag:version:
 # ============================================================
 # Dev Tag Pipeline (lightweight — lint + test only)
 # ============================================================
-# Triggered by v0.2.3-dev.N tags. Runs lint + test only.
-# Dev tags do NOT run build/package/publish (excluded from .release-or-rc).
+# Triggered by v0.2.3-dev.N tags. Dev tags do NOT run build/package/publish
+# (excluded from .release-or-rc), nor lint and test again: auto-tag:version
+# cuts the tag only after every blocking main job passed on this commit
+# (vauchi/private#1179; ci/tests/dev-tag-no-retest.test.sh).
 
 dev:verify:
   extends: [.linux-runner-nocache, .dev-verify]
   stage: lint
   needs: []
-
-dev:lint:format:
-  extends: [.linux-runner-nocache, .dev-lint-format]
-
-dev:lint:clippy:
-  extends: [.linux-runner-readonly, .dev-lint-clippy]
-
-dev:test:
-  extends: [.linux-runner, .dev-test-nextest, .timeout-standard]
 
 # ============================================================
 # RC Tag Pipeline (full quality gate — no publish/deploy)

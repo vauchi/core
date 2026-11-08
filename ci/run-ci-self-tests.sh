@@ -16,7 +16,7 @@
 set -u
 cd "$(dirname "$0")/.." || exit 1
 
-ALL="run-ci-self-tests formal-triggers auto-tag-order windows-trigger-mr
+ALL="run-ci-self-tests dev-tag-no-retest formal-triggers auto-tag-order windows-trigger-mr
 swift-bindings-timeout packaging-matrix-isolation security-provenance
 fuzz-security mutation-nightly-budget mutation-nightly-exit-codes
 coverage-features e2e-smoke"

@@ -7,10 +7,10 @@
 //! Covers event-to-entry mapping, deduplication via INSERT OR IGNORE, and
 //! that ignored event variants produce no log entries.
 
-use vauchi_app::activity_log_writer::ActivityLogWriter;
-use vauchi_app::notification_types::{ActivityLogEntry, EventOrigin};
+use vauchi_core::EventOrigin;
 use vauchi_core::Storage;
 use vauchi_core::VauchiEvent;
+use vauchi_core::activity_log::{ActivityLogEntry, ActivityLogWriter};
 use vauchi_core::crypto::SymmetricKey;
 
 fn test_storage() -> Storage {

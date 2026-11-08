@@ -160,6 +160,7 @@ pub use api::{
 };
 #[cfg(all(feature = "network-rustls", feature = "network-http"))]
 pub use api::{PERIODIC_SYNC_INTERVAL_SECONDS, PERIODIC_SYNC_MAX_RETRIES};
+pub mod activity_log;
 pub mod aha_moments;
 pub mod avatar;
 pub use aha_moments::AhaMoment;

@@ -9,6 +9,7 @@
 //! migration adds an encrypted column without updating the rekey registry.
 
 use std::collections::BTreeSet;
+use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::storage::{ENCRYPTED_COLUMNS, REKEY_SKIP_COLUMNS, Storage};
 
@@ -169,48 +170,24 @@ fn test_rekey_preserves_password_hash() {
 // @scenario: security :: Rekey preserves decoy_contacts
 #[test]
 fn test_rekey_preserves_decoy_contacts() {
-    let (_dir, mut storage) = open_storage();
-    let key1 = storage.key().clone();
-    let mask1 = crate::common::helpers::duress_mask_key(&key1);
-
-    let card_enc = vauchi_core::crypto::encrypt(&mask1, b"{\"name\":\"Decoy\"}").unwrap();
-    let name_enc = vauchi_core::crypto::encrypt(&mask1, b"Decoy").unwrap();
-    storage.duress_connection().execute(
-        "INSERT INTO decoy_contacts (id, display_name_encrypted, card_encrypted, created_at, updated_at) VALUES ('d1', ?1, ?2, 1000, 1000)",
-        [&name_enc, &card_enc],
-    ).unwrap();
+    let (dir, mut storage) = open_storage();
+    storage
+        .decoy()
+        .save_decoy_contact("d1", "Decoy", &ContactCard::new("Decoy"))
+        .unwrap();
 
     let key2 = SymmetricKey::generate();
     storage.rekey(key2.clone()).unwrap();
+    drop(storage);
+    let reopened = Storage::open(dir.path().join("vauchi.db"), key2).unwrap();
 
-    let loaded: Vec<u8> = storage
-        .duress_connection()
-        .query_row(
-            "SELECT card_encrypted FROM decoy_contacts WHERE id = 'd1'",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap();
+    let decoys = reopened.decoy().load_decoy_contacts().unwrap();
     assert_eq!(
-        vauchi_core::crypto::decrypt(&crate::common::helpers::duress_mask_key(&key2), &loaded)
-            .unwrap(),
-        b"{\"name\":\"Decoy\"}"
-    );
-    let loaded_name: Vec<u8> = storage
-        .duress_connection()
-        .query_row(
-            "SELECT display_name_encrypted FROM decoy_contacts WHERE id = 'd1'",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap();
-    assert_eq!(
-        vauchi_core::crypto::decrypt(
-            &crate::common::helpers::duress_mask_key(&key2),
-            &loaded_name
-        )
-        .unwrap(),
-        b"Decoy"
+        decoys
+            .iter()
+            .map(|(id, name, card)| (id.as_str(), name.as_str(), card.display_name()))
+            .collect::<Vec<_>>(),
+        [("d1", "Decoy", "Decoy")]
     );
 }
 
@@ -494,6 +471,6 @@ fn rekey_reports_progress_one_table_at_a_time() {
     let seen = seen.into_inner().unwrap();
     assert!(!seen.is_empty());
     for (step, (done, total)) in seen.iter().enumerate() {
-        assert_eq!((*done, *total), (step as u32 + 1, 46));
+        assert_eq!((*done, *total), (step as u32 + 1, 42));
     }
 }

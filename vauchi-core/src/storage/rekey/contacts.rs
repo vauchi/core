@@ -346,38 +346,6 @@ impl Storage {
         Ok(())
     }
 
-    /// Re-encrypt decoy_contacts: card_encrypted (multi-row)
-    pub(super) fn rekey_decoy_contacts(
-        &self,
-        old_key: &SymmetricKey,
-        new_key: &SymmetricKey,
-    ) -> Result<(), StorageError> {
-        let mut stmt = self
-            .table_conn("decoy_contacts")
-            .prepare("SELECT id, card_encrypted FROM decoy_contacts")
-            .map_err(|e| StorageError::Migration(format!("Read decoys: {}", e)))?;
-
-        let rows: Vec<(String, Vec<u8>)> = stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
-            .map_err(|e| StorageError::Migration(format!("Query decoys: {}", e)))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| StorageError::Migration(format!("Collect decoys: {}", e)))?;
-
-        for (id, enc) in &rows {
-            let plain = decrypt(old_key, enc)
-                .map_err(|e| StorageError::Migration(format!("Decrypt decoy: {}", e)))?;
-            let new_enc = encrypt(new_key, &plain)
-                .map_err(|e| StorageError::Migration(format!("Encrypt decoy: {}", e)))?;
-            self.table_conn("decoy_contacts")
-                .execute(
-                    "UPDATE decoy_contacts SET card_encrypted = ?1 WHERE id = ?2",
-                    params![new_enc, id],
-                )
-                .map_err(|e| StorageError::Migration(format!("Update decoy: {}", e)))?;
-        }
-        Ok(())
-    }
-
     /// Re-encrypt contacts: nickname_encrypted, custom_avatar_encrypted (nullable, V43)
     pub(super) fn rekey_contact_display(
         &self,

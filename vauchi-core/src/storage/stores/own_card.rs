@@ -18,7 +18,6 @@ use crate::card::ContactCard;
 use crate::clock::Clock;
 use crate::crypto::SymmetricKey;
 use crate::storage::Storage;
-use crate::storage::duress_content::SealOnDrop;
 
 /// One own-card row: `table` has `id = 1`, `card_json`,
 /// `card_json_encrypted` and `updated_at`.
@@ -27,7 +26,9 @@ pub struct OwnCardStore<'a> {
     key: &'a SymmetricKey,
     clock: &'a Arc<dyn Clock>,
     table: &'static str,
-    seal: Option<SealOnDrop<'a>>,
+    /// Sealed after a write, for the mask profile's copy: a write whose
+    /// seal fails returns the error (vauchi/private#1003).
+    sealer: Option<&'a Storage>,
 }
 
 impl<'a> ContactStore<'a> {
@@ -38,21 +39,33 @@ impl<'a> ContactStore<'a> {
             key: self.key,
             clock: self.clock,
             table: "own_card",
-            seal: None,
+            sealer: None,
         }
     }
 }
 
 impl Storage {
-    /// The copy a duress session shows and edits (vauchi/private#811).
-    pub fn duress_own_card(&self) -> OwnCardStore<'_> {
-        OwnCardStore {
-            conn: self.mask.conn(),
-            key: self.mask.key(),
+    /// This database's own card.
+    pub fn own_card(&self) -> crate::storage::Sealed<'_, OwnCardStore<'_>> {
+        self.sealed(OwnCardStore {
+            conn: &self.conn,
+            key: &self.encryption_key,
             clock: &self.clock,
-            table: "duress_own_card",
-            seal: Some(SealOnDrop::new(self)),
-        }
+            table: "own_card",
+            sealer: None,
+        })
+    }
+
+    /// The copy a duress session shows and edits (vauchi/private#811).
+    pub fn duress_own_card(&self) -> crate::storage::Sealed<'_, OwnCardStore<'_>> {
+        let mask = self.mask_profile();
+        self.mask_sealed(mask.sealed(OwnCardStore {
+            conn: &mask.conn,
+            key: &mask.encryption_key,
+            clock: &mask.clock,
+            table: "own_card",
+            sealer: Some(self),
+        }))
     }
 }
 
@@ -74,8 +87,8 @@ impl OwnCardStore<'_> {
             ),
             params![card_encrypted, now as i64],
         )?;
-        if let Some(seal) = &self.seal {
-            seal.seal_now()?;
+        if let Some(sealer) = self.sealer {
+            sealer.seal_mask()?;
         }
 
         Ok(())

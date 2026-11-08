@@ -8,6 +8,7 @@
 #
 # Exit 0: all boundaries clean
 # Exit 1: violations found (prints each with file:line)
+# Exit >1: the check could not complete
 #
 # Add new rules by appending to the RULES array. Format:
 #   "source_glob|forbidden_pattern|explanation"
@@ -15,6 +16,11 @@
 set -euo pipefail
 
 CORE_SRC="vauchi-core/src"
+
+if [[ ! -d "$CORE_SRC" ]]; then
+  echo "ERROR: module source tree is missing: $CORE_SRC" >&2
+  exit 2
+fi
 
 # Each rule: source glob | grep -E pattern | human explanation
 # The pattern matches `use crate::...` import lines.
@@ -40,13 +46,28 @@ RULES=(
 )
 
 violations=0
+searched=0
 
 for rule in "${RULES[@]}"; do
   IFS='|' read -r glob pattern explanation <<< "$rule"
 
-  # shellcheck disable=SC2086
-  # Match only actual use statements, not comments or strings
-  matches=$(grep -rn -E "^[[:space:]]*$pattern" $glob 2>/dev/null || true)
+  # Some rules name optional modules that have been removed or split.
+  targets=()
+  for target in $glob; do
+    [[ ! -e "$target" ]] || targets+=("$target")
+  done
+  [[ ${#targets[@]} -gt 0 ]] || continue
+
+  if matches=$(grep -Hrn -E "^[[:space:]]*$pattern" "${targets[@]}"); then
+    :
+  else
+    search_status=$?
+    if [[ "$search_status" -ne 1 ]]; then
+      echo "ERROR: module-boundary search could not complete: $glob" >&2
+      exit "$search_status"
+    fi
+  fi
+  searched=$((searched + ${#targets[@]}))
 
   if [ -n "$matches" ]; then
     echo "VIOLATION: $explanation"
@@ -55,6 +76,11 @@ for rule in "${RULES[@]}"; do
     violations=$((violations + 1))
   fi
 done
+
+if [[ "$searched" -eq 0 ]]; then
+  echo "ERROR: no source files matched the module-boundary rules" >&2
+  exit 2
+fi
 
 if [ "$violations" -gt 0 ]; then
   echo "Found $violations module boundary violation(s)."

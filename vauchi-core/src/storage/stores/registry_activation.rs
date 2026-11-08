@@ -32,11 +32,13 @@ pub struct RegistryActivationStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for F4 registry-activation handshake state.
-    pub fn registry_activation(&self) -> RegistryActivationStore<'_> {
-        RegistryActivationStore {
-            conn: &self.conn,
-            clock: &self.clock,
-        }
+    pub fn registry_activation(&self) -> crate::storage::Sealed<'_, RegistryActivationStore<'_>> {
+        self.sealed({
+            RegistryActivationStore {
+                conn: &self.conn,
+                clock: &self.clock,
+            }
+        })
     }
 }
 

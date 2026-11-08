@@ -50,22 +50,8 @@ pub(super) fn fixtures() -> Vec<(&'static str, &'static str, &'static [u8])> {
         ),
         ("contact_field_notes", "note_encrypted", b"phone is work"),
         ("own_card", "card_json_encrypted", b"{\"name\":\"Alice\"}"),
-        (
-            "duress_own_card",
-            "card_json_encrypted",
-            b"{\"name\":\"Alicia\"}",
-        ),
-        (
-            "duress_emergency_config",
-            "trusted_contact_ids_encrypted",
-            b"[\"decoy-1\"]",
-        ),
-        (
-            "duress_emergency_config",
-            "message_encrypted",
-            b"decoy-emergency-msg",
-        ),
         ("mask_seed", "seed_encrypted", &[0x5a; 32]),
+        ("decoy_ids", "display_name_encrypted", b"Decoy"),
         (
             "device_registry",
             "registry_json_encrypted",
@@ -171,37 +157,7 @@ pub(super) fn fixtures() -> Vec<(&'static str, &'static str, &'static [u8])> {
         ("tags", "name_encrypted", b"climbing"),
         ("places", "data_encrypted", b"{\"name\":\"Home\"}"),
         // The duress session's twins (vauchi/private#813).
-        (
-            "duress_visibility_labels",
-            "contacts_json_encrypted",
-            b"[\"d1\"]",
-        ),
-        (
-            "duress_visibility_labels",
-            "visible_fields_json_encrypted",
-            b"[\"email\"]",
-        ),
-        ("duress_visibility_labels", "name_encrypted", b"Work"),
-        (
-            "duress_visibility_labels",
-            "display_name_override_encrypted",
-            b"Custom Work",
-        ),
-        (
-            "duress_visibility_labels",
-            "bio_override_encrypted",
-            b"Work bio",
-        ),
-        (
-            "duress_visibility_labels",
-            "avatar_override_encrypted",
-            b"work-avatar",
-        ),
-        ("duress_tags", "name_encrypted", b"books"),
-        ("duress_places", "data_encrypted", b"{\"name\":\"Bern\"}"),
         ("audit_log", "details_encrypted", b"audit-details"),
-        ("decoy_contacts", "card_encrypted", b"{\"name\":\"Decoy\"}"),
-        ("decoy_contacts", "display_name_encrypted", b"Decoy"),
         (
             "emergency_config",
             "trusted_contact_ids_encrypted",

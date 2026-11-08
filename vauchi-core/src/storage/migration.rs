@@ -851,7 +851,7 @@ fn migrate_v114_duress_own_card_into_mask(
     conn: &Connection,
     key: &SymmetricKey,
 ) -> Result<(), StorageError> {
-    use super::duress_content::{mask_key, open_duress_db, unseal_into, write_sealed};
+    use super::duress_content::{mask_key, open_seal};
     use super::mask::SealedSlot;
     use crate::crypto::{decrypt, encrypt};
     use rusqlite::OptionalExtension;
@@ -876,25 +876,29 @@ fn migrate_v114_duress_own_card_into_mask(
         let card = zeroize::Zeroizing::new(
             decrypt(key, &encrypted).map_err(|e| StorageError::Encryption(e.to_string()))?,
         );
-        let mask = mask_key(key);
-        let duress_db = open_duress_db()?;
-        // v94 sealed the content under the SEK, and the first open after it
-        // moves it to the mask key; whichever key opens it seals it again.
-        let seal_key = match SealedSlot::of(conn).read()? {
-            None => &mask,
-            Some(sealed) if unseal_into(&mask, &sealed, &duress_db).is_ok() => &mask,
-            Some(sealed) => {
-                unseal_into(key, &sealed, &duress_db)?;
-                key
+        // The seal may be v94's, under the SEK, or a later one under the
+        // mask key; either loads, and the result is sealed under the mask
+        // key in the current shape.
+        let mask = super::Storage::empty_mask_profile(mask_key(key), None)?;
+        if let Some(sealed) = SealedSlot::of(conn).read()? {
+            match open_seal(mask.mask_key(), &sealed) {
+                Ok(body) => {
+                    mask.load_body(&body, mask.mask_key())?;
+                }
+                Err(under_mask_key) => {
+                    let body = open_seal(key, &sealed).map_err(|_| under_mask_key)?;
+                    mask.load_body(&body, key)?;
+                }
             }
-        };
-        let card = encrypt(seal_key, &card).map_err(|e| StorageError::Encryption(e.to_string()))?;
-        duress_db.execute(
-            "INSERT OR REPLACE INTO duress_own_card (id, card_json, card_json_encrypted, updated_at)
+        }
+        let card =
+            encrypt(mask.mask_key(), &card).map_err(|e| StorageError::Encryption(e.to_string()))?;
+        mask.conn.execute(
+            "INSERT OR REPLACE INTO own_card (id, card_json, card_json_encrypted, updated_at)
              VALUES (1, '', ?1, ?2)",
             rusqlite::params![card, updated_at],
         )?;
-        write_sealed(conn, &duress_db, seal_key)?;
+        SealedSlot::of(conn).write(&mask.sealed_mask()?)?;
     }
     conn.execute_batch("DROP TABLE duress_own_card;")?;
     Ok(())

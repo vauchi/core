@@ -20,11 +20,13 @@ pub struct PendingStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for the pending domain.
-    pub fn pending(&self) -> PendingStore<'_> {
-        PendingStore {
-            conn: &self.conn,
-            key: &self.encryption_key,
-        }
+    pub fn pending(&self) -> crate::storage::Sealed<'_, PendingStore<'_>> {
+        self.sealed({
+            PendingStore {
+                conn: &self.conn,
+                key: &self.encryption_key,
+            }
+        })
     }
 }
 

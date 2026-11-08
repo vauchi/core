@@ -8,7 +8,6 @@
 
 use crate::clock::Clock;
 use crate::crypto::SymmetricKey;
-use crate::storage::duress_content::SealOnDrop;
 use rusqlite::Connection;
 use std::sync::Arc;
 
@@ -32,9 +31,9 @@ pub struct LabelStore<'a> {
     /// duress session's twin of it (vauchi/private#813).
     labels_table: &'static str,
     overrides_table: &'static str,
-    /// Re-seals the duress content after a write, for the duress twin
-    /// (vauchi/private#1003).
-    seal: Option<SealOnDrop<'a>>,
+    /// The database to seal after a write, for a mask profile's twin: a
+    /// write whose seal fails returns the error (vauchi/private#1003).
+    sealer: Option<&'a Storage>,
 }
 
 const LABEL_COLUMNS: &str = "id, name_encrypted, contacts_json_encrypted, visible_fields_json_encrypted, display_name_override_encrypted, bio_override_encrypted, avatar_override_encrypted, created_at, modified_at";
@@ -68,26 +67,29 @@ impl EncryptedLabelRow {
 }
 impl Storage {
     /// Scoped persistence view for the visibility-label domain.
-    pub fn labels(&self) -> LabelStore<'_> {
-        self.labels_in(
-            &self.conn,
-            &self.encryption_key,
-            "visibility_labels",
-            "contact_visibility_overrides",
-            None,
-        )
+    pub fn labels(&self) -> crate::storage::Sealed<'_, LabelStore<'_>> {
+        self.sealed({
+            self.labels_in(
+                &self.conn,
+                &self.encryption_key,
+                "visibility_labels",
+                "contact_visibility_overrides",
+            )
+        })
     }
 
     /// The duress session's groups and overrides: a persistent twin the
     /// real vocabulary never sees (vauchi/private#813).
-    pub fn duress_labels(&self) -> LabelStore<'_> {
-        self.labels_in(
-            self.duress_conn(),
-            self.mask.key(),
-            "duress_visibility_labels",
-            "duress_contact_visibility_overrides",
-            Some(SealOnDrop::new(self)),
-        )
+    pub fn duress_labels(&self) -> crate::storage::Sealed<'_, LabelStore<'_>> {
+        let mask = self.mask_profile();
+        let mut store = mask.labels_in(
+            &mask.conn,
+            &mask.encryption_key,
+            "visibility_labels",
+            "contact_visibility_overrides",
+        );
+        store.sealer = Some(self);
+        self.mask_sealed(mask.sealed(store))
     }
 
     fn labels_in<'a>(
@@ -96,7 +98,6 @@ impl Storage {
         key: &'a SymmetricKey,
         labels_table: &'static str,
         overrides_table: &'static str,
-        seal: Option<SealOnDrop<'a>>,
     ) -> LabelStore<'a> {
         LabelStore {
             conn,
@@ -104,19 +105,17 @@ impl Storage {
             clock: &self.clock,
             labels_table,
             overrides_table,
-            seal,
+            sealer: None,
         }
     }
 }
 
 impl LabelStore<'_> {
-    /// Runs one write. On the duress twin it then seals the duress content
-    /// and returns a failed seal, so the write is not reported done while
-    /// it would be lost on restart (vauchi/private#1003).
+    /// Runs one write, and seals a mask twin after it.
     fn execute<P: rusqlite::Params>(&self, sql: &str, params: P) -> Result<usize, StorageError> {
         let changed = self.conn.execute(sql, params)?;
-        if let Some(seal) = &self.seal {
-            seal.seal_now()?;
+        if let Some(sealer) = self.sealer {
+            sealer.seal_mask()?;
         }
         Ok(changed)
     }

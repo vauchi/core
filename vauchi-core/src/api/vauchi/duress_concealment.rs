@@ -75,7 +75,7 @@ impl ProfileEngine {
     /// coercer sees none of the real ones, what they make never reaches
     /// them, and it is still there after a lock. Engine internals that
     /// decide what real contacts receive keep using `self.storage.labels()`.
-    pub(super) fn labels_slot(&self) -> crate::storage::LabelStore<'_> {
+    pub(super) fn labels_slot(&self) -> crate::storage::Sealed<'_, crate::storage::LabelStore<'_>> {
         if self.in_duress_mode() {
             self.storage.duress_labels()
         } else {
@@ -83,7 +83,7 @@ impl ProfileEngine {
         }
     }
 
-    pub(super) fn tags_slot(&self) -> crate::storage::TagStore<'_> {
+    pub(super) fn tags_slot(&self) -> crate::storage::Sealed<'_, crate::storage::TagStore<'_>> {
         if self.in_duress_mode() {
             self.storage.duress_tags()
         } else {
@@ -91,7 +91,7 @@ impl ProfileEngine {
         }
     }
 
-    pub(super) fn places_slot(&self) -> crate::storage::PlaceStore<'_> {
+    pub(super) fn places_slot(&self) -> crate::storage::Sealed<'_, crate::storage::PlaceStore<'_>> {
         if self.in_duress_mode() {
             self.storage.duress_places()
         } else {
@@ -134,11 +134,13 @@ impl ProfileEngine {
     /// an edit that vanished after a lock would give the mode away. Engine
     /// paths that decide what contacts receive keep
     /// `self.storage.contacts().own_card()`.
-    pub(super) fn own_card_slot(&self) -> crate::storage::OwnCardStore<'_> {
+    pub(super) fn own_card_slot(
+        &self,
+    ) -> crate::storage::Sealed<'_, crate::storage::OwnCardStore<'_>> {
         if self.in_duress_mode() {
             self.storage.duress_own_card()
         } else {
-            self.storage.contacts().own_card()
+            self.storage.own_card()
         }
     }
 

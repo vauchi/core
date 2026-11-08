@@ -18,7 +18,6 @@ use super::super::{Storage, StorageError};
 use crate::clock::Clock;
 use crate::contact::place::{PLACE_MATCH_RADIUS_M, Place, PlaceData};
 use crate::crypto::SymmetricKey;
-use crate::storage::duress_content::SealOnDrop;
 
 /// Scoped persistence view for named places.
 pub struct PlaceStore<'a> {
@@ -28,25 +27,23 @@ pub struct PlaceStore<'a> {
     /// The real `places` table, or the duress session's twin
     /// (vauchi/private#813).
     table: &'static str,
-    /// Re-seals the duress content after a write, for the duress twin
-    /// (vauchi/private#1003).
-    seal: Option<SealOnDrop<'a>>,
+    /// The database to seal after a write, for a mask profile's twin: a
+    /// write whose seal fails returns the error (vauchi/private#1003).
+    sealer: Option<&'a Storage>,
 }
 
 impl Storage {
     /// Scoped persistence view for the place domain.
-    pub fn places(&self) -> PlaceStore<'_> {
-        self.places_in(&self.conn, &self.encryption_key, "places", None)
+    pub fn places(&self) -> crate::storage::Sealed<'_, PlaceStore<'_>> {
+        self.sealed(self.places_in(&self.conn, &self.encryption_key, "places"))
     }
 
     /// The duress session's places, persistent and never the real ones.
-    pub fn duress_places(&self) -> PlaceStore<'_> {
-        self.places_in(
-            self.duress_conn(),
-            self.mask.key(),
-            "duress_places",
-            Some(SealOnDrop::new(self)),
-        )
+    pub fn duress_places(&self) -> crate::storage::Sealed<'_, PlaceStore<'_>> {
+        let mask = self.mask_profile();
+        let mut store = mask.places_in(&mask.conn, &mask.encryption_key, "places");
+        store.sealer = Some(self);
+        self.mask_sealed(mask.sealed(store))
     }
 
     fn places_in<'a>(
@@ -54,26 +51,23 @@ impl Storage {
         conn: &'a Connection,
         key: &'a SymmetricKey,
         table: &'static str,
-        seal: Option<SealOnDrop<'a>>,
     ) -> PlaceStore<'a> {
         PlaceStore {
             conn,
             key,
             clock: &self.clock,
             table,
-            seal,
+            sealer: None,
         }
     }
 }
 
 impl PlaceStore<'_> {
-    /// Runs one write. On the duress twin it then seals the duress content
-    /// and returns a failed seal, so the write is not reported done while
-    /// it would be lost on restart (vauchi/private#1003).
+    /// Runs one write, and seals a mask twin after it.
     fn execute<P: rusqlite::Params>(&self, sql: &str, params: P) -> Result<usize, StorageError> {
         let changed = self.conn.execute(sql, params)?;
-        if let Some(seal) = &self.seal {
-            seal.seal_now()?;
+        if let Some(sealer) = self.sealer {
+            sealer.seal_mask()?;
         }
         Ok(changed)
     }

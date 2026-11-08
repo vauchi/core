@@ -35,12 +35,14 @@ impl Storage {
     /// The returned [`DeviceStore`] borrows this storage's connection,
     /// encryption key, and clock; it cannot outlive `self` and reaches only
     /// the device-owned tables.
-    pub fn device(&self) -> DeviceStore<'_> {
-        DeviceStore {
-            conn: &self.conn,
-            key: &self.encryption_key,
-            clock: &self.clock,
-        }
+    pub fn device(&self) -> crate::storage::Sealed<'_, DeviceStore<'_>> {
+        self.sealed({
+            DeviceStore {
+                conn: &self.conn,
+                key: &self.encryption_key,
+                clock: &self.clock,
+            }
+        })
     }
 }
 

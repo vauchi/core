@@ -27,12 +27,14 @@ pub struct UxStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for the ux domain.
-    pub fn ux(&self) -> UxStore<'_> {
-        UxStore {
-            conn: &self.conn,
-            key: &self.encryption_key,
-            clock: &self.clock,
-        }
+    pub fn ux(&self) -> crate::storage::Sealed<'_, UxStore<'_>> {
+        self.sealed({
+            UxStore {
+                conn: &self.conn,
+                key: &self.encryption_key,
+                clock: &self.clock,
+            }
+        })
     }
 }
 

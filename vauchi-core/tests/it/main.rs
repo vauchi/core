@@ -385,6 +385,7 @@ mod lost_primary_bootstrap_diag_tests;
 mod mailbox_token_shape_tests;
 mod mailbox_token_tests;
 mod mask_profile_contents_tests;
+mod mask_profile_storage_tests;
 mod migration_tests;
 mod migration_v37_test;
 mod migration_v67_test;

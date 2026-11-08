@@ -66,7 +66,6 @@ const CONTACT_PK: &[u8; 32] = b"\x01\x01\x01\x01\x01\x01\x01\x01\
                                 \x01\x01\x01\x01\x01\x01\x01\x01\
                                 \x01\x01\x01\x01\x01\x01\x01\x01";
 const LABEL_ID: &str = "l1";
-const DURESS_LABEL_ID: &str = "dl1";
 
 fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     let conn = storage.connection();
@@ -421,72 +420,30 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     )
     .unwrap();
 
-    // ── the duress twins (vauchi/private#813), under the mask key ───────
+    // ── the mask profile (ADR-080): a regular table and the two only it
+    // has, under the mask key ───────
     let mask = crate::common::helpers::duress_mask_key(key);
     let enc =
         |table: &str, column: &str| -> Vec<u8> { encrypt(&mask, &fx(table, column)).unwrap() };
-    let duress_label_name_plain = fx("duress_visibility_labels", "name_encrypted");
     let duress = storage.duress_connection();
     duress
         .execute(
-            "INSERT INTO duress_visibility_labels \
-         (id, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, \
-          name_hmac, display_name_override_encrypted, bio_override_encrypted, \
-          avatar_override_encrypted, created_at, modified_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-            params![
-                DURESS_LABEL_ID,
-                enc("duress_visibility_labels", "contacts_json_encrypted"),
-                enc("duress_visibility_labels", "visible_fields_json_encrypted"),
-                enc("duress_visibility_labels", "name_encrypted"),
-                label_hmac(&mask, &duress_label_name_plain),
-                enc(
-                    "duress_visibility_labels",
-                    "display_name_override_encrypted"
-                ),
-                enc("duress_visibility_labels", "bio_override_encrypted"),
-                enc("duress_visibility_labels", "avatar_override_encrypted"),
-                now,
-                now,
-            ],
-        )
-        .unwrap();
-    duress
-        .execute(
-            "INSERT INTO duress_tags (id, name_encrypted, created_at) VALUES ('dt1', ?1, ?2)",
-            params![enc("duress_tags", "name_encrypted"), now],
-        )
-        .unwrap();
-    duress
-        .execute(
-            "INSERT INTO duress_places (id, data_encrypted, created_at) VALUES ('dp1', ?1, ?2)",
-            params![enc("duress_places", "data_encrypted"), now],
-        )
-        .unwrap();
-    // The mask profile's own card, emergency config and seed (ADR-080).
-    duress
-        .execute(
-            "INSERT OR REPLACE INTO duress_own_card \
-             (id, card_json, card_json_encrypted, updated_at) VALUES (1, '', ?1, ?2)",
-            params![enc("duress_own_card", "card_json_encrypted"), now],
-        )
-        .unwrap();
-    duress
-        .execute(
-            "INSERT INTO duress_emergency_config \
-             (id, trusted_contact_ids_encrypted, message_encrypted, created_at, updated_at) \
-             VALUES (1, ?1, ?2, ?3, ?3)",
-            params![
-                enc("duress_emergency_config", "trusted_contact_ids_encrypted"),
-                enc("duress_emergency_config", "message_encrypted"),
-                now
-            ],
+            "INSERT INTO tags (id, name_encrypted, created_at) VALUES ('mt1', ?1, ?2)",
+            params![enc("tags", "name_encrypted"), now],
         )
         .unwrap();
     duress
         .execute(
             "INSERT OR REPLACE INTO mask_seed (id, seed_encrypted) VALUES (1, ?1)",
             params![enc("mask_seed", "seed_encrypted")],
+        )
+        .unwrap();
+    duress
+        .execute(
+            "INSERT INTO decoy_ids \
+             (contact_id, decoy_id, display_name_encrypted, created_at, updated_at) \
+             VALUES ('c-d1', 'd1', ?1, ?2, ?2)",
+            params![enc("decoy_ids", "display_name_encrypted"), now],
         )
         .unwrap();
 
@@ -499,23 +456,6 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
         params![enc("audit_log", "details_encrypted"), now],
     )
     .unwrap();
-
-    // ── decoy_contacts, under the mask key ──────────────────
-    let enc_mask =
-        |table: &str, column: &str| -> Vec<u8> { encrypt(&mask, &fx(table, column)).unwrap() };
-    duress
-        .execute(
-            "INSERT INTO decoy_contacts \
-         (id, display_name_encrypted, card_encrypted, created_at, updated_at) \
-         VALUES ('d1', ?1, ?2, ?3, ?4)",
-            params![
-                enc_mask("decoy_contacts", "display_name_encrypted"),
-                enc_mask("decoy_contacts", "card_encrypted"),
-                now,
-                now
-            ],
-        )
-        .unwrap();
 
     // ── emergency_config (singleton) ─────────────────────────
     conn.execute(
@@ -571,22 +511,13 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
 }
 
 #[allow(clippy::too_many_lines)]
-/// The duress tables live in the sealed duress database (vauchi/private#1003).
-const DURESS_TABLES: [&str; 8] = [
-    "decoy_contacts",
-    "duress_tags",
-    "duress_places",
-    "duress_visibility_labels",
-    "duress_contact_visibility_overrides",
-    "duress_own_card",
-    "duress_emergency_config",
-    "mask_seed",
-];
+/// The tables only the mask profile has (ADR-080).
+const MASK_ONLY_TABLES: [&str; 2] = ["mask_seed", "decoy_ids"];
 
 fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
     let conn = storage.connection();
     let conn_for = |table: &str| {
-        if DURESS_TABLES.contains(&table) {
+        if MASK_ONLY_TABLES.contains(&table) {
             storage.duress_connection()
         } else {
             conn
@@ -600,7 +531,7 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
             let blob: Vec<u8> = conn_for(table)
                 .query_row(&sql, params_, |row| row.get(0))
                 .unwrap_or_else(|e| panic!("read {}.{}: {}", table, column, e));
-            let table_key = if DURESS_TABLES.contains(&table) {
+            let table_key = if MASK_ONLY_TABLES.contains(&table) {
                 &new_mask_key
             } else {
                 new_key
@@ -634,40 +565,27 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
     check_one("tags", "name_encrypted", "id = 't1'", id_eq_1);
     check_one("places", "data_encrypted", "id = 'p1'", id_eq_1);
 
-    // ── the duress twins (vauchi/private#813) ───────────────────
-    for col in [
-        "contacts_json_encrypted",
-        "visible_fields_json_encrypted",
-        "name_encrypted",
-        "display_name_override_encrypted",
-        "bio_override_encrypted",
-        "avatar_override_encrypted",
-    ] {
-        check_one("duress_visibility_labels", col, "id = 'dl1'", id_eq_1);
-    }
-    let duress_hmac: Vec<u8> = storage
+    // ── the mask profile: its regular tables under the mask key ───
+    let mask_tag: Vec<u8> = storage
         .duress_connection()
         .query_row(
-            "SELECT name_hmac FROM duress_visibility_labels WHERE id = ?1",
-            [&DURESS_LABEL_ID],
+            "SELECT name_encrypted FROM tags WHERE id = 'mt1'",
+            [],
             |row| row.get(0),
         )
         .unwrap();
     assert_eq!(
-        duress_hmac,
-        label_hmac(
-            &new_mask_key,
-            &fx("duress_visibility_labels", "name_encrypted")
-        ),
-        "duress label hmac rekeyed"
+        decrypt(&new_mask_key, &mask_tag).unwrap(),
+        fx("tags", "name_encrypted"),
+        "the mask profile's tag is under the new mask key"
     );
-    check_one("duress_tags", "name_encrypted", "id = 'dt1'", id_eq_1);
-    check_one("duress_places", "data_encrypted", "id = 'dp1'", id_eq_1);
-    check_one("duress_own_card", "card_json_encrypted", "id = 1", id_eq_1);
-    for col in ["trusted_contact_ids_encrypted", "message_encrypted"] {
-        check_one("duress_emergency_config", col, "id = 1", id_eq_1);
-    }
     check_one("mask_seed", "seed_encrypted", "id = 1", id_eq_1);
+    check_one(
+        "decoy_ids",
+        "display_name_encrypted",
+        "contact_id = 'c-d1'",
+        id_eq_1,
+    );
 
     // ── identity (3 columns, singleton) ─────────────────────
     for col in [
@@ -879,10 +797,6 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
         fx("audit_log", "details_encrypted")
     );
 
-    // ── decoy_contacts ──────────────────────────────────────
-    check_one("decoy_contacts", "card_encrypted", "id = 'd1'", &[]);
-    check_one("decoy_contacts", "display_name_encrypted", "id = 'd1'", &[]);
-
     // ── exchange_states ─────────────────────────────────────
     check_one(
         "exchange_states",
@@ -975,7 +889,6 @@ const COVERED_ELSEWHERE: &[(&str, &str)] = &[
     // Recomputed (not re-encrypted) during rekey; populated and checked in
     // this file through label_hmac rather than through the fixtures.
     ("visibility_labels", "name_hmac"),
-    ("duress_visibility_labels", "name_hmac"),
     // Re-sealed whole from the duress tables above;
     // the_duress_content_survives_a_storage_rekey in duress_at_rest_tests.rs.
     ("duress_content", "content_encrypted"),

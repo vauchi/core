@@ -18,8 +18,8 @@ pub struct DeviceDeliveryStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for the device_deliveries domain.
-    pub fn device_deliveries(&self) -> DeviceDeliveryStore<'_> {
-        DeviceDeliveryStore { conn: &self.conn }
+    pub fn device_deliveries(&self) -> crate::storage::Sealed<'_, DeviceDeliveryStore<'_>> {
+        self.sealed(DeviceDeliveryStore { conn: &self.conn })
     }
 }
 

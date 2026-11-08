@@ -29,12 +29,14 @@ pub struct RatchetStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for the ratchets domain.
-    pub fn ratchets(&self) -> RatchetStore<'_> {
-        RatchetStore {
-            conn: &self.conn,
-            key: &self.encryption_key,
-            clock: &self.clock,
-        }
+    pub fn ratchets(&self) -> crate::storage::Sealed<'_, RatchetStore<'_>> {
+        self.sealed({
+            RatchetStore {
+                conn: &self.conn,
+                key: &self.encryption_key,
+                clock: &self.clock,
+            }
+        })
     }
 }
 

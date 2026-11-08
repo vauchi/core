@@ -19,8 +19,8 @@ pub struct ReplayStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for the replay-nonce domain.
-    pub fn replay(&self) -> ReplayStore<'_> {
-        ReplayStore { conn: &self.conn }
+    pub fn replay(&self) -> crate::storage::Sealed<'_, ReplayStore<'_>> {
+        self.sealed(ReplayStore { conn: &self.conn })
     }
 }
 

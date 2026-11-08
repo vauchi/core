@@ -22,12 +22,14 @@ pub struct FieldNoteStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for the field_notes domain.
-    pub fn field_notes(&self) -> FieldNoteStore<'_> {
-        FieldNoteStore {
-            conn: &self.conn,
-            key: &self.encryption_key,
-            clock: &self.clock,
-        }
+    pub fn field_notes(&self) -> crate::storage::Sealed<'_, FieldNoteStore<'_>> {
+        self.sealed({
+            FieldNoteStore {
+                conn: &self.conn,
+                key: &self.encryption_key,
+                clock: &self.clock,
+            }
+        })
     }
 }
 

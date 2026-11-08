@@ -47,8 +47,12 @@ impl Storage {
         key_check::verify(&conn, &encryption_key)?;
         let storage = Storage {
             conn,
-            mask: super::mask::MaskStorage::new(&encryption_key)?,
+            mask: Some(Box::new(Storage::empty_mask_profile(
+                super::duress_content::mask_key(&encryption_key),
+                None,
+            )?)),
             encryption_key,
+            seal_target: None,
             db_path: Some(path_buf),
             clock: crate::clock::SystemClock::shared(),
             #[cfg(any(test, feature = "testing"))]
@@ -67,19 +71,23 @@ impl Storage {
         Ok(storage)
     }
 
-    /// Creates an in-memory storage (for testing).
     /// The database file, or `None` for an in-memory database.
     pub fn db_path(&self) -> Option<&Path> {
         self.db_path.as_deref()
     }
 
+    /// Creates an in-memory storage (for testing).
     pub fn in_memory(encryption_key: SymmetricKey) -> Result<Self, StorageError> {
         let conn = Connection::open_in_memory()?;
         Self::configure_pragmas(&conn)?;
         let storage = Storage {
             conn,
-            mask: super::mask::MaskStorage::new(&encryption_key)?,
+            mask: Some(Box::new(Storage::empty_mask_profile(
+                super::duress_content::mask_key(&encryption_key),
+                None,
+            )?)),
             encryption_key,
+            seal_target: None,
             db_path: None,
             clock: crate::clock::SystemClock::shared(),
             #[cfg(any(test, feature = "testing"))]
@@ -105,7 +113,7 @@ impl Storage {
     /// Note: secure_delete is partially negated by WAL mode (pre-modification
     /// data persists in WAL file). The primary protection is the SMK encryption
     /// layer; these PRAGMAs are secondary defense-in-depth.
-    fn configure_pragmas(conn: &Connection) -> Result<(), StorageError> {
+    pub(super) fn configure_pragmas(conn: &Connection) -> Result<(), StorageError> {
         // Set busy_timeout at the C level FIRST, before executing any SQL.
         // This ensures all subsequent statements (including the pragma batch
         // below) will wait up to 5s for locks instead of failing immediately.
@@ -186,9 +194,17 @@ impl Storage {
         if self.commit_fault.replace(false) {
             return Err(StorageError::Database(rusqlite::Error::QueryReturnedNoRows));
         }
-        self.conn
-            .execute_batch("COMMIT")
-            .map_err(StorageError::from)
+        self.conn.execute_batch("COMMIT")?;
+        self.reseal()
+    }
+
+    /// Writes this database into its seal target's row; nothing for a
+    /// database that is its own file.
+    pub(super) fn reseal(&self) -> Result<(), StorageError> {
+        let Some(file) = &self.seal_target else {
+            return Ok(());
+        };
+        super::mask::SealedSlot::of(file).write(&self.sealed_mask()?)
     }
 
     /// Arm a one-shot commit fault: the next [`Self::commit`] fails with the
@@ -261,17 +277,10 @@ impl Storage {
         }
     }
 
-    /// The connection the duress content lives on: decoy contacts and the
-    /// duress session's groups, tags and places (vauchi/private#813,
-    /// vauchi/private#1003).
-    pub(crate) fn duress_conn(&self) -> &Connection {
-        self.mask.conn()
-    }
-
     /// The in-memory duress database (testing only).
     #[cfg(any(test, feature = "testing"))]
     pub fn duress_connection(&self) -> &Connection {
-        self.mask.conn()
+        &self.mask_profile().conn
     }
 
     /// Returns a reference to the underlying connection (testing only).

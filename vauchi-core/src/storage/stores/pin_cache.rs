@@ -21,11 +21,13 @@ pub struct PinCacheStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for the pin_cache domain.
-    pub fn pin_cache(&self) -> PinCacheStore<'_> {
-        PinCacheStore {
-            conn: &self.conn,
-            clock: &self.clock,
-        }
+    pub fn pin_cache(&self) -> crate::storage::Sealed<'_, PinCacheStore<'_>> {
+        self.sealed({
+            PinCacheStore {
+                conn: &self.conn,
+                clock: &self.clock,
+            }
+        })
     }
 }
 

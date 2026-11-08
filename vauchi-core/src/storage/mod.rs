@@ -16,6 +16,13 @@ pub(crate) mod duress_content;
 mod key_check;
 mod lookup;
 mod mask;
+mod mask_profile;
+// INLINE_TEST_REQUIRED: a seal in the legacy decoy-table shape can only be built through the crate-private legacy writer, which no public API reaches any more
+#[cfg(test)]
+#[path = "mask_profile_tests.rs"]
+mod mask_profile_tests;
+mod sealing;
+pub use sealing::Sealed;
 
 mod contact_row;
 
@@ -91,12 +98,14 @@ use rusqlite::Connection;
 /// open a fresh storage per call via `open_vauchi()`.
 pub struct Storage {
     conn: Connection,
-    /// Decoy contacts and the duress session's groups, tags and places,
-    /// sealed into the file's `duress_content` row (vauchi/private#1003),
-    /// with the mask key they are under (ADR-080).
-    mask: mask::MaskStorage,
+    /// The mask profile sealed in this file's `duress_content` row, for a
+    /// real database (ADR-080); `None` for a mask profile itself.
+    mask: Option<Box<Storage>>,
     /// Encryption key derived from user's master key
     encryption_key: SymmetricKey,
+    /// The file holding this database sealed in one row, for a database that
+    /// lives only in memory and in that seal (the mask profile, ADR-080).
+    seal_target: Option<Connection>,
     /// Database file path (None for in-memory databases).
     db_path: Option<std::path::PathBuf>,
     /// Explicit-time seam for the storage subsystem (Phase 1 /

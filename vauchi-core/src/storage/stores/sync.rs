@@ -74,12 +74,14 @@ impl Storage {
     /// The returned [`SyncStore`] borrows this storage's connection,
     /// encryption key, and clock; it cannot outlive `self` and reaches only
     /// the sync-owned tables.
-    pub fn sync(&self) -> SyncStore<'_> {
-        SyncStore {
-            conn: &self.conn,
-            key: &self.encryption_key,
-            clock: &self.clock,
-        }
+    pub fn sync(&self) -> crate::storage::Sealed<'_, SyncStore<'_>> {
+        self.sealed({
+            SyncStore {
+                conn: &self.conn,
+                key: &self.encryption_key,
+                clock: &self.clock,
+            }
+        })
     }
 }
 

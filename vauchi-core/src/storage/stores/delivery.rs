@@ -21,11 +21,13 @@ pub struct DeliveryStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for the deliveries domain.
-    pub fn deliveries(&self) -> DeliveryStore<'_> {
-        DeliveryStore {
-            conn: &self.conn,
-            clock: &self.clock,
-        }
+    pub fn deliveries(&self) -> crate::storage::Sealed<'_, DeliveryStore<'_>> {
+        self.sealed({
+            DeliveryStore {
+                conn: &self.conn,
+                clock: &self.clock,
+            }
+        })
     }
 }
 

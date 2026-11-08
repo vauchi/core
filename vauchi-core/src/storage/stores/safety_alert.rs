@@ -44,11 +44,13 @@ pub struct SafetyAlertFactStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for received safety-alert facts.
-    pub fn safety_alerts(&self) -> SafetyAlertFactStore<'_> {
-        SafetyAlertFactStore {
-            conn: &self.conn,
-            key: &self.encryption_key,
-        }
+    pub fn safety_alerts(&self) -> crate::storage::Sealed<'_, SafetyAlertFactStore<'_>> {
+        self.sealed({
+            SafetyAlertFactStore {
+                conn: &self.conn,
+                key: &self.encryption_key,
+            }
+        })
     }
 }
 

@@ -80,7 +80,7 @@ impl ProfileEngine {
         if !self.has_ohttp_key() && self.connect().is_err() {
             return false;
         }
-        self.next_sync_allowed = None;
+        self.relay().next_sync_allowed = None;
         matches!(
             self.sync(),
             Ok(super::VauchiSyncOutcome::Ok { ref errors, .. }) if errors.is_empty()

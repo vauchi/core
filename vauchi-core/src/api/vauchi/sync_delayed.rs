@@ -125,7 +125,7 @@ impl ProfileEngine {
     }
 
     pub(super) fn answered_delayed_fetches(&self) -> u64 {
-        self.delayed_ohttp
+        self.delayed_ohttp()
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .answered_fetches()

@@ -335,6 +335,40 @@ impl From<ProfileEngine> for Vauchi {
     }
 }
 
+/// What a device's profiles share of the relay: one OHTTP key, one pacing of
+/// requests to the outer relay and one sync timing (ADR-080 point 2), so a
+/// background worker's traffic keeps the device's schedule.
+#[cfg(feature = "network-http")]
+pub(crate) struct RelayTransport {
+    /// Shared by every transport this device builds, so the outer relay's
+    /// per-address limit holds across one sync's requests (private#912).
+    ohttp_pacer: Arc<crate::network::request_pacer::RequestPacer>,
+    /// Cached OHTTP key (loaded from Storage on connect).
+    ohttp_key: Option<crate::network::OhttpClient>,
+    /// Fetches and acknowledgements posted through the outer relay's delayed
+    /// path, collected on later syncs (#628).
+    delayed_ohttp: Arc<std::sync::Mutex<crate::network::DelayedRequests>>,
+    /// Deadline before which sync() returns TooSoon.
+    next_sync_allowed: Option<std::time::Instant>,
+    /// Timestamp of last successful exchange (for C1 post-exchange delay).
+    last_exchange_time: Option<std::time::Instant>,
+}
+
+#[cfg(feature = "network-http")]
+impl RelayTransport {
+    fn shared(
+        ohttp_pacer: Arc<crate::network::request_pacer::RequestPacer>,
+    ) -> Arc<std::sync::Mutex<Self>> {
+        Arc::new(std::sync::Mutex::new(RelayTransport {
+            ohttp_pacer,
+            ohttp_key: None,
+            delayed_ohttp: crate::network::DelayedRequests::shared(),
+            next_sync_allowed: None,
+            last_exchange_time: None,
+        }))
+    }
+}
+
 /// One profile's identity, storage, events and sync state (ADR-080 point 1).
 pub struct ProfileEngine {
     /// Another of the identity's devices told this one to wipe (#916);
@@ -383,23 +417,10 @@ pub struct ProfileEngine {
     /// monotonic time deterministically. Diagnostic perf-timers are
     /// exempt (see `crate::monotonic` module docs).
     monotonic: Arc<dyn MonotonicClock>,
-    /// Shared by every transport this client builds, so the outer relay's
-    /// per-address limit holds across one sync's requests (private#912).
+    /// The device's relay transport, shared with the engine of every other
+    /// profile on this device (ADR-080 point 2).
     #[cfg(feature = "network-http")]
-    ohttp_pacer: Arc<crate::network::request_pacer::RequestPacer>,
-    /// Cached OHTTP key (loaded from Storage on connect).
-    #[cfg(feature = "network-http")]
-    ohttp_key: Option<crate::network::OhttpClient>,
-    /// Fetches and acknowledgements posted through the outer relay's delayed
-    /// path, collected on later syncs (#628).
-    #[cfg(feature = "network-http")]
-    delayed_ohttp: std::sync::Arc<std::sync::Mutex<crate::network::DelayedRequests>>,
-    /// Deadline before which sync() returns TooSoon.
-    #[cfg(feature = "network-http")]
-    next_sync_allowed: Option<std::time::Instant>,
-    /// Timestamp of last successful exchange (for C1 post-exchange delay).
-    #[cfg(feature = "network-http")]
-    last_exchange_time: Option<std::time::Instant>,
+    relay: Arc<std::sync::Mutex<RelayTransport>>,
     /// Wall-clock unix seconds of the last successful sync, captured via
     /// `clock().unix_seconds()` inside `update_timing_after_sync`. Resets
     /// on process restart — in-memory only. Surfaced via `last_sync_time()`
@@ -415,6 +436,23 @@ pub struct ProfileEngine {
     /// `BROADCAST_COOLDOWN_SECS` without adding a new storage column for a
     /// pre-release guard.
     last_emergency_broadcast_unix_seconds: Option<u64>,
+}
+
+#[cfg(feature = "network-http")]
+impl ProfileEngine {
+    fn relay(&self) -> std::sync::MutexGuard<'_, RelayTransport> {
+        self.relay
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    fn ohttp_pacer(&self) -> Arc<crate::network::request_pacer::RequestPacer> {
+        self.relay().ohttp_pacer.clone()
+    }
+
+    fn delayed_ohttp(&self) -> Arc<std::sync::Mutex<crate::network::DelayedRequests>> {
+        self.relay().delayed_ohttp.clone()
+    }
 }
 
 impl ProfileEngine {
@@ -552,22 +590,16 @@ impl ProfileEngine {
             clock,
             rng,
             #[cfg(feature = "network-http")]
-            ohttp_pacer: Arc::new(crate::network::request_pacer::RequestPacer::ohttp_with(
-                monotonic.clone(),
-                sleeper.clone(),
+            relay: RelayTransport::shared(Arc::new(
+                crate::network::request_pacer::RequestPacer::ohttp_with(
+                    monotonic.clone(),
+                    sleeper.clone(),
+                ),
             )),
             sleeper,
             monotonic,
-            #[cfg(feature = "network-http")]
-            ohttp_key: None,
-            #[cfg(feature = "network-http")]
-            delayed_ohttp: crate::network::DelayedRequests::shared(),
-            #[cfg(feature = "network-http")]
-            next_sync_allowed: None,
             wipe_requested: std::sync::atomic::AtomicBool::new(false),
             wiped_by_another_device: false,
-            #[cfg(feature = "network-http")]
-            last_exchange_time: None,
             last_sync_unix_seconds: None,
             missed_background_run_unix_seconds: None,
             last_emergency_broadcast_unix_seconds: None,
@@ -671,20 +703,21 @@ impl ProfileEngine {
     /// `with_sleeper` and `with_monotonic`, which rebuild it.
     #[cfg(feature = "network-http")]
     pub(crate) fn with_ohttp_pacer(
-        mut self,
+        self,
         pacer: Arc<crate::network::request_pacer::RequestPacer>,
     ) -> Self {
-        self.ohttp_pacer = pacer;
+        self.relay().ohttp_pacer = pacer;
         self
     }
 
     fn rebuild_ohttp_pacer(&mut self) {
         #[cfg(feature = "network-http")]
         {
-            self.ohttp_pacer = Arc::new(crate::network::request_pacer::RequestPacer::ohttp_with(
+            let pacer = Arc::new(crate::network::request_pacer::RequestPacer::ohttp_with(
                 self.monotonic.clone(),
                 self.sleeper.clone(),
             ));
+            self.relay().ohttp_pacer = pacer;
         }
     }
 
@@ -784,17 +817,11 @@ impl ProfileEngine {
             sleeper: SystemSleeper::shared(),
             monotonic: SystemMonotonicClock::shared(),
             #[cfg(feature = "network-http")]
-            ohttp_pacer: Arc::new(crate::network::request_pacer::RequestPacer::ohttp()),
-            #[cfg(feature = "network-http")]
-            ohttp_key: None,
-            #[cfg(feature = "network-http")]
-            delayed_ohttp: crate::network::DelayedRequests::shared(),
-            #[cfg(feature = "network-http")]
-            next_sync_allowed: None,
+            relay: RelayTransport::shared(Arc::new(
+                crate::network::request_pacer::RequestPacer::ohttp(),
+            )),
             wipe_requested: std::sync::atomic::AtomicBool::new(false),
             wiped_by_another_device: false,
-            #[cfg(feature = "network-http")]
-            last_exchange_time: None,
             last_sync_unix_seconds: None,
             missed_background_run_unix_seconds: None,
             last_emergency_broadcast_unix_seconds: None,

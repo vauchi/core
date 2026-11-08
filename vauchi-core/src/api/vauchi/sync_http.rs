@@ -88,12 +88,13 @@ impl ProfileEngine {
             return Ok(VauchiSyncOutcome::NoIdentity);
         }
 
-        if self.ohttp_key.is_none() {
+        if !self.has_ohttp_key() {
             return Ok(VauchiSyncOutcome::NotConnected);
         }
 
         // C1 / C2 timing gate
-        if let Some(deadline) = self.next_sync_allowed {
+        let next_sync_allowed = self.relay().next_sync_allowed;
+        if let Some(deadline) = next_sync_allowed {
             let now = self.monotonic.now();
             if now < deadline {
                 let remaining = deadline.saturating_duration_since(now);
@@ -122,7 +123,7 @@ impl ProfileEngine {
                 .resolve_signed_ohttp_key(&relay_url, &anchor, true)?
                 .key_config;
             let client = OhttpClient::new(key_bytes).map_err(VauchiError::Network)?;
-            self.ohttp_key = Some(client);
+            self.relay().ohttp_key = Some(client);
 
             let outcome = self.sync_inner()?;
             self.update_timing_after_sync();
@@ -149,7 +150,7 @@ impl ProfileEngine {
         // Receive/send run over the same hardened OHTTP transport as every
         // application-relay action (Step 4): build_relay_transport derives the
         // outer OHTTP hop internally and fails closed without it. sync() has
-        // already returned NotConnected unless self.ohttp_key is Some.
+        // already returned NotConnected unless an OHTTP key is cached.
         let mut adapter = HttpTransportAdapter::new(self.build_relay_transport(
             &self.config.relay.server_url,
             self.config.relay.connect_timeout_ms,
@@ -161,7 +162,7 @@ impl ProfileEngine {
                 window.as_secs(),
                 self.answered_delayed_fetches()
             );
-            adapter = adapter.with_delayed(self.delayed_ohttp.clone());
+            adapter = adapter.with_delayed(self.delayed_ohttp());
         } else {
             tracing::info!("[Sync] fetch path: direct");
         }
@@ -240,11 +241,13 @@ impl ProfileEngine {
             .sync
             .random_post_exchange_delay(self.rng.as_ref());
         let new_deadline = self.monotonic.now() + delay;
-        self.next_sync_allowed = Some(match self.next_sync_allowed {
+        let now = self.monotonic.now();
+        let mut relay = self.relay();
+        relay.next_sync_allowed = Some(match relay.next_sync_allowed {
             Some(existing) => existing.max(new_deadline),
             None => new_deadline,
         });
-        self.last_exchange_time = Some(self.monotonic.now());
+        relay.last_exchange_time = Some(now);
     }
 
     /// Run one periodic sync tick — invoked by the platform
@@ -275,7 +278,7 @@ impl ProfileEngine {
         if self.identity.is_none() {
             return Ok(VauchiSyncOutcome::NoIdentity);
         }
-        if self.ohttp_key.is_none() {
+        if !self.has_ohttp_key() {
             return Ok(VauchiSyncOutcome::NotConnected);
         }
         self.sync()
@@ -298,8 +301,10 @@ impl ProfileEngine {
     /// stands, so a due sync is never pushed back.
     pub fn pull_sync_deadline_within(&mut self, budget: Option<crate::api::BackgroundBudget>) {
         let due_by = self.monotonic.now() + self.draw_background_sync_gap(budget);
-        self.next_sync_allowed = Some(
-            self.next_sync_allowed
+        let mut relay = self.relay();
+        relay.next_sync_allowed = Some(
+            relay
+                .next_sync_allowed
                 .map_or(due_by, |deadline| deadline.min(due_by)),
         );
     }
@@ -320,7 +325,8 @@ impl ProfileEngine {
             return Ok(outcome);
         }
         let gap = self.draw_background_sync_gap(budget);
-        self.next_sync_allowed = Some(self.monotonic.now() + gap);
+        let deadline = self.monotonic.now() + gap;
+        self.relay().next_sync_allowed = Some(deadline);
         Ok(outcome)
     }
 
@@ -329,14 +335,15 @@ impl ProfileEngine {
     /// After calling this, `sync()` returns `NotConnected` until `connect()` is
     /// called again.
     pub fn disconnect(&mut self) {
-        self.ohttp_key = None;
-        self.next_sync_allowed = None;
+        let mut relay = self.relay();
+        relay.ohttp_key = None;
+        relay.next_sync_allowed = None;
     }
 
     /// Test helper: directly set the `next_sync_allowed` deadline.
     #[cfg(any(test, feature = "testing"))]
     pub fn set_next_sync_allowed(&mut self, deadline: std::time::Instant) {
-        self.next_sync_allowed = Some(deadline);
+        self.relay().next_sync_allowed = Some(deadline);
     }
 
     /// Test helper: inject a pre-built OHTTP key so tests can reach the
@@ -345,7 +352,7 @@ impl ProfileEngine {
     /// Only available with the `testing` feature.
     #[cfg(feature = "testing")]
     pub fn set_ohttp_key_for_testing(&mut self, client: OhttpClient) {
-        self.ohttp_key = Some(client);
+        self.relay().ohttp_key = Some(client);
     }
 
     /// Connect to the relay, bootstrapping the OHTTP key.
@@ -357,7 +364,7 @@ impl ProfileEngine {
     /// 1. Check identity exists (fail with `IdentityNotInitialized` if not).
     /// 2. Resolve OHTTP key: cached → fetch (signed for an anchored relay).
     /// 3. Validate key via `OhttpClient::new()`.
-    /// 4. Store in `self.ohttp_key`.
+    /// 4. Cache it in the device's relay transport.
     ///
     /// No direct health check is performed — the first OHTTP sync request
     /// serves as an implicit reachability check, avoiding a direct HTTPS
@@ -374,7 +381,7 @@ impl ProfileEngine {
 
         // 3-4. Validate and store
         let client = OhttpClient::new(key_bytes).map_err(VauchiError::Network)?;
-        self.ohttp_key = Some(client);
+        self.relay().ohttp_key = Some(client);
 
         Ok(())
     }
@@ -382,10 +389,9 @@ impl ProfileEngine {
     /// Whether [`Self::sync`] would pass its identity and C1/C2 timing gates
     /// now. Cheap: no network, so a frequent wakeup can ask on every tick.
     pub fn sync_due(&self) -> bool {
+        let next_sync_allowed = self.relay().next_sync_allowed;
         self.identity.is_some()
-            && self
-                .next_sync_allowed
-                .is_none_or(|deadline| self.monotonic.now() >= deadline)
+            && next_sync_allowed.is_none_or(|deadline| self.monotonic.now() >= deadline)
     }
 
     /// How long until [`Self::sync`]'s timing gate opens; zero when a sync is
@@ -393,8 +399,9 @@ impl ProfileEngine {
     /// the drawn gap instead of its own cadence (#603).
     pub fn time_until_sync_due(&self) -> Option<std::time::Duration> {
         self.identity.as_ref()?;
+        let next_sync_allowed = self.relay().next_sync_allowed;
         Some(
-            self.next_sync_allowed
+            next_sync_allowed
                 .map(|deadline| deadline.saturating_duration_since(self.monotonic.now()))
                 .unwrap_or_default(),
         )
@@ -407,7 +414,7 @@ impl ProfileEngine {
     /// `build_relay_transport` to wire OHTTP into downstream calls
     /// (device link, shred, exchange).
     pub fn has_ohttp_key(&self) -> bool {
-        self.ohttp_key.is_some()
+        self.relay().ohttp_key.is_some()
     }
 
     // =====================================================================
@@ -903,7 +910,8 @@ impl ProfileEngine {
         let c2_deadline =
             self.monotonic.now() + self.config.sync.next_sync_interval(self.rng.as_ref());
 
-        let deadline = if let Some(exchange_time) = self.last_exchange_time {
+        let last_exchange_time = self.relay().last_exchange_time;
+        let deadline = if let Some(exchange_time) = last_exchange_time {
             let max_delay = Duration::from_millis(self.config.sync.post_exchange_delay_max_ms);
             if self.monotonic.now().duration_since(exchange_time) < max_delay {
                 // Exchange was recent — enforce C1 as well
@@ -920,7 +928,7 @@ impl ProfileEngine {
             c2_deadline
         };
 
-        self.next_sync_allowed = Some(deadline);
+        self.relay().next_sync_allowed = Some(deadline);
         self.last_sync_unix_seconds = Some(self.clock.unix_seconds());
     }
 
@@ -1159,7 +1167,7 @@ impl ProfileEngine {
             allow_direct: true,
             pinned_certs,
         })
-        .with_pacer(self.ohttp_pacer.clone())
+        .with_pacer(self.ohttp_pacer())
     }
 
     /// Pin set for a transport targeting `relay_url`.
@@ -1229,7 +1237,7 @@ impl ProfileEngine {
                 self.config.relay.server_url.clone(),
                 timeout_ms,
             ))
-            .with_pacer(self.ohttp_pacer.clone());
+            .with_pacer(self.ohttp_pacer());
         }
 
         let route = self.action_ohttp_route(application_relay_url);
@@ -1244,7 +1252,7 @@ impl ProfileEngine {
             allow_direct: false,
             pinned_certs,
         })
-        .with_pacer(self.ohttp_pacer.clone());
+        .with_pacer(self.ohttp_pacer());
 
         if route_valid {
             match self.config.relay.ohttp_trust_anchor() {
@@ -1269,8 +1277,8 @@ impl ProfileEngine {
 
     /// The in-memory OHTTP client, copied without network I/O.
     fn offline_ohttp_client(&self) -> Option<OhttpClient> {
-        let client = self.ohttp_key.as_ref()?;
-        OhttpClient::new(client.encoded_config().to_vec()).ok()
+        let config = self.relay().ohttp_key.as_ref()?.encoded_config().to_vec();
+        OhttpClient::new(config).ok()
     }
 
     /// OHTTP-relay base URL for `/v2/ohttp` + the `/v2/ohttp-key-signed` bootstrap,
@@ -1742,7 +1750,7 @@ mod tests {
         v.update_timing_after_sync();
 
         assert_eq!(
-            v.next_sync_allowed,
+            v.relay().next_sync_allowed,
             Some(exchanged_at + Duration::from_secs(300))
         );
     }

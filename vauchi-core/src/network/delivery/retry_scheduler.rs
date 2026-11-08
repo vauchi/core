@@ -62,18 +62,16 @@ impl RetryScheduler {
 
         for entry in due_entries {
             if entry.is_max_attempts_exceeded() {
-                // Remove permanently failed entry
-                storage.retries().delete_retry_entry(&entry.message_id)?;
-                // Update delivery status to permanent failure —
-                // propagate so the user sees "Failed" instead of "Pending"
-                // (was silently dropped before 2026-05-21).
-                storage.deliveries().update_delivery_status(
-                    &entry.message_id,
-                    &DeliveryStatus::Failed {
-                        reason: "max retries exceeded".to_string(),
-                    },
-                    now,
-                )?;
+                storage.with_savepoint(|| {
+                    storage.retries().delete_retry_entry(&entry.message_id)?;
+                    storage.deliveries().update_delivery_status(
+                        &entry.message_id,
+                        &DeliveryStatus::Failed {
+                            reason: "max retries exceeded".to_string(),
+                        },
+                        now,
+                    )
+                })?;
                 result.expired += 1;
             } else {
                 // Reschedule with exponential backoff + jitter

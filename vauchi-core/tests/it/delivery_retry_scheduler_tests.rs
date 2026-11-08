@@ -187,3 +187,63 @@ fn test_tick_returns_ready_message_ids() {
         "Max-attempt entries should not be in ready_ids"
     );
 }
+
+// @scenario: message_delivery :: Automatic retry on transient failure
+#[test]
+fn failed_expiry_keeps_delivery_and_recovery_work_coherent() {
+    for statement in [
+        "CREATE TRIGGER fail_expiry BEFORE UPDATE ON delivery_records BEGIN SELECT RAISE(ABORT, 'injected status failure'); END",
+        "CREATE TRIGGER fail_expiry BEFORE DELETE ON retry_entries BEGIN SELECT RAISE(ABORT, 'injected deletion failure'); END",
+    ] {
+        let storage = test_storage();
+        create_delivery(&storage, "atomic-expiry");
+        create_retry(&storage, "atomic-expiry", 5, 0);
+        storage.connection().execute_batch(statement).unwrap();
+
+        let error = RetryScheduler::new()
+            .tick(&storage, &vauchi_core::rng::OsSecureRng::new())
+            .unwrap_err();
+        assert!(error.to_string().contains("injected"), "{error}");
+        let delivery = storage
+            .deliveries()
+            .get_delivery_record("atomic-expiry")
+            .unwrap()
+            .unwrap();
+        assert_eq!(delivery.status, DeliveryStatus::Sent);
+        let retry = storage
+            .retries()
+            .get_retry_entry("atomic-expiry")
+            .unwrap()
+            .expect("a failed expiry must preserve its recovery entry");
+        assert_eq!(retry.attempt, 5);
+        assert_eq!(retry.payload, vec![1, 2, 3]);
+
+        storage
+            .connection()
+            .execute_batch("DROP TRIGGER fail_expiry")
+            .unwrap();
+        let result = RetryScheduler::new()
+            .tick(&storage, &vauchi_core::rng::OsSecureRng::new())
+            .unwrap();
+        assert_eq!((result.due, result.expired, result.rescheduled), (1, 1, 0));
+        assert!(result.ready_ids.is_empty());
+        assert!(
+            storage
+                .retries()
+                .get_retry_entry("atomic-expiry")
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            storage
+                .deliveries()
+                .get_delivery_record("atomic-expiry")
+                .unwrap()
+                .unwrap()
+                .status,
+            DeliveryStatus::Failed {
+                reason: "max retries exceeded".into()
+            }
+        );
+    }
+}

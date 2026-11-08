@@ -213,14 +213,13 @@ impl MyInfoEngine {
         }
     }
 
-    /// The trailing chip: the granting group names, else Everyone / Hidden.
     fn visibility_chip(&self, field: &OwnFieldInfo) -> String {
         if !field.visible_groups.is_empty() {
             field.visible_groups.join(", ")
         } else if field.shown {
-            self.t("my_info.visibility_everyone")
+            self.t("my_info.visibility_everyone_default")
         } else {
-            self.t("fields.hidden")
+            self.t("my_info.visibility_hidden_default")
         }
     }
 
@@ -285,6 +284,12 @@ impl MyInfoEngine {
             return components;
         }
 
+        components.push(Component::Text {
+            id: "entry_visibility_guidance".into(),
+            content: self.t("my_info.visibility_guidance"),
+            style: TextStyle::Caption,
+            a11y: None,
+        });
         components.push(Component::List {
             id: "own_entries".into(),
             items: self.own_fields.iter().map(|f| self.entry_item(f)).collect(),

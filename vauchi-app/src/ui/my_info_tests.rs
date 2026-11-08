@@ -296,7 +296,7 @@ fn entry_shown_to_every_contact_carries_the_everyone_chip() {
     .current_screen();
     assert_eq!(
         own_entries(&screen)[0].status.as_deref(),
-        Some("All contacts")
+        Some("All contacts by default")
     );
 }
 
@@ -322,7 +322,10 @@ fn entry_granted_by_groups_carries_the_group_names_chip() {
 fn entry_hidden_from_every_contact_carries_the_hidden_chip() {
     let screen =
         card_with(vec![own_field("f1", "1815-12-10", "Birthday", &[], false)]).current_screen();
-    assert_eq!(own_entries(&screen)[0].status.as_deref(), Some("Hidden"));
+    assert_eq!(
+        own_entries(&screen)[0].status.as_deref(),
+        Some("Hidden by default")
+    );
 }
 
 // @internal

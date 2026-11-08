@@ -7,10 +7,11 @@
 //! (ADR-080 points 2 and 5). It runs in duress mode, so it syncs exactly as a
 //! duress session does today.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use super::{AuthMode, ProfileEngine, Vauchi, VauchiSyncOutcome};
-use crate::api::{BackgroundBudget, EventDispatcher, VauchiResult};
+use crate::activity_log::ActivityLogWriter;
+use crate::api::{BackgroundBudget, EventDispatcher, VauchiEvent, VauchiResult};
 use crate::identity::Identity;
 use crate::storage::Storage;
 
@@ -48,8 +49,16 @@ impl Vauchi {
             return run(&mut self.foreground);
         };
         worker.take_sync_state_from(&self.foreground);
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let sink = received.clone();
+        worker.events.add_handler(Arc::new(move |event| {
+            sink.lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push(event)
+        }));
         let outcome = run(&mut worker);
         self.foreground.take_sync_state_from(&worker);
+        worker.record_without_notifying(&received);
         outcome
     }
 }
@@ -87,6 +96,24 @@ impl ProfileEngine {
             last_sync_unix_seconds: self.last_sync_unix_seconds,
             last_emergency_broadcast_unix_seconds: None,
         }))
+    }
+
+    /// Records what the worker's sync raised in the real activity log, so
+    /// the next real unlock shows it, without a notification now (owner,
+    /// 2026-11-08). Best-effort: a failed write must not fail the sync.
+    fn record_without_notifying(&self, received: &Mutex<Vec<VauchiEvent>>) {
+        let events = std::mem::take(
+            &mut *received
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        );
+        if let Err(error) = ActivityLogWriter::write_without_notifying(
+            &self.storage,
+            &events,
+            self.clock.unix_seconds(),
+        ) {
+            tracing::warn!(%error, "[Worker] recording received activity failed");
+        }
     }
 
     /// Takes the cover a duress edit owes and the last sync time, so each

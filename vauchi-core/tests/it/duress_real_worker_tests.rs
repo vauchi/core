@@ -204,13 +204,14 @@ fn what_the_worker_received_is_in_the_real_activity_log_and_never_notifies() {
     let mut real = world.alice_install.open(&world.relays);
     assert_eq!(real.authenticate(APP_PIN).unwrap(), AuthMode::Normal);
     let log = real.storage().activity_log();
-    let from_bob: Vec<String> = log
+    let mut from_bob: Vec<String> = log
         .activity_log_query_recent(NOW, RETENTION_SECS)
         .unwrap()
         .into_iter()
         .filter(|row| row.contact_id.as_deref() == Some(world.linked.peer_contact_id.as_str()))
         .map(|row| row.category)
         .collect();
-    assert_eq!(from_bob, vec!["card_update_received".to_string()]);
+    from_bob.sort();
+    assert_eq!(from_bob, ["card_update_delivered", "card_update_received"]);
     assert_eq!(log.claim_notifications().unwrap().len(), 0);
 }

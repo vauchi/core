@@ -59,16 +59,28 @@ impl ActivityLogStore<'_> {
     /// skipped. Returns `true` if the row was inserted, `false` if it was a
     /// duplicate.
     pub fn activity_log_insert(&self, row: &ActivityLogRow) -> Result<bool, StorageError> {
+        self.insert(row, false)
+    }
+
+    /// [`Self::activity_log_insert`] for a row no notification may ever
+    /// claim: what a profile's worker recorded while another profile was in
+    /// the foreground (ADR-080).
+    pub fn activity_log_insert_claimed(&self, row: &ActivityLogRow) -> Result<bool, StorageError> {
+        self.insert(row, true)
+    }
+
+    fn insert(&self, row: &ActivityLogRow, claimed: bool) -> Result<bool, StorageError> {
         let changes = self.conn.execute(
             "INSERT OR IGNORE INTO activity_log
-             (event_key, category, contact_id, payload, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+             (event_key, category, contact_id, payload, created_at, notification_claimed)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 row.event_key,
                 row.category,
                 row.contact_id,
                 row.payload,
                 row.created_at as i64,
+                i64::from(claimed),
             ],
         )?;
         Ok(changes > 0)

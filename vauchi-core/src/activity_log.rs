@@ -41,6 +41,26 @@ impl ActivityLogWriter {
         events: &[VauchiEvent],
         now_secs: u64,
     ) -> Result<Vec<(String, ActivityLogEntry)>, StorageError> {
+        Self::write_rows(storage, events, now_secs, false)
+    }
+
+    /// [`Self::write`] for events no notification may announce: what a
+    /// profile's worker received while another profile was in the
+    /// foreground (ADR-080, owner 2026-11-08).
+    pub fn write_without_notifying(
+        storage: &Storage,
+        events: &[VauchiEvent],
+        now_secs: u64,
+    ) -> Result<Vec<(String, ActivityLogEntry)>, StorageError> {
+        Self::write_rows(storage, events, now_secs, true)
+    }
+
+    fn write_rows(
+        storage: &Storage,
+        events: &[VauchiEvent],
+        now_secs: u64,
+        claimed: bool,
+    ) -> Result<Vec<(String, ActivityLogEntry)>, StorageError> {
         let mut inserted = Vec::new();
 
         for event in events {
@@ -56,7 +76,12 @@ impl ActivityLogWriter {
                     created_at: now_secs,
                 };
 
-                let was_inserted = storage.activity_log().activity_log_insert(&row)?;
+                let log = storage.activity_log();
+                let was_inserted = if claimed {
+                    log.activity_log_insert_claimed(&row)?
+                } else {
+                    log.activity_log_insert(&row)?
+                };
                 if was_inserted {
                     inserted.push((event_key, entry));
                 }

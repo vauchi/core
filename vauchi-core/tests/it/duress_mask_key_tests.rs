@@ -112,8 +112,8 @@ fn the_fields_inside_the_duress_content_open_under_the_mask_key_only() {
         .unwrap();
     storage.duress_tags().create_tag("Work").unwrap();
 
-    let card = duress_column(&storage, "SELECT card_encrypted FROM decoy_contacts");
-    let tag = duress_column(&storage, "SELECT name_encrypted FROM duress_tags");
+    let card = duress_column(&storage, "SELECT card_encrypted FROM contacts");
+    let tag = duress_column(&storage, "SELECT name_encrypted FROM tags");
 
     assert!(decrypt(&key, &card).is_err());
     assert!(decrypt(&key, &tag).is_err());

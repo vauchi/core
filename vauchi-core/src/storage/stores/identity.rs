@@ -17,7 +17,8 @@ use super::super::{Storage, StorageError};
 /// Scoped persistence view for the identity domain.
 pub struct IdentityStore<'a> {
     conn: &'a Connection,
-    mask: &'a crate::storage::mask::MaskStorage,
+    /// The database this view belongs to, for the mask profile it embeds.
+    storage: &'a Storage,
     key: &'a SymmetricKey,
     clock: &'a Arc<dyn Clock>,
 }
@@ -28,7 +29,7 @@ impl Storage {
         self.sealed({
             IdentityStore {
                 conn: &self.conn,
-                mask: &self.mask,
+                storage: self,
                 key: &self.encryption_key,
                 clock: &self.clock,
             }
@@ -109,8 +110,8 @@ impl IdentityStore<'_> {
         if self.load_duress_seal()?.is_none() {
             self.write_duress_cover()?;
         }
-        super::MaskSeedStore::new(self.mask, crate::storage::mask::SealedSlot::of(self.conn))
-            .ensure()
+        self.storage.mask_seed().ensure()?;
+        self.storage.seal_mask()
     }
     /// Saves the duress password hash and salt, and enables duress mode.
     ///
@@ -196,18 +197,16 @@ impl IdentityStore<'_> {
         // And so do the groups, tags and places its sessions made
         // (vauchi/private#813). The own-card copy stays, as every identity
         // has one; the caller starts it again from the real card.
+        let mask = self.storage.mask_profile();
         for table in [
-            "duress_visibility_labels",
-            "duress_contact_visibility_overrides",
-            "duress_tags",
-            "duress_places",
+            "visibility_labels",
+            "contact_visibility_overrides",
+            "tags",
+            "places",
         ] {
-            self.mask
-                .conn()
-                .execute(&format!("DELETE FROM {table}"), [])?;
+            mask.conn.execute(&format!("DELETE FROM {table}"), [])?;
         }
-        self.mask
-            .seal_into(crate::storage::mask::SealedSlot::of(self.conn))?;
+        self.storage.seal_mask()?;
 
         Ok(())
     }

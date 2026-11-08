@@ -25,7 +25,7 @@ use super::events::{EventDispatcher, VauchiEvent};
 /// - Removing contacts
 pub struct ContactManager<'a> {
     storage: &'a Storage,
-    own_card: OwnCardStore<'a>,
+    own_card: crate::storage::Sealed<'a, OwnCardStore<'a>>,
     events: Arc<EventDispatcher>,
 }
 
@@ -34,14 +34,14 @@ impl<'a> ContactManager<'a> {
     pub fn new(storage: &'a Storage, events: Arc<EventDispatcher>) -> Self {
         ContactManager {
             storage,
-            own_card: storage.contacts().own_card(),
+            own_card: storage.own_card(),
             events,
         }
     }
 
     /// The own card this manager reads and writes: a session's slot rather
     /// than the real card (vauchi/private#811).
-    pub fn with_own_card(mut self, own_card: OwnCardStore<'a>) -> Self {
+    pub fn with_own_card(mut self, own_card: crate::storage::Sealed<'a, OwnCardStore<'a>>) -> Self {
         self.own_card = own_card;
         self
     }

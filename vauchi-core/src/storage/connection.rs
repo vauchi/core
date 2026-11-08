@@ -47,7 +47,10 @@ impl Storage {
         key_check::verify(&conn, &encryption_key)?;
         let storage = Storage {
             conn,
-            mask: super::mask::MaskStorage::new(&encryption_key)?,
+            mask: Some(Box::new(Storage::empty_mask_profile(
+                super::duress_content::mask_key(&encryption_key),
+                None,
+            )?)),
             encryption_key,
             seal_target: None,
             db_path: Some(path_buf),
@@ -79,7 +82,10 @@ impl Storage {
         Self::configure_pragmas(&conn)?;
         let storage = Storage {
             conn,
-            mask: super::mask::MaskStorage::new(&encryption_key)?,
+            mask: Some(Box::new(Storage::empty_mask_profile(
+                super::duress_content::mask_key(&encryption_key),
+                None,
+            )?)),
             encryption_key,
             seal_target: None,
             db_path: None,
@@ -107,7 +113,7 @@ impl Storage {
     /// Note: secure_delete is partially negated by WAL mode (pre-modification
     /// data persists in WAL file). The primary protection is the SMK encryption
     /// layer; these PRAGMAs are secondary defense-in-depth.
-    fn configure_pragmas(conn: &Connection) -> Result<(), StorageError> {
+    pub(super) fn configure_pragmas(conn: &Connection) -> Result<(), StorageError> {
         // Set busy_timeout at the C level FIRST, before executing any SQL.
         // This ensures all subsequent statements (including the pragma batch
         // below) will wait up to 5s for locks instead of failing immediately.
@@ -198,10 +204,7 @@ impl Storage {
         let Some(file) = &self.seal_target else {
             return Ok(());
         };
-        super::mask::SealedSlot::of(file).write(&super::duress_content::seal(
-            &self.encryption_key,
-            &self.conn,
-        )?)
+        super::mask::SealedSlot::of(file).write(&self.sealed_mask()?)
     }
 
     /// Arm a one-shot commit fault: the next [`Self::commit`] fails with the
@@ -274,17 +277,10 @@ impl Storage {
         }
     }
 
-    /// The connection the duress content lives on: decoy contacts and the
-    /// duress session's groups, tags and places (vauchi/private#813,
-    /// vauchi/private#1003).
-    pub(crate) fn duress_conn(&self) -> &Connection {
-        self.mask.conn()
-    }
-
     /// The in-memory duress database (testing only).
     #[cfg(any(test, feature = "testing"))]
     pub fn duress_connection(&self) -> &Connection {
-        self.mask.conn()
+        &self.mask_profile().conn
     }
 
     /// Returns a reference to the underlying connection (testing only).

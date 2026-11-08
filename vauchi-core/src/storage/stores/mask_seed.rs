@@ -11,8 +11,7 @@ use rusqlite::OptionalExtension;
 use subtle::ConstantTimeEq;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-use super::super::mask::{MaskStorage, SealedSlot};
-use super::super::{Storage, StorageError};
+use super::super::{Sealed, Storage, StorageError};
 
 /// The mask profile's seed.
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
@@ -34,26 +33,22 @@ impl std::fmt::Debug for MaskSeed {
 
 /// The one `mask_seed` row of the mask database.
 pub struct MaskSeedStore<'a> {
-    mask: &'a MaskStorage,
-    slot: SealedSlot<'a>,
+    mask: &'a Storage,
 }
 
 impl Storage {
     /// The mask profile's seed (ADR-080).
-    pub fn mask_seed(&self) -> MaskSeedStore<'_> {
-        MaskSeedStore::new(&self.mask, SealedSlot::of(&self.conn))
+    pub fn mask_seed(&self) -> Sealed<'_, MaskSeedStore<'_>> {
+        let mask = self.mask_profile();
+        self.mask_sealed(mask.sealed(MaskSeedStore { mask }))
     }
 }
 
-impl<'a> MaskSeedStore<'a> {
-    pub(crate) fn new(mask: &'a MaskStorage, slot: SealedSlot<'a>) -> Self {
-        MaskSeedStore { mask, slot }
-    }
-
+impl MaskSeedStore<'_> {
     pub fn load(&self) -> Result<Option<MaskSeed>, StorageError> {
         let Some(sealed) = self
             .mask
-            .conn()
+            .conn
             .query_row(
                 "SELECT seed_encrypted FROM mask_seed WHERE id = 1",
                 [],
@@ -64,7 +59,7 @@ impl<'a> MaskSeedStore<'a> {
             return Ok(None);
         };
         let plain = Zeroizing::new(
-            crate::crypto::decrypt(self.mask.key(), &sealed)
+            crate::crypto::decrypt(&self.mask.encryption_key, &sealed)
                 .map_err(|e| StorageError::Encryption(e.to_string()))?,
         );
         let seed: [u8; 32] = plain
@@ -74,18 +69,18 @@ impl<'a> MaskSeedStore<'a> {
         Ok(Some(MaskSeed(seed)))
     }
 
-    /// Makes the seed if there is none and seals it; an existing seed stays.
+    /// Makes the seed if there is none; an existing seed stays.
     pub(crate) fn ensure(&self) -> Result<(), StorageError> {
         if self.load()?.is_some() {
             return Ok(());
         }
         let seed = MaskSeed(crate::crypto::random_bytes::<32>());
-        let sealed = crate::crypto::encrypt(self.mask.key(), &seed.0)
+        let sealed = crate::crypto::encrypt(&self.mask.encryption_key, &seed.0)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
-        self.mask.conn().execute(
+        self.mask.conn.execute(
             "INSERT INTO mask_seed (id, seed_encrypted) VALUES (1, ?1)",
             [sealed],
         )?;
-        self.mask.seal_into(self.slot)
+        Ok(())
     }
 }

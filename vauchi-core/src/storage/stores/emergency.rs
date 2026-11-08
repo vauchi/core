@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 use super::super::{Storage, StorageError};
 use crate::emergency::EmergencyBroadcastConfig;
-use crate::storage::duress_content::SealOnDrop;
 
 /// Scoped persistence view for the emergency domain.
 pub struct EmergencyStore<'a> {
@@ -21,7 +20,9 @@ pub struct EmergencyStore<'a> {
     key: &'a SymmetricKey,
     clock: &'a Arc<dyn Clock>,
     table: &'static str,
-    seal: Option<SealOnDrop<'a>>,
+    /// Sealed after a write, for the mask profile's config: a write whose
+    /// seal fails returns the error (vauchi/private#1003).
+    sealer: Option<&'a Storage>,
 }
 
 impl Storage {
@@ -33,7 +34,7 @@ impl Storage {
                 key: &self.encryption_key,
                 clock: &self.clock,
                 table: "emergency_config",
-                seal: None,
+                sealer: None,
             }
         })
     }
@@ -41,25 +42,27 @@ impl Storage {
     /// The mask profile's emergency config, in the sealed mask database
     /// (ADR-080). It starts not set up, as on a fresh install: nothing of the
     /// real one is copied.
-    pub fn duress_emergency(&self) -> EmergencyStore<'_> {
-        EmergencyStore {
-            conn: self.mask.conn(),
-            key: self.mask.key(),
-            clock: &self.clock,
-            table: "duress_emergency_config",
-            seal: Some(SealOnDrop::new(self)),
-        }
+    pub fn duress_emergency(&self) -> crate::storage::Sealed<'_, EmergencyStore<'_>> {
+        let mask = self.mask_profile();
+        self.mask_sealed(mask.sealed(EmergencyStore {
+            conn: &mask.conn,
+            key: &mask.encryption_key,
+            clock: &mask.clock,
+            table: "emergency_config",
+            sealer: Some(self),
+        }))
     }
 }
 
 impl EmergencyStore<'_> {
+    fn seal_if_twin(&self) -> Result<(), StorageError> {
+        self.sealer.map_or(Ok(()), Storage::seal_mask)
+    }
+
     fn now_secs(&self) -> u64 {
         self.clock.unix_seconds()
     }
 
-    fn seal_if_mask(&self) -> Result<(), StorageError> {
-        self.seal.as_ref().map_or(Ok(()), SealOnDrop::seal_now)
-    }
     /// Saves emergency broadcast configuration.
     ///
     /// Uses INSERT OR REPLACE for idempotent saves (singleton table, id=1).
@@ -88,8 +91,7 @@ impl EmergencyStore<'_> {
                 now as i64,
             ],
         )?;
-
-        self.seal_if_mask()
+        self.seal_if_twin()
     }
     /// Loads emergency broadcast configuration.
     ///
@@ -133,6 +135,6 @@ impl EmergencyStore<'_> {
     pub fn delete_emergency_config(&self) -> Result<(), StorageError> {
         self.conn
             .execute(&format!("DELETE FROM {} WHERE id = 1", self.table), [])?;
-        self.seal_if_mask()
+        self.seal_if_twin()
     }
 }

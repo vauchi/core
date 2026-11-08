@@ -14,7 +14,6 @@
 
 use rusqlite::{Connection, params};
 
-use super::duress_content::DURESS_TABLES;
 use super::{Storage, StorageError};
 use crate::crypto::SymmetricKey;
 
@@ -52,18 +51,13 @@ pub const CONTACT_REFERENCES: &[(&str, &str, ContactReference)] = &[
         "contact_id",
         ContactReference::Id,
     ),
-    (
-        "duress_contact_visibility_overrides",
-        "contact_id",
-        ContactReference::Id,
-    ),
+    ("decoy_ids", "contact_id", ContactReference::Id),
     ("field_validations", "contact_id", ContactReference::Id),
     ("recovery_responses", "contact_id", ContactReference::Id),
     ("resync_honored", "contact_id", ContactReference::Id),
     ("pending_updates", "contact_id", ContactReference::StaleId),
     ("replay_nonces", "contact_id", ContactReference::StaleId),
     ("tags", "contact_ids_json", ContactReference::IdList),
-    ("duress_tags", "contact_ids_json", ContactReference::IdList),
     ("local_groups", "contact_ids_json", ContactReference::IdList),
     (
         "visibility_labels",
@@ -71,17 +65,7 @@ pub const CONTACT_REFERENCES: &[(&str, &str, ContactReference)] = &[
         ContactReference::EncryptedIdList,
     ),
     (
-        "duress_visibility_labels",
-        "contacts_json_encrypted",
-        ContactReference::EncryptedIdList,
-    ),
-    (
         "emergency_config",
-        "trusted_contact_ids_encrypted",
-        ContactReference::EncryptedIdList,
-    ),
-    (
-        "duress_emergency_config",
         "trusted_contact_ids_encrypted",
         ContactReference::EncryptedIdList,
     ),
@@ -131,7 +115,7 @@ impl Storage {
         if self.contacts().load_contact(old_id)?.is_none() {
             return Err(StorageError::NotFound(old_id.to_string()));
         }
-        self.in_both_databases(|| self.move_references(old_id, new_id, false))
+        self.in_both_databases(|| self.move_references_everywhere(old_id, new_id, false))
     }
 
     /// Folds the contact `old_id` into the contact `new_id` (D21), when both
@@ -150,35 +134,57 @@ impl Storage {
                 return Err(StorageError::NotFound(id.to_string()));
             }
         }
-        self.in_both_databases(|| self.move_references(old_id, new_id, true))
+        self.in_both_databases(|| self.move_references_everywhere(old_id, new_id, true))
     }
 
-    /// Runs `operation` in a savepoint on both databases and seals the
-    /// duress content, or rolls both back.
+    /// Runs `operation` in a savepoint on this database and the mask
+    /// profile it embeds and seals the mask profile, or rolls both back.
     fn in_both_databases(
         &self,
         operation: impl FnOnce() -> Result<(), StorageError>,
     ) -> Result<(), StorageError> {
         let begin = format!("SAVEPOINT {MOVE_SAVEPOINT}");
-        self.mask.conn().execute_batch(&begin)?;
+        let mask = self.mask.as_deref();
+        if let Some(mask) = mask {
+            mask.conn.execute_batch(&begin)?;
+        }
         if let Err(error) = self.conn.execute_batch(&begin) {
-            rollback(self.mask.conn());
+            if let Some(mask) = mask {
+                rollback(&mask.conn);
+            }
             return Err(error.into());
         }
-        let moved =
-            operation().and_then(|()| self.mask.seal_into(super::mask::SealedSlot::of(&self.conn)));
-        match moved {
+        match operation().and_then(|()| self.seal_mask()) {
             Ok(()) => {
                 let release = format!("RELEASE {MOVE_SAVEPOINT}");
                 self.conn.execute_batch(&release)?;
-                self.mask.conn().execute_batch(&release)?;
+                if let Some(mask) = mask {
+                    mask.conn.execute_batch(&release)?;
+                }
                 Ok(())
             }
             Err(error) => {
                 rollback(&self.conn);
-                rollback(self.mask.conn());
+                if let Some(mask) = mask {
+                    rollback(&mask.conn);
+                }
                 Err(error)
             }
+        }
+    }
+
+    /// [`Self::move_references`] here and in the embedded mask profile,
+    /// whose groups, tags and emergency config may name the contact too.
+    fn move_references_everywhere(
+        &self,
+        old_id: &str,
+        new_id: &str,
+        fold: bool,
+    ) -> Result<(), StorageError> {
+        self.move_references(old_id, new_id, fold)?;
+        match &self.mask {
+            Some(mask) => mask.move_references(old_id, new_id, fold),
+            None => Ok(()),
         }
     }
 
@@ -219,6 +225,10 @@ impl Storage {
         }
         for (table, column, reference) in CONTACT_REFERENCES {
             let conn = self.table_conn_for_move(table);
+            // `decoy_ids` is in a mask profile only (ADR-080).
+            if !has_table(conn, table)? {
+                continue;
+            }
             match reference {
                 ContactReference::Id => {
                     conn.execute(
@@ -347,20 +357,12 @@ impl Storage {
         Ok(())
     }
 
-    fn table_key_for_move(&self, table: &str) -> &SymmetricKey {
-        if DURESS_TABLES.contains(&table) {
-            self.mask.key()
-        } else {
-            &self.encryption_key
-        }
+    fn table_key_for_move(&self, _table: &str) -> &SymmetricKey {
+        &self.encryption_key
     }
 
-    fn table_conn_for_move(&self, table: &str) -> &Connection {
-        if DURESS_TABLES.contains(&table) {
-            self.mask.conn()
-        } else {
-            &self.conn
-        }
+    fn table_conn_for_move(&self, _table: &str) -> &Connection {
+        &self.conn
     }
 }
 
@@ -390,4 +392,12 @@ fn foreign_keys_to_contacts(conn: &Connection) -> Result<Vec<(String, String)>, 
 fn rollback(conn: &Connection) {
     let undo = format!("ROLLBACK TO {MOVE_SAVEPOINT}; RELEASE {MOVE_SAVEPOINT}");
     if let Err(_already_failing) = conn.execute_batch(&undo) {}
+}
+
+fn has_table(conn: &Connection, table: &str) -> Result<bool, StorageError> {
+    Ok(conn.query_row(
+        "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = ?1",
+        params![table],
+        |row| row.get(0),
+    )?)
 }

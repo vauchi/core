@@ -2,126 +2,147 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Decoy domain persistence view (decoy_contacts).
+//! Decoy contacts: rows of the mask profile's `contacts`, each with the decoy
+//! id it was added under, which the decoy API is keyed by (ADR-080 point 4,
+//! amended 2026-11-08).
 //!
-//! Part of problem record `2026-06-09-storage-per-domain-store-boundaries` (Phase 1).
+//! A decoy's contact id is the hex of SHA-256 of its decoy id, as the duress
+//! session has always shown it.
 
-use crate::clock::Clock;
-use crate::crypto::SymmetricKey;
-use crate::storage::duress_content::SealOnDrop;
-use rusqlite::{Connection, params};
-use std::sync::Arc;
-
-use super::super::{Storage, StorageError};
-use crate::card::ContactCard;
+use rusqlite::{OptionalExtension, params};
 use sha2::{Digest, Sha256};
 
-/// Scoped persistence view for the decoy domain.
+use super::super::{Sealed, Storage, StorageError};
+use crate::card::ContactCard;
+use crate::contact::Contact;
+use crate::crypto::{SymmetricKey, decrypt, encrypt};
+
+/// Scoped persistence view for decoy contacts.
 pub struct DecoyStore<'a> {
-    conn: &'a Connection,
-    key: &'a SymmetricKey,
-    clock: &'a Arc<dyn Clock>,
-    /// Re-seals the duress content after a write (vauchi/private#1003).
-    seal: Option<SealOnDrop<'a>>,
+    mask: &'a Storage,
+    /// Sealed after each write; a write whose seal fails returns the error
+    /// (vauchi/private#1003).
+    sealer: &'a Storage,
 }
 
 impl Storage {
-    /// Scoped persistence view for the decoy domain.
-    pub fn decoy(&self) -> DecoyStore<'_> {
-        DecoyStore {
-            conn: self.duress_conn(),
-            key: self.mask.key(),
-            clock: &self.clock,
-            seal: Some(SealOnDrop::new(self)),
-        }
+    /// The mask profile's decoy contacts.
+    pub fn decoy(&self) -> Sealed<'_, DecoyStore<'_>> {
+        let mask = self.mask_profile();
+        self.mask_sealed(mask.sealed(DecoyStore { mask, sealer: self }))
     }
 }
 
+/// The signing key a decoy's contact is stored under.
+pub(crate) fn decoy_public_key(decoy_id: &str) -> [u8; 32] {
+    Sha256::digest(decoy_id.as_bytes()).into()
+}
+
 impl DecoyStore<'_> {
-    /// Runs one write. On the duress twin it then seals the duress content
-    /// and returns a failed seal, so the write is not reported done while
-    /// it would be lost on restart (vauchi/private#1003).
-    fn execute<P: rusqlite::Params>(&self, sql: &str, params: P) -> Result<usize, StorageError> {
-        let changed = self.conn.execute(sql, params)?;
-        if let Some(seal) = &self.seal {
-            seal.seal_now()?;
-        }
-        Ok(changed)
+    fn key(&self) -> &SymmetricKey {
+        &self.mask.encryption_key
     }
 
-    fn now_secs(&self) -> u64 {
-        self.clock.unix_seconds()
-    }
-    /// Saves a decoy contact.
-    ///
-    /// The card is encrypted with the storage key before persisting.
-    /// Uses INSERT OR REPLACE for idempotent saves.
+    /// Saves a decoy contact, backdated so it never looks freshly made.
     pub fn save_decoy_contact(
         &self,
         id: &str,
         display_name: &str,
         card: &ContactCard,
     ) -> Result<(), StorageError> {
-        let card_json =
-            serde_json::to_vec(card).map_err(|e| StorageError::Serialization(e.to_string()))?;
-
-        let encrypted = crate::crypto::encrypt(self.key, &card_json)
-            .map_err(|e| StorageError::Encryption(e.to_string()))?;
-        let name_encrypted = crate::crypto::encrypt(self.key, display_name.as_bytes())
-            .map_err(|e| StorageError::Encryption(e.to_string()))?;
-
-        let now = self.now_secs();
-        let (created_at, updated_at) = decoy_timestamps(id, now);
-
-        self.execute(
-            "INSERT OR REPLACE INTO decoy_contacts (id, display_name_encrypted, card_encrypted, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![id, name_encrypted, encrypted, created_at as i64, updated_at as i64],
-        )?;
-
-        Ok(())
+        let (created_at, updated_at) = decoy_timestamps(id, self.mask.clock.unix_seconds());
+        self.insert_decoy(id, display_name, card, created_at, updated_at)
     }
-    /// Loads all decoy contacts.
-    ///
-    /// Returns a list of (id, display_name, card) tuples.
+
+    /// Saves a decoy contact with the timestamps it already has.
+    pub(crate) fn insert_decoy(
+        &self,
+        id: &str,
+        display_name: &str,
+        card: &ContactCard,
+        created_at: u64,
+        updated_at: u64,
+    ) -> Result<(), StorageError> {
+        let contact = Contact::from_exchange(
+            decoy_public_key(id),
+            card.clone(),
+            SymmetricKey::generate(),
+            created_at,
+        );
+        self.mask.contacts().save_contact(&contact)?;
+        let name = encrypt(self.key(), display_name.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        self.mask.conn.execute(
+            "INSERT OR REPLACE INTO decoy_ids
+             (contact_id, decoy_id, display_name_encrypted, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![contact.id(), id, name, created_at as i64, updated_at as i64],
+        )?;
+        self.sealer.seal_mask()
+    }
+
+    /// Loads all decoy contacts, oldest first, as (id, display_name, card).
     pub fn load_decoy_contacts(&self) -> Result<Vec<(String, String, ContactCard)>, StorageError> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, display_name_encrypted, card_encrypted FROM decoy_contacts ORDER BY created_at",
+        let mut stmt = self.mask.conn.prepare(
+            "SELECT contact_id, decoy_id, display_name_encrypted FROM decoy_ids
+             ORDER BY created_at",
         )?;
-
-        let rows = stmt.query_map([], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, Vec<u8>>(1)?,
-                row.get::<_, Vec<u8>>(2)?,
-            ))
-        })?;
-
-        let mut contacts = Vec::new();
-        for row in rows {
-            let (id, name_encrypted, encrypted) = row?;
-            let name_bytes = crate::crypto::decrypt(self.key, &name_encrypted)
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
-            let display_name = String::from_utf8(name_bytes)
-                .map_err(|e| StorageError::Serialization(e.to_string()))?;
-            let card_json = crate::crypto::decrypt(self.key, &encrypted)
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
-            let card: ContactCard = serde_json::from_slice(&card_json)
-                .map_err(|e| StorageError::Serialization(e.to_string()))?;
-            contacts.push((id, display_name, card));
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Vec<u8>>(2)?,
+                ))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let mut decoys = Vec::with_capacity(rows.len());
+        for (contact_id, decoy_id, name) in rows {
+            let name = String::from_utf8(
+                decrypt(self.key(), &name).map_err(|e| StorageError::Encryption(e.to_string()))?,
+            )
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+            let Some(contact) = self.mask.contacts().load_contact(&contact_id)? else {
+                continue;
+            };
+            decoys.push((decoy_id, name, contact.card().clone()));
         }
-
-        Ok(contacts)
+        Ok(decoys)
     }
-    /// Deletes a single decoy contact by ID.
-    pub fn delete_decoy_contact(&self, id: &str) -> Result<(), StorageError> {
-        self.execute("DELETE FROM decoy_contacts WHERE id = ?1", params![id])?;
 
+    /// Deletes a single decoy contact by its decoy id.
+    pub fn delete_decoy_contact(&self, id: &str) -> Result<(), StorageError> {
+        let contact_id: Option<String> = self
+            .mask
+            .conn
+            .query_row(
+                "SELECT contact_id FROM decoy_ids WHERE decoy_id = ?1",
+                params![id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if let Some(contact_id) = contact_id {
+            self.mask.delete_contact(&contact_id)?;
+            self.mask.conn.execute(
+                "DELETE FROM decoy_ids WHERE contact_id = ?1",
+                params![contact_id],
+            )?;
+            self.sealer.seal_mask()?;
+        }
         Ok(())
     }
+
     /// Deletes all decoy contacts.
     pub fn clear_all_decoy_contacts(&self) -> Result<(), StorageError> {
-        self.execute("DELETE FROM decoy_contacts", [])?;
-
+        let ids: Vec<String> = self
+            .mask
+            .conn
+            .prepare("SELECT decoy_id FROM decoy_ids")?
+            .query_map([], |row| row.get(0))?
+            .collect::<rusqlite::Result<_>>()?;
+        for id in ids {
+            self.delete_decoy_contact(&id)?;
+        }
         Ok(())
     }
 }

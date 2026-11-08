@@ -18,7 +18,6 @@ use super::super::{Storage, StorageError};
 use crate::clock::Clock;
 use crate::contact::Tag;
 use crate::crypto::SymmetricKey;
-use crate::storage::duress_content::SealOnDrop;
 
 /// Scoped persistence view for contact tags.
 pub struct TagStore<'a> {
@@ -28,25 +27,23 @@ pub struct TagStore<'a> {
     /// The real `tags` table, or the duress session's twin
     /// (vauchi/private#813).
     table: &'static str,
-    /// Re-seals the duress content after a write, for the duress twin
-    /// (vauchi/private#1003).
-    seal: Option<SealOnDrop<'a>>,
+    /// The database to seal after a write, for a mask profile's twin: a
+    /// write whose seal fails returns the error (vauchi/private#1003).
+    sealer: Option<&'a Storage>,
 }
 
 impl Storage {
     /// Scoped persistence view for the tag domain.
     pub fn tags(&self) -> crate::storage::Sealed<'_, TagStore<'_>> {
-        self.sealed(self.tags_in(&self.conn, &self.encryption_key, "tags", None))
+        self.sealed(self.tags_in(&self.conn, &self.encryption_key, "tags"))
     }
 
     /// The duress session's tags, persistent and never the real ones.
     pub fn duress_tags(&self) -> crate::storage::Sealed<'_, TagStore<'_>> {
-        self.sealed(self.tags_in(
-            self.duress_conn(),
-            self.mask.key(),
-            "duress_tags",
-            Some(SealOnDrop::new(self)),
-        ))
+        let mask = self.mask_profile();
+        let mut store = mask.tags_in(&mask.conn, &mask.encryption_key, "tags");
+        store.sealer = Some(self);
+        self.mask_sealed(mask.sealed(store))
     }
 
     fn tags_in<'a>(
@@ -54,26 +51,23 @@ impl Storage {
         conn: &'a Connection,
         key: &'a SymmetricKey,
         table: &'static str,
-        seal: Option<SealOnDrop<'a>>,
     ) -> TagStore<'a> {
         TagStore {
             conn,
             key,
             clock: &self.clock,
             table,
-            seal,
+            sealer: None,
         }
     }
 }
 
 impl TagStore<'_> {
-    /// Runs one write. On the duress twin it then seals the duress content
-    /// and returns a failed seal, so the write is not reported done while
-    /// it would be lost on restart (vauchi/private#1003).
+    /// Runs one write, and seals a mask twin after it.
     fn execute<P: rusqlite::Params>(&self, sql: &str, params: P) -> Result<usize, StorageError> {
         let changed = self.conn.execute(sql, params)?;
-        if let Some(seal) = &self.seal {
-            seal.seal_now()?;
+        if let Some(sealer) = self.sealer {
+            sealer.seal_mask()?;
         }
         Ok(changed)
     }

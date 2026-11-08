@@ -63,10 +63,9 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("contacts", "cek_encrypted"),
     // V14 high-priority
     ("own_card", "card_json_encrypted"),
-    ("duress_own_card", "card_json_encrypted"),
-    ("duress_emergency_config", "trusted_contact_ids_encrypted"),
-    ("duress_emergency_config", "message_encrypted"),
+    // Only a mask profile has these, beside its regular schema (ADR-080).
     ("mask_seed", "seed_encrypted"),
+    ("decoy_ids", "display_name_encrypted"),
     ("device_registry", "registry_json_encrypted"),
     ("contact_device_registries", "broadcast_encrypted"),
     // V62 received safety-alert facts
@@ -99,9 +98,6 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("identity", "password_hash_encrypted"),
     ("identity", "duress_hash_encrypted"),
     // V20 duress settings
-    // V21 decoy contacts
-    ("decoy_contacts", "card_encrypted"),
-    ("decoy_contacts", "display_name_encrypted"),
     ("contacts", "last_sent_display_name_encrypted"),
     ("contacts", "relay_url_encrypted"),
     ("contacts", "original_uid_encrypted"),
@@ -173,19 +169,6 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("tags", "name_encrypted"),
     // V50 owner-private named places (ADR-051)
     ("places", "data_encrypted"),
-    // The duress session's twins of the vocabulary tables (private#813).
-    ("duress_visibility_labels", "contacts_json_encrypted"),
-    ("duress_visibility_labels", "visible_fields_json_encrypted"),
-    ("duress_visibility_labels", "name_encrypted"),
-    ("duress_visibility_labels", "name_hmac"),
-    (
-        "duress_visibility_labels",
-        "display_name_override_encrypted",
-    ),
-    ("duress_visibility_labels", "bio_override_encrypted"),
-    ("duress_visibility_labels", "avatar_override_encrypted"),
-    ("duress_tags", "name_encrypted"),
-    ("duress_places", "data_encrypted"),
     // V94 the sealed duress content, re-sealed whole (vauchi/private#1003)
     ("duress_content", "content_encrypted"),
     // V51 per-contact exchange location (ADR-051)
@@ -227,46 +210,258 @@ fn rekey_or_heal(
 }
 
 impl Storage {
-    /// The connection `table` lives on: the duress tables are in the sealed
-    /// duress database (vauchi/private#1003), every other one in the file.
-    fn table_conn(&self, table: &str) -> &rusqlite::Connection {
-        if super::duress_content::DURESS_TABLES.contains(&table) {
-            self.mask.conn()
-        } else {
-            &self.conn
-        }
+    fn table_conn(&self, _table: &str) -> &rusqlite::Connection {
+        &self.conn
     }
 
-    /// Re-encrypts the fields of the duress tables, the ones inside the sealed
-    /// duress content. `rekey_with_progress` makes the same calls,
-    /// interleaved with its progress reports; a new duress table goes in both.
-    pub(super) fn rekey_duress_tables(
+    /// Re-encrypts the embedded mask profile: every table of its regular
+    /// schema, and the two only a mask profile has (ADR-080).
+    fn rekey_mask(
         &self,
         old_key: &SymmetricKey,
         new_key: &SymmetricKey,
     ) -> Result<(), StorageError> {
-        self.rekey_visibility_labels(old_key, new_key, "duress_visibility_labels")?;
-        self.rekey_decoy_contacts(old_key, new_key)?;
-        self.rekey_nullable_column(old_key, new_key, "decoy_contacts", "display_name_encrypted")?;
-        self.rekey_tags(old_key, new_key, "duress_tags")?;
-        self.rekey_places(old_key, new_key, "duress_places")?;
-        self.rekey_mask_profile(old_key, new_key)
-    }
-
-    /// The mask profile's own card, emergency config and seed (ADR-080).
-    fn rekey_mask_profile(
-        &self,
-        old_key: &SymmetricKey,
-        new_key: &SymmetricKey,
-    ) -> Result<(), StorageError> {
+        let Some(mask) = &self.mask else {
+            return Ok(());
+        };
+        mask.rekey_tables(old_key, new_key, &mut |_| ())?;
         for (table, column) in [
-            ("duress_own_card", "card_json_encrypted"),
-            ("duress_emergency_config", "trusted_contact_ids_encrypted"),
-            ("duress_emergency_config", "message_encrypted"),
             ("mask_seed", "seed_encrypted"),
+            ("decoy_ids", "display_name_encrypted"),
         ] {
-            self.rekey_nullable_column(old_key, new_key, table, column)?;
+            mask.rekey_nullable_column(old_key, new_key, table, column)?;
         }
+        Ok(())
+    }
+
+    /// Re-encrypts the tables a legacy seal's twins were copied into, for a
+    /// seal from before the mask key whose fields are under the SEK.
+    pub(in crate::storage) fn rekey_mask_twins(
+        &self,
+        old_key: &SymmetricKey,
+        new_key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        self.rekey_tags(old_key, new_key, "tags")?;
+        self.rekey_places(old_key, new_key, "places")?;
+        self.rekey_visibility_labels(old_key, new_key, "visibility_labels")?;
+        self.rekey_own_card(old_key, new_key, "own_card")?;
+        self.rekey_emergency_config(old_key, new_key)
+    }
+
+    /// Re-encrypts every encrypted column of this database's tables from
+    /// `old_key` to `new_key`, reporting each table as it is done.
+    fn rekey_tables(
+        &self,
+        old_key: &SymmetricKey,
+        new_key: &SymmetricKey,
+        report: &mut dyn FnMut(&str),
+    ) -> Result<(), StorageError> {
+        self.rekey_contacts(old_key, new_key)?;
+        report("contacts");
+
+        self.rekey_contact_extras(old_key, new_key)?;
+        report("contact_extras");
+
+        self.rekey_contact_field_notes(old_key, new_key)?;
+        report("contact_field_notes");
+
+        self.rekey_identity_backup(old_key, new_key)?;
+        report("identity");
+
+        self.rekey_ratchets(old_key, new_key)?;
+        report("ratchets");
+
+        self.rekey_own_card(old_key, new_key, "own_card")?;
+        report("own_card");
+
+        self.rekey_device_registry(old_key, new_key)?;
+        report("device_registry");
+
+        self.rekey_contact_device_registries(old_key, new_key)?;
+        report("contact_device_registries");
+
+        self.rekey_safety_alert_facts(old_key, new_key)?;
+        report("safety_alert_facts");
+
+        self.rekey_device_sync_state(old_key, new_key)?;
+        report("device_sync_state");
+
+        self.rekey_visibility_labels(old_key, new_key, "visibility_labels")?;
+        report("visibility_labels");
+
+        self.rekey_device_info(old_key, new_key)?;
+        report("device_info");
+
+        self.rekey_device_signing_key(old_key, new_key)?;
+        report("device_signing_key");
+
+        self.rekey_version_vector(old_key, new_key)?;
+        report("version_vector");
+
+        self.rekey_receive_checkpoints(old_key, new_key)?;
+        report("receive_checkpoints");
+
+        self.rekey_field_timestamps(old_key, new_key)?;
+        report("field_timestamps");
+
+        self.rekey_nullable_column(old_key, new_key, "peer_card_ordering", "state_encrypted")?;
+        report("peer_card_ordering");
+
+        self.rekey_nullable_column(
+            old_key,
+            new_key,
+            "revoked_senders",
+            "display_name_encrypted",
+        )?;
+        report("revoked_senders");
+
+        self.rekey_nullable_column(
+            old_key,
+            new_key,
+            "guardian_backup_pieces",
+            "piece_encrypted",
+        )?;
+        report("guardian_backup_pieces");
+
+        self.rekey_nullable_column(old_key, new_key, "guardian_backups", "delivery_encrypted")?;
+        report("guardian_backups");
+
+        self.rekey_nullable_column(
+            old_key,
+            new_key,
+            "returned_backup_pieces",
+            "piece_encrypted",
+        )?;
+        report("returned_backup_pieces");
+
+        self.rekey_nullable_column(old_key, new_key, "returned_backups", "delivery_encrypted")?;
+        report("returned_backups");
+
+        self.retag_guardian_designators(old_key, new_key)?;
+        report("guardian_designator_tags");
+
+        self.rekey_nullable_column(old_key, new_key, "recovery_passphrase", "key_encrypted")?;
+        report("recovery_passphrase");
+
+        self.rekey_nullable_column(old_key, new_key, "recovery_own_proof", "proof_encrypted")?;
+        report("recovery_own_proof");
+
+        self.rekey_nullable_column(
+            old_key,
+            new_key,
+            "recovery_rekey_offers",
+            "exchange_secret_encrypted",
+        )?;
+        report("recovery_rekey_offers");
+
+        self.rekey_nullable_column(
+            old_key,
+            new_key,
+            "recovery_rekey_answers",
+            "answer_encrypted",
+        )?;
+        self.rekey_nullable_column(
+            old_key,
+            new_key,
+            "recovery_rekey_answers",
+            "old_shared_encrypted",
+        )?;
+        report("recovery_rekey_answers");
+
+        self.rekey_nullable_column(old_key, new_key, "recovery_old_identity", "seed_encrypted")?;
+        report("recovery_old_identity");
+
+        self.rekey_nullable_column(old_key, new_key, "recovery_mode_key", "seed_encrypted")?;
+        report("recovery_mode_key");
+
+        self.rekey_nullable_column(
+            old_key,
+            new_key,
+            "recovery_hand_backs",
+            "delivery_encrypted",
+        )?;
+        report("recovery_hand_backs");
+
+        self.rekey_nullable_column(
+            old_key,
+            new_key,
+            "recovery_backup_pieces",
+            "piece_encrypted",
+        )?;
+        report("recovery_backup_pieces");
+
+        self.rekey_sync_timestamps(old_key, new_key)?;
+        report("sync_timestamps");
+
+        self.rekey_pending_updates(old_key, new_key)?;
+        report("pending_updates");
+
+        self.rekey_retry_entries(old_key, new_key)?;
+        report("retry_entries");
+
+        self.rekey_device_sync_checkpoints(old_key, new_key)?;
+        report("device_sync_checkpoints");
+
+        self.rekey_recovery_responses(old_key, new_key)?;
+        report("recovery_responses");
+
+        self.rekey_deletion_state(old_key, new_key)?;
+        report("deletion_state");
+
+        self.rekey_sync_checkpoints(old_key, new_key)?;
+        report("sync_checkpoints");
+
+        self.rekey_field_validations(old_key, new_key)?;
+        report("field_validations");
+
+        self.rekey_ux_state(old_key, new_key)?;
+        self.rekey_user_presence_digest(old_key, new_key)?;
+        report("ux_state");
+
+        self.rekey_audit_log(old_key, new_key)?;
+        report("audit_log");
+
+        self.rekey_contacts_crypto(old_key, new_key)?;
+        report("contacts_crypto");
+
+        self.rekey_identity_passwords(old_key, new_key)?;
+        report("identity_passwords");
+
+        self.rekey_emergency_config(old_key, new_key)?;
+        report("emergency_config");
+
+        self.rekey_recovery_settings(old_key, new_key)?;
+        report("recovery_settings");
+
+        self.rekey_recovery_progress(old_key, new_key)?;
+        report("recovery_progress");
+
+        self.rekey_exchange_states(old_key, new_key)?;
+        report("exchange_states");
+
+        self.rekey_contact_display(old_key, new_key)?;
+        report("contact_display");
+
+        self.rekey_shared_avatars(old_key, new_key)?;
+        report("shared_avatars");
+
+        self.rekey_tags(old_key, new_key, "tags")?;
+        report("tags");
+
+        self.rekey_places(old_key, new_key, "places")?;
+        report("places");
+
+        self.rekey_exchange_location(old_key, new_key)?;
+        self.rekey_nullable_column(
+            old_key,
+            new_key,
+            "contacts",
+            "last_sent_display_name_encrypted",
+        )?;
+        self.rekey_nullable_column(old_key, new_key, "contacts", "relay_url_encrypted")?;
+        self.rekey_contact_vcard_uids(old_key, new_key)?;
+        report("exchange_location");
+
         Ok(())
     }
 
@@ -304,9 +499,9 @@ impl Storage {
         self.wal_checkpoint()?;
 
         let old_key = &self.encryption_key;
-        let old_mask_key = self.mask.key();
+        let old_mask_key = self.mask_key().clone();
         let new_mask_key = super::duress_content::mask_key(&new_key);
-        const TOTAL_TABLES: u32 = 46;
+        const TOTAL_TABLES: u32 = 42;
         let mut completed: u32 = 0;
 
         let report = |completed: &mut u32, table: &str| {
@@ -318,265 +513,41 @@ impl Storage {
 
         // The duress database begins first: if it cannot, no file
         // transaction is left open.
-        self.mask.conn().execute_batch("BEGIN")?;
+        let mask_conn = self.mask.as_deref().map(|mask| &mask.conn);
+        if let Some(mask) = mask_conn {
+            mask.execute_batch("BEGIN")?;
+        }
         if let Err(e) = self.conn.execute_batch("BEGIN EXCLUSIVE TRANSACTION") {
-            self.mask.conn().execute_batch("ROLLBACK")?;
+            if let Some(mask) = mask_conn {
+                mask.execute_batch("ROLLBACK")?;
+            }
             return Err(e.into());
         }
 
         let result = (|| -> Result<(), StorageError> {
-            self.rekey_contacts(old_key, &new_key)?;
-            report(&mut completed, "contacts");
-
-            self.rekey_contact_extras(old_key, &new_key)?;
-            report(&mut completed, "contact_extras");
-
-            self.rekey_contact_field_notes(old_key, &new_key)?;
-            report(&mut completed, "contact_field_notes");
-
-            self.rekey_identity_backup(old_key, &new_key)?;
-            report(&mut completed, "identity");
-
-            self.rekey_ratchets(old_key, &new_key)?;
-            report(&mut completed, "ratchets");
-
-            self.rekey_own_card(old_key, &new_key, "own_card")?;
-            report(&mut completed, "own_card");
-
-            self.rekey_mask_profile(old_mask_key, &new_mask_key)?;
+            self.rekey_tables(old_key, &new_key, &mut |table| {
+                report(&mut completed, table)
+            })?;
+            self.rekey_mask(&old_mask_key, &new_mask_key)?;
             report(&mut completed, "mask_profile");
 
-            self.rekey_device_registry(old_key, &new_key)?;
-            report(&mut completed, "device_registry");
-
-            self.rekey_contact_device_registries(old_key, &new_key)?;
-            report(&mut completed, "contact_device_registries");
-
-            self.rekey_safety_alert_facts(old_key, &new_key)?;
-            report(&mut completed, "safety_alert_facts");
-
-            self.rekey_device_sync_state(old_key, &new_key)?;
-            report(&mut completed, "device_sync_state");
-
-            self.rekey_visibility_labels(old_key, &new_key, "visibility_labels")?;
-            report(&mut completed, "visibility_labels");
-
-            self.rekey_visibility_labels(old_mask_key, &new_mask_key, "duress_visibility_labels")?;
-            report(&mut completed, "duress_visibility_labels");
-
-            self.rekey_device_info(old_key, &new_key)?;
-            report(&mut completed, "device_info");
-
-            self.rekey_device_signing_key(old_key, &new_key)?;
-            report(&mut completed, "device_signing_key");
-
-            self.rekey_version_vector(old_key, &new_key)?;
-            report(&mut completed, "version_vector");
-
-            self.rekey_receive_checkpoints(old_key, &new_key)?;
-            report(&mut completed, "receive_checkpoints");
-
-            self.rekey_field_timestamps(old_key, &new_key)?;
-            report(&mut completed, "field_timestamps");
-
-            self.rekey_nullable_column(old_key, &new_key, "peer_card_ordering", "state_encrypted")?;
-            report(&mut completed, "peer_card_ordering");
-
-            self.rekey_nullable_column(
-                old_key,
-                &new_key,
-                "revoked_senders",
-                "display_name_encrypted",
-            )?;
-            report(&mut completed, "revoked_senders");
-
-            self.rekey_nullable_column(
-                old_key,
-                &new_key,
-                "guardian_backup_pieces",
-                "piece_encrypted",
-            )?;
-            report(&mut completed, "guardian_backup_pieces");
-
-            self.rekey_nullable_column(
-                old_key,
-                &new_key,
-                "guardian_backups",
-                "delivery_encrypted",
-            )?;
-            report(&mut completed, "guardian_backups");
-
-            self.rekey_nullable_column(
-                old_key,
-                &new_key,
-                "returned_backup_pieces",
-                "piece_encrypted",
-            )?;
-            report(&mut completed, "returned_backup_pieces");
-
-            self.rekey_nullable_column(
-                old_key,
-                &new_key,
-                "returned_backups",
-                "delivery_encrypted",
-            )?;
-            report(&mut completed, "returned_backups");
-
-            self.retag_guardian_designators(old_key, &new_key)?;
-            report(&mut completed, "guardian_designator_tags");
-
-            self.rekey_nullable_column(old_key, &new_key, "recovery_passphrase", "key_encrypted")?;
-            report(&mut completed, "recovery_passphrase");
-
-            self.rekey_nullable_column(old_key, &new_key, "recovery_own_proof", "proof_encrypted")?;
-            report(&mut completed, "recovery_own_proof");
-
-            self.rekey_nullable_column(
-                old_key,
-                &new_key,
-                "recovery_rekey_offers",
-                "exchange_secret_encrypted",
-            )?;
-            report(&mut completed, "recovery_rekey_offers");
-
-            self.rekey_nullable_column(
-                old_key,
-                &new_key,
-                "recovery_rekey_answers",
-                "answer_encrypted",
-            )?;
-            self.rekey_nullable_column(
-                old_key,
-                &new_key,
-                "recovery_rekey_answers",
-                "old_shared_encrypted",
-            )?;
-            report(&mut completed, "recovery_rekey_answers");
-
-            self.rekey_nullable_column(
-                old_key,
-                &new_key,
-                "recovery_old_identity",
-                "seed_encrypted",
-            )?;
-            report(&mut completed, "recovery_old_identity");
-
-            self.rekey_nullable_column(old_key, &new_key, "recovery_mode_key", "seed_encrypted")?;
-            report(&mut completed, "recovery_mode_key");
-
-            self.rekey_nullable_column(
-                old_key,
-                &new_key,
-                "recovery_hand_backs",
-                "delivery_encrypted",
-            )?;
-            report(&mut completed, "recovery_hand_backs");
-
-            self.rekey_nullable_column(
-                old_key,
-                &new_key,
-                "recovery_backup_pieces",
-                "piece_encrypted",
-            )?;
-            report(&mut completed, "recovery_backup_pieces");
-
-            self.rekey_sync_timestamps(old_key, &new_key)?;
-            report(&mut completed, "sync_timestamps");
-
-            self.rekey_pending_updates(old_key, &new_key)?;
-            report(&mut completed, "pending_updates");
-
-            self.rekey_retry_entries(old_key, &new_key)?;
-            report(&mut completed, "retry_entries");
-
-            self.rekey_device_sync_checkpoints(old_key, &new_key)?;
-            report(&mut completed, "device_sync_checkpoints");
-
-            self.rekey_recovery_responses(old_key, &new_key)?;
-            report(&mut completed, "recovery_responses");
-
-            self.rekey_deletion_state(old_key, &new_key)?;
-            report(&mut completed, "deletion_state");
-
-            self.rekey_sync_checkpoints(old_key, &new_key)?;
-            report(&mut completed, "sync_checkpoints");
-
-            self.rekey_field_validations(old_key, &new_key)?;
-            report(&mut completed, "field_validations");
-
-            self.rekey_ux_state(old_key, &new_key)?;
-            self.rekey_user_presence_digest(old_key, &new_key)?;
-            report(&mut completed, "ux_state");
-
-            self.rekey_audit_log(old_key, &new_key)?;
-            report(&mut completed, "audit_log");
-
-            self.rekey_contacts_crypto(old_key, &new_key)?;
-            report(&mut completed, "contacts_crypto");
-
-            self.rekey_identity_passwords(old_key, &new_key)?;
-            report(&mut completed, "identity_passwords");
-
-            self.rekey_decoy_contacts(old_mask_key, &new_mask_key)?;
-            self.rekey_nullable_column(
-                old_mask_key,
-                &new_mask_key,
-                "decoy_contacts",
-                "display_name_encrypted",
-            )?;
-            report(&mut completed, "decoy_contacts");
-
-            self.rekey_emergency_config(old_key, &new_key)?;
-            report(&mut completed, "emergency_config");
-
-            self.rekey_recovery_settings(old_key, &new_key)?;
-            report(&mut completed, "recovery_settings");
-
-            self.rekey_recovery_progress(old_key, &new_key)?;
-            report(&mut completed, "recovery_progress");
-
-            self.rekey_exchange_states(old_key, &new_key)?;
-            report(&mut completed, "exchange_states");
-
-            self.rekey_contact_display(old_key, &new_key)?;
-            report(&mut completed, "contact_display");
-
-            self.rekey_shared_avatars(old_key, &new_key)?;
-            report(&mut completed, "shared_avatars");
-
-            self.rekey_tags(old_key, &new_key, "tags")?;
-            report(&mut completed, "tags");
-
-            self.rekey_tags(old_mask_key, &new_mask_key, "duress_tags")?;
-            report(&mut completed, "duress_tags");
-
-            self.rekey_places(old_key, &new_key, "places")?;
-            report(&mut completed, "places");
-
-            self.rekey_places(old_mask_key, &new_mask_key, "duress_places")?;
-            report(&mut completed, "duress_places");
-
-            self.rekey_exchange_location(old_key, &new_key)?;
-            self.rekey_nullable_column(
-                old_key,
-                &new_key,
-                "contacts",
-                "last_sent_display_name_encrypted",
-            )?;
-            self.rekey_nullable_column(old_key, &new_key, "contacts", "relay_url_encrypted")?;
-            self.rekey_contact_vcard_uids(old_key, &new_key)?;
-            report(&mut completed, "exchange_location");
-
             super::key_check::rewrite(&self.conn, &new_key)?;
-            super::duress_content::write_sealed(&self.conn, self.mask.conn(), &new_mask_key)
+            match &self.mask {
+                Some(mask) => super::mask::SealedSlot::of(&self.conn).write(
+                    &super::duress_content::seal_body(&new_mask_key, &mask.sealed_body()?)?,
+                ),
+                None => Ok(()),
+            }
         })()
         .and_then(|()| self.commit());
 
         match result {
             Ok(()) => {
-                self.mask.conn().execute_batch("COMMIT")?;
+                if let Some(mask) = self.mask.as_deref_mut() {
+                    mask.conn.execute_batch("COMMIT")?;
+                    mask.encryption_key = new_mask_key;
+                }
                 self.encryption_key = new_key;
-                self.mask.replace_key(new_mask_key);
                 Ok(())
             }
             Err(e) => {
@@ -585,10 +556,11 @@ impl Storage {
                 // connection drops anyway. `and` evaluates its argument
                 // first, so the duress database rolls back too.
                 #[allow(clippy::let_underscore_must_use)]
-                let _ = self
-                    .conn
-                    .execute_batch("ROLLBACK")
-                    .and(self.mask.conn().execute_batch("ROLLBACK"));
+                let _ = self.conn.execute_batch("ROLLBACK").and(
+                    self.mask
+                        .as_deref()
+                        .map_or(Ok(()), |mask| mask.conn.execute_batch("ROLLBACK")),
+                );
                 Err(e)
             }
         }

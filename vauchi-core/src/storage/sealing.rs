@@ -31,8 +31,24 @@ impl<S> DerefMut for Sealed<'_, S> {
     }
 }
 
+impl<'a, S> Sealed<'a, S> {
+    /// This store, resealed by `sealer` when `watched` changed: a real
+    /// database seals the mask profile it embeds into its own row.
+    pub(super) fn resealed_by(self, watched: &'a Storage, sealer: &'a Storage) -> Self {
+        Sealed {
+            store: self.store,
+            _reseal: Some(ResealOnDrop {
+                watched,
+                sealer,
+                changes_before: watched.conn.total_changes(),
+            }),
+        }
+    }
+}
+
 struct ResealOnDrop<'a> {
-    storage: &'a Storage,
+    watched: &'a Storage,
+    sealer: &'a Storage,
     changes_before: u64,
 }
 
@@ -40,10 +56,11 @@ impl Drop for ResealOnDrop<'_> {
     fn drop(&mut self) {
         // Inside a transaction the rows may still be rolled back;
         // `Storage::commit` reseals once they are not.
-        if self.storage.conn.is_autocommit()
-            && self.storage.conn.total_changes() != self.changes_before
+        if self.watched.conn.is_autocommit()
+            && self.watched.conn.total_changes() != self.changes_before
+            && let Err(error) = self.sealer.seal_mask()
         {
-            self.storage.reseal_logged();
+            tracing::error!(%error, "[Storage] resealing the mask profile failed");
         }
     }
 }
@@ -55,15 +72,10 @@ impl Storage {
         Sealed {
             store,
             _reseal: self.seal_target.as_ref().map(|_| ResealOnDrop {
-                storage: self,
+                watched: self,
+                sealer: self,
                 changes_before: self.conn.total_changes(),
             }),
-        }
-    }
-
-    pub(super) fn reseal_logged(&self) {
-        if let Err(error) = self.reseal() {
-            tracing::error!(%error, "[Storage] resealing the mask profile failed");
         }
     }
 }

@@ -2,34 +2,35 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! The duress content as one sealed blob (ADR-032, vauchi/private#1003).
+//! The mask profile as one sealed row of the real file (ADR-032,
+//! vauchi/private#1003; ADR-080).
 //!
-//! Decoy contacts and the duress session's groups, tags and places live in
-//! an in-memory database with the tables they had in the file up to v93.
 //! The file holds only `duress_content`, one row every database has: the
-//! rows of those tables, sealed under the mask key and padded to a size
+//! mask profile's rows, sealed under the mask key and padded to a size
 //! bucket, so a reader without the SMK cannot tell whether there are any.
-//! With no content the row seals empty tables, the same way.
 //!
 //! The mask key is derived from the SEK, one way, so the mask profile can be
 //! handed its key without the one that opens the real database (ADR-080).
+//!
+//! Up to 2026-11-08 the seal held twin tables of their own (`decoy_contacts`,
+//! `duress_tags` ...), the legacy shape below; migrations v94 and v114 still
+//! write it, and a seal in it converts into the regular schema when it loads
+//! (`mask_profile.rs`).
 //!
 //! The rows travel as a dump of SQLite values rather than as a serialized
 //! database: `Connection::deserialize` needs `unsafe`, which core forbids.
 
 use rusqlite::types::Value;
-use rusqlite::{Connection, params_from_iter};
+use rusqlite::{Connection, params, params_from_iter};
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::{SymmetricKey, decrypt, encrypt, kdf::HKDF};
 
-use super::mask::{MaskStorage, SealedSlot};
+use super::mask::SealedSlot;
 use super::{Storage, StorageError};
 
-/// The mask database's tables. A new table needs no migration: a seal from
-/// before it loads with the table empty. A change to an existing one is a
-/// change here and a migration that re-seals the blob.
-const DURESS_TABLES_SCHEMA: &str = "
+/// The legacy shape's tables, as v93 to 2026-11-08 sealed them.
+const LEGACY_SCHEMA: &str = "
     CREATE TABLE decoy_contacts (
         id TEXT PRIMARY KEY,
         card_encrypted BLOB NOT NULL,
@@ -86,7 +87,8 @@ const DURESS_TABLES_SCHEMA: &str = "
     );
 ";
 
-pub(super) const DURESS_TABLES: [&str; 8] = [
+/// The tables only the legacy shape has; a seal naming one is legacy.
+pub(super) const LEGACY_TABLES: [&str; 7] = [
     "decoy_contacts",
     "duress_tags",
     "duress_places",
@@ -94,7 +96,20 @@ pub(super) const DURESS_TABLES: [&str; 8] = [
     "duress_contact_visibility_overrides",
     "duress_own_card",
     "duress_emergency_config",
-    "mask_seed",
+];
+
+/// Each legacy twin and the regular table that replaces it, with the same
+/// columns: the twin stores ran the regular SQL on another table name.
+const LEGACY_TWINS: [(&str, &str); 6] = [
+    ("duress_tags", "tags"),
+    ("duress_places", "places"),
+    ("duress_visibility_labels", "visibility_labels"),
+    (
+        "duress_contact_visibility_overrides",
+        "contact_visibility_overrides",
+    ),
+    ("duress_own_card", "own_card"),
+    ("duress_emergency_config", "emergency_config"),
 ];
 
 const MASK_KEY_INFO: &[u8] = b"Vauchi_Duress_Mask_Key_v1";
@@ -119,16 +134,16 @@ enum Cell {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-struct TableRows {
-    name: String,
+pub(super) struct TableRows {
+    pub(super) name: String,
     columns: Vec<String>,
     rows: Vec<Vec<Cell>>,
 }
 
-/// An in-memory database holding the mask tables, empty.
+/// An in-memory database in the legacy shape, empty.
 pub(super) fn open_duress_db() -> Result<Connection, StorageError> {
     let conn = Connection::open_in_memory()?;
-    conn.execute_batch(DURESS_TABLES_SCHEMA)?;
+    conn.execute_batch(LEGACY_SCHEMA)?;
     Ok(conn)
 }
 
@@ -141,12 +156,7 @@ pub(crate) fn bucket_for(len: usize) -> usize {
     bucket
 }
 
-/// Every row of the mask tables on `conn`, encoded.
-pub(super) fn dump(conn: &Connection) -> Result<Vec<u8>, StorageError> {
-    dump_tables(conn, &DURESS_TABLES)
-}
-
-/// Every row of `names` on `conn`, encoded as [`dump`] does.
+/// Every row of `names` on `conn`, encoded.
 pub(super) fn dump_tables(conn: &Connection, names: &[&str]) -> Result<Vec<u8>, StorageError> {
     let mut tables = Vec::with_capacity(names.len());
     for name in names {
@@ -177,21 +187,20 @@ pub(super) fn dump_tables(conn: &Connection, names: &[&str]) -> Result<Vec<u8>, 
     postcard::to_allocvec(&tables).map_err(|e| StorageError::Serialization(e.to_string()))
 }
 
-/// Replaces the rows of the mask tables on `conn` with `bytes` from [`dump`].
-pub(super) fn load_dump(conn: &Connection, bytes: &[u8]) -> Result<(), StorageError> {
-    let tables: Vec<TableRows> =
-        postcard::from_bytes(bytes).map_err(|e| StorageError::Serialization(e.to_string()))?;
-    for name in DURESS_TABLES {
-        conn.execute(&format!("DELETE FROM {name}"), [])?;
-    }
+pub(super) fn decode_tables(bytes: &[u8]) -> Result<Vec<TableRows>, StorageError> {
+    postcard::from_bytes(bytes).map_err(|e| StorageError::Serialization(e.to_string()))
+}
+
+/// Inserts `tables`' rows into `conn`, whose tables they must name.
+pub(super) fn insert_tables(conn: &Connection, tables: Vec<TableRows>) -> Result<(), StorageError> {
     for table in tables {
-        let Some(name) = DURESS_TABLES.iter().find(|known| **known == table.name) else {
+        let name = table.name;
+        let known_columns = table_columns(conn, &name)?;
+        if known_columns.is_empty() {
             return Err(StorageError::Serialization(format!(
-                "duress content names an unknown table {}",
-                table.name
+                "duress content names an unknown table {name}"
             )));
-        };
-        let known_columns = table_columns(conn, name)?;
+        }
         if let Some(unknown) = table.columns.iter().find(|c| !known_columns.contains(c)) {
             return Err(StorageError::Serialization(format!(
                 "duress content names an unknown column {name}.{unknown}"
@@ -199,7 +208,7 @@ pub(super) fn load_dump(conn: &Connection, bytes: &[u8]) -> Result<(), StorageEr
         }
         let placeholders = vec!["?"; table.columns.len()].join(", ");
         let insert = format!(
-            "INSERT INTO {name} ({}) VALUES ({placeholders})",
+            "INSERT OR REPLACE INTO {name} ({}) VALUES ({placeholders})",
             table.columns.join(", ")
         );
         let mut stmt = conn.prepare(&insert)?;
@@ -223,6 +232,15 @@ pub(super) fn load_dump(conn: &Connection, bytes: &[u8]) -> Result<(), StorageEr
     Ok(())
 }
 
+/// Replaces the legacy tables' rows on `conn` with `bytes` from
+/// [`dump_tables`].
+pub(super) fn load_dump(conn: &Connection, bytes: &[u8]) -> Result<(), StorageError> {
+    for name in LEGACY_TABLES.iter().chain(["mask_seed"].iter()) {
+        conn.execute(&format!("DELETE FROM {name}"), [])?;
+    }
+    insert_tables(conn, decode_tables(bytes)?)
+}
+
 fn table_columns(conn: &Connection, table: &str) -> Result<Vec<String>, StorageError> {
     let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
     let columns = stmt
@@ -231,123 +249,172 @@ fn table_columns(conn: &Connection, table: &str) -> Result<Vec<String>, StorageE
     Ok(columns)
 }
 
-/// `Enc_mask(len || dump || zeros)`, padded to a bucket.
-pub(super) fn seal(
-    mask_key: &SymmetricKey,
-    duress_db: &Connection,
-) -> Result<Vec<u8>, StorageError> {
-    let body = dump(duress_db)?;
+/// `Enc_key(len || body || zeros)`, padded to a bucket.
+pub(super) fn seal_body(key: &SymmetricKey, body: &[u8]) -> Result<Vec<u8>, StorageError> {
     let len = u32::try_from(body.len())
         .map_err(|_| StorageError::Serialization("duress content over 4 GiB".into()))?;
     let mut framed = Vec::with_capacity(bucket_for(LENGTH_PREFIX + body.len()));
     framed.extend_from_slice(&len.to_le_bytes());
-    framed.extend_from_slice(&body);
+    framed.extend_from_slice(body);
     framed.resize(bucket_for(framed.len()), 0);
-    encrypt(mask_key, &framed).map_err(|e| StorageError::Encryption(e.to_string()))
+    encrypt(key, &framed).map_err(|e| StorageError::Encryption(e.to_string()))
 }
 
-/// Opens `sealed` and loads its rows into `duress_db`.
-pub(super) fn unseal_into(
-    mask_key: &SymmetricKey,
-    sealed: &[u8],
-    duress_db: &Connection,
-) -> Result<(), StorageError> {
-    let framed = decrypt(mask_key, sealed).map_err(|e| StorageError::Encryption(e.to_string()))?;
+/// The body sealed in `sealed`, which must open under `key`.
+pub(super) fn open_seal(key: &SymmetricKey, sealed: &[u8]) -> Result<Vec<u8>, StorageError> {
+    let framed = decrypt(key, sealed).map_err(|e| StorageError::Encryption(e.to_string()))?;
     let (prefix, rest) = framed.split_first_chunk::<LENGTH_PREFIX>().ok_or_else(|| {
         StorageError::Serialization("duress content shorter than its length".into())
     })?;
     let len = usize::try_from(u32::from_le_bytes(*prefix))
         .map_err(|_| StorageError::Serialization("duress content length".into()))?;
-    let body = rest.get(..len).ok_or_else(|| {
-        StorageError::Serialization("duress content shorter than its length".into())
-    })?;
-    load_dump(duress_db, body)
+    rest.get(..len)
+        .map(<[u8]>::to_vec)
+        .ok_or_else(|| StorageError::Serialization("duress content shorter than its length".into()))
 }
 
-/// Seals `duress_db` into the file's `duress_content` row under `key`.
+/// Seals a legacy-shape `duress_db` into the file's `duress_content` row
+/// under `key`, as migration v94 does.
 pub(crate) fn write_sealed(
     conn: &Connection,
     duress_db: &Connection,
     key: &SymmetricKey,
 ) -> Result<(), StorageError> {
-    SealedSlot::of(conn).write(&seal(key, duress_db)?)
+    let mut names: Vec<&str> = LEGACY_TABLES.to_vec();
+    names.push("mask_seed");
+    SealedSlot::of(conn).write(&seal_body(key, &dump_tables(duress_db, &names)?)?)
 }
 
-/// Re-seals the blob when a store that holds it has changed the duress
-/// database, so every write path persists without naming it.
-pub(crate) struct SealOnDrop<'a> {
-    slot: SealedSlot<'a>,
-    mask: &'a MaskStorage,
-    changes_before: std::cell::Cell<u64>,
+/// A seal's content in the legacy shape, on its own in-memory database.
+pub(super) struct LegacyContent {
+    conn: Connection,
 }
 
-impl<'a> SealOnDrop<'a> {
-    pub(crate) fn new(storage: &'a Storage) -> Self {
-        SealOnDrop {
-            slot: SealedSlot::of(&storage.conn),
-            mask: &storage.mask,
-            changes_before: std::cell::Cell::new(storage.mask.conn().total_changes()),
-        }
+impl LegacyContent {
+    pub(super) fn load(tables: Vec<TableRows>) -> Result<Self, StorageError> {
+        let conn = open_duress_db()?;
+        insert_tables(&conn, tables)?;
+        Ok(LegacyContent { conn })
     }
-}
 
-impl SealOnDrop<'_> {
-    /// Seals now and returns the error, for a store's write paths.
-    pub(crate) fn seal_now(&self) -> Result<(), StorageError> {
-        self.mask.seal_into(self.slot)?;
-        self.changes_before.set(self.mask.conn().total_changes());
+    /// Moves this content into `mask`'s regular tables. Its fields are under
+    /// `fields_key`: the mask key, or the SEK for a seal from before ADR-080.
+    pub(super) fn convert_into(
+        &self,
+        mask: &Storage,
+        fields_key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        for (twin, regular) in LEGACY_TWINS {
+            self.copy_rows(mask, twin, regular)?;
+        }
+        if !bool::from(subtle::ConstantTimeEq::ct_eq(
+            fields_key.as_bytes().as_slice(),
+            mask.mask_key().as_bytes().as_slice(),
+        )) {
+            mask.rekey_mask_twins(fields_key, mask.mask_key())?;
+        }
+        self.convert_decoys(mask, fields_key)?;
+        self.convert_seed(mask, fields_key)
+    }
+
+    fn copy_rows(&self, mask: &Storage, twin: &str, regular: &str) -> Result<(), StorageError> {
+        let body = dump_tables(&self.conn, &[twin])?;
+        let mut tables = decode_tables(&body)?;
+        for table in &mut tables {
+            table.name = regular.to_string();
+        }
+        insert_tables(&mask.conn, tables)
+    }
+
+    fn convert_decoys(
+        &self,
+        mask: &Storage,
+        fields_key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, display_name_encrypted, card_encrypted, created_at, updated_at
+             FROM decoy_contacts ORDER BY created_at",
+        )?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<Vec<u8>>>(1)?,
+                    row.get::<_, Vec<u8>>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, i64>(4)?,
+                ))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        for (id, name, card, created_at, updated_at) in rows {
+            let card =
+                decrypt(fields_key, &card).map_err(|e| StorageError::Encryption(e.to_string()))?;
+            let card: crate::card::ContactCard = serde_json::from_slice(&card)
+                .map_err(|e| StorageError::Serialization(e.to_string()))?;
+            let name = match name {
+                Some(name) => String::from_utf8(
+                    decrypt(fields_key, &name)
+                        .map_err(|e| StorageError::Encryption(e.to_string()))?,
+                )
+                .map_err(|e| StorageError::Serialization(e.to_string()))?,
+                None => card.display_name().to_string(),
+            };
+            mask.decoy().insert_decoy(
+                &id,
+                &name,
+                &card,
+                u64::try_from(created_at).unwrap_or_default(),
+                u64::try_from(updated_at).unwrap_or_default(),
+            )?;
+        }
+        Ok(())
+    }
+
+    fn convert_seed(&self, mask: &Storage, fields_key: &SymmetricKey) -> Result<(), StorageError> {
+        let sealed: Option<Vec<u8>> = rusqlite::OptionalExtension::optional(self.conn.query_row(
+            "SELECT seed_encrypted FROM mask_seed WHERE id = 1",
+            [],
+            |row| row.get(0),
+        ))?;
+        let Some(sealed) = sealed else {
+            return Ok(());
+        };
+        let seed = zeroize::Zeroizing::new(
+            decrypt(fields_key, &sealed).map_err(|e| StorageError::Encryption(e.to_string()))?,
+        );
+        let under_mask =
+            encrypt(mask.mask_key(), &seed).map_err(|e| StorageError::Encryption(e.to_string()))?;
+        mask.conn.execute(
+            "INSERT OR REPLACE INTO mask_seed (id, seed_encrypted) VALUES (1, ?1)",
+            params![under_mask],
+        )?;
         Ok(())
     }
 }
 
-/// A backstop for a write that did not seal through [`SealOnDrop::seal_now`].
-impl Drop for SealOnDrop<'_> {
-    fn drop(&mut self) {
-        if self.mask.conn().total_changes() == self.changes_before.get() {
-            return;
-        }
-        if let Err(error) = self.mask.seal_into(self.slot) {
-            tracing::error!(%error, "[Storage] sealing the duress content failed");
-        }
-    }
-}
-
 impl Storage {
-    /// Loads the duress content from the file, writing an empty seal first
-    /// when there is none.
+    /// Loads the mask profile from the file's seal, writing an empty seal
+    /// first when there is none. A seal that opens only under the SEK is
+    /// from before the mask key (ADR-080); it converts and is sealed again
+    /// under the mask key, as is one in the legacy shape.
     pub(super) fn load_duress_content(&self) -> Result<(), StorageError> {
-        let slot = SealedSlot::of(&self.conn);
-        let sealed = slot.read()?;
-        let Some(sealed) = sealed else {
-            return self.mask.seal_into(slot);
+        let Some(sealed) = SealedSlot::of(&self.conn).read()? else {
+            return self.seal_mask();
         };
-        let Err(under_mask_key) = unseal_into(self.mask.key(), &sealed, self.mask.conn()) else {
-            return Ok(());
-        };
-        if unseal_into(&self.encryption_key, &sealed, self.mask.conn()).is_err() {
-            return Err(under_mask_key);
-        }
-        self.move_duress_content_to_mask_key()
-    }
-
-    /// A seal that opens under the SEK and not the mask key was written
-    /// before the mask key (ADR-080): its fields move to the mask key and it
-    /// is sealed again. A seal that opens under neither is refused above.
-    fn move_duress_content_to_mask_key(&self) -> Result<(), StorageError> {
-        self.mask.conn().execute_batch("BEGIN")?;
-        let moved = self
-            .rekey_duress_tables(&self.encryption_key, self.mask.key())
-            .and_then(|()| self.mask.seal_into(SealedSlot::of(&self.conn)));
-        match moved {
-            Ok(()) => Ok(self.mask.conn().execute_batch("COMMIT")?),
-            Err(e) => {
-                // The seal in the file was not replaced, so the next open
-                // moves it again from the same state.
-                if let Err(rollback) = self.mask.conn().execute_batch("ROLLBACK") {
-                    tracing::error!(%rollback, "[Storage] rolling back the duress database failed");
-                }
-                Err(e)
+        let mask = self.mask_profile();
+        let resealed = match open_seal(mask.mask_key(), &sealed) {
+            Ok(body) => mask.load_body(&body, mask.mask_key())?,
+            Err(under_mask_key) => {
+                let Ok(body) = open_seal(&self.encryption_key, &sealed) else {
+                    return Err(under_mask_key);
+                };
+                mask.load_body(&body, &self.encryption_key)?;
+                true
             }
+        };
+        if resealed {
+            self.seal_mask()?;
         }
+        Ok(())
     }
 }

@@ -134,11 +134,13 @@ impl ProfileEngine {
     /// an edit that vanished after a lock would give the mode away. Engine
     /// paths that decide what contacts receive keep
     /// `self.storage.contacts().own_card()`.
-    pub(super) fn own_card_slot(&self) -> crate::storage::OwnCardStore<'_> {
+    pub(super) fn own_card_slot(
+        &self,
+    ) -> crate::storage::Sealed<'_, crate::storage::OwnCardStore<'_>> {
         if self.in_duress_mode() {
             self.storage.duress_own_card()
         } else {
-            self.storage.contacts().own_card()
+            self.storage.own_card()
         }
     }
 

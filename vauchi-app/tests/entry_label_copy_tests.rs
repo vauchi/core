@@ -9,7 +9,7 @@ fn entry_label_explains_what_contacts_see() {
     let mut engine = FormDialogEngine::new(FormDialogType::AddField {
         available_groups: vec![],
     });
-    engine.handle_action(UserAction::ListItemSelected {
+    let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "email".into(),
     });

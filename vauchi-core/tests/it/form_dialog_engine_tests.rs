@@ -11,10 +11,10 @@ use vauchi_app::ui::*;
 // `2026-05-21-add-entry-form-mixes-picker-and-fields` §G1:
 //
 //   step 1 (picker)  → user picks a catalog type
-//   step 2 (form)    → user fills in Value / Display Name / Comment
+//   step 2 (form)    → user fills in Value / Entry label / Comment
 //
 // On the picker step the screen MUST show only the catalog list. The
-// value inputs (Value / Display Name / Comment) must be absent so the
+// value inputs (Value / Entry label / Comment) must be absent so the
 // user isn't asked to fill in fields whose type they haven't picked
 // yet. The previous shape rendered both on one scroll, scrolling a
 // 35-row catalog past the user every time and burying the form below.
@@ -54,7 +54,7 @@ fn form_dialog_add_field_picker_step_shows_only_type_list() {
     });
     assert!(
         !has_label,
-        "Picker step must NOT show the Display Name input"
+        "Picker step must NOT show the entry label input"
     );
 
     let has_note = screen.components.iter().any(|c| {
@@ -102,10 +102,13 @@ fn form_dialog_add_field_form_step_shows_inputs_and_hides_picker() {
     let has_label = screen.components.iter().any(|c| {
         matches!(c,
             Component::TextInput { id, label, ..
-            } if id == "field_label" && label.contains("Display Name")
+            } if id == "field_label" && label == "Entry label (optional)"
         )
     });
-    assert!(has_label, "Form step should show the Display Name input");
+    assert!(
+        has_label,
+        "Form step should show the optional entry label input"
+    );
 
     let has_note = screen.components.iter().any(|c| {
         matches!(c,

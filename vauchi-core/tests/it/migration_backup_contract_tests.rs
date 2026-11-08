@@ -79,7 +79,6 @@ fn update() -> Migration {
 #[test]
 fn backup_diagnostics_are_silent_on_success_and_redacted_on_failure() {
     let diagnostics = Diagnostics::default();
-    // #1175: one observer lifetime avoids concurrent subscription registration.
     tracing::subscriber::with_default(diagnostics.clone(), || {
         assert_successful_snapshot();
         assert_eq!(*diagnostics.0.lock().unwrap(), Vec::new());
@@ -149,6 +148,8 @@ fn assert_backup_failure(diagnostics: &Diagnostics) {
 // @internal
 #[test]
 fn rollback_preserves_data_even_when_no_recovery_snapshot_can_be_created() {
+    // #1175: every warning producer needs a subscriber during parallel callsite registration.
+    let _observer = tracing::subscriber::set_default(Diagnostics::default());
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("history.db");
     let conn = Connection::open(&path).unwrap();
@@ -183,6 +184,7 @@ fn rollback_preserves_data_even_when_no_recovery_snapshot_can_be_created() {
 // @internal
 #[test]
 fn migration_failure_rolls_back_data_and_version_independently_of_the_backup() {
+    let _observer = tracing::subscriber::set_default(Diagnostics::default());
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("history.db");
     let conn = Connection::open(&path).unwrap();

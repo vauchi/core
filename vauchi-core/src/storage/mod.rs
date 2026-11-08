@@ -105,6 +105,9 @@ pub struct Storage {
     /// The mask profile sealed in this file's `duress_content` row, for a
     /// real database (ADR-080); `None` for a mask profile itself.
     mask: Option<Box<Storage>>,
+    /// Whether `mask` is lent to the foreground (ADR-080); `mask` then holds
+    /// an empty stand-in that nothing seals.
+    mask_lent: bool,
     /// Encryption key derived from user's master key
     encryption_key: SymmetricKey,
     /// The file holding this database sealed in one row, for a database that

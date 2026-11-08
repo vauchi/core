@@ -56,6 +56,11 @@ impl Storage {
     /// Seals the mask profile into its row: the real file's slot for an
     /// embedded one, its own seal target otherwise.
     pub(crate) fn seal_mask(&self) -> Result<(), StorageError> {
+        if self.mask_lent {
+            return Err(StorageError::InvalidData(
+                "the mask profile is lent to the foreground".into(),
+            ));
+        }
         match &self.mask {
             Some(mask) => SealedSlot::of(&self.conn).write(&mask.sealed_mask()?),
             None => self.reseal(),
@@ -74,6 +79,45 @@ impl Storage {
         }
     }
 
+    /// Lends the embedded mask profile, which then seals straight into this
+    /// database's file, or for an in-memory database only when it is taken
+    /// back. While it is lent, a mask write through this database fails.
+    pub fn lend_mask_profile(&mut self) -> Result<Storage, StorageError> {
+        if self.mask_lent || self.mask.is_none() {
+            return Err(StorageError::InvalidData(
+                "no embedded mask profile to lend".into(),
+            ));
+        }
+        let seal_target = match &self.db_path {
+            Some(path) => {
+                let file = Connection::open(path)?;
+                Self::configure_pragmas(&file)?;
+                Some(file)
+            }
+            None => None,
+        };
+        let stand_in = Self::empty_mask_profile(SymmetricKey::generate(), None)?;
+        let mut mask = self
+            .mask
+            .replace(Box::new(stand_in))
+            .expect("checked above");
+        mask.seal_target = seal_target;
+        self.mask_lent = true;
+        Ok(*mask)
+    }
+
+    /// Takes back the mask profile [`Self::lend_mask_profile`] lent, and
+    /// seals it into this database's row.
+    pub fn take_back_mask_profile(&mut self, mut mask: Storage) -> Result<(), StorageError> {
+        if !self.mask_lent {
+            return Err(StorageError::InvalidData("no mask profile is lent".into()));
+        }
+        mask.seal_target = None;
+        self.mask = Some(Box::new(mask));
+        self.mask_lent = false;
+        self.seal_mask()
+    }
+
     /// An empty mask profile under `mask_key`, sealed into `seal_target`'s
     /// row when it has one.
     pub(super) fn empty_mask_profile(
@@ -87,6 +131,7 @@ impl Storage {
             mask: None,
             encryption_key: mask_key,
             seal_target,
+            mask_lent: false,
             receive_key: None,
             db_path: None,
             clock: crate::clock::SystemClock::shared(),

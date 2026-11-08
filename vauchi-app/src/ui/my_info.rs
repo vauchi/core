@@ -225,15 +225,17 @@ impl MyInfoEngine {
 
     fn entry_item(&self, field: &OwnFieldInfo) -> Item {
         let label = if field.label.is_empty() {
-            field.field_type.clone()
+            let (key, _) =
+                super::form_dialog::entry_value_keys(&field.field_type.to_ascii_lowercase());
+            self.t(key)
         } else {
             field.label.clone()
         };
         Item {
             id: field.field_id.clone(),
-            name: field.value.clone(),
+            name: label.clone(),
             initials: crate::ui::component::initials(&label),
-            subtitle: Some(label),
+            subtitle: Some(field.value.clone()),
             status: Some(self.visibility_chip(field)),
             actions: Vec::new(),
             a11y: None,

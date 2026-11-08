@@ -267,7 +267,7 @@ fn card_with(fields: Vec<OwnFieldInfo>) -> MyInfoEngine {
 
 // @internal
 #[test]
-fn entries_render_the_value_as_title_and_the_label_as_subtitle() {
+fn entries_render_the_label_as_title_and_the_value_as_subtitle() {
     let screen = card_with(vec![own_field(
         "f1",
         "+41 79 000 00 00",
@@ -279,8 +279,8 @@ fn entries_render_the_value_as_title_and_the_label_as_subtitle() {
     let items = own_entries(&screen);
     assert_eq!(items.len(), 1);
     assert_eq!(items[0].id, "f1");
-    assert_eq!(items[0].name, "+41 79 000 00 00");
-    assert_eq!(items[0].subtitle.as_deref(), Some("Mobile"));
+    assert_eq!(items[0].name, "Mobile");
+    assert_eq!(items[0].subtitle.as_deref(), Some("+41 79 000 00 00"));
 }
 
 // @internal
@@ -333,7 +333,7 @@ fn entry_hidden_from_every_contact_carries_the_hidden_chip() {
 fn entry_without_a_label_falls_back_to_its_field_type() {
     let screen =
         card_with(vec![own_field("f1", "+41 79 000 00 00", "", &[], true)]).current_screen();
-    assert_eq!(own_entries(&screen)[0].subtitle.as_deref(), Some("Phone"));
+    assert_eq!(own_entries(&screen)[0].name, "Phone number");
 }
 
 // @internal

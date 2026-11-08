@@ -46,17 +46,36 @@ pub enum FormDialogType {
     },
 }
 
-/// Returns a placeholder hint for a given catalog entry key.
-fn placeholder_for_key(key: &str) -> &'static str {
+pub(super) fn entry_value_keys(key: &str) -> (&'static str, &'static str) {
     match key {
-        "phone" => "+1 555 123 4567",
-        "email" => "name@example.com",
-        "address" => "123 Main St, City",
-        "website" => "https://example.com",
-        "birthday" => "YYYY-MM-DD",
-        "custom" => "Any custom info",
-        k if k.starts_with("social:") => "@handle or profile URL",
-        _ => "Enter value",
+        "phone" => (
+            "form.entry_value.phone_label",
+            "form.entry_value.phone_placeholder",
+        ),
+        "email" => (
+            "form.entry_value.email_label",
+            "form.entry_value.email_placeholder",
+        ),
+        "address" => (
+            "form.entry_value.address_label",
+            "form.entry_value.address_placeholder",
+        ),
+        "website" => (
+            "form.entry_value.website_label",
+            "form.entry_value.website_placeholder",
+        ),
+        "birthday" => (
+            "form.entry_value.birthday_label",
+            "form.entry_value.birthday_placeholder",
+        ),
+        k if k == "social" || k.starts_with("social:") => (
+            "form.entry_value.social_label",
+            "form.entry_value.social_placeholder",
+        ),
+        _ => (
+            "form.entry_value.custom_label",
+            "form.entry_value.custom_placeholder",
+        ),
     }
 }
 
@@ -281,7 +300,9 @@ impl FormDialogEngine {
             .as_deref()
             .expect("form step requires selected_entry_type");
         let catalog_entry = self.catalog_entries.iter().find(|e| e.key == selected_key);
-        let placeholder = placeholder_for_key(selected_key);
+        let (label_key, placeholder_key) = entry_value_keys(selected_key);
+        let value_label = self.t(label_key);
+        let placeholder = self.t(placeholder_key);
 
         let input_type = match selected_key {
             "phone" => InputType::Phone,
@@ -289,7 +310,7 @@ impl FormDialogEngine {
             _ => InputType::Text,
         };
 
-        let mut components = self.add_field_inputs(placeholder, input_type);
+        let mut components = self.add_field_inputs(&value_label, &placeholder, input_type);
 
         // Group visibility toggles (form step only — picking groups
         // before picking a type would be confusing).
@@ -366,18 +387,27 @@ impl FormDialogEngine {
         }
     }
 
-    fn add_field_inputs(&self, placeholder: &str, input_type: InputType) -> Vec<Component> {
+    fn add_field_inputs(
+        &self,
+        label: &str,
+        placeholder: &str,
+        input_type: InputType,
+    ) -> Vec<Component> {
         vec![
             Component::TextInput {
                 id: "field_value".into(),
-                label: self.t("card.value"),
+                label: label.into(),
                 value: self.get_value("field_value").into(),
                 placeholder: Some(placeholder.into()),
                 max_length: Some(200),
                 validation_error: None,
                 input_type,
                 a11y: Some(A11y {
-                    label: Some(self.t("form.value_input_a11y")),
+                    label: Some(get_string_with_args(
+                        self.locale,
+                        "form.entry_value_input_a11y",
+                        &[("label", label)],
+                    )),
                     hint: Some(placeholder.into()),
                     role: Some(AccessibilityRole::TextField),
                 }),

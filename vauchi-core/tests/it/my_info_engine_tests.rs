@@ -48,8 +48,8 @@ fn my_info_shows_own_fields_as_the_own_entries_list() {
     let items = items.expect("MyInfo should show the own_entries List");
 
     assert_eq!(items.len(), 2);
-    assert_eq!(items[0].name, "+41 79 123 45 67");
-    assert_eq!(items[0].subtitle.as_deref(), Some("Mobile"));
+    assert_eq!(items[0].name, "Mobile");
+    assert_eq!(items[0].subtitle.as_deref(), Some("+41 79 123 45 67"));
     assert_eq!(items[0].status.as_deref(), Some("Family"));
     assert_eq!(items[1].status.as_deref(), Some("All contacts by default"));
 }

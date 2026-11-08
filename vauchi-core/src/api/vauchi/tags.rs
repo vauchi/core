@@ -13,7 +13,7 @@
 //! vocabulary and matches in Rust — there is no SQL name lookup.
 
 use super::super::error::{VauchiError, VauchiResult};
-use super::Vauchi;
+use super::ProfileEngine;
 use crate::contact::Tag;
 
 /// Normalises a tag name for comparison and storage: trims surrounding
@@ -23,7 +23,7 @@ fn normalise_name(name: &str) -> &str {
     name.trim()
 }
 
-impl Vauchi {
+impl ProfileEngine {
     fn record_tag_change(&self, tag: &Tag) {
         self.record_sync_item(crate::sync::SyncItem::TagChanged {
             tag_data: crate::sync::device_sync::TagSyncData::from_tag(tag),
@@ -47,7 +47,7 @@ impl Vauchi {
     ///
     /// Rejects an empty/whitespace-only name. Does **not** dedupe — callers
     /// that want autocomplete-or-create semantics use
-    /// [`Vauchi::add_tag_to_contact`].
+    /// [`ProfileEngine::add_tag_to_contact`].
     pub fn create_tag(&self, name: &str) -> VauchiResult<Tag> {
         let name = normalise_name(name);
         if name.is_empty() {
@@ -117,7 +117,7 @@ impl Vauchi {
     }
 
     /// Removes a tag from a contact. Idempotent. Errors if the tag does not
-    /// exist. The tag itself stays in the vocabulary (use [`Vauchi::delete_tag`]
+    /// exist. The tag itself stays in the vocabulary (use [`ProfileEngine::delete_tag`]
     /// to remove it entirely).
     pub fn remove_tag_from_contact(&self, tag_id: &str, contact_id: &str) -> VauchiResult<()> {
         self.tags_slot().remove_from_tag(tag_id, contact_id)?;
@@ -156,8 +156,8 @@ impl Vauchi {
 }
 
 /// An unsaved preview of the `Group` that promoting a tag would create
-/// (T1.4, ADR-051). Returned by [`Vauchi::begin_tag_promotion`] — **nothing is
-/// persisted** until [`Vauchi::confirm_tag_promotion`]. The owner reviews and
+/// (T1.4, ADR-051). Returned by [`ProfileEngine::begin_tag_promotion`] — **nothing is
+/// persisted** until [`ProfileEngine::confirm_tag_promotion`]. The owner reviews and
 /// may edit `visible_fields` on a confirmation screen before confirming;
 /// discarding the draft (not confirming) is the cancel path.
 #[derive(Debug, Clone)]
@@ -173,11 +173,11 @@ pub struct GroupDraft {
     pub visible_fields: Vec<String>,
 }
 
-impl Vauchi {
+impl ProfileEngine {
     /// Begins promoting a tag to a visibility `Group`: returns an **unsaved**
     /// [`GroupDraft`] (members = tagged contacts; `visible_fields` inherited
     /// from the owner's current default-visible card fields). No `Group` is
-    /// created and the tag is untouched until [`Vauchi::confirm_tag_promotion`].
+    /// created and the tag is untouched until [`ProfileEngine::confirm_tag_promotion`].
     /// Errors if the tag does not exist.
     pub fn begin_tag_promotion(&self, tag_id: &str) -> VauchiResult<GroupDraft> {
         let tag = self

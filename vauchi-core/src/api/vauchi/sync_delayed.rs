@@ -9,7 +9,7 @@
 
 use std::time::Duration;
 
-use super::{Vauchi, VauchiSyncOutcome};
+use super::{ProfileEngine, VauchiSyncOutcome};
 use crate::api::error::VauchiResult;
 use crate::network::DelayWindowAdvert;
 
@@ -28,7 +28,7 @@ pub enum FetchPath {
     SynchronousSinceWithdrawn { since_unix: u64 },
 }
 
-impl Vauchi {
+impl ProfileEngine {
     /// Syncs, then, when fetches go through the delayed path, keeps syncing
     /// every `poll` until the outer relay's delay window has passed and a fetch answer has been collected, or `max_wait` of pauses
     /// has passed. A lost answer is posted again and waited for. Counts are

@@ -16,13 +16,13 @@ use crate::contact::Contact;
 use crate::sync::delta::{encode_guardian_backup_piece, encode_guardian_release};
 use crate::sync::guardian_piece::{GuardianDelivery, split_into_pieces};
 
-use super::Vauchi;
+use super::ProfileEngine;
 
 /// A changed guardian backup is sent again at most once a day (D11): each
 /// send is about 2 MB per guardian, and a day-old copy still restores.
 const GUARDIAN_BACKUP_REFRESH_SECS: u64 = 86_400;
 
-impl Vauchi {
+impl ProfileEngine {
     /// Exports a fresh guardian backup and queues each recovery-trusted
     /// contact its share and the backup, in pieces. Returns how many
     /// guardians it was queued for; a guardian with no session to send on

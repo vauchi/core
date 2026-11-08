@@ -18,7 +18,7 @@ use super::super::consent::{ConsentManager, ConsentRecord, ConsentType};
 use super::super::contact_manager::ContactManager;
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::VauchiEvent;
-use super::{RecoveryReadiness, Vauchi};
+use super::{ProfileEngine, RecoveryReadiness};
 
 /// A contact's share of an own-card repropagation (`Vauchi::owed_card_delta`).
 pub(crate) struct OwedCardDelta {
@@ -27,7 +27,7 @@ pub(crate) struct OwedCardDelta {
     pub(crate) new_visible: std::collections::HashSet<String>,
 }
 
-impl Vauchi {
+impl ProfileEngine {
     /// Diagnostic dump of a contact's F4 sync/handshake state — debug-only
     /// observability for the lost-primary certification (2026-07-26). Reveals
     /// whether this device reaches `Active` for the contact and which peer

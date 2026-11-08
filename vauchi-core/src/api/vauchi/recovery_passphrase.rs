@@ -9,13 +9,13 @@
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::backup::passphrase_layer;
 
-use super::Vauchi;
+use super::ProfileEngine;
 
 /// A sealed backup is the guardian backup plus the layer's magic, salt
 /// and AEAD overhead; anything longer is refused before it is decoded.
 const MAX_SEALED_HEX_LEN: usize = 2 * (crate::backup::full_backup::MAX_GUARDIAN_BACKUP_BYTES + 128);
 
-impl Vauchi {
+impl ProfileEngine {
     /// Sets the owner's recovery passphrase and sends the guardians a
     /// backup sealed under it, replacing an earlier passphrase.
     ///
@@ -113,7 +113,7 @@ pub(super) fn open_guardian_backup_with_passphrase(
     passphrase: Option<&str>,
     our_secret: &x25519_dalek::StaticSecret,
 ) -> VauchiResult<crate::backup::FullBackupEnvelope> {
-    if !Vauchi::guardian_backup_needs_passphrase(backup_data) {
+    if !ProfileEngine::guardian_backup_needs_passphrase(backup_data) {
         return super::identity::open_guardian_backup(backup_data, re_sealed_shares, our_secret);
     }
     let refused = || VauchiError::Configuration("Guardian backup recovery failed".into());

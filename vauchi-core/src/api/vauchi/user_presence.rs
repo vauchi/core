@@ -12,12 +12,12 @@ use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
 use super::super::error::VauchiResult;
-use super::Vauchi;
+use super::ProfileEngine;
 
 /// The shell makes 32 bytes; anything outside this range is not a secret.
 const SECRET_LEN: std::ops::RangeInclusive<usize> = 16..=64;
 
-impl Vauchi {
+impl ProfileEngine {
     /// Whether this device has enrolled a user-presence secret.
     pub fn has_user_presence_secret(&self) -> VauchiResult<bool> {
         Ok(self.storage.ux().load_user_presence_digest()?.is_some())

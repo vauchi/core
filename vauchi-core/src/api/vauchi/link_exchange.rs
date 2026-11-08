@@ -9,7 +9,7 @@
 //! relay escrow round trip ([`Vauchi::run_escrow_command`]) and
 //! [`Vauchi::complete_link_exchange`].
 
-use super::Vauchi;
+use super::ProfileEngine;
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::card::ContactCard;
 use crate::exchange::X3DHKeyPair;
@@ -86,7 +86,7 @@ impl LinkExchange {
     }
 }
 
-impl Vauchi {
+impl ProfileEngine {
     /// Start a link-mode exchange as the initiator: returns the link to send
     /// and the exchange to advance.
     pub fn start_link_exchange(&self) -> VauchiResult<(String, LinkExchange)> {

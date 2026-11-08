@@ -4,14 +4,14 @@
 
 //! Faceted contact search (ADR-051 contact annotations).
 //!
-//! Plain [`Vauchi::search_contacts`] matches display name only — the default.
+//! Plain [`ProfileEngine::search_contacts`] matches display name only — the default.
 //! [`Vauchi::search_contacts_faceted`] opts into matching the owner's private
 //! annotations too: tags, the comment (`personal_notes`), and the named
 //! exchange place, plus an exchange-time range filter. Core-owned (ADR-021);
 //! frontends pass flags, never re-implement matching.
 
 use super::super::error::VauchiResult;
-use super::Vauchi;
+use super::ProfileEngine;
 use crate::contact::Contact;
 
 /// Which annotation facets a faceted search should match, beyond display name.
@@ -32,14 +32,14 @@ pub struct SearchFacets {
     pub time_range: Option<(u64, u64)>,
 }
 
-impl Vauchi {
+impl ProfileEngine {
     /// Faceted contact search. A non-hidden contact is included when it passes
     /// the optional `time_range` filter **and** either the query is empty or it
     /// text-matches (case-insensitive substring) the display name or any
     /// enabled facet (tags / comment / place name).
     ///
     /// With `SearchFacets::default()` (no facets, no range) this matches
-    /// [`Vauchi::search_contacts`] — name only.
+    /// [`ProfileEngine::search_contacts`] — name only.
     pub fn search_contacts_faceted(
         &self,
         query: &str,

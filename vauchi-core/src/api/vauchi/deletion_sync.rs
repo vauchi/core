@@ -7,11 +7,11 @@
 //! (vauchi/private#723).
 
 use super::super::error::{VauchiError, VauchiResult};
-use super::Vauchi;
+use super::ProfileEngine;
 use crate::api::deletion::{DeletionChoice, DeletionManager};
 use crate::storage::DeletionState;
 
-impl Vauchi {
+impl ProfileEngine {
     /// Schedules the identity's deletion with its grace period and tells the
     /// other devices, with what it carries out when it runs: erasing the
     /// guardian set (#711), wiping the other devices (#916).

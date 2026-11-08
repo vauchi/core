@@ -24,9 +24,9 @@
 use crate::rng::SecureRngExt;
 
 use super::super::error::{VauchiError, VauchiResult};
-use super::Vauchi;
+use super::ProfileEngine;
 
-impl Vauchi {
+impl ProfileEngine {
     /// Queue a reciprocity confirmation for every still-`Pending` confirmable
     /// contact. Returns the number queued. Idempotent per cycle and
     /// self-terminating: run *after* the receive phase (which may have just

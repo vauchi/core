@@ -14,9 +14,9 @@ use crate::contact::merge::{
 
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::VauchiEvent;
-use super::Vauchi;
+use super::ProfileEngine;
 
-impl Vauchi {
+impl ProfileEngine {
     /// Scans all contacts for potential duplicates.
     ///
     /// Returns duplicate pairs ordered by similarity (highest first),

@@ -18,7 +18,7 @@
 use base64::Engine as _;
 use sha2::Digest as _;
 
-use super::Vauchi;
+use super::ProfileEngine;
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::crypto::SigningKeyPair;
 use crate::identity::{DeviceInfo, DeviceRegistry, Identity};
@@ -112,7 +112,7 @@ fn encoded_claim(target: &[u8; 32], recovery_key: &SigningKeyPair, issued_at: u6
     base64::engine::general_purpose::STANDARD.encode(claim.to_bytes())
 }
 
-impl Vauchi {
+impl ProfileEngine {
     /// The claim as issued for an identity-free recovery stored on this
     /// phone, which may have expired: reading never extends its lifetime;
     /// [`Self::renew_pending_recovery_claim`] does. A recovery from before

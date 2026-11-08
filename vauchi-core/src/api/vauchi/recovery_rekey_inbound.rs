@@ -23,14 +23,14 @@ use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, to
 use crate::recovery::authorization::RecoveryAuthorization;
 use crate::recovery::rekey::{RekeyAnswer, RekeyOffer, rekey_shared_key};
 
-use super::Vauchi;
+use super::ProfileEngine;
 use super::recovery_rekey::{REKEY_RESEND_WINDOW_SECS, RekeyDelivery};
 
 /// An answer not yet followed by the new relationship goes again after a
 /// day; its exchange key stays the one the contact already switched to.
 const REKEY_ANSWER_RESEND_SECS: u64 = 86_400;
 
-/// What [`Vauchi::take_rekey_offer`] made of an offer.
+/// What [`ProfileEngine::take_rekey_offer`] made of an offer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RekeyOfferTaken {
     /// Accepted: the recovered contact now has this id, its new key's.
@@ -39,7 +39,7 @@ pub enum RekeyOfferTaken {
     Dropped,
 }
 
-impl Vauchi {
+impl ProfileEngine {
     /// Takes in a rekey offer from the relay and accepts it when it is
     /// provably the recovered contact's; drops it otherwise.
     ///

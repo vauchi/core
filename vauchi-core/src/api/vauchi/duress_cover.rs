@@ -17,9 +17,9 @@ use crate::reminders::OwnCardRepropagateState;
 use crate::sync::delta::encode_cover_payload;
 
 use super::super::error::{VauchiError, VauchiResult};
-use super::Vauchi;
+use super::ProfileEngine;
 
-impl Vauchi {
+impl ProfileEngine {
     /// Journals `item` for the owner's other devices — or, under duress,
     /// a cover item of the same length: the edit itself must not reach
     /// them, and neither may its absence show (vauchi/private#947).

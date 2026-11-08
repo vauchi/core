@@ -13,9 +13,9 @@ use crate::card::normalize_avatar;
 use crate::contact::display::{AvatarPreference, ContactDisplayOptions, DisplayNamePreference};
 
 use super::super::error::{VauchiError, VauchiResult};
-use super::Vauchi;
+use super::ProfileEngine;
 
-impl Vauchi {
+impl ProfileEngine {
     // === Personal Notes Operations ===
 
     /// Adds or replaces a personal note for a contact.

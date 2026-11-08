@@ -16,9 +16,9 @@ use crate::api::error::{VauchiError, VauchiResult};
 use crate::backup::FullBackupEnvelope;
 use crate::contact::Group;
 
-use super::Vauchi;
+use super::ProfileEngine;
 
-impl Vauchi {
+impl ProfileEngine {
     /// How many guardians have handed a backup back to this identity.
     ///
     /// # Errors

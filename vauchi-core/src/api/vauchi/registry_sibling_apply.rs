@@ -10,11 +10,11 @@
 //! per-item `Err` value that the tolerant apply loop skips, never a
 //! batch-aborting early return.
 
-use super::Vauchi;
+use super::ProfileEngine;
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::sync::registry_activation::ActivationTracker;
 
-impl Vauchi {
+impl ProfileEngine {
     /// Persist a relayed contact registry on this sibling.
     ///
     /// Same guard as direct receipt: signature re-verified against the

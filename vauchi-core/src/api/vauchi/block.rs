@@ -11,9 +11,9 @@ use crate::rng::SecureRngExt;
 
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::VauchiEvent;
-use super::Vauchi;
+use super::ProfileEngine;
 
-impl Vauchi {
+impl ProfileEngine {
     /// Blocks a contact.
     ///
     /// Blocked contacts will not receive card updates and their incoming

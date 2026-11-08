@@ -9,7 +9,7 @@
 use crate::rng::SecureRngExt;
 
 use super::super::error::{VauchiError, VauchiResult};
-use super::Vauchi;
+use super::ProfileEngine;
 
 /// A card delta stamped, signed and CEK-wrapped for one contact
 /// (`Vauchi::cek_wrapped_card_delta`).
@@ -19,7 +19,7 @@ pub(crate) struct SealedCardDelta {
     pub(crate) version: u32,
 }
 
-impl Vauchi {
+impl ProfileEngine {
     /// Seals `payload` to every active device of `contact` and queues one
     /// `card_delta` per copy, persisting only the ratchet sessions — for
     /// payloads that carry no card state (cover, a resync request), where

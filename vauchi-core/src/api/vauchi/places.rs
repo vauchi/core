@@ -13,10 +13,10 @@
 //! the core layer, `set_exchange_location` is the entry point.
 
 use super::super::error::{VauchiError, VauchiResult};
-use super::Vauchi;
+use super::ProfileEngine;
 use crate::contact::place::{ExchangeLocation, PLACE_MATCH_RADIUS_M, Place, haversine_m};
 
-impl Vauchi {
+impl ProfileEngine {
     // === Named-place vocabulary ===
 
     /// Lists all named places, oldest first.

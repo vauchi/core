@@ -6,7 +6,7 @@
 //! (vauchi/private#915, ADR-033 amendment 2026-10-29).
 
 use super::super::error::VauchiResult;
-use super::Vauchi;
+use super::ProfileEngine;
 
 /// What removing the identity from this device achieved; the device is
 /// wiped in every case.
@@ -23,7 +23,7 @@ pub enum DeviceRemoval {
     Wiped,
 }
 
-impl Vauchi {
+impl ProfileEngine {
     /// Revokes this device, sends that to the identity's other devices in
     /// one sync, then wipes this device; contacts and the relay are not
     /// told. When the sync fails it wipes only with `wipe_if_not_told`; a

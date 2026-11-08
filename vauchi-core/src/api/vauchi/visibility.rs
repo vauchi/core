@@ -5,9 +5,9 @@
 //! Visibility labels and field visibility management.
 
 use super::super::error::{VauchiError, VauchiResult};
-use super::Vauchi;
+use super::ProfileEngine;
 
-impl Vauchi {
+impl ProfileEngine {
     pub(crate) fn record_group_change(&self, group: &crate::contact::Group) {
         self.record_sync_item(crate::sync::SyncItem::GroupChanged {
             group_data: crate::sync::GroupSyncData::from_group(group),

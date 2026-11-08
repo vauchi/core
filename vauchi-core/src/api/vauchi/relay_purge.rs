@@ -7,9 +7,9 @@
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::api::pre_signed::purge_signing_message;
 
-use super::Vauchi;
+use super::ProfileEngine;
 
-impl Vauchi {
+impl ProfileEngine {
     /// Asks the relay to erase what it holds for this identity, and with
     /// `erase_guardian_set` its guardian set too.
     ///

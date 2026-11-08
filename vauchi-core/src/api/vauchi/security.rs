@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use super::super::app_password::{AppPasswordConfig, AuthResult};
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventCallback, VauchiEvent};
-use super::{AuthMode, BiometricUnlockOutcome, Vauchi};
+use super::{AuthMode, BiometricUnlockOutcome, ProfileEngine};
 use crate::emergency::DURESS_PIN_LENGTH;
 use crate::sleeper::Sleeper;
 use crate::storage::ActivityLogRow;
@@ -36,7 +36,7 @@ pub fn validate_duress_pin(pin: &str) -> VauchiResult<()> {
     Ok(())
 }
 
-/// Minimum wall-clock duration for [`Vauchi::biometric_unlock_check`].
+/// Minimum wall-clock duration for [`ProfileEngine::biometric_unlock_check`].
 ///
 /// Padding the call to a fixed floor hides whether a duress PIN is
 /// configured: an observer cannot distinguish "biometric → straight
@@ -48,7 +48,7 @@ pub fn validate_duress_pin(pin: &str) -> VauchiResult<()> {
 /// implementations cannot drift apart.
 pub const BIOMETRIC_UNLOCK_MIN_DURATION: Duration = Duration::from_millis(300);
 
-impl Vauchi {
+impl ProfileEngine {
     // === Delivery Status Operations ===
 
     /// Gets delivery records for a specific contact.
@@ -164,7 +164,7 @@ impl Vauchi {
     /// - [`BiometricUnlockOutcome::PromptForDuressPin`] when duress is
     ///   configured. The frontend must show the PIN entry screen so
     ///   the user enters either the real PIN (-> `Normal` via
-    ///   [`Vauchi::authenticate`]) or the duress PIN (-> `Duress`).
+    ///   [`ProfileEngine::authenticate`]) or the duress PIN (-> `Duress`).
     ///   `auth_mode` is left untouched in this case.
     ///
     /// The call always takes at least

@@ -10,7 +10,7 @@ use crate::crypto::ratchet::DoubleRatchetState;
 use crate::exchange::{ExchangeEvent, ExchangeSession, ManualConfirmationVerifier};
 
 use super::super::error::{VauchiError, VauchiResult};
-use super::Vauchi;
+use super::ProfileEngine;
 
 /// Exchange QR data with expiration info.
 #[derive(Debug, Clone)]
@@ -41,7 +41,7 @@ impl ExchangeQrData {
     }
 }
 
-impl Vauchi {
+impl ProfileEngine {
     /// Generates exchange QR data for contact exchange.
     ///
     /// Uses ExchangeSession state machine with ManualConfirmationVerifier.

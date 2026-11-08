@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use super::Vauchi;
+use super::ProfileEngine;
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::sync::guardian_transfer::HandBackReceiver;
 
-impl Vauchi {
+impl ProfileEngine {
     /// Accepts one recovery transport packet and returns its flow-control ACK.
     /// A completed piece is stored and the whole-backup hash checked before
     /// its final ACK can escape (Social Recovery A11, P33).

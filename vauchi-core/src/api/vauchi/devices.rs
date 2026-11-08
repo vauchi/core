@@ -5,7 +5,7 @@
 //! Device management operations: listing, linking, and revocation.
 
 use super::super::error::{VauchiError, VauchiResult};
-use super::Vauchi;
+use super::ProfileEngine;
 
 /// Device information for display.
 #[derive(Debug, Clone)]
@@ -33,7 +33,7 @@ pub struct DeviceLinkResult {
     pub fingerprint: String,
 }
 
-impl Vauchi {
+impl ProfileEngine {
     /// Lists all linked devices.
     ///
     /// Returns device info from the registry, or falls back to the current

@@ -14,12 +14,12 @@
 //! identity start with the device-registry handshake, which the move
 //! leaves to run again.
 
-use super::Vauchi;
+use super::ProfileEngine;
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::crypto::SymmetricKey;
 use crate::sync::device_sync::{ContactRekeySyncData, RekeySettledSyncData, SyncItem};
 
-impl Vauchi {
+impl ProfileEngine {
     /// Journals for the siblings that the contact `old_id` is now `new_id`.
     ///
     /// # Errors

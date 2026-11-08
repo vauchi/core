@@ -9,7 +9,7 @@
 //! linking into a unified `SetupProgress` struct.
 
 use super::super::error::VauchiResult;
-use super::Vauchi;
+use super::ProfileEngine;
 
 /// Represents the user's onboarding progress.
 ///
@@ -50,7 +50,7 @@ impl SetupProgress {
     }
 }
 
-impl Vauchi {
+impl ProfileEngine {
     /// Returns the current onboarding/setup progress.
     ///
     /// Aggregates multiple state checks into a single struct that clients

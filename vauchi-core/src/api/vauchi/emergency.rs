@@ -17,11 +17,11 @@ use super::super::emergency::{BROADCAST_COOLDOWN_SECS, BroadcastResult};
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventDispatcher, VauchiEvent};
 use super::super::shred::{ShredManager, widget_panic_shred};
-use super::Vauchi;
+use super::ProfileEngine;
 use crate::emergency::EmergencyBroadcastConfig;
 use crate::emergency::MAX_TRUSTED_CONTACTS;
 
-impl Vauchi {
+impl ProfileEngine {
     // === Emergency Broadcast ===
 
     /// Configures the emergency broadcast system.

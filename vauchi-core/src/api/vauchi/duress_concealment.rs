@@ -18,7 +18,7 @@ use crate::api::error::{VauchiError, VauchiResult};
 use crate::card::ContactCard;
 use crate::contact::place::ExchangeLocation;
 
-use super::{AuthMode, Vauchi};
+use super::{AuthMode, ProfileEngine};
 
 #[derive(Default)]
 pub(super) struct ConcealedDuress {
@@ -32,7 +32,7 @@ pub(super) struct ConcealedDuress {
 
 pub(super) type ConcealedDuressCell = Mutex<ConcealedDuress>;
 
-impl Vauchi {
+impl ProfileEngine {
     pub(super) fn in_duress_mode(&self) -> bool {
         self.auth_mode == AuthMode::Duress
     }

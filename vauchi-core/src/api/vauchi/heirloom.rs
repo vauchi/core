@@ -6,11 +6,11 @@
 
 use std::collections::HashMap;
 
-use super::Vauchi;
+use super::ProfileEngine;
 use crate::api::error::VauchiResult;
 use crate::api::heirloom::{HeirloomBook, HeirloomContact, HeirloomField};
 
-impl Vauchi {
+impl ProfileEngine {
     /// The contact book as plain, human-facing content, sorted by name and
     /// then exchange date so the same data always yields the same book.
     ///

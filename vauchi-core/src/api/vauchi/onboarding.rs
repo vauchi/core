@@ -14,9 +14,9 @@ use crate::onboarding::OnboardingProgress;
 use crate::onboarding::OnboardingStep;
 
 use super::super::error::VauchiResult;
-use super::Vauchi;
+use super::ProfileEngine;
 
-impl Vauchi {
+impl ProfileEngine {
     // === Onboarding Progress Operations ===
 
     /// Returns the current onboarding progress.
@@ -70,7 +70,7 @@ impl Vauchi {
     /// progress is currently on.
     ///
     /// Idempotent — calling on already-complete progress is a no-op.
-    /// Used by [`Vauchi::create_identity_with_onboarding`] so an
+    /// Used by [`ProfileEngine::create_identity_with_onboarding`] so an
     /// atomic create-and-complete can be expressed as one FFI call,
     /// closing the crash window the audit
     /// `2026-04-28-app-launch-and-identity-orchestration-in-core`

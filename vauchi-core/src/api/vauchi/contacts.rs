@@ -12,9 +12,9 @@ use super::super::contact_manager::ContactManager;
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventOrigin, VauchiEvent};
 use super::builder::decoy_id_to_fake_pk;
-use super::{AuthMode, Vauchi};
+use super::{AuthMode, ProfileEngine};
 
-impl Vauchi {
+impl ProfileEngine {
     // === Contact Operations ===
 
     /// Converts decoy contact tuples into `Contact` objects (display-only).

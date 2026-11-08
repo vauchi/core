@@ -16,11 +16,11 @@ use crate::storage::SecureStorage;
 use super::super::contact_manager::ContactManager;
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::VauchiEvent;
-use super::{SMK_KEY_NAME, Vauchi, storage_keys};
+use super::{ProfileEngine, SMK_KEY_NAME, storage_keys};
 
 const MAX_IDENTITY_BACKUP_BYTES: usize = 64 * 1024;
 
-impl Vauchi {
+impl ProfileEngine {
     // === Identity Operations ===
 
     /// Sets the SecureStorage backend for SMK persistence.
@@ -392,7 +392,7 @@ impl Vauchi {
 
     /// Re-load identity from storage into `self.identity` if currently None.
     ///
-    /// Companion to [`Vauchi::has_identity`]'s storage-fallback. Use this
+    /// Companion to [`ProfileEngine::has_identity`]'s storage-fallback. Use this
     /// before code paths that read `self.identity` directly (e.g. screen
     /// builders inside the AppEngine, signing/encryption flows). Without
     /// it, those paths would still see `None` after a sibling Vauchi

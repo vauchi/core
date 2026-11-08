@@ -23,7 +23,7 @@
 //! §2). `register_tokens` lives here too: it registers the same self-token
 //! the receive partition keys on.
 
-use super::Vauchi;
+use super::ProfileEngine;
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::api::send_phase::SendPhase;
 use crate::api::sync::DeviceSyncOrchestrator;
@@ -36,7 +36,7 @@ use crate::network::{
 use crate::rng::SecureRngExt;
 use crate::sync::device_sync::SyncItem;
 
-impl Vauchi {
+impl ProfileEngine {
     /// Register mailbox tokens on the adapter for fetch routing.
     ///
     /// Computes contact tokens from shared keys and a self-token from the
@@ -306,6 +306,7 @@ impl Vauchi {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api::Vauchi;
     use crate::card::ContactCard;
     use crate::identity::device::DeviceInfo;
     use crate::sync::device_sync::ContactSyncData;

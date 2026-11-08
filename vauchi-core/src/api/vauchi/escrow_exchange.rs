@@ -13,12 +13,12 @@
 
 use vauchi_protocol::escrow::{EscrowMessage, EscrowResponse};
 
-use super::Vauchi;
+use super::ProfileEngine;
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::network::escrow_client::{EscrowOutcome, escrow_outcome, escrow_request};
 use crate::platform::{Command, Event};
 
-impl Vauchi {
+impl ProfileEngine {
     /// Perform a single relay escrow round-trip over the configured relay
     /// transport.
     ///

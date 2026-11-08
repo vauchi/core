@@ -19,9 +19,9 @@ use crate::recovery::{
 };
 use vauchi_protocol::v2::V2GuardianEntry;
 
-use super::Vauchi;
+use super::ProfileEngine;
 
-impl Vauchi {
+impl ProfileEngine {
     // === Guardian Management ===
 
     /// Uploads encrypted guardian entries to the relay.

@@ -14,10 +14,10 @@ use base64::Engine;
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::recovery::{RecoveryClaim, RecoveryProgress, RecoveryVoucher};
 
-use super::Vauchi;
+use super::ProfileEngine;
 
 /// Whom a recovery claim's old key belonged to
-/// ([`Vauchi::recovery_claim_contact`]).
+/// ([`ProfileEngine::recovery_claim_contact`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecoveryClaimContact {
     contact_id: String,
@@ -43,7 +43,7 @@ impl RecoveryClaimContact {
 
 const MAX_VOUCHER_B64_LEN: usize = 4096;
 
-impl Vauchi {
+impl ProfileEngine {
     /// Creates a claim binding `old_pk` to this identity and stores it as
     /// the recovery in progress, so vouchers have a claim to attach to.
     ///

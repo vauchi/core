@@ -48,7 +48,7 @@ impl EmergencyBroadcastConfig {
 
 /// Snapshot of emergency-related configuration and state.
 ///
-/// Returned by [`Vauchi::get_emergency_wipe_status`](crate::api::Vauchi::get_emergency_wipe_status)
+/// Returned by [`Vauchi::get_emergency_wipe_status`](crate::api::ProfileEngine::get_emergency_wipe_status)
 /// so frontends can render an emergency readiness overview without issuing
 /// multiple API calls.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -69,7 +69,7 @@ pub struct EmergencyWipeStatus {
     pub password_enabled: bool,
 }
 
-/// Outcome of [`crate::api::Vauchi::biometric_unlock_check`].
+/// Outcome of [`crate::api::ProfileEngine::biometric_unlock_check`].
 ///
 /// Returned after a successful platform biometric authentication
 /// (LAContext on iOS, BiometricPrompt on Android). The variant tells
@@ -79,7 +79,7 @@ pub struct EmergencyWipeStatus {
 ///   post-auth screen.
 /// - `PromptForDuressPin`: a duress PIN is configured, so the user
 ///   must enter the PIN — that PIN check determines `Normal` vs
-///   `Duress` mode via [`crate::api::Vauchi::authenticate`].
+///   `Duress` mode via [`crate::api::ProfileEngine::authenticate`].
 ///
 /// The dispatcher is constant-time: the wall-clock duration of the
 /// containing call is at least
@@ -97,7 +97,7 @@ pub enum BiometricUnlockOutcome {
     /// Biometric authentication succeeded but a duress PIN is
     /// configured — the frontend must present the PIN entry screen so
     /// the user enters either the real PIN or the duress PIN. The
-    /// subsequent [`crate::api::Vauchi::authenticate`] call sets the
+    /// subsequent [`crate::api::ProfileEngine::authenticate`] call sets the
     /// final [`crate::api::AuthMode`].
     PromptForDuressPin,
 }

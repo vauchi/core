@@ -13,7 +13,7 @@
 //! are indistinguishable from card updates on the wire (ADR-032 posture,
 //! same as reciprocity confirmations and safety alerts).
 
-use super::Vauchi;
+use super::ProfileEngine;
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::api::sync::RegistryReplyNeeded;
 use crate::rng::SecureRngExt;
@@ -21,7 +21,7 @@ use crate::storage::{PendingUpdate, UpdateStatus};
 use crate::sync::delta::VersionedPayload;
 use crate::sync::registry_activation::{ActivationState, RegistryAckPayload, RegistryPushPayload};
 
-impl Vauchi {
+impl ProfileEngine {
     /// Seal a payload into the stateless genesis envelope for a contact
     /// with no session and no registry (alerts and F4 handshake payloads).
     /// The initiator session is deliberately never persisted (ADR-064

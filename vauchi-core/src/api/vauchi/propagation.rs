@@ -9,7 +9,7 @@ use crate::rng::SecureRngExt;
 
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::VauchiEvent;
-use super::Vauchi;
+use super::ProfileEngine;
 
 /// One per-device ciphertext plus the session that produced it.
 pub(crate) struct PreparedDevicePayload {
@@ -34,7 +34,7 @@ impl PreparedDevicePayload {
     }
 }
 
-impl Vauchi {
+impl ProfileEngine {
     // === Card Propagation Operations ===
 
     /// Propagates own card update to all contacts.

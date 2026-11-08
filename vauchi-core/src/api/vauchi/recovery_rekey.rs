@@ -15,7 +15,7 @@ use crate::exchange::X3DHKeyPair;
 use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
 use crate::recovery::rekey::RekeyOffer;
 
-use super::Vauchi;
+use super::ProfileEngine;
 
 /// An unanswered offer goes out again after a day, with the same key.
 const REKEY_OFFER_RESEND_SECS: u64 = 86_400;
@@ -34,7 +34,7 @@ pub enum RekeyWait {
     NotAnswered,
 }
 
-/// What [`Vauchi::take_rekey_answer`] made of an answer.
+/// What [`ProfileEngine::take_rekey_answer`] made of an answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RekeyAnswerTaken {
     /// The contact with this id moved to the new relationship.
@@ -51,7 +51,7 @@ pub struct RekeyDelivery {
     pub blob: Vec<u8>,
 }
 
-impl Vauchi {
+impl ProfileEngine {
     /// The rekey offers due now: one for each contact waiting for its rekey
     /// whose offer has not gone out in the last day. None before this
     /// identity holds a complete recovery proof, and none from a duress

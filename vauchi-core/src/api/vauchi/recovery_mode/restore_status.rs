@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use super::Vauchi;
+use super::ProfileEngine;
 use crate::api::error::VauchiResult;
 use crate::backup::{guardian_backup_metadata, open_share_for_guardian, passphrase_layer};
 use crate::crypto::SigningKeyPair;
@@ -18,7 +18,7 @@ pub struct HandBackRestoreStatus {
     pub needs_passphrase: bool,
 }
 
-impl Vauchi {
+impl ProfileEngine {
     /// Reads identity-free hand-backs without creating a claim, changing
     /// its lifetime, writing storage or restoring an identity.
     /// Returns `None` outside identity-free recovery.

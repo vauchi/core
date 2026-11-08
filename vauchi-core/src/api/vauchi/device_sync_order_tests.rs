@@ -5,6 +5,7 @@
 //! Authenticated own-device delivery through the live receive seam.
 
 use super::*;
+use crate::api::Vauchi;
 use crate::api::sync::SyncEnvelope;
 use crate::crypto::SymmetricKey;
 use crate::identity::DeviceRegistry;

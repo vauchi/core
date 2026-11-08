@@ -224,13 +224,119 @@ const SMK_KEY_NAME: &str = "smk";
 
 /// Main API entry point for the Vauchi contact card system.
 ///
-/// Coordinates identity management, contact exchange, synchronization, and event dispatching.
+/// Holds the foreground profile's engine and forwards every call to it
+/// (ADR-080 point 2): the UI and every public read, export and event API see
+/// that one profile.
 ///
 /// Transport is type-erased (ADR-030): callers no longer need to carry a
 /// generic `<T: Transport>` through the call chain. `with_transport_factory()`
 /// is retained for call-site compatibility but does not invoke the factory —
 /// connection management will be handled separately.
 pub struct Vauchi {
+    foreground: ProfileEngine,
+}
+
+impl std::ops::Deref for Vauchi {
+    type Target = ProfileEngine;
+
+    fn deref(&self) -> &ProfileEngine {
+        &self.foreground
+    }
+}
+
+impl std::ops::DerefMut for Vauchi {
+    fn deref_mut(&mut self) -> &mut ProfileEngine {
+        &mut self.foreground
+    }
+}
+
+impl Vauchi {
+    /// Creates a new Vauchi instance with mock transport (for testing).
+    pub fn new(config: VauchiConfig) -> VauchiResult<Self> {
+        ProfileEngine::new(config).map(Self::from)
+    }
+
+    /// Creates a new Vauchi instance using SMK from SecureStorage for encryption.
+    ///
+    /// Boot flow (DP-1): Load SMK from SecureStorage → derive SEK → open Storage.
+    /// Falls back to `config.storage_key` if SMK is not found in SecureStorage.
+    pub fn with_secure_storage(
+        config: VauchiConfig,
+        secure_storage: Arc<dyn SecureStorage>,
+    ) -> VauchiResult<Self> {
+        ProfileEngine::with_secure_storage(config, secure_storage).map(Self::from)
+    }
+
+    /// Creates a new Vauchi instance with an explicit [`Clock`] and
+    /// optional [`SecureStorage`]; tests pass a `FakeClock`.
+    pub fn new_with(
+        config: VauchiConfig,
+        clock: Arc<dyn Clock>,
+        rng: Arc<dyn SecureRng>,
+        secure_storage: Option<Arc<dyn SecureStorage>>,
+    ) -> VauchiResult<Self> {
+        ProfileEngine::new_with(config, clock, rng, secure_storage).map(Self::from)
+    }
+
+    /// Creates a new Vauchi instance with in-memory storage (for testing).
+    pub fn in_memory() -> VauchiResult<Self> {
+        ProfileEngine::in_memory().map(Self::from)
+    }
+
+    /// In-memory Vauchi with an injected [`Clock`] (production
+    /// [`SecureRng`]).
+    pub fn in_memory_with_clock(clock: Arc<dyn Clock>) -> VauchiResult<Self> {
+        ProfileEngine::in_memory_with_clock(clock).map(Self::from)
+    }
+
+    /// In-memory Vauchi with both seams injected; pass `FakeClock` and
+    /// `DeterministicRng` for a deterministic fixture.
+    pub fn in_memory_with_clock_and_rng(
+        clock: Arc<dyn Clock>,
+        rng: Arc<dyn SecureRng>,
+    ) -> VauchiResult<Self> {
+        ProfileEngine::in_memory_with_clock_and_rng(clock, rng).map(Self::from)
+    }
+
+    /// Replaces the [`Sleeper`]. Test-only: a `FakeSleeper` in a production
+    /// binary erases the `BIOMETRIC_UNLOCK_MIN_DURATION` floor that defends
+    /// against the duress side-channel.
+    #[must_use]
+    pub fn with_sleeper(self, sleeper: Arc<dyn Sleeper>) -> Self {
+        self.foreground.with_sleeper(sleeper).into()
+    }
+
+    /// Replaces the [`MonotonicClock`]. Test-only: tests inject a
+    /// `FakeMonotonicClock` to advance timeouts without waiting.
+    #[must_use]
+    pub fn with_monotonic(self, monotonic: Arc<dyn MonotonicClock>) -> Self {
+        self.foreground.with_monotonic(monotonic).into()
+    }
+
+    /// Replaces the pacing of requests to the outer relay; call after
+    /// `with_sleeper` and `with_monotonic`, which rebuild it.
+    #[cfg(feature = "network-http")]
+    #[must_use]
+    pub fn with_ohttp_pacer(self, pacer: Arc<crate::network::request_pacer::RequestPacer>) -> Self {
+        self.foreground.with_ohttp_pacer(pacer).into()
+    }
+}
+
+impl Vauchi {
+    /// Whether a guardian backup needs the recovery passphrase to open.
+    pub fn guardian_backup_needs_passphrase(backup_data: &str) -> bool {
+        ProfileEngine::guardian_backup_needs_passphrase(backup_data)
+    }
+}
+
+impl From<ProfileEngine> for Vauchi {
+    fn from(foreground: ProfileEngine) -> Self {
+        Vauchi { foreground }
+    }
+}
+
+/// One profile's identity, storage, events and sync state (ADR-080 point 1).
+pub struct ProfileEngine {
     /// Another of the identity's devices told this one to wipe (#916);
     /// set while sync items are applied, acted on by `apply_pending_wipe`.
     wipe_requested: std::sync::atomic::AtomicBool,
@@ -311,9 +417,9 @@ pub struct Vauchi {
     last_emergency_broadcast_unix_seconds: Option<u64>,
 }
 
-impl Vauchi {
+impl ProfileEngine {
     /// Creates a new Vauchi instance with mock transport (for testing).
-    pub fn new(config: VauchiConfig) -> VauchiResult<Self> {
+    pub(crate) fn new(config: VauchiConfig) -> VauchiResult<Self> {
         Self::init(config, None, None, None)
     }
 
@@ -321,7 +427,7 @@ impl Vauchi {
     ///
     /// Boot flow (DP-1): Load SMK from SecureStorage → derive SEK → open Storage.
     /// Falls back to `config.storage_key` if SMK is not found in SecureStorage.
-    pub fn with_secure_storage(
+    pub(crate) fn with_secure_storage(
         config: VauchiConfig,
         secure_storage: Arc<dyn SecureStorage>,
     ) -> VauchiResult<Self> {
@@ -337,7 +443,7 @@ impl Vauchi {
     /// [`SystemClock::shared`] internally. Tests pass a `FakeClock` so
     /// the state machine becomes a deterministic function of
     /// `(state, input)` — the headline goal of the program.
-    pub fn new_with(
+    pub(crate) fn new_with(
         config: VauchiConfig,
         clock: Arc<dyn Clock>,
         rng: Arc<dyn SecureRng>,
@@ -435,7 +541,7 @@ impl Vauchi {
             _ => None,
         };
 
-        let mut wb = Vauchi {
+        let mut wb = ProfileEngine {
             config,
             identity,
             storage,
@@ -533,7 +639,7 @@ impl Vauchi {
     /// behind `#[cfg(any(test, feature = "testing"))]` (the
     /// `FakeSleeper` type itself is already gated that way).
     #[must_use]
-    pub fn with_sleeper(mut self, sleeper: Arc<dyn Sleeper>) -> Self {
+    pub(crate) fn with_sleeper(mut self, sleeper: Arc<dyn Sleeper>) -> Self {
         self.sleeper = sleeper;
         self.rebuild_ohttp_pacer();
         self
@@ -555,7 +661,7 @@ impl Vauchi {
     /// deadline, and retry-window time deterministically without real
     /// wall-clock waits.
     #[must_use]
-    pub fn with_monotonic(mut self, monotonic: Arc<dyn MonotonicClock>) -> Self {
+    pub(crate) fn with_monotonic(mut self, monotonic: Arc<dyn MonotonicClock>) -> Self {
         self.monotonic = monotonic;
         self.rebuild_ohttp_pacer();
         self
@@ -564,7 +670,7 @@ impl Vauchi {
     /// Replaces the pacing of requests to the outer relay; call after
     /// `with_sleeper` and `with_monotonic`, which rebuild it.
     #[cfg(feature = "network-http")]
-    pub fn with_ohttp_pacer(
+    pub(crate) fn with_ohttp_pacer(
         mut self,
         pacer: Arc<crate::network::request_pacer::RequestPacer>,
     ) -> Self {
@@ -636,14 +742,14 @@ impl Vauchi {
     }
 
     /// Creates a new Vauchi instance with in-memory storage (for testing).
-    pub fn in_memory() -> VauchiResult<Self> {
+    pub(crate) fn in_memory() -> VauchiResult<Self> {
         Self::in_memory_with_clock_and_rng(SystemClock::shared(), OsSecureRng::shared())
     }
 
     /// In-memory Vauchi with an injected [`Clock`] (production
     /// [`SecureRng`]). Use for tests that need `FakeClock` but
     /// keep ambient OS entropy.
-    pub fn in_memory_with_clock(clock: Arc<dyn Clock>) -> VauchiResult<Self> {
+    pub(crate) fn in_memory_with_clock(clock: Arc<dyn Clock>) -> VauchiResult<Self> {
         Self::in_memory_with_clock_and_rng(clock, OsSecureRng::shared())
     }
 
@@ -652,7 +758,7 @@ impl Vauchi {
     /// program. Pass `FakeClock` + `DeterministicRng` for a fully
     /// deterministic `(state, input) -> (state, output)` test
     /// fixture.
-    pub fn in_memory_with_clock_and_rng(
+    pub(crate) fn in_memory_with_clock_and_rng(
         clock: Arc<dyn Clock>,
         rng: Arc<dyn SecureRng>,
     ) -> VauchiResult<Self> {
@@ -660,7 +766,7 @@ impl Vauchi {
         let storage = Storage::in_memory(storage_key.clone())?.with_clock(clock.clone());
         let events = Arc::new(EventDispatcher::new());
 
-        Ok(Vauchi {
+        Ok(ProfileEngine {
             // Config must name the key `Storage` is actually using. Leaving it
             // unset made `config().storage_key` disagree with reality, so
             // anything reading it — device-link persistence — failed to build

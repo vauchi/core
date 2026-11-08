@@ -9,9 +9,9 @@ use crate::backup::snapshot::{self, BackupSnapshot};
 use crate::card::ContactCard;
 use crate::identity::Identity;
 
-use super::Vauchi;
+use super::ProfileEngine;
 
-impl Vauchi {
+impl ProfileEngine {
     /// Exports an encrypted v6 password backup, including sharing choices.
     ///
     /// Returns hex-encoded bytes. Readers predating v6 reject this format.

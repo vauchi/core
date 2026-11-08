@@ -41,7 +41,7 @@ use base64::Engine;
 use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use super::Vauchi;
+use super::ProfileEngine;
 use crate::api::contact_manager::ContactManager;
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::card::ContactCard;
@@ -142,7 +142,7 @@ fn decode_payload_b64(b64: &str) -> VauchiResult<Vec<u8>> {
 
 // ── Vauchi methods ────────────────────────────────────────────────
 
-impl Vauchi {
+impl ProfileEngine {
     /// Starts a relay-mediated contact exchange as the initiator.
     ///
     /// Posts an offer containing our public keys and display name to the

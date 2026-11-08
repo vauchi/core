@@ -40,7 +40,7 @@ pub const PERIODIC_SYNC_MAX_RETRIES: u32 = 3;
 use super::ohttp_key_error::should_refetch_key_and_retry;
 use super::receive_context::ReceiveContext;
 use super::receive_routing::{incoming_update_events, process_received_blobs_with_routes};
-use super::{Vauchi, VauchiSyncOutcome};
+use super::{ProfileEngine, VauchiSyncOutcome};
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::api::send_phase::SendPhase;
 use crate::contact::Contact;
@@ -54,7 +54,7 @@ use crate::network::{
 };
 use crate::rng::SecureRngExt;
 
-impl Vauchi {
+impl ProfileEngine {
     /// Perform a bidirectional sync: receive pending messages, send outgoing updates.
     ///
     /// Must call `connect()` first to bootstrap the OHTTP key.
@@ -1401,6 +1401,7 @@ fn merge_pins(target: &mut Vec<PinnedCertificate>, source: &[PinnedCertificate])
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api::Vauchi;
 
     // @internal
     #[test]

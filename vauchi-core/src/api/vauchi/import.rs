@@ -14,7 +14,7 @@ use crate::contact_card::vcard_import::import_vcf;
 use crate::rng::SecureRngExt;
 
 use super::super::error::{VauchiError, VauchiResult};
-use super::Vauchi;
+use super::ProfileEngine;
 
 /// Reason a single vCard entry was skipped (G6 of the pure-renderer
 /// remediation — ADR tracks at `_private/docs/problems/2026-04-16-frontend-pure-renderer-violations/`).
@@ -79,7 +79,7 @@ pub struct ImportResult {
     pub warnings: Vec<ImportWarning>,
 }
 
-impl Vauchi {
+impl ProfileEngine {
     /// Imports contacts from vCard data (supports 2.1 / 3.0 / 4.0, multi-contact files).
     ///
     /// Each successfully parsed vCard becomes an imported [`Contact`] stored

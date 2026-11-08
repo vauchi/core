@@ -16,9 +16,9 @@ use crate::network::mailbox_token::current_day_epoch;
 use crate::sync::delta::encode_resync_request;
 
 use super::super::error::{VauchiError, VauchiResult};
-use super::Vauchi;
+use super::ProfileEngine;
 
-impl Vauchi {
+impl ProfileEngine {
     /// Asks every exchanged contact this device can reach to repropagate
     /// its visible card. Returns how many contacts were asked; a contact
     /// with no session yet, like a blocked one, is skipped.

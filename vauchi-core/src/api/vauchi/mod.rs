@@ -44,6 +44,8 @@ mod receive_context;
 mod receive_routing;
 #[cfg(feature = "network-http")]
 mod receive_tokens_ahead;
+#[cfg(feature = "network-http")]
+pub use receive_tokens_ahead::RegistrationDay;
 mod reciprocity_send;
 #[cfg(feature = "network-http")]
 mod recovery;

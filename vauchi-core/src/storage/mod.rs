@@ -75,8 +75,7 @@ pub use stores::{
 #[cfg(any(test, feature = "testing"))]
 pub use secure::MemoryKeyStorage;
 
-#[cfg(feature = "network-http")]
-pub use stores::{ReceiveTokenStore, RegistrationDay};
+pub use stores::ReceiveTokenStore;
 
 pub use contact_move::{CONTACT_REFERENCES, ContactReference};
 #[cfg(feature = "testing")]

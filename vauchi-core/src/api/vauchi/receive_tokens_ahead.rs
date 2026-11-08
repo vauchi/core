@@ -7,10 +7,16 @@
 //! shared key, which also starts new ratchet sessions, or the master seed
 //! (owner 2026-11-08, vauchi/private#1093 slice 5).
 
+use std::collections::{BTreeSet, HashMap};
+
+use serde::{Deserialize, Serialize};
+use zeroize::Zeroizing;
+
 use crate::contact::Contact;
 use crate::identity::Identity;
+use crate::network::mailbox_context::MailboxRoute;
 use crate::network::mailbox_token::{current_day_epoch, padded_registration_set};
-use crate::storage::RegistrationDay;
+use crate::storage::StorageError;
 
 use super::super::VauchiResult;
 use super::ProfileEngine;
@@ -20,7 +26,44 @@ use super::receive_context::registered_mailboxes;
 /// last unlocked sync stops receiving until the next one.
 const DAYS_AHEAD: u64 = 14;
 
+/// One day's receive registration: the padded batches, before the shuffle,
+/// and what each real token routes to.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RegistrationDay {
+    batches: Vec<Vec<String>>,
+    routes: HashMap<String, MailboxRoute>,
+}
+
+impl RegistrationDay {
+    /// The padded batches the day registers, each in a fixed order; a
+    /// caller shuffles them before sending.
+    pub fn batches(&self) -> &[Vec<String>] {
+        &self.batches
+    }
+
+    /// The contacts the day's tokens receive from.
+    pub fn contact_ids(&self) -> BTreeSet<&str> {
+        self.routes
+            .values()
+            .filter_map(|route| match route {
+                MailboxRoute::Contact { id, .. } => Some(id.as_str()),
+                MailboxRoute::DeviceSync { .. } => None,
+            })
+            .collect()
+    }
+}
+
 impl ProfileEngine {
+    /// The receive registration stored ahead for `day`, if any.
+    pub fn receive_registration_ahead(&self, day: u64) -> VauchiResult<Option<RegistrationDay>> {
+        let Some(bytes) = self.storage.receive_tokens().load_day(day)? else {
+            return Ok(None);
+        };
+        serde_json::from_slice(&bytes)
+            .map(Some)
+            .map_err(|e| StorageError::Serialization(e.to_string()).into())
+    }
+
     /// Best-effort: a failure leaves the days stored by an earlier sync,
     /// and the next sync retries.
     pub(super) fn store_receive_tokens_ahead(&self, identity: &Identity, contacts: &[Contact]) {
@@ -47,17 +90,35 @@ impl ProfileEngine {
                 let context = registered_mailboxes(identity, contacts, &self.config.relay, &[day]);
                 let tokens = context.routes.keys().cloned().collect();
                 let batches = padded_registration_set(identity.master_seed(), day, tokens);
-                (day, RegistrationDay::new(batches, context.routes))
+                (
+                    day,
+                    RegistrationDay {
+                        batches,
+                        routes: context.routes,
+                    },
+                )
             })
             .collect();
-        let store = self.storage.receive_tokens();
         // Unchanged contacts give an unchanged today, so a sync within the
         // same day rewrites nothing.
-        let today_unchanged = store.load_day(today)?.as_ref() == days.first().map(|(_, d)| d);
-        if today_unchanged && store.load_day(today + DAYS_AHEAD - 1)?.is_some() {
+        let today_unchanged =
+            self.receive_registration_ahead(today)?.as_ref() == days.first().map(|(_, d)| d);
+        if today_unchanged
+            && self
+                .receive_registration_ahead(today + DAYS_AHEAD - 1)?
+                .is_some()
+        {
             return Ok(());
         }
-        store.replace_days(&days)?;
+        let sealed = days
+            .iter()
+            .map(|(day, registration)| {
+                serde_json::to_vec(registration)
+                    .map(|bytes| (*day, Zeroizing::new(bytes)))
+                    .map_err(|e| StorageError::Serialization(e.to_string()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        self.storage.receive_tokens().replace_days(&sealed)?;
         Ok(())
     }
 }

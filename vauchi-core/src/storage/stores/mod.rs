@@ -36,8 +36,6 @@ mod pending;
 mod pin_cache;
 mod place;
 pub(super) mod ratchet;
-// Its routes come from the HTTP receive path.
-#[cfg(feature = "network-http")]
 mod receive_tokens;
 mod recovery;
 mod registry_activation;
@@ -73,8 +71,7 @@ pub use pending::PendingStore;
 pub use pin_cache::PinCacheStore;
 pub use place::PlaceStore;
 pub use ratchet::RatchetStore;
-#[cfg(feature = "network-http")]
-pub use receive_tokens::{ReceiveTokenStore, RegistrationDay};
+pub use receive_tokens::ReceiveTokenStore;
 pub use recovery::RecoveryStore;
 pub use replay::ReplayStore;
 pub use retry::RetryStore;

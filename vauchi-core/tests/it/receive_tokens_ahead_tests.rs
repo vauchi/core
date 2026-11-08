@@ -139,9 +139,7 @@ fn a_sync_stores_today_exactly_the_batches_it_registered() {
     sync(&mut alice);
 
     let stored = alice
-        .storage()
-        .receive_tokens()
-        .load_day(today(&relays))
+        .receive_registration_ahead(today(&relays))
         .unwrap()
         .expect("today is stored");
     let chunks = fetched_chunks(&relays.outer);
@@ -177,12 +175,16 @@ fn the_next_fourteen_days_are_stored_and_no_more() {
 
     sync(&mut alice);
 
-    let store = alice.storage().receive_tokens();
     let first = today(&relays);
     let last = first + DAYS_AHEAD - 1;
-    assert!(store.load_day(first).unwrap().is_some());
-    assert!(store.load_day(last).unwrap().is_some());
-    assert!(store.load_day(last + 1).unwrap().is_none());
+    assert!(alice.receive_registration_ahead(first).unwrap().is_some());
+    assert!(alice.receive_registration_ahead(last).unwrap().is_some());
+    assert!(
+        alice
+            .receive_registration_ahead(last + 1)
+            .unwrap()
+            .is_none()
+    );
 }
 
 // @internal
@@ -204,12 +206,7 @@ fn a_new_contact_is_in_the_stored_days_after_the_next_sync() {
     sync(&mut alice);
 
     let last = today(&relays) + DAYS_AHEAD - 1;
-    let stored = alice
-        .storage()
-        .receive_tokens()
-        .load_day(last)
-        .unwrap()
-        .unwrap();
+    let stored = alice.receive_registration_ahead(last).unwrap().unwrap();
     assert_eq!(
         stored.contact_ids(),
         BTreeSet::from([linked.peer_contact_id.as_str()])
@@ -283,9 +280,7 @@ fn without_a_receive_key_nothing_is_stored_ahead() {
 
     assert!(
         alice
-            .storage()
-            .receive_tokens()
-            .load_day(today(&relays))
+            .receive_registration_ahead(today(&relays))
             .unwrap()
             .is_none()
     );
@@ -305,9 +300,7 @@ fn no_stored_token_is_readable_on_disk() {
         );
         sync(&mut alice);
         alice
-            .storage()
-            .receive_tokens()
-            .load_day(today(&relays))
+            .receive_registration_ahead(today(&relays))
             .unwrap()
             .unwrap()
             .batches()[0][0]

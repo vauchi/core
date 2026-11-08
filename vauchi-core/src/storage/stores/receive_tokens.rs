@@ -5,48 +5,16 @@
 //! Receive registrations stored ahead under the Background Receive Key, so
 //! a locked phone can fetch without a contact's shared key or the master
 //! seed (owner 2026-11-08, vauchi/private#1093 slice 5).
-
-use std::collections::{BTreeSet, HashMap};
+//!
+//! The store keeps each day as sealed bytes. What a day holds belongs to
+//! the receive path, so storage does not depend on network (VRS06).
 
 use rusqlite::{Connection, OptionalExtension, params};
-use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
 use crate::crypto::{SymmetricKey, decrypt, encrypt, kdf::HKDF};
-use crate::network::mailbox_context::MailboxRoute;
 
 use super::super::{Storage, StorageError};
-
-/// One day's receive registration: the padded batches, before the shuffle,
-/// and what each real token routes to.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RegistrationDay {
-    batches: Vec<Vec<String>>,
-    routes: HashMap<String, MailboxRoute>,
-}
-
-impl RegistrationDay {
-    pub(crate) fn new(batches: Vec<Vec<String>>, routes: HashMap<String, MailboxRoute>) -> Self {
-        Self { batches, routes }
-    }
-
-    /// The padded batches the day registers, each in a fixed order; a
-    /// caller shuffles them before sending.
-    pub fn batches(&self) -> &[Vec<String>] {
-        &self.batches
-    }
-
-    /// The contacts the day's tokens receive from.
-    pub fn contact_ids(&self) -> BTreeSet<&str> {
-        self.routes
-            .values()
-            .filter_map(|route| match route {
-                MailboxRoute::Contact { id, .. } => Some(id.as_str()),
-                MailboxRoute::DeviceSync { .. } => None,
-            })
-            .collect()
-    }
-}
 
 /// Scoped persistence view for the receive registrations stored ahead.
 pub struct ReceiveTokenStore<'a> {
@@ -56,11 +24,11 @@ pub struct ReceiveTokenStore<'a> {
 
 impl Storage {
     /// Scoped persistence view for the receive registrations stored ahead.
-    pub fn receive_tokens(&self) -> ReceiveTokenStore<'_> {
-        ReceiveTokenStore {
+    pub fn receive_tokens(&self) -> crate::storage::Sealed<'_, ReceiveTokenStore<'_>> {
+        self.sealed(ReceiveTokenStore {
             conn: &self.conn,
             receive_key: self.receive_key(),
-        }
+        })
     }
 }
 
@@ -76,7 +44,7 @@ impl ReceiveTokenStore<'_> {
     }
 
     /// The registration stored for `day`, if any.
-    pub fn load_day(&self, day: u64) -> Result<Option<RegistrationDay>, StorageError> {
+    pub fn load_day(&self, day: u64) -> Result<Option<Zeroizing<Vec<u8>>>, StorageError> {
         let sealed: Option<Vec<u8>> = self
             .conn
             .query_row(
@@ -88,18 +56,17 @@ impl ReceiveTokenStore<'_> {
         let Some(sealed) = sealed else {
             return Ok(None);
         };
-        let plain = Zeroizing::new(
-            decrypt(&day_key(self.key()?, day), &sealed)
-                .map_err(|e| StorageError::Encryption(e.to_string()))?,
-        );
-        serde_json::from_slice(&plain)
-            .map(Some)
-            .map_err(|e| StorageError::Serialization(e.to_string()))
+        decrypt(&day_key(self.key()?, day), &sealed)
+            .map(|plain| Some(Zeroizing::new(plain)))
+            .map_err(|e| StorageError::Encryption(e.to_string()))
     }
 
     /// Replaces the stored days with `days`, dropping every day before the
     /// first one, in one transaction.
-    pub(crate) fn replace_days(&self, days: &[(u64, RegistrationDay)]) -> Result<(), StorageError> {
+    pub(crate) fn replace_days(
+        &self,
+        days: &[(u64, Zeroizing<Vec<u8>>)],
+    ) -> Result<(), StorageError> {
         let key = self.key()?;
         let Some(first) = days.iter().map(|(day, _)| *day).min() else {
             return Ok(());
@@ -110,11 +77,7 @@ impl ReceiveTokenStore<'_> {
             params![first as i64],
         )?;
         for (day, registration) in days {
-            let plain = Zeroizing::new(
-                serde_json::to_vec(registration)
-                    .map_err(|e| StorageError::Serialization(e.to_string()))?,
-            );
-            let sealed = encrypt(&day_key(key, *day), &plain)
+            let sealed = encrypt(&day_key(key, *day), registration)
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
             tx.execute(
                 "INSERT OR REPLACE INTO receive_tokens_ahead (day, registration_encrypted)

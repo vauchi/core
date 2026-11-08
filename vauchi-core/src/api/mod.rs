@@ -187,5 +187,6 @@ pub use vauchi::{
 #[cfg(feature = "network-http")]
 pub use vauchi::{
     FetchPath, LinkExchange, LinkExchangeProgress, PERIODIC_SYNC_INTERVAL_SECONDS,
-    PERIODIC_SYNC_MAX_RETRIES, RekeyOfferTaken, RelayExchangeOffer, RelayExchangeResult,
+    PERIODIC_SYNC_MAX_RETRIES, RegistrationDay, RekeyOfferTaken, RelayExchangeOffer,
+    RelayExchangeResult,
 };

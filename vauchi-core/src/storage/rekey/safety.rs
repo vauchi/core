@@ -96,7 +96,7 @@ impl Storage {
             |row| Ok((row.get(0)?,)),
         );
 
-        if let Ok((Some(enc),)) = result
+        if let Some((Some(enc),)) = result.optional()?
             && !enc.is_empty()
         {
             let plain = decrypt(old_key, &enc)
@@ -147,7 +147,7 @@ impl Storage {
             },
         );
 
-        if let Ok((
+        if let Some((
             id,
             aha_enc,
             demo_enc,
@@ -158,7 +158,7 @@ impl Storage {
             own_card_repropagate_enc,
             exchange_defaults_enc,
             relay_anchor_enc,
-        )) = result
+        )) = result.optional()?
         {
             if let Some(enc) = aha_enc
                 && !enc.is_empty()
@@ -358,7 +358,7 @@ impl Storage {
             |row| Ok((row.get(0)?, row.get(1)?)),
         );
 
-        if let Ok((ids_enc, msg_enc)) = result {
+        if let Some((ids_enc, msg_enc)) = result.optional()? {
             if let Some(enc) = ids_enc
                 && !enc.is_empty()
             {
@@ -405,7 +405,7 @@ impl Storage {
             |row| Ok((row.get(0)?,)),
         );
 
-        if let Ok((Some(enc),)) = result
+        if let Some((Some(enc),)) = result.optional()?
             && !enc.is_empty()
         {
             let plain = decrypt(old_key, &enc).map_err(|e| {
@@ -436,7 +436,7 @@ impl Storage {
             |row| Ok((row.get(0)?,)),
         );
 
-        if let Ok((Some(enc),)) = result
+        if let Some((Some(enc),)) = result.optional()?
             && !enc.is_empty()
         {
             let plain = decrypt(old_key, &enc).map_err(|e| {

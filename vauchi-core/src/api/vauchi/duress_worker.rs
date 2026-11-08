@@ -72,7 +72,13 @@ impl ProfileEngine {
         else {
             return Ok(None);
         };
-        let storage = Storage::open(path, key)?.with_clock(self.clock.clone());
+        let mut storage = Storage::open(path, key)?.with_clock(self.clock.clone());
+        // The real profile's ratchets are under the Background Receive Key
+        // (vauchi/private#1093), so the worker's storage needs it as every
+        // other open of the real profile gets it.
+        if let Some(secure) = &self.secure_storage {
+            super::storage_keys::attach_background_receive_key(&mut storage, secure.as_ref());
+        }
         let identity = storage
             .identity()
             .load_identity()?

@@ -5,4 +5,4 @@
 # Core's let_underscore_must_use allows, held by
 # scripts/check-ignored-results.sh (vauchi/private#747). Lower it in the
 # MR that removes allows; never raise it.
-85
+84

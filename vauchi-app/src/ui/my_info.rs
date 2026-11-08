@@ -567,6 +567,20 @@ impl WorkflowEngine for MyInfoEngine {
             MyInfoViewMode::PreviewAs { .. } => unreachable!("handled above"),
         });
 
+        if self.own_fields.is_empty() && self.show_exchange_prompt {
+            components.push(Component::ActionList {
+                id: "empty_card_actions".into(),
+                items: vec![ActionListItem {
+                    id: "add_field".into(),
+                    label: self.t("my_info.add_entry_button"),
+                    icon: None,
+                    detail: None,
+                    a11y: None,
+                    info_key: None,
+                }],
+            });
+        }
+
         components.extend(self.sync_status_components());
 
         let actions = self.build_actions();

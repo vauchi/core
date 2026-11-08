@@ -103,3 +103,54 @@ fn the_mask_profile_does_not_open_under_the_storage_key() {
         Err(vauchi_core::storage::StorageError::Encryption(_))
     ));
 }
+
+fn decoy_names(storage: &Storage) -> Vec<String> {
+    let mut names: Vec<String> = storage
+        .decoy()
+        .load_decoy_contacts()
+        .unwrap()
+        .into_iter()
+        .map(|(_, name, _)| name)
+        .collect();
+    names.sort();
+    names
+}
+
+// @scenario: duress_mode :: Decoy profile has separate database
+#[test]
+fn a_lent_mask_profile_seals_its_writes_into_the_file_and_the_lender_refuses_mask_writes() {
+    let disk = OnDisk::new();
+    let mut real = disk.real();
+    let lent = real.lend_mask_profile().unwrap();
+
+    lent.decoy()
+        .save_decoy_contact("decoy-dana", "Decoy Dana", &ContactCard::new("Decoy Dana"))
+        .unwrap();
+    let through_the_lender =
+        real.decoy()
+            .save_decoy_contact("decoy-eve", "Decoy Eve", &ContactCard::new("Decoy Eve"));
+
+    assert!(matches!(
+        through_the_lender,
+        Err(vauchi_core::storage::StorageError::InvalidData(_))
+    ));
+    assert_eq!(decoy_names(&disk.mask()), ["Decoy Dana"]);
+}
+
+// @scenario: duress_mode :: Decoy profile has separate database
+#[test]
+fn an_in_memory_database_takes_a_lent_mask_profile_back_with_its_writes() {
+    let key = SymmetricKey::generate();
+    let mut real = Storage::in_memory(key).unwrap();
+    let lent = real.lend_mask_profile().unwrap();
+    lent.decoy()
+        .save_decoy_contact("decoy-dana", "Decoy Dana", &ContactCard::new("Decoy Dana"))
+        .unwrap();
+
+    real.take_back_mask_profile(lent).unwrap();
+    real.decoy()
+        .save_decoy_contact("decoy-eve", "Decoy Eve", &ContactCard::new("Decoy Eve"))
+        .unwrap();
+
+    assert_eq!(decoy_names(&real), ["Decoy Dana", "Decoy Eve"]);
+}

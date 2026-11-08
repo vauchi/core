@@ -98,7 +98,7 @@ include:
 # fail-fast off: a merge request changing the models, the nightly and
 # release tags (vauchi/private#1115). A rules list replaces the
 # template's, so the other rules repeat rust-base.yml's at the pinned ref;
-# check:formal-triggers holds the first rule's paths to the job's.
+# check:ci-self-tests (formal-triggers) holds the first rule's paths to the job's.
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -246,18 +246,20 @@ check:vendor-locales:
         - .gitlab-ci.yml
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
-# The formal jobs run on a merge request only when it changes what they
-# check, so a trigger path that misses a harness or a model lets a broken
-# proof merge until the nightly (vauchi/private#1032; the Shamir and delta
-# harnesses and the device-link Quint model were outside the paths, #950).
-# Seconds of grep, so it runs on every merge request.
-check:formal-triggers:
+# CI self-tests that need only alpine's sh, in one job: each was a job of
+# its own, and on allyson a docker job spends ~27 s in setup for ~10 s of
+# script (vauchi/private#1179). ci/run-ci-self-tests.sh runs every test even
+# after one fails and names each failure. formal-triggers is among them: the
+# formal jobs run on a merge request only when it changes what they check,
+# so a trigger path that misses a harness or a model lets a broken proof
+# merge until the nightly (vauchi/private#1032; #950).
+check:ci-self-tests:
   stage: lint
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
   tags: [docker]
   needs: []
   script:
-    - sh ci/tests/formal-triggers.test.sh
+    - sh ci/run-ci-self-tests.sh
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -325,17 +327,6 @@ check:ignored-results:
         - scripts/check-ignored-results.sh
         - ci/tests/ignored-results-ratchet.test.sh
         - .gitlab-ci.yml
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-check:auto-tag-order:
-  stage: lint
-  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
-  tags: [docker]
-  needs: []
-  script:
-    - sh ci/tests/auto-tag-order.test.sh
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 check:consumer-pins-bump:
@@ -426,90 +417,12 @@ open:follow-ups:
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
 
-check:windows-trigger-safety:
-  stage: lint
-  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
-  tags: [docker]
-  needs: []
-  script:
-    - sh ci/tests/windows-trigger-mr.test.sh
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-check:swift-bindings-timeout:
-  stage: lint
-  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
-  tags: [docker]
-  needs: []
-  script:
-    - sh ci/tests/swift-bindings-timeout.test.sh
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
 check:binding-validation-contract:
   stage: lint
   extends: [.linux-runner-nocache, .timeout-quick]
   needs: []
   script:
     - sh ci/tests/validate-bindings-contract.test.sh
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-check:packaging-matrix-isolation:
-  stage: lint
-  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
-  tags: [docker]
-  needs: []
-  script:
-    - sh ci/tests/packaging-matrix-isolation.test.sh
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-check:security-provenance:
-  stage: lint
-  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
-  tags: [docker]
-  needs: []
-  script:
-    - sh ci/tests/security-provenance.test.sh
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-check:fuzz-security:
-  stage: lint
-  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
-  tags: [docker]
-  needs: []
-  script:
-    - sh ci/tests/fuzz-security.test.sh
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-check:mutation-nightly-budget:
-  stage: lint
-  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
-  tags: [docker]
-  needs: []
-  script:
-    - sh ci/tests/mutation-nightly-budget.test.sh
-    - sh ci/tests/mutation-nightly-exit-codes.test.sh
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-check:coverage-features:
-  stage: lint
-  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
-  tags: [docker]
-  needs: []
-  script:
-    - sh ci/tests/coverage-features.test.sh
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -1049,7 +962,7 @@ test:core-32bit:
 # hand-written and read no Rust, so a Rust change does not start them.
 # Before the split one job ran both on every trigger, 32 to 51 minutes,
 # and half its runs were lockfile-only changes that no model reads.
-# check:formal-triggers holds both path lists to the files they check;
+# check:ci-self-tests (formal-triggers) holds both path lists to the files they check;
 # the slow models run in test:formal-extended below (private#842).
 test:formal-code:
   extends: [.timeout-long]
@@ -1187,18 +1100,6 @@ test:e2e-smoke:
           - vauchi-core/src/sync/**/*
           - vauchi-protocol/**/*
           - Cargo.lock
-
-# The contract of test:e2e-smoke and the downstream matrices.
-check:e2e-smoke:
-  stage: lint
-  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
-  tags: [docker]
-  needs: []
-  script:
-    - sh ci/tests/e2e-smoke.test.sh
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 test:cucumber:
   # .timeout-cold-rebuild: compiles the full workspace before running

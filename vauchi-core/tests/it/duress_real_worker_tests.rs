@@ -13,6 +13,7 @@ use std::time::{Duration, Instant, UNIX_EPOCH};
 use crate::common::linked_peer::link_contacts;
 use crate::common::mock_relay::MockRelay;
 use crate::common::signed_gateway::{NOW, SignedGateway};
+use vauchi_core::activity_log::RETENTION_SECS;
 use vauchi_core::api::{AuthMode, Vauchi, VauchiConfig, VauchiSyncOutcome};
 use vauchi_core::clock::FakeClock;
 use vauchi_core::contact_card::{ContactField, FieldType};
@@ -189,4 +190,27 @@ fn the_cover_a_duress_edit_owes_leaves_with_the_workers_sync() {
 
     assert_eq!(real, 1);
     assert_eq!(duress, real);
+}
+
+// @scenario: duress_mode :: Duress mode with notification
+#[test]
+fn what_the_worker_received_is_in_the_real_activity_log_and_never_notifies() {
+    let mut world = world(DURESS_PIN, AuthMode::Duress);
+
+    bob_shares_an_email(&mut world.bob, &world.linked.host_contact_id);
+    sync(&mut world.alice);
+    drop(world.alice);
+
+    let mut real = world.alice_install.open(&world.relays);
+    assert_eq!(real.authenticate(APP_PIN).unwrap(), AuthMode::Normal);
+    let log = real.storage().activity_log();
+    let from_bob: Vec<String> = log
+        .activity_log_query_recent(NOW, RETENTION_SECS)
+        .unwrap()
+        .into_iter()
+        .filter(|row| row.contact_id.as_deref() == Some(world.linked.peer_contact_id.as_str()))
+        .map(|row| row.category)
+        .collect();
+    assert_eq!(from_bob, vec!["card_update_received".to_string()]);
+    assert_eq!(log.claim_notifications().unwrap().len(), 0);
 }

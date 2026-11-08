@@ -73,13 +73,14 @@ impl Install {
     }
 }
 
-fn sync(client: &mut Vauchi) {
+fn sync(client: &mut Vauchi) -> VauchiSyncOutcome {
     client.set_next_sync_allowed(Instant::now());
     let outcome = client.sync().unwrap();
     assert!(
         matches!(&outcome, VauchiSyncOutcome::Ok { errors, .. } if errors.is_empty()),
         "{outcome:?}"
     );
+    outcome
 }
 
 /// Bob shares an email with Alice and sends it.
@@ -106,9 +107,18 @@ fn card_values(alice: &Vauchi, bob_at_alice: &str) -> Vec<String> {
         .collect()
 }
 
-// @scenario: duress_mode :: Duress mode with notification
-#[test]
-fn a_real_update_received_under_duress_is_applied_and_reaches_no_foreground_event() {
+/// Alice, with an app password and a duress PIN, linked to Bob; both on
+/// file-backed installs, Alice unlocked with `credential`.
+struct World {
+    relays: Relays,
+    alice_install: Install,
+    alice: Vauchi,
+    _bob_install: Install,
+    bob: Vauchi,
+    linked: crate::common::linked_peer::LinkedPeer,
+}
+
+fn world(credential: &str, expected_mode: AuthMode) -> World {
     let relays = Relays::start();
     let alice_install = Install::new();
     let mut alice = alice_install.open(&relays);
@@ -119,22 +129,64 @@ fn a_real_update_received_under_duress_is_applied_and_reaches_no_foreground_even
     let linked = link_contacts(&alice, &bob, "Bob");
     alice.setup_app_password(APP_PIN).unwrap();
     alice.setup_duress_password(DURESS_PIN).unwrap();
-    assert_eq!(alice.authenticate(DURESS_PIN).unwrap(), AuthMode::Duress);
+    assert_eq!(alice.authenticate(credential).unwrap(), expected_mode);
+    World {
+        relays,
+        alice_install,
+        alice,
+        _bob_install: bob_install,
+        bob,
+        linked,
+    }
+}
+
+// @scenario: duress_mode :: Duress mode with notification
+#[test]
+fn a_real_update_received_under_duress_is_applied_and_reaches_no_foreground_event() {
+    let mut world = world(DURESS_PIN, AuthMode::Duress);
     let seen = Arc::new(Mutex::new(Vec::new()));
     let sink = seen.clone();
-    alice.events().add_handler(Arc::new(move |event| {
+    world.alice.events().add_handler(Arc::new(move |event| {
         sink.lock().unwrap().push(format!("{event:?}"))
     }));
 
-    bob_shares_an_email(&mut bob, &linked.host_contact_id);
-    sync(&mut alice);
-    drop(alice);
+    bob_shares_an_email(&mut world.bob, &world.linked.host_contact_id);
+    sync(&mut world.alice);
+    drop(world.alice);
 
     assert_eq!(*seen.lock().unwrap(), Vec::<String>::new());
-    let mut real = alice_install.open(&relays);
+    let mut real = world.alice_install.open(&world.relays);
     assert_eq!(real.authenticate(APP_PIN).unwrap(), AuthMode::Normal);
     assert_eq!(
-        card_values(&real, &linked.peer_contact_id),
+        card_values(&real, &world.linked.peer_contact_id),
         vec!["bob@example.invalid".to_string()]
     );
+}
+
+/// How many messages Alice's next sync sends after she adds a public field,
+/// unlocked with `credential`.
+fn sent_by_an_edit_and_sync(credential: &str, expected_mode: AuthMode) -> usize {
+    let mut world = world(credential, expected_mode);
+    // Alice holds the responder's ratchet, which sends once Bob has.
+    bob_shares_an_email(&mut world.bob, &world.linked.host_contact_id);
+    sync(&mut world.alice);
+    let field = ContactField::new(FieldType::Email, "Work", "alice@work.invalid", 0);
+    let field_id = field.id().to_string();
+    world.alice.add_own_field(field).unwrap();
+    world.alice.set_own_field_public(&field_id).unwrap();
+
+    match sync(&mut world.alice) {
+        VauchiSyncOutcome::Ok { sent, .. } => sent,
+        other => panic!("{other:?}"),
+    }
+}
+
+// @scenario: duress_mode :: Duress mode looks identical to normal mode
+#[test]
+fn the_cover_a_duress_edit_owes_leaves_with_the_workers_sync() {
+    let real = sent_by_an_edit_and_sync(APP_PIN, AuthMode::Normal);
+    let duress = sent_by_an_edit_and_sync(DURESS_PIN, AuthMode::Duress);
+
+    assert_eq!(real, 1);
+    assert_eq!(duress, real);
 }

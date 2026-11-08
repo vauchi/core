@@ -17,6 +17,8 @@ mod device_sync_loop;
 mod devices;
 mod duress_concealment;
 mod duress_cover;
+#[cfg(feature = "network-http")]
+mod duress_worker;
 mod emergency;
 #[cfg(feature = "network-http")]
 mod escrow_exchange;

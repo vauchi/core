@@ -261,3 +261,37 @@ fn current_ts() -> u64 {
         .map(|d| d.as_secs())
         .unwrap_or(0)
 }
+
+// @scenario: security :: Replay attack prevention
+#[test]
+fn assumption_replay_freshness_matches_wide_arithmetic_at_integer_boundaries() {
+    let boundaries = [0, 1, 59, 60, u64::MAX - 60, u64::MAX];
+    for previous in boundaries {
+        for timestamp in boundaries {
+            for skew in [0, 60, u64::MAX] {
+                let mut detector = ReplayDetector::new(skew);
+                assert!(detector.check_replay("peer", &[1; 32], previous));
+                assert!(!detector.check_replay("peer", &[1; 32], previous));
+                let expected = u128::from(timestamp) + u128::from(skew) >= u128::from(previous);
+                assert_eq!(
+                    detector.check_replay("peer", &[2; 32], timestamp),
+                    expected,
+                    "previous={previous}, timestamp={timestamp}, skew={skew}"
+                );
+            }
+        }
+    }
+}
+
+proptest::proptest! {
+    // @scenario: security :: Replay attack prevention
+    #[test]
+    fn assumption_replay_matches_wide_arithmetic_for_arbitrary_timestamps(
+        previous: u64, timestamp: u64, skew: u64
+    ) {
+        let mut detector = ReplayDetector::new(skew);
+        proptest::prop_assert!(detector.check_replay("peer", &[1; 32], previous));
+        let expected = u128::from(timestamp) + u128::from(skew) >= u128::from(previous);
+        proptest::prop_assert_eq!(detector.check_replay("peer", &[2; 32], timestamp), expected);
+    }
+}

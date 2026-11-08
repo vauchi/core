@@ -393,10 +393,16 @@ impl FormDialogEngine {
                 input_type: InputType::Text,
                 a11y: Some(A11y {
                     label: Some(self.t("form.display_name_optional_a11y")),
-                    hint: Some(self.t("form.display_name_optional_placeholder")),
+                    hint: Some(self.t("form.entry_label_hint")),
                     role: Some(AccessibilityRole::TextField),
                 }),
                 info_key: None,
+            },
+            Component::Text {
+                id: "entry_label_hint".into(),
+                content: self.t("form.entry_label_hint"),
+                style: TextStyle::Subtitle,
+                a11y: None,
             },
             Component::TextInput {
                 id: "field_note".into(),

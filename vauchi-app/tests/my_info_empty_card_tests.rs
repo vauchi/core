@@ -83,12 +83,16 @@ fn add_entry(value: &Value) -> Option<ActionSpec> {
 // @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
 #[test]
 fn empty_card_offers_add_entry_in_its_body_without_replacing_exchange() {
-    for width in [360, 960] {
-        let (mut app, commands) = card(false, width);
+    for (has_field, width) in [(false, 360), (false, 960), (true, 360), (true, 960)] {
+        let (mut app, commands) = card(has_field, width);
         let surface = card_surface(&commands);
         let id: SurfaceId = surface.surface_id.clone();
         let nodes = serde_json::to_value(&surface.nodes).expect("presentation nodes");
         let action = add_entry(&nodes).expect("Add Entry is directly available in the card body");
+        assert!(
+            button_list(&nodes),
+            "Add Entry must be presented as a button"
+        );
         assert!(action.enabled);
         app.dispatch(Event::SurfaceActivated {
             surface_id: id.clone(),
@@ -113,9 +117,23 @@ fn empty_card_offers_add_entry_in_its_body_without_replacing_exchange() {
 
 // @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
 #[test]
-fn a_card_with_entries_keeps_the_existing_body_and_exchange_action() {
+fn a_card_with_entries_keeps_the_add_entry_button_and_exchange_action() {
     let (_, commands) = card(true, 960);
     let surface = card_surface(&commands);
     let nodes = serde_json::to_value(&surface.nodes).expect("presentation nodes");
-    assert_eq!(add_entry(&nodes), None);
+    assert!(
+        add_entry(&nodes).is_some(),
+        "A populated card still offers Add Entry"
+    );
+}
+
+fn button_list(value: &Value) -> bool {
+    match value {
+        Value::Object(object) => {
+            (object.get("style") == Some(&Value::from("buttons")) && add_entry(value).is_some())
+                || object.values().any(button_list)
+        }
+        Value::Array(values) => values.iter().any(button_list),
+        _ => false,
+    }
 }

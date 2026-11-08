@@ -567,9 +567,11 @@ impl WorkflowEngine for MyInfoEngine {
             MyInfoViewMode::PreviewAs { .. } => unreachable!("handled above"),
         });
 
-        if self.own_fields.is_empty() && self.show_exchange_prompt {
-            components.push(Component::ActionList {
-                id: "empty_card_actions".into(),
+        if self.show_exchange_prompt
+            && self.own_fields.len() < vauchi_core::contact_card::MAX_FIELDS
+        {
+            components.push(Component::ButtonList {
+                id: "card_actions".into(),
                 items: vec![ActionListItem {
                     id: "add_field".into(),
                     label: self.t("my_info.add_entry_button"),

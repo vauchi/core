@@ -270,6 +270,22 @@ pub(crate) fn padded_registration_batches(
     rng: &dyn crate::rng::SecureRng,
     padding_secret: &[u8; 32],
     day: u64,
+    all_tokens: Vec<String>,
+) -> Vec<Vec<String>> {
+    let mut batches = padded_registration_set(padding_secret, day, all_tokens);
+    for batch in &mut batches {
+        // Shuffle to prevent positional leakage across sessions
+        rng.shuffle(batch);
+    }
+    batches
+}
+
+/// The padded batches a day registers, before the shuffle: the same for
+/// every registration of that day, so a set stored ahead registers exactly
+/// what an unlocked run would (vauchi/private#1093).
+pub(crate) fn padded_registration_set(
+    padding_secret: &[u8; 32],
+    day: u64,
     mut all_tokens: Vec<String>,
 ) -> Vec<Vec<String>> {
     all_tokens.sort_unstable();
@@ -296,8 +312,6 @@ pub(crate) fn padded_registration_batches(
             )));
             padding_index = padding_index.saturating_add(1);
         }
-        // Shuffle to prevent positional leakage across sessions
-        rng.shuffle(&mut batch);
         batches.push(batch);
     }
 

@@ -59,6 +59,11 @@ impl Storage {
         Ok(())
     }
 
+    /// Whether this storage was given the Background Receive Key.
+    pub fn has_receive_key(&self) -> bool {
+        self.receive_key.is_some()
+    }
+
     pub(super) fn receive_key(&self) -> Option<&SymmetricKey> {
         self.receive_key.as_ref()
     }

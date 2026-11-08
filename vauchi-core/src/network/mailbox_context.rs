@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum MailboxRoute {
     Contact {
         id: String,

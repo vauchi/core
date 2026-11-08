@@ -42,6 +42,8 @@ mod propagation;
 mod receive_context;
 #[cfg(feature = "network-http")]
 mod receive_routing;
+#[cfg(feature = "network-http")]
+mod receive_tokens_ahead;
 mod reciprocity_send;
 #[cfg(feature = "network-http")]
 mod recovery;

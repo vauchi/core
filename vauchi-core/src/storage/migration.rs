@@ -852,7 +852,8 @@ const MIGRATIONS: [Migration; 115] = [
 /// v115 (ADR-033 amendment 2026-11-07, vauchi/private#1093): a ratchet row
 /// records whether the Background Receive Key sealed it, and the receive
 /// key gets its own check row, so a different key is refused rather than
-/// read as garbage. A callback, because a database replayed from an earlier
+/// read as garbage. The days of receive registrations stored ahead, sealed
+/// under the same key, get their table. A callback, because a database replayed from an earlier
 /// version row may already carry the column.
 fn migrate_v115_receive_key_sealing(
     conn: &Connection,
@@ -868,6 +869,10 @@ fn migrate_v115_receive_key_sealing(
         "CREATE TABLE IF NOT EXISTS receive_key_check (
             id INTEGER PRIMARY KEY CHECK (id = 1),
             sealed_label BLOB NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS receive_tokens_ahead (
+            day INTEGER PRIMARY KEY,
+            registration_encrypted BLOB NOT NULL
         );",
     )?;
     Ok(())

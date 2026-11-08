@@ -184,6 +184,11 @@ pub const REKEY_SKIP_COLUMNS: &[(&str, &str, &str)] = &[
         "tor_config_encrypted",
         "deprecated, always NULL",
     ),
+    (
+        "receive_tokens_ahead",
+        "registration_encrypted",
+        "sealed under the Background Receive Key, not the storage key (vauchi/private#1093)",
+    ),
 ];
 
 /// Try to decrypt data with the old key; if it is not a ciphertext at all,

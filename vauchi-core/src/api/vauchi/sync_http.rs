@@ -178,6 +178,7 @@ impl ProfileEngine {
         let receive = self.run_receive_phase(identity, &contacts, &mut adapter);
         self.keep_delay_window_advert(adapter.delay_window_advert());
         let (received, fetched, rejected, unresolved, reject_reasons) = receive?;
+        self.store_receive_tokens_ahead(identity, &contacts);
 
         // Capture version policy from relay response headers before adapter is moved.
         let version_policy = adapter.last_version_policy();

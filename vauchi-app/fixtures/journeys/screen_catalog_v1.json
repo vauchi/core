@@ -1271,8 +1271,8 @@
                     "label": null,
                     "rows": [
                       {
-                        "title": "+44 20 7946 0958",
-                        "subtitle": "mobile",
+                        "title": "mobile",
+                        "subtitle": "+44 20 7946 0958",
                         "detail": "All contacts by default",
                         "icon_token": null,
                         "image_data": null,
@@ -1281,8 +1281,8 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.3",
-                          "label": "+44 20 7946 0958",
-                          "accessibility_label": "+44 20 7946 0958",
+                          "label": "mobile",
+                          "accessibility_label": "mobile: +44 20 7946 0958",
                           "icon_token": null,
                           "enabled": true,
                           "shortcut": null
@@ -1290,13 +1290,13 @@
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
-                          "label": "+44 20 7946 0958",
+                          "label": "mobile: +44 20 7946 0958",
                           "description": null
                         }
                       },
                       {
-                        "title": "ada@analytical.example.org",
-                        "subtitle": "work",
+                        "title": "work",
+                        "subtitle": "ada@analytical.example.org",
                         "detail": "All contacts by default",
                         "icon_token": null,
                         "image_data": null,
@@ -1305,8 +1305,8 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.4",
-                          "label": "ada@analytical.example.org",
-                          "accessibility_label": "ada@analytical.example.org",
+                          "label": "work",
+                          "accessibility_label": "work: ada@analytical.example.org",
                           "icon_token": null,
                           "enabled": true,
                           "shortcut": null
@@ -1314,13 +1314,13 @@
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
-                          "label": "ada@analytical.example.org",
+                          "label": "work: ada@analytical.example.org",
                           "description": null
                         }
                       },
                       {
-                        "title": "https://ada.example.org",
-                        "subtitle": "homepage",
+                        "title": "homepage",
+                        "subtitle": "https://ada.example.org",
                         "detail": "All contacts by default",
                         "icon_token": null,
                         "image_data": null,
@@ -1329,8 +1329,8 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.5",
-                          "label": "https://ada.example.org",
-                          "accessibility_label": "https://ada.example.org",
+                          "label": "homepage",
+                          "accessibility_label": "homepage: https://ada.example.org",
                           "icon_token": null,
                           "enabled": true,
                           "shortcut": null
@@ -1338,13 +1338,13 @@
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
-                          "label": "https://ada.example.org",
+                          "label": "homepage: https://ada.example.org",
                           "description": null
                         }
                       },
                       {
-                        "title": "12 St James's Square, London",
-                        "subtitle": "home",
+                        "title": "home",
+                        "subtitle": "12 St James's Square, London",
                         "detail": "Family",
                         "icon_token": null,
                         "image_data": null,
@@ -1353,8 +1353,8 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.6",
-                          "label": "12 St James's Square, London",
-                          "accessibility_label": "12 St James's Square, London",
+                          "label": "home",
+                          "accessibility_label": "home: 12 St James's Square, London",
                           "icon_token": null,
                           "enabled": true,
                           "shortcut": null
@@ -1362,13 +1362,13 @@
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
-                          "label": "12 St James's Square, London",
+                          "label": "home: 12 St James's Square, London",
                           "description": null
                         }
                       },
                       {
-                        "title": "1815-12-10",
-                        "subtitle": "birthday",
+                        "title": "birthday",
+                        "subtitle": "1815-12-10",
                         "detail": "Cycling club, Family",
                         "icon_token": null,
                         "image_data": null,
@@ -1377,8 +1377,8 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.7",
-                          "label": "1815-12-10",
-                          "accessibility_label": "1815-12-10",
+                          "label": "birthday",
+                          "accessibility_label": "birthday: 1815-12-10",
                           "icon_token": null,
                           "enabled": true,
                           "shortcut": null
@@ -1386,7 +1386,7 @@
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
-                          "label": "1815-12-10",
+                          "label": "birthday: 1815-12-10",
                           "description": null
                         }
                       }
@@ -14318,8 +14318,8 @@
                     "label": null,
                     "rows": [
                       {
-                        "title": "+44 20 7946 0958",
-                        "subtitle": "mobile",
+                        "title": "mobile",
+                        "subtitle": "+44 20 7946 0958",
                         "detail": "All contacts by default",
                         "icon_token": null,
                         "image_data": null,
@@ -14328,8 +14328,8 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.2",
-                          "label": "+44 20 7946 0958",
-                          "accessibility_label": "+44 20 7946 0958",
+                          "label": "mobile",
+                          "accessibility_label": "mobile: +44 20 7946 0958",
                           "icon_token": null,
                           "enabled": true,
                           "shortcut": null
@@ -14337,13 +14337,13 @@
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
-                          "label": "+44 20 7946 0958",
+                          "label": "mobile: +44 20 7946 0958",
                           "description": null
                         }
                       },
                       {
-                        "title": "ada@analytical.example.org",
-                        "subtitle": "work",
+                        "title": "work",
+                        "subtitle": "ada@analytical.example.org",
                         "detail": "All contacts by default",
                         "icon_token": null,
                         "image_data": null,
@@ -14352,8 +14352,8 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.3",
-                          "label": "ada@analytical.example.org",
-                          "accessibility_label": "ada@analytical.example.org",
+                          "label": "work",
+                          "accessibility_label": "work: ada@analytical.example.org",
                           "icon_token": null,
                           "enabled": true,
                           "shortcut": null
@@ -14361,13 +14361,13 @@
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
-                          "label": "ada@analytical.example.org",
+                          "label": "work: ada@analytical.example.org",
                           "description": null
                         }
                       },
                       {
-                        "title": "https://ada.example.org",
-                        "subtitle": "homepage",
+                        "title": "homepage",
+                        "subtitle": "https://ada.example.org",
                         "detail": "All contacts by default",
                         "icon_token": null,
                         "image_data": null,
@@ -14376,8 +14376,8 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.4",
-                          "label": "https://ada.example.org",
-                          "accessibility_label": "https://ada.example.org",
+                          "label": "homepage",
+                          "accessibility_label": "homepage: https://ada.example.org",
                           "icon_token": null,
                           "enabled": true,
                           "shortcut": null
@@ -14385,13 +14385,13 @@
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
-                          "label": "https://ada.example.org",
+                          "label": "homepage: https://ada.example.org",
                           "description": null
                         }
                       },
                       {
-                        "title": "12 St James's Square, London",
-                        "subtitle": "home",
+                        "title": "home",
+                        "subtitle": "12 St James's Square, London",
                         "detail": "Family",
                         "icon_token": null,
                         "image_data": null,
@@ -14400,8 +14400,8 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.5",
-                          "label": "12 St James's Square, London",
-                          "accessibility_label": "12 St James's Square, London",
+                          "label": "home",
+                          "accessibility_label": "home: 12 St James's Square, London",
                           "icon_token": null,
                           "enabled": true,
                           "shortcut": null
@@ -14409,13 +14409,13 @@
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
-                          "label": "12 St James's Square, London",
+                          "label": "home: 12 St James's Square, London",
                           "description": null
                         }
                       },
                       {
-                        "title": "1815-12-10",
-                        "subtitle": "birthday",
+                        "title": "birthday",
+                        "subtitle": "1815-12-10",
                         "detail": "Cycling club, Family",
                         "icon_token": null,
                         "image_data": null,
@@ -14424,8 +14424,8 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.6",
-                          "label": "1815-12-10",
-                          "accessibility_label": "1815-12-10",
+                          "label": "birthday",
+                          "accessibility_label": "birthday: 1815-12-10",
                           "icon_token": null,
                           "enabled": true,
                           "shortcut": null
@@ -14433,7 +14433,7 @@
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
-                          "label": "1815-12-10",
+                          "label": "birthday: 1815-12-10",
                           "description": null
                         }
                       }
@@ -22988,8 +22988,8 @@
                     "label": null,
                     "rows": [
                       {
-                        "title": "+44 20 7946 0958",
-                        "subtitle": "mobile",
+                        "title": "mobile",
+                        "subtitle": "+44 20 7946 0958",
                         "detail": "Standardmäßig alle Kontakte",
                         "icon_token": null,
                         "image_data": null,
@@ -22998,8 +22998,8 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.3",
-                          "label": "+44 20 7946 0958",
-                          "accessibility_label": "+44 20 7946 0958",
+                          "label": "mobile",
+                          "accessibility_label": "mobile: +44 20 7946 0958",
                           "icon_token": null,
                           "enabled": true,
                           "shortcut": null
@@ -23007,13 +23007,13 @@
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
-                          "label": "+44 20 7946 0958",
+                          "label": "mobile: +44 20 7946 0958",
                           "description": null
                         }
                       },
                       {
-                        "title": "ada@analytical.example.org",
-                        "subtitle": "work",
+                        "title": "work",
+                        "subtitle": "ada@analytical.example.org",
                         "detail": "Standardmäßig alle Kontakte",
                         "icon_token": null,
                         "image_data": null,
@@ -23022,8 +23022,8 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.4",
-                          "label": "ada@analytical.example.org",
-                          "accessibility_label": "ada@analytical.example.org",
+                          "label": "work",
+                          "accessibility_label": "work: ada@analytical.example.org",
                           "icon_token": null,
                           "enabled": true,
                           "shortcut": null
@@ -23031,13 +23031,13 @@
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
-                          "label": "ada@analytical.example.org",
+                          "label": "work: ada@analytical.example.org",
                           "description": null
                         }
                       },
                       {
-                        "title": "https://ada.example.org",
-                        "subtitle": "homepage",
+                        "title": "homepage",
+                        "subtitle": "https://ada.example.org",
                         "detail": "Standardmäßig alle Kontakte",
                         "icon_token": null,
                         "image_data": null,
@@ -23046,8 +23046,8 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.5",
-                          "label": "https://ada.example.org",
-                          "accessibility_label": "https://ada.example.org",
+                          "label": "homepage",
+                          "accessibility_label": "homepage: https://ada.example.org",
                           "icon_token": null,
                           "enabled": true,
                           "shortcut": null
@@ -23055,13 +23055,13 @@
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
-                          "label": "https://ada.example.org",
+                          "label": "homepage: https://ada.example.org",
                           "description": null
                         }
                       },
                       {
-                        "title": "12 St James's Square, London",
-                        "subtitle": "home",
+                        "title": "home",
+                        "subtitle": "12 St James's Square, London",
                         "detail": "Family",
                         "icon_token": null,
                         "image_data": null,
@@ -23070,8 +23070,8 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.6",
-                          "label": "12 St James's Square, London",
-                          "accessibility_label": "12 St James's Square, London",
+                          "label": "home",
+                          "accessibility_label": "home: 12 St James's Square, London",
                           "icon_token": null,
                           "enabled": true,
                           "shortcut": null
@@ -23079,13 +23079,13 @@
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
-                          "label": "12 St James's Square, London",
+                          "label": "home: 12 St James's Square, London",
                           "description": null
                         }
                       },
                       {
-                        "title": "1815-12-10",
-                        "subtitle": "birthday",
+                        "title": "birthday",
+                        "subtitle": "1815-12-10",
                         "detail": "Cycling club, Family",
                         "icon_token": null,
                         "image_data": null,
@@ -23094,8 +23094,8 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.7",
-                          "label": "1815-12-10",
-                          "accessibility_label": "1815-12-10",
+                          "label": "birthday",
+                          "accessibility_label": "birthday: 1815-12-10",
                           "icon_token": null,
                           "enabled": true,
                           "shortcut": null
@@ -23103,7 +23103,7 @@
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
-                          "label": "1815-12-10",
+                          "label": "birthday: 1815-12-10",
                           "description": null
                         }
                       }

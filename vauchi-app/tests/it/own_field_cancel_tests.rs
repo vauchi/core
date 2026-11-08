@@ -35,7 +35,7 @@ fn mobile_entry_detail() -> (AppEngine, Vec<Command>) {
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::MyInfo);
     let my_card = engine.initial_commands().unwrap();
-    let (surface_id, entry) = row(&my_card, MOBILE);
+    let (surface_id, entry) = row(&my_card, "Mobile");
     let detail = activate(&mut engine, surface_id, &entry);
     (engine, detail)
 }

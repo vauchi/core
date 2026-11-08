@@ -467,9 +467,7 @@ fn my_info_visibility_by_label(entry: &ScreenCatalogEntry) -> BTreeMap<String, S
         .flatten()
         .map(|row| {
             (
-                row.subtitle
-                    .clone()
-                    .expect("own entry row carries its label"),
+                row.title.clone(),
                 row.detail
                     .clone()
                     .expect("own entry row carries a visibility chip"),

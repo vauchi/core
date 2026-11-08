@@ -169,6 +169,19 @@ impl FormDialogEngine {
         get_string(self.locale, key)
     }
 
+    fn entry_type_name(&self, entry: &CatalogEntry) -> String {
+        let key = match entry.key.as_str() {
+            "phone" => "field_type.phone",
+            "email" => "field_type.email",
+            "address" => "field_type.address",
+            "website" => "field_type.website",
+            "birthday" => "form.entry_value.birthday_label",
+            "custom" => "field_type.custom",
+            _ => return entry.display_name.clone(),
+        };
+        self.t(key)
+    }
+
     fn get_value(&self, id: &str) -> &str {
         self.values
             .iter()
@@ -254,15 +267,15 @@ impl FormDialogEngine {
             .iter()
             .map(|e| ActionListItem {
                 id: e.key.clone(),
-                label: e.display_name.clone(),
+                label: self.entry_type_name(e),
                 icon: e.icon.clone(),
                 detail: None,
                 a11y: Some(A11y {
-                    label: Some(e.display_name.clone()),
+                    label: Some(self.entry_type_name(e)),
                     hint: Some(get_string_with_args(
                         self.locale,
                         "form.field_type_select_hint",
-                        &[("name", &e.display_name)],
+                        &[("name", &self.entry_type_name(e))],
                     )),
                     role: None,
                 }),
@@ -339,7 +352,7 @@ impl FormDialogEngine {
             get_string_with_args(
                 self.locale,
                 "form.add_entry_title",
-                &[("name", &entry.display_name)],
+                &[("name", &self.entry_type_name(entry))],
             )
         } else {
             self.t("form.add_to_card_title")

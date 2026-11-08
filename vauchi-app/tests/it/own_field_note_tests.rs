@@ -26,7 +26,7 @@ fn work_email_edit_form() -> (AppEngine, Vec<Command>) {
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::MyInfo);
     let my_card = engine.initial_commands().unwrap();
-    let (surface_id, entry) = row(&my_card, WORK);
+    let (surface_id, entry) = row(&my_card, "Work");
     let detail = activate(&mut engine, surface_id, &entry);
     let (surface_id, edit) = action(&detail, "Edit").expect("Edit");
     let form = activate(&mut engine, surface_id, &edit);

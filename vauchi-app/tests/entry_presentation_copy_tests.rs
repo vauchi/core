@@ -86,13 +86,15 @@ fn downloaded_locale_copy_reloads_without_losing_a_draft() {
             "_meta": {"locale": "qaa", "name": "Test", "english_name": "Test", "is_rtl": false},
             "form.entry_value.email_label": label,
             "form.entry_value.email_placeholder": example,
-            "form.entry_value_input_a11y": "Remote input: {label}"
+            "form.entry_value_input_a11y": "Remote input: {label}",
+            "field_type.email": "Remote entry type"
         }))
         .expect("locale JSON");
         load_locale_from_bytes("qaa", &bytes).expect("downloaded locale loader");
     };
     load("Remote email", "Remote example");
     let mut engine = form("email", locale);
+    assert_eq!(engine.current_screen().title, "Add Remote entry type");
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "field_value".into(),
         value: "ada@example.invalid".into(),

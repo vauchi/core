@@ -177,6 +177,7 @@ impl MigrationRunner {
     }
 
     /// Returns the current schema version, or 0 if no migrations have been applied.
+    /// Returns an error if the history cannot be queried or its version is invalid.
     pub fn current_version(conn: &Connection) -> Result<u32, StorageError> {
         // Check if schema_version table exists
         let table_exists: bool = conn.query_row(
@@ -189,11 +190,10 @@ impl MigrationRunner {
             return Ok(0);
         }
 
-        let version: Option<u32> = conn
-            .query_row("SELECT MAX(version) FROM schema_version", [], |row| {
+        let version: Option<u32> =
+            conn.query_row("SELECT MAX(version) FROM schema_version", [], |row| {
                 row.get(0)
-            })
-            .unwrap_or(None);
+            })?;
 
         Ok(version.unwrap_or(0))
     }

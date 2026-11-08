@@ -37,8 +37,9 @@ fn current_version_reports_a_missing_history_column() {
 
     let error = MigrationRunner::current_version(&conn).unwrap_err();
     match error {
-        StorageError::Database(error) => {
-            assert_eq!(error.sqlite_error().unwrap().extended_code, 1);
+        StorageError::Database(rusqlite::Error::SqliteFailure(error, _))
+        | StorageError::Database(rusqlite::Error::SqlInputError { error, .. }) => {
+            assert_eq!(error.extended_code, 1);
         }
         other => panic!("expected a schema query error, got {other:?}"),
     }

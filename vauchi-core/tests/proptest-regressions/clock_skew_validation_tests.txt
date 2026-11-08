@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 51f53f203ee7e21c26e6ec40a6449628af53b2c60d1facf02dc0a180de01418e # shrinks to previous = 0, timestamp = 11063373597652999510, skew = 7383370476056552106

@@ -82,7 +82,7 @@ impl Storage {
             |row| Ok((row.get(0)?,)),
         );
 
-        if let Ok((Some(enc),)) = result
+        if let Some((Some(enc),)) = result.optional()?
             && !enc.is_empty()
         {
             let plain = decrypt(old_key, &enc)
@@ -110,7 +110,7 @@ impl Storage {
             |row| Ok((row.get(0)?,)),
         );
 
-        if let Ok((Some(enc),)) = result
+        if let Some((Some(enc),)) = result.optional()?
             && !enc.is_empty()
         {
             let plain = decrypt(old_key, &enc).map_err(|e| {

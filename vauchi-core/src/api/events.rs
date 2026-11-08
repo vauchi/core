@@ -326,12 +326,17 @@ impl EventDispatcher {
     }
 
     /// Dispatches an event to all handlers.
+    /// Handler changes during callbacks affect subsequent dispatches.
     ///
     /// NOTE (#71): Dispatch is synchronous — a slow handler blocks the caller.
     /// For non-blocking dispatch, callers should spawn handler execution on a
     /// separate thread or use an async event channel.
     pub fn dispatch(&self, event: VauchiEvent) {
-        let handlers = self.handlers.lock().expect("EventDispatcher lock poisoned");
+        let handlers = self
+            .handlers
+            .lock()
+            .expect("EventDispatcher lock poisoned")
+            .clone();
         for (_, handler) in handlers.iter() {
             handler(event.clone());
         }

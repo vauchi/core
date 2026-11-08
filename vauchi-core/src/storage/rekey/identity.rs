@@ -19,7 +19,7 @@ impl Storage {
             |row| Ok((row.get(0)?, row.get(1)?)),
         );
 
-        if let Ok((id, backup_enc)) = result {
+        if let Some((id, backup_enc)) = result.optional()? {
             let plain = decrypt(old_key, &backup_enc)
                 .map_err(|e| StorageError::Migration(format!("Decrypt identity: {}", e)))?;
             let new_enc = encrypt(new_key, &plain)
@@ -102,7 +102,7 @@ impl Storage {
             |row| Ok((row.get(0)?,)),
         );
 
-        if let Ok((Some(enc),)) = result
+        if let Some((Some(enc),)) = result.optional()?
             && !enc.is_empty()
         {
             let plain = decrypt(old_key, &enc)
@@ -131,7 +131,7 @@ impl Storage {
             |row| Ok((row.get(0)?,)),
         );
 
-        if let Ok((Some(enc),)) = result
+        if let Some((Some(enc),)) = result.optional()?
             && !enc.is_empty()
         {
             let plain = decrypt(old_key, &enc)
@@ -196,7 +196,7 @@ impl Storage {
             |row| Ok((row.get(0)?,)),
         );
 
-        if let Ok((Some(enc),)) = result
+        if let Some((Some(enc),)) = result.optional()?
             && !enc.is_empty()
         {
             let plain = decrypt(old_key, &enc)
@@ -261,7 +261,7 @@ impl Storage {
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         );
 
-        if let Ok((id, pw_enc, duress_enc)) = result {
+        if let Some((id, pw_enc, duress_enc)) = result.optional()? {
             if let Some(enc) = pw_enc
                 && !enc.is_empty()
             {

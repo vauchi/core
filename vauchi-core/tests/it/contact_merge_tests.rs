@@ -294,3 +294,28 @@ fn test_preview_merge_additions() {
     assert!(labels.contains(&"Personal"));
     assert!(labels.contains(&"Blog"));
 }
+
+// @scenario: contacts_management :: Merge duplicate contacts
+#[test]
+fn assumption_self_merge_is_rejected_without_losing_the_contact() {
+    let vauchi = vauchi_core::Vauchi::in_memory().unwrap();
+    vauchi
+        .add_contact(Contact::from_import(
+            "preserved".into(),
+            ContactCard::new("Preserved card"),
+            ImportSource::VcardFile,
+            None,
+            0,
+        ))
+        .unwrap();
+    let result = vauchi.merge_contacts("preserved", "preserved");
+    let stored = vauchi
+        .get_contact("preserved")
+        .unwrap()
+        .expect("self merge deleted the contact");
+    assert_eq!(stored.display_name(), "Preserved card");
+    assert!(matches!(
+        result,
+        Err(vauchi_core::api::VauchiError::InvalidState(_))
+    ));
+}

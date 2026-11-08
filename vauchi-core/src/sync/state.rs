@@ -89,7 +89,7 @@ impl ReplayDetector {
         }
 
         if let Some(&last_ts) = self.last_timestamps.get(contact_id)
-            && timestamp + self.max_clock_skew_secs < last_ts
+            && timestamp.saturating_add(self.max_clock_skew_secs) < last_ts
         {
             return false;
         }

@@ -5,8 +5,9 @@
 //! Tests for api::events
 //! Extracted from events.rs
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, mpsc};
+use std::time::Duration;
 use vauchi_core::api::*;
 use vauchi_core::*;
 
@@ -215,4 +216,26 @@ fn test_connection_state_event() {
     } else {
         panic!("Expected ConnectionStateChanged event");
     }
+}
+
+// @internal
+#[test]
+fn assumption_event_callback_can_query_its_dispatcher() {
+    let dispatcher = Arc::new(EventDispatcher::new());
+    let weak = Arc::downgrade(&dispatcher);
+    let (sent, received) = mpsc::channel();
+    dispatcher.on_event(move |_| {
+        sent.send(weak.upgrade().unwrap().handler_count()).unwrap();
+    });
+    let worker_dispatcher = dispatcher.clone();
+    let worker =
+        std::thread::spawn(move || worker_dispatcher.dispatch(VauchiEvent::ContentUpdated));
+    assert_eq!(
+        received
+            .recv_timeout(Duration::from_secs(2))
+            .expect("callback query deadlocked"),
+        1
+    );
+    worker.join().unwrap();
+    assert_eq!(dispatcher.handler_count(), 1);
 }

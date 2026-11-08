@@ -20,7 +20,7 @@
 //! a static, greppable literal.
 
 use hmac::{Hmac, Mac};
-use rusqlite::params;
+use rusqlite::{OptionalExtension, params};
 use sha2::Sha256;
 
 use crate::crypto::encryption::EncryptionError;

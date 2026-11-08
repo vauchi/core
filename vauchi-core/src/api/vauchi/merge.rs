@@ -77,6 +77,11 @@ impl ProfileEngine {
         primary_id: &str,
         secondary_id: &str,
     ) -> VauchiResult<crate::contact::Contact> {
+        if primary_id == secondary_id {
+            return Err(VauchiError::InvalidState(
+                "Cannot merge a contact with itself".into(),
+            ));
+        }
         let primary = self
             .storage
             .contacts()

@@ -63,7 +63,7 @@ fn the_mask_seed_s_identity_is_the_same_in_every_duress_session() {
     assert_eq!(real.vauchi.identity().unwrap().signing_public_key(), &first);
 }
 
-// @scenario: duress_mode :: Normal mode shows real data
+// @scenario: duress_mode :: Normal credential shows real contacts
 #[test]
 fn an_unlock_with_the_app_password_after_duress_brings_the_real_identity_back() {
     let mut real = alice_with_a_duress_pin();
@@ -81,7 +81,7 @@ fn an_unlock_with_the_app_password_after_duress_brings_the_real_identity_back() 
     assert_eq!(real.vauchi.public_id().unwrap(), real.public_id);
 }
 
-// @scenario: duress_mode :: Decoy profile functions normally
+// @scenario: duress_mode :: What a duress session makes survives a lock
 #[test]
 fn a_rename_under_duress_is_there_after_the_real_profile_comes_back_and_duress_returns() {
     let mut real = alice_with_a_duress_pin();

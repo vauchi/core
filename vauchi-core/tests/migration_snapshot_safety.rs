@@ -38,7 +38,7 @@ fn migrate(conn: &Connection, path: &std::path::Path) {
     assert_eq!(MigrationRunner::current_version(conn).unwrap(), 2);
 }
 
-// @scenario: emergency_shred :: Files are overwritten with zeros before deletion
+// @internal
 #[test]
 fn snapshot_names_distinguish_same_stem_databases() {
     let root = tempfile::tempdir().unwrap();
@@ -98,7 +98,7 @@ fn snapshot_creation_preserves_preexisting_outside_symlink_targets() {
     }
 }
 
-// @scenario: emergency_shred :: Post-shred verification
+// @internal
 #[test]
 fn unreadable_real_key_store_is_not_confirmed_absence() {
     let root = tempfile::tempdir().unwrap();

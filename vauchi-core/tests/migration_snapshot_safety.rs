@@ -145,3 +145,73 @@ fn shred_preserves_outside_targets_of_backup_aliases() {
         );
     }
 }
+
+#[test]
+fn widget_removes_closed_regular_files_and_managed_keys() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(root.path().join("vauchi.db"), b"database fixture").unwrap();
+    std::fs::write(root.path().join("identity.json"), b"identity fixture").unwrap();
+    let keys = MemoryKeyStorage::new();
+    keys.save_key("smk", &[17; 32]).unwrap();
+    let report = vauchi_core::api::shred::widget_panic_shred(root.path(), &keys).unwrap();
+    assert_eq!(
+        (
+            report.smk_destroyed,
+            report.sqlite_destroyed,
+            report.identity_file_destroyed,
+            report.data_dir_deleted
+        ),
+        (true, true, true, true)
+    );
+    assert_eq!(keys.load_key("smk").unwrap(), None);
+    assert!(!root.path().exists());
+}
+
+#[test]
+fn widget_preserves_an_outside_hardlinked_identity_target() {
+    let root = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    let target = outside.path().join("keep");
+    std::fs::write(&target, b"outside identity fixture").unwrap();
+    std::fs::hard_link(&target, root.path().join("identity.json")).unwrap();
+    let keys = MemoryKeyStorage::new();
+    let report = vauchi_core::api::shred::widget_panic_shred(root.path(), &keys).unwrap();
+    assert_eq!(std::fs::read(target).unwrap(), b"outside identity fixture");
+    assert_eq!(
+        (report.identity_file_destroyed, report.data_dir_deleted),
+        (false, true)
+    );
+}
+
+#[test]
+fn real_key_store_does_not_overwrite_an_outside_hardlinked_key() {
+    let root = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    let key = SymmetricKey::generate();
+    let writer = FileKeyStorage::new(outside.path().to_path_buf(), key.clone());
+    writer.save_key("smk", &[17; 32]).unwrap();
+    let source = outside.path().join("smk.key");
+    let bytes = std::fs::read(&source).unwrap();
+    std::fs::hard_link(&source, root.path().join("smk.key")).unwrap();
+    let reader = FileKeyStorage::new(root.path().to_path_buf(), key);
+    assert_eq!(reader.load_key("smk").unwrap(), Some(vec![17; 32]));
+    let result = reader.secure_delete_key("smk");
+    assert_eq!(std::fs::read(&source).unwrap(), bytes);
+    assert!(matches!(
+        result,
+        Err(vauchi_core::storage::StorageError::Encryption(_))
+    ));
+}
+
+#[test]
+fn real_key_store_inspection_errors_are_not_absence() {
+    let root = tempfile::tempdir().unwrap();
+    let not_directory = root.path().join("not-a-directory");
+    std::fs::write(&not_directory, b"unreadable key namespace").unwrap();
+    let reader = FileKeyStorage::new(not_directory, SymmetricKey::generate());
+    let result = reader.load_key("smk");
+    assert!(matches!(
+        result,
+        Err(vauchi_core::storage::StorageError::Encryption(_))
+    ));
+}

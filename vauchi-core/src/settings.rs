@@ -116,6 +116,10 @@ pub struct SettingsFlags {
     /// (vauchi/private#790).
     #[serde(default)]
     pub appearance: Option<AppearancePick>,
+    /// A backup export asks for a biometric check before the password
+    /// (ADR-080 point 7, amended 2026-11-09). Defaults to false: an opt-in.
+    #[serde(default)]
+    pub confirm_exports_with_biometrics: bool,
 }
 
 /// A language and theme picked in Settings; a `None` field is "Follow
@@ -140,6 +144,7 @@ impl Default for SettingsFlags {
             content_updates: ContentUpdates::On,
             content_updates_in_background: true,
             appearance: None,
+            confirm_exports_with_biometrics: false,
         }
     }
 }

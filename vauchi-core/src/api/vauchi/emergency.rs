@@ -16,8 +16,7 @@ use super::super::config::VauchiConfig;
 use super::super::emergency::{BROADCAST_COOLDOWN_SECS, BroadcastResult};
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventDispatcher, VauchiEvent};
-use super::super::shred::ShredManager;
-use super::ProfileEngine;
+use super::{AuthMode, ProfileEngine};
 use crate::emergency::EmergencyBroadcastConfig;
 use crate::emergency::MAX_TRUSTED_CONTACTS;
 
@@ -246,10 +245,9 @@ impl ProfileEngine {
 
     /// Performs an emergency data wipe (panic shred) of this device.
     ///
-    /// The crypto-shred (vauchi/private#599): every key that opens the data
-    /// is deleted from secure storage, then the database and the data
-    /// directory, through [`ShredManager::panic_shred`]; a copy of the data
-    /// taken before the wipe then has no key left that opens it. It sends
+    /// The crypto-shred (vauchi/private#599) retires this file-backed session's
+    /// keys and closes its database before deleting managed keys and profile
+    /// files. It sends
     /// nothing: the identity's other devices keep working, so its contacts
     /// and the relay are not told (vauchi/private#910). Requires explicit
     /// confirmation, so a buggy caller cannot wipe by accident.
@@ -260,22 +258,29 @@ impl ProfileEngine {
             ));
         }
 
-        match self.storage.db_path() {
+        match self.storage.db_path().map(Path::to_path_buf) {
             Some(database) => {
-                let data_dir = self.config.profile_directory.as_deref().ok_or_else(|| {
+                let data_dir = self.config.profile_directory.clone().ok_or_else(|| {
                     VauchiError::Configuration(
                         "emergency wipe requires an explicit profile directory".into(),
                     )
                 })?;
-                crate::storage::secure_file::validate_profile_root(Some(database), data_dir)
+                crate::storage::secure_file::validate_profile_root(Some(&database), &data_dir)
                     .map_err(|_| {
                         VauchiError::Configuration(
                             "invalid emergency wipe profile directory".into(),
                         )
                     })?;
-                let result = self.shred_data_directory(data_dir);
+                let empty = Storage::in_memory(crate::crypto::SymmetricKey::generate())?
+                    .with_clock(self.clock.clone());
+                // #1178: Windows cannot overwrite/unlink SQLite files with our handle open.
+                drop(std::mem::replace(&mut self.storage, empty));
                 self.identity = None;
-                result?;
+                self.config.storage_key = None;
+                self.shown = None;
+                self.session_password = None;
+                self.auth_mode = AuthMode::Unauthenticated;
+                self.shred_data_directory(&data_dir, &database)?;
             }
             // An in-memory database ends with the process; there is no file
             // or directory to shred, and its parent is not ours to delete.
@@ -285,20 +290,11 @@ impl ProfileEngine {
         Ok(())
     }
 
-    fn shred_data_directory(&self, data_dir: &Path) -> VauchiResult<()> {
+    fn shred_data_directory(&self, data_dir: &Path, database: &Path) -> VauchiResult<()> {
         let keyless = NoSecureStorage;
         let secure: &dyn SecureStorage = self.secure_storage.as_deref().unwrap_or(&keyless);
-        let report = match self.identity.as_ref() {
-            Some(identity) => {
-                ShredManager::new(&self.storage, secure, identity, data_dir).panic_shred()
-            }
-            None => super::super::shred::shred_profile_database(
-                data_dir,
-                &self.config.storage_path,
-                secure,
-            ),
-        }
-        .map_err(|e| VauchiError::Configuration(format!("Emergency wipe failed: {e}")))?;
+        let report = super::super::shred::shred_profile_database(data_dir, database, secure)
+            .map_err(|e| VauchiError::Configuration(format!("Emergency wipe failed: {e}")))?;
         if !report.smk_destroyed
             || !report.key_files_complete
             || !report.identity_file_destroyed

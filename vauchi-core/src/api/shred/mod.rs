@@ -7,7 +7,6 @@
 //! Provides the public types for the shred protocol and re-exports the
 //! `ShredManager` orchestrator and `widget_panic_shred` entry point.
 
-mod file;
 mod manager;
 mod relay_sender;
 mod storage;

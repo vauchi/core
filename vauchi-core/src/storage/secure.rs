@@ -188,61 +188,11 @@ impl FileKeyStorage {
 }
 
 impl FileKeyStorage {
-    /// Securely overwrites a file with random data, then zeros, then removes it.
-    ///
-    /// Uses a single file handle with `sync_all()` between passes to ensure
-    /// each overwrite reaches the storage controller before the next pass,
-    /// preventing write coalescing on SSDs.
+    /// Overwrites a verified single-link regular file before removing it.
     fn secure_overwrite_and_remove(path: &std::path::Path) -> Result<(), StorageError> {
-        use std::io::{Seek, Write};
-
-        if !path.exists() {
-            return Ok(());
-        }
-
-        let size = std::fs::metadata(path)
-            .map_err(|e| StorageError::Encryption(format!("Failed to read file metadata: {}", e)))?
-            .len() as usize;
-
-        if size == 0 {
-            std::fs::remove_file(path).map_err(|e| {
-                StorageError::Encryption(format!("Failed to remove empty file: {}", e))
-            })?;
-            return Ok(());
-        }
-
-        // Open file once, keep handle for all passes
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .open(path)
-            .map_err(|e| {
-                StorageError::Encryption(format!("Failed to open file for overwrite: {}", e))
-            })?;
-
-        let mut random = vec![0u8; size];
-        crate::crypto::random_fill(&mut random);
-        file.write_all(&random).map_err(|e| {
-            StorageError::Encryption(format!("Failed to write random overwrite: {}", e))
-        })?;
-        file.sync_all().map_err(|e| {
-            StorageError::Encryption(format!("Failed to sync after random overwrite: {}", e))
-        })?;
-
-        file.seek(std::io::SeekFrom::Start(0)).map_err(|e| {
-            StorageError::Encryption(format!("Failed to seek for zero overwrite: {}", e))
-        })?;
-        file.write_all(&vec![0u8; size]).map_err(|e| {
-            StorageError::Encryption(format!("Failed to write zero overwrite: {}", e))
-        })?;
-        file.sync_all().map_err(|e| {
-            StorageError::Encryption(format!("Failed to sync after zero overwrite: {}", e))
-        })?;
-
-        drop(file);
-        std::fs::remove_file(path)
-            .map_err(|e| StorageError::Encryption(format!("Failed to remove file: {}", e)))?;
-
-        Ok(())
+        super::secure_file::secure_overwrite_file(path).map_err(|error| {
+            StorageError::Encryption(format!("could not remove key file: {}", error.kind()))
+        })
     }
 }
 
@@ -273,12 +223,16 @@ impl SecureStorage for FileKeyStorage {
     fn load_key(&self, name: &str) -> Result<Option<Vec<u8>>, StorageError> {
         let file_path = self.key_file_path(name);
 
-        if !file_path.exists() {
-            return Ok(None);
-        }
-
-        let encrypted = std::fs::read(&file_path)
-            .map_err(|e| StorageError::Encryption(format!("Failed to read key file: {}", e)))?;
+        let encrypted = match std::fs::read(&file_path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => {
+                return Err(StorageError::Encryption(format!(
+                    "could not read key file: {}",
+                    error.kind()
+                )));
+            }
+        };
 
         let key = crate::crypto::decrypt(&self.encryption_key, &encrypted)
             .map_err(|e| StorageError::Encryption(format!("Decryption failed: {}", e)))?;

@@ -57,6 +57,7 @@ pub(crate) mod migration_backup;
 mod migration_durability;
 mod migration_snapshot;
 pub mod secure;
+pub(crate) mod secure_file;
 mod stores;
 
 pub use activity_log::ActivityLogRow;

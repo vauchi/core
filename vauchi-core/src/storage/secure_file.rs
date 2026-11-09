@@ -51,7 +51,7 @@ fn check_handle(_: &Metadata, _: &File) -> io::Result<()> {
 /// Alias entries are preserved for the caller's namespace cleanup, never
 /// followed for overwrite. The parent directory must not have hostile
 /// concurrent writers; handle verification is not a directory capability.
-pub(super) fn secure_overwrite_file(path: &Path) -> io::Result<()> {
+pub(crate) fn secure_overwrite_file(path: &Path) -> io::Result<()> {
     let before = match std::fs::symlink_metadata(path) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),

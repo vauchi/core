@@ -12,8 +12,8 @@ use std::path::Path;
 use crate::api::pre_signed::legacy_pre_signed_file;
 use crate::storage::secure::{KeyAccess, SecureStorage};
 
-pub(super) use super::file::secure_overwrite_file;
 use super::{BOOTSTRAP_KEY_NAME, BRK_KEY_NAME, SMK_KEY_NAME, ShredError, ShredReport};
+pub(super) use crate::storage::secure_file::secure_overwrite_file;
 
 /// Public entry point for secure file overwrite, callable from other modules.
 pub(crate) fn secure_overwrite_file_public(path: &Path) -> Result<(), std::io::Error> {

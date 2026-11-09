@@ -115,7 +115,8 @@ fn a_blob_on_the_shared_session_is_stored_for_the_unlock() {
     let mut world = world_with_session_on(SHARED);
     let blob = world.next_blob();
 
-    let receipt = store_locked_update(&world.locked(), &world.contact, &blob, NOW).unwrap();
+    let receipt =
+        store_locked_update(&world.locked(), "blob-1", &world.contact, &blob, NOW).unwrap();
 
     assert_eq!(receipt, LockedReceipt::Stored);
     let inbox = world.inbox();
@@ -137,7 +138,8 @@ fn a_blob_on_a_device_session_names_that_device() {
     let mut world = world_with_session_on(device);
     let blob = world.next_blob();
 
-    let receipt = store_locked_update(&world.locked(), &world.contact, &blob, NOW).unwrap();
+    let receipt =
+        store_locked_update(&world.locked(), "blob-1", &world.contact, &blob, NOW).unwrap();
 
     assert_eq!(receipt, LockedReceipt::Stored);
     assert_eq!(world.inbox()[0].peer_device_id(), &device);
@@ -157,7 +159,8 @@ fn a_blob_no_session_opens_is_left_and_changes_nothing() {
     };
     let blob = serde_json::to_vec(&stranger.encrypt(MESSAGE).unwrap()).unwrap();
 
-    let receipt = store_locked_update(&world.locked(), &world.contact, &blob, NOW).unwrap();
+    let receipt =
+        store_locked_update(&world.locked(), "blob-1", &world.contact, &blob, NOW).unwrap();
 
     assert_eq!(receipt, LockedReceipt::LeftForUnlock);
     assert!(world.inbox().is_empty());
@@ -170,7 +173,8 @@ fn a_contact_without_a_session_is_left_for_the_unlock() {
     let mut world = world_with_session_on(SHARED);
     let blob = world.next_blob();
 
-    let receipt = store_locked_update(&world.locked(), "no-such-contact", &blob, NOW).unwrap();
+    let receipt =
+        store_locked_update(&world.locked(), "blob-1", "no-such-contact", &blob, NOW).unwrap();
 
     assert_eq!(receipt, LockedReceipt::LeftForUnlock);
     assert!(world.inbox().is_empty());
@@ -189,7 +193,7 @@ fn malformed_blobs_are_left_for_the_unlock() {
         b"{\"header\":null}",
         &[0u8; 4096],
     ] {
-        let receipt = store_locked_update(&locked, &world.contact, blob, NOW).unwrap();
+        let receipt = store_locked_update(&locked, "blob-1", &world.contact, blob, NOW).unwrap();
         assert_eq!(receipt, LockedReceipt::LeftForUnlock, "{blob:?}");
     }
     assert!(world.inbox().is_empty());
@@ -205,7 +209,7 @@ fn when_the_inbox_write_fails_the_ratchet_does_not_move() {
         .execute("DELETE FROM inbox_key", [])
         .unwrap();
 
-    let failed = store_locked_update(&world.locked(), &world.contact, &blob, NOW);
+    let failed = store_locked_update(&world.locked(), "blob-1", &world.contact, &blob, NOW);
 
     assert!(
         matches!(failed, Err(StorageError::ReceiveKeyUnavailable)),

@@ -18,7 +18,9 @@ use crate::crypto::SymmetricKey;
 
 use super::migration::{MigrationRunner, all_migrations};
 use super::receive_key::{ReceiveKeyCheck, check_receive_key};
-use super::{RatchetStore, ReceiveInboxStore, ReceiveTokenStore, Storage, StorageError};
+use super::{
+    KeptBlobStore, RatchetStore, ReceiveInboxStore, ReceiveTokenStore, Storage, StorageError,
+};
 
 /// The database opened with the Background Receive Key alone.
 pub struct LockedReceiveStorage {
@@ -108,6 +110,11 @@ impl LockedReceiveStorage {
     /// The OHTTP key and delay-window cache, which no key seals.
     pub fn ohttp_cache(&self) -> super::OhttpCacheStore<'_> {
         super::OhttpCacheStore::unsealed(&self.conn, &self.clock)
+    }
+
+    /// The blobs a locked run kept, to acknowledge without trying again.
+    pub fn kept_blobs(&self) -> KeptBlobStore<'_> {
+        KeptBlobStore::new(&self.conn, Some(&self.receive_key))
     }
 
     /// The receive registrations stored ahead.

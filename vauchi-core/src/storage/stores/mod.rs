@@ -28,6 +28,7 @@ mod field_notes;
 mod genesis_limit;
 mod guardian_backup;
 pub(super) mod identity;
+mod kept_blobs;
 mod labels;
 mod mask_public_values;
 mod mask_seed;
@@ -65,6 +66,7 @@ pub use genesis_limit::{
 pub(crate) use guardian_backup::designator_tag;
 pub use guardian_backup::{GuardianBackupStore, KeptPiece};
 pub use identity::IdentityStore;
+pub use kept_blobs::KeptBlobStore;
 pub use labels::LabelStore;
 pub use mask_public_values::{MaskPublicValues, MaskPublicValuesStore};
 pub use mask_seed::{MaskSeed, MaskSeedStore};

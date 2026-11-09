@@ -643,6 +643,30 @@ impl ProfileEngine {
             if let Err(_ack_lost) = adapter.send(&ack) {}
         }
 
+        // 2e. Blobs a locked run kept whose ack was lost: their session moved
+        //     past them, and a failed try on a device session deletes it, so
+        //     acknowledge them instead (vauchi/private#1093). A storage error
+        //     leaves the blob to the ordinary path.
+        let (kept, update_blobs): (Vec<_>, Vec<_>) =
+            update_blobs.into_iter().partition(|(message_id, ..)| {
+                self.storage
+                    .kept_blobs()
+                    .was_kept(message_id)
+                    .unwrap_or(false)
+            });
+        for (message_id, ..) in kept {
+            let ack = create_envelope(
+                MessagePayload::Acknowledgment(Acknowledgment {
+                    message_id: message_id.into(),
+                    status: AckStatus::Stored,
+                    error: None,
+                }),
+                self.clock.unix_seconds(),
+                self.rng.uuid_v4().into(),
+            );
+            if let Err(_ack_lost) = adapter.send(&ack) {}
+        }
+
         // 3. Route + apply each contact blob, build per-blob ACK envelopes.
         let outcomes = process_received_blobs_with_routes(
             identity,

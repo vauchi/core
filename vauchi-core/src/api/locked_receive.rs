@@ -80,13 +80,15 @@ impl LockedInboxItem {
     }
 }
 
-/// Opens `ciphertext`, routed to `contact_id`, on the first session with
-/// that contact that opens it, and keeps it for the unlock.
+/// Opens `ciphertext`, the relay's blob `blob_id` routed to `contact_id`, on
+/// the first session with that contact that opens it, and keeps it for the
+/// unlock, recording the blob as kept.
 ///
 /// A failed trial is not saved, so it advances no session. A session still
 /// under the storage key is skipped like one that does not open.
 pub fn store_locked_update(
     storage: &LockedReceiveStorage,
+    blob_id: &str,
     contact_id: &str,
     ciphertext: &[u8],
     received_at: u64,
@@ -124,7 +126,8 @@ pub fn store_locked_update(
                 &ratchet,
                 is_initiator,
             )?;
-            storage.receive_inbox().put(&item)
+            storage.receive_inbox().put(&item)?;
+            storage.kept_blobs().record(blob_id, received_at)
         })?;
         return Ok(LockedReceipt::Stored);
     }
@@ -290,10 +293,23 @@ mod network {
                     continue;
                 };
                 fetched += 1;
+                // An earlier run kept it and its ack was lost: acknowledge
+                // it again rather than try a session that moved past it.
+                if storage
+                    .kept_blobs()
+                    .was_kept(envelope.message_id.as_str())?
+                {
+                    acks.push(envelope.message_id);
+                    continue;
+                }
                 let receipt = match routes.get(update.recipient_id.as_str()) {
-                    Some(MailboxRoute::Contact { id, .. }) => {
-                        store_locked_update(storage, id, &update.ciphertext, clock.unix_seconds())?
-                    }
+                    Some(MailboxRoute::Contact { id, .. }) => store_locked_update(
+                        storage,
+                        envelope.message_id.as_str(),
+                        id,
+                        &update.ciphertext,
+                        clock.unix_seconds(),
+                    )?,
                     // Device-sync tokens derive from the master seed; the
                     // unlock receives them (ADR-033 amendment point 3).
                     Some(MailboxRoute::DeviceSync { .. }) | None => LockedReceipt::LeftForUnlock,

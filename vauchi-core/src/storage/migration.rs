@@ -297,7 +297,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 116] = [
+const MIGRATIONS: [Migration; 117] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -878,7 +878,22 @@ const MIGRATIONS: [Migration; 116] = [
         name: "receive_inbox",
         action: MigrationAction::Sql(MIGRATION_V116_RECEIVE_INBOX),
     },
+    Migration {
+        version: 117,
+        name: "locked_kept_blobs",
+        action: MigrationAction::Sql(MIGRATION_V117_LOCKED_KEPT_BLOBS),
+    },
 ];
+
+/// v117 (vauchi/private#1093): the blobs a locked run kept, by a tag keyed
+/// under the Background Receive Key, so a blob whose ack was lost is
+/// acknowledged rather than tried again on a session that moved past it.
+const MIGRATION_V117_LOCKED_KEPT_BLOBS: &str = "
+    CREATE TABLE IF NOT EXISTS locked_kept_blobs (
+        blob_tag BLOB PRIMARY KEY,
+        kept_at INTEGER NOT NULL
+    );
+";
 
 /// v116 (ADR-033 addendum 2026-11-09, vauchi/private#1093 slice 6): the
 /// inbox keypair, its private key under the storage key, and the inbox of

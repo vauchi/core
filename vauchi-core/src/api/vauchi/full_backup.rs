@@ -4,7 +4,7 @@
 
 //! Password full-backup capture and atomic restoration.
 
-use crate::api::{VauchiError, VauchiResult};
+use crate::api::{AuthResult, VauchiError, VauchiResult};
 use crate::backup::snapshot::{self, BackupSnapshot, DuressSection, Payload};
 use crate::card::ContactCard;
 use crate::identity::Identity;
@@ -20,6 +20,7 @@ impl ProfileEngine {
             .identity
             .as_ref()
             .ok_or(VauchiError::IdentityNotInitialized)?;
+        self.refuse_reused_passwords(&[password])?;
         // The same gate as the identity-only export: this file holds every
         // contact's shared key, so it must not be weaker (private#891).
         validate_backup_password(password)?;
@@ -46,6 +47,7 @@ impl ProfileEngine {
             .identity
             .as_ref()
             .ok_or(VauchiError::IdentityNotInitialized)?;
+        self.refuse_reused_passwords(&[password, decoy_password])?;
         validate_backup_password(password)?;
         validate_backup_password(decoy_password)?;
         let real = self.real_snapshot(identity)?;
@@ -85,6 +87,32 @@ impl ProfileEngine {
         }
         snapshot.validate().map_err(backup_error)?;
         Ok(snapshot)
+    }
+
+    /// Refuses backup passwords that unlock this install, or that equal
+    /// each other, since one guess would then open two layers (ADR-080
+    /// point 7, D3). It runs before the strength check, so a duress PIN is
+    /// refused for reuse under duress just as the app password is on the
+    /// real profile.
+    fn refuse_reused_passwords(&self, passwords: &[&str]) -> VauchiResult<()> {
+        let config = self.password_config()?;
+        let unlocks = |password: &str| {
+            config
+                .as_ref()
+                .is_some_and(|c| !matches!(c.verify(password), AuthResult::Invalid))
+        };
+        let repeated = passwords
+            .iter()
+            .enumerate()
+            .any(|(i, p)| passwords.iter().skip(i + 1).any(|q| q == p));
+        if repeated || passwords.iter().any(|p| unlocks(p)) {
+            return Err(VauchiError::Configuration(
+                "Export failed: a backup password must differ from the app password, \
+                 the duress PIN and the other backup password"
+                    .into(),
+            ));
+        }
+        Ok(())
     }
 
     fn finish_export(&self, blob: &[u8]) -> String {

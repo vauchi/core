@@ -9,6 +9,23 @@ use vauchi_core::storage::{MemoryKeyStorage, SecureStorage};
 
 // @internal
 #[test]
+fn a_file_backed_wipe_retires_the_owned_session_key() {
+    let root = tempfile::tempdir().unwrap();
+    let mut app = Vauchi::new(
+        VauchiConfig::with_profile_directory(root.path())
+            .with_storage_key(SymmetricKey::generate()),
+    )
+    .unwrap();
+    app.create_identity("Fixture").unwrap();
+    assert!(app.config().storage_key.is_some());
+    app.perform_emergency_wipe(true).unwrap();
+    assert!(app.config().storage_key.is_none());
+    assert!(app.identity().is_none());
+    assert!(!root.path().exists());
+}
+
+// @internal
+#[test]
 fn a_database_path_does_not_authorize_emergency_directory_deletion() {
     let root = tempfile::tempdir().unwrap();
     let sentinel = root.path().join("unrelated");

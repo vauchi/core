@@ -57,6 +57,13 @@ impl RegistrationDay {
         self.receive_until
     }
 
+    /// Whether a locked run at `now` is inside this day's window: before
+    /// its end and not before the sync that stored it, so a clock set back
+    /// cannot stretch the window (Codex, 2026-11-09).
+    pub(crate) fn locked_window_covers(&self, now: u64) -> bool {
+        now < self.receive_until && now >= self.receive_until.saturating_sub(LOCKED_RECEIVE_SECS)
+    }
+
     pub(crate) fn decode(bytes: &[u8]) -> Result<Self, StorageError> {
         serde_json::from_slice(bytes).map_err(|e| StorageError::Serialization(e.to_string()))
     }

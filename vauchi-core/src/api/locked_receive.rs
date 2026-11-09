@@ -136,8 +136,9 @@ pub fn store_locked_update(
 pub enum LockedRunOutcome {
     /// No unlocked sync stored today's registration.
     NothingStored,
-    /// The day after the last unlocked sync has passed; the unlock catches
-    /// up (ADR-033 addendum 2026-11-09, point 3).
+    /// The day after the last unlocked sync has passed, or the clock reads
+    /// earlier than that sync; the unlock catches up (ADR-033 addendum
+    /// 2026-11-09, point 3).
     WindowEnded,
     /// The outer relay offers delayed fetches, whose answers a short
     /// background run cannot wait for; the unlock fetches (owner
@@ -217,7 +218,7 @@ mod network {
         let Some(today_registration) = stored_day(storage, today)? else {
             return Ok(LockedRunOutcome::NothingStored);
         };
-        if now >= today_registration.receive_until() {
+        if !today_registration.locked_window_covers(now) {
             return Ok(LockedRunOutcome::WindowEnded);
         }
         if relay.ohttp_delayed

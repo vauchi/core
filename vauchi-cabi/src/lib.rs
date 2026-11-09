@@ -13,7 +13,6 @@ use std::sync::{Arc, Mutex};
 
 use vauchi_app::ui::*;
 use vauchi_core::api::Vauchi;
-use vauchi_core::exchange::{ExchangeSession, ManualConfirmationVerifier};
 
 mod app;
 mod app_import_warnings;
@@ -28,7 +27,6 @@ mod content_updates;
 #[cfg(test)]
 mod content_updates_tests;
 mod design_tokens;
-mod exchange;
 #[cfg(test)]
 mod hardware_batch_tests;
 mod i18n;
@@ -41,7 +39,6 @@ pub use app::*;
 #[cfg(test)]
 pub use app_navigation::*;
 pub use app_presentation::*;
-pub use exchange::*;
 pub use i18n::*;
 pub use logging::*;
 
@@ -79,12 +76,6 @@ impl VauchiApp {
             content_scheduler: Mutex::new(None),
         }
     }
-}
-
-/// Opaque handle to an exchange session.
-pub struct VauchiExchange {
-    pub(crate) session: Mutex<ExchangeSession>,
-    pub(crate) manual_verifier: Arc<ManualConfirmationVerifier>,
 }
 
 // ── Config builder ──────────────────────────────────────────────────
@@ -685,8 +676,6 @@ mod tests {
         }
     }
 
-    // ── Exchange session tests ──────────────────────────────────────
-
     /// Drive a VauchiApp through onboarding to create an identity.
     unsafe fn create_app_with_identity() -> *mut VauchiApp {
         // SAFETY: Calling FFI with valid inputs from this test scope.
@@ -698,310 +687,6 @@ mod tests {
             assert_eq!(vauchi_app_create_identity(handle, name.as_ptr()), 0);
 
             handle
-        }
-    }
-
-    #[test]
-    fn exchange_create_returns_null_without_identity() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let app = vauchi_app_create();
-            let exchange = vauchi_exchange_create(app);
-            assert!(exchange.is_null(), "exchange should fail without identity");
-            vauchi_app_destroy(app);
-        }
-    }
-
-    #[test]
-    fn exchange_create_returns_null_for_null_app() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let exchange = vauchi_exchange_create(std::ptr::null_mut());
-            assert!(exchange.is_null());
-        }
-    }
-
-    #[test]
-    fn exchange_destroy_null_is_safe() {
-        // allow(zero_assertions) — no-panic boundary test
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            vauchi_exchange_destroy(std::ptr::null_mut());
-        }
-    }
-
-    #[test]
-    fn exchange_create_with_identity_returns_non_null() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let app = create_app_with_identity();
-            let exchange = vauchi_exchange_create(app);
-            assert!(!exchange.is_null(), "exchange should succeed with identity");
-            vauchi_exchange_destroy(exchange);
-            vauchi_app_destroy(app);
-        }
-    }
-
-    #[test]
-    fn exchange_initial_state_is_idle() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let app = create_app_with_identity();
-            let exchange = vauchi_exchange_create(app);
-            assert!(!exchange.is_null());
-
-            let state_ptr = vauchi_exchange_state(exchange);
-            assert!(!state_ptr.is_null());
-            let state = CStr::from_ptr(state_ptr).to_str().unwrap();
-            assert_eq!(state, "idle");
-
-            vauchi_string_free(state_ptr);
-            vauchi_exchange_destroy(exchange);
-            vauchi_app_destroy(app);
-        }
-    }
-
-    #[test]
-    fn exchange_state_null_handle_returns_null() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let state_ptr = vauchi_exchange_state(std::ptr::null_mut());
-            assert!(state_ptr.is_null());
-        }
-    }
-
-    #[test]
-    fn exchange_generate_qr_transitions_to_displaying() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let app = create_app_with_identity();
-            let exchange = vauchi_exchange_create(app);
-            assert!(!exchange.is_null());
-
-            let qr_ptr = vauchi_exchange_generate_qr(exchange);
-            assert!(!qr_ptr.is_null());
-            let qr = CStr::from_ptr(qr_ptr).to_str().unwrap();
-            assert!(
-                qr.starts_with("https://vauchi.app/x#q="),
-                "QR should be the landing URL, got: {}",
-                qr
-            );
-
-            let state_ptr = vauchi_exchange_state(exchange);
-            let state = CStr::from_ptr(state_ptr).to_str().unwrap();
-            assert_eq!(state, "displaying_qr");
-
-            vauchi_string_free(qr_ptr);
-            vauchi_string_free(state_ptr);
-            vauchi_exchange_destroy(exchange);
-            vauchi_app_destroy(app);
-        }
-    }
-
-    #[test]
-    fn exchange_generate_qr_null_handle_returns_null() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let qr_ptr = vauchi_exchange_generate_qr(std::ptr::null_mut());
-            assert!(qr_ptr.is_null());
-        }
-    }
-
-    #[test]
-    fn exchange_is_not_timed_out_initially() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let app = create_app_with_identity();
-            let exchange = vauchi_exchange_create(app);
-            assert!(!exchange.is_null());
-
-            let result = vauchi_exchange_is_timed_out(exchange);
-            assert_eq!(result, 0, "new exchange should not be timed out");
-
-            vauchi_exchange_destroy(exchange);
-            vauchi_app_destroy(app);
-        }
-    }
-
-    #[test]
-    fn exchange_is_timed_out_null_returns_error() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let result = vauchi_exchange_is_timed_out(std::ptr::null_mut());
-            assert_eq!(result, -1, "null handle should return -1");
-        }
-    }
-
-    #[test]
-    fn exchange_peer_name_null_before_scan() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let app = create_app_with_identity();
-            let exchange = vauchi_exchange_create(app);
-            assert!(!exchange.is_null());
-
-            let name_ptr = vauchi_exchange_peer_display_name(exchange);
-            assert!(
-                name_ptr.is_null(),
-                "peer name should be null before QR scan"
-            );
-
-            vauchi_exchange_destroy(exchange);
-            vauchi_app_destroy(app);
-        }
-    }
-
-    #[test]
-    fn exchange_confirm_proximity_null_is_safe() {
-        // allow(zero_assertions) — no-panic boundary test
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            vauchi_exchange_confirm_proximity(std::ptr::null_mut());
-        }
-    }
-
-    #[test]
-    fn exchange_debug_log_null_before_enable() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let app = create_app_with_identity();
-            let exchange = vauchi_exchange_create(app);
-            assert!(!exchange.is_null());
-
-            let jsonl_ptr = vauchi_exchange_debug_jsonl(exchange);
-            assert!(
-                jsonl_ptr.is_null(),
-                "debug JSONL should be null before enabling"
-            );
-
-            let md_ptr = vauchi_exchange_debug_markdown(exchange);
-            assert!(
-                md_ptr.is_null(),
-                "debug markdown should be null before enabling"
-            );
-
-            vauchi_exchange_destroy(exchange);
-            vauchi_app_destroy(app);
-        }
-    }
-
-    #[test]
-    fn exchange_enable_debug_log_produces_output() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let app = create_app_with_identity();
-            let exchange = vauchi_exchange_create(app);
-            assert!(!exchange.is_null());
-
-            vauchi_exchange_enable_debug_log(exchange);
-
-            // Generate QR to produce at least one debug event
-            let qr_ptr = vauchi_exchange_generate_qr(exchange);
-            vauchi_string_free(qr_ptr);
-
-            let jsonl_ptr = vauchi_exchange_debug_jsonl(exchange);
-            assert!(
-                !jsonl_ptr.is_null(),
-                "debug JSONL should be non-null after enabling and generating QR"
-            );
-            let jsonl = CStr::from_ptr(jsonl_ptr).to_str().unwrap();
-            assert!(!jsonl.is_empty(), "debug JSONL should not be empty");
-
-            let md_ptr = vauchi_exchange_debug_markdown(exchange);
-            assert!(
-                !md_ptr.is_null(),
-                "debug markdown should be non-null after enabling"
-            );
-
-            vauchi_string_free(jsonl_ptr);
-            vauchi_string_free(md_ptr);
-            vauchi_exchange_destroy(exchange);
-            vauchi_app_destroy(app);
-        }
-    }
-
-    #[test]
-    fn exchange_process_qr_rejects_invalid_data() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let app = create_app_with_identity();
-            let exchange = vauchi_exchange_create(app);
-            assert!(!exchange.is_null());
-
-            // Must be in DisplayingQr state first
-            let qr_ptr = vauchi_exchange_generate_qr(exchange);
-            vauchi_string_free(qr_ptr);
-
-            let bad_qr = CString::new("not-a-valid-qr").unwrap();
-            let result_ptr = vauchi_exchange_process_qr(exchange, bad_qr.as_ptr());
-            assert!(!result_ptr.is_null());
-            let result = CStr::from_ptr(result_ptr).to_str().unwrap();
-            assert!(
-                result.contains("error"),
-                "invalid QR should return error, got: {}",
-                result
-            );
-
-            vauchi_string_free(result_ptr);
-            vauchi_exchange_destroy(exchange);
-            vauchi_app_destroy(app);
-        }
-    }
-
-    #[test]
-    fn exchange_process_qr_null_data_returns_error() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let app = create_app_with_identity();
-            let exchange = vauchi_exchange_create(app);
-            assert!(!exchange.is_null());
-
-            let result_ptr = vauchi_exchange_process_qr(exchange, std::ptr::null());
-            assert!(!result_ptr.is_null());
-            let result = CStr::from_ptr(result_ptr).to_str().unwrap();
-            assert!(result.contains("error"));
-
-            vauchi_string_free(result_ptr);
-            vauchi_exchange_destroy(exchange);
-            vauchi_app_destroy(app);
-        }
-    }
-
-    #[test]
-    fn exchange_they_scanned_null_returns_null() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let result_ptr = vauchi_exchange_they_scanned_our_qr(std::ptr::null_mut());
-            assert!(result_ptr.is_null());
-        }
-    }
-
-    #[test]
-    fn exchange_complete_null_handle_returns_null() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let name = CString::new("Bob").unwrap();
-            let result_ptr = vauchi_exchange_complete(std::ptr::null_mut(), name.as_ptr());
-            assert!(result_ptr.is_null());
-        }
-    }
-
-    #[test]
-    fn exchange_complete_null_name_returns_error() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let app = create_app_with_identity();
-            let exchange = vauchi_exchange_create(app);
-            assert!(!exchange.is_null());
-
-            let result_ptr = vauchi_exchange_complete(exchange, std::ptr::null());
-            assert!(!result_ptr.is_null());
-            let result = CStr::from_ptr(result_ptr).to_str().unwrap();
-            assert!(result.contains("error"));
-
-            vauchi_string_free(result_ptr);
-            vauchi_exchange_destroy(exchange);
-            vauchi_app_destroy(app);
         }
     }
 

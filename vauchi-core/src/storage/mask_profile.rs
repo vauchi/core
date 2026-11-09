@@ -40,7 +40,7 @@ const MASK_ONLY_SCHEMA: &str = "
 ";
 
 /// Tables a profile database has that never belong in a seal.
-const NEVER_SEALED: [&str; 2] = ["schema_version", "duress_content"];
+pub(super) const NEVER_SEALED: [&str; 2] = ["schema_version", "duress_content"];
 
 impl Storage {
     /// The mask profile: the one a real database embeds, or this one.

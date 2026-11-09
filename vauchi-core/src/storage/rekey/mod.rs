@@ -233,14 +233,24 @@ impl Storage {
         let Some(mask) = &self.mask else {
             return Ok(());
         };
-        mask.rekey_tables(old_key, new_key, &mut |_| ())?;
+        mask.rekey_mask_rows(old_key, new_key)
+    }
+
+    /// Re-encrypts a mask profile's rows, its regular tables and the
+    /// columns only a mask has, from `old_key` to `new_key`.
+    pub(in crate::storage) fn rekey_mask_rows(
+        &self,
+        old_key: &SymmetricKey,
+        new_key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        self.rekey_tables(old_key, new_key, &mut |_| ())?;
         for (table, column) in [
             ("mask_seed", "seed_encrypted"),
             ("decoy_ids", "display_name_encrypted"),
             ("public_values", "signing_public_key_encrypted"),
             ("public_values", "display_name_encrypted"),
         ] {
-            mask.rekey_nullable_column(old_key, new_key, table, column)?;
+            self.rekey_nullable_column(old_key, new_key, table, column)?;
         }
         Ok(())
     }

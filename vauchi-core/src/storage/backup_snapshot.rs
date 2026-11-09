@@ -3,12 +3,13 @@
 
 //! Storage capture adapter for the pure backup representation.
 
-use super::Storage;
+use super::{MaskTransfer, Storage, StorageError};
 use crate::backup::{
     BackupError,
-    snapshot::{BackupSnapshot, VisibilityOverride},
+    snapshot::{BackupSnapshot, DuressSection, VisibilityOverride},
 };
 use crate::identity::Identity;
+use crate::identity::password_config::AppPasswordConfig;
 
 impl BackupSnapshot {
     pub fn capture(storage: &Storage, identity: &Identity, now: u64) -> Result<Self, BackupError> {
@@ -46,5 +47,54 @@ impl BackupSnapshot {
             groups,
             overrides,
         )
+    }
+}
+
+impl DuressSection {
+    /// The duress section of `storage`'s install, whose password
+    /// configuration is `config`.
+    pub(crate) fn capture(
+        storage: &Storage,
+        config: &AppPasswordConfig,
+    ) -> Result<Self, StorageError> {
+        let transfer = storage.mask_for_backup()?;
+        let duress_pin = match (
+            config.duress_enabled(),
+            config.duress_hash(),
+            config.duress_salt(),
+        ) {
+            (true, Some(hash), Some(salt)) => {
+                Some(((hash, salt), storage.identity().duress_copy_in_use()?))
+            }
+            _ => None,
+        };
+        Ok(Self::new(
+            &transfer.key,
+            &transfer.body,
+            (config.password_hash(), config.password_salt()),
+            duress_pin,
+        ))
+    }
+
+    /// Writes the credentials and the mask into `storage`, a fresh install
+    /// whose identity row the restore has just saved.
+    pub(crate) fn restore(&self, storage: &Storage) -> Result<(), StorageError> {
+        let invalid = |e: BackupError| StorageError::InvalidData(e.to_string());
+        let password = self.password().map_err(invalid)?;
+        storage
+            .identity()
+            .save_app_password(&password.hash, &password.salt)?;
+        if let Some(pin) = self.duress_pin().map_err(invalid)? {
+            storage
+                .identity()
+                .save_duress_password(&pin.credential.hash, &pin.credential.salt)?;
+            if pin.copy_in_use {
+                storage.identity().mark_duress_copy_in_use()?;
+            }
+        }
+        storage.restore_mask_from_backup(&MaskTransfer {
+            key: self.mask_key().map_err(invalid)?,
+            body: self.mask_body().map_err(invalid)?,
+        })
     }
 }

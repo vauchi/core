@@ -17,11 +17,13 @@ mod key_check;
 mod lookup;
 mod mask;
 mod mask_profile;
+mod mask_transfer;
 // INLINE_TEST_REQUIRED: a seal in the legacy decoy-table shape can only be built through the crate-private legacy writer, which no public API reaches any more
 #[cfg(test)]
 #[path = "mask_profile_tests.rs"]
 mod mask_profile_tests;
 mod sealing;
+pub(crate) use mask_transfer::MaskTransfer;
 pub use sealing::Sealed;
 mod locked_receive;
 mod receive_key;

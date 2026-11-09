@@ -5,7 +5,7 @@
 //! Password full-backup capture and atomic restoration.
 
 use crate::api::{VauchiError, VauchiResult};
-use crate::backup::snapshot::{self, BackupSnapshot};
+use crate::backup::snapshot::{self, BackupSnapshot, DuressSection};
 use crate::card::ContactCard;
 use crate::identity::Identity;
 
@@ -24,8 +24,16 @@ impl ProfileEngine {
         // contact's shared key, so it must not be weaker (private#891).
         crate::identity::password::validate_password(password)
             .map_err(|e| VauchiError::Configuration(format!("Export failed: {:?}", e)))?;
-        let snapshot = BackupSnapshot::capture(&self.storage, identity, self.clock.unix_seconds())
-            .map_err(backup_error)?;
+        let mut snapshot =
+            BackupSnapshot::capture(&self.storage, identity, self.clock.unix_seconds())
+                .map_err(backup_error)?;
+        // A duress export comes from the mask itself, which holds no real
+        // credential to carry.
+        if !self.is_mask()
+            && let Some(config) = self.password_config()?
+        {
+            snapshot.duress = Some(DuressSection::capture(&self.storage, &config)?);
+        }
         snapshot.validate().map_err(backup_error)?;
         let blob = snapshot::encode(&snapshot, password).map_err(backup_error)?;
         // The completion timestamp is a UX hint, not part of backup integrity.
@@ -73,6 +81,9 @@ impl ProfileEngine {
                     &item.field_id,
                     item.visible,
                 )?;
+            }
+            if let Some(duress) = &snapshot.duress {
+                duress.restore(&self.storage)?;
             }
             self.storage.commit()?;
             Ok(())

@@ -6,6 +6,7 @@
 
 mod codec;
 mod contacts;
+mod duress;
 mod validation;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
@@ -21,6 +22,7 @@ use super::{BackupError, FullBackupEnvelope, IdentitySection};
 use contacts::SnapshotContact;
 
 pub(crate) use codec::{SNAPSHOT_VERSION, decode, encode};
+pub(crate) use duress::DuressSection;
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -33,6 +35,10 @@ pub(crate) struct BackupSnapshot {
     pub contacts: Vec<SnapshotContact>,
     pub groups: Vec<GroupSyncData>,
     pub overrides: Vec<VisibilityOverride>,
+    /// The mask and the credentials, in a real payload of v7 (ADR-080
+    /// point 7); absent from v6 files and from a duress export.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duress: Option<DuressSection>,
 }
 
 impl Drop for BackupSnapshot {
@@ -74,6 +80,7 @@ impl BackupSnapshot {
                 .collect::<Result<_, _>>()?,
             groups: groups.iter().map(GroupSyncData::from_group).collect(),
             overrides,
+            duress: None,
         };
         snapshot.normalize_references()?;
         Ok(snapshot)
@@ -119,6 +126,7 @@ impl BackupSnapshot {
             contacts,
             groups,
             overrides: Vec::new(),
+            duress: None,
         };
         snapshot.normalize_references()?;
         Ok(snapshot)

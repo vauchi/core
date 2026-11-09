@@ -54,7 +54,7 @@ fn alice(with_duress_pin: bool) -> OnDisk {
 fn row_shapes(path: &Path, table: &str) -> Vec<String> {
     let conn = rusqlite::Connection::open(path).unwrap();
     let mut stmt = conn.prepare(&format!("SELECT * FROM {table}")).unwrap();
-    let columns: Vec<String> = stmt.column_names().iter().map(|c| c.to_string()).collect();
+    let columns: Vec<String> = stmt.column_names().map(str::to_string).collect();
     stmt.query_map([], |row| {
         let mut shape = Vec::new();
         for (i, column) in columns.iter().enumerate() {

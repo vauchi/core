@@ -161,7 +161,7 @@ pub(super) fn dump_tables(conn: &Connection, names: &[&str]) -> Result<Vec<u8>, 
     let mut tables = Vec::with_capacity(names.len());
     for name in names {
         let mut stmt = conn.prepare(&format!("SELECT * FROM {name} ORDER BY rowid"))?;
-        let columns: Vec<String> = stmt.column_names().iter().map(|c| c.to_string()).collect();
+        let columns: Vec<String> = stmt.column_names().map(str::to_string).collect();
         let width = columns.len();
         let rows = stmt
             .query_map([], |row| {

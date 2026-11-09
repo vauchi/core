@@ -486,6 +486,7 @@ mod propagation_sync_item_variant_tests;
 mod property_tests;
 mod protocol_compatibility_tests;
 mod protocol_exchange_vectors_tests;
+mod protocol_test_vectors_backup_v7_tests;
 mod protocol_test_vectors_tests;
 mod proximity_confidence_tests;
 mod public_keys_never_route_tests;

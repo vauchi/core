@@ -71,6 +71,7 @@ pub(crate) struct Vectors {
     mailbox_tokens: MailboxVector,
     backup: BackupVector,
     backup_v6: BackupV6Vector,
+    pub(crate) backup_v7: crate::protocol_test_vectors_backup_v7_tests::BackupV7Vector,
     pub(crate) qr_symmetric: QrSymmetricVector,
     pub(crate) link_exchange: LinkExchangeVector,
     recovery_proof: RecoveryProofVector,
@@ -206,11 +207,11 @@ struct BackupV6Vector {
 }
 
 #[derive(Serialize, Deserialize)]
-struct Argon2Params {
-    memory_kib: u32,
-    iterations: u32,
-    parallelism: u32,
-    output_bytes: u32,
+pub(crate) struct Argon2Params {
+    pub(crate) memory_kib: u32,
+    pub(crate) iterations: u32,
+    pub(crate) parallelism: u32,
+    pub(crate) output_bytes: u32,
 }
 
 fn fixture_path() -> PathBuf {
@@ -748,14 +749,14 @@ fn backup_vector_imports_with_production_argon2id() {
 
 // ── backup v6 ─────────────────────────────────────────────────────────
 
-const V6_SEED_BYTE: u8 = 0xb0;
+pub(crate) const V6_SEED_BYTE: u8 = 0xb0;
 const V6_PASSWORD: &str = "correct horse battery staple";
-const V6_CREATED_AT: u64 = 1_793_100_000;
+pub(crate) const V6_CREATED_AT: u64 = 1_793_100_000;
 
 /// A `Vauchi` whose identity has a known seed and whose clock stands at
 /// `V6_CREATED_AT`: the only public way to a fixed seed is to restore one,
 /// so the v3 exporter seeds the v6 vector's identity.
-fn vauchi_with_vector_identity() -> Vauchi {
+pub(crate) fn vauchi_with_vector_identity() -> Vauchi {
     let identity = FullBackupIdentityData {
         display_name: "Vector".to_string(),
         master_seed: seed(V6_SEED_BYTE),
@@ -770,37 +771,6 @@ fn vauchi_with_vector_identity() -> Vauchi {
         .import_full_backup(&hex::encode(legacy), V6_PASSWORD)
         .expect("v3 import");
     vauchi
-}
-
-fn compute_backup_v6() -> BackupV6Vector {
-    let vauchi = vauchi_with_vector_identity();
-    let backup =
-        hex::decode(vauchi.export_full_backup(V6_PASSWORD).expect("v6 export")).expect("hex");
-    let salt: [u8; 16] = backup[1..17].try_into().expect("salt");
-    let base_key =
-        vauchi_core::crypto::derive_key_argon2id(V6_PASSWORD.as_bytes(), &salt).expect("argon2id");
-    let prk = HKDF::extract(None, base_key.as_bytes());
-    let key = HKDF::expand(&prk, BACKUP_V6_INFO.as_bytes(), 32).expect("expand");
-    BackupV6Vector {
-        password: V6_PASSWORD.to_string(),
-        argon2id: Argon2Params {
-            memory_kib: 65_536,
-            iterations: 3,
-            parallelism: 4,
-            output_bytes: 32,
-        },
-        hkdf_info: BACKUP_V6_INFO.to_string(),
-        display_name: "Vector".to_string(),
-        master_seed: hex::encode(seed(V6_SEED_BYTE)),
-        device_index: 0,
-        device_name: "vector-device".to_string(),
-        created_at: V6_CREATED_AT,
-        salt: hex::encode(salt),
-        argon2id_base_key: hex::encode(base_key.as_bytes()),
-        key: hex::encode(&key),
-        header: hex::encode(&backup[..17]),
-        backup: hex::encode(&backup),
-    }
 }
 
 // @claim: S13
@@ -890,6 +860,15 @@ fn backup_v6_vector_imports_with_production_argon2id_and_refuses_a_wrong_passwor
     assert_eq!(identity.device_index(), v.device_index);
 }
 
+/// The v6 entry as the fixture holds it: the exporter writes v7 now, so a
+/// regeneration keeps the recorded v6 file instead of making a new one.
+#[cfg(not(feature = "test-kdf"))]
+fn recorded_backup_v6() -> BackupV6Vector {
+    let text = std::fs::read_to_string(fixture_path()).expect("vector fixture present");
+    let fixture: serde_json::Value = serde_json::from_str(&text).expect("vector fixture parses");
+    serde_json::from_value(fixture["backup_v6"].clone()).expect("recorded backup_v6")
+}
+
 // ── regeneration ──────────────────────────────────────────────────────
 
 /// `VAUCHI_WRITE_TEST_VECTORS=1 cargo test -p vauchi-core --features testing
@@ -936,8 +915,18 @@ fn write_test_vectors_when_asked() {
             "backup_v6: header = 0x06 || salt(16); file = header || \
              XChaCha20-Poly1305(key, zlib(json), associated data = header) in the \
              0x03 tagged format; key = HKDF-expand(HKDF-extract(none, \
-             Argon2id(password, salt)), hkdf_info, 32). This is the format the app \
-             exports today; the nonce is random, so only decryption is reproducible."
+             Argon2id(password, salt)), hkdf_info, 32). The importer still accepts \
+             it; the exporter writes v7, so this entry is kept as recorded."
+                .into(),
+            "backup_v7: header = 0x07 || file_id(16) || salt_0(16) || salt_1(16); \
+             file = header || payload_0 || payload_1, both the same length; \
+             payload_i = XChaCha20-Poly1305(key_i, frame, associated data = header) \
+             in the 0x03 tagged format; frame = big-endian u32 length || \
+             zlib(json) || zero padding to the bucket; key_i = \
+             HKDF-expand(HKDF-extract(none, Argon2id(password_i, salt_i)), \
+             hkdf_info, 32). real_slot names the payload the password opens; the \
+             other is sealed under a random key. The nonces, salts and slot are \
+             random, so only decryption is reproducible."
                 .into(),
             "qr_symmetric: the mutual QR exchange. shared_key = HKDF(salt = none, ikm = \
              X25519(eph_a, eph_b), info_prefix || min(id_a, id_b) || max(id_a, id_b) || \
@@ -962,7 +951,8 @@ fn write_test_vectors_when_asked() {
         x3dh,
         mailbox_tokens: compute_mailbox(),
         backup: compute_backup(),
-        backup_v6: compute_backup_v6(),
+        backup_v6: recorded_backup_v6(),
+        backup_v7: crate::protocol_test_vectors_backup_v7_tests::compute_backup_v7(),
         qr_symmetric: compute_qr_symmetric(),
         link_exchange: compute_link_exchange(),
         recovery_proof: compute_recovery_proof(),

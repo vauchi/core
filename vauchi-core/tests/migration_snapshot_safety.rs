@@ -59,6 +59,7 @@ fn snapshot_names_distinguish_same_stem_databases() {
     }
 }
 
+// @internal
 #[test]
 fn preexisting_empty_destinations_are_not_used_as_snapshot_output() {
     let root = tempfile::tempdir().unwrap();
@@ -78,6 +79,7 @@ fn preexisting_empty_destinations_are_not_used_as_snapshot_output() {
 }
 
 #[cfg(unix)]
+// @internal
 #[test]
 fn snapshot_creation_preserves_preexisting_outside_symlink_targets() {
     for name in [
@@ -118,6 +120,7 @@ fn unreadable_real_key_store_is_not_confirmed_absence() {
 }
 
 #[cfg(unix)]
+// @internal
 #[test]
 fn shred_preserves_outside_targets_of_backup_aliases() {
     for hardlink in [false, true] {
@@ -146,6 +149,7 @@ fn shred_preserves_outside_targets_of_backup_aliases() {
     }
 }
 
+// @internal
 #[test]
 fn widget_removes_closed_regular_files_and_managed_keys() {
     let root = tempfile::tempdir().unwrap();
@@ -167,6 +171,7 @@ fn widget_removes_closed_regular_files_and_managed_keys() {
     assert!(!root.path().exists());
 }
 
+// @internal
 #[test]
 fn widget_preserves_an_outside_hardlinked_identity_target() {
     let root = tempfile::tempdir().unwrap();
@@ -183,6 +188,7 @@ fn widget_preserves_an_outside_hardlinked_identity_target() {
     );
 }
 
+// @internal
 #[test]
 fn real_key_store_does_not_overwrite_an_outside_hardlinked_key() {
     let root = tempfile::tempdir().unwrap();
@@ -203,6 +209,7 @@ fn real_key_store_does_not_overwrite_an_outside_hardlinked_key() {
     ));
 }
 
+// @internal
 #[test]
 fn real_key_store_inspection_errors_are_not_absence() {
     let root = tempfile::tempdir().unwrap();
@@ -216,6 +223,7 @@ fn real_key_store_inspection_errors_are_not_absence() {
     ));
 }
 
+// @internal
 #[test]
 fn verification_does_not_call_an_untraversable_namespace_absent() {
     let root = tempfile::tempdir().unwrap();
@@ -238,6 +246,7 @@ fn verification_does_not_call_an_untraversable_namespace_absent() {
 }
 
 #[cfg(unix)]
+// @internal
 #[test]
 fn a_dangling_profile_alias_is_not_confirmed_namespace_removal() {
     let root = tempfile::tempdir().unwrap();

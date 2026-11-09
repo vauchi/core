@@ -7,6 +7,7 @@ use vauchi_core::api::{Vauchi, VauchiConfig};
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::storage::{MemoryKeyStorage, SecureStorage};
 
+// @internal
 #[test]
 fn a_database_path_does_not_authorize_emergency_directory_deletion() {
     let root = tempfile::tempdir().unwrap();
@@ -24,6 +25,7 @@ fn a_database_path_does_not_authorize_emergency_directory_deletion() {
     assert!(app.identity().is_some());
 }
 
+// @internal
 #[test]
 fn an_explicit_profile_wipe_overwrites_the_actual_database_with_or_without_identity() {
     for has_identity in [false, true] {
@@ -50,6 +52,7 @@ fn an_explicit_profile_wipe_overwrites_the_actual_database_with_or_without_ident
     }
 }
 
+// @internal
 #[test]
 fn partial_snapshot_staging_prevents_reset_before_any_mutation() {
     let root = tempfile::tempdir().unwrap();
@@ -74,6 +77,7 @@ fn partial_snapshot_staging_prevents_reset_before_any_mutation() {
     assert_eq!(keys.load_key("smk").unwrap(), Some(vec![17; 32]));
 }
 
+// @internal
 #[test]
 fn a_refused_key_file_overwrite_is_reported_as_incomplete_wipe() {
     let root = tempfile::tempdir().unwrap();
@@ -96,6 +100,7 @@ fn a_refused_key_file_overwrite_is_reported_as_incomplete_wipe() {
     assert!(app.identity().is_none());
 }
 
+// @internal
 #[test]
 fn database_only_reset_preserves_neighboring_identity_and_key_files() {
     let root = tempfile::tempdir().unwrap();
@@ -119,6 +124,7 @@ fn database_only_reset_preserves_neighboring_identity_and_key_files() {
     );
 }
 
+// @internal
 #[test]
 fn explicit_profile_reset_removes_current_snapshots_after_restart() {
     let root = tempfile::tempdir().unwrap();
@@ -156,6 +162,7 @@ fn explicit_profile_reset_removes_current_snapshots_after_restart() {
     assert_eq!(keys.load_key("smk").unwrap(), None);
 }
 
+// @internal
 #[test]
 fn explicit_profile_reset_rejects_mismatched_scope_before_mutation() {
     let root = tempfile::tempdir().unwrap();
@@ -173,6 +180,7 @@ fn explicit_profile_reset_rejects_mismatched_scope_before_mutation() {
 }
 
 #[cfg(unix)]
+// @internal
 #[test]
 fn partial_wipe_reports_failure_and_retires_the_in_memory_identity() {
     let root = tempfile::tempdir().unwrap();
@@ -195,6 +203,7 @@ fn partial_wipe_reports_failure_and_retires_the_in_memory_identity() {
 }
 
 #[cfg(unix)]
+// @internal
 #[test]
 fn a_key_directory_alias_does_not_authorize_overwriting_outside_files() {
     for widget in [false, true] {

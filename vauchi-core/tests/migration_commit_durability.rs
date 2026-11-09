@@ -6,6 +6,7 @@ use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::storage::StorageError;
 use vauchi_core::storage::migration::{Migration, MigrationAction, MigrationRunner};
 
+// @internal
 #[test]
 fn migration_commit_uses_full_sync_and_restores_normal_after_success() {
     let root = tempfile::tempdir().unwrap();
@@ -43,6 +44,7 @@ fn abort(conn: &Connection, _: &SymmetricKey) -> Result<(), StorageError> {
     Err(StorageError::InvalidData(reason.into()))
 }
 
+// @internal
 #[test]
 fn failed_migration_restores_the_previous_sync_policy() {
     let conn = Connection::open_in_memory().unwrap();
@@ -66,6 +68,7 @@ fn failed_migration_restores_the_previous_sync_policy() {
     );
 }
 
+// @internal
 #[test]
 fn a_stronger_existing_sync_policy_is_not_lowered() {
     let conn = Connection::open_in_memory().unwrap();

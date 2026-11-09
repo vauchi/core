@@ -7,6 +7,7 @@ use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::identity::Identity;
 use vauchi_core::storage::{MemoryKeyStorage, SecureStorage, Storage};
 
+// @internal
 #[test]
 fn an_unrelated_root_is_rejected_before_keys_or_files_are_changed() {
     let database = tempfile::tempdir().unwrap();
@@ -33,6 +34,7 @@ fn an_unrelated_root_is_rejected_before_keys_or_files_are_changed() {
     assert!(path.exists());
 }
 
+// @internal
 #[test]
 fn widget_rejects_a_non_directory_before_destroying_keys() {
     let root = tempfile::tempdir().unwrap();
@@ -47,6 +49,7 @@ fn widget_rejects_a_non_directory_before_destroying_keys() {
 }
 
 #[cfg(unix)]
+// @internal
 #[test]
 fn custom_database_overwrite_report_matches_the_actual_file() {
     use std::io::Read;

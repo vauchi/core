@@ -72,19 +72,25 @@ impl ProfileEngine {
         Ok(self.finish_export(&blob))
     }
 
-    /// The real profile's snapshot, with its duress section when exported
-    /// from the real profile of an install with an app password.
+    /// The snapshot of the profile in front, with its duress section. On
+    /// the mask, the export is shaped as a decoy payload is: locked with
+    /// the duress PIN, with a fresh mask and no duress, so a backup made
+    /// under duress restores as a decoy backup does (ADR-080 point 7).
     fn real_snapshot(&self, identity: &Identity) -> VauchiResult<BackupSnapshot> {
-        let mut snapshot =
-            BackupSnapshot::capture(&self.storage, identity, self.clock.unix_seconds())
-                .map_err(backup_error)?;
-        // A duress export comes from the mask itself, which holds no real
-        // credential to carry.
-        if !self.is_mask()
-            && let Some(config) = self.password_config()?
-        {
-            snapshot.duress = Some(DuressSection::capture(&self.storage, &config)?);
-        }
+        let now = self.clock.unix_seconds();
+        let config = self.password_config()?;
+        let snapshot = match config {
+            Some(config) if self.is_mask() => {
+                BackupSnapshot::capture_decoy(&self.storage, &config, identity.display_name(), now)?
+            }
+            Some(config) => {
+                let mut snapshot =
+                    BackupSnapshot::capture(&self.storage, identity, now).map_err(backup_error)?;
+                snapshot.duress = Some(DuressSection::capture(&self.storage, &config)?);
+                snapshot
+            }
+            None => BackupSnapshot::capture(&self.storage, identity, now).map_err(backup_error)?,
+        };
         snapshot.validate().map_err(backup_error)?;
         Ok(snapshot)
     }

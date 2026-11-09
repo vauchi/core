@@ -17,7 +17,6 @@ fn install(dir: &Path) -> MemoryKeyStorage {
         "vauchi.db",
         "vauchi.db-wal",
         "vauchi.db-shm",
-        "vauchi.db.pre-migration-v74.bak",
         "identity.json",
     ] {
         std::fs::write(dir.join(name), b"old").unwrap();
@@ -79,4 +78,28 @@ fn starting_over_with_nothing_on_disk_succeeds() {
     delete_unreadable_data(&dir.path().join("vauchi.db"), &keys).unwrap();
 
     assert_eq!(remaining(dir.path()), Vec::<String>::new());
+}
+
+// @internal
+#[test]
+fn starting_over_refuses_an_appended_legacy_copy_before_any_deletion() {
+    let dir = tempfile::tempdir().unwrap();
+    let keys = install(dir.path());
+    let backup = dir.path().join("vauchi.db.pre-migration-v74.bak");
+    std::fs::write(&backup, b"old recovery").unwrap();
+    let before = remaining(dir.path());
+
+    let error = delete_unreadable_data(&dir.path().join("vauchi.db"), &keys).unwrap_err();
+
+    assert_eq!(
+        error.to_string(),
+        "Invalid data: migration backup ownership is ambiguous; recovery data was preserved"
+    );
+    assert_eq!(remaining(dir.path()), before);
+    assert_eq!(std::fs::read(backup).unwrap(), b"old recovery");
+    assert_eq!(keys.load_key("smk").unwrap(), Some(vec![1; 32]));
+    assert_eq!(
+        keys.load_key("storage_bootstrap").unwrap(),
+        Some(vec![2; 32])
+    );
 }

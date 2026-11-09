@@ -129,7 +129,7 @@ fn all_contact_overrides_load_exactly_as_saved() {
 
 // @internal
 #[test]
-fn opening_storage_removes_leftover_migration_backups() {
+fn opening_storage_preserves_preexisting_recovery_files_and_unrelated_files() {
     let dir = tempfile::tempdir().unwrap();
     let db = dir.path().join("vauchi.db");
     let backup = dir.path().join("vauchi.db.pre-migration-v3.bak");
@@ -139,6 +139,6 @@ fn opening_storage_removes_leftover_migration_backups() {
 
     let _storage = Storage::open(&db, SymmetricKey::generate()).unwrap();
 
-    assert!(!backup.exists());
-    assert!(unrelated.exists());
+    assert_eq!(std::fs::read(backup).unwrap(), b"old");
+    assert_eq!(std::fs::read(unrelated).unwrap(), b"keep");
 }

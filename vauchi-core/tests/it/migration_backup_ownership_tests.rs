@@ -97,6 +97,24 @@ fn startup_cleans_a_snapshot_created_by_its_own_successful_migration() {
 
 // @internal
 #[test]
+fn startup_does_not_claim_an_empty_preexisting_destination_as_its_own() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("history.db");
+    let backup = path.with_extension("pre-migration-v0.bak");
+    std::fs::write(&backup, b"").unwrap();
+
+    let storage = Storage::open(&path, SymmetricKey::generate()).unwrap();
+
+    assert_eq!(
+        storage.schema_version().unwrap(),
+        all_migrations().last().unwrap().version
+    );
+    let copy = Connection::open_with_flags(backup, OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+    assert_eq!(MigrationRunner::current_version(&copy).unwrap(), 0);
+}
+
+// @internal
+#[test]
 fn reset_refuses_an_actual_legacy_snapshot_before_removing_data_or_keys() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("private-person.db");

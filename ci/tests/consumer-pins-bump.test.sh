@@ -94,8 +94,10 @@ cat > "$T/table.json" <<'EOF'
 ] }
 EOF
 
-# Fake curl: answers the three GitLab calls the script makes and logs them.
-# tui has an open MR for its branch; relay's branch has none.
+# Fake curl: answers the GitLab calls the script makes and logs them.
+# tui has an open MR for its branch; relay's branch has none. cli has a
+# ready MR (!3) with a running pipeline, so its bump MR must queue behind
+# it (ready queue, vauchi/private#1179).
 cat > "$T/bin/curl" <<'EOF'
 #!/bin/sh
 out=""; method=GET; url=""; data=""
@@ -115,9 +117,15 @@ case "$method $url" in
     "GET "*/user) [ -n "${FAKE_USER_STATUS:-}" ] && { printf '%s' '{}' > "$out"; printf '%s' "$FAKE_USER_STATUS"; exit 0; }
         body='{"name":"Vauchi Bot","email":"bot@example.invalid"}'; status=200 ;;
     "GET "*vauchi%2Ftui/merge_requests*) body='[{"web_url":"https://gitlab.example/tui/-/merge_requests/7"}]'; status=200 ;;
+    "GET "*vauchi%2Fcli/merge_requests\?state=opened\&per_page=100)
+        body='[{"iid":3,"draft":false},{"iid":41,"draft":true}]'; status=200 ;;
+    "GET "*vauchi%2Fcli/merge_requests/3) body='{"iid":3,"head_pipeline":{"status":"running"}}'; status=200 ;;
+    "GET "*/merge_requests\?state=opened\&per_page=100) body='[{"iid":41,"draft":true}]'; status=200 ;;
     "GET "*/merge_requests*) body='[]'; status=200 ;;
     "POST "*vauchi%2Fweb-demo/merge_requests) body='{"message":"500 Internal Server Error"}'; status=500 ;;
-    "POST "*/merge_requests) body='{"web_url":"https://gitlab.example/mr/new"}'; status=201 ;;
+    "POST "*/merge_requests) body='{"iid":41,"web_url":"https://gitlab.example/mr/new"}'; status=201 ;;
+    "POST "*/merge_requests/*/notes) body='{"id":1}'; status=201 ;;
+    "PUT "*/merge_requests/41) body='{"iid":41}'; status=200 ;;
     *) body='{}'; status=404 ;;
 esac
 printf '%s' "$body" > "$out"
@@ -169,7 +177,17 @@ grep -q "cargo update --workspace (in cli)" "$T/log" || fail "cargo update must 
 # e2e locks relay's vauchi-protocol beside its own (#558): a -p by name is
 # ambiguous there, and the bump is only the manifest change anyway.
 grep -q "cargo update.* -p " "$T/log" && fail "cargo update must not name crates"
-[ "$(grep -c '^POST .*vauchi%2Fcli/merge_requests' "$T/log")" -eq 1 ] || fail "cli must get exactly one MR"
+[ "$(grep -c '^POST .*vauchi%2Fcli/merge_requests {' "$T/log")" -eq 1 ] || fail "cli must get exactly one MR"
+grep '^POST .*vauchi%2Fcli/merge_requests {' "$T/log" | grep -q '"title": *"Draft: chore: pin Core to v0.70.0"' \
+    || fail "a bump MR must open as a Draft"
+grep -q '^PUT .*vauchi%2Fcli/merge_requests/41' "$T/log" \
+    && fail "cli's bump MR is behind ready !3 and must stay Draft"
+grep '^POST .*vauchi%2Fcli/merge_requests/41/notes' "$T/log" | grep -q 'ready-queue: waiting behind !3' \
+    || fail "cli's bump MR must say it waits behind !3"
+grep '^POST .*vauchi%2Fcli/merge_requests/3/notes' "$T/log" | grep -q '!41 waits for this MR' \
+    || fail "!3 must say that the bump MR waits for it"
+grep -q "cli: opened https://gitlab.example/mr/new (Draft, waiting behind !3)" "$T/out" \
+    || fail "the job must say cli's bump MR is waiting"
 grep '^POST .*vauchi%2Fcli/merge_requests' "$T/log" | grep -q '"source_branch": *"chore/bump-core-0.70.0"' \
     || fail "cli's MR must come from the bump branch"
 grep '^POST .*vauchi%2Fcli/merge_requests' "$T/log" | grep -q '"target_branch": *"main"' \
@@ -233,7 +251,9 @@ cat "$T/out3"
 [ "$status" -eq 0 ] || fail "a push declined once must be retried and the job stay green"
 git -C "$T/remotes/flaky.git" rev-parse -q --verify "refs/heads/chore/bump-core-0.70.0" >/dev/null \
     || fail "the retried push must land the bump branch"
-[ "$(grep -c '^POST .*vauchi%2Fflaky/merge_requests' "$T/log3")" -eq 1 ] || fail "flaky must get exactly one MR"
+[ "$(grep -c '^POST .*vauchi%2Fflaky/merge_requests {' "$T/log3")" -eq 1 ] || fail "flaky must get exactly one MR"
+grep '^PUT .*vauchi%2Fflaky/merge_requests/41' "$T/log3" | grep -q '"title": *"chore: pin Core to v0.70.0"' \
+    || fail "with no ready MR ahead, the bump MR must be marked ready"
 
 # A consumer can list several pin files (private#1034): e2e pins Core in
 # Cargo.toml and names the same tag in ci/pins.env, the Core tag of its

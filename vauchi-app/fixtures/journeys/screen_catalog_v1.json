@@ -6976,7 +6976,7 @@
                       {
                         "title": "Version",
                         "subtitle": null,
-                        "detail": "0.102.0",
+                        "detail": "0.102.1",
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": null,
@@ -9202,7 +9202,7 @@
                             },
                             {
                               "title": "About",
-                              "subtitle": "Vauchi 0.102.0 · core 0.102.0",
+                              "subtitle": "Vauchi 0.102.1 · core 0.102.1",
                               "detail": null,
                               "icon_token": null,
                               "image_data": null,

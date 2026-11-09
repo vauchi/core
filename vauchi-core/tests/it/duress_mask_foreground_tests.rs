@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Under duress the foreground holds no real secret (ADR-080). These are the
-//! acceptance tests for ADR-080 step 3: until the duress foreground is built
-//! from the mask profile, the real seed, contacts and emergency config are
-//! reachable from it, so they are ignored (vauchi/private#1117).
+//! acceptance tests for ADR-080 step 3: the duress foreground is the mask
+//! profile's engine, and neither the real seed, contacts nor emergency
+//! config are reachable from it (vauchi/private#1117).
 
 use crate::common;
 
@@ -59,7 +59,6 @@ fn restore_full(backup: &str) -> Vauchi {
 
 // @scenario: duress_mode :: Cannot access real contacts from duress mode
 #[test]
-#[ignore = "ADR-080 step 3, vauchi/private#1117"]
 fn a_full_backup_made_under_duress_restores_the_decoys_not_the_real_identity() {
     let session = duress_session();
 
@@ -87,7 +86,6 @@ fn a_full_backup_made_under_duress_restores_the_decoys_not_the_real_identity() {
 
 // @scenario: duress_mode :: Real keys never loaded in duress mode
 #[test]
-#[ignore = "ADR-080 step 3, vauchi/private#1117"]
 fn an_identity_backup_made_under_duress_does_not_hold_the_real_seed() {
     let session = duress_session();
 
@@ -105,7 +103,6 @@ fn an_identity_backup_made_under_duress_does_not_hold_the_real_seed() {
 
 // @scenario: duress_mode :: Settings reflect decoy state
 #[test]
-#[ignore = "ADR-080 step 3, vauchi/private#1117"]
 fn the_real_emergency_message_is_not_readable_under_duress() {
     let session = duress_session();
 
@@ -116,7 +113,6 @@ fn the_real_emergency_message_is_not_readable_under_duress() {
 
 // @scenario: duress_mode :: Decoy profile functions normally
 #[test]
-#[ignore = "ADR-080 step 3, vauchi/private#1117"]
 fn a_contact_listed_under_duress_can_be_archived() {
     let session = duress_session();
     let listed = session.vauchi.list_contacts().expect("contacts");

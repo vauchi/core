@@ -8,6 +8,7 @@
 # pin is rewritten by vauchi/scripts' core-pins.py; a Cargo consumer also
 # gets `cargo update --workspace`, so the MR carries a lockfile its
 # pipeline can build with --locked. Merging stays with the maintainer.
+# Each MR opens as a Draft and goes through the ready queue (queue_mr).
 #
 # One consumer failing never stops the others; the job reports every
 # failure and exits non-zero at the end.
@@ -63,6 +64,65 @@ data = json.load(open(sys.argv[1]))
 if isinstance(data, list):
     data = data[0] if data else {}
 print(data.get(sys.argv[2]) or "")' "$WORK/response.json" "$1"
+}
+
+# Ready queue (vauchi/private#1179, maintainer 2026-11-09): one live ready
+# MR per repository, so merging what is ready merges a tested tree. A bump
+# MR opens as a Draft; behind a ready MR whose pipeline is not red it stays
+# Draft and both MRs say so. Its turn comes in session-init's "READY QUEUE"
+# list: `just gitlab mr-rebase`, then `just gitlab mr-ready`.
+queue_mr() {
+    local repo=$1 project=$2 iid=$3 url=$4 status other ahead="" pipeline body
+    status=$(api GET "$API/projects/$project/merge_requests?state=opened&per_page=100")
+    if [ "$status" != 200 ]; then
+        echo "$repo: ERROR: listing open MRs failed (HTTP $status); $url stays Draft" >&2
+        return 1
+    fi
+    for other in $(python3 -c 'import json, sys
+mrs = json.load(open(sys.argv[1]))
+print(" ".join(str(i) for i in sorted(m["iid"] for m in mrs if not m["draft"] and m["iid"] != int(sys.argv[2]))))' \
+            "$WORK/response.json" "$iid"); do
+        status=$(api GET "$API/projects/$project/merge_requests/$other")
+        if [ "$status" != 200 ]; then
+            echo "$repo: ERROR: reading !$other failed (HTTP $status); $url stays Draft" >&2
+            return 1
+        fi
+        pipeline=$(python3 -c 'import json, sys
+print((json.load(open(sys.argv[1])).get("head_pipeline") or {}).get("status") or "")' "$WORK/response.json")
+        # A ready MR with a red pipeline cannot be merged as it is: it holds nothing.
+        case "$pipeline" in
+            failed|canceled) ;;
+            *) ahead=$other; break ;;
+        esac
+    done
+    if [ -z "$ahead" ]; then
+        body=$(python3 -c 'import json, sys; print(json.dumps({"title": f"chore: pin Core to v{sys.argv[1]}"}))' "$VERSION")
+        status=$(api PUT "$API/projects/$project/merge_requests/$iid" "$body")
+        if [ "$status" != 200 ]; then
+            echo "$repo: ERROR: marking $url ready failed (HTTP $status); it stays Draft" >&2
+            return 1
+        fi
+        echo "$repo: opened $url"
+        return 0
+    fi
+    body=$(python3 -c 'import json, sys
+iid, ahead, repo = sys.argv[1:4]
+print(json.dumps({"body": f"ready-queue: waiting behind !{ahead}, which is ready, so this MR stays Draft. "
+                  f"After !{ahead} merges: `just gitlab mr-rebase {iid} {repo}`, then `just gitlab mr-ready {iid} {repo}`."}))' \
+        "$iid" "$ahead" "$repo")
+    status=$(api POST "$API/projects/$project/merge_requests/$iid/notes" "$body")
+    if [ "$status" != 201 ]; then
+        echo "$repo: ERROR: $url waits behind !$ahead but its comment failed (HTTP $status)" >&2
+        return 1
+    fi
+    body=$(python3 -c 'import json, sys
+print(json.dumps({"body": f"ready-queue: !{sys.argv[1]} waits for this MR to merge, then rebases on it."}))' "$iid")
+    status=$(api POST "$API/projects/$project/merge_requests/$ahead/notes" "$body")
+    if [ "$status" != 201 ]; then
+        echo "$repo: ERROR: commenting on !$ahead failed (HTTP $status)" >&2
+        return 1
+    fi
+    echo "$repo: opened $url (Draft, waiting behind !$ahead)"
 }
 
 # bump_one <repo> <kind> <file> [<kind> <file>...]: a consumer may pin Core in
@@ -135,7 +195,7 @@ version, repo, current, branch = sys.argv[1:5]
 print(json.dumps({
     "source_branch": branch,
     "target_branch": "main",
-    "title": f"chore: pin Core to v{version}",
+    "title": f"Draft: chore: pin Core to v{version}",
     "description": (
         f"Core v{version} was released; {repo} pinned {current}.\n\n"
         "Opened by Core'"'"'s release pipeline (`bump:consumer-pins`, ADR-026 "
@@ -149,7 +209,7 @@ print(json.dumps({
         echo "$repo: ERROR: pushed $BRANCH but opening the MR failed (HTTP $status)" >&2
         return 1
     fi
-    echo "$repo: opened $(json_field web_url)"
+    queue_mr "$repo" "$project" "$(json_field iid)" "$(json_field web_url)"
 }
 
 if [ "${MODE:-}" = one ]; then

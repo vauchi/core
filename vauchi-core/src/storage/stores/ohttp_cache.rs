@@ -20,6 +20,13 @@ pub struct OhttpCacheStore<'a> {
     clock: &'a Arc<dyn Clock>,
 }
 
+impl<'a> OhttpCacheStore<'a> {
+    /// The view a locked run has: the cache is not sealed.
+    pub(in crate::storage) fn unsealed(conn: &'a Connection, clock: &'a Arc<dyn Clock>) -> Self {
+        Self { conn, clock }
+    }
+}
+
 impl Storage {
     /// Scoped persistence view for the ohttp_cache domain.
     pub fn ohttp_cache(&self) -> crate::storage::Sealed<'_, OhttpCacheStore<'_>> {

@@ -60,6 +60,12 @@ pub(crate) fn ohttp_endpoint_pins(
     }
 }
 
+/// Whether the gateway still accepts a key held for `window` in the
+/// `current` window: the one before, its own, or the one after.
+pub(crate) fn gateway_still_holds(window: u64, current: u64) -> bool {
+    window.saturating_add(1) >= current && window <= current.saturating_add(1)
+}
+
 /// The OHTTP key a relay transport is given.
 pub(crate) enum TransportOhttpKey {
     /// An anchored relay's held signed key, while the gateway still

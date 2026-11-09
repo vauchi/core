@@ -105,6 +105,11 @@ impl LockedReceiveStorage {
         RatchetStore::under_receive_key(&self.conn, &self.receive_key, &self.clock)
     }
 
+    /// The OHTTP key and delay-window cache, which no key seals.
+    pub fn ohttp_cache(&self) -> super::OhttpCacheStore<'_> {
+        super::OhttpCacheStore::unsealed(&self.conn, &self.clock)
+    }
+
     /// The receive registrations stored ahead.
     pub fn receive_tokens(&self) -> ReceiveTokenStore<'_> {
         ReceiveTokenStore::under_receive_key(&self.conn, &self.receive_key)

@@ -57,6 +57,14 @@ impl RegistrationDay {
         self.receive_until
     }
 
+    pub(crate) fn decode(bytes: &[u8]) -> Result<Self, StorageError> {
+        serde_json::from_slice(bytes).map_err(|e| StorageError::Serialization(e.to_string()))
+    }
+
+    pub(crate) fn routes(&self) -> &HashMap<String, MailboxRoute> {
+        &self.routes
+    }
+
     /// The contacts the day's tokens receive from.
     pub fn contact_ids(&self) -> BTreeSet<&str> {
         self.routes
@@ -75,9 +83,7 @@ impl ProfileEngine {
         let Some(bytes) = self.storage.receive_tokens().load_day(day)? else {
             return Ok(None);
         };
-        serde_json::from_slice(&bytes)
-            .map(Some)
-            .map_err(|e| StorageError::Serialization(e.to_string()).into())
+        Ok(Some(RegistrationDay::decode(&bytes)?))
     }
 
     /// Best-effort: a failure leaves the days stored by an earlier sync,

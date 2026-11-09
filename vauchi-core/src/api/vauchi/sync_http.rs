@@ -21,6 +21,7 @@
 //! 5. Send phase: delegates to `SendPhase` for outbound updates + ACKs.
 //! 6. Returns combined `VauchiSyncOutcome`.
 
+use crate::api::relay_transport::gateway_still_holds;
 use std::time::Duration;
 
 /// Recommended interval (seconds) between scheduled sync ticks.
@@ -1329,11 +1330,6 @@ fn classify_inbound_blob(
             ciphertext,
         },
     }
-}
-
-/// The gateway holds the previous, current and next window's keys.
-fn gateway_still_holds(window: u64, current: u64) -> bool {
-    window.saturating_add(1) >= current && window <= current.saturating_add(1)
 }
 
 fn ohttp_route_error() -> VauchiError {

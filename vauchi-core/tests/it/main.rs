@@ -306,6 +306,7 @@ mod full_backup_api_tests;
 mod full_backup_atomic_tests;
 mod full_backup_state_tests;
 mod full_backup_tests;
+mod full_backup_v7_format_tests;
 mod full_backup_validation_tests;
 mod fuzz_tests;
 mod gdpr_deletion_tests;

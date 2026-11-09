@@ -215,3 +215,37 @@ fn real_key_store_inspection_errors_are_not_absence() {
         Err(vauchi_core::storage::StorageError::Encryption(_))
     ));
 }
+
+#[test]
+fn verification_does_not_call_an_untraversable_namespace_absent() {
+    let root = tempfile::tempdir().unwrap();
+    let parent = root.path().join("not-a-directory");
+    std::fs::write(&parent, b"namespace fixture").unwrap();
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let keys = MemoryKeyStorage::new();
+    let identity = Identity::create("Fixture", 0);
+    let report =
+        ShredManager::new(&storage, &keys, &identity, parent.join("profile")).verify_shred();
+    assert_eq!(
+        (
+            report.database_absent,
+            report.data_dir_absent,
+            report.pre_signed_absent,
+            report.all_clear
+        ),
+        (false, false, false, false)
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_dangling_profile_alias_is_not_confirmed_namespace_removal() {
+    let root = tempfile::tempdir().unwrap();
+    let alias = root.path().join("profile");
+    std::os::unix::fs::symlink(root.path().join("missing"), &alias).unwrap();
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let keys = MemoryKeyStorage::new();
+    let identity = Identity::create("Fixture", 0);
+    let report = ShredManager::new(&storage, &keys, &identity, &alias).verify_shred();
+    assert_eq!((report.data_dir_absent, report.all_clear), (false, false));
+}

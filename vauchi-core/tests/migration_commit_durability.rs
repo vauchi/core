@@ -65,3 +65,28 @@ fn failed_migration_restores_the_previous_sync_policy() {
         1
     );
 }
+
+#[test]
+fn a_stronger_existing_sync_policy_is_not_lowered() {
+    let conn = Connection::open_in_memory().unwrap();
+    conn.execute_batch("PRAGMA synchronous=EXTRA").unwrap();
+    let migration = Migration {
+        version: 1,
+        name: "preserve stronger durability",
+        action: MigrationAction::Sql(
+            "CREATE TABLE observed_sync(value INTEGER); INSERT INTO observed_sync SELECT synchronous FROM pragma_synchronous",
+        ),
+    };
+    MigrationRunner::run(&conn, &SymmetricKey::generate(), &[migration], None, 11).unwrap();
+    assert_eq!(
+        conn.query_row("SELECT value FROM observed_sync", [], |r| r
+            .get::<_, i64>(0))
+            .unwrap(),
+        3
+    );
+    assert_eq!(
+        conn.pragma_query_value(None, "synchronous", |r| r.get::<_, i64>(0))
+            .unwrap(),
+        3
+    );
+}

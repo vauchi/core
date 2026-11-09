@@ -31,6 +31,7 @@ impl ProfileEngine {
             return self.journal_sync_item(item);
         }
         match crate::sync::SyncItem::cover_of(&item, |bytes| self.rng.fill_bytes(bytes)) {
+            Ok(cover) if self.is_mask() => self.concealed_duress().owed_journal_cover.push(cover),
             Ok(cover) => self.journal_sync_item(cover),
             Err(error) => tracing::warn!(%error, "[DeviceSync] sizing a cover item failed"),
         }
@@ -48,6 +49,10 @@ impl ProfileEngine {
     /// The duress counterpart of `run_owed_repropagation`, with the same
     /// retry budget so a failing contact backs off the same way.
     pub(super) fn run_owed_cover(&self) -> VauchiResult<()> {
+        // The mask holds no real contact: the worker queues what it owes.
+        if self.is_mask() {
+            return Ok(());
+        }
         let mut state = self.concealed_duress().owed_cover.clone();
         if !state.should_run() {
             return Ok(());
@@ -67,6 +72,14 @@ impl ProfileEngine {
             state
         };
         Ok(())
+    }
+
+    /// Journals the cover a mask engine's edits owe the other devices.
+    pub(super) fn journal_owed_cover(&self) {
+        let owed = std::mem::take(&mut self.concealed_duress().owed_journal_cover);
+        for cover in owed {
+            self.journal_sync_item(cover);
+        }
     }
 
     fn cover_or_defer(&self, contact_id: &str) -> VauchiResult<()> {

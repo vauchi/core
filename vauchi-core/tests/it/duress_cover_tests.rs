@@ -128,6 +128,16 @@ fn edit_then_tick(world: &mut World, edits: &[Edit]) {
         apply(&mut world.alice, edit);
     }
     world.alice.run_owed_repropagation().unwrap();
+    back_to_the_real_profile(&mut world.alice);
+}
+
+/// Under duress the real queue is out of the foreground's reach (ADR-080):
+/// the unlock with the app password brings the real profile back, which
+/// first queues what the session's edits owe, and the queue is read there.
+fn back_to_the_real_profile(alice: &mut Vauchi) {
+    if alice.auth_mode() == AuthMode::Duress {
+        assert_eq!(alice.authenticate(APP_PASSWORD).unwrap(), AuthMode::Normal);
+    }
 }
 
 /// Bob receives everything Alice queued for him; the outcomes, in order.
@@ -223,6 +233,7 @@ fn every_own_card_writer_under_duress_queues_only_cover() {
     assert!(wb.remove_own_field_by_id(&field_id).unwrap());
     duress.alice.update_display_name("Alicia").unwrap();
     duress.alice.run_owed_repropagation().unwrap();
+    back_to_the_real_profile(&mut duress.alice);
 
     let outcomes = bob_receives_all(&duress);
     assert!(

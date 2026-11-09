@@ -72,7 +72,7 @@ impl ProfileEngine {
             None => false,
         };
 
-        let password_set = self.storage.identity().load_password_config()?.is_some();
+        let password_set = self.password_config()?.is_some();
 
         // Count completed steps
         let steps = [

@@ -42,6 +42,23 @@ impl AppPasswordConfig {
         Ok(Self::from_stored(hash, salt, None, None, false))
     }
 
+    /// What a duress session confirms: this configuration's duress PIN, and
+    /// in place of the real password a random hash no password matches, so
+    /// verifying still hashes twice (ADR-080 point 4).
+    pub(crate) fn duress_session_password(&self) -> VauchiResult<Self> {
+        let (Some(duress_hash), Some(duress_salt)) = (self.duress_hash(), self.duress_salt())
+        else {
+            return Err(VauchiError::InvalidState("no duress PIN is set".into()));
+        };
+        Ok(Self::from_stored(
+            crate::crypto::random_bytes(),
+            generate_salt()?,
+            Some(*duress_hash),
+            Some(*duress_salt),
+            true,
+        ))
+    }
+
     /// Sets up a duress PIN on this configuration.
     ///
     /// The duress password must differ from the normal password.

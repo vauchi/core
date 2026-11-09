@@ -128,7 +128,10 @@ fn what_is_made_in_duress_mode_stays_in_the_session() {
 // entries disappear while the owner is coerced.
 #[test]
 fn real_contacts_still_see_what_the_real_groups_grant() {
-    let w = in_duress_mode();
+    let mut w = in_duress_mode();
+    // The real groups are out of the duress foreground's reach (ADR-080):
+    // the real profile is read once the app password brings it back.
+    assert_eq!(w.wb.authenticate(APP_PIN).unwrap(), AuthMode::Normal);
     assert!(
         w.wb.get_effective_field_visibility(&w.rita, &w.field)
             .unwrap(),

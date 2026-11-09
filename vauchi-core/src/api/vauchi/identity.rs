@@ -342,6 +342,9 @@ impl ProfileEngine {
 
     /// Returns the public ID of the current identity.
     pub fn public_id(&self) -> VauchiResult<String> {
+        if let Some(shown) = &self.shown {
+            return Ok(shown.public_id());
+        }
         self.identity
             .as_ref()
             .map(|id| id.public_id())
@@ -357,7 +360,13 @@ impl ProfileEngine {
             .identity
             .as_ref()
             .ok_or(VauchiError::IdentityNotInitialized)?;
-        let hex = hex::encode(identity.signing_public_key());
+        let shown_key = self
+            .shown
+            .as_ref()
+            .map_or(identity.signing_public_key(), |shown| {
+                shown.signing_public_key()
+            });
+        let hex = hex::encode(shown_key);
         Ok(hex
             .chars()
             .collect::<Vec<_>>()

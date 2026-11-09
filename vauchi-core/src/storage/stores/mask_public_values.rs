@@ -56,12 +56,30 @@ impl Storage {
         self.mask_sealed(mask.sealed(MaskPublicValuesStore { mask, sealer: self }))
     }
 
-    /// Makes the mask's public values those of `identity`, the real one.
+    /// Makes the mask's public values those of `identity`, the real one,
+    /// and of this database's user-presence enrolment.
     pub fn keep_mask_public_values(&self, identity: &Identity) -> Result<(), StorageError> {
         self.mask_public_values().save(&MaskPublicValues::new(
             *identity.signing_public_key(),
             identity.display_name(),
-        ))
+        ))?;
+        self.keep_mask_presence_digest(self.ux().load_user_presence_digest()?.as_ref())
+    }
+
+    /// Makes the mask's user-presence digest `digest`. The digest only
+    /// verifies the keystore's secret, so the mask holds it as a public
+    /// value: under duress an export reveals the enrolled secret as it
+    /// always does, and never seals a new one over it (owner, 2026-11-09).
+    pub fn keep_mask_presence_digest(&self, digest: Option<&[u8; 32]>) -> Result<(), StorageError> {
+        let mask = self.mask_profile();
+        if mask.ux().load_user_presence_digest()?.as_ref() == digest {
+            return Ok(());
+        }
+        match digest {
+            Some(digest) => mask.ux().save_user_presence_digest(digest)?,
+            None => mask.ux().clear_user_presence_digest()?,
+        }
+        self.seal_mask()
     }
 }
 

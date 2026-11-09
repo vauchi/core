@@ -29,6 +29,13 @@ fn alice(credential: &str, expected_mode: AuthMode) -> (Vauchi, DeviceRegistry, 
     (wb, registry, tablet_id)
 }
 
+/// Under duress the real journal is out of the foreground's reach
+/// (ADR-080): the unlock with the app password brings the real profile
+/// back, which first journals the cover the session's edits owe.
+fn back_to_the_real_profile(wb: &mut Vauchi) {
+    assert_eq!(wb.authenticate(APP_PASSWORD).unwrap(), AuthMode::Normal);
+}
+
 fn journaled_for_tablet(
     wb: &Vauchi,
     registry: DeviceRegistry,
@@ -99,7 +106,7 @@ fn applying_a_cover_item_changes_nothing() {
 #[test]
 fn a_duress_edit_journals_cover_of_the_real_item_s_length_for_the_other_device() {
     let (normal, normal_registry, tablet) = alice(APP_PASSWORD, AuthMode::Normal);
-    let (duress, duress_registry, _) = alice(DURESS_PIN, AuthMode::Duress);
+    let (mut duress, duress_registry, _) = alice(DURESS_PIN, AuthMode::Duress);
     for wb in [&normal, &duress] {
         let field = ContactField::new(FieldType::Phone, "Phone", "+41 79 000 00 00", 0);
         let field_id = field.id().to_string();
@@ -107,6 +114,7 @@ fn a_duress_edit_journals_cover_of_the_real_item_s_length_for_the_other_device()
         assert!(wb.remove_own_field_by_id(&field_id).unwrap());
     }
 
+    back_to_the_real_profile(&mut duress);
     let real = journaled_for_tablet(&normal, normal_registry, &tablet);
     let cover = journaled_for_tablet(&duress, duress_registry, &tablet);
 
@@ -146,10 +154,11 @@ fn add_and_annotate_bob(wb: &Vauchi) {
 #[test]
 fn a_duress_session_never_journals_a_non_cover_item() {
     let (normal, normal_registry, tablet) = alice(APP_PASSWORD, AuthMode::Normal);
-    let (duress, duress_registry, _) = alice(DURESS_PIN, AuthMode::Duress);
+    let (mut duress, duress_registry, _) = alice(DURESS_PIN, AuthMode::Duress);
     add_and_annotate_bob(&normal);
     add_and_annotate_bob(&duress);
 
+    back_to_the_real_profile(&mut duress);
     let real = journaled_for_tablet(&normal, normal_registry, &tablet);
     let cover = journaled_for_tablet(&duress, duress_registry, &tablet);
 
@@ -178,10 +187,11 @@ fn edit_tags_and_groups(wb: &Vauchi) {
 #[test]
 fn a_duress_tag_or_group_change_journals_cover_of_the_real_item_s_length() {
     let (normal, normal_registry, tablet) = alice(APP_PASSWORD, AuthMode::Normal);
-    let (duress, duress_registry, _) = alice(DURESS_PIN, AuthMode::Duress);
+    let (mut duress, duress_registry, _) = alice(DURESS_PIN, AuthMode::Duress);
     edit_tags_and_groups(&normal);
     edit_tags_and_groups(&duress);
 
+    back_to_the_real_profile(&mut duress);
     let real = journaled_for_tablet(&normal, normal_registry, &tablet);
     let cover = journaled_for_tablet(&duress, duress_registry, &tablet);
 

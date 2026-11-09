@@ -32,6 +32,7 @@ mod identity;
 mod import;
 #[cfg(feature = "network-http")]
 mod link_exchange;
+mod mask_foreground;
 mod merge;
 mod ohttp_key_error;
 mod onboarding;
@@ -240,6 +241,9 @@ const SMK_KEY_NAME: &str = "smk";
 /// connection management will be handled separately.
 pub struct Vauchi {
     foreground: ProfileEngine,
+    /// The real engine while the mask is in the foreground (ADR-080): no
+    /// method returns it, and nothing derefs to it.
+    held: Option<ProfileEngine>,
 }
 
 impl std::ops::Deref for Vauchi {
@@ -337,7 +341,10 @@ impl Vauchi {
 
 impl From<ProfileEngine> for Vauchi {
     fn from(foreground: ProfileEngine) -> Self {
-        Vauchi { foreground }
+        Vauchi {
+            foreground,
+            held: None,
+        }
     }
 }
 
@@ -384,6 +391,13 @@ pub struct ProfileEngine {
     wiped_by_another_device: bool,
     config: VauchiConfig,
     identity: Option<Identity>,
+    /// What a mask engine shows for the identity: the real public ID,
+    /// fingerprint and name (ADR-080 point 4). `None` for the real engine.
+    shown: Option<crate::storage::MaskPublicValues>,
+    /// A mask engine's password: the duress PIN that opened the session,
+    /// so it confirms that PIN only. `None` for the real engine, which reads
+    /// its own from storage.
+    session_password: Option<crate::identity::password_config::AppPasswordConfig>,
     storage: Storage,
     events: Arc<EventDispatcher>,
     secure_storage: Option<Arc<dyn SecureStorage>>,
@@ -592,6 +606,8 @@ impl ProfileEngine {
         let mut wb = ProfileEngine {
             config,
             identity,
+            shown: None,
+            session_password: None,
             storage,
             events,
             secure_storage,
@@ -817,6 +833,8 @@ impl ProfileEngine {
             // (2026-08-13-device-link-generation-never-completes).
             config: VauchiConfig::default().with_storage_key(storage_key),
             identity: None,
+            shown: None,
+            session_password: None,
             storage,
             events,
             secure_storage: None,

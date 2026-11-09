@@ -38,31 +38,53 @@ impl Vauchi {
         &mut self,
         run: impl FnOnce(&mut ProfileEngine) -> VauchiResult<VauchiSyncOutcome>,
     ) -> VauchiResult<VauchiSyncOutcome> {
-        if !self.foreground.in_duress_mode() {
+        let Some(held) = self.held.as_mut() else {
             return run(&mut self.foreground);
-        }
+        };
         // Built for each sync: a connection loads the sealed mask database
         // when it opens, so a long-lived worker would size cover from a stale
         // duress own card.
-        let Some(mut worker) = self.foreground.duress_worker()? else {
-            return run(&mut self.foreground);
-        };
-        worker.take_sync_state_from(&self.foreground);
-        let received = Arc::new(Mutex::new(Vec::new()));
-        let sink = received.clone();
-        worker.events.add_handler(Arc::new(move |event| {
-            sink.lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .push(event)
-        }));
-        let outcome = run(&mut worker);
-        self.foreground.take_sync_state_from(&worker);
-        worker.record_without_notifying(&received);
+        if let Some(mut worker) = held.duress_worker()? {
+            return worker.sync_as_worker(&mut self.foreground, run);
+        }
+        // An in-memory profile cannot be opened again: the held engine syncs,
+        // with the mask handed back so it sizes cover from the current card.
+        let mask = self.foreground.hand_back_storage()?;
+        held.storage.take_back_mask_profile(mask)?;
+        let events = std::mem::replace(&mut held.events, Arc::new(EventDispatcher::new()));
+        let outcome = held.sync_as_worker(&mut self.foreground, run);
+        held.events = events;
+        self.foreground.storage = held.storage.lend_mask_profile()?;
         outcome
     }
 }
 
 impl ProfileEngine {
+    /// Runs this real engine's sync for the mask `foreground`: first it
+    /// queues the cover the mask's edits owe (ADR-080 point 5, amended
+    /// 2026-11-09), then syncs, and records what the sync raised without a
+    /// notification.
+    fn sync_as_worker(
+        &mut self,
+        foreground: &mut ProfileEngine,
+        run: impl FnOnce(&mut ProfileEngine) -> VauchiResult<VauchiSyncOutcome>,
+    ) -> VauchiResult<VauchiSyncOutcome> {
+        // Before any relay call, so the cover is queued even when the sync
+        // itself then fails, as a duress edit's cover was before the mask.
+        self.queue_owed_cover_of(foreground);
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let sink = received.clone();
+        self.events.add_handler(Arc::new(move |event| {
+            sink.lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push(event)
+        }));
+        let outcome = run(self);
+        foreground.last_sync_unix_seconds = self.last_sync_unix_seconds;
+        self.record_without_notifying(&received);
+        outcome
+    }
+
     /// The real profile opened again on its own connection, with its own
     /// identity and an event dispatcher no handler listens on; it shares the
     /// device's clock, RNG, sleeper and relay transport. `None` for an
@@ -86,6 +108,8 @@ impl ProfileEngine {
         Ok(Some(ProfileEngine {
             config: self.config.clone(),
             identity,
+            shown: None,
+            session_password: None,
             storage,
             events: Arc::new(EventDispatcher::new()),
             secure_storage: self.secure_storage.clone(),
@@ -120,13 +144,5 @@ impl ProfileEngine {
         ) {
             tracing::warn!(%error, "[Worker] recording received activity failed");
         }
-    }
-
-    /// Takes the cover a duress edit owes and the last sync time, so each
-    /// sync continues where the other engine's left off.
-    fn take_sync_state_from(&mut self, other: &ProfileEngine) {
-        self.concealed_duress().owed_cover =
-            std::mem::take(&mut other.concealed_duress().owed_cover);
-        self.last_sync_unix_seconds = other.last_sync_unix_seconds;
     }
 }

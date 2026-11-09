@@ -82,6 +82,13 @@ impl Identity {
         Self::from_seed(master_seed, normalize_text(display_name), now)
     }
 
+    /// The mask profile's identity: the mask seed's keys under the real
+    /// name, which the mask displays (ADR-080 point 4).
+    #[cfg(feature = "storage")]
+    pub(crate) fn for_mask(seed: &[u8; 32], display_name: &str, now: u64) -> Self {
+        Self::from_seed(*seed, normalize_text(display_name), now)
+    }
+
     /// Creates an identity from an existing seed with default device index 0.
     fn from_seed(master_seed: [u8; 32], display_name: String, now: u64) -> Self {
         Self::from_seed_with_device(

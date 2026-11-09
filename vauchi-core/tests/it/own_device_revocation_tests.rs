@@ -145,6 +145,8 @@ fn in_duress_mode_this_device_never_revokes_itself_in_the_real_registry() {
     );
 
     let refused = phone.revoke_this_device().is_err();
+    // The real registry is out of the duress foreground's reach (ADR-080).
+    phone.authenticate("app-pin-1234").unwrap();
 
     assert_eq!(
         (refused, revoked_in_my_registry(&phone, &this_phone)),

@@ -118,6 +118,15 @@ impl ProfileEngine {
 
     // === App Password / Duress PIN ===
 
+    /// This engine's password configuration: a mask engine's session
+    /// password, or the real one from storage.
+    pub(super) fn password_config(&self) -> VauchiResult<Option<AppPasswordConfig>> {
+        if let Some(session) = &self.session_password {
+            return Ok(Some(session.clone()));
+        }
+        Ok(self.storage.identity().load_password_config()?)
+    }
+
     /// Returns the current authentication mode.
     pub fn auth_mode(&self) -> AuthMode {
         self.auth_mode
@@ -132,9 +141,7 @@ impl ProfileEngine {
     /// - Returns an error if neither matches
     pub fn authenticate(&mut self, password: &str) -> VauchiResult<AuthMode> {
         let config = self
-            .storage
-            .identity()
-            .load_password_config()?
+            .password_config()?
             .ok_or_else(|| VauchiError::InvalidState("no password configured".into()))?;
 
         match config.verify(password) {
@@ -208,7 +215,7 @@ impl ProfileEngine {
     /// the PIN they unlocked with is wrong would reveal duress mode. With no
     /// app password there is nothing to confirm.
     pub fn confirm_session_password(&self, password: &str) -> VauchiResult<bool> {
-        let Some(config) = self.storage.identity().load_password_config()? else {
+        let Some(config) = self.password_config()? else {
             return Ok(true);
         };
         Ok(match config.verify(password) {
@@ -234,7 +241,7 @@ impl ProfileEngine {
         // this guard a wrong-mode caller could replace the stored hash+salt
         // with no current-password check — a clobber/lockout risk
         // (2026-06-13-ios-app-password-setup-missing review).
-        if self.storage.identity().load_password_config()?.is_some() {
+        if self.password_config()?.is_some() {
             return Err(VauchiError::InvalidState(
                 "app password already configured; use change_app_password to rotate".into(),
             ));
@@ -278,9 +285,7 @@ impl ProfileEngine {
         }
 
         let mut config = self
-            .storage
-            .identity()
-            .load_password_config()?
+            .password_config()?
             .ok_or_else(|| VauchiError::InvalidState("no password configured".into()))?;
 
         match config.verify(current_password) {
@@ -312,13 +317,9 @@ impl ProfileEngine {
             return Ok(());
         }
 
-        let mut config = self
-            .storage
-            .identity()
-            .load_password_config()?
-            .ok_or_else(|| {
-                VauchiError::InvalidState("app password must be set before duress PIN".into())
-            })?;
+        let mut config = self.password_config()?.ok_or_else(|| {
+            VauchiError::InvalidState("app password must be set before duress PIN".into())
+        })?;
 
         config.setup_duress(duress_password)?;
 
@@ -338,7 +339,7 @@ impl ProfileEngine {
 
     /// Returns whether an app password has been configured.
     pub fn is_password_enabled(&self) -> VauchiResult<bool> {
-        Ok(self.storage.identity().load_password_config()?.is_some())
+        Ok(self.password_config()?.is_some())
     }
 
     /// Returns the activity log entries newer than `since_secs`.
@@ -368,7 +369,7 @@ impl ProfileEngine {
     }
 
     fn real_duress_enabled(&self) -> VauchiResult<bool> {
-        match self.storage.identity().load_password_config()? {
+        match self.password_config()? {
             Some(config) => Ok(config.duress_enabled()),
             None => Ok(false),
         }

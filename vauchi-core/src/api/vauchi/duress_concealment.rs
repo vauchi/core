@@ -28,6 +28,10 @@ pub(super) struct ConcealedDuress {
     /// edit's marker is durable: the marker itself must not outlive the
     /// session.
     pub(super) owed_cover: crate::reminders::OwnCardRepropagateState,
+    /// Cover a mask engine's edits owe the owner's other devices, journaled
+    /// by the real engine when it next runs (ADR-080 point 5, amended
+    /// 2026-11-09): random bytes, each the length of an edit's item.
+    pub(super) owed_journal_cover: Vec<crate::sync::SyncItem>,
 }
 
 pub(super) type ConcealedDuressCell = Mutex<ConcealedDuress>;
@@ -35,6 +39,11 @@ pub(super) type ConcealedDuressCell = Mutex<ConcealedDuress>;
 impl ProfileEngine {
     pub(super) fn in_duress_mode(&self) -> bool {
         self.auth_mode == AuthMode::Duress
+    }
+
+    /// Whether this is the mask profile's engine (ADR-080 point 4).
+    pub(super) fn is_mask(&self) -> bool {
+        self.shown.is_some()
     }
 
     /// Whether `contact_id` names a contact the duress session hides: in

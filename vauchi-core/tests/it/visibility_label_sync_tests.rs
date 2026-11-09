@@ -638,10 +638,10 @@ fn re_saving_unchanged_entries_journals_nothing() {
     );
 }
 
-// vauchi/private#649 review: a duress session shares the real storage, so
-// its own-card visibility changes must not reach the owner's other
-// devices — only cover items that apply nothing do (ADR-032,
-// vauchi/private#811).
+// vauchi/private#649 review: a duress session's own-card visibility
+// changes must not reach the owner's other devices — only cover items that
+// apply nothing do (ADR-032, vauchi/private#811). The real journal is read
+// after the unlock that brings the real profile back (ADR-080).
 // @internal
 #[test]
 fn in_duress_mode_visibility_changes_are_journaled_only_as_cover() {
@@ -653,11 +653,12 @@ fn in_duress_mode_visibility_changes_are_journaled_only_as_cover() {
     let (registry, tablet_id) = link_tablet(&vauchi, [31u8; 32]);
     vauchi.setup_app_password("app-password-123").unwrap();
     vauchi.setup_duress_password("135790").unwrap();
-    vauchi.authenticate("135790").unwrap();
     let before = journal_for_tablet(&vauchi, registry.clone(), &tablet_id).len();
+    vauchi.authenticate("135790").unwrap();
 
     vauchi.set_own_field_public(&field_id).unwrap();
     vauchi.set_own_field_private(&field_id).unwrap();
+    vauchi.authenticate("app-password-123").unwrap();
 
     let journal = journal_for_tablet(&vauchi, registry, &tablet_id);
     assert_eq!(journal.len(), before + 2);

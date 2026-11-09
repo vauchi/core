@@ -96,7 +96,7 @@ impl Storage {
             }
             None => None,
         };
-        let stand_in = Self::empty_mask_profile(SymmetricKey::generate(), None)?;
+        let stand_in = Self::stand_in()?;
         let mut mask = self
             .mask
             .replace(Box::new(stand_in))
@@ -104,6 +104,12 @@ impl Storage {
         mask.seal_target = seal_target;
         self.mask_lent = true;
         Ok(*mask)
+    }
+
+    /// An empty database under a key nobody holds, sealed nowhere: what is
+    /// left in place of a `Storage` that was handed on.
+    pub fn stand_in() -> Result<Storage, StorageError> {
+        Self::empty_mask_profile(SymmetricKey::generate(), None)
     }
 
     /// Takes back the mask profile [`Self::lend_mask_profile`] lent, and

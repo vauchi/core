@@ -25,6 +25,12 @@ impl PartialEq for MaskSeed {
 
 impl Eq for MaskSeed {}
 
+impl MaskSeed {
+    pub(crate) fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
 impl std::fmt::Debug for MaskSeed {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("MaskSeed(..)")

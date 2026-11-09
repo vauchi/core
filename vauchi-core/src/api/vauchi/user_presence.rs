@@ -32,6 +32,9 @@ impl ProfileEngine {
         }
         let digest: [u8; 32] = Sha256::digest(secret).into();
         self.storage.ux().save_user_presence_digest(&digest)?;
+        if !self.is_mask() {
+            self.storage.keep_mask_presence_digest(Some(&digest))?;
+        }
         Ok(true)
     }
 
@@ -40,6 +43,9 @@ impl ProfileEngine {
     /// shell must never be able to trigger it.
     pub fn forget_user_presence_secret(&self) -> VauchiResult<()> {
         self.storage.ux().clear_user_presence_digest()?;
+        if !self.is_mask() {
+            self.storage.keep_mask_presence_digest(None)?;
+        }
         Ok(())
     }
 

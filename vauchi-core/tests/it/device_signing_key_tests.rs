@@ -173,6 +173,8 @@ fn a_duress_session_holds_the_same_key() {
     let before = public_key_of(wb.storage());
 
     let mode = wb.authenticate("654321").unwrap();
+    // The real key is out of the duress foreground's reach (ADR-080).
+    wb.authenticate("my-pin-1234").unwrap();
 
     assert_eq!(mode, AuthMode::Duress);
     assert_eq!(public_key_of(wb.storage()), before);

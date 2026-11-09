@@ -102,6 +102,54 @@ attribution() { # mr-broken target-broken expected
 attribution no no 0
 attribution yes no 1
 attribution yes yes 3
+
+# E2E_SMOKE_RELAY_SHA (vauchi/private#1183): a dependency both Core and the
+# relay link, such as libsqlite3-sys, can move in only one of them per
+# build, so a Core MR that moves it cannot resolve against e2e's pinned
+# relay. The override names the relay commit that moved with it, for the
+# MR's attempt only: the target's attempt keeps e2e's pins, so a real MR
+# failure still exits 1 rather than hiding behind a target failure.
+pinned=1111111111111111111111111111111111111111
+override=2222222222222222222222222222222222222222
+printf 'vauchi-relay = { git = "https://gitlab.com/vauchi/relay.git", rev = "%s" }\n' "$pinned" > "$fake/e2e/Cargo.toml"
+printf 'CORE_TAG=v0.1.0\nRELAY_SHA=%s\n' "$pinned" > "$fake/e2e/ci/pins.env"
+cat > "$fake/e2e/ci/build-pinned-binaries.sh" <<'FAKE'
+#!/bin/sh
+here=$(dirname "$0")
+echo "built relay $(sed -n 's/^RELAY_SHA=//p' "$here/pins.env") dep $(sed -n 's/.*rev = "\([0-9a-f]*\)".*/\1/p' "$here/../Cargo.toml") for $E2E_CORE_DIR"
+[ ! -f "$E2E_CORE_DIR/BROKEN" ]
+FAKE
+smoke_with_override() { # override mr-broken
+    rm -f "$fake/mr/BROKEN" "$fake/target/BROKEN"
+    [ "$2" = yes ] && : > "$fake/mr/BROKEN"
+    rc=0
+    E2E_SMOKE_RELAY_SHA=$1 PATH="$fake/bin:$PATH" E2E_DEVICE_BACKEND=core \
+        sh ci/e2e-smoke.sh "$fake/e2e" "$fake/mr" "$fake/target" > "$fake/out" 2>&1 || rc=$?
+}
+smoke_with_override "$override" no
+if [ "$rc" = 0 ] && grep -qF "built relay $override dep $override for $fake/mr" "$fake/out" &&
+    grep -qF "relay override: $override (e2e pins $pinned)" "$fake/out"; then
+    echo "PASS: the override builds and depends on the named relay for the MR's Core, and says so"
+else
+    fail "the override must set the relay dependency and binary for the MR's Core and print it, got $rc: $(cat "$fake/out")"
+fi
+smoke_with_override "$override" yes
+if [ "$rc" = 1 ] && grep -qF "built relay $pinned dep $pinned for $fake/target" "$fake/out"; then
+    echo "PASS: the target's attempt keeps e2e's pinned relay, so an MR failure exits 1"
+else
+    fail "the target's attempt must keep e2e's pins and the MR failure exit 1, got $rc: $(cat "$fake/out")"
+fi
+if grep -qF "RELAY_SHA=$pinned" "$fake/e2e/ci/pins.env" && grep -qF "rev = \"$pinned\"" "$fake/e2e/Cargo.toml"; then
+    echo "PASS: the override leaves the e2e checkout itself unchanged"
+else
+    fail "the override must rewrite only the attempt's copy of e2e"
+fi
+smoke_with_override "not-a-sha" no
+if [ "$rc" = 2 ] && ! grep -q 'built relay' "$fake/out"; then
+    echo "PASS: an override that is not a full commit sha stops before any build, exit 2"
+else
+    fail "an override that is not a 40-hex sha must exit 2 before building, got $rc: $(cat "$fake/out")"
+fi
 rm -rf "$fake"
 
 if [ "$failures" -gt 0 ]; then

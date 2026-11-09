@@ -27,11 +27,41 @@ target_core=${3:?target core dir}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
+# E2E_SMOKE_RELAY_SHA (private#1183): a dependency Core and the relay both
+# link (libsqlite3-sys) moves in only one of them per build, so the MR
+# that moves it cannot resolve against e2e's pinned relay. It names the
+# relay commit that moved with it, for the MR's attempt only; the
+# target's attempt keeps e2e's pins, so an MR failure still exits 1.
+# Remove it from .gitlab-ci.yml when e2e pins that relay.
+relay_override=${E2E_SMOKE_RELAY_SHA:-}
+if [ -n "$relay_override" ]; then
+    case "$relay_override" in
+        *[!0-9a-f]*) valid=no ;;
+        *) [ "${#relay_override}" -eq 40 ] && valid=yes || valid=no ;;
+    esac
+    if [ "$valid" != yes ]; then
+        echo "ERROR: E2E_SMOKE_RELAY_SHA must be a full 40-hex relay commit, got '$relay_override'" >&2
+        exit 2
+    fi
+fi
+
+point_relay_at() { # copy sha
+    pinned=$(sed -n 's/^RELAY_SHA=//p' "$1/ci/pins.env")
+    echo "relay override: $2 (e2e pins $pinned)"
+    sed "/^vauchi-relay = /s/rev = \"[0-9a-f]*\"/rev = \"$2\"/" "$1/Cargo.toml" > "$1/Cargo.toml.new" &&
+        mv "$1/Cargo.toml.new" "$1/Cargo.toml" &&
+        sed "s/^RELAY_SHA=.*/RELAY_SHA=$2/" "$1/ci/pins.env" > "$1/ci/pins.env.new" &&
+        mv "$1/ci/pins.env.new" "$1/ci/pins.env"
+}
+
 # One attempt in a fresh copy of the e2e checkout, so the rewritten
 # manifest and the build of one attempt never leak into the other.
 smoke_against() { # core-dir name
     copy="$work/$2"
     cp -R "$e2e" "$copy"
+    if [ "$2" = mr ] && [ -n "$relay_override" ]; then
+        point_relay_at "$copy" "$relay_override" || return 1
+    fi
     sh "$copy/ci/point-core-at.sh" "$1" "$copy/Cargo.toml" &&
         E2E_CORE_DIR="$1" sh "$copy/ci/build-pinned-binaries.sh" "$copy/.bin" &&
         (cd "$copy" && E2E_BIN_DIR="$copy/.bin" cargo nextest run --profile ci \

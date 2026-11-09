@@ -32,7 +32,14 @@ foreach ($taskCase in @(
     Write-Host "Observed expected rejection: $($taskCase.Error)"
 }
 
+$taskFailures = @()
 foreach ($taskName in @('migration_snapshot_safety', 'migration_commit_durability', 'shred_profile_scope', 'profile_directory_authority')) {
-    Invoke-RustTest -Executable (Join-Path $taskRoot ($taskName + '.exe')) `
-        -TestArguments @('--nocapture') -Log (Join-Path $taskRoot ($taskName + '.log'))
+    try {
+        Invoke-RustTest -Executable (Join-Path $taskRoot ($taskName + '.exe')) `
+            -TestArguments @('--nocapture') -Log (Join-Path $taskRoot ($taskName + '.log'))
+    } catch {
+        $taskFailures += $taskName
+        Write-Host ("Native suite failed: " + $taskName + ": " + $_.Exception.Message)
+    }
 }
+if ($taskFailures.Count -ne 0) { throw ('Native suites failed: ' + ($taskFailures -join ', ')) }

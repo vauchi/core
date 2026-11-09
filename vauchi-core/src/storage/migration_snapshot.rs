@@ -80,7 +80,8 @@ pub(crate) fn create(
     let sql_path = snapshot.to_str().ok_or(SnapshotFailure::InvalidPath)?;
     conn.execute("VACUUM INTO ?1", [sql_path])
         .map_err(|error| SnapshotFailure::Sqlite(error.sqlite_error().map(|e| e.extended_code)))?;
-    File::open(&snapshot)?.sync_all()?;
+    // #1178: Windows FlushFileBuffers requires a handle opened for writing.
+    File::options().write(true).open(&snapshot)?.sync_all()?;
     // #1178: publication must fail if another file or alias already owns the name.
     std::fs::hard_link(&snapshot, &destination)?;
     #[cfg(unix)]

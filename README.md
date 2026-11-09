@@ -84,6 +84,7 @@ cargo fmt                         # Format
 
 ## Documentation
 
+- **Verify the security claims yourself**: [VERIFY.md](VERIFY.md)
 - **Architecture**: [vauchi/docs](https://gitlab.com/vauchi/docs) repository
 - **API Reference**: Generated from code comments
 - **BDD Scenarios**: `../features/` (separate repo)

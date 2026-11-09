@@ -113,6 +113,30 @@ fn startup_does_not_claim_an_empty_preexisting_destination_as_its_own() {
     assert_eq!(MigrationRunner::current_version(&copy).unwrap(), 0);
 }
 
+#[cfg(unix)]
+// @internal
+#[test]
+fn cleanup_failure_after_commit_does_not_prevent_opening_a_readable_database() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("history.db");
+    // #1178: SQLite resolves file URIs; remove_file sees a literal path and returns NotFound.
+    let uri = format!("file:{}", path.display());
+
+    let result = Storage::open(&uri, SymmetricKey::generate());
+
+    let conn = Connection::open_with_flags(&path, OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+    let expected = all_migrations().last().unwrap().version;
+    assert_eq!(MigrationRunner::current_version(&conn).unwrap(), expected);
+    let recovery = Connection::open_with_flags(
+        path.with_extension("pre-migration-v0.bak"),
+        OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .unwrap();
+    assert_eq!(MigrationRunner::current_version(&recovery).unwrap(), 0);
+    let storage = result.unwrap();
+    assert_eq!(storage.schema_version().unwrap(), expected);
+}
+
 // @internal
 #[test]
 fn reset_refuses_an_actual_legacy_snapshot_before_removing_data_or_keys() {

@@ -15,6 +15,7 @@ use crate::api::pre_signed::PreSignedPurgeRequest;
 
 pub use manager::ShredManager;
 pub(crate) use storage::secure_overwrite_file_public;
+pub(crate) use storage::shred_profile_database;
 pub use storage::widget_panic_shred;
 
 /// Key name for the Shredding Master Key in SecureStorage.
@@ -100,7 +101,8 @@ pub struct ShredReport {
     pub identity_file_destroyed: bool,
     /// Number of key files deleted from FileKeyStorage.
     pub key_files_destroyed: usize,
-    /// Whether the SQLite database was securely deleted.
+    /// Whether the database, companions and canonical snapshots were overwritten
+    /// and unlinked. This is not a guarantee of physical-media erasure.
     pub sqlite_destroyed: bool,
     /// Whether the pre-signed messages file was deleted.
     pub pre_signed_deleted: bool,

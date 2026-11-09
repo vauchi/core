@@ -65,7 +65,15 @@ pub fn widget_panic_shred(
     data_dir: &Path,
     secure_storage: &dyn SecureStorage,
 ) -> Result<ShredReport, ShredError> {
-    validate_profile_root(None, data_dir).map_err(|_| {
+    shred_profile_database(data_dir, &data_dir.join("vauchi.db"), secure_storage)
+}
+
+pub(crate) fn shred_profile_database(
+    data_dir: &Path,
+    database: &Path,
+    secure_storage: &dyn SecureStorage,
+) -> Result<ShredReport, ShredError> {
+    validate_profile_root(Some(database), data_dir).map_err(|_| {
         ShredError::FileError("profile directory is not associated with the database".into())
     })?;
     // ── Phase A: Destroy all key material ──
@@ -103,8 +111,7 @@ pub fn widget_panic_shred(
     // ── Phase B: Cleanup ──
 
     // 4. Secure-delete SQLite database + WAL/SHM
-    let db_path = data_dir.join("vauchi.db");
-    report.sqlite_destroyed = secure_delete_database_files(&db_path);
+    report.sqlite_destroyed = secure_delete_database_files(database);
 
     // 5. Delete pre-signed messages file (secure overwrite, #200a)
     let pre_signed_path = legacy_pre_signed_file(data_dir);

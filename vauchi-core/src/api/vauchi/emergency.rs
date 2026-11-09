@@ -16,7 +16,7 @@ use super::super::config::VauchiConfig;
 use super::super::emergency::{BROADCAST_COOLDOWN_SECS, BroadcastResult};
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventDispatcher, VauchiEvent};
-use super::super::shred::{ShredManager, widget_panic_shred};
+use super::super::shred::ShredManager;
 use super::ProfileEngine;
 use crate::emergency::EmergencyBroadcastConfig;
 use crate::emergency::MAX_TRUSTED_CONTACTS;
@@ -292,7 +292,11 @@ impl ProfileEngine {
             Some(identity) => {
                 ShredManager::new(&self.storage, secure, identity, data_dir).panic_shred()
             }
-            None => widget_panic_shred(data_dir, secure),
+            None => super::super::shred::shred_profile_database(
+                data_dir,
+                &self.config.storage_path,
+                secure,
+            ),
         }
         .map_err(|e| VauchiError::Configuration(format!("Emergency wipe failed: {e}")))?;
         if !report.smk_destroyed

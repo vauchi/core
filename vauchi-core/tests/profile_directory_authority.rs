@@ -25,6 +25,32 @@ fn a_database_path_does_not_authorize_emergency_directory_deletion() {
 }
 
 #[test]
+fn an_explicit_profile_wipe_overwrites_the_actual_database_with_or_without_identity() {
+    for has_identity in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        let mut config = VauchiConfig::with_profile_directory(root.path())
+            .with_storage_key(SymmetricKey::generate());
+        config.storage_path = root.path().join("custom.db");
+        let mut app = Vauchi::new(config).unwrap();
+        if has_identity {
+            app.create_identity("Fixture").unwrap();
+        }
+        #[cfg(unix)]
+        let mut held = std::fs::File::open(root.path().join("custom.db")).unwrap();
+        app.perform_emergency_wipe(true).unwrap();
+        #[cfg(unix)]
+        {
+            use std::io::Read;
+            let mut header = [0u8; 16];
+            held.read_exact(&mut header).unwrap();
+            assert_eq!(header, [0; 16]);
+        }
+        assert!(!root.path().exists());
+        assert!(app.identity().is_none());
+    }
+}
+
+#[test]
 fn database_only_reset_preserves_neighboring_identity_and_key_files() {
     let root = tempfile::tempdir().unwrap();
     let database = root.path().join("custom.db");

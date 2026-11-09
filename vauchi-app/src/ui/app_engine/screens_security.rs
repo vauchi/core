@@ -136,6 +136,12 @@ impl AppEngine {
                         .ok()
                         .and_then(|s| s.last_backup_timestamp),
                     vauchi.clock().unix_seconds(),
+                )
+                // Under duress the mask's session reports a duress PIN too,
+                // so the real profile is told apart by the auth mode.
+                .with_decoy_offer(
+                    vauchi.auth_mode() == vauchi_core::AuthMode::Normal
+                        && vauchi.is_duress_enabled().unwrap_or(false),
                 ),
             ),
             _ => unreachable!("create_security_engine called for {screen:?}"),

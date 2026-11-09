@@ -48,6 +48,11 @@ pub struct BackupRecoveryEngine {
     level: BackupLevel,
     password: String,
     confirm_password: String,
+    /// Whether this export asks for a decoy password: the real profile
+    /// with a duress PIN set (ADR-080 point 7, amended 2026-11-09).
+    offers_decoy: bool,
+    decoy_password: String,
+    confirm_decoy_password: String,
     has_identity: bool,
     /// Pasted backup blob (Restore mode only). Hex-encoded ASCII matching
     /// `Vauchi::export_full_backup` output. Captured on the password screen.
@@ -61,6 +66,8 @@ impl Drop for BackupRecoveryEngine {
     fn drop(&mut self) {
         self.password.zeroize();
         self.confirm_password.zeroize();
+        self.decoy_password.zeroize();
+        self.confirm_decoy_password.zeroize();
         self.restore_data.zeroize();
     }
 }
@@ -72,6 +79,10 @@ enum BackupStep {
     /// A backup restores only into an app with no identity (vauchi/private#819).
     RestoreNeedsEmptyApp,
     ConfirmPassword,
+    /// The decoy password of a full backup from the real profile with a
+    /// duress PIN set (ADR-080 point 7).
+    EnterDecoyPassword,
+    ConfirmDecoyPassword,
     Processing,
     Complete,
     Failed,
@@ -93,12 +104,28 @@ impl BackupRecoveryEngine {
             level: BackupLevel::Full,
             password: String::new(),
             confirm_password: String::new(),
+            offers_decoy: false,
+            decoy_password: String::new(),
+            confirm_decoy_password: String::new(),
             has_identity,
             restore_data: String::new(),
             last_backup: None,
             now: 0,
             locale,
         }
+    }
+
+    /// Whether a full export asks for a decoy password: set for the real
+    /// profile with a duress PIN, never under duress.
+    pub fn with_decoy_offer(mut self, offers_decoy: bool) -> Self {
+        self.offers_decoy = offers_decoy;
+        self
+    }
+
+    fn asks_for_decoy(&self) -> bool {
+        self.offers_decoy
+            && matches!(self.mode, BackupMode::Create)
+            && matches!(self.level, BackupLevel::Full)
     }
 
     /// When the last backup was made (Unix seconds), and the current time
@@ -191,6 +218,7 @@ impl BackupRecoveryEngine {
 
     fn total_steps(&self) -> u8 {
         match self.mode {
+            BackupMode::Create if self.asks_for_decoy() => 6,
             BackupMode::Create => 4,
             BackupMode::Restore => 3,
         }
@@ -201,7 +229,10 @@ impl BackupRecoveryEngine {
             BackupStep::ChooseMode | BackupStep::RestoreNeedsEmptyApp => return None,
             BackupStep::EnterPassword => 1,
             BackupStep::ConfirmPassword => 2,
+            BackupStep::EnterDecoyPassword => 3,
+            BackupStep::ConfirmDecoyPassword => 4,
             BackupStep::Processing => match self.mode {
+                BackupMode::Create if self.asks_for_decoy() => 5,
                 BackupMode::Create => 3,
                 BackupMode::Restore => 2,
             },
@@ -421,6 +452,87 @@ impl BackupRecoveryEngine {
         }
     }
 
+    fn password_input(&self, id: &str, label: String, value: &str) -> Component {
+        Component::TextInput {
+            id: id.into(),
+            label: label.clone(),
+            value: value.to_string(),
+            placeholder: None,
+            max_length: None,
+            validation_error: None,
+            input_type: InputType::Password,
+            a11y: Some(A11y {
+                label: Some(get_string_with_args(
+                    self.locale,
+                    "backup.wizard.password_a11y",
+                    &[("label", &label)],
+                )),
+                hint: None,
+                role: Some(AccessibilityRole::TextField),
+            }),
+            info_key: None,
+        }
+    }
+
+    fn back_and_continue(&self, can_continue: bool) -> Vec<ScreenAction> {
+        vec![
+            ScreenAction {
+                id: "back".into(),
+                label: self.t("action.back"),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: Some(A11y::labeled(self.t("action.back"))),
+            },
+            ScreenAction {
+                id: "continue".into(),
+                label: self.t("action.continue"),
+                style: ActionStyle::Primary,
+                enabled: can_continue,
+                a11y: Some(A11y::labeled(self.t("action.continue"))),
+            },
+        ]
+    }
+
+    fn decoy_password_screen(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "backup_decoy_password".into(),
+            title: self.t("backup.wizard.decoy_password_title"),
+            subtitle: None,
+            components: vec![
+                Component::Text {
+                    id: "decoy_password_detail".into(),
+                    content: self.t("backup.wizard.decoy_password_detail"),
+                    style: TextStyle::Body,
+                    a11y: None,
+                },
+                self.password_input(
+                    "decoy_password",
+                    self.t("backup.wizard.decoy_password_label"),
+                    &self.decoy_password,
+                ),
+            ],
+            contextual_actions: self.back_and_continue(!self.decoy_password.is_empty()),
+            progress: self.progress(),
+            ..Default::default()
+        }
+    }
+
+    fn decoy_confirm_screen(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "backup_decoy_confirm".into(),
+            title: self.t("backup.wizard.decoy_password_title"),
+            subtitle: None,
+            components: vec![self.password_input(
+                "confirm_decoy_password",
+                self.t("backup.wizard.decoy_confirm_label"),
+                &self.confirm_decoy_password,
+            )],
+            contextual_actions: self.back_and_continue(!self.confirm_decoy_password.is_empty()),
+            progress: self.progress(),
+            ..Default::default()
+        }
+    }
+
     fn processing_screen(&self) -> ScreenModel {
         let (title, detail) = match self.mode {
             BackupMode::Create => (
@@ -552,6 +664,11 @@ impl WorkflowEngine for BackupRecoveryEngine {
             restore_data: self.restore_data().trim().to_string(),
             password: self.password().to_string(),
             full_level: *self.level() == BackupLevel::Full,
+            decoy_password: if self.asks_for_decoy() {
+                self.decoy_password.clone()
+            } else {
+                String::new()
+            },
         }))
     }
 
@@ -561,6 +678,8 @@ impl WorkflowEngine for BackupRecoveryEngine {
             BackupStep::EnterPassword => self.password_screen(),
             BackupStep::RestoreNeedsEmptyApp => self.restore_needs_empty_app_screen(),
             BackupStep::ConfirmPassword => self.confirm_screen(),
+            BackupStep::EnterDecoyPassword => self.decoy_password_screen(),
+            BackupStep::ConfirmDecoyPassword => self.decoy_confirm_screen(),
             BackupStep::Processing => self.processing_screen(),
             BackupStep::Complete => self.complete_screen(),
             BackupStep::Failed => self.failed_screen(),
@@ -717,7 +836,71 @@ impl WorkflowEngine for BackupRecoveryEngine {
                         message: self.t("backup.error_passwords_mismatch"),
                     };
                 }
+                self.step = if self.asks_for_decoy() {
+                    BackupStep::EnterDecoyPassword
+                } else {
+                    BackupStep::Processing
+                };
+                ActionResult::NavigateTo(self.current_screen())
+            }
+
+            // EnterDecoyPassword
+            (
+                BackupStep::EnterDecoyPassword,
+                UserAction::TextChanged {
+                    component_id,
+                    value,
+                },
+            ) if component_id == "decoy_password" => {
+                self.decoy_password = value;
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            (BackupStep::EnterDecoyPassword, UserAction::ActionPressed { action_id })
+                if action_id == "continue" =>
+            {
+                if self.decoy_password.is_empty() {
+                    return ActionResult::ValidationError {
+                        component_id: "decoy_password".into(),
+                        message: self.t("backup.error_enter_password"),
+                    };
+                }
+                self.step = BackupStep::ConfirmDecoyPassword;
+                ActionResult::NavigateTo(self.current_screen())
+            }
+            (BackupStep::EnterDecoyPassword, UserAction::ActionPressed { action_id })
+                if action_id == "back" =>
+            {
+                self.step = BackupStep::ConfirmPassword;
+                ActionResult::NavigateTo(self.current_screen())
+            }
+
+            // ConfirmDecoyPassword
+            (
+                BackupStep::ConfirmDecoyPassword,
+                UserAction::TextChanged {
+                    component_id,
+                    value,
+                },
+            ) if component_id == "confirm_decoy_password" => {
+                self.confirm_decoy_password = value;
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            (BackupStep::ConfirmDecoyPassword, UserAction::ActionPressed { action_id })
+                if action_id == "continue" =>
+            {
+                if self.confirm_decoy_password != self.decoy_password {
+                    return ActionResult::ValidationError {
+                        component_id: "confirm_decoy_password".into(),
+                        message: self.t("backup.error_passwords_mismatch"),
+                    };
+                }
                 self.step = BackupStep::Processing;
+                ActionResult::NavigateTo(self.current_screen())
+            }
+            (BackupStep::ConfirmDecoyPassword, UserAction::ActionPressed { action_id })
+                if action_id == "back" =>
+            {
+                self.step = BackupStep::EnterDecoyPassword;
                 ActionResult::NavigateTo(self.current_screen())
             }
             (BackupStep::ConfirmPassword, UserAction::ActionPressed { action_id })
@@ -740,6 +923,8 @@ impl WorkflowEngine for BackupRecoveryEngine {
             {
                 self.password.zeroize();
                 self.confirm_password.zeroize();
+                self.decoy_password.zeroize();
+                self.confirm_decoy_password.zeroize();
                 self.step = BackupStep::EnterPassword;
                 ActionResult::NavigateTo(self.current_screen())
             }

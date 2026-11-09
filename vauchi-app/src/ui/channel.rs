@@ -691,6 +691,9 @@ pub struct BackupFormSnapshot {
     pub restore_data: String,
     pub password: String,
     pub full_level: bool,
+    /// The decoy password of a full export from the real profile with a
+    /// duress PIN; empty otherwise (ADR-080 point 7).
+    pub decoy_password: String,
 }
 
 impl std::fmt::Debug for BackupFormSnapshot {
@@ -700,6 +703,7 @@ impl std::fmt::Debug for BackupFormSnapshot {
             .field("restore_data_len", &self.restore_data.len())
             .field("password", &"<redacted>")
             .field("full_level", &self.full_level)
+            .field("decoy_password", &"<redacted>")
             .finish()
     }
 }

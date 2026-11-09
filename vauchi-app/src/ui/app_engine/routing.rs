@@ -646,18 +646,26 @@ impl AppEngine {
         // The backup password, level toggle, and restore blob all live on the
         // engine (it captures them as the user advances and zeroizes the
         // password on drop; the snapshot redacts the password in Debug).
-        let (is_restore, backup_hex, password, is_full) = match self.engine.engine_output() {
-            Some(crate::ui::EngineOutput::Backup(snap)) => (
-                snap.restore_mode,
-                snap.restore_data,
-                snap.password,
-                snap.full_level,
-            ),
-            other => {
-                tracing::warn!(?other, "execute_backup without Backup output");
-                (false, String::new(), String::new(), true)
-            }
-        };
+        let (is_restore, backup_hex, password, is_full, decoy_password) =
+            match self.engine.engine_output() {
+                Some(crate::ui::EngineOutput::Backup(snap)) => (
+                    snap.restore_mode,
+                    snap.restore_data.clone(),
+                    snap.password.clone(),
+                    snap.full_level,
+                    zeroize::Zeroizing::new(snap.decoy_password.clone()),
+                ),
+                other => {
+                    tracing::warn!(?other, "execute_backup without Backup output");
+                    (
+                        false,
+                        String::new(),
+                        String::new(),
+                        true,
+                        zeroize::Zeroizing::new(String::new()),
+                    )
+                }
+            };
 
         if is_restore {
             // Restore from a pasted/typed backup blob (keyboard frontends).
@@ -688,7 +696,10 @@ impl AppEngine {
             return ActionResult::NavigateTo(self.engine.current_screen());
         }
 
-        let result = if is_full {
+        let result = if is_full && !decoy_password.is_empty() {
+            self.vauchi
+                .export_full_backup_with_decoy(&password, &decoy_password)
+        } else if is_full {
             self.vauchi.export_full_backup(&password)
         } else {
             self.vauchi.export_backup(&password)

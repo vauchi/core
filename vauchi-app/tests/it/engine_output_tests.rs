@@ -59,6 +59,7 @@ fn backup_output_redacts_password_in_debug() {
             restore_data: String::new(),
             password: String::new(),
             full_level: true,
+            decoy_password: String::new(),
         }
     );
     let debug = format!("{output:?}");

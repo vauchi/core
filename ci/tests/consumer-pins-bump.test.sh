@@ -64,6 +64,7 @@ version = "0.1.0"
 [dependencies]
 vauchi-contract = { git = "https://gitlab.com/vauchi/contract.git", tag = "v0.1.0", version = "=0.1.0" }
 ' Cargo.lock "# lock
+" supply-chain/config.toml "# vet
 "
 remote linux-qt core-ref "v0.70.0
 "
@@ -112,7 +113,7 @@ while [ "$#" -gt 0 ]; do
     esac
     shift
 done
-echo "$method $url $data" >> "$FAKE_LOG"
+printf '%s\n' "$method $url $data" >> "$FAKE_LOG"
 case "$method $url" in
     "GET "*/user) [ -n "${FAKE_USER_STATUS:-}" ] && { printf '%s' '{}' > "$out"; printf '%s' "$FAKE_USER_STATUS"; exit 0; }
         body='{"name":"Vauchi Bot","email":"bot@example.invalid"}'; status=200 ;;
@@ -134,6 +135,16 @@ EOF
 cat > "$T/bin/cargo" <<'EOF'
 #!/bin/sh
 echo "cargo $* (in $(basename "$PWD"))" >> "$FAKE_LOG"
+# cargo-vet (private#1183): in cli, the bump brings two crates nothing
+# vets; FAKE_NO_VET stands for a runner without cargo-vet.
+if [ "$1" = vet ]; then
+    [ -z "${FAKE_NO_VET:-}" ] || { echo "error: no such command: vet" >&2; exit 101; }
+    [ "${2:-}" = --version ] && { echo "cargo-vet 0.10.0"; exit 0; }
+    case "$PWD" in
+        */cli) printf 'Vetting Failed!\n\n2 unvetted dependencies:\n  libsqlite3-sys:0.39.1 missing ["safe-to-deploy"]\n  rusqlite:0.41.1 missing ["safe-to-deploy"]\n'; exit 255 ;;
+    esac
+    echo "Vetting Succeeded (3 fully audited)"; exit 0
+fi
 case "$PWD" in */linux-gtk) echo "error: failed to select a version" >&2; exit 101 ;; esac
 if [ -f cli-display/Cargo.toml ]; then
     grep -q "tag = \"$EXPECTED_CONTRACT_TAG\"" cli-display/Cargo.toml \
@@ -186,6 +197,17 @@ grep '^POST .*vauchi%2Fcli/merge_requests/41/notes' "$T/log" | grep -q 'ready-qu
     || fail "cli's bump MR must say it waits behind !3"
 grep '^POST .*vauchi%2Fcli/merge_requests/3/notes' "$T/log" | grep -q '!41 waits for this MR' \
     || fail "!3 must say that the bump MR waits for it"
+# A bump that brings crates nothing vets says so on its MR, so a red
+# security:vet explains itself (maintainer, 2026-11-09): new dependencies
+# get their exemptions by hand, after review.
+vet_note=$(grep '^POST .*vauchi%2Fcli/merge_requests/41/notes' "$T/log" | grep 'cargo-vet' || true)
+[ -n "$vet_note" ] || fail "cli's bump MR must name the crates cargo-vet does not cover"
+for crate in 'libsqlite3-sys 0.39.1' 'rusqlite 0.41.1' 'exemptions' 'never'; do
+    printf '%s' "$vet_note" | grep -qF -- "$crate" || fail "the cargo-vet note must mention: $crate"
+done
+grep "cargo vet --locked (in cli)" "$T/log" > /dev/null || fail "cargo vet must run on the bumped lockfile"
+grep '^POST .*vauchi%2Flinux-qt/merge_requests/41/notes' "$T/log" | grep -q 'cargo-vet' \
+    && fail "a consumer without supply-chain/ must get no cargo-vet note"
 grep -q "cli: opened https://gitlab.example/mr/new (Draft, waiting behind !3)" "$T/out" \
     || fail "the job must say cli's bump MR is waiting"
 grep '^POST .*vauchi%2Fcli/merge_requests' "$T/log" | grep -q '"source_branch": *"chore/bump-core-0.70.0"' \
@@ -231,7 +253,8 @@ fi
 # (cli, Core 0.84.1: "calling pre_receive endpoint: http post to gitlab
 # api /pre_receive endpoint"). A declined push is retried, so one blip does
 # not leave a consumer unbumped.
-remote flaky Cargo.toml "$CARGO_TOML" Cargo.lock "# lock
+remote flaky supply-chain/config.toml "# vet
+" Cargo.toml "$CARGO_TOML" Cargo.lock "# lock
 "
 cat > "$T/remotes/flaky.git/hooks/pre-receive" <<HOOK
 #!/bin/sh
@@ -243,7 +266,7 @@ HOOK
 chmod +x "$T/remotes/flaky.git/hooks/pre-receive"
 printf '%s\n' '{ "consumers": [ { "repo": "flaky", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" } ] }' > "$T/table3.json"
 status=0
-PATH="$T/bin:$PATH" FAKE_LOG="$T/log3" PROJECT_ACCESS_TOKEN=token PUSH_RETRY_DELAY=0 \
+PATH="$T/bin:$PATH" FAKE_LOG="$T/log3" PROJECT_ACCESS_TOKEN=token PUSH_RETRY_DELAY=0 FAKE_NO_VET=1 \
     CI_API_V4_URL=https://gitlab.example/api/v4 CONSUMER_GIT_BASE="$T/remotes" \
     bash "$HERE/scripts/bump-consumer-pins.sh" v0.70.0 "$T/table3.json" "$CORE_PINS" \
     > "$T/out3" 2>&1 || status=$?
@@ -254,6 +277,10 @@ git -C "$T/remotes/flaky.git" rev-parse -q --verify "refs/heads/chore/bump-core-
 [ "$(grep -c '^POST .*vauchi%2Fflaky/merge_requests {' "$T/log3")" -eq 1 ] || fail "flaky must get exactly one MR"
 grep '^PUT .*vauchi%2Fflaky/merge_requests/41' "$T/log3" | grep -q '"title": *"chore: pin Core to v0.70.0"' \
     || fail "with no ready MR ahead, the bump MR must be marked ready"
+grep -q 'flaky: cargo-vet is not installed here; security:vet will tell' "$T/out3" \
+    || fail "a runner without cargo-vet must say the bump was not vetted"
+grep -q '^POST .*vauchi%2Fflaky/merge_requests/41/notes' "$T/log3" \
+    && fail "an unvetted check must not post a cargo-vet note"
 
 # A consumer can list several pin files (private#1034): e2e pins Core in
 # Cargo.toml and names the same tag in ci/pins.env, the Core tag of its

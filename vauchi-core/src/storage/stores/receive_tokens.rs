@@ -61,21 +61,18 @@ impl ReceiveTokenStore<'_> {
             .map_err(|e| StorageError::Encryption(e.to_string()))
     }
 
-    /// Replaces the stored days with `days`, dropping every day before the
-    /// first one, in one transaction.
+    /// Replaces the stored days with `days`, dropping every other day, in
+    /// one transaction.
     pub(crate) fn replace_days(
         &self,
         days: &[(u64, Zeroizing<Vec<u8>>)],
     ) -> Result<(), StorageError> {
         let key = self.key()?;
-        let Some(first) = days.iter().map(|(day, _)| *day).min() else {
+        if days.is_empty() {
             return Ok(());
-        };
+        }
         let tx = self.conn.unchecked_transaction()?;
-        tx.execute(
-            "DELETE FROM receive_tokens_ahead WHERE day < ?1",
-            params![first as i64],
-        )?;
+        tx.execute("DELETE FROM receive_tokens_ahead", [])?;
         for (day, registration) in days {
             let sealed = encrypt(&day_key(key, *day), registration)
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;

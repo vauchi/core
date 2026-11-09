@@ -22,9 +22,14 @@ use super::super::VauchiResult;
 use super::ProfileEngine;
 use super::receive_context::registered_mailboxes;
 
-/// Matches the catch-up window: a phone locked longer than this since its
-/// last unlocked sync stops receiving until the next one.
-const DAYS_AHEAD: u64 = 14;
+/// Today and tomorrow, so the locked window below never outlives the
+/// stored tokens.
+const DAYS_AHEAD: u64 = 2;
+
+/// A locked phone receives for one day after its last unlocked sync, then
+/// waits for the next unlock, whose catch-up fetches what it missed
+/// (ADR-033 addendum 2026-11-09, point 3).
+const LOCKED_RECEIVE_SECS: u64 = 86_400;
 
 /// One day's receive registration: the padded batches, before the shuffle,
 /// and what each real token routes to.
@@ -32,6 +37,9 @@ const DAYS_AHEAD: u64 = 14;
 pub struct RegistrationDay {
     batches: Vec<Vec<String>>,
     routes: HashMap<String, MailboxRoute>,
+    /// A day stored before the window existed reads as already ended.
+    #[serde(default)]
+    receive_until: u64,
 }
 
 impl RegistrationDay {
@@ -39,6 +47,12 @@ impl RegistrationDay {
     /// caller shuffles them before sending.
     pub fn batches(&self) -> &[Vec<String>] {
         &self.batches
+    }
+
+    /// Unix seconds after which a locked run no longer receives with this
+    /// day.
+    pub fn receive_until(&self) -> u64 {
+        self.receive_until
     }
 
     /// The contacts the day's tokens receive from.
@@ -84,7 +98,8 @@ impl ProfileEngine {
         if !self.storage.has_receive_key() {
             return Ok(());
         }
-        let today = current_day_epoch(self.clock.unix_seconds());
+        let now = self.clock.unix_seconds();
+        let today = current_day_epoch(now);
         let days: Vec<(u64, RegistrationDay)> = (today..today + DAYS_AHEAD)
             .map(|day| {
                 let context = registered_mailboxes(identity, contacts, &self.config.relay, &[day]);
@@ -95,21 +110,11 @@ impl ProfileEngine {
                     RegistrationDay {
                         batches,
                         routes: context.routes,
+                        receive_until: now + LOCKED_RECEIVE_SECS,
                     },
                 )
             })
             .collect();
-        // Unchanged contacts give an unchanged today, so a sync within the
-        // same day rewrites nothing.
-        let today_unchanged =
-            self.receive_registration_ahead(today)?.as_ref() == days.first().map(|(_, d)| d);
-        if today_unchanged
-            && self
-                .receive_registration_ahead(today + DAYS_AHEAD - 1)?
-                .is_some()
-        {
-            return Ok(());
-        }
         let sealed = days
             .iter()
             .map(|(day, registration)| {

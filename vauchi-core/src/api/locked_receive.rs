@@ -195,8 +195,8 @@ mod network {
     use crate::network::mailbox_token::current_day_epoch;
     use crate::network::request_pacer::RequestPacer;
     use crate::network::{
-        AckStatus, Acknowledgment, HttpTransportAdapter, MessagePayload, OhttpClient,
-        RegisterMailbox, Transport, TransportConfig, create_envelope,
+        AckStatus, Acknowledgment, DelayWindowAdvert, HttpTransportAdapter, MessagePayload,
+        OhttpClient, RegisterMailbox, Transport, TransportConfig, create_envelope,
     };
     use crate::rng::{SecureRng, SecureRngExt};
     use crate::storage::LockedReceiveStorage;
@@ -332,7 +332,27 @@ mod network {
         if let Err(e) = adapter.receive() {
             tracing::warn!(target: "vauchi.locked_receive", error = %e, "acks not sent");
         }
+        keep_delay_window(storage, relay, adapter.delay_window_advert());
         Ok(LockedRunOutcome::Received { stored, left })
+    }
+
+    /// A relay may start delaying after the last unlocked sync; the run
+    /// learns it only from an answer, so it keeps the window for the next
+    /// locked run to skip (Socratic discussion 2026-11-09).
+    fn keep_delay_window(
+        storage: &LockedReceiveStorage,
+        relay: &RelayConfig,
+        advert: Option<DelayWindowAdvert>,
+    ) {
+        let Some(DelayWindowAdvert::Advertised(window)) = advert else {
+            return;
+        };
+        if let Err(e) = storage
+            .ohttp_cache()
+            .save_delay_window(&relay.ohttp_endpoint(), window)
+        {
+            tracing::warn!(target: "vauchi.locked_receive", error = %e, "delay window not kept");
+        }
     }
 
     fn stored_day(

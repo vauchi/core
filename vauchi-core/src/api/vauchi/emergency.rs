@@ -260,13 +260,21 @@ impl ProfileEngine {
             ));
         }
 
-        let data_dir = self
-            .storage
-            .db_path()
-            .and_then(Path::parent)
-            .map(Path::to_path_buf);
-        match data_dir {
-            Some(data_dir) => self.shred_data_directory(&data_dir)?,
+        match self.storage.db_path() {
+            Some(database) => {
+                let data_dir = self.config.profile_directory.as_deref().ok_or_else(|| {
+                    VauchiError::Configuration(
+                        "emergency wipe requires an explicit profile directory".into(),
+                    )
+                })?;
+                crate::storage::secure_file::validate_profile_root(Some(database), data_dir)
+                    .map_err(|_| {
+                        VauchiError::Configuration(
+                            "invalid emergency wipe profile directory".into(),
+                        )
+                    })?;
+                self.shred_data_directory(data_dir)?;
+            }
             // An in-memory database ends with the process; there is no file
             // or directory to shred, and its parent is not ours to delete.
             None => self.clear_in_memory_data()?,
@@ -285,9 +293,14 @@ impl ProfileEngine {
             None => widget_panic_shred(data_dir, secure),
         }
         .map_err(|e| VauchiError::Configuration(format!("Emergency wipe failed: {e}")))?;
-        if !report.smk_destroyed {
+        if !report.smk_destroyed
+            || !report.identity_file_destroyed
+            || !report.sqlite_destroyed
+            || !report.pre_signed_deleted
+            || !report.data_dir_deleted
+        {
             return Err(VauchiError::Configuration(
-                "Emergency wipe could not delete the storage keys".into(),
+                "Emergency wipe did not complete all required cleanup".into(),
             ));
         }
         Ok(())

@@ -30,6 +30,10 @@ pub struct VauchiConfig {
     /// Storage directory for identity, contacts, and sync state.
     pub storage_path: PathBuf,
 
+    /// Exclusive profile directory the caller authorizes emergency wipe to remove.
+    /// A database path alone never authorizes deletion of its parent directory.
+    pub profile_directory: Option<PathBuf>,
+
     /// Relay server configuration.
     pub relay: RelayConfig,
 
@@ -97,6 +101,7 @@ impl Default for VauchiConfig {
     fn default() -> Self {
         VauchiConfig {
             storage_path: PathBuf::from("./vauchi_data"),
+            profile_directory: None,
             relay: RelayConfig::default(),
             sync: SyncConfig::default(),
             auto_save: true,

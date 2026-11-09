@@ -149,3 +149,26 @@ fn a_decoy_password_is_refused_without_a_duress_pin_and_under_duress_alike() {
         without_pin_error.to_string()
     );
 }
+
+// @scenario: duress_mode :: Duress mode looks identical to normal mode
+#[test]
+fn a_backup_made_under_duress_restores_as_a_decoy_backup_does() {
+    let mut alice = alice(true);
+    alice.vauchi.authenticate(DURESS_PIN).expect("unlock");
+    let backup = alice
+        .vauchi
+        .export_full_backup(BACKUP_PASSWORD)
+        .expect("a duress export");
+
+    let mut restored = restored(&backup, BACKUP_PASSWORD);
+
+    assert!(restored.is_password_enabled().expect("password state"));
+    assert!(!restored.is_duress_enabled().expect("duress state"));
+    assert!(restored.authenticate(APP_PASSWORD).is_err());
+    assert_eq!(
+        restored.authenticate(DURESS_PIN).expect("unlock"),
+        AuthMode::Normal
+    );
+    assert_eq!(signing_key(&restored), alice.mask_key);
+    assert_eq!(contact_names(&restored), vec!["Decoy Dana".to_string()]);
+}

@@ -584,6 +584,10 @@ impl ProfileEngine {
             Ok(Some(bytes)) => Identity::from_storage_bytes(&bytes, clock.unix_seconds()).ok(),
             _ => None,
         };
+        // A profile saved before the mask held public values gets them here.
+        if let Some(identity) = &identity {
+            storage.keep_mask_public_values(identity)?;
+        }
 
         let mut wb = ProfileEngine {
             config,

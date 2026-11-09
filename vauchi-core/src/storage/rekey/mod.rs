@@ -66,6 +66,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     // Only a mask profile has these, beside its regular schema (ADR-080).
     ("mask_seed", "seed_encrypted"),
     ("decoy_ids", "display_name_encrypted"),
+    ("public_values", "signing_public_key_encrypted"),
+    ("public_values", "display_name_encrypted"),
     ("device_registry", "registry_json_encrypted"),
     ("contact_device_registries", "broadcast_encrypted"),
     // V62 received safety-alert facts
@@ -220,7 +222,7 @@ impl Storage {
     }
 
     /// Re-encrypts the embedded mask profile: every table of its regular
-    /// schema, and the two only a mask profile has (ADR-080).
+    /// schema, and those only a mask profile has (ADR-080).
     fn rekey_mask(
         &self,
         old_key: &SymmetricKey,
@@ -233,6 +235,8 @@ impl Storage {
         for (table, column) in [
             ("mask_seed", "seed_encrypted"),
             ("decoy_ids", "display_name_encrypted"),
+            ("public_values", "signing_public_key_encrypted"),
+            ("public_values", "display_name_encrypted"),
         ] {
             mask.rekey_nullable_column(old_key, new_key, table, column)?;
         }

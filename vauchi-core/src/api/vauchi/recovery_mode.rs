@@ -383,9 +383,7 @@ impl ProfileEngine {
             if self.storage.identity().has_identity()? {
                 return Err(VauchiError::AlreadyInitialized);
             }
-            self.storage
-                .identity()
-                .save_identity(&identity.to_storage_bytes())?;
+            self.storage.identity().save(&identity)?;
             self.storage.device().save_device_registry(&registry)?;
             for contact in &contacts {
                 self.storage.contacts().save_contact(contact)?;

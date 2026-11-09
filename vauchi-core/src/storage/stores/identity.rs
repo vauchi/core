@@ -55,6 +55,12 @@ impl IdentityStore<'_> {
 
         Ok(())
     }
+    /// Saves `identity`, and its public ID and name as the mask profile's
+    /// public values (ADR-080 point 4).
+    pub fn save(&self, identity: &crate::identity::Identity) -> Result<(), StorageError> {
+        self.save_identity(&identity.to_storage_bytes())?;
+        self.storage.keep_mask_public_values(identity)
+    }
     /// Loads identity backup data (decrypted), which carries the display
     /// name.
     pub fn load_identity(&self) -> Result<Option<Vec<u8>>, StorageError> {

@@ -82,7 +82,9 @@ pub fn widget_panic_shred(
 
     // 3. Delete all key files
     let keys_dir = data_dir.join("keys");
-    report.key_files_destroyed = if keys_dir.exists() {
+    report.key_files_destroyed = if std::fs::symlink_metadata(&keys_dir)
+        .is_ok_and(|metadata| metadata.is_dir() && !metadata.file_type().is_symlink())
+    {
         let mut count = 0;
         if let Ok(entries) = std::fs::read_dir(&keys_dir) {
             for entry in entries.flatten() {

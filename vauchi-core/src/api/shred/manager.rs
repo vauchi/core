@@ -240,7 +240,9 @@ impl<'a> ShredManager<'a> {
 
     fn delete_key_files(&self) -> usize {
         let keys_dir = self.data_dir.join("keys");
-        if !keys_dir.exists() {
+        if !std::fs::symlink_metadata(&keys_dir)
+            .is_ok_and(|metadata| metadata.is_dir() && !metadata.file_type().is_symlink())
+        {
             return 0;
         }
         let mut count = 0;

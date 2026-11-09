@@ -121,3 +121,31 @@ fn partial_wipe_reports_failure_and_retires_the_in_memory_identity() {
     assert!(app.identity().is_none());
     assert_eq!(std::fs::read(target).unwrap(), b"outside identity");
 }
+
+#[cfg(unix)]
+#[test]
+fn a_key_directory_alias_does_not_authorize_overwriting_outside_files() {
+    for widget in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let target = outside.path().join("keep.key");
+        std::fs::write(&target, b"outside key").unwrap();
+        std::os::unix::fs::symlink(outside.path(), root.path().join("keys")).unwrap();
+        let keys = MemoryKeyStorage::new();
+        let report = if widget {
+            vauchi_core::api::shred::widget_panic_shred(root.path(), &keys).unwrap()
+        } else {
+            let storage = vauchi_core::storage::Storage::open(
+                root.path().join("vauchi.db"),
+                SymmetricKey::generate(),
+            )
+            .unwrap();
+            let identity = vauchi_core::identity::Identity::create("Fixture", 0);
+            vauchi_core::api::shred::ShredManager::new(&storage, &keys, &identity, root.path())
+                .panic_shred()
+                .unwrap()
+        };
+        assert_eq!(std::fs::read(&target).unwrap(), b"outside key");
+        assert_eq!(report.key_files_destroyed, 0);
+    }
+}

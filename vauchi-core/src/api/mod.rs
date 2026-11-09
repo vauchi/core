@@ -49,6 +49,8 @@
 pub mod app_password;
 pub mod emergency;
 pub mod locked_receive;
+#[cfg(feature = "network-http")]
+pub(crate) mod relay_transport;
 pub mod storage_reset;
 
 #[cfg(feature = "testing")]

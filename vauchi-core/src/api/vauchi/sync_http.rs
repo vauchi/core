@@ -21,7 +21,6 @@
 //! 5. Send phase: delegates to `SendPhase` for outbound updates + ACKs.
 //! 6. Returns combined `VauchiSyncOutcome`.
 
-use crate::api::config::http_origin;
 use std::time::Duration;
 
 /// Recommended interval (seconds) between scheduled sync ticks.
@@ -1171,29 +1170,12 @@ impl ProfileEngine {
         .with_pacer(self.ohttp_pacer())
     }
 
-    /// Pin set for a transport targeting `relay_url`.
-    ///
-    /// When `relay_url` is the distinct OHTTP-relay host (`ohttp.vauchi.app`
-    /// in production — a separate entity with its own TLS key per ADR-037),
-    /// pin ITS SPKI (`ohttp_pinned_certs`). Otherwise — the OHTTP endpoint
-    /// shares the data-relay host (self-hosted / local / e2e), or the target
-    /// is the data relay itself — use `relay_pins` (the data-relay set the
-    /// caller would otherwise apply).
-    ///
-    /// Fixes 2026-05-25-relay-ohttp-forward-hop-502: pinning the relay's
-    /// SPKI against `ohttp.vauchi.app` made every production sync fail
-    /// `certificate pin verification failed`.
     fn ohttp_endpoint_pins(
         &self,
         relay_url: &str,
         relay_pins: Vec<PinnedCertificate>,
     ) -> Vec<PinnedCertificate> {
-        let ohttp = self.http_relay_url();
-        if relay_url == ohttp && ohttp != self.config.relay.server_url {
-            self.config.relay.ohttp_pinned_certs.clone()
-        } else {
-            relay_pins
-        }
+        crate::api::relay_transport::ohttp_endpoint_pins(&self.config.relay, relay_url, relay_pins)
     }
 
     /// [`Self::build_relay_transport`] for a one-off relay action (an
@@ -1241,39 +1223,23 @@ impl ProfileEngine {
             .with_pacer(self.ohttp_pacer());
         }
 
-        let route = self.action_ohttp_route(application_relay_url);
-        let route_valid = route.is_some();
-        let relay_url = route.unwrap_or_else(|| self.http_relay_url());
-        let pinned_certs =
-            self.ohttp_endpoint_pins(&relay_url, self.config.relay.pinned_certs.clone());
-        let mut transport = HttpTransport::new(HttpTransportConfig {
-            relay_url,
+        use crate::api::relay_transport::{TransportOhttpKey, relay_transport};
+        let key = match self.config.relay.ohttp_trust_anchor() {
+            Some(_) => self
+                .usable_held_ohttp_key()
+                .map_or(TransportOhttpKey::None, TransportOhttpKey::Signed),
+            None => self
+                .offline_ohttp_client()
+                .map_or(TransportOhttpKey::None, TransportOhttpKey::Unanchored),
+        };
+        relay_transport(
+            &self.config.relay,
+            application_relay_url,
             timeout_ms,
-            proxy: self.config.relay.proxy.clone(),
-            allow_direct: false,
-            pinned_certs,
-        })
-        .with_pacer(self.ohttp_pacer());
-
-        if route_valid {
-            match self.config.relay.ohttp_trust_anchor() {
-                // An anchored relay's transport carries its held signed key or
-                // none, and refetches only signed keys (#288).
-                Some(anchor) => {
-                    if let Some(held) = self.usable_held_ohttp_key() {
-                        #[allow(clippy::let_underscore_must_use)]
-                        let _ = transport.set_signed_ohttp(anchor, held, self.clock.clone());
-                    }
-                }
-                None => {
-                    if let Some(client) = self.offline_ohttp_client() {
-                        transport.set_ohttp(client);
-                    }
-                }
-            }
-        }
-
-        transport
+            self.ohttp_pacer(),
+            key,
+            self.clock.clone(),
+        )
     }
 
     /// The in-memory OHTTP client, copied without network I/O.
@@ -1286,24 +1252,11 @@ impl ProfileEngine {
     /// derived by [`crate::api::config::ohttp_endpoint`] (problem
     /// 2026-05-25-relay-ohttp-forward-hop-502).
     pub(crate) fn http_relay_url(&self) -> String {
-        crate::api::config::ohttp_endpoint(
-            &self.config.relay.server_url,
-            self.config.relay.ohttp_relay_url.as_deref(),
-        )
+        crate::api::relay_transport::http_relay_url(&self.config.relay)
     }
 
     fn distinct_ohttp_route(&self) -> Option<String> {
-        self.config
-            .relay
-            .ohttp_route_for(&self.config.relay.server_url)
-    }
-
-    fn action_ohttp_route(&self, application_relay_url: &str) -> Option<String> {
-        let configured_origin = http_origin(&self.config.relay.server_url)?;
-        let requested_origin = http_origin(application_relay_url)?;
-        (configured_origin == requested_origin)
-            .then(|| self.distinct_ohttp_route())
-            .flatten()
+        crate::api::relay_transport::distinct_ohttp_route(&self.config.relay)
     }
 }
 
@@ -1411,6 +1364,7 @@ fn merge_pins(target: &mut Vec<PinnedCertificate>, source: &[PinnedCertificate])
 mod tests {
     use super::*;
     use crate::api::Vauchi;
+    use crate::api::config::http_origin;
 
     // @internal
     #[test]

@@ -25,12 +25,9 @@ fn matches_backup(name: &OsStr, prefix: &OsStr) -> bool {
         })
 }
 
-pub(crate) fn ensure_no_ambiguous_backups(database: &Path) -> Result<(), StorageError> {
+pub(crate) fn snapshot_paths(database: &Path) -> Result<Vec<std::path::PathBuf>, StorageError> {
     let invalid_name = || StorageError::InvalidData("invalid database filename".into());
     let name = database.file_name().ok_or_else(invalid_name)?;
-    let stem = database.file_stem().ok_or_else(invalid_name)?;
-    let mut stem_prefix = stem.to_os_string();
-    stem_prefix.push(".pre-migration-v");
     let mut name_prefix = name.to_os_string();
     name_prefix.push(".pre-migration-v");
     let directory = database
@@ -38,14 +35,31 @@ pub(crate) fn ensure_no_ambiguous_backups(database: &Path) -> Result<(), Storage
         .filter(|path| !path.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
 
-    for entry in std::fs::read_dir(directory).map_err(inspection_error)? {
-        let name = entry.map_err(inspection_error)?.file_name();
-        if matches_backup(&name, &stem_prefix) || matches_backup(&name, &name_prefix) {
-            // #1178: both legacy spellings can refer to another database's recovery copy.
-            return Err(StorageError::InvalidData(
-                "migration backup ownership is ambiguous; recovery data was preserved".into(),
-            ));
+    let entries = match std::fs::read_dir(directory) {
+        Ok(entries) => entries,
+        Err(error)
+            if error.kind() == std::io::ErrorKind::NotFound
+                && super::secure_file::confirmed_absent(directory) =>
+        {
+            return Ok(Vec::new());
         }
+        Err(error) => return Err(inspection_error(error)),
+    };
+    let mut paths = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(inspection_error)?;
+        if matches_backup(&entry.file_name(), &name_prefix) {
+            paths.push(entry.path());
+        }
+    }
+    Ok(paths)
+}
+
+pub(crate) fn ensure_no_ambiguous_backups(database: &Path) -> Result<(), StorageError> {
+    if !snapshot_paths(database)?.is_empty() {
+        return Err(StorageError::InvalidData(
+            "migration backup ownership is ambiguous; recovery data was preserved".into(),
+        ));
     }
     Ok(())
 }

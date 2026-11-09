@@ -36,6 +36,31 @@ pub(crate) fn confirmed_absent(path: &Path) -> bool {
     false
 }
 
+pub(crate) fn validate_profile_root(database: Option<&Path>, root: &Path) -> io::Result<()> {
+    let parent = database.map(|path| {
+        path.parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or(Path::new("."))
+    });
+    if confirmed_absent(root) {
+        return if parent.is_none_or(|p| p == root) {
+            Ok(())
+        } else {
+            Err(unsafe_entry())
+        };
+    }
+    let metadata = std::fs::symlink_metadata(root)?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err(unsafe_entry());
+    }
+    if let Some(parent) = parent
+        && std::fs::canonicalize(parent)? != std::fs::canonicalize(root)?
+    {
+        return Err(unsafe_entry());
+    }
+    Ok(())
+}
+
 #[cfg(unix)]
 fn check_handle(before: &Metadata, file: &File) -> io::Result<()> {
     use std::os::unix::fs::MetadataExt;

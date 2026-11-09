@@ -18,10 +18,10 @@ use crate::api::deletion::{DeletionError, DeletionManager};
 use crate::api::pre_signed::{PreSignedPurgeRequest, legacy_pre_signed_file};
 use crate::identity::Identity;
 use crate::storage::secure::{KeyAccess, SecureStorage};
-use crate::storage::secure_file::confirmed_absent;
+use crate::storage::secure_file::{confirmed_absent, validate_profile_root};
 use crate::storage::{DeletionState, Storage};
 
-use super::storage::{destroy_storage_keys, secure_overwrite_file};
+use super::storage::{destroy_storage_keys, secure_delete_database_files, secure_overwrite_file};
 use super::{
     BOOTSTRAP_KEY_NAME, BRK_KEY_NAME, PurgeSender, RevocationSender, SMK_KEY_NAME, ShredError,
     ShredReport, ShredToken, ShredVerification,
@@ -40,6 +40,9 @@ pub struct ShredManager<'a> {
 
 impl<'a> ShredManager<'a> {
     /// Creates a new ShredManager.
+    ///
+    /// The caller declares `data_dir` an exclusive profile directory. A file
+    /// database must reside there; destructive operations validate the association.
     pub fn new(
         storage: &'a Storage,
         secure_storage: &'a dyn SecureStorage,
@@ -84,6 +87,7 @@ impl<'a> ShredManager<'a> {
         purge_sender: Option<&mut dyn PurgeSender>,
         revocation_sender: Option<&mut dyn RevocationSender>,
     ) -> Result<ShredReport, ShredError> {
+        self.ensure_profile_scope()?;
         let mut report = ShredReport::default();
 
         // Validate ShredToken was created at or after the scheduled deletion time (#199a).
@@ -155,6 +159,7 @@ impl<'a> ShredManager<'a> {
     /// (vauchi/private#910, ADR-033 amendment 2026-10-29). Telling the whole
     /// identity is identity deletion's job ([`Self::hard_shred`]).
     pub fn panic_shred(&self) -> Result<ShredReport, ShredError> {
+        self.ensure_profile_scope()?;
         let mut report = ShredReport {
             smk_destroyed: self.destroy_smk(),
             ..ShredReport::default()
@@ -169,7 +174,7 @@ impl<'a> ShredManager<'a> {
 
     /// Post-shred verification audit.
     ///
-    /// Checks that all key material and data has been destroyed.
+    /// Confirms configured-key and namespace absences; errors are inconclusive.
     pub fn verify_shred(&self) -> ShredVerification {
         let smk_absent = self
             .secure_storage
@@ -187,7 +192,7 @@ impl<'a> ShredManager<'a> {
             .load_key_with_access(BRK_KEY_NAME, KeyAccess::AfterFirstUnlock)
             .map(|k| k.is_none())
             .unwrap_or(false);
-        let database_absent = confirmed_absent(&self.data_dir.join("vauchi.db"));
+        let database_absent = confirmed_absent(&self.database_path());
         let data_dir_absent = confirmed_absent(&self.data_dir);
         let pre_signed_absent = confirmed_absent(&legacy_pre_signed_file(&self.data_dir));
 
@@ -211,17 +216,26 @@ impl<'a> ShredManager<'a> {
 
     // ── Internal helpers ──
 
+    fn ensure_profile_scope(&self) -> Result<(), ShredError> {
+        validate_profile_root(self.storage.db_path(), &self.data_dir).map_err(|_| {
+            ShredError::FileError("profile directory is not associated with the database".into())
+        })
+    }
+
+    fn database_path(&self) -> PathBuf {
+        self.storage
+            .db_path()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| self.data_dir.join("vauchi.db"))
+    }
+
     fn destroy_smk(&self) -> bool {
         destroy_storage_keys(self.secure_storage)
     }
 
     fn secure_delete_identity_file(&self) -> bool {
         let identity_path = self.data_dir.join("identity.json");
-        if identity_path.exists() {
-            secure_overwrite_file(&identity_path).is_ok()
-        } else {
-            true // File doesn't exist, nothing to delete
-        }
+        secure_overwrite_file(&identity_path).is_ok()
     }
 
     fn delete_key_files(&self) -> usize {
@@ -237,8 +251,6 @@ impl<'a> ShredManager<'a> {
                 }
             }
         }
-        // best-effort: keys overwritten above; directory removal failure
-        // (FS busy, EACCES) leaves an empty dir but no recoverable data
         #[allow(clippy::let_underscore_must_use)]
         let _ = std::fs::remove_dir(&keys_dir);
         count
@@ -251,45 +263,12 @@ impl<'a> ShredManager<'a> {
         #[allow(clippy::let_underscore_must_use)]
         let _ = self.storage.wal_checkpoint();
 
-        let db_path = self.data_dir.join("vauchi.db");
-        let mut success = true;
-
-        for suffix in &["", "-wal", "-shm", "-journal"] {
-            let path = if suffix.is_empty() {
-                db_path.clone()
-            } else {
-                db_path.with_extension(format!("db{}", suffix))
-            };
-            if path.exists() && secure_overwrite_file(&path).is_err() {
-                success = false;
-            }
-        }
-
-        // Clean pre-migration backup files (F8 audit fix)
-        if let Ok(entries) = std::fs::read_dir(&self.data_dir) {
-            for entry in entries.flatten() {
-                let name = entry.file_name();
-                let name_str = name.to_string_lossy();
-                if name_str.contains(".pre-migration-v")
-                    && name_str.ends_with(".bak")
-                    && secure_overwrite_file(&entry.path()).is_err()
-                {
-                    success = false;
-                }
-            }
-        }
-
-        success
+        secure_delete_database_files(&self.database_path())
     }
 
     fn delete_pre_signed_file(&self) -> bool {
         let path = legacy_pre_signed_file(&self.data_dir);
-        if path.exists() {
-            // Use secure overwrite instead of bare remove_file (#200a)
-            secure_overwrite_file(&path).is_ok()
-        } else {
-            true
-        }
+        secure_overwrite_file(&path).is_ok()
     }
 
     fn delete_data_directory(&self) -> bool {

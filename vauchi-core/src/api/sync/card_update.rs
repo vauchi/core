@@ -20,8 +20,9 @@
 mod ordering;
 mod ratchet_only;
 
+use crate::contact::Contact;
 use crate::crypto::cek::ContentEncryptionKey;
-use crate::crypto::ratchet::RatchetMessage;
+use crate::crypto::ratchet::{DoubleRatchetState, RatchetMessage};
 use crate::identity::Identity;
 use crate::network::GeoLocation;
 use crate::network::anonymous::{current_epoch, resolve_sender_device};
@@ -359,7 +360,7 @@ fn process_single_card_update_for_device_with_budget(
     }
 
     // 2. Load contact and reject if blocked
-    let mut contact = storage
+    let contact = storage
         .contacts()
         .load_contact(sender_id)?
         .ok_or(CardUpdateError::ContactNotFound)?;
@@ -478,11 +479,38 @@ fn process_single_card_update_for_device_with_budget(
         }
     };
 
+    apply_opened_update(
+        identity,
+        storage,
+        sender_id,
+        peer_device_id,
+        contact,
+        &ratchet,
+        is_initiator,
+        &plaintext,
+    )
+}
+
+/// Everything after a blob opened: alerts, reciprocity confirmations, the
+/// ratchet-only kinds, registry pushes and acks, and card deltas, each
+/// saved with `ratchet` in one transaction. The merge at the unlock calls
+/// it for what a locked run opened (vauchi/private#1093 slice 7).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn apply_opened_update(
+    identity: &Identity,
+    storage: &Storage,
+    sender_id: &str,
+    peer_device_id: &[u8; 32],
+    mut contact: Contact,
+    ratchet: &DoubleRatchetState,
+    is_initiator: bool,
+    plaintext: &[u8],
+) -> Result<ReceiveOutcome, CardUpdateError> {
     // 3b. Alerts route separately. Emergency alerts reuse the card-update
     //     envelope for wire indistinguishability (ADR-036) but carry no card
     //     delta — a 0x04 payload is verified + surfaced here, before the
     //     card-delta path (2026-07-04-coercion-safety-alerts-never-received).
-    if let Ok(VersionedPayload::Alert(alert)) = VersionedPayload::decode(&plaintext) {
+    if let Ok(VersionedPayload::Alert(alert)) = VersionedPayload::decode(plaintext) {
         // Verify the sender+recipient signature BEFORE acting on the alert.
         let sender_pk = contact
             .public_key()
@@ -506,7 +534,7 @@ fn process_single_card_update_for_device_with_budget(
             storage.ratchets().save_ratchet_state_for_device(
                 sender_id,
                 peer_device_id,
-                &ratchet,
+                ratchet,
                 is_initiator,
             )?;
             storage
@@ -515,7 +543,7 @@ fn process_single_card_update_for_device_with_budget(
             storage.safety_alerts().insert_fact_if_absent(
                 sender_id,
                 alert.nonce(),
-                &plaintext,
+                plaintext,
                 storage.clock().unix_seconds(),
             )?;
             Ok(())
@@ -544,8 +572,7 @@ fn process_single_card_update_for_device_with_budget(
     //     deterministic and re-confirming is idempotent — a replay can only
     //     re-assert a true Confirmed, never forge one (the token must still
     //     match the expected value, checked at the app layer).
-    if let Ok(VersionedPayload::ReciprocityConfirm(confirm)) = VersionedPayload::decode(&plaintext)
-    {
+    if let Ok(VersionedPayload::ReciprocityConfirm(confirm)) = VersionedPayload::decode(plaintext) {
         let sender_pk = contact
             .public_key()
             .ok_or(CardUpdateError::SignatureInvalid)?;
@@ -560,7 +587,7 @@ fn process_single_card_update_for_device_with_budget(
         let confirm_txn = storage.ratchets().save_ratchet_state_for_device(
             sender_id,
             peer_device_id,
-            &ratchet,
+            ratchet,
             is_initiator,
         );
         match confirm_txn {
@@ -578,12 +605,12 @@ fn process_single_card_update_for_device_with_budget(
     }
 
     // 3c'. The kinds that apply no card change (`ratchet_only`).
-    if let Some(outcome) = ratchet_only::outcome_of(VersionedPayload::decode(&plaintext)) {
+    if let Some(outcome) = ratchet_only::outcome_of(VersionedPayload::decode(plaintext)) {
         return ratchet_only::receive(
             storage,
             sender_id,
             peer_device_id,
-            &ratchet,
+            ratchet,
             is_initiator,
             outcome,
         );
@@ -592,33 +619,33 @@ fn process_single_card_update_for_device_with_budget(
     // 3d. F4 registry handshake payloads (0x05/0x06) — persist/ack registry
     //     state inside the receive transaction; the caller queues any reply
     //     (ADR-064 Amendment 2026-07-25).
-    if let Ok(VersionedPayload::RegistryPush(push)) = VersionedPayload::decode(&plaintext) {
+    if let Ok(VersionedPayload::RegistryPush(push)) = VersionedPayload::decode(plaintext) {
         return super::registry_handshake::receive_registry_push(
             identity,
             storage,
             sender_id,
             &contact,
             &push,
-            &ratchet,
+            ratchet,
             is_initiator,
             peer_device_id,
         );
     }
-    if let Ok(VersionedPayload::RegistryAck(ack)) = VersionedPayload::decode(&plaintext) {
+    if let Ok(VersionedPayload::RegistryAck(ack)) = VersionedPayload::decode(plaintext) {
         return super::registry_handshake::receive_registry_ack(
             identity,
             storage,
             sender_id,
             &contact,
             &ack,
-            &ratchet,
+            ratchet,
             is_initiator,
             peer_device_id,
         );
     }
 
     // 4. Handle versioned payload (CEK-wrapped only)
-    let (delta_bytes, new_cek) = decode_versioned_payload(&plaintext)?;
+    let (delta_bytes, new_cek) = decode_versioned_payload(plaintext)?;
 
     // 5. Parse delta
     let delta: CardDelta =
@@ -679,7 +706,7 @@ fn process_single_card_update_for_device_with_budget(
         storage.ratchets().save_ratchet_state_for_device(
             sender_id,
             peer_device_id,
-            &ratchet,
+            ratchet,
             is_initiator,
         )?;
         storage

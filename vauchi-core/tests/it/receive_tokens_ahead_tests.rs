@@ -2,8 +2,9 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! An unlocked sync stores, under the Background Receive Key, today's and
-//! tomorrow's receive registrations, so a locked phone can fetch without a
+//! An unlocked sync stores, under the Background Receive Key, the receive
+//! registrations of yesterday, today and tomorrow, the days a locked run in
+//! the next 24 hours registers as an unlocked one would, so a locked phone can fetch without a
 //! shared key or the master seed (owner 2026-11-08, vauchi/private#1093
 //! slice 5). A locked phone receives for one day after the last unlocked
 //! sync (ADR-033 addendum 2026-11-09, point 3). A stored day is the whole set the day registers, padding
@@ -30,8 +31,6 @@ use vauchi_core::rng::OsSecureRng;
 use vauchi_core::sleeper::FakeSleeper;
 use vauchi_core::storage::{MemoryKeyStorage, SecureStorage, Storage, StorageError};
 use vauchi_protocol::ohttp_key::window_of;
-
-const DAYS_AHEAD: u64 = 2;
 
 struct Relays {
     outer: MockRelay,
@@ -124,7 +123,7 @@ fn as_sets(batches: &[Vec<String>]) -> Vec<BTreeSet<String>> {
 
 // @internal
 #[test]
-fn a_sync_stores_today_exactly_the_batches_it_registered() {
+fn a_sync_stores_exactly_the_batches_it_registered() {
     let relays = relays();
     let dir = tempfile::tempdir().unwrap();
     let mut alice = client(
@@ -139,15 +138,25 @@ fn a_sync_stores_today_exactly_the_batches_it_registered() {
 
     sync(&mut alice);
 
-    let stored = alice
-        .receive_registration_ahead(today(&relays))
-        .unwrap()
-        .expect("today is stored");
     let chunks = fetched_chunks(&relays.outer);
-    assert!(!stored.batches().is_empty());
-    // A locked run must register the very set an unlocked one did: the
-    // chunks that touch a stored batch lie wholly inside it and cover it.
-    for batch in as_sets(stored.batches()) {
+    // A locked run must register the very set an unlocked one did, for
+    // every day the unlocked one registered: the chunks that touch a stored
+    // batch lie wholly inside it and cover it.
+    let batches: Vec<BTreeSet<String>> = [today(&relays) - 1, today(&relays)]
+        .into_iter()
+        .flat_map(|day| {
+            let stored = alice
+                .receive_registration_ahead(day)
+                .unwrap()
+                .expect("every registered day is stored");
+            as_sets(stored.batches())
+        })
+        .collect();
+    assert_eq!(batches.len(), 2, "one padded batch a day");
+    let fetched: BTreeSet<String> = chunks.iter().flatten().cloned().collect();
+    let stored: BTreeSet<String> = batches.iter().flatten().cloned().collect();
+    assert_eq!(fetched, stored, "nothing was fetched that is not stored");
+    for batch in batches {
         assert_eq!(batch.len(), 256, "a stored batch is padded like a sent one");
         let touching: Vec<&BTreeSet<String>> = chunks
             .iter()
@@ -164,7 +173,7 @@ fn a_sync_stores_today_exactly_the_batches_it_registered() {
 
 // @internal
 #[test]
-fn today_and_tomorrow_are_stored_and_no_more() {
+fn yesterday_today_and_tomorrow_are_stored_and_no_more() {
     let relays = relays();
     let dir = tempfile::tempdir().unwrap();
     let mut alice = client(
@@ -176,16 +185,22 @@ fn today_and_tomorrow_are_stored_and_no_more() {
 
     sync(&mut alice);
 
-    let first = today(&relays);
-    let last = first + DAYS_AHEAD - 1;
-    assert!(alice.receive_registration_ahead(first).unwrap().is_some());
-    assert!(alice.receive_registration_ahead(last).unwrap().is_some());
-    assert!(
-        alice
-            .receive_registration_ahead(last + 1)
-            .unwrap()
-            .is_none()
-    );
+    let day = today(&relays);
+    for stored in [day - 1, day, day + 1] {
+        assert!(
+            alice.receive_registration_ahead(stored).unwrap().is_some(),
+            "day {stored}"
+        );
+    }
+    for not_stored in [day - 2, day + 2] {
+        assert!(
+            alice
+                .receive_registration_ahead(not_stored)
+                .unwrap()
+                .is_none(),
+            "day {not_stored}"
+        );
+    }
 }
 
 // @internal
@@ -203,7 +218,7 @@ fn a_locked_phone_receives_until_a_day_after_the_unlocked_sync() {
     sync(&mut alice);
 
     let synced_at = relays.clock.unix_seconds();
-    for day in [today(&relays), today(&relays) + 1] {
+    for day in [today(&relays) - 1, today(&relays), today(&relays) + 1] {
         let stored = alice.receive_registration_ahead(day).unwrap().unwrap();
         assert_eq!(stored.receive_until(), synced_at + DAY);
     }
@@ -252,7 +267,7 @@ fn a_new_contact_is_in_the_stored_days_after_the_next_sync() {
 
     sync(&mut alice);
 
-    let last = today(&relays) + DAYS_AHEAD - 1;
+    let last = today(&relays) + 1;
     let stored = alice.receive_registration_ahead(last).unwrap().unwrap();
     assert_eq!(
         stored.contact_ids(),
@@ -262,7 +277,7 @@ fn a_new_contact_is_in_the_stored_days_after_the_next_sync() {
 
 // @internal
 #[test]
-fn days_before_today_are_dropped() {
+fn days_before_yesterday_are_dropped() {
     let relays = relays();
     let dir = tempfile::tempdir().unwrap();
     let mut alice = client(
@@ -279,12 +294,8 @@ fn days_before_today_are_dropped() {
 
     let store = alice.storage().receive_tokens();
     assert!(store.load_day(first).unwrap().is_none());
-    assert!(
-        store
-            .load_day(first + 2 + DAYS_AHEAD - 1)
-            .unwrap()
-            .is_some()
-    );
+    assert!(store.load_day(first + 1).unwrap().is_some());
+    assert!(store.load_day(first + 3).unwrap().is_some());
 }
 
 // @internal

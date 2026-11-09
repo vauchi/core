@@ -399,6 +399,8 @@ pub struct ProfileEngine {
     /// its own from storage.
     session_password: Option<crate::identity::password_config::AppPasswordConfig>,
     storage: Storage,
+    /// Retain file cleanup authority after retirement so a failed wipe can retry.
+    pending_wipe_database: Option<std::path::PathBuf>,
     events: Arc<EventDispatcher>,
     secure_storage: Option<Arc<dyn SecureStorage>>,
     auth_mode: AuthMode,
@@ -609,6 +611,7 @@ impl ProfileEngine {
             shown: None,
             session_password: None,
             storage,
+            pending_wipe_database: None,
             events,
             secure_storage,
             auth_mode: AuthMode::Unauthenticated,
@@ -836,6 +839,7 @@ impl ProfileEngine {
             shown: None,
             session_password: None,
             storage,
+            pending_wipe_database: None,
             events,
             secure_storage: None,
             auth_mode: AuthMode::Unauthenticated,

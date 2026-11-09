@@ -121,6 +121,8 @@ fn an_explicit_profile_wipe_overwrites_the_actual_database_with_or_without_ident
         }
         assert!(!root.path().exists());
         assert!(app.identity().is_none());
+        drop(app);
+        assert!(!root.path().exists());
     }
 }
 

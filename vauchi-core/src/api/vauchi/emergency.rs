@@ -258,7 +258,12 @@ impl ProfileEngine {
             ));
         }
 
-        match self.storage.db_path().map(Path::to_path_buf) {
+        match self
+            .storage
+            .db_path()
+            .map(Path::to_path_buf)
+            .or_else(|| self.pending_wipe_database.clone())
+        {
             Some(database) => {
                 let data_dir = self.config.profile_directory.clone().ok_or_else(|| {
                     VauchiError::Configuration(
@@ -273,6 +278,7 @@ impl ProfileEngine {
                     })?;
                 let empty = Storage::in_memory(crate::crypto::SymmetricKey::generate())?
                     .with_clock(self.clock.clone());
+                self.pending_wipe_database = Some(database.clone());
                 // #1178: Windows cannot overwrite/unlink SQLite files with our handle open.
                 drop(std::mem::replace(&mut self.storage, empty));
                 self.identity = None;
@@ -281,6 +287,7 @@ impl ProfileEngine {
                 self.session_password = None;
                 self.auth_mode = AuthMode::Unauthenticated;
                 self.shred_data_directory(&data_dir, &database)?;
+                self.pending_wipe_database = None;
             }
             // An in-memory database ends with the process; there is no file
             // or directory to shred, and its parent is not ours to delete.

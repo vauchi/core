@@ -111,6 +111,7 @@ impl ProfileEngine {
             shown: None,
             session_password: None,
             storage,
+            pending_wipe_database: None,
             events: Arc::new(EventDispatcher::new()),
             secure_storage: self.secure_storage.clone(),
             auth_mode: AuthMode::Duress,

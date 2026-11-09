@@ -7,6 +7,9 @@
 
 [advisories]
 ignore = [
+    # Existing CI exception in .gitlab-ci.yml: ab_glyph -> owned_ttf_parser.
+    # Remove when ab_glyph moves off ttf-parser or the diagnostic dep is dropped.
+    "RUSTSEC-2026-0192",
     # rsa Marvin Attack (timing side channel) — transitive via arti-client.
     # No fix available until arti updates rsa. Tracked upstream.
     "RUSTSEC-2023-0071",

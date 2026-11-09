@@ -84,3 +84,38 @@ fn a_periodic_tick_keeps_the_foreground_schedule() {
         );
     }
 }
+
+// An OS scheduler also wakes the worker before the deadline: the S7 ran its
+// worker every 1 to 16 min. A tick that is too soon must leave the deadline
+// alone; drawing a fresh gap each time pushes it away on every early wake,
+// and the phone never syncs in the background (vauchi/private#1093, arm A:
+// 13 runs in two hours, no sync).
+// @internal
+#[test]
+fn a_background_tick_too_soon_keeps_the_deadline() {
+    let outer = MockRelay::start();
+    outer.enable_ohttp_gateway(&SignedGateway::new(0x41), window_of(NOW));
+    let application = MockRelay::start();
+    let (mut vauchi, _dir) = connected_client(&outer, &application);
+    vauchi.set_next_sync_allowed(std::time::Instant::now());
+    vauchi.background_sync_tick(None).expect("tick that syncs");
+    let first = vauchi.time_until_sync_due().expect("identity");
+
+    let mut later = Vec::new();
+    for _ in 0..5 {
+        let outcome = vauchi.background_sync_tick(None).expect("early tick");
+        assert!(
+            matches!(outcome, vauchi_core::api::VauchiSyncOutcome::TooSoon { .. }),
+            "{outcome:?}"
+        );
+        later.push(vauchi.time_until_sync_due().expect("identity"));
+    }
+
+    let slack = Duration::from_secs(1);
+    for gap in &later {
+        assert!(
+            *gap <= first && first - *gap < slack,
+            "an early tick moved the deadline: first {first:?}, then {later:?}"
+        );
+    }
+}

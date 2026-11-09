@@ -8,6 +8,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+
+- The next stable Core release is 0.103.0 because the migration/reset/shred
+  safety changes intentionally break Rust source compatibility
+  (vauchi/private#1178). `ShredReport` literals must supply
+  `key_files_complete`; callers must include that result when deciding
+  whether key-file cleanup completed. A successful file count alone does
+  not establish complete cleanup.
+- Database paths authorize cleanup of that database and its companions.
+  Callers that own an exclusive profile directory must explicitly declare
+  it with `VauchiConfig::with_profile_directory` before requesting directory
+  cleanup. Directory ownership is checked against the actual database path.
+
 ### Removed
 
 - `Vauchi::accept_link_exchange(link)`, which since 0.101.0 always

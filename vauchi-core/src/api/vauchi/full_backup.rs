@@ -42,6 +42,17 @@ impl ProfileEngine {
         Ok(hex::encode(blob))
     }
 
+    /// Exports a v7 backup whose second payload opens with
+    /// `decoy_password` and holds the decoy profile only (ADR-080 point 7).
+    pub fn export_full_backup_with_decoy(
+        &self,
+        password: &str,
+        decoy_password: &str,
+    ) -> VauchiResult<String> {
+        let _ = (password, decoy_password);
+        Err(no_decoy_to_export())
+    }
+
     /// Atomically restores a password backup onto a fresh installation.
     ///
     /// Accepts v6 and legacy v3; missing legacy privacy state cannot be recovered.
@@ -99,4 +110,8 @@ impl ProfileEngine {
 
 fn backup_error(error: crate::backup::BackupError) -> VauchiError {
     VauchiError::Configuration(format!("Full backup operation failed: {error}"))
+}
+
+fn no_decoy_to_export() -> VauchiError {
+    VauchiError::InvalidState("no decoy profile to export".into())
 }

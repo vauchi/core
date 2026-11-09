@@ -48,6 +48,7 @@
 
 pub mod app_password;
 pub mod emergency;
+pub mod locked_receive;
 pub mod storage_reset;
 
 #[cfg(feature = "testing")]

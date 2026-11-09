@@ -66,6 +66,33 @@ impl LockedReceiveStorage {
         })
     }
 
+    /// Runs `writes` in one transaction: all of them commit, or none.
+    pub fn in_transaction<T>(
+        &self,
+        writes: impl FnOnce(&Self) -> Result<T, StorageError>,
+    ) -> Result<T, StorageError> {
+        self.conn.execute_batch("BEGIN IMMEDIATE")?;
+        match writes(self) {
+            Ok(value) => {
+                self.conn.execute_batch("COMMIT")?;
+                Ok(value)
+            }
+            Err(e) => {
+                // A failed rollback leaves SQLite to undo the open
+                // transaction when the connection closes; the write error is
+                // the one the caller needs.
+                if let Err(rollback) = self.conn.execute_batch("ROLLBACK") {
+                    tracing::warn!(
+                        target: "vauchi.storage.locked_receive",
+                        error = %rollback,
+                        "rollback failed; the connection's close undoes it"
+                    );
+                }
+                Err(e)
+            }
+        }
+    }
+
     /// Replaces the clock the stores stamp rows with.
     pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
         self.clock = clock;

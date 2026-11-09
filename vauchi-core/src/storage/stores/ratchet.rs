@@ -211,7 +211,23 @@ impl RatchetStore<'_> {
         }
     }
 
-    /// Deletes the ratchet session for one device belonging to a contact.
+    /// The devices `contact_id` has a session with, the shared session
+    /// first: its id is all zeros.
+    pub fn peer_devices(&self, contact_id: &str) -> Result<Vec<[u8; 32]>, StorageError> {
+        let devices: Vec<Vec<u8>> = self
+            .conn
+            .prepare(
+                "SELECT peer_device_id FROM contact_ratchets
+                 WHERE contact_id = ?1 ORDER BY peer_device_id",
+            )?
+            .query_map(params![contact_id], |row| row.get(0))?
+            .collect::<Result<_, _>>()?;
+        Ok(devices
+            .into_iter()
+            .filter_map(|device| device.try_into().ok())
+            .collect())
+    }
+
     /// Deletes every ratchet state of `contact_id`, on all its devices.
     pub fn delete_ratchet_states_for_contact(
         &self,

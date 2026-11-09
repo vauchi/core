@@ -58,6 +58,16 @@ fn derive_sealed_box_key(ikm: &[u8]) -> zeroize::Zeroizing<[u8; 32]> {
 /// point, which would collapse the DH output to an all-zero (predictable)
 /// shared secret.
 pub fn seal(plaintext: &[u8], recipient_pk: &PublicKey) -> Result<Vec<u8>, RecoveryError> {
+    seal_with(derive_sealed_box_key, plaintext, recipient_pk)
+}
+
+/// [`seal`] under another purpose's key derivation, so each purpose keeps
+/// its own HKDF info string at its own site (ADR-007).
+pub(crate) fn seal_with(
+    derive_key: fn(&[u8]) -> zeroize::Zeroizing<[u8; 32]>,
+    plaintext: &[u8],
+    recipient_pk: &PublicKey,
+) -> Result<Vec<u8>, RecoveryError> {
     let ephemeral_secret = StaticSecret::random_from_rng(OsRng);
     let ephemeral_pk = PublicKey::from(&ephemeral_secret);
 
@@ -70,7 +80,7 @@ pub fn seal(plaintext: &[u8], recipient_pk: &PublicKey) -> Result<Vec<u8>, Recov
     }
 
     // 3. Derive symmetric key via HKDF-SHA256 (ADR-007).
-    let key = derive_sealed_box_key(shared.as_bytes());
+    let key = derive_key(shared.as_bytes());
 
     let mut nonce_bytes = [0u8; 24];
     OsRng.fill_bytes(&mut nonce_bytes);
@@ -101,6 +111,15 @@ pub fn seal(plaintext: &[u8], recipient_pk: &PublicKey) -> Result<Vec<u8>, Recov
 /// Returns [`RecoveryError::DecryptionFailed`] if authentication fails
 /// (wrong key, tampered ciphertext, or truncated input).
 pub fn open(sealed: &[u8], recipient_secret: &StaticSecret) -> Result<Vec<u8>, RecoveryError> {
+    open_with(derive_sealed_box_key, sealed, recipient_secret)
+}
+
+/// [`open`] under the key derivation [`seal_with`] used.
+pub(crate) fn open_with(
+    derive_key: fn(&[u8]) -> zeroize::Zeroizing<[u8; 32]>,
+    sealed: &[u8],
+    recipient_secret: &StaticSecret,
+) -> Result<Vec<u8>, RecoveryError> {
     if sealed.len() < MIN_SEALED_LEN {
         return Err(RecoveryError::InvalidFormat);
     }
@@ -125,7 +144,7 @@ pub fn open(sealed: &[u8], recipient_secret: &StaticSecret) -> Result<Vec<u8>, R
     }
 
     // 3. Derive symmetric key via HKDF-SHA256 (ADR-007).
-    let key = derive_sealed_box_key(shared.as_bytes());
+    let key = derive_key(shared.as_bytes());
 
     // INVARIANT: a 32-byte array is always a valid XChaCha20 key
     // (vauchi/private#761).

@@ -65,6 +65,8 @@ impl MigrationRunner {
     /// any migrations whose version is greater than the current schema version.
     /// All pending migrations run within a single transaction — if any migration
     /// fails, all changes are rolled back.
+    /// Pending migrations use FULL synchronous durability; the connection's
+    /// previous sync policy is restored after success or rollback.
     ///
     /// If `db_path` is provided and there are pending migrations, a recovery
     /// snapshot is attempted before applying them (#17). Its filename appends
@@ -124,6 +126,8 @@ impl MigrationRunner {
         if pending.is_empty() {
             return Ok(None);
         }
+
+        let _durability = super::migration_durability::MigrationDurability::full(conn)?;
 
         let mut created_backup = None;
         if let Some(path) = db_path {

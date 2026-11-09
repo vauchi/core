@@ -381,6 +381,7 @@ mod local_data_retention_tests;
 mod local_keys_tests;
 mod locales_dir_tests;
 mod lock_screen_engine_tests;
+mod locked_receive_run_tests;
 mod locked_receive_storage_tests;
 mod locked_receive_tests;
 mod lost_one_device_tests;

@@ -362,3 +362,25 @@ fn a_phone_that_never_synced_unlocked_has_nothing_to_register() {
     assert_eq!(outcome, LockedRunOutcome::NothingStored);
     assert!(outer.ohttp_actions().is_empty());
 }
+
+// @internal
+#[test]
+fn a_relay_that_starts_delaying_after_the_unlock_gets_one_locked_round() {
+    let mut world = world();
+    world.bob_sends_an_update();
+    // The last unlocked sync saw no window; the relay offers one now. A
+    // locked run cannot know before its first answer, so it fetches once,
+    // keeps the window, and the next locked run makes no request.
+    world.outer.advertise_delay_window(Some("900"));
+
+    let first = world.locked_run(&world.relay());
+    let after_first = world.outer.ohttp_actions().len();
+    let second = world.locked_run(&world.relay());
+
+    assert!(
+        matches!(first, LockedRunOutcome::Received { .. }),
+        "{first:?}"
+    );
+    assert_eq!(second, LockedRunOutcome::DelayedFetchesOffered);
+    assert_eq!(world.outer.ohttp_actions().len(), after_first, "no request");
+}

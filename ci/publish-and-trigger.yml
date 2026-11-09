@@ -698,6 +698,10 @@ bump:consumer-pins:
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
   script:
+    # cargo-vet names the crates a bump brings that nothing vets, on the
+    # MR (private#1183); as in security:vet, best-effort, and the script
+    # says so when it is missing.
+    - command -v cargo-vet >/dev/null 2>&1 || cargo binstall cargo-vet --no-confirm 2>/dev/null || true
     - |
       set -euo pipefail
       SCRIPTS_DIR=$(mktemp -d)

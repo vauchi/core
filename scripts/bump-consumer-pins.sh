@@ -125,6 +125,44 @@ print(json.dumps({"body": f"ready-queue: !{sys.argv[1]} waits for this MR to mer
     echo "$repo: opened $url (Draft, waiting behind !$ahead)"
 }
 
+# unvetted_crates <repo> <dir>: "crate version" for each crate the bumped
+# lockfile brings that cargo-vet does not cover. New dependencies get their
+# exemptions by hand, after review (maintainer, 2026-11-09), so the bump
+# names them on its MR instead of adding them (private#1183).
+unvetted_crates() {
+    local repo=$1 dir=$2 out
+    [ -f "$dir/supply-chain/config.toml" ] || return 0
+    if ! (cd "$dir" && cargo vet --version) >/dev/null 2>&1; then
+        echo "$repo: cargo-vet is not installed here; security:vet will tell" >&2
+        return 0
+    fi
+    if out=$(cd "$dir" && cargo vet --locked 2>&1); then
+        return 0
+    fi
+    out=$(printf '%s\n' "$out" | sed -n 's/^ *\([A-Za-z0-9_-]*\):\([^ ]*\) missing .*/\1 \2/p')
+    if [ -z "$out" ]; then
+        echo "$repo: cargo vet failed without naming a crate; security:vet will tell" >&2
+        return 0
+    fi
+    printf '%s\n' "$out"
+}
+
+# vet_note <repo> <project> <iid> <crates>: says on the MR why security:vet
+# will be red. A failed comment is reported, never a failed bump.
+vet_note() {
+    local repo=$1 project=$2 iid=$3 crates=$4 body status
+    body=$(python3 -c 'import json, sys
+crates = [line.split() for line in sys.argv[1].splitlines() if line.strip()]
+listed = "\n".join(f"- `{name} {version}`" for name, version in crates)
+print(json.dumps({"body": (
+    f"cargo-vet: this bump brings {len(crates)} crate(s) with no audit or exemption, "
+    "so `security:vet` fails until they are reviewed:\n\n" + listed + "\n\n"
+    "After review, add each as `[[exemptions.<crate>]]` in `supply-chain/config.toml` "
+    "on this branch; never `[[audits]]` (VSC01).")}))' "$crates")
+    status=$(api POST "$API/projects/$project/merge_requests/$iid/notes" "$body")
+    [ "$status" = 201 ] || echo "$repo: WARNING: the cargo-vet note on !$iid failed (HTTP $status)" >&2
+}
+
 # bump_one <repo> <kind> <file> [<kind> <file>...]: a consumer may pin Core in
 # several files (e2e: Cargo.toml and ci/pins.env, private#1034); they move in
 # one clone, one commit, one branch and one MR.
@@ -171,6 +209,8 @@ bump_one() {
         echo "$repo: already pins v$VERSION"
         return 0
     fi
+    local unvetted
+    unvetted=$(unvetted_crates "$repo" "$dir")
 
     git -C "$dir" checkout -q -b "$BRANCH"
     git -C "$dir" -c user.name="$BOT_NAME" -c user.email="$BOT_EMAIL" commit -q -a \
@@ -209,7 +249,11 @@ print(json.dumps({
         echo "$repo: ERROR: pushed $BRANCH but opening the MR failed (HTTP $status)" >&2
         return 1
     fi
-    queue_mr "$repo" "$project" "$(json_field iid)" "$(json_field web_url)"
+    local iid
+    iid=$(json_field iid)
+    url=$(json_field web_url)
+    [ -z "$unvetted" ] || vet_note "$repo" "$project" "$iid" "$unvetted"
+    queue_mr "$repo" "$project" "$iid" "$url"
 }
 
 if [ "${MODE:-}" = one ]; then

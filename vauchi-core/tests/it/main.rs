@@ -381,6 +381,7 @@ mod local_data_retention_tests;
 mod local_keys_tests;
 mod locales_dir_tests;
 mod lock_screen_engine_tests;
+mod locked_receive_storage_tests;
 mod lost_one_device_tests;
 mod lost_primary_bootstrap_diag_tests;
 mod mailbox_token_shape_tests;

@@ -1,0 +1,95 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+.migration-safety-rules:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_PIPELINE_SOURCE == "api"'
+      changes:
+        paths:
+          - vauchi-core/src/storage/**
+          - vauchi-core/src/api/shred/**
+          - vauchi-core/tests/migration_snapshot_safety.rs
+          - vauchi-core/tests/migration_commit_durability.rs
+          - ci/migration-safety.yml
+          - ci/run-native-migration-tests.ps1
+          - ci/native-migration-runner.ps1
+          - ci/tests/native-migration-runner.tests.ps1
+          - Cargo.lock
+          - vauchi-core/Cargo.toml
+
+test:migration-safety:macos:
+  extends: [.macos-runner, .migration-safety-rules]
+  stage: test
+  needs: []
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - !reference [.clone-locales, before_script]
+    - !reference [.clone-themes, before_script]
+  script:
+    - |
+      set -euo pipefail
+      uname -s
+      test "$(uname -s)" = Darwin
+      cargo test --locked -p vauchi-core --features testing \
+        --test migration_snapshot_safety --test migration_commit_durability \
+        -- --nocapture 2>&1 | tee migration-safety-macos.log
+      grep -E '^running [1-9][0-9]* tests?' migration-safety-macos.log
+      test "$(grep -Ec '^test result: ok\. [1-9][0-9]* passed; 0 failed;' migration-safety-macos.log)" -eq 2
+  artifacts:
+    when: always
+    paths: [migration-safety-macos.log]
+
+build:migration-safety:windows:
+  extends: [.linux-runner-nocache, .migration-safety-rules]
+  stage: test
+  needs: []
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - !reference [.clone-locales, before_script]
+    - !reference [.clone-themes, before_script]
+  script:
+    - |
+      set -euo pipefail
+      rustup target add x86_64-pc-windows-msvc
+      cargo xwin --version
+      cargo xwin test --locked -p vauchi-core --features testing \
+        --target x86_64-pc-windows-msvc \
+        --test migration_snapshot_safety --test migration_commit_durability \
+        --no-run --message-format=json > migration-safety-build.jsonl
+      python3 - <<'PY'
+      import json
+      import pathlib
+      import shutil
+      expected = {'migration_snapshot_safety', 'migration_commit_durability'}
+      output = pathlib.Path('migration-safety-windows')
+      output.mkdir(exist_ok=True)
+      found = set()
+      for line in pathlib.Path('migration-safety-build.jsonl').read_text().splitlines():
+          record = json.loads(line)
+          name = record.get('target', {}).get('name')
+          if record.get('reason') == 'compiler-artifact' and name in expected and record.get('executable'):
+              shutil.copy2(record['executable'], output / (name + '.exe'))
+              found.add(name)
+      if found != expected:
+          raise SystemExit('Missing native test executable: ' + str(expected - found))
+      PY
+      sha256sum migration-safety-windows/*.exe > migration-safety-windows/SHA256SUMS
+  artifacts:
+    paths: [migration-safety-windows/]
+    expire_in: 1 week
+
+test:migration-safety:windows:
+  extends: .migration-safety-rules
+  stage: test
+  tags: [canary-pam-shell]
+  needs:
+    - job: build:migration-safety:windows
+      artifacts: true
+  before_script: []
+  after_script: []
+  script:
+    - pwsh -NoProfile -File ci/tests/native-migration-runner.tests.ps1
+    - pwsh -NoProfile -File ci/run-native-migration-tests.ps1
+  artifacts:
+    when: always
+    paths: [migration-safety-windows/*.log]

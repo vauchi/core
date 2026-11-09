@@ -91,6 +91,7 @@ include:
   - local: ci/prebuild.yml
   - local: ci/internal-dev-bindings.yml
   - local: ci/journey-fixtures.yml
+  - local: ci/migration-safety.yml
 
 # rust-base.yml cancels every job once one fails (on_job_failure: all).
 # Neither interruptible: false (core!2251) nor a child pipeline (core!2252)

@@ -98,8 +98,8 @@ pub mod storage;
 pub use storage::{
     ActivityLogStore, ConsentStore, ContactStore, DecoyStore, DeliveryStore, DeviceDeliveryStore,
     DeviceStore, EmergencyStore, FieldNoteStore, IdentityStore, LabelStore, OhttpCacheStore,
-    PendingStore, PendingUpdate, PinCacheStore, PlaceStore, RatchetStore, RecoveryStore,
-    ReplayStore, RetryStore, Storage, StorageError, SyncStore, TagStore, UpdateStatus, UxStore,
+    PendingStore, PendingUpdate, PlaceStore, RatchetStore, RecoveryStore, ReplayStore, RetryStore,
+    Storage, StorageError, SyncStore, TagStore, UpdateStatus, UxStore,
 };
 
 pub mod exchange;

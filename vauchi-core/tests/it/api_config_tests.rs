@@ -148,28 +148,6 @@ fn relay_config_pin_propagates_to_transport_config() {
     );
 }
 
-/// @internal C7
-// @internal
-#[test]
-fn default_relay_config_has_no_pin_rotation_key() {
-    let config = RelayConfig::default();
-    assert!(
-        config.pin_config_verify_key.is_none(),
-        "Pin rotation must be disabled by default (no verify key)"
-    );
-}
-
-/// @internal C7
-// @internal
-#[test]
-fn default_relay_config_has_24h_pin_ttl() {
-    let config = RelayConfig::default();
-    assert_eq!(
-        config.pin_ttl_secs, 86_400,
-        "Default pin TTL must be 24 hours"
-    );
-}
-
 // ── OHTTP trust anchor (#288, decisions 0.6 and 0.9) ────────────────
 
 const ANCHOR: [u8; 32] = [0x5a; 32];

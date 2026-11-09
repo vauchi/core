@@ -265,25 +265,6 @@ pub struct RelayConfig {
     /// the relay's SPKI against `ohttp.vauchi.app` made every sync fail).
     pub ohttp_pinned_certs: Vec<PinnedCertificate>,
 
-    /// TTL for cached pin configurations in seconds (default 86400 = 24h).
-    ///
-    /// Controls how long relay-served pin updates are trusted before
-    /// the client re-fetches. Shorter = more frequent checks, more
-    /// network traffic. Longer = more risk of stale pins after rotation.
-    pub pin_ttl_secs: u64,
-
-    /// Ed25519 public key for verifying signed pin-config responses.
-    ///
-    /// When `Some`, the client fetches and verifies pin updates from
-    /// the relay's `/v2/pin-config` endpoint. The relay must sign
-    /// pin-config responses with the corresponding private key.
-    ///
-    /// When `None` (default), pin rotation is disabled — only the
-    /// bundled `pinned_certs` are used. This is the safe default:
-    /// unauthenticated pin updates would allow a MITM to replace
-    /// the pin set permanently.
-    pub pin_config_verify_key: Option<[u8; 32]>,
-
     /// Explicit OHTTP-relay base URL — where OHTTP traffic (`POST /v2/ohttp`
     /// and the `GET /v2/ohttp-key-signed` bootstrap) is sent: the IP-stripping hop
     /// per ADR-037.
@@ -389,10 +370,8 @@ impl Default for RelayConfig {
                 PinnedCertificate::new(OHTTP_PROD_SPKI_PIN),
                 PinnedCertificate::new(OHTTP_DEDICATED_HOST_SPKI_PIN),
             ],
-            pin_ttl_secs: 86_400,        // 24 hours
-            pin_config_verify_key: None, // disabled until relay signs pin-config
-            ohttp_relay_url: None,       // derived from server_url (see ohttp_endpoint)
-            ohttp_anchor: None,          // production resolves to PROD_OHTTP_ANCHOR
+            ohttp_relay_url: None, // derived from server_url (see ohttp_endpoint)
+            ohttp_anchor: None,    // production resolves to PROD_OHTTP_ANCHOR
             ohttp_backup_commitment: None,
             ohttp_delayed: false,
             ohttp_delay_window: std::time::Duration::from_secs(900),

@@ -480,8 +480,6 @@ mod performance_threshold_tests;
 mod personal_note_app_sync_tests;
 mod personal_note_format_tests;
 mod phase3_engine_proptest;
-mod pin_cache_tests;
-mod pin_config_verification_tests;
 mod place_tests;
 mod presentation_resolver_tests;
 mod preview_as_proptest;

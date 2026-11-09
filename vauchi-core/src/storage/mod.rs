@@ -76,9 +76,8 @@ pub use stores::{
     GENESIS_GLOBAL_ATTEMPTS_PER_WINDOW, GENESIS_WINDOW_SECS, GenesisFactWrite, GenesisLimitStore,
     GuardianBackupStore, IdentityStore, KeptPiece, LabelStore, MaskPublicValues,
     MaskPublicValuesStore, MaskSeed, MaskSeedStore, OhttpCacheStore, OwnCardStore, PendingStore,
-    PinCacheStore, PlaceStore, RatchetStore, ReceiveCheckpoint, ReceiveScope, RecoveryStore,
-    ReplayStore, RetryStore, SafetyAlertFactStore, StoredSafetyAlertFact, SyncStore, TagStore,
-    UxStore,
+    PlaceStore, RatchetStore, ReceiveCheckpoint, ReceiveScope, RecoveryStore, ReplayStore,
+    RetryStore, SafetyAlertFactStore, StoredSafetyAlertFact, SyncStore, TagStore, UxStore,
 };
 
 #[cfg(any(test, feature = "testing"))]

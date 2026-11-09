@@ -233,6 +233,7 @@ mod duress_contact_api_tests;
 mod duress_contact_reads_by_id_tests;
 mod duress_cover_device_sync_tests;
 mod duress_cover_tests;
+mod duress_decoy_backup_tests;
 mod duress_mask_engine_tests;
 mod duress_mask_foreground_tests;
 mod duress_mask_key_tests;

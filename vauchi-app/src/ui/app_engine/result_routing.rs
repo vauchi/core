@@ -132,11 +132,19 @@ impl AppEngine {
                 dialog_type,
                 context_id,
             } => self.route_show_form_dialog(&dialog_type, context_id),
-            // Intercept backup Processing: execute backup in core, return result screen
+            // Intercept backup Processing: execute backup in core, return result
+            // screen. An export first asks for the session PIN (ADR-080 point 7);
+            // a restore runs on an install with no PIN to ask for.
             ActionResult::NavigateTo(ref screen)
                 if self.screen == AppScreen::Backup && screen.screen_id == "backup_processing" =>
             {
-                self.execute_backup()
+                if self.backup_is_restore() {
+                    self.execute_backup()
+                } else {
+                    self.confirm_session_pin_then(
+                        super::credential_gate::CredentialChange::BackupExport,
+                    )
+                }
             }
             ActionResult::SetGroupFieldVisibility {
                 group_id,

@@ -634,6 +634,14 @@ impl AppEngine {
     /// of `2026-05-03-core-file-picker-command`) which wires the file
     /// picker + password entry through core. This helper handles the
     /// export side only.
+    /// Whether the backup wizard is restoring rather than exporting.
+    pub(super) fn backup_is_restore(&self) -> bool {
+        matches!(
+            self.engine.engine_output(),
+            Some(crate::ui::EngineOutput::Backup(snap)) if snap.restore_mode
+        )
+    }
+
     pub(super) fn execute_backup(&mut self) -> ActionResult {
         // The backup password, level toggle, and restore blob all live on the
         // engine (it captures them as the user advances and zeroizes the

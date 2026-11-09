@@ -22,6 +22,8 @@ pub(super) enum CredentialChange {
     /// Who receives the emergency alerts, and the message (#781).
     EmergencyBroadcastConfig,
     EmergencyBroadcastDisable,
+    /// Every backup export, on every install (ADR-080 point 7).
+    BackupExport,
 }
 
 /// The change waiting on the PIN, and the engine of the screen that asked
@@ -49,6 +51,7 @@ impl CredentialChange {
             Self::EmergencyBroadcastConfig | Self::EmergencyBroadcastDisable => {
                 ("emergency.title", "emergency.confirm_password_hint")
             }
+            Self::BackupExport => ("backup.export_title", "backup.confirm_password_hint"),
         }
     }
 }
@@ -140,6 +143,7 @@ impl AppEngine {
                 self.complete_emergency_broadcast_disable()
             }
             CredentialChange::RecoveryHandBack => self.intercept_hand_back_action(),
+            CredentialChange::BackupExport => self.execute_backup(),
             CredentialChange::RecoveryVoucher => self
                 .intercept_create_voucher_action()
                 .unwrap_or_else(|| ActionResult::UpdateScreen(self.engine.current_screen())),

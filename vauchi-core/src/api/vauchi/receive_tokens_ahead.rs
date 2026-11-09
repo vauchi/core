@@ -22,9 +22,11 @@ use super::super::VauchiResult;
 use super::ProfileEngine;
 use super::receive_context::registered_mailboxes;
 
-/// Today and tomorrow, so the locked window below never outlives the
-/// stored tokens.
-const DAYS_AHEAD: u64 = 2;
+/// An up-to-date receive registers yesterday and today (`plan_receive`),
+/// so a locked run within the window below, on this day or the next, needs
+/// yesterday, today and tomorrow.
+const DAYS_BEFORE: u64 = 1;
+const DAYS_AFTER: u64 = 1;
 
 /// A locked phone receives for one day after its last unlocked sync, then
 /// waits for the next unlock, whose catch-up fetches what it missed
@@ -100,7 +102,8 @@ impl ProfileEngine {
         }
         let now = self.clock.unix_seconds();
         let today = current_day_epoch(now);
-        let days: Vec<(u64, RegistrationDay)> = (today..today + DAYS_AHEAD)
+        let days: Vec<(u64, RegistrationDay)> = (today.saturating_sub(DAYS_BEFORE)
+            ..=today + DAYS_AFTER)
             .map(|day| {
                 let context = registered_mailboxes(identity, contacts, &self.config.relay, &[day]);
                 let tokens = context.routes.keys().cloned().collect();

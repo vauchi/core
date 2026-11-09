@@ -166,6 +166,7 @@
   "backup.authenticating": "Authenticating...",
   "backup.choose_file": "Choose File",
   "backup.confirm_password": "Confirm Password",
+  "backup.confirm_password_hint": "Enter your password to export a backup.",
   "backup.confirm_password_placeholder": "Confirm password",
   "backup.copy_button": "Copy to Clipboard",
   "backup.data": "Backup data",

@@ -174,18 +174,18 @@ impl<'a> ShredManager<'a> {
             .secure_storage
             .load_key(SMK_KEY_NAME)
             .map(|k| k.is_none())
-            .unwrap_or(true);
+            .unwrap_or(false);
 
         let bootstrap_key_absent = self
             .secure_storage
             .load_key(BOOTSTRAP_KEY_NAME)
             .map(|k| k.is_none())
-            .unwrap_or(true);
+            .unwrap_or(false);
         let brk_absent = self
             .secure_storage
             .load_key_with_access(BRK_KEY_NAME, KeyAccess::AfterFirstUnlock)
             .map(|k| k.is_none())
-            .unwrap_or(true);
+            .unwrap_or(false);
         let database_absent = !self.data_dir.join("vauchi.db").exists();
         let data_dir_absent = !self.data_dir.exists();
         let pre_signed_absent = !legacy_pre_signed_file(&self.data_dir).exists();

@@ -12,49 +12,12 @@ use std::path::Path;
 use crate::api::pre_signed::legacy_pre_signed_file;
 use crate::storage::secure::{KeyAccess, SecureStorage};
 
+pub(super) use super::file::secure_overwrite_file;
 use super::{BOOTSTRAP_KEY_NAME, BRK_KEY_NAME, SMK_KEY_NAME, ShredError, ShredReport};
 
 /// Public entry point for secure file overwrite, callable from other modules.
 pub(crate) fn secure_overwrite_file_public(path: &Path) -> Result<(), std::io::Error> {
     secure_overwrite_file(path)
-}
-
-/// Securely overwrites a file with random data then zeros before removing it.
-///
-/// Uses 2-pass overwrite (#200a): random data (destroys original bit patterns)
-/// followed by zeros (verifiable wipe). Both passes are flushed to disk with
-/// `sync_all()` to ensure the overwrite reaches physical storage.
-pub(super) fn secure_overwrite_file(path: &Path) -> Result<(), std::io::Error> {
-    use std::io::{Seek, Write};
-
-    if !path.exists() {
-        return Ok(());
-    }
-
-    let size = std::fs::metadata(path)?.len() as usize;
-    if size == 0 {
-        std::fs::remove_file(path)?;
-        return Ok(());
-    }
-
-    let mut file = std::fs::OpenOptions::new().write(true).open(path)?;
-
-    // Pass 1: Overwrite with random data
-    let mut random = vec![0u8; size];
-    crate::crypto::random_fill(&mut random);
-    file.write_all(&random)?;
-    file.sync_all()?;
-
-    // Pass 2: Overwrite with zeros
-    file.seek(std::io::SeekFrom::Start(0))?;
-    let zeros = vec![0u8; size];
-    file.write_all(&zeros)?;
-    file.sync_all()?;
-
-    // Close handle, then remove
-    drop(file);
-    std::fs::remove_file(path)?;
-    Ok(())
 }
 
 /// Deletes every key in secure storage that opens stored data, the BRK

@@ -4231,6 +4231,7 @@ dependencies = [
  "vauchi-contract",
  "vauchi-protocol",
  "webpki-roots",
+ "winapi-util",
  "x25519-dalek",
  "zeroize",
 ]

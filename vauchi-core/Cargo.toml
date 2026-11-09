@@ -177,6 +177,10 @@ ort = { version = "2.0.0-rc.9", optional = true }
 uuid = { version = "1.0", features = ["js"] }
 getrandom = { version = "0.2", features = ["js"] }
 
+[target.'cfg(windows)'.dependencies]
+# #1178: safe handle link-count/reparse checks; already in the locked graph.
+winapi-util = "=0.1.11"
+
 [dev-dependencies]
 # OHTTP server features for roundtrip tests (merged with optional ohttp dep)
 ohttp = { version = "0.7", default-features = false, features = ["server", "rust-hpke"] }

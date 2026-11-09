@@ -67,8 +67,9 @@ impl MigrationRunner {
     /// fails, all changes are rolled back.
     ///
     /// If `db_path` is provided and there are pending migrations, a recovery
-    /// snapshot is attempted before applying them (#17). Its filename replaces
-    /// the database extension with `pre-migration-v<current>.bak`.
+    /// snapshot is attempted before applying them (#17). Its filename appends
+    /// `.pre-migration-v<current>.bak` to the complete database filename.
+    /// The complete synced copy is published without replacing existing files.
     /// Backup failure is nonfatal and emits a path-free warning to any configured
     /// tracing subscriber. The runner does not install a diagnostic backend.
     /// Transaction rollback does not establish that a backup was created.
@@ -124,27 +125,14 @@ impl MigrationRunner {
             return Ok(None);
         }
 
-        // Create pre-migration backup for file-based databases (#17).
-        // Uses VACUUM INTO for a consistent snapshot. Failure is logged but
-        // does not block migration — the transaction provides rollback safety.
         let mut created_backup = None;
         if let Some(path) = db_path {
-            let backup_path =
-                path.with_extension(format!("pre-migration-v{}.bak", current_version));
-            // #1178: VACUUM can reuse an empty file; that does not establish ownership.
-            let destination_was_absent = matches!(
-                std::fs::symlink_metadata(&backup_path),
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound
-            );
-            match conn.execute(
-                "VACUUM INTO ?1",
-                rusqlite::params![backup_path.to_string_lossy().as_ref()],
-            ) {
-                Ok(_) if destination_was_absent => created_backup = Some(backup_path),
-                Ok(_) => {}
+            match super::migration_snapshot::create(conn, path, current_version) {
+                Ok(path) => created_backup = Some(path),
                 Err(error) => tracing::warn!(
                     target: "vauchi.storage.migration",
-                    sqlite_error_code = ?error.sqlite_error().map(|error| error.extended_code),
+                    sqlite_error_code = ?error.sqlite_code(),
+                    io_error_kind = ?error.io_kind(),
                     "pre-migration backup unavailable; continuing transactionally"
                 ),
             }

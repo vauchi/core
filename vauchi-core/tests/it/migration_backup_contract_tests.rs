@@ -97,7 +97,7 @@ fn assert_successful_snapshot() {
     assert_eq!(MigrationRunner::current_version(&conn).unwrap(), 2);
 
     let snapshot = Connection::open_with_flags(
-        path.with_extension("pre-migration-v1.bak"),
+        path.with_extension("db.pre-migration-v1.bak"),
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
     )
     .unwrap();
@@ -110,23 +110,11 @@ fn assert_backup_failure(diagnostics: &Diagnostics) {
     let path = dir.path().join("private-person-name.db");
     let conn = Connection::open(&path).unwrap();
     seed(&conn);
-    let backup = path.with_extension("pre-migration-v1.bak");
+    let backup = path.with_extension("db.pre-migration-v1.bak");
     let recovery = Connection::open(&backup).unwrap();
     seed(&recovery);
     drop(recovery);
     let recovery_bytes = std::fs::read(&backup).unwrap();
-    let backend_error = conn
-        .execute(
-            "VACUUM INTO ?1",
-            rusqlite::params![backup.to_string_lossy().as_ref()],
-        )
-        .unwrap_err();
-    let backend_code = match backend_error {
-        rusqlite::Error::SqliteFailure(error, _) | rusqlite::Error::SqlInputError { error, .. } => {
-            error.extended_code
-        }
-        other => panic!("expected a SQLite backup error, got {other:?}"),
-    };
     let key = SymmetricKey::generate();
     MigrationRunner::run(&conn, &key, &[update()], Some(&path), 11).unwrap();
 
@@ -136,7 +124,8 @@ fn assert_backup_failure(diagnostics: &Diagnostics) {
     let expected = BTreeMap::from([
         ("level".into(), "WARN".into()),
         ("target".into(), "vauchi.storage.migration".into()),
-        ("sqlite_error_code".into(), format!("Some({backend_code})")),
+        ("sqlite_error_code".into(), "None".into()),
+        ("io_error_kind".into(), "Some(AlreadyExists)".into()),
         (
             "message".into(),
             "pre-migration backup unavailable; continuing transactionally".into(),
@@ -154,7 +143,7 @@ fn rollback_preserves_data_even_when_no_recovery_snapshot_can_be_created() {
     let path = dir.path().join("history.db");
     let conn = Connection::open(&path).unwrap();
     seed(&conn);
-    let backup = path.with_extension("pre-migration-v1.bak");
+    let backup = path.with_extension("db.pre-migration-v1.bak");
     std::fs::create_dir(&backup).unwrap();
     let fail = Migration {
         version: 3,
@@ -206,7 +195,7 @@ fn migration_failure_rolls_back_data_and_version_independently_of_the_backup() {
     assert_eq!(data(&reopened), "kept");
     assert_eq!(MigrationRunner::current_version(&reopened).unwrap(), 1);
     let snapshot = Connection::open_with_flags(
-        path.with_extension("pre-migration-v1.bak"),
+        path.with_extension("db.pre-migration-v1.bak"),
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
     )
     .unwrap();

@@ -9,6 +9,12 @@ use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::storage::migration::{MigrationRunner, all_migrations};
 use vauchi_core::storage::{MemoryKeyStorage, SecureStorage, Storage, StorageError};
 
+fn recovery_path(path: &Path, version: u32) -> PathBuf {
+    let mut name = path.as_os_str().to_os_string();
+    name.push(format!(".pre-migration-v{version}.bak"));
+    name.into()
+}
+
 fn snapshot(path: &Path, key: &SymmetricKey) -> PathBuf {
     let conn = Connection::open(path).unwrap();
     conn.execute_batch(
@@ -16,7 +22,7 @@ fn snapshot(path: &Path, key: &SymmetricKey) -> PathBuf {
     )
     .unwrap();
     MigrationRunner::run(&conn, key, all_migrations(), Some(path), 1).unwrap();
-    let backup = path.with_extension("pre-migration-v0.bak");
+    let backup = recovery_path(path, 0);
     let copy = Connection::open_with_flags(&backup, OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
     assert_eq!(
         copy.query_row("SELECT value FROM retained_data", [], |r| r
@@ -92,7 +98,7 @@ fn startup_cleans_a_snapshot_created_by_its_own_successful_migration() {
         storage.schema_version().unwrap(),
         all_migrations().last().unwrap().version
     );
-    assert!(!path.with_extension("pre-migration-v0.bak").exists());
+    assert!(!recovery_path(&path, 0).exists());
 }
 
 // @internal
@@ -100,7 +106,7 @@ fn startup_cleans_a_snapshot_created_by_its_own_successful_migration() {
 fn startup_does_not_claim_an_empty_preexisting_destination_as_its_own() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("history.db");
-    let backup = path.with_extension("pre-migration-v0.bak");
+    let backup = recovery_path(&path, 0);
     std::fs::write(&backup, b"").unwrap();
 
     let storage = Storage::open(&path, SymmetricKey::generate()).unwrap();
@@ -109,17 +115,16 @@ fn startup_does_not_claim_an_empty_preexisting_destination_as_its_own() {
         storage.schema_version().unwrap(),
         all_migrations().last().unwrap().version
     );
-    let copy = Connection::open_with_flags(backup, OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
-    assert_eq!(MigrationRunner::current_version(&copy).unwrap(), 0);
+    assert_eq!(std::fs::read(backup).unwrap(), b"");
 }
 
 #[cfg(unix)]
 // @internal
 #[test]
-fn cleanup_failure_after_commit_does_not_prevent_opening_a_readable_database() {
+fn uri_path_mismatch_does_not_prevent_opening_a_readable_database() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("history.db");
-    // #1178: SQLite resolves file URIs; remove_file sees a literal path and returns NotFound.
+    // #1178: SQLite resolves URIs, but snapshot staging requires a filesystem path.
     let uri = format!("file:{}", path.display());
 
     let result = Storage::open(&uri, SymmetricKey::generate());
@@ -127,19 +132,14 @@ fn cleanup_failure_after_commit_does_not_prevent_opening_a_readable_database() {
     let conn = Connection::open_with_flags(&path, OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
     let expected = all_migrations().last().unwrap().version;
     assert_eq!(MigrationRunner::current_version(&conn).unwrap(), expected);
-    let recovery = Connection::open_with_flags(
-        path.with_extension("pre-migration-v0.bak"),
-        OpenFlags::SQLITE_OPEN_READ_ONLY,
-    )
-    .unwrap();
-    assert_eq!(MigrationRunner::current_version(&recovery).unwrap(), 0);
+    assert!(!recovery_path(&path, 0).exists());
     let storage = result.unwrap();
     assert_eq!(storage.schema_version().unwrap(), expected);
 }
 
 // @internal
 #[test]
-fn reset_refuses_an_actual_legacy_snapshot_before_removing_data_or_keys() {
+fn reset_refuses_an_unclaimed_snapshot_before_removing_data_or_keys() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("private-person.db");
     let backup = snapshot(&path, &SymmetricKey::generate());
@@ -164,7 +164,7 @@ fn reset_refuses_an_actual_legacy_snapshot_before_removing_data_or_keys() {
 
 // @internal
 #[test]
-fn reset_preserves_a_same_stem_databases_snapshot_and_its_own_data() {
+fn reset_preserves_a_same_stem_databases_snapshot_while_removing_own_data() {
     let dir = tempfile::tempdir().unwrap();
     let key = SymmetricKey::generate();
     let backup = snapshot(&dir.path().join("shared.sqlite"), &key);
@@ -173,12 +173,11 @@ fn reset_preserves_a_same_stem_databases_snapshot_and_its_own_data() {
     std::fs::write(&path, b"unreadable own data").unwrap();
     let keys = keys();
 
-    let error = delete_unreadable_data(&path, &keys).unwrap_err();
+    delete_unreadable_data(&path, &keys).unwrap();
 
-    assert!(matches!(error, StorageError::InvalidData(_)));
-    assert_eq!(std::fs::read(&path).unwrap(), b"unreadable own data");
+    assert!(!path.exists());
     assert_eq!(std::fs::read(&backup).unwrap(), backup_bytes);
-    assert_keys_retained(&keys);
+    assert_eq!(keys.load_key("smk").unwrap(), None);
 }
 
 // @internal

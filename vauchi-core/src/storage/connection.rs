@@ -154,13 +154,14 @@ impl Storage {
         if self.identity().load_password_config()?.is_some() {
             self.mask_seed().ensure()?;
         }
-        if let Some(backup) = created_backup {
-            std::fs::remove_file(backup).map_err(|error| {
-                StorageError::InvalidData(format!(
-                    "could not remove the newly created recovery snapshot: {}",
-                    error.kind()
-                ))
-            })?;
+        if let Some(backup) = created_backup
+            && let Err(error) = std::fs::remove_file(backup)
+        {
+            tracing::warn!(
+                target: "vauchi.storage.migration",
+                io_error_kind = ?error.kind(),
+                "could not remove the newly created recovery snapshot"
+            );
         }
         Ok(())
     }

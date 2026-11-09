@@ -76,7 +76,7 @@ impl SecureStorage for SwitchableKeyring {
 }
 
 fn open(dir: &tempfile::TempDir, keyring: Arc<dyn SecureStorage>) -> *mut VauchiApp {
-    let config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"));
+    let config = VauchiConfig::with_profile_directory(dir.path());
     let app = open_app(dir.path(), config, Some(keyring));
     assert!(
         !app.is_null(),

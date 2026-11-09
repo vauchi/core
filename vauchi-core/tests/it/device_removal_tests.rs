@@ -35,7 +35,7 @@ fn phone_with_a_tablet(online: bool) -> Phone {
     } else {
         "http://127.0.0.1:9".into()
     };
-    let config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
+    let config = VauchiConfig::with_profile_directory(dir.path())
         .with_storage_key(SymmetricKey::generate())
         .with_relay_url(application.url())
         .with_ohttp_relay_url(outer_url);

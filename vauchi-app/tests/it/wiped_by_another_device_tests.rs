@@ -17,7 +17,7 @@ fn a_device_told_to_wipe_resets_after_its_sync() {
     // Relay addresses that lead nowhere: the sync must not leave this
     // machine (the default relay is production).
     let dir = tempfile::tempdir().unwrap();
-    let config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
+    let config = VauchiConfig::with_profile_directory(dir.path())
         .with_storage_key(SymmetricKey::generate())
         .with_relay_url("http://127.0.0.1:9")
         .with_ohttp_relay_url("http://127.0.0.1:9");

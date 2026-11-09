@@ -8,6 +8,7 @@
 //! navigation routing, and implements `WorkflowEngine` for all frontends.
 
 mod app_screen;
+mod auth_mode_sessions;
 mod ble_handshake;
 mod completion;
 #[cfg(feature = "content-updates")]
@@ -287,6 +288,8 @@ pub struct AppEngine {
     /// screen alone was escaped by tab navigation and then by Back, and
     /// data reads are not gated by the session (vauchi/private#639).
     session_locked: bool,
+    /// The auth mode the cached engines and sessions were built under.
+    sessions_auth_mode: vauchi_core::api::AuthMode,
     /// Glance (one-sided QR) OOB state. `glance_display_nonce` is the nonce
     /// this device shows in its QR and must require as the responder;
     /// `glance_scanned` is the scanner-side binding built from a scanned QR —
@@ -543,6 +546,7 @@ impl AppEngine {
         );
 
         let session_locked = matches!(screen, AppScreen::Lock);
+        let sessions_auth_mode = vauchi.auth_mode();
         Self {
             vauchi,
             screen,
@@ -601,6 +605,7 @@ impl AppEngine {
             held_for_unlock: None,
             storage_shredded: false,
             session_locked,
+            sessions_auth_mode,
             glance_display_nonce: None,
             glance_scanned: None,
             glance_pre_scan_discoveries: Vec::new(),
@@ -764,6 +769,7 @@ impl WorkflowEngine for AppEngine {
 
     #[tracing::instrument(level = "debug", skip_all, name = "app.handle_action")]
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
+        self.end_sessions_from_another_auth_mode();
         // Neither focus leaving a field nor its unchanged text sent again is
         // new input. iOS sends both right after Save re-renders the form,
         // which cleared a refused value's error before anyone saw it

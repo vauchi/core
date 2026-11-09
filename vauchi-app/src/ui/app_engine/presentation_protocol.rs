@@ -178,6 +178,7 @@ impl AppEngine {
 
     /// Reduce one raw shell event into the next ordered command batch.
     pub fn dispatch(&mut self, event: Event) -> Result<Vec<Command>, AppPresentationError> {
+        self.end_sessions_from_another_auth_mode();
         let Some(event) = self.correlate_file_event(event) else {
             return Ok(self.drain_pending_commands());
         };

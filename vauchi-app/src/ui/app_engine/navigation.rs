@@ -187,6 +187,7 @@ impl AppEngine {
 
     /// Navigate without pushing to history (used by back-navigation and completion routing).
     pub(super) fn navigate_to_internal(&mut self, screen: AppScreen) -> ScreenModel {
+        self.end_sessions_from_another_auth_mode();
         if matches!(screen, AppScreen::Lock) {
             self.session_locked = true;
             self.cancel_file_pick();
@@ -325,6 +326,7 @@ impl AppEngine {
     }
 
     pub(super) fn activate_surface_engine(&mut self, screen: AppScreen) {
+        self.end_sessions_from_another_auth_mode();
         if self.screen == screen || self.refuses_while_locked(&screen) {
             return;
         }

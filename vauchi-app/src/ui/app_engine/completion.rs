@@ -13,7 +13,6 @@
 use super::{AppEngine, AppScreen, EntryFlow};
 use crate::ui::action::{ActionResult, UserAction};
 use crate::ui::engine::WorkflowEngine;
-use vauchi_core::api::AuthMode;
 use vauchi_core::contact_card::FieldType;
 use zeroize::Zeroize;
 
@@ -159,15 +158,7 @@ impl AppEngine {
             }
         };
         match self.vauchi.authenticate(&pin) {
-            Ok(mode) => {
-                if mode == AuthMode::Duress {
-                    // ADR-032 decoy mode: proceed exactly like a normal
-                    // unlock — auth_mode already routes every read to the
-                    // decoy set. Wiping here would reveal the duress entry
-                    // to the coercer. The cache clear drops any pre-lock
-                    // screens built from real data.
-                    self.engine_cache.clear();
-                }
+            Ok(_) => {
                 self.unlock_session();
                 // The duress-setup entry flow asked for the password to
                 // reach the duress PIN; anything else opens the app.

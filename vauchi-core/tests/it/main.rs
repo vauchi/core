@@ -295,6 +295,7 @@ mod exchange_x3dh_tests;
 mod exchanged_ratchet_roundtrip_tests;
 mod exchangeddata_seal_guard;
 mod expanded_crypto_property_tests;
+mod export_biometric_opt_in_tests;
 mod field_catalog_tests;
 mod field_centric_visibility_tests;
 mod field_link_tests;

@@ -25,6 +25,7 @@ mod escrow_exchange;
 mod exchange;
 #[cfg(feature = "network-http")]
 mod exchange_relay;
+mod export_check;
 mod features;
 mod full_backup;
 mod heirloom;

@@ -327,7 +327,7 @@ impl PlatformAppEngine {
         let storage_path = data_path.join("vauchi.db");
         let storage_key = parse_storage_key(storage_key_bytes)?;
 
-        let config = VauchiConfig::with_storage_path(&storage_path)
+        let config = VauchiConfig::with_profile_directory(&data_path)
             .with_relay_url(&relay_url)
             .with_storage_key(storage_key);
 

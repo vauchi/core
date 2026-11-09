@@ -40,8 +40,16 @@ pub(crate) enum Opened {
 
 impl OpenParams {
     pub(crate) fn open(&self) -> Result<Opened, MobileError> {
+        // OpenParams is constructed from the shell's exclusive profile directory.
+        let profile = self
+            .storage_path
+            .parent()
+            .ok_or_else(|| MobileError::StorageError {
+                detail: "missing profile directory".into(),
+            })?;
         let mut config =
-            VauchiConfig::with_storage_path(&self.storage_path).with_relay_url(&self.relay_url);
+            VauchiConfig::with_profile_directory(profile).with_relay_url(&self.relay_url);
+        config.storage_path = self.storage_path.clone();
         // A local relay in Settings needs a distinct OHTTP route, which
         // mobile Settings cannot name (vauchi/private#733 T4.2).
         #[cfg(feature = "dev-local-content")]
@@ -75,10 +83,20 @@ impl OpenParams {
         let bridge = KeychainBridge {
             callback: self.keychain.clone(),
         };
-        vauchi_core::api::storage_reset::delete_unreadable_data(&self.storage_path, &bridge)
-            .map_err(|e| MobileError::StorageError {
-                detail: e.to_string(),
-            })
+        let profile = self
+            .storage_path
+            .parent()
+            .ok_or_else(|| MobileError::StorageError {
+                detail: "missing profile directory".into(),
+            })?;
+        vauchi_core::api::storage_reset::delete_unreadable_profile(
+            &self.storage_path,
+            profile,
+            &bridge,
+        )
+        .map_err(|e| MobileError::StorageError {
+            detail: e.to_string(),
+        })
     }
 }
 

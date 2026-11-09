@@ -46,3 +46,78 @@ fn database_only_reset_preserves_neighboring_identity_and_key_files() {
         b"neighbor key"
     );
 }
+
+#[test]
+fn explicit_profile_reset_removes_current_snapshots_after_restart() {
+    let root = tempfile::tempdir().unwrap();
+    let database = root.path().join("custom.db");
+    let key = SymmetricKey::generate();
+    let conn = rusqlite::Connection::open(&database).unwrap();
+    conn.execute_batch("CREATE TABLE sentinel(value); INSERT INTO sentinel VALUES (7)")
+        .unwrap();
+    vauchi_core::storage::migration::MigrationRunner::run(
+        &conn,
+        &key,
+        vauchi_core::storage::migration::all_migrations(),
+        Some(&database),
+        1,
+    )
+    .unwrap();
+    let snapshot = root.path().join("custom.db.pre-migration-v0.bak");
+    assert_eq!(
+        rusqlite::Connection::open(&snapshot)
+            .unwrap()
+            .query_row("SELECT value FROM sentinel", [], |row| row.get::<_, i64>(0))
+            .unwrap(),
+        7
+    );
+    drop(conn);
+    let storage = vauchi_core::storage::Storage::open(&database, key).unwrap();
+    drop(storage);
+    assert!(snapshot.exists());
+    let keys = MemoryKeyStorage::new();
+    keys.save_key("smk", &[17; 32]).unwrap();
+    vauchi_core::api::storage_reset::delete_unreadable_profile(&database, root.path(), &keys)
+        .unwrap();
+    assert!(!snapshot.exists());
+    assert!(!database.exists());
+    assert_eq!(keys.load_key("smk").unwrap(), None);
+}
+
+#[test]
+fn explicit_profile_reset_rejects_mismatched_scope_before_mutation() {
+    let root = tempfile::tempdir().unwrap();
+    let other = tempfile::tempdir().unwrap();
+    let database = root.path().join("custom.db");
+    std::fs::write(&database, b"unreadable").unwrap();
+    let keys = MemoryKeyStorage::new();
+    keys.save_key("smk", &[17; 32]).unwrap();
+    assert!(
+        vauchi_core::api::storage_reset::delete_unreadable_profile(&database, other.path(), &keys)
+            .is_err()
+    );
+    assert_eq!(std::fs::read(database).unwrap(), b"unreadable");
+    assert_eq!(keys.load_key("smk").unwrap(), Some(vec![17; 32]));
+}
+
+#[cfg(unix)]
+#[test]
+fn partial_wipe_reports_failure_and_retires_the_in_memory_identity() {
+    let root = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    let target = outside.path().join("keep");
+    std::fs::write(&target, b"outside identity").unwrap();
+    let mut app = Vauchi::new(
+        VauchiConfig::with_profile_directory(root.path())
+            .with_storage_key(SymmetricKey::generate()),
+    )
+    .unwrap();
+    app.create_identity("Fixture").unwrap();
+    std::os::unix::fs::symlink(&target, root.path().join("identity.json")).unwrap();
+    assert!(matches!(
+        app.perform_emergency_wipe(true),
+        Err(vauchi_core::VauchiError::Configuration(_))
+    ));
+    assert!(app.identity().is_none());
+    assert_eq!(std::fs::read(target).unwrap(), b"outside identity");
+}

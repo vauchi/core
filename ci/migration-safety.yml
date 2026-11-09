@@ -8,8 +8,13 @@
         paths:
           - vauchi-core/src/storage/**
           - vauchi-core/src/api/shred/**
+          - vauchi-core/src/api/config.rs
+          - vauchi-core/src/api/storage_reset.rs
+          - vauchi-core/src/api/vauchi/emergency.rs
           - vauchi-core/tests/migration_snapshot_safety.rs
           - vauchi-core/tests/migration_commit_durability.rs
+          - vauchi-core/tests/shred_profile_scope.rs
+          - vauchi-core/tests/profile_directory_authority.rs
           - ci/migration-safety.yml
           - ci/run-native-migration-tests.ps1
           - ci/native-migration-runner.ps1
@@ -31,10 +36,10 @@ test:migration-safety:macos:
       uname -s
       test "$(uname -s)" = Darwin
       cargo test --locked -p vauchi-core --features testing \
-        --test migration_snapshot_safety --test migration_commit_durability \
+        --test migration_snapshot_safety --test migration_commit_durability --test shred_profile_scope --test profile_directory_authority \
         -- --nocapture 2>&1 | tee migration-safety-macos.log
       grep -E '^running [1-9][0-9]* tests?' migration-safety-macos.log
-      test "$(grep -Ec '^test result: ok\. [1-9][0-9]* passed; 0 failed;' migration-safety-macos.log)" -eq 2
+      test "$(grep -Ec '^test result: ok\. [1-9][0-9]* passed; 0 failed;' migration-safety-macos.log)" -eq 4
   artifacts:
     when: always
     paths: [migration-safety-macos.log]
@@ -54,13 +59,13 @@ build:migration-safety:windows:
       cargo xwin --version
       cargo xwin test --locked -p vauchi-core --features testing \
         --target x86_64-pc-windows-msvc \
-        --test migration_snapshot_safety --test migration_commit_durability \
+        --test migration_snapshot_safety --test migration_commit_durability --test shred_profile_scope --test profile_directory_authority \
         --no-run --message-format=json > migration-safety-build.jsonl
       python3 - <<'PY'
       import json
       import pathlib
       import shutil
-      expected = {'migration_snapshot_safety', 'migration_commit_durability'}
+      expected = {'migration_snapshot_safety', 'migration_commit_durability', 'shred_profile_scope', 'profile_directory_authority'}
       output = pathlib.Path('migration-safety-windows')
       output.mkdir(exist_ok=True)
       found = set()

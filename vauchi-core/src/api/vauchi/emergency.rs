@@ -273,7 +273,9 @@ impl ProfileEngine {
                             "invalid emergency wipe profile directory".into(),
                         )
                     })?;
-                self.shred_data_directory(data_dir)?;
+                let result = self.shred_data_directory(data_dir);
+                self.identity = None;
+                result?;
             }
             // An in-memory database ends with the process; there is no file
             // or directory to shred, and its parent is not ours to delete.

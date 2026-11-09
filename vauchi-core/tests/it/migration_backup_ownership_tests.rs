@@ -215,7 +215,7 @@ fn reset_refuses_an_ambiguous_directory_without_removing_any_owned_data() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("history.db");
     std::fs::write(&path, b"unreadable").unwrap();
-    let candidate = dir.path().join("history.pre-migration-v4.bak");
+    let candidate = dir.path().join("history.db.pre-migration-v4.bak");
     std::fs::create_dir(&candidate).unwrap();
     let keys = keys();
 
@@ -256,7 +256,7 @@ fn reset_refuses_ambiguous_symlinks_without_touching_external_targets() {
         }
         let path = dir.path().join("history.db");
         std::fs::write(&path, b"unreadable").unwrap();
-        let candidate = dir.path().join("history.pre-migration-v4.bak");
+        let candidate = dir.path().join("history.db.pre-migration-v4.bak");
         std::os::unix::fs::symlink(&target, &candidate).unwrap();
         let keys = keys();
 

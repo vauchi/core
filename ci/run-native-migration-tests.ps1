@@ -7,7 +7,7 @@ Write-Host ([System.Runtime.InteropServices.RuntimeInformation]::OSDescription)
 
 $taskRoot = Join-Path $PSScriptRoot '../migration-safety-windows'
 $taskManifest = @(Get-Content (Join-Path $taskRoot 'SHA256SUMS'))
-if ($taskManifest.Count -ne 2) { throw 'Expected exactly two native test artifacts' }
+if ($taskManifest.Count -ne 4) { throw 'Expected exactly four native test artifacts' }
 foreach ($taskLine in $taskManifest) {
     $taskFields = $taskLine -split '\s+', 2
     $taskFile = Join-Path $taskRoot (Split-Path $taskFields[1] -Leaf)
@@ -32,7 +32,7 @@ foreach ($taskCase in @(
     Write-Host "Observed expected rejection: $($taskCase.Error)"
 }
 
-foreach ($taskName in @('migration_snapshot_safety', 'migration_commit_durability')) {
+foreach ($taskName in @('migration_snapshot_safety', 'migration_commit_durability', 'shred_profile_scope', 'profile_directory_authority')) {
     Invoke-RustTest -Executable (Join-Path $taskRoot ($taskName + '.exe')) `
         -TestArguments @('--nocapture') -Log (Join-Path $taskRoot ($taskName + '.log'))
 }

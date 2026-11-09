@@ -49,7 +49,7 @@ fn install(keychain: Arc<Keychain>) -> (tempfile::TempDir, std::path::PathBuf, V
     let root = tempfile::tempdir().unwrap();
     let data_dir = root.path().join("data");
     std::fs::create_dir_all(&data_dir).unwrap();
-    let config = VauchiConfig::with_storage_path(data_dir.join("vauchi.db"));
+    let config = VauchiConfig::with_profile_directory(&data_dir);
     let mut vauchi = Vauchi::with_secure_storage(config, keychain).unwrap();
     vauchi.create_identity("Alice").unwrap();
     (root, data_dir, vauchi)
@@ -89,7 +89,7 @@ fn a_wipe_without_secure_storage_deletes_the_data_directory() {
     let root = tempfile::tempdir().unwrap();
     let data_dir = root.path().join("data");
     std::fs::create_dir_all(&data_dir).unwrap();
-    let config = VauchiConfig::with_storage_path(data_dir.join("vauchi.db"))
+    let config = VauchiConfig::with_profile_directory(&data_dir)
         .with_storage_key(vauchi_core::crypto::SymmetricKey::generate());
     let mut vauchi = Vauchi::new(config).unwrap();
     vauchi.create_identity("Alice").unwrap();

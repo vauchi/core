@@ -9,7 +9,7 @@
 use std::path::Path;
 
 use vauchi_core::api::legacy_pre_signed_file;
-use vauchi_core::api::storage_reset::delete_unreadable_data;
+use vauchi_core::api::storage_reset::{delete_unreadable_data, delete_unreadable_profile};
 use vauchi_core::storage::{MemoryKeyStorage, SecureStorage};
 
 fn install(dir: &Path) -> MemoryKeyStorage {
@@ -46,7 +46,7 @@ fn starting_over_deletes_the_data_its_companions_and_the_storage_keys() {
     let dir = tempfile::tempdir().unwrap();
     let keys = install(dir.path());
 
-    delete_unreadable_data(&dir.path().join("vauchi.db"), &keys).unwrap();
+    delete_unreadable_profile(&dir.path().join("vauchi.db"), dir.path(), &keys).unwrap();
 
     assert_eq!(remaining(dir.path()), Vec::<String>::new());
     assert!(!keys.has_key("smk").unwrap());

@@ -39,9 +39,8 @@ impl CabiConfig {
         // `create_dir_all` is idempotent — the C caller may have
         // already created the dir for its own logging.
         let _ = std::fs::create_dir_all(&self.data_dir);
-        let storage_path = self.data_dir.join("vauchi.db");
         let mut config =
-            VauchiConfig::with_storage_path(&storage_path).with_relay_url(&self.relay_url);
+            VauchiConfig::with_profile_directory(&self.data_dir).with_relay_url(&self.relay_url);
         if let Some(key) = self.storage_key {
             config = config.with_storage_key(key);
         }

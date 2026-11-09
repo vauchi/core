@@ -27,7 +27,7 @@ fn an_emergency_wipe_with_contacts_sends_nothing_to_either_hop() {
     outer.enable_ohttp_gateway(&SignedGateway::new(0x41), window_of(NOW));
     let application = MockRelay::start();
     let dir = tempfile::tempdir().expect("temp dir");
-    let config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
+    let config = VauchiConfig::with_profile_directory(dir.path())
         .with_storage_key(SymmetricKey::generate())
         .with_relay_url(application.url())
         .with_ohttp_relay_url(outer.url());

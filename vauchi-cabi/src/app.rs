@@ -109,8 +109,7 @@ pub unsafe extern "C" fn vauchi_app_create_with_config(
             return std::ptr::null_mut();
         }
 
-        let storage_path = data_path.join("vauchi.db");
-        let mut config = vauchi_core::api::VauchiConfig::with_storage_path(&storage_path);
+        let mut config = vauchi_core::api::VauchiConfig::with_profile_directory(&data_path);
         if let Some(url) = from_c_str(relay_url) {
             config = config.with_relay_url(url);
         }
@@ -176,8 +175,7 @@ pub unsafe extern "C" fn vauchi_app_create_with_key(
             };
             arr.zeroize();
 
-            let storage_path = data_path.join("vauchi.db");
-            let mut config = vauchi_core::api::VauchiConfig::with_storage_path(&storage_path)
+            let mut config = vauchi_core::api::VauchiConfig::with_profile_directory(&data_path)
                 .with_storage_key(key);
             if let Some(url) = from_c_str(relay_url) {
                 config = config.with_relay_url(url);
@@ -790,8 +788,7 @@ pub unsafe extern "C" fn vauchi_app_create_with_keyring(
             return std::ptr::null_mut();
         }
 
-        let storage_path = data_path.join("vauchi.db");
-        let mut config = vauchi_core::api::VauchiConfig::with_storage_path(&storage_path);
+        let mut config = vauchi_core::api::VauchiConfig::with_profile_directory(&data_path);
         if let Some(url) = from_c_str(relay_url) {
             config = config.with_relay_url(url);
         }

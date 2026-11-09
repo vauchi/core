@@ -17,7 +17,7 @@ use vauchi_app::i18n::Locale;
 use vauchi_app::ui::{
     AppEngine, RenderContext, StorageLockPresentation, StorageLockReason, StorageLockStep,
 };
-use vauchi_core::api::storage_reset::delete_unreadable_data;
+use vauchi_core::api::storage_reset::delete_unreadable_profile;
 use vauchi_core::api::{Vauchi, VauchiConfig};
 use vauchi_core::storage::SecureStorage;
 use vauchi_core::{Command, Event, StorageError, VauchiError};
@@ -296,10 +296,16 @@ impl VauchiApp {
             StorageLockStep::Commands(commands) => commands,
             StorageLockStep::StartOverConfirmed => {
                 let deleted = match &start.params.keyring {
-                    Some(keyring) => {
-                        delete_unreadable_data(&start.params.storage_path(), &**keyring)
-                    }
-                    None => delete_unreadable_data(&start.params.storage_path(), &NoKeys),
+                    Some(keyring) => delete_unreadable_profile(
+                        &start.params.storage_path(),
+                        &start.params.data_path,
+                        &**keyring,
+                    ),
+                    None => delete_unreadable_profile(
+                        &start.params.storage_path(),
+                        &start.params.data_path,
+                        &NoKeys,
+                    ),
                 };
                 match deleted {
                     Ok(()) => return self.locked_retry(&mut locked),

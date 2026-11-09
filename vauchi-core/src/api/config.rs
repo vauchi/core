@@ -143,6 +143,17 @@ impl crate::settings::SettingsFlags {
 }
 
 impl VauchiConfig {
+    /// Declares exclusive ownership of a profile directory, including wipe authority.
+    /// Its database is `vauchi.db`; use `storage_path` to select a different filename.
+    pub fn with_profile_directory(directory: impl Into<PathBuf>) -> Self {
+        let directory = directory.into();
+        Self {
+            storage_path: directory.join("vauchi.db"),
+            profile_directory: Some(directory),
+            ..Default::default()
+        }
+    }
+
     /// Creates a new configuration with the given storage path.
     pub fn with_storage_path(storage_path: impl Into<PathBuf>) -> Self {
         VauchiConfig {

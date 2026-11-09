@@ -7,6 +7,61 @@ use vauchi_core::api::{Vauchi, VauchiConfig};
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::storage::{MemoryKeyStorage, SecureStorage};
 
+struct WipeKeychain {
+    values: MemoryKeyStorage,
+    refuses_deletes: std::sync::atomic::AtomicBool,
+}
+
+impl SecureStorage for WipeKeychain {
+    fn save_key(&self, name: &str, key: &[u8]) -> Result<(), vauchi_core::StorageError> {
+        self.values.save_key(name, key)
+    }
+
+    fn load_key(&self, name: &str) -> Result<Option<Vec<u8>>, vauchi_core::StorageError> {
+        self.values.load_key(name)
+    }
+
+    fn delete_key(&self, name: &str) -> Result<(), vauchi_core::StorageError> {
+        if self
+            .refuses_deletes
+            .load(std::sync::atomic::Ordering::SeqCst)
+        {
+            return Err(vauchi_core::StorageError::SecureStorageUnavailable);
+        }
+        self.values.delete_key(name)
+    }
+}
+
+// @internal
+#[test]
+fn a_failed_file_wipe_retry_cannot_report_success_until_managed_keys_are_removed() {
+    use std::sync::atomic::Ordering::SeqCst;
+    let root = tempfile::tempdir().unwrap();
+    let keys = std::sync::Arc::new(WipeKeychain {
+        values: MemoryKeyStorage::new(),
+        refuses_deletes: std::sync::atomic::AtomicBool::new(false),
+    });
+    let mut app = Vauchi::with_secure_storage(
+        VauchiConfig::with_profile_directory(root.path()),
+        keys.clone(),
+    )
+    .unwrap();
+    app.create_identity("Fixture").unwrap();
+    let original = keys.load_key("smk").unwrap().unwrap();
+    keys.refuses_deletes.store(true, SeqCst);
+    for _ in 0..2 {
+        assert!(matches!(
+            app.perform_emergency_wipe(true),
+            Err(vauchi_core::VauchiError::Configuration(_))
+        ));
+        assert_eq!(keys.load_key("smk").unwrap(), Some(original.clone()));
+    }
+    keys.refuses_deletes.store(false, SeqCst);
+    app.perform_emergency_wipe(true).unwrap();
+    assert_eq!(keys.load_key("smk").unwrap(), None);
+    assert!(!root.path().exists());
+}
+
 // @internal
 #[test]
 fn a_file_backed_wipe_retires_the_owned_session_key() {

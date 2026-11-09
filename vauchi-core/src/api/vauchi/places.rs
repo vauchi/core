@@ -21,7 +21,7 @@ impl ProfileEngine {
 
     /// Lists all named places, oldest first.
     pub fn list_places(&self) -> VauchiResult<Vec<Place>> {
-        Ok(self.places_slot().list_places()?)
+        Ok(self.storage.places().list_places()?)
     }
 
     /// Creates a named place at the given coordinates. Rejects an empty name.
@@ -37,20 +37,23 @@ impl ProfileEngine {
                 "Place name cannot be empty".into(),
             ));
         }
-        Ok(self.places_slot().create_place(name, latitude, longitude)?)
+        Ok(self
+            .storage
+            .places()
+            .create_place(name, latitude, longitude)?)
     }
 
     /// Deletes a named place. Returns `true` if it existed. Contacts that
     /// referenced it keep their raw coordinates; only the name link dangles.
     pub fn delete_place(&self, place_id: &str) -> VauchiResult<bool> {
-        Ok(self.places_slot().delete_place(place_id)?)
+        Ok(self.storage.places().delete_place(place_id)?)
     }
 
     /// Suggests the nearest named place within the proximity radius of the
     /// given coordinates, or `None` — the proximity-autocomplete read used when
     /// recording a new exchange location (T2.4). Named-place match only.
     pub fn suggest_place_near(&self, latitude: f64, longitude: f64) -> VauchiResult<Option<Place>> {
-        Ok(self.places_slot().find_place_near(latitude, longitude)?)
+        Ok(self.storage.places().find_place_near(latitude, longitude)?)
     }
 
     /// Returns the named place whose name matches (trimmed, case-insensitive),
@@ -61,7 +64,8 @@ impl ProfileEngine {
             return Ok(None);
         }
         Ok(self
-            .places_slot()
+            .storage
+            .places()
             .list_places()?
             .into_iter()
             .find(|p| p.name.to_lowercase() == needle))
@@ -121,7 +125,8 @@ impl ProfileEngine {
         let place = match self.find_place_by_name(name)? {
             Some(existing) => existing,
             None => self
-                .places_slot()
+                .storage
+                .places()
                 .create_place(name, loc.latitude, loc.longitude)?,
         };
 

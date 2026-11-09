@@ -40,7 +40,7 @@ impl ProfileEngine {
 
     /// Lists all tags in the owner's vocabulary, oldest first.
     pub fn list_tags(&self) -> VauchiResult<Vec<Tag>> {
-        Ok(self.tags_slot().list_tags()?)
+        Ok(self.storage.tags().list_tags()?)
     }
 
     /// Creates a new tag with the given name.
@@ -53,7 +53,7 @@ impl ProfileEngine {
         if name.is_empty() {
             return Err(VauchiError::InvalidState("Tag name cannot be empty".into()));
         }
-        let tag = self.tags_slot().create_tag(name)?;
+        let tag = self.storage.tags().create_tag(name)?;
         self.record_tag_change(&tag);
         Ok(tag)
     }
@@ -61,7 +61,7 @@ impl ProfileEngine {
     /// Deletes a tag from the vocabulary. Tagged contacts simply lose the tag.
     /// Returns `true` if the tag existed.
     pub fn delete_tag(&self, tag_id: &str) -> VauchiResult<bool> {
-        let deleted = self.tags_slot().delete_tag(tag_id)?;
+        let deleted = self.storage.tags().delete_tag(tag_id)?;
         if deleted {
             self.record_tag_deletion(tag_id);
         }
@@ -77,7 +77,8 @@ impl ProfileEngine {
             return Ok(None);
         }
         Ok(self
-            .tags_slot()
+            .storage
+            .tags()
             .list_tags()?
             .into_iter()
             .find(|t| t.name.to_lowercase() == needle))
@@ -103,13 +104,14 @@ impl ProfileEngine {
 
         let tag = match self.find_tag_by_name(name)? {
             Some(existing) => existing,
-            None => self.tags_slot().create_tag(name)?,
+            None => self.storage.tags().create_tag(name)?,
         };
-        self.tags_slot().add_to_tag(&tag.id, contact_id)?;
+        self.storage.tags().add_to_tag(&tag.id, contact_id)?;
 
         // Return the up-to-date tag (with the new membership reflected).
         let tag = self
-            .tags_slot()
+            .storage
+            .tags()
             .get_tag(&tag.id)?
             .ok_or_else(|| VauchiError::NotFound("Tag vanished after creation".into()))?;
         self.record_tag_change(&tag);
@@ -120,9 +122,10 @@ impl ProfileEngine {
     /// exist. The tag itself stays in the vocabulary (use [`ProfileEngine::delete_tag`]
     /// to remove it entirely).
     pub fn remove_tag_from_contact(&self, tag_id: &str, contact_id: &str) -> VauchiResult<()> {
-        self.tags_slot().remove_from_tag(tag_id, contact_id)?;
+        self.storage.tags().remove_from_tag(tag_id, contact_id)?;
         let tag = self
-            .tags_slot()
+            .storage
+            .tags()
             .get_tag(tag_id)?
             .ok_or_else(|| VauchiError::NotFound(format!("tag: {tag_id}")))?;
         self.record_tag_change(&tag);
@@ -132,7 +135,8 @@ impl ProfileEngine {
     /// Returns the tags applied to a given contact, oldest first.
     pub fn tags_for_contact(&self, contact_id: &str) -> VauchiResult<Vec<Tag>> {
         Ok(self
-            .tags_slot()
+            .storage
+            .tags()
             .list_tags()?
             .into_iter()
             .filter(|t| t.contains(contact_id))
@@ -146,7 +150,8 @@ impl ProfileEngine {
     pub fn tag_name_suggestions(&self, prefix: &str) -> VauchiResult<Vec<String>> {
         let needle = normalise_name(prefix).to_lowercase();
         Ok(self
-            .tags_slot()
+            .storage
+            .tags()
             .list_tags()?
             .into_iter()
             .filter(|t| needle.is_empty() || t.name.to_lowercase().starts_with(&needle))
@@ -181,14 +186,15 @@ impl ProfileEngine {
     /// Errors if the tag does not exist.
     pub fn begin_tag_promotion(&self, tag_id: &str) -> VauchiResult<GroupDraft> {
         let tag = self
-            .tags_slot()
+            .storage
+            .tags()
             .get_tag(tag_id)?
             .ok_or_else(|| VauchiError::NotFound(format!("tag: {tag_id}")))?;
 
         let mut contact_ids: Vec<String> = tag.contact_ids.into_iter().collect();
         contact_ids.sort();
 
-        let mut visible_fields: Vec<String> = match self.own_card_slot().load()? {
+        let mut visible_fields: Vec<String> = match self.storage.own_card().load()? {
             Some(card) => card
                 .field_visibility()
                 .everyone_field_ids()
@@ -222,21 +228,22 @@ impl ProfileEngine {
         visible_fields: Vec<String>,
     ) -> VauchiResult<String> {
         let tag = self
-            .tags_slot()
+            .storage
+            .tags()
             .get_tag(tag_id)?
             .ok_or_else(|| VauchiError::NotFound(format!("tag: {tag_id}")))?;
 
         let now = self.clock.unix_seconds();
-        let mut group = self.labels_slot().create_group(&tag.name)?;
+        let mut group = self.storage.labels().create_group(&tag.name)?;
         for contact_id in &tag.contact_ids {
             group.add_contact(contact_id, now);
         }
         group.set_visible_fields(visible_fields.into_iter().collect(), now);
-        self.labels_slot().save_group(&group)?;
+        self.storage.labels().save_group(&group)?;
         self.record_group_change(&group);
 
         // Replace: consume the tag now that the group is fully persisted.
-        self.tags_slot().delete_tag(tag_id)?;
+        self.storage.tags().delete_tag(tag_id)?;
         self.record_tag_deletion(tag_id);
 
         Ok(group.id().to_string())

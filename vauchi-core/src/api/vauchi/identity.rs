@@ -441,14 +441,11 @@ impl ProfileEngine {
         // Under duress the rename lands on the copy only: the identity's
         // name is real, and so is every contact (vauchi/private#811).
         if self.in_duress_mode() {
-            let mut card = self
-                .own_card_slot()
-                .load()?
-                .ok_or(VauchiError::IdentityNotInitialized)?;
+            let mut card = self.initialized_own_card()?;
             let renamed = card.display_name() != name;
             card.set_display_name(name)
                 .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-            self.own_card_slot().save(&card)?;
+            self.storage.own_card().save(&card)?;
             if renamed {
                 self.events.dispatch(VauchiEvent::OwnCardUpdated {
                     changed_fields: vec!["display_name".into()],
@@ -497,14 +494,21 @@ impl ProfileEngine {
 
     /// Gets the user's own contact card.
     pub fn own_card(&self) -> VauchiResult<Option<ContactCard>> {
-        Ok(self.own_card_slot().load()?)
+        Ok(self.storage.own_card().load()?)
+    }
+
+    fn initialized_own_card(&self) -> VauchiResult<ContactCard> {
+        self.storage
+            .own_card()
+            .load()?
+            .ok_or(VauchiError::IdentityNotInitialized)
     }
 
     /// Updates the user's own contact card.
     pub fn update_own_card(&self, card: &ContactCard) -> VauchiResult<Vec<String>> {
-        let old_card = self.own_card_slot().load()?;
+        let old_card = self.storage.own_card().load()?;
         let manager = ContactManager::new(&self.storage, self.events.clone())
-            .with_own_card(self.own_card_slot());
+            .with_own_card(self.storage.own_card());
         let changed_labels = manager.update_own_card(card)?;
         // Journaled by entry id: two entries may share a label (private#649).
         let ts = self.now_timestamp();
@@ -560,16 +564,13 @@ impl ProfileEngine {
     pub fn add_own_field(&self, field: ContactField) -> VauchiResult<()> {
         let field_id = field.id().to_string();
         let manager = ContactManager::new(&self.storage, self.events.clone())
-            .with_own_card(self.own_card_slot());
+            .with_own_card(self.storage.own_card());
         manager.add_field_to_own_card(field)?;
         if self.load_settings_flags()?.new_field_default_visible {
             self.set_own_field_public(&field_id)?;
         }
         self.mark_own_card_repropagate()?;
-        let card = self
-            .own_card_slot()
-            .load()?
-            .ok_or(VauchiError::IdentityNotInitialized)?;
+        let card = self.initialized_own_card()?;
         let synced_field = card
             .fields()
             .iter()
@@ -590,10 +591,7 @@ impl ProfileEngine {
 
     /// Removes a field from the user's own card by label.
     pub fn remove_own_field(&self, label: &str) -> VauchiResult<bool> {
-        let card = self
-            .own_card_slot()
-            .load()?
-            .ok_or(VauchiError::IdentityNotInitialized)?;
+        let card = self.initialized_own_card()?;
         let Some(field_id) = card
             .fields()
             .iter()
@@ -608,7 +606,7 @@ impl ProfileEngine {
     /// Removes a field from the user's own card by field ID.
     pub fn remove_own_field_by_id(&self, field_id: &str) -> VauchiResult<bool> {
         let manager = ContactManager::new(&self.storage, self.events.clone())
-            .with_own_card(self.own_card_slot());
+            .with_own_card(self.storage.own_card());
         let Some(label) = manager.remove_field_by_id_from_own_card(field_id)? else {
             return Ok(false);
         };
@@ -656,11 +654,12 @@ impl ProfileEngine {
     /// (field-centric model), so the change arms repropagation.
     pub fn set_field_shown(&self, field_id: &str, shown: bool) -> VauchiResult<()> {
         let mut card = self
-            .own_card_slot()
+            .storage
+            .own_card()
             .load()?
             .ok_or_else(|| VauchiError::InvalidState("No own card found".into()))?;
         card.set_field_shown(field_id, shown);
-        self.own_card_slot().save(&card)?;
+        self.storage.own_card().save(&card)?;
         self.mark_own_card_repropagate()?;
         // The apps' "Visible to all contacts" toggle lands here; the owner's
         // other devices must agree on it (private#649).

@@ -19,7 +19,7 @@ impl ProfileEngine {
     /// so linked devices converge on the membership-free state (private#854).
     pub(crate) fn record_groups_left(&self, groups: &[crate::contact::Group]) -> VauchiResult<()> {
         for group in groups {
-            let updated = self.labels_slot().load_group(group.id())?;
+            let updated = self.storage.labels().load_group(group.id())?;
             self.record_group_change(&updated);
         }
         Ok(())
@@ -36,20 +36,20 @@ impl ProfileEngine {
 
     /// Lists all visibility labels.
     pub fn list_groups(&self) -> VauchiResult<Vec<crate::contact::Group>> {
-        Ok(self.labels_slot().load_all_groups()?)
+        Ok(self.storage.labels().load_all_groups()?)
     }
 
     /// Creates a new visibility label.
     pub fn create_group(&self, name: &str) -> VauchiResult<crate::contact::Group> {
-        let group = self.labels_slot().create_group(name)?;
+        let group = self.storage.labels().create_group(name)?;
         self.record_group_change(&group);
         Ok(group)
     }
 
     /// Renames a visibility label.
     pub fn rename_group(&self, label_id: &str, new_name: &str) -> VauchiResult<()> {
-        self.labels_slot().rename_group(label_id, new_name)?;
-        self.record_group_change(&self.labels_slot().load_group(label_id)?);
+        self.storage.labels().rename_group(label_id, new_name)?;
+        self.record_group_change(&self.storage.labels().load_group(label_id)?);
         Ok(())
     }
 
@@ -63,11 +63,11 @@ impl ProfileEngine {
         label_id: &str,
         name_override: Option<&str>,
     ) -> VauchiResult<()> {
-        let mut label = self.labels_slot().load_group(label_id)?;
+        let mut label = self.storage.labels().load_group(label_id)?;
         label
             .set_display_name_override(name_override, self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        self.labels_slot().save_group(&label)?;
+        self.storage.labels().save_group(&label)?;
         self.record_group_change(&label);
         Ok(())
     }
@@ -81,11 +81,11 @@ impl ProfileEngine {
         label_id: &str,
         bio_override: Option<&str>,
     ) -> VauchiResult<()> {
-        let mut label = self.labels_slot().load_group(label_id)?;
+        let mut label = self.storage.labels().load_group(label_id)?;
         label
             .set_bio_override(bio_override, self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        self.labels_slot().save_group(&label)?;
+        self.storage.labels().save_group(&label)?;
         self.record_group_change(&label);
         Ok(())
     }
@@ -100,11 +100,11 @@ impl ProfileEngine {
         label_id: &str,
         avatar_override: Option<&[u8]>,
     ) -> VauchiResult<()> {
-        let mut label = self.labels_slot().load_group(label_id)?;
+        let mut label = self.storage.labels().load_group(label_id)?;
         label
             .set_avatar_override(avatar_override, self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        self.labels_slot().save_group(&label)?;
+        self.storage.labels().save_group(&label)?;
         self.record_group_change(&label);
         Ok(())
     }
@@ -126,15 +126,15 @@ impl ProfileEngine {
     /// fields before deletion.
     pub fn delete_group(&self, label_id: &str) -> VauchiResult<()> {
         // Load the label before deletion to capture its visible fields
-        let label = self.labels_slot().load_group(label_id)?;
+        let label = self.storage.labels().load_group(label_id)?;
         let visible_fields = label.visible_fields().clone();
 
         // Delete the label from storage
-        self.labels_slot().delete_group(label_id)?;
+        self.storage.labels().delete_group(label_id)?;
 
         // Check if this was the last label. Not in duress mode: the
         // migration writes the real card (#468).
-        let remaining_labels = self.labels_slot().load_all_groups()?;
+        let remaining_labels = self.storage.labels().load_all_groups()?;
         if !self.in_duress_mode() && remaining_labels.is_empty() && !visible_fields.is_empty() {
             // Transitioning to no-group mode:
             // Migrate visible fields from the deleted label to field_visibility
@@ -153,7 +153,7 @@ impl ProfileEngine {
 
     /// Gets a visibility label by ID.
     pub fn get_group(&self, label_id: &str) -> VauchiResult<crate::contact::Group> {
-        Ok(self.labels_slot().load_group(label_id)?)
+        Ok(self.storage.labels().load_group(label_id)?)
     }
 
     /// Gets all contacts that are members of a visibility label.
@@ -162,7 +162,7 @@ impl ProfileEngine {
     /// `Contact` objects. Contacts that no longer exist in storage are
     /// silently skipped.
     pub fn get_group_members(&self, label_id: &str) -> VauchiResult<Vec<crate::contact::Contact>> {
-        let label = self.labels_slot().load_group(label_id)?;
+        let label = self.storage.labels().load_group(label_id)?;
         let mut members = Vec::new();
         for contact_id in label.contacts() {
             if let Some(contact) = self.storage.contacts().load_contact(contact_id)? {
@@ -174,17 +174,19 @@ impl ProfileEngine {
 
     /// Adds a contact to a visibility label.
     pub fn add_contact_to_group(&self, label_id: &str, contact_id: &str) -> VauchiResult<()> {
-        self.labels_slot()
+        self.storage
+            .labels()
             .add_contact_to_group(label_id, contact_id)?;
-        self.record_group_change(&self.labels_slot().load_group(label_id)?);
+        self.record_group_change(&self.storage.labels().load_group(label_id)?);
         Ok(())
     }
 
     /// Removes a contact from a visibility label.
     pub fn remove_contact_from_group(&self, label_id: &str, contact_id: &str) -> VauchiResult<()> {
-        self.labels_slot()
+        self.storage
+            .labels()
             .remove_contact_from_group(label_id, contact_id)?;
-        self.record_group_change(&self.labels_slot().load_group(label_id)?);
+        self.record_group_change(&self.storage.labels().load_group(label_id)?);
         Ok(())
     }
 
@@ -193,7 +195,7 @@ impl ProfileEngine {
         &self,
         contact_id: &str,
     ) -> VauchiResult<Vec<crate::contact::Group>> {
-        Ok(self.labels_slot().get_groups_for_contact(contact_id)?)
+        Ok(self.storage.labels().get_groups_for_contact(contact_id)?)
     }
 
     /// Sets field visibility for a label.
@@ -206,9 +208,10 @@ impl ProfileEngine {
         field_id: &str,
         is_visible: bool,
     ) -> VauchiResult<()> {
-        self.labels_slot()
+        self.storage
+            .labels()
             .set_group_field_visibility(label_id, field_id, is_visible)?;
-        self.record_group_change(&self.labels_slot().load_group(label_id)?);
+        self.record_group_change(&self.storage.labels().load_group(label_id)?);
         Ok(())
     }
 
@@ -264,11 +267,12 @@ impl ProfileEngine {
     /// (2026-06-14 visibility layering.)
     pub fn set_own_field_public(&self, field_id: &str) -> VauchiResult<()> {
         let mut card = self
-            .own_card_slot()
+            .storage
+            .own_card()
             .load()?
             .ok_or(VauchiError::IdentityNotInitialized)?;
         card.field_visibility_mut().set_everyone(field_id);
-        self.own_card_slot().save(&card)?;
+        self.storage.own_card().save(&card)?;
         // A public-base change is what ungrouped contacts may see — arm the
         // repropagation marker so the next sync pass sends the grant/revoke.
         self.mark_own_card_repropagate()?;
@@ -282,11 +286,12 @@ impl ProfileEngine {
     /// to grouped contacts via their groups (and to anyone via an override).
     pub fn set_own_field_private(&self, field_id: &str) -> VauchiResult<()> {
         let mut card = self
-            .own_card_slot()
+            .storage
+            .own_card()
             .load()?
             .ok_or(VauchiError::IdentityNotInitialized)?;
         card.field_visibility_mut().set_nobody(field_id);
-        self.own_card_slot().save(&card)?;
+        self.storage.own_card().save(&card)?;
         // See set_own_field_public: arm the marker so the revoke propagates.
         self.mark_own_card_repropagate()?;
         self.journal_own_field(&card, field_id, self.now_timestamp());
@@ -319,7 +324,7 @@ impl ProfileEngine {
         contact_id: &str,
         field_id: &str,
     ) -> VauchiResult<bool> {
-        let own_card = self.own_card_slot().load()?;
+        let own_card = self.storage.own_card().load()?;
         self.field_visible_to_contact(contact_id, own_card.as_ref(), field_id)
     }
 

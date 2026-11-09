@@ -66,35 +66,6 @@ impl ProfileEngine {
         self.reset_concealed_duress();
     }
 
-    /// Where screens read and write groups: the real tables, or under
-    /// duress their persistent twins (#468, vauchi/private#813), so the
-    /// coercer sees none of the real ones, what they make never reaches
-    /// them, and it is still there after a lock. Engine internals that
-    /// decide what real contacts receive keep using `self.storage.labels()`.
-    pub(super) fn labels_slot(&self) -> crate::storage::Sealed<'_, crate::storage::LabelStore<'_>> {
-        if self.in_duress_mode() {
-            self.storage.duress_labels()
-        } else {
-            self.storage.labels()
-        }
-    }
-
-    pub(super) fn tags_slot(&self) -> crate::storage::Sealed<'_, crate::storage::TagStore<'_>> {
-        if self.in_duress_mode() {
-            self.storage.duress_tags()
-        } else {
-            self.storage.tags()
-        }
-    }
-
-    pub(super) fn places_slot(&self) -> crate::storage::Sealed<'_, crate::storage::PlaceStore<'_>> {
-        if self.in_duress_mode() {
-            self.storage.duress_places()
-        } else {
-            self.storage.places()
-        }
-    }
-
     /// Exchange locations live on the real contact rows, which a duress
     /// session never sees: it reads none and records none, the same answer
     /// an unknown contact gets.
@@ -122,22 +93,6 @@ impl ProfileEngine {
             return Err(VauchiError::ContactNotFound(contact_id.to_string()));
         }
         Ok(())
-    }
-
-    /// The own card a screen reads and writes: the real card, or under
-    /// duress a copy of its own (vauchi/private#811), so what a coercer
-    /// types reaches no contact. The copy persists across duress unlocks:
-    /// an edit that vanished after a lock would give the mode away. Engine
-    /// paths that decide what contacts receive keep
-    /// `self.storage.contacts().own_card()`.
-    pub(super) fn own_card_slot(
-        &self,
-    ) -> crate::storage::Sealed<'_, crate::storage::OwnCardStore<'_>> {
-        if self.in_duress_mode() {
-            self.storage.duress_own_card()
-        } else {
-            self.storage.own_card()
-        }
     }
 
     /// Starts the duress copy from the real card the first time a duress

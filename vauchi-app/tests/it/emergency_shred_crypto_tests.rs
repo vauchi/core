@@ -54,7 +54,7 @@ impl Install {
     }
 
     fn open(&self, db_dir: &Path) -> Result<Vauchi, VauchiError> {
-        let config = VauchiConfig::with_storage_path(db_dir.join("vauchi.db"));
+        let config = VauchiConfig::with_profile_directory(db_dir);
         Vauchi::with_secure_storage(config, self.keychain.clone())
     }
 

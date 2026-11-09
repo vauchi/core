@@ -137,7 +137,7 @@ impl<'a> ShredManager<'a> {
         report.identity_file_destroyed = self.secure_delete_identity_file();
 
         // 7. Delete all key files (best-effort, count successes)
-        report.key_files_destroyed = self.delete_key_files();
+        (report.key_files_destroyed, report.key_files_complete) = self.delete_key_files();
 
         // 8. Secure-delete SQLite database + WAL/SHM
         report.sqlite_destroyed = self.secure_delete_database();
@@ -165,7 +165,7 @@ impl<'a> ShredManager<'a> {
             ..ShredReport::default()
         };
         report.identity_file_destroyed = self.secure_delete_identity_file();
-        report.key_files_destroyed = self.delete_key_files();
+        (report.key_files_destroyed, report.key_files_complete) = self.delete_key_files();
         report.sqlite_destroyed = self.secure_delete_database();
         report.pre_signed_deleted = self.delete_pre_signed_file();
         report.data_dir_deleted = self.delete_data_directory();
@@ -238,24 +238,8 @@ impl<'a> ShredManager<'a> {
         secure_overwrite_file(&identity_path).is_ok()
     }
 
-    fn delete_key_files(&self) -> usize {
-        let keys_dir = self.data_dir.join("keys");
-        if !std::fs::symlink_metadata(&keys_dir)
-            .is_ok_and(|metadata| metadata.is_dir() && !metadata.file_type().is_symlink())
-        {
-            return 0;
-        }
-        let mut count = 0;
-        if let Ok(entries) = std::fs::read_dir(&keys_dir) {
-            for entry in entries.flatten() {
-                if secure_overwrite_file(&entry.path()).is_ok() {
-                    count += 1;
-                }
-            }
-        }
-        #[allow(clippy::let_underscore_must_use)]
-        let _ = std::fs::remove_dir(&keys_dir);
-        count
+    fn delete_key_files(&self) -> (usize, bool) {
+        super::storage::delete_key_files(&self.data_dir.join("keys"))
     }
 
     fn secure_delete_database(&self) -> bool {
@@ -277,7 +261,7 @@ impl<'a> ShredManager<'a> {
         if self.data_dir.exists() {
             std::fs::remove_dir_all(&self.data_dir).is_ok()
         } else {
-            true
+            confirmed_absent(&self.data_dir)
         }
     }
 }

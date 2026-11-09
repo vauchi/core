@@ -101,6 +101,8 @@ pub struct ShredReport {
     pub identity_file_destroyed: bool,
     /// Number of key files deleted from FileKeyStorage.
     pub key_files_destroyed: usize,
+    /// Whether enumeration, overwrite and removal of key files all completed.
+    pub key_files_complete: bool,
     /// Whether the database, companions and canonical snapshots were overwritten
     /// and unlinked. This is not a guarantee of physical-media erasure.
     pub sqlite_destroyed: bool,

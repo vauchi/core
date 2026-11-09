@@ -51,6 +51,52 @@ fn an_explicit_profile_wipe_overwrites_the_actual_database_with_or_without_ident
 }
 
 #[test]
+fn partial_snapshot_staging_prevents_reset_before_any_mutation() {
+    let root = tempfile::tempdir().unwrap();
+    let database = root.path().join("vauchi.db");
+    std::fs::write(&database, b"database").unwrap();
+    let staging = root
+        .path()
+        .join(".vauchi-migration-12345678-1234-4234-8234-123456789abc");
+    std::fs::create_dir(&staging).unwrap();
+    std::fs::write(staging.join("snapshot.db"), b"partial recovery").unwrap();
+    let keys = MemoryKeyStorage::new();
+    keys.save_key("smk", &[17; 32]).unwrap();
+    assert!(
+        vauchi_core::api::storage_reset::delete_unreadable_profile(&database, root.path(), &keys)
+            .is_err()
+    );
+    assert_eq!(std::fs::read(database).unwrap(), b"database");
+    assert_eq!(
+        std::fs::read(staging.join("snapshot.db")).unwrap(),
+        b"partial recovery"
+    );
+    assert_eq!(keys.load_key("smk").unwrap(), Some(vec![17; 32]));
+}
+
+#[test]
+fn a_refused_key_file_overwrite_is_reported_as_incomplete_wipe() {
+    let root = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    let target = outside.path().join("keep.key");
+    std::fs::write(&target, b"outside key").unwrap();
+    std::fs::create_dir(root.path().join("keys")).unwrap();
+    std::fs::hard_link(&target, root.path().join("keys/alias")).unwrap();
+    let mut app = Vauchi::new(
+        VauchiConfig::with_profile_directory(root.path())
+            .with_storage_key(SymmetricKey::generate()),
+    )
+    .unwrap();
+    app.create_identity("Fixture").unwrap();
+    assert!(matches!(
+        app.perform_emergency_wipe(true),
+        Err(vauchi_core::VauchiError::Configuration(_))
+    ));
+    assert_eq!(std::fs::read(target).unwrap(), b"outside key");
+    assert!(app.identity().is_none());
+}
+
+#[test]
 fn database_only_reset_preserves_neighboring_identity_and_key_files() {
     let root = tempfile::tempdir().unwrap();
     let database = root.path().join("custom.db");

@@ -300,6 +300,7 @@ impl ProfileEngine {
         }
         .map_err(|e| VauchiError::Configuration(format!("Emergency wipe failed: {e}")))?;
         if !report.smk_destroyed
+            || !report.key_files_complete
             || !report.identity_file_destroyed
             || !report.sqlite_destroyed
             || !report.pre_signed_deleted

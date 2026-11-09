@@ -11,7 +11,7 @@ use std::path::Path;
 
 use crate::api::pre_signed::legacy_pre_signed_file;
 use crate::storage::secure::{KeyAccess, SecureStorage};
-use crate::storage::secure_file::validate_profile_root;
+use crate::storage::secure_file::{confirmed_absent, validate_profile_root};
 
 use super::{BOOTSTRAP_KEY_NAME, BRK_KEY_NAME, SMK_KEY_NAME, ShredError, ShredReport};
 pub(super) use crate::storage::secure_file::secure_overwrite_file;
@@ -49,6 +49,29 @@ pub(super) fn secure_delete_database_files(database: &Path) -> bool {
         Err(_) => complete = false,
     }
     complete
+}
+
+pub(super) fn delete_key_files(directory: &Path) -> (usize, bool) {
+    let metadata = match std::fs::symlink_metadata(directory) {
+        Ok(metadata) => metadata,
+        Err(_) => return (0, confirmed_absent(directory)),
+    };
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return (0, false);
+    }
+    let Ok(entries) = std::fs::read_dir(directory) else {
+        return (0, false);
+    };
+    let mut count = 0;
+    let mut complete = true;
+    for entry in entries {
+        match entry {
+            Ok(entry) if secure_overwrite_file(&entry.path()).is_ok() => count += 1,
+            _ => complete = false,
+        }
+    }
+    complete &= std::fs::remove_dir(directory).is_ok();
+    (count, complete)
 }
 
 /// Panic shred callable from a widget without full Vauchi initialization.
@@ -90,23 +113,7 @@ pub(crate) fn shred_profile_database(
 
     // 3. Delete all key files
     let keys_dir = data_dir.join("keys");
-    report.key_files_destroyed = if std::fs::symlink_metadata(&keys_dir)
-        .is_ok_and(|metadata| metadata.is_dir() && !metadata.file_type().is_symlink())
-    {
-        let mut count = 0;
-        if let Ok(entries) = std::fs::read_dir(&keys_dir) {
-            for entry in entries.flatten() {
-                if secure_overwrite_file(&entry.path()).is_ok() {
-                    count += 1;
-                }
-            }
-        }
-        #[allow(clippy::let_underscore_must_use)]
-        let _ = std::fs::remove_dir(&keys_dir);
-        count
-    } else {
-        0
-    };
+    (report.key_files_destroyed, report.key_files_complete) = delete_key_files(&keys_dir);
 
     // ── Phase B: Cleanup ──
 
@@ -121,7 +128,7 @@ pub(crate) fn shred_profile_database(
     report.data_dir_deleted = if data_dir.exists() {
         std::fs::remove_dir_all(data_dir).is_ok()
     } else {
-        true
+        confirmed_absent(data_dir)
     };
 
     Ok(report)

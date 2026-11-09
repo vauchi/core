@@ -48,6 +48,16 @@ pub(crate) fn snapshot_paths(database: &Path) -> Result<Vec<std::path::PathBuf>,
     let mut paths = Vec::new();
     for entry in entries {
         let entry = entry.map_err(inspection_error)?;
+        if entry.file_name().to_str().is_some_and(|name| {
+            name.strip_prefix(".vauchi-migration-")
+                .and_then(|suffix| uuid::Uuid::parse_str(suffix).ok())
+                .is_some_and(|id| format!(".vauchi-migration-{id}") == name)
+        }) {
+            // #1178: a cut before staging cleanup leaves unattributed recovery data.
+            return Err(StorageError::InvalidData(
+                "incomplete migration staging; recovery data was preserved".into(),
+            ));
+        }
         if matches_backup(&entry.file_name(), &name_prefix) {
             paths.push(entry.path());
         }

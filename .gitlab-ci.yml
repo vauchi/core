@@ -1103,10 +1103,6 @@ test:e2e-smoke:
   variables:
     E2E_DIR: ${CI_PROJECT_DIR}/../e2e-for-core-${CI_JOB_ID}
     TARGET_CORE_DIR: ${CI_PROJECT_DIR}/../core-target-${CI_JOB_ID}
-    # private#1183: this Core moves libsqlite3-sys to 0.39 and relay main
-    # moved with it (relay!606); e2e still pins the relay on 0.30.1, which
-    # cannot share a build with it. Remove with e2e's pin bump to this relay.
-    E2E_SMOKE_RELAY_SHA: "10e55df5fc441b18dc21b2ad7d4c740779f89e7c"
   script:
     - git clone --depth=1 "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/e2e.git" "$E2E_DIR"
     - git clone --depth=1 --branch "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/core.git" "$TARGET_CORE_DIR"

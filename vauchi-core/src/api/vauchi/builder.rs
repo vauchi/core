@@ -10,20 +10,6 @@ use super::super::config::VauchiConfig;
 use super::super::error::VauchiResult;
 use super::Vauchi;
 
-/// Converts a decoy contact ID string into a fake 32-byte "public key".
-///
-/// This is a deterministic mapping used only for display purposes — decoy
-/// contacts don't have real cryptographic keys. The resulting bytes are
-/// derived by hashing the ID with SHA-256, ensuring consistent
-/// IDs across sessions.
-pub(super) fn decoy_id_to_fake_pk(id: &str) -> [u8; 32] {
-    use sha2::{Digest, Sha256};
-    let hash = Sha256::digest(id.as_bytes());
-    let mut pk = [0u8; 32];
-    pk.copy_from_slice(hash.as_ref());
-    pk
-}
-
 /// Builder for creating Vauchi instances (ADR-030: transport type-erased).
 pub struct VauchiBuilder {
     config: VauchiConfig,

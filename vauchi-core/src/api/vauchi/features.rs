@@ -286,9 +286,6 @@ impl ProfileEngine {
 
     /// Lists all hidden contacts.
     pub fn list_hidden_contacts(&self) -> VauchiResult<Vec<Contact>> {
-        if self.auth_mode == super::AuthMode::Duress {
-            return Ok(Vec::new());
-        }
         let contacts = self.storage.contacts().list_contacts()?;
         Ok(contacts.into_iter().filter(|c| c.is_hidden()).collect())
     }

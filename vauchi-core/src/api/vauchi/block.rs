@@ -89,9 +89,6 @@ impl ProfileEngine {
 
     /// Lists all blocked contacts.
     pub fn list_blocked_contacts(&self) -> VauchiResult<Vec<Contact>> {
-        if self.auth_mode == super::AuthMode::Duress {
-            return Ok(Vec::new());
-        }
         let contacts = self.storage.contacts().list_contacts()?;
         Ok(contacts.into_iter().filter(|c| c.is_blocked()).collect())
     }

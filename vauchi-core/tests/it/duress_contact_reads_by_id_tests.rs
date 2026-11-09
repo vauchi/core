@@ -71,10 +71,20 @@ fn test_duress_hides_real_shared_names_and_avatars() {
 #[test]
 fn test_duress_hides_real_nickname_custom_avatar_and_note() {
     let (wb, bob_id) = duress_with_real_annotations();
+    // The mask profile holds no real contact: a real id reads exactly as an
+    // id no profile has ever held (ADR-080 point 4).
+    let unknown = "ab".repeat(32);
+    let reads = |id: &str| {
+        (
+            wb.get_contact_nickname(id).map_err(|e| e.to_string()),
+            wb.get_contact_custom_avatar(id).map_err(|e| e.to_string()),
+            wb.read_personal_note(id).map_err(|e| e.to_string()),
+        )
+    };
 
-    assert_eq!(wb.get_contact_nickname(&bob_id).unwrap(), None);
-    assert_eq!(wb.get_contact_custom_avatar(&bob_id).unwrap(), None);
-    assert_eq!(wb.read_personal_note(&bob_id).unwrap(), None);
+    assert_eq!(reads(&bob_id), reads(&unknown));
+    let not_found = Err("storage error: Not found: Contact not found".to_string());
+    assert_eq!(reads(&bob_id).2, not_found);
 }
 
 // @scenario: duress_mode :: Cannot access real contacts from duress mode

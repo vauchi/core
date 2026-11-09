@@ -59,9 +59,6 @@ impl ProfileEngine {
         &self,
         contact_id: &str,
     ) -> VauchiResult<Vec<crate::storage::DeliveryRecord>> {
-        if self.conceals_contact(contact_id)? {
-            return Ok(Vec::new());
-        }
         Ok(self
             .storage
             .deliveries()
@@ -73,20 +70,11 @@ impl ProfileEngine {
     /// Returns delivery records with `Failed` status, useful for showing
     /// the user which messages need attention or retry.
     pub fn get_failed_deliveries(&self) -> VauchiResult<Vec<crate::storage::DeliveryRecord>> {
-        let mut failed = self.storage.deliveries().get_delivery_records_by_status(
+        Ok(self.storage.deliveries().get_delivery_records_by_status(
             &crate::storage::DeliveryStatus::Failed {
                 reason: String::new(),
             },
-        )?;
-        if self.in_duress_mode() {
-            let decoy_ids: std::collections::HashSet<String> = self
-                .decoy_contacts_as_contacts()?
-                .iter()
-                .map(|decoy| decoy.id().to_string())
-                .collect();
-            failed.retain(|record| decoy_ids.contains(&record.recipient_id));
-        }
-        Ok(failed)
+        )?)
     }
 
     // === Event Operations ===

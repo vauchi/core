@@ -45,9 +45,6 @@ impl ProfileEngine {
     /// carries an extra layer under the contact's shared key; the AEAD tag
     /// tells it apart from plain text, so it still reads.
     pub fn read_personal_note(&self, contact_id: &str) -> VauchiResult<Option<String>> {
-        if self.conceals_contact(contact_id)? {
-            return Ok(None);
-        }
         let Some(stored) = self.storage.contacts().load_personal_notes(contact_id)? else {
             return Ok(None);
         };
@@ -83,9 +80,6 @@ impl ProfileEngine {
     /// Loads a contact's stored personal note bytes. Low-level API for
     /// sync/migration; prefer `read_personal_note()`.
     pub fn load_personal_notes(&self, contact_id: &str) -> VauchiResult<Option<Vec<u8>>> {
-        if self.conceals_contact(contact_id)? {
-            return Ok(None);
-        }
         Ok(self.storage.contacts().load_personal_notes(contact_id)?)
     }
 
@@ -166,9 +160,6 @@ impl ProfileEngine {
 
     /// Returns the local nickname for a contact, or None if unset.
     pub fn get_contact_nickname(&self, contact_id: &str) -> VauchiResult<Option<String>> {
-        if self.conceals_contact(contact_id)? {
-            return Ok(None);
-        }
         Ok(self.storage.contacts().load_contact_nickname(contact_id)?)
     }
 
@@ -208,9 +199,6 @@ impl ProfileEngine {
 
     /// Returns the custom avatar for a contact, or None if unset.
     pub fn get_contact_custom_avatar(&self, contact_id: &str) -> VauchiResult<Option<Vec<u8>>> {
-        if self.conceals_contact(contact_id)? {
-            return Ok(None);
-        }
         Ok(self
             .storage
             .contacts()
@@ -299,9 +287,6 @@ impl ProfileEngine {
     ) -> VauchiResult<ContactDisplayOptions> {
         use crate::contact::display::*;
 
-        if self.conceals_contact(contact_id)? {
-            return Err(VauchiError::ContactNotFound(contact_id.to_string()));
-        }
         let _contact = self
             .storage
             .contacts()

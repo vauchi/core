@@ -21,6 +21,18 @@ use common::helpers::setup_alice_bob_exchange;
 
 /// Sets up duress mode: password, duress PIN, one decoy contact.
 /// Returns the Vauchi instance (in duress mode) and Bob's real contact ID.
+/// An audit event of the real owner's. Under duress the real log is out of
+/// the foreground's reach (ADR-080), so the app password brings the real
+/// profile back for it and the duress PIN opens the mask again.
+fn log_a_real_audit_event(wb: &mut vauchi_core::Vauchi) {
+    assert_eq!(wb.authenticate("normal-pin").unwrap(), AuthMode::Normal);
+    wb.storage()
+        .consent()
+        .log_audit_event("real_owner_event", None)
+        .unwrap();
+    assert_eq!(wb.authenticate("112233").unwrap(), AuthMode::Duress);
+}
+
 fn setup_duress_with_decoy() -> (vauchi_core::Vauchi, String /* bob_real_id */) {
     let (mut alice_wb, _bob_wb, _secret, bob_id, _alice_id) = setup_alice_bob_exchange();
 
@@ -370,11 +382,8 @@ fn test_search_contacts_faceted_duress_covers_decoys_only() {
 // @scenario: duress_mode :: Cannot access real contacts from duress mode
 #[test]
 fn test_export_personal_data_duress_holds_decoys_only() {
-    let (wb, bob_id) = setup_duress_with_decoy();
-    wb.storage()
-        .consent()
-        .log_audit_event("real_owner_event", None)
-        .unwrap();
+    let (mut wb, bob_id) = setup_duress_with_decoy();
+    log_a_real_audit_event(&mut wb);
 
     let export = wb
         .export_personal_data()
@@ -434,11 +443,8 @@ fn test_export_personal_data_normal_mode_holds_real_contacts() {
 // @scenario: duress_mode :: Cannot access real contacts from duress mode
 #[test]
 fn test_export_personal_data_encrypted_duress_holds_decoys_only() {
-    let (wb, bob_id) = setup_duress_with_decoy();
-    wb.storage()
-        .consent()
-        .log_audit_event("real_owner_event", None)
-        .unwrap();
+    let (mut wb, bob_id) = setup_duress_with_decoy();
+    log_a_real_audit_event(&mut wb);
 
     let encrypted = wb
         .export_personal_data_encrypted("export-password")

@@ -351,14 +351,12 @@ impl ProfileEngine {
             crate::storage::DeletionState::Executed { .. }
         );
 
-        // Duress mode counts the decoys, which are never recovery-trusted;
-        // normal mode counts every stored contact, hidden ones included.
-        let contacts = if concealed {
-            self.decoy_contacts_as_contacts()?
-        } else {
-            self.storage.contacts().list_contacts()?
-        };
-        let trusted_contacts: Vec<_> = contacts
+        // Every stored contact, hidden ones included; under duress the mask
+        // profile's, which are never recovery-trusted (ADR-080 point 4).
+        let trusted_contacts: Vec<_> = self
+            .storage
+            .contacts()
+            .list_contacts()?
             .into_iter()
             .filter(|c| c.is_recovery_trusted())
             .collect();

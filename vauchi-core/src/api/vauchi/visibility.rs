@@ -162,9 +162,6 @@ impl ProfileEngine {
     /// `Contact` objects. Contacts that no longer exist in storage are
     /// silently skipped.
     pub fn get_group_members(&self, label_id: &str) -> VauchiResult<Vec<crate::contact::Contact>> {
-        if self.in_duress_mode() {
-            return Ok(Vec::new());
-        }
         let label = self.labels_slot().load_group(label_id)?;
         let mut members = Vec::new();
         for contact_id in label.contacts() {

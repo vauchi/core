@@ -21,7 +21,7 @@ use crate::sync::GroupSyncData;
 use super::{BackupError, FullBackupEnvelope, IdentitySection};
 use contacts::SnapshotContact;
 
-pub(crate) use codec::{SNAPSHOT_VERSION, decode, encode};
+pub(crate) use codec::{Payload, SNAPSHOT_VERSION, decode, encode, encode_with_decoy};
 pub(crate) use duress::DuressSection;
 
 #[derive(Serialize, Deserialize)]

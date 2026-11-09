@@ -5,7 +5,7 @@
 //! Password full-backup capture and atomic restoration.
 
 use crate::api::{VauchiError, VauchiResult};
-use crate::backup::snapshot::{self, BackupSnapshot, DuressSection};
+use crate::backup::snapshot::{self, BackupSnapshot, DuressSection, Payload};
 use crate::card::ContactCard;
 use crate::identity::Identity;
 
@@ -22,8 +22,57 @@ impl ProfileEngine {
             .ok_or(VauchiError::IdentityNotInitialized)?;
         // The same gate as the identity-only export: this file holds every
         // contact's shared key, so it must not be weaker (private#891).
-        crate::identity::password::validate_password(password)
-            .map_err(|e| VauchiError::Configuration(format!("Export failed: {:?}", e)))?;
+        validate_backup_password(password)?;
+        let snapshot = self.real_snapshot(identity)?;
+        let blob = snapshot::encode(&snapshot, password).map_err(backup_error)?;
+        Ok(self.finish_export(&blob))
+    }
+
+    /// Exports a v7 backup whose second payload opens with
+    /// `decoy_password` and holds the decoy profile only (ADR-080 point 7).
+    /// Only the real profile with a duress PIN has a decoy to export; a
+    /// duress session is refused with the same error as an install
+    /// without a duress PIN.
+    pub fn export_full_backup_with_decoy(
+        &self,
+        password: &str,
+        decoy_password: &str,
+    ) -> VauchiResult<String> {
+        let config = match self.password_config()? {
+            Some(config) if !self.is_mask() && config.duress_enabled() => config,
+            _ => return Err(no_decoy_to_export()),
+        };
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        validate_backup_password(password)?;
+        validate_backup_password(decoy_password)?;
+        let real = self.real_snapshot(identity)?;
+        let decoy = BackupSnapshot::capture_decoy(
+            &self.storage,
+            &config,
+            identity.display_name(),
+            self.clock.unix_seconds(),
+        )?;
+        decoy.validate().map_err(backup_error)?;
+        let blob = snapshot::encode_with_decoy(
+            &Payload {
+                snapshot: &real,
+                password,
+            },
+            Some(&Payload {
+                snapshot: &decoy,
+                password: decoy_password,
+            }),
+        )
+        .map_err(backup_error)?;
+        Ok(self.finish_export(&blob))
+    }
+
+    /// The real profile's snapshot, with its duress section when exported
+    /// from the real profile of an install with an app password.
+    fn real_snapshot(&self, identity: &Identity) -> VauchiResult<BackupSnapshot> {
         let mut snapshot =
             BackupSnapshot::capture(&self.storage, identity, self.clock.unix_seconds())
                 .map_err(backup_error)?;
@@ -35,22 +84,14 @@ impl ProfileEngine {
             snapshot.duress = Some(DuressSection::capture(&self.storage, &config)?);
         }
         snapshot.validate().map_err(backup_error)?;
-        let blob = snapshot::encode(&snapshot, password).map_err(backup_error)?;
+        Ok(snapshot)
+    }
+
+    fn finish_export(&self, blob: &[u8]) -> String {
         // The completion timestamp is a UX hint, not part of backup integrity.
         #[allow(clippy::let_underscore_must_use)]
         let _ = self.record_backup_completed();
-        Ok(hex::encode(blob))
-    }
-
-    /// Exports a v7 backup whose second payload opens with
-    /// `decoy_password` and holds the decoy profile only (ADR-080 point 7).
-    pub fn export_full_backup_with_decoy(
-        &self,
-        password: &str,
-        decoy_password: &str,
-    ) -> VauchiResult<String> {
-        let _ = (password, decoy_password);
-        Err(no_decoy_to_export())
+        hex::encode(blob)
     }
 
     /// Atomically restores a password backup onto a fresh installation.
@@ -114,4 +155,10 @@ fn backup_error(error: crate::backup::BackupError) -> VauchiError {
 
 fn no_decoy_to_export() -> VauchiError {
     VauchiError::InvalidState("no decoy profile to export".into())
+}
+
+fn validate_backup_password(password: &str) -> VauchiResult<()> {
+    crate::identity::password::validate_password(password)
+        .map(|_| ())
+        .map_err(|e| VauchiError::Configuration(format!("Export failed: {:?}", e)))
 }

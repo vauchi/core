@@ -34,6 +34,18 @@ impl Storage {
         })
     }
 
+    /// A fresh mask profile with a seed of its own and nothing else, for a
+    /// decoy payload, whose restored install has no duress of its own.
+    pub(crate) fn synthetic_mask_for_backup() -> Result<MaskTransfer, StorageError> {
+        let key = SymmetricKey::generate();
+        let mask = Self::empty_mask_profile(key.clone(), None)?;
+        mask.mask_seed().ensure()?;
+        Ok(MaskTransfer {
+            key,
+            body: mask.sealed_body()?,
+        })
+    }
+
     /// Replaces this install's mask profile with the one a backup carried,
     /// re-encrypted under this install's mask key, and seals it.
     pub(crate) fn restore_mask_from_backup(

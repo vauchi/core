@@ -9,7 +9,9 @@ try {
     $taskCases = @(
         @{ Name = 'backend'; Command = "Write-Output 'running 1 test'; exit 17"; Expected = 'TEST_BACKEND_FAILED: exit 17' },
         @{ Name = 'empty'; Command = "Write-Output 'running 0 tests'; exit 0"; Expected = 'NO_EXECUTED_TESTS:' },
-        @{ Name = 'listing'; Command = "Write-Output 'one_test: test'; exit 0"; Expected = 'NO_EXECUTED_TESTS:' }
+        @{ Name = 'listing'; Command = "Write-Output 'one_test: test'; exit 0"; Expected = 'NO_EXECUTED_TESTS:' },
+        @{ Name = 'early-exit'; Command = "Write-Output 'running 1 test'; exit 0"; Expected = 'INCOMPLETE_TEST_RUN:' },
+        @{ Name = 'partial'; Command = "Write-Output 'running 2 tests'; Write-Output 'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured;'; exit 0"; Expected = 'INCOMPLETE_TEST_RUN:' }
     )
     foreach ($taskCase in $taskCases) {
         $taskObserved = ''
@@ -24,12 +26,12 @@ try {
     }
     $taskLog = Join-Path $taskTemporary 'healthy.log'
     Invoke-RustTest -Executable $taskShell `
-        -TestArguments @('-NoProfile', '-Command', "Write-Output 'running 1 test'; exit 0") `
+        -TestArguments @('-NoProfile', '-Command', "Write-Output 'running 1 test'; Write-Output 'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured;'; exit 0") `
         -Log $taskLog
-    if ((Get-Content -Raw $taskLog).Trim() -ne 'running 1 test') {
+    if ((Get-Content $taskLog).Count -ne 2 -or (Get-Content $taskLog)[1] -ne 'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured;') {
         throw 'The successful backend output was not preserved'
     }
-    Write-Host 'RUNNER_CONTROLS_PASSED: backend failure, zero tests, listing, healthy'
+    Write-Host 'RUNNER_CONTROLS_PASSED: failure, zero, listing, early exit, partial, healthy'
 } finally {
     Remove-Item -LiteralPath $taskTemporary -Recurse -Force
 }

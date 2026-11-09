@@ -65,10 +65,9 @@ impl Storage {
         match replaced {
             Ok(()) => mask.conn.execute_batch("COMMIT")?,
             Err(error) => {
-                // The error being returned matters more than a failed
-                // rollback; the connection drops the transaction anyway.
-                #[allow(clippy::let_underscore_must_use)]
-                let _ = mask.conn.execute_batch("ROLLBACK");
+                // The connection drops the transaction even when ROLLBACK
+                // fails, so the error that caused it is the one to return.
+                let _rolled_back = mask.conn.execute_batch("ROLLBACK").is_ok();
                 return Err(error);
             }
         }

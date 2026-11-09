@@ -12,6 +12,30 @@ fn unsafe_entry() -> io::Error {
     )
 }
 
+pub(crate) fn confirmed_absent(path: &Path) -> bool {
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        let Ok(current) = std::env::current_dir() else {
+            return false;
+        };
+        current.join(path)
+    };
+    if !matches!(std::fs::symlink_metadata(&absolute), Err(error) if error.kind() == io::ErrorKind::NotFound)
+    {
+        return false;
+    }
+    // #1178: some platforms report NotFound for children of a regular file.
+    for parent in absolute.ancestors().skip(1) {
+        match std::fs::metadata(parent) {
+            Ok(metadata) => return metadata.is_dir(),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(_) => return false,
+        }
+    }
+    false
+}
+
 #[cfg(unix)]
 fn check_handle(before: &Metadata, file: &File) -> io::Result<()> {
     use std::os::unix::fs::MetadataExt;
@@ -54,7 +78,9 @@ fn check_handle(_: &Metadata, _: &File) -> io::Result<()> {
 pub(crate) fn secure_overwrite_file(path: &Path) -> io::Result<()> {
     let before = match std::fs::symlink_metadata(path) {
         Ok(metadata) => metadata,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound && confirmed_absent(path) => {
+            return Ok(());
+        }
         Err(error) => return Err(error),
     };
     if !before.is_file() || before.file_type().is_symlink() {

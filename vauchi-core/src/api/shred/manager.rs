@@ -18,6 +18,7 @@ use crate::api::deletion::{DeletionError, DeletionManager};
 use crate::api::pre_signed::{PreSignedPurgeRequest, legacy_pre_signed_file};
 use crate::identity::Identity;
 use crate::storage::secure::{KeyAccess, SecureStorage};
+use crate::storage::secure_file::confirmed_absent;
 use crate::storage::{DeletionState, Storage};
 
 use super::storage::{destroy_storage_keys, secure_overwrite_file};
@@ -186,9 +187,9 @@ impl<'a> ShredManager<'a> {
             .load_key_with_access(BRK_KEY_NAME, KeyAccess::AfterFirstUnlock)
             .map(|k| k.is_none())
             .unwrap_or(false);
-        let database_absent = !self.data_dir.join("vauchi.db").exists();
-        let data_dir_absent = !self.data_dir.exists();
-        let pre_signed_absent = !legacy_pre_signed_file(&self.data_dir).exists();
+        let database_absent = confirmed_absent(&self.data_dir.join("vauchi.db"));
+        let data_dir_absent = confirmed_absent(&self.data_dir);
+        let pre_signed_absent = confirmed_absent(&legacy_pre_signed_file(&self.data_dir));
 
         let all_clear = smk_absent
             && bootstrap_key_absent

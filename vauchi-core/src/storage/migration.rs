@@ -65,7 +65,7 @@ impl MigrationRunner {
     /// any migrations whose version is greater than the current schema version.
     /// All pending migrations run within a single transaction — if any migration
     /// fails, all changes are rolled back.
-    /// Pending migrations use FULL synchronous durability; the connection's
+    /// Pending migrations use at least FULL synchronous durability; the connection's
     /// previous sync policy is restored after success or rollback.
     ///
     /// If `db_path` is provided and there are pending migrations, a recovery

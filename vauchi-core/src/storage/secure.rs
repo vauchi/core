@@ -225,7 +225,12 @@ impl SecureStorage for FileKeyStorage {
 
         let encrypted = match std::fs::read(&file_path) {
             Ok(bytes) => bytes,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error)
+                if error.kind() == std::io::ErrorKind::NotFound
+                    && super::secure_file::confirmed_absent(&file_path) =>
+            {
+                return Ok(None);
+            }
             Err(error) => {
                 return Err(StorageError::Encryption(format!(
                     "could not read key file: {}",

@@ -12,8 +12,8 @@ pub(crate) struct MigrationDurability<'a> {
 
 impl<'a> MigrationDurability<'a> {
     pub(crate) fn full(conn: &'a Connection) -> Result<Self, StorageError> {
-        let previous = conn.pragma_query_value(None, "synchronous", |row| row.get(0))?;
-        conn.pragma_update(None, "synchronous", "FULL")?;
+        let previous: i64 = conn.pragma_query_value(None, "synchronous", |row| row.get(0))?;
+        conn.pragma_update(None, "synchronous", previous.max(2))?;
         Ok(Self { conn, previous })
     }
 }

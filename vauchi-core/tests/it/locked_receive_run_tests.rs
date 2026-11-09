@@ -384,3 +384,19 @@ fn a_relay_that_starts_delaying_after_the_unlock_gets_one_locked_round() {
     assert_eq!(second, LockedRunOutcome::DelayedFetchesOffered);
     assert_eq!(world.outer.ohttp_actions().len(), after_first, "no request");
 }
+
+// @internal
+#[test]
+fn a_clock_set_before_the_unlocked_sync_receives_nothing() {
+    let mut world = world();
+    world.bob_sends_an_update();
+    // Back to the same day, before the sync that stored it: a clock set
+    // back must not stretch the one-day window.
+    world.clock.set(UNIX_EPOCH + Duration::from_secs(NOW - 30));
+    let before = world.outer.ohttp_actions().len();
+
+    let outcome = world.locked_run(&world.relay());
+
+    assert_eq!(outcome, LockedRunOutcome::WindowEnded);
+    assert_eq!(world.outer.ohttp_actions().len(), before, "no request");
+}

@@ -400,3 +400,33 @@ fn a_clock_set_before_the_unlocked_sync_receives_nothing() {
     assert_eq!(outcome, LockedRunOutcome::WindowEnded);
     assert_eq!(world.outer.ohttp_actions().len(), before, "no request");
 }
+
+// @internal
+#[test]
+fn an_update_kept_while_locked_is_acknowledged_at_the_unlock_when_its_ack_was_lost() {
+    let mut world = world();
+    world.bob_sends_an_update();
+    world.outer.drop_gateway_acks(true);
+    let locked = world.locked_run(&world.relay());
+    world.outer.drop_gateway_acks(false);
+
+    // The session has moved past the kept blob, so trying it again would
+    // fail, and on a device session that failure deletes the session.
+    let unlocked = sync(&mut world.alice);
+    let after = world.locked_run(&world.relay());
+
+    assert_eq!(locked, LockedRunOutcome::Received { stored: 1, left: 1 });
+    // Bob's other blob has no session on this side at all, locked or not.
+    assert!(
+        matches!(
+            &unlocked,
+            VauchiSyncOutcome::Ok { rejected: 1, reject_reasons, .. } if reject_reasons == "no_ratchet:1"
+        ),
+        "the kept blob is not tried again: {unlocked:?}"
+    );
+    assert_eq!(
+        after,
+        LockedRunOutcome::Received { stored: 0, left: 0 },
+        "the unlock acknowledged both blobs"
+    );
+}

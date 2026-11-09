@@ -281,6 +281,16 @@ impl MockRelay {
         });
     }
 
+    /// Answer acknowledgements as accepted without removing the blob, as
+    /// when an ack is lost on the way.
+    pub fn drop_gateway_acks(&self, drop: bool) {
+        self.with_gateway(|gateway| {
+            if let Some(mailboxes) = gateway.mailboxes.as_mut() {
+                mailboxes.drop_acks = drop;
+            }
+        });
+    }
+
     /// The encoded key config of the gateway enabled by
     /// [`Self::enable_ohttp_gateway`].
     pub fn ohttp_key_config(&self) -> Vec<u8> {

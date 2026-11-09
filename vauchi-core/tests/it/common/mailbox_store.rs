@@ -11,6 +11,9 @@ use vauchi_core::clock::Clock;
 use vauchi_protocol::v2::{FetchedBlob, V2AckRequest, V2FetchRequest, V2SendRequest};
 
 pub(super) struct MailboxStore {
+    /// Acknowledgements answered as accepted but not applied, as when an
+    /// ack is lost on the way (vauchi/private#1093).
+    pub(super) drop_acks: bool,
     clock: Arc<dyn Clock>,
     page_size: NonZeroUsize,
     sequence: u64,
@@ -20,6 +23,7 @@ pub(super) struct MailboxStore {
 impl MailboxStore {
     pub(super) fn new(clock: Arc<dyn Clock>, page_size: usize) -> Self {
         Self {
+            drop_acks: false,
             clock,
             page_size: NonZeroUsize::new(page_size)
                 .expect("test mailbox page size must be positive"),
@@ -99,6 +103,9 @@ impl MailboxStore {
     }
 
     fn acknowledge(&mut self, request: V2AckRequest) -> serde_json::Value {
+        if self.drop_acks {
+            return serde_json::json!({ "status": "ok", "acknowledged": true });
+        }
         let index = self.blobs.iter().position(|blob| {
             blob.blob_id == request.blob_id
                 && blob.mailbox_token.as_deref() == Some(request.recipient_id.as_str())

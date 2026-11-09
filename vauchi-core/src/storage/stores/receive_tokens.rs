@@ -22,6 +22,19 @@ pub struct ReceiveTokenStore<'a> {
     receive_key: Option<&'a SymmetricKey>,
 }
 
+impl<'a> ReceiveTokenStore<'a> {
+    /// The view a locked run has.
+    pub(in crate::storage) fn under_receive_key(
+        conn: &'a Connection,
+        receive_key: &'a SymmetricKey,
+    ) -> Self {
+        Self {
+            conn,
+            receive_key: Some(receive_key),
+        }
+    }
+}
+
 impl Storage {
     /// Scoped persistence view for the receive registrations stored ahead.
     pub fn receive_tokens(&self) -> crate::storage::Sealed<'_, ReceiveTokenStore<'_>> {

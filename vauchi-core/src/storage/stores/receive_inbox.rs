@@ -41,7 +41,17 @@ pub struct InboxItems {
 /// Scoped persistence view for the receive inbox.
 pub struct ReceiveInboxStore<'a> {
     conn: &'a Connection,
-    storage_key: &'a SymmetricKey,
+    storage_key: Option<&'a SymmetricKey>,
+}
+
+impl<'a> ReceiveInboxStore<'a> {
+    /// The view a locked run has: it can put items and read none.
+    pub(in crate::storage) fn write_only(conn: &'a Connection) -> Self {
+        Self {
+            conn,
+            storage_key: None,
+        }
+    }
 }
 
 impl Storage {
@@ -49,7 +59,7 @@ impl Storage {
     pub fn receive_inbox(&self) -> crate::storage::Sealed<'_, ReceiveInboxStore<'_>> {
         self.sealed(ReceiveInboxStore {
             conn: &self.conn,
-            storage_key: &self.encryption_key,
+            storage_key: Some(&self.encryption_key),
         })
     }
 }
@@ -94,6 +104,9 @@ impl ReceiveInboxStore<'_> {
     }
 
     fn private_key(&self) -> Result<Option<StaticSecret>, StorageError> {
+        let storage_key = self
+            .storage_key
+            .ok_or(StorageError::StorageKeyUnavailable)?;
         let sealed: Option<Vec<u8>> = self
             .conn
             .query_row(
@@ -106,8 +119,7 @@ impl ReceiveInboxStore<'_> {
             return Ok(None);
         };
         let bytes = Zeroizing::new(
-            decrypt(self.storage_key, &sealed)
-                .map_err(|e| StorageError::Encryption(e.to_string()))?,
+            decrypt(storage_key, &sealed).map_err(|e| StorageError::Encryption(e.to_string()))?,
         );
         let bytes: [u8; 32] = bytes
             .as_slice()
@@ -129,6 +141,9 @@ impl ReceiveInboxStore<'_> {
 
     /// Every item, oldest first, opened with the inbox private key.
     pub fn items(&self) -> Result<InboxItems, StorageError> {
+        if self.storage_key.is_none() {
+            return Err(StorageError::StorageKeyUnavailable);
+        }
         let rows: Vec<(i64, Vec<u8>)> = self
             .conn
             .prepare("SELECT id, sealed_update FROM receive_inbox ORDER BY id")?

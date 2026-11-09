@@ -23,7 +23,9 @@ mod mask_profile;
 mod mask_profile_tests;
 mod sealing;
 pub use sealing::Sealed;
+mod locked_receive;
 mod receive_key;
+pub use locked_receive::LockedReceiveStorage;
 
 mod contact_row;
 

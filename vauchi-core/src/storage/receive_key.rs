@@ -24,6 +24,38 @@ fn check_key(receive_key: &SymmetricKey) -> SymmetricKey {
     SymmetricKey::from_bytes(*HKDF::derive_key(None, receive_key.as_bytes(), CHECK_INFO))
 }
 
+/// What the file's receive key check row says of a key.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum ReceiveKeyCheck {
+    /// No key was set on this file yet.
+    Absent,
+    Opens,
+    Refused,
+}
+
+pub(super) fn check_receive_key(
+    conn: &rusqlite::Connection,
+    receive_key: &SymmetricKey,
+) -> Result<ReceiveKeyCheck, StorageError> {
+    let sealed: Option<Vec<u8>> = conn
+        .query_row(
+            "SELECT sealed_label FROM receive_key_check WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let Some(sealed) = sealed else {
+        return Ok(ReceiveKeyCheck::Absent);
+    };
+    let opens = sealed.len() <= MAX_SEALED_LEN
+        && decrypt(&check_key(receive_key), &sealed).is_ok_and(|label| label == CHECK_LABEL);
+    Ok(if opens {
+        ReceiveKeyCheck::Opens
+    } else {
+        ReceiveKeyCheck::Refused
+    })
+}
+
 impl Storage {
     /// Gives this storage the Background Receive Key. Receive state still
     /// under the storage key moves under it, in one transaction.
@@ -31,21 +63,8 @@ impl Storage {
     /// Fails with [`StorageError::WrongKey`] when the file's receive state is
     /// under a different key; the storage then keeps none.
     pub fn set_receive_key(&mut self, receive_key: SymmetricKey) -> Result<(), StorageError> {
-        let sealed: Option<Vec<u8>> = self
-            .conn
-            .query_row(
-                "SELECT sealed_label FROM receive_key_check WHERE id = 1",
-                [],
-                |row| row.get(0),
-            )
-            .optional()?;
-        if let Some(sealed) = sealed {
-            let opens = sealed.len() <= MAX_SEALED_LEN
-                && decrypt(&check_key(&receive_key), &sealed)
-                    .is_ok_and(|label| label == CHECK_LABEL);
-            if !opens {
-                return Err(StorageError::WrongKey);
-            }
+        if check_receive_key(&self.conn, &receive_key)? == ReceiveKeyCheck::Refused {
+            return Err(StorageError::WrongKey);
         }
         self.begin_transaction()?;
         match self.seal_receive_state(&receive_key) {

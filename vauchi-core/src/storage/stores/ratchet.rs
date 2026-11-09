@@ -23,9 +23,25 @@ pub const SHARED_PEER_DEVICE_ID: [u8; 32] = [0; 32];
 /// Scoped persistence view for the ratchets domain.
 pub struct RatchetStore<'a> {
     conn: &'a Connection,
-    key: &'a SymmetricKey,
+    key: Option<&'a SymmetricKey>,
     receive_key: Option<&'a SymmetricKey>,
     clock: &'a Arc<dyn Clock>,
+}
+
+impl<'a> RatchetStore<'a> {
+    /// The view a locked run has: the receive key and no storage key.
+    pub(in crate::storage) fn under_receive_key(
+        conn: &'a Connection,
+        receive_key: &'a SymmetricKey,
+        clock: &'a Arc<dyn Clock>,
+    ) -> Self {
+        Self {
+            conn,
+            key: None,
+            receive_key: Some(receive_key),
+            clock,
+        }
+    }
 }
 
 /// The per-contact key for ratchet state under the storage key, so that
@@ -59,7 +75,7 @@ impl Storage {
         self.sealed({
             RatchetStore {
                 conn: &self.conn,
-                key: &self.encryption_key,
+                key: Some(&self.encryption_key),
                 receive_key: self.receive_key(),
                 clock: &self.clock,
             }
@@ -73,10 +89,13 @@ impl RatchetStore<'_> {
     }
     /// The key a new row is sealed with: the receive key once the storage
     /// has it, the storage key before.
-    fn sealing_key(&self, contact_id: &str) -> (SymmetricKey, bool) {
-        match self.receive_key {
-            Some(receive_key) => (ratchet_key_under_receive_key(receive_key, contact_id), true),
-            None => (ratchet_key_under_storage_key(self.key, contact_id), false),
+    fn sealing_key(&self, contact_id: &str) -> Result<(SymmetricKey, bool), StorageError> {
+        match (self.receive_key, self.key) {
+            (Some(receive_key), _) => {
+                Ok((ratchet_key_under_receive_key(receive_key, contact_id), true))
+            }
+            (None, Some(key)) => Ok((ratchet_key_under_storage_key(key, contact_id), false)),
+            (None, None) => Err(StorageError::ReceiveKeyUnavailable),
         }
     }
 
@@ -86,7 +105,10 @@ impl RatchetStore<'_> {
         sealed_with_receive_key: bool,
     ) -> Result<SymmetricKey, StorageError> {
         match (sealed_with_receive_key, self.receive_key) {
-            (false, _) => Ok(ratchet_key_under_storage_key(self.key, contact_id)),
+            (false, _) => self
+                .key
+                .map(|key| ratchet_key_under_storage_key(key, contact_id))
+                .ok_or(StorageError::StorageKeyUnavailable),
             (true, Some(receive_key)) => Ok(ratchet_key_under_receive_key(receive_key, contact_id)),
             (true, None) => Err(StorageError::ReceiveKeyUnavailable),
         }
@@ -113,7 +135,7 @@ impl RatchetStore<'_> {
         let state_json = serde_json::to_vec(&serialized)
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
-        let (ratchet_key, sealed_with_receive_key) = self.sealing_key(contact_id);
+        let (ratchet_key, sealed_with_receive_key) = self.sealing_key(contact_id)?;
         let state_encrypted = crate::crypto::encrypt(&ratchet_key, &state_json)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 

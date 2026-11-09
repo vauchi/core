@@ -93,6 +93,12 @@ pub enum StorageError {
     #[error("Receive state needs the background receive key")]
     ReceiveKeyUnavailable,
 
+    /// A locked run opened the file with the Background Receive Key alone,
+    /// and this needs the storage key, which waits for the unlock
+    /// (vauchi/private#1093).
+    #[error("This needs the storage key, available after the unlock")]
+    StorageKeyUnavailable,
+
     /// Secure storage cannot be read until the user authenticates or the
     /// device unlocks; the keys are intact (vauchi/private#580).
     #[error("Secure storage is locked")]

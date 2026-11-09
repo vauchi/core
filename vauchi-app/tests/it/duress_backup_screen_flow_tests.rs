@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! The Backup screens under duress export a decoy backup, never the real
-//! identity (ADR-080). Acceptance test for ADR-080 step 3, ignored until the
-//! duress foreground is built from the mask profile (vauchi/private#1117).
+//! identity (ADR-080 step 3, vauchi/private#1117). The export asks for the
+//! session PIN, which under duress is the duress PIN.
 
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
@@ -27,7 +27,6 @@ fn type_into(engine: &mut AppEngine, component_id: &str, value: &str) {
 
 // @scenario: duress_mode :: Cannot access real contacts from duress mode
 #[test]
-#[ignore = "ADR-080 step 3, vauchi/private#1117"]
 fn the_backup_screens_under_duress_export_a_backup_that_is_not_the_real_identity() {
     let mut vauchi = Vauchi::in_memory().expect("install");
     vauchi.create_identity("Real Owner").expect("identity");
@@ -54,7 +53,9 @@ fn the_backup_screens_under_duress_export_a_backup_that_is_not_the_real_identity
     let first = press(&mut engine, "continue");
     type_into(&mut engine, "confirm_password", BACKUP_PASSWORD);
     let second = press(&mut engine, "continue");
-    let backup = [first, second]
+    type_into(&mut engine, "pin", "112233");
+    let third = press(&mut engine, "confirm_pin");
+    let backup = [first, second, third]
         .into_iter()
         .find_map(|result| match result {
             ActionResult::BackupExportComplete { data } => Some(data),

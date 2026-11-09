@@ -494,6 +494,7 @@ mod ratchet_crash_recovery_tests;
 mod ratchet_error_tests;
 mod rate_limit_handling;
 mod receive_checkpoint_tests;
+mod receive_inbox_tests;
 mod receive_key_sealing_tests;
 mod receive_tokens_ahead_tests;
 mod reciprocity_answer_tests;

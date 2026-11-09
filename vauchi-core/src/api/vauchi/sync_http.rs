@@ -311,9 +311,12 @@ impl ProfileEngine {
     }
 
     /// [`Self::periodic_sync_tick`] for a scheduler running while the app is
-    /// in the background: the next deadline is drawn from the background
-    /// schedule whatever the sync answered, because the scheduler wakes at
-    /// it (#603 option 2). A foreground caller keeps the 60 s schedule.
+    /// in the background: after a tick that tried to sync, the next deadline
+    /// is drawn from the background schedule whatever the sync answered
+    /// (#603 option 2). A tick before the deadline keeps it: an OS scheduler
+    /// also wakes the worker early, and a fresh draw on each early wake moves
+    /// the deadline away for good (vauchi/private#1093). A foreground caller
+    /// keeps the 60 s schedule.
     pub fn background_sync_tick(
         &mut self,
         budget: Option<crate::api::BackgroundBudget>,
@@ -321,7 +324,9 @@ impl ProfileEngine {
         let outcome = self.periodic_sync_tick()?;
         if matches!(
             outcome,
-            VauchiSyncOutcome::NoIdentity | VauchiSyncOutcome::NotConnected
+            VauchiSyncOutcome::NoIdentity
+                | VauchiSyncOutcome::NotConnected
+                | VauchiSyncOutcome::TooSoon { .. }
         ) {
             return Ok(outcome);
         }

@@ -1515,6 +1515,11 @@ impl ExchangeSession {
         &self.our_card
     }
 
+    /// The signing public key of the identity this session exchanges as.
+    pub fn our_signing_public_key(&self) -> &[u8; 32] {
+        self.identity.signing_public_key()
+    }
+
     /// Returns our X3DH public key (for generating transport payloads).
     pub fn our_exchange_public_key(&self) -> &[u8; 32] {
         self.our_x3dh.public_key()

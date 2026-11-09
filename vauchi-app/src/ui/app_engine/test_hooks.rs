@@ -22,4 +22,14 @@ impl AppEngine {
             .select_mode_for_testing(mode);
         self.finish_engine_result(result)
     }
+
+    /// The signing key of the identity the active exchange engine's session
+    /// was built with, or `None` when no exchange session is active.
+    pub fn exchange_session_signing_key_for_testing(&mut self) -> Option<[u8; 32]> {
+        self.engine
+            .as_any_mut()
+            .and_then(|engine| engine.downcast_mut::<ExchangeEngine>())
+            .and_then(|engine| engine.session())
+            .map(|session| *session.our_signing_public_key())
+    }
 }

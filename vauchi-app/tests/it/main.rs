@@ -139,6 +139,9 @@ mod exchange_group_filter_preview_tests;
 mod exchange_group_selection_actions_tests;
 mod exchange_last_used_defaults_tests;
 mod exchange_location_capture_tests;
+// Uses the testing-feature hooks (vauchi/private#1117).
+#[cfg(feature = "testing")]
+mod exchange_session_auth_change_tests;
 mod exchange_tab_tests;
 mod no_read_receipt_tests;
 // Uses the testing-feature hooks (vauchi/private#271).

@@ -17,11 +17,13 @@ use vauchi_core::{ContactField, FieldType, Vauchi};
 use zeroize::Zeroizing;
 
 const PASSWORD: &str = "correct-horse-battery-staple";
+/// Version, file id and one salt per payload (spec D4).
+const HEADER_LENGTH: usize = 1 + 16 + 16 + 16;
 
 fn key(salt: &[u8; 16]) -> SymmetricKey {
     let base = derive_key_argon2id(PASSWORD.as_bytes(), salt).unwrap();
     let prk = HKDF::extract(None, base.as_bytes());
-    let expanded = Zeroizing::new(HKDF::expand(&prk, b"vauchi-backup-v6-state", 32).unwrap());
+    let expanded = Zeroizing::new(HKDF::expand(&prk, b"vauchi-backup-v7-payload", 32).unwrap());
     SymmetricKey::try_from_bytes(expanded.as_slice().try_into().unwrap()).unwrap()
 }
 
@@ -48,17 +50,17 @@ fn fixture() -> Value {
         .save_contact_override(bob.id(), &field_id, false)
         .unwrap();
     let data = hex::decode(source.export_full_backup(PASSWORD).unwrap()).unwrap();
-    assert_eq!(data[0], 6);
-    let decrypted = Zeroizing::new(
-        decrypt_with_ad(
-            &key(data[1..17].try_into().unwrap()),
-            &data[17..],
-            &data[..17],
-        )
-        .unwrap(),
+    assert_eq!(data[0], 7);
+    let (header, payloads) = data.split_at(HEADER_LENGTH);
+    let (first, second) = payloads.split_at(payloads.len() / 2);
+    let framed = Zeroizing::new(
+        decrypt_with_ad(&key(header[17..33].try_into().unwrap()), first, header)
+            .or_else(|_| decrypt_with_ad(&key(header[33..49].try_into().unwrap()), second, header))
+            .unwrap(),
     );
+    let length = u32::from_be_bytes(framed[..4].try_into().unwrap()) as usize;
     let mut plaintext = Zeroizing::new(Vec::new());
-    ZlibDecoder::new(&decrypted[..])
+    ZlibDecoder::new(&framed[4..4 + length])
         .read_to_end(&mut plaintext)
         .unwrap();
     serde_json::from_slice(&plaintext).unwrap()
@@ -69,11 +71,19 @@ fn encode(value: &Value) -> String {
     let plaintext = Zeroizing::new(serde_json::to_vec(value).unwrap());
     encoder.write_all(&plaintext).unwrap();
     let compressed = Zeroizing::new(encoder.finish().unwrap());
+    let bucket = (compressed.len() + 4).next_power_of_two().max(4096);
+    let mut framed = Zeroizing::new((compressed.len() as u32).to_be_bytes().to_vec());
+    framed.extend_from_slice(&compressed);
+    framed.resize(bucket, 0);
     let salt = [0x24; 16];
-    let mut header = vec![6];
+    let mut header = vec![7];
+    header.extend([0x11; 16]);
     header.extend(salt);
-    let ciphertext = encrypt_with_ad(&key(&salt), &compressed, &header).unwrap();
-    header.extend(ciphertext);
+    header.extend([0x25; 16]);
+    let real = encrypt_with_ad(&key(&salt), &framed, &header).unwrap();
+    let unopened = encrypt_with_ad(&SymmetricKey::generate(), &vec![0; bucket], &header).unwrap();
+    header.extend(real);
+    header.extend(unopened);
     hex::encode(header)
 }
 
@@ -90,7 +100,7 @@ fn full_backup_validation_rejects_invalid_state_before_mutation() {
     for case in 0..18 {
         let mut malformed = valid.clone();
         match case {
-            0 => malformed["version"] = json!(7),
+            0 => malformed["version"] = json!(6),
             1 => {
                 let item = malformed["contacts"][0].clone();
                 malformed["contacts"].as_array_mut().unwrap().push(item);
@@ -165,7 +175,10 @@ fn full_backup_validation_rejects_invalid_state_before_mutation() {
 #[test]
 fn full_backup_validation_authenticates_header_and_ciphertext() {
     let bytes = hex::decode(encode(&fixture())).unwrap();
-    for index in [0, 1, 16, 17, bytes.len() - 1] {
+    // `encode` seals the real payload first; the second, under a random
+    // key, is never opened, so a restore cannot check it.
+    let last_of_real_payload = HEADER_LENGTH + (bytes.len() - HEADER_LENGTH) / 2 - 1;
+    for index in [0, 1, 16, 17, 33, 48, 49, last_of_real_payload] {
         let mut corrupt = bytes.clone();
         corrupt[index] ^= 1;
         let mut target = Vauchi::in_memory().unwrap();

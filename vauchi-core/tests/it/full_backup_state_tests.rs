@@ -230,7 +230,7 @@ fn full_backup_state_old_reader_rejects_richer_password_backup() {
         .unwrap_err();
     assert!(matches!(
         error,
-        vauchi_core::backup::BackupError::UnsupportedVersion(6)
+        vauchi_core::backup::BackupError::UnsupportedVersion(7)
     ));
 }
 

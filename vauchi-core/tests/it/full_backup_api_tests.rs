@@ -191,8 +191,8 @@ fn full_backup_export_refuses_the_weak_password_the_identity_export_refuses() {
     );
     let strong = v.export_full_backup(BACKUP_PASSWORD).unwrap();
     assert!(
-        strong.starts_with("06"),
-        "a strong password still exports a v6 file"
+        strong.starts_with("07"),
+        "a strong password still exports a v7 file"
     );
 }
 

@@ -23,7 +23,7 @@
 //! If a deployed migration needs reversal, a new forward migration should
 //! undo the changes explicitly.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
@@ -84,6 +84,16 @@ impl MigrationRunner {
         db_path: Option<&Path>,
         now: u64,
     ) -> Result<(), StorageError> {
+        Self::run_with_created_backup(conn, key, migrations, db_path, now).map(|_| ())
+    }
+
+    pub(crate) fn run_with_created_backup(
+        conn: &Connection,
+        key: &SymmetricKey,
+        migrations: &[Migration],
+        db_path: Option<&Path>,
+        now: u64,
+    ) -> Result<Option<PathBuf>, StorageError> {
         // Create the schema_version table if it doesn't exist (outside transaction,
         // since we need to read it before starting the migration transaction).
         conn.execute_batch(
@@ -111,24 +121,32 @@ impl MigrationRunner {
             .collect();
 
         if pending.is_empty() {
-            return Ok(());
+            return Ok(None);
         }
 
         // Create pre-migration backup for file-based databases (#17).
         // Uses VACUUM INTO for a consistent snapshot. Failure is logged but
         // does not block migration — the transaction provides rollback safety.
+        let mut created_backup = None;
         if let Some(path) = db_path {
             let backup_path =
                 path.with_extension(format!("pre-migration-v{}.bak", current_version));
-            if let Err(error) = conn.execute(
+            // #1178: VACUUM can reuse an empty file; that does not establish ownership.
+            let destination_was_absent = matches!(
+                std::fs::symlink_metadata(&backup_path),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound
+            );
+            match conn.execute(
                 "VACUUM INTO ?1",
                 rusqlite::params![backup_path.to_string_lossy().as_ref()],
             ) {
-                tracing::warn!(
+                Ok(_) if destination_was_absent => created_backup = Some(backup_path),
+                Ok(_) => {}
+                Err(error) => tracing::warn!(
                     target: "vauchi.storage.migration",
                     sqlite_error_code = ?error.sqlite_error().map(|error| error.extended_code),
                     "pre-migration backup unavailable; continuing transactionally"
-                );
+                ),
             }
         }
 
@@ -181,7 +199,7 @@ impl MigrationRunner {
         }
 
         conn.execute_batch("COMMIT;")?;
-        Ok(())
+        Ok(created_backup)
     }
 
     /// Returns the current schema version, or 0 if no migrations have been applied.

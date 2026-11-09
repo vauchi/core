@@ -51,6 +51,7 @@ mod activity_log;
 
 pub mod local_keys;
 pub mod migration;
+pub(crate) mod migration_backup;
 pub mod secure;
 mod stores;
 

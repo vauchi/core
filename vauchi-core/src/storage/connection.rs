@@ -66,10 +66,6 @@ impl Storage {
         // be cleaned on the next startup; no data integrity impact
         #[allow(clippy::let_underscore_must_use)]
         let _ = storage.deliveries().run_startup_maintenance();
-        // F4 audit fix: remove pre-migration .bak files after successful migration
-        if let Some(ref db) = storage.db_path {
-            Self::cleanup_migration_backups(db);
-        }
         Ok(storage)
     }
 
@@ -145,7 +141,7 @@ impl Storage {
     /// applying pending migrations (#17). Failure does not prevent migration.
     fn run_migrations(&self) -> Result<(), StorageError> {
         let migrations = migration::all_migrations();
-        migration::MigrationRunner::run(
+        let created_backup = migration::MigrationRunner::run_with_created_backup(
             &self.conn,
             &self.encryption_key,
             migrations,
@@ -157,6 +153,14 @@ impl Storage {
         // An app password set before mask seeds existed (ADR-080).
         if self.identity().load_password_config()?.is_some() {
             self.mask_seed().ensure()?;
+        }
+        if let Some(backup) = created_backup {
+            std::fs::remove_file(backup).map_err(|error| {
+                StorageError::InvalidData(format!(
+                    "could not remove the newly created recovery snapshot: {}",
+                    error.kind()
+                ))
+            })?;
         }
         Ok(())
     }
@@ -255,28 +259,6 @@ impl Storage {
                     )
                     .map_err(StorageError::from)?;
                 Err(error)
-            }
-        }
-    }
-
-    /// Removes `.pre-migration-v*.bak` files left by migration backups (F4 audit fix).
-    ///
-    /// Called on startup after migrations succeed. These backups are created by
-    /// `VACUUM INTO` before migration runs; once migration commits, the backup
-    /// is no longer needed and should not persist on disk.
-    fn cleanup_migration_backups(db_path: &std::path::Path) {
-        if let Some(dir) = db_path.parent()
-            && let Ok(entries) = std::fs::read_dir(dir)
-        {
-            for entry in entries.flatten() {
-                let name = entry.file_name();
-                let name_str = name.to_string_lossy();
-                if name_str.contains(".pre-migration-v") && name_str.ends_with(".bak") {
-                    // best-effort: post-migration .bak cleanup; failure
-                    // leaves a harmless backup file the user can remove
-                    #[allow(clippy::let_underscore_must_use)]
-                    let _ = std::fs::remove_file(entry.path());
-                }
             }
         }
     }

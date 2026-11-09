@@ -19,32 +19,23 @@ fn remove_error(error: std::io::Error) -> StorageError {
 }
 
 fn remove_file_if_present(path: &Path) -> Result<(), StorageError> {
-    if path.exists() {
-        std::fs::remove_file(path).map_err(remove_error)?;
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(remove_error(error)),
     }
-    Ok(())
 }
 
-/// The database's WAL and shared-memory files and pre-migration backups.
+/// The database's WAL and shared-memory files.
 fn companion_files(storage_path: &Path) -> Vec<PathBuf> {
-    let mut files = Vec::new();
-    let Some(name) = storage_path.file_name().and_then(|n| n.to_str()) else {
-        return files;
-    };
-    let Some(dir) = storage_path.parent() else {
-        return files;
-    };
-    files.push(dir.join(format!("{name}-wal")));
-    files.push(dir.join(format!("{name}-shm")));
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        let backup_prefix = format!("{name}.pre-migration-");
-        files.extend(entries.flatten().map(|entry| entry.path()).filter(|path| {
-            path.file_name()
-                .and_then(|n| n.to_str())
-                .is_some_and(|n| n.starts_with(&backup_prefix))
-        }));
-    }
-    files
+    ["-wal", "-shm"]
+        .into_iter()
+        .map(|suffix| {
+            let mut path = storage_path.as_os_str().to_os_string();
+            path.push(suffix);
+            PathBuf::from(path)
+        })
+        .collect()
 }
 
 /// Deletes the database, the lost identity's files and every key that
@@ -52,10 +43,13 @@ fn companion_files(storage_path: &Path) -> Vec<PathBuf> {
 ///
 /// Companion files go first: if one cannot be removed, the database stays,
 /// so a fresh database never starts next to an old WAL.
+/// Ambiguous legacy migration snapshots prevent reset before any data or keys
+/// are removed; their filename alone cannot establish database ownership.
 pub fn delete_unreadable_data(
     storage_path: &Path,
     secure: &dyn SecureStorage,
 ) -> Result<(), StorageError> {
+    crate::storage::migration_backup::ensure_no_ambiguous_backups(storage_path)?;
     for path in companion_files(storage_path) {
         remove_file_if_present(&path)?;
     }

@@ -297,7 +297,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 115] = [
+const MIGRATIONS: [Migration; 116] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -873,7 +873,28 @@ const MIGRATIONS: [Migration; 115] = [
         name: "receive_key_sealing",
         action: MigrationAction::Callback(migrate_v115_receive_key_sealing),
     },
+    Migration {
+        version: 116,
+        name: "receive_inbox",
+        action: MigrationAction::Sql(MIGRATION_V116_RECEIVE_INBOX),
+    },
 ];
+
+/// v116 (ADR-033 addendum 2026-11-09, vauchi/private#1093 slice 6): the
+/// inbox keypair, its private key under the storage key, and the inbox of
+/// updates a locked run sealed to its public key. Who sent an item is
+/// sealed inside it, so the table shows only how many arrived.
+const MIGRATION_V116_RECEIVE_INBOX: &str = "
+    CREATE TABLE IF NOT EXISTS inbox_key (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        public_key BLOB NOT NULL,
+        private_key_encrypted BLOB NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS receive_inbox (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sealed_update BLOB NOT NULL
+    );
+";
 
 /// v115 (ADR-033 amendment 2026-11-07, vauchi/private#1093): a ratchet row
 /// records whether the Background Receive Key sealed it, and the receive

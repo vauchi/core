@@ -175,6 +175,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("duress_content", "content_encrypted"),
     // V51 per-contact exchange location (ADR-051)
     ("contacts", "exchange_location_encrypted"),
+    // V116 the inbox private key (vauchi/private#1093)
+    ("inbox_key", "private_key_encrypted"),
 ];
 
 /// Encrypted columns intentionally skipped by rekey, with documented reason.
@@ -352,6 +354,9 @@ impl Storage {
         self.rekey_nullable_column(old_key, new_key, "recovery_passphrase", "key_encrypted")?;
         report("recovery_passphrase");
 
+        self.rekey_nullable_column(old_key, new_key, "inbox_key", "private_key_encrypted")?;
+        report("inbox_key");
+
         self.rekey_nullable_column(old_key, new_key, "recovery_own_proof", "proof_encrypted")?;
         report("recovery_own_proof");
 
@@ -510,7 +515,7 @@ impl Storage {
         let old_key = &self.encryption_key;
         let old_mask_key = self.mask_key().clone();
         let new_mask_key = super::duress_content::mask_key(&new_key);
-        const TOTAL_TABLES: u32 = 42;
+        const TOTAL_TABLES: u32 = 43;
         let mut completed: u32 = 0;
 
         let report = |completed: &mut u32, table: &str| {

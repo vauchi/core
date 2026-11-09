@@ -75,6 +75,7 @@ impl Storage {
             "INSERT OR IGNORE INTO receive_key_check (id, sealed_label) VALUES (1, ?1)",
             params![sealed_label],
         )?;
+        super::stores::receive_inbox::ensure_inbox_key(&self.conn, &self.encryption_key)?;
 
         let rows: Vec<(String, Vec<u8>, Vec<u8>)> = self
             .conn

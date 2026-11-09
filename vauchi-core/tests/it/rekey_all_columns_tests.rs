@@ -891,6 +891,8 @@ const COVERED_ELSEWHERE: &[(&str, &str)] = &[
     ("recovery_mode_key", "seed_encrypted"),
     ("recovery_hand_backs", "delivery_encrypted"),
     ("recovery_backup_pieces", "piece_encrypted"),
+    // the_inbox_survives_a_storage_rekey in receive_inbox_tests.rs.
+    ("inbox_key", "private_key_encrypted"),
     // the_vcard_uid_lookup_survives_a_rekey in
     // identifying_columns_at_rest_tests.rs (value and lookup hash).
     ("contacts", "original_uid_encrypted"),

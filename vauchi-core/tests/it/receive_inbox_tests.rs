@@ -88,6 +88,23 @@ fn the_inbox_reopens_with_the_same_keys() {
     assert_eq!(readable(&reopened), vec![UPDATE.to_vec()]);
 }
 
+// @internal
+#[test]
+fn the_inbox_survives_a_storage_rekey() {
+    let dir = tempfile::tempdir().unwrap();
+    let brk = SymmetricKey::generate();
+    let new_sek = SymmetricKey::generate();
+    {
+        let mut storage = with_receive_key(&dir, &SymmetricKey::generate(), &brk);
+        storage.receive_inbox().put(UPDATE).unwrap();
+        storage.rekey(new_sek.clone()).unwrap();
+    }
+
+    let reopened = with_receive_key(&dir, &new_sek, &brk);
+
+    assert_eq!(readable(&reopened), vec![UPDATE.to_vec()]);
+}
+
 // @claim: S12
 // @internal
 #[test]

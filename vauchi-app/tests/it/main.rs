@@ -53,6 +53,7 @@ mod app_password_typing_tests;
 mod avatar_editor_tests;
 mod avatar_editor_wiring_tests;
 mod avatar_i18n_tests;
+mod backup_biometric_opt_in_tests;
 mod backup_decoy_password_step_tests;
 mod backup_export_session_pin_tests;
 mod backup_reminder_toast_tests;

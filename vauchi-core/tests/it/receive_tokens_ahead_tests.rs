@@ -2,10 +2,11 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! An unlocked sync stores, under the Background Receive Key, the next 14
-//! days of receive registrations, so a locked phone can fetch without a
+//! An unlocked sync stores, under the Background Receive Key, today's and
+//! tomorrow's receive registrations, so a locked phone can fetch without a
 //! shared key or the master seed (owner 2026-11-08, vauchi/private#1093
-//! slice 5). A stored day is the whole set the day registers, padding
+//! slice 5). A locked phone receives for one day after the last unlocked
+//! sync (ADR-033 addendum 2026-11-09, point 3). A stored day is the whole set the day registers, padding
 //! included, because the padding is fixed per day and a locked run that
 //! registered less would mark itself to the relay (private#946).
 //!
@@ -30,7 +31,7 @@ use vauchi_core::sleeper::FakeSleeper;
 use vauchi_core::storage::{MemoryKeyStorage, SecureStorage, Storage, StorageError};
 use vauchi_protocol::ohttp_key::window_of;
 
-const DAYS_AHEAD: u64 = 14;
+const DAYS_AHEAD: u64 = 2;
 
 struct Relays {
     outer: MockRelay,
@@ -163,7 +164,7 @@ fn a_sync_stores_today_exactly_the_batches_it_registered() {
 
 // @internal
 #[test]
-fn the_next_fourteen_days_are_stored_and_no_more() {
+fn today_and_tomorrow_are_stored_and_no_more() {
     let relays = relays();
     let dir = tempfile::tempdir().unwrap();
     let mut alice = client(
@@ -185,6 +186,52 @@ fn the_next_fourteen_days_are_stored_and_no_more() {
             .unwrap()
             .is_none()
     );
+}
+
+// @internal
+#[test]
+fn a_locked_phone_receives_until_a_day_after_the_unlocked_sync() {
+    let relays = relays();
+    let dir = tempfile::tempdir().unwrap();
+    let mut alice = client(
+        &relays,
+        &dir,
+        Some(Arc::new(MemoryKeyStorage::new())),
+        "Alice",
+    );
+
+    sync(&mut alice);
+
+    let synced_at = relays.clock.unix_seconds();
+    for day in [today(&relays), today(&relays) + 1] {
+        let stored = alice.receive_registration_ahead(day).unwrap().unwrap();
+        assert_eq!(stored.receive_until(), synced_at + DAY);
+    }
+}
+
+// @internal
+#[test]
+fn a_later_sync_the_same_day_moves_the_end_forward() {
+    let relays = relays();
+    let dir = tempfile::tempdir().unwrap();
+    let mut alice = client(
+        &relays,
+        &dir,
+        Some(Arc::new(MemoryKeyStorage::new())),
+        "Alice",
+    );
+    sync(&mut alice);
+    let first_day = today(&relays);
+
+    relays.clock.advance(Duration::from_secs(60));
+    sync(&mut alice);
+
+    assert_eq!(today(&relays), first_day, "the second sync is the same day");
+    let stored = alice
+        .receive_registration_ahead(first_day)
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.receive_until(), relays.clock.unix_seconds() + DAY);
 }
 
 // @internal

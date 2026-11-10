@@ -18,7 +18,7 @@ fn stored_device_key(wb: &Vauchi) -> [u8; 32] {
         .as_bytes()
 }
 
-// @scenario: device_sync :: Registry broadcast on device changes
+// @scenario: device_management :: Device-specific keys
 // @internal
 #[test]
 fn this_device_signs_its_own_registry_broadcast() {
@@ -40,7 +40,7 @@ fn this_device_signs_its_own_registry_broadcast() {
     assert_eq!(signer.signing_public_key, Some(stored_device_key(&wb)));
 }
 
-// @scenario: device_sync :: Registry broadcast on device changes
+// @scenario: device_management :: Device-specific keys
 // @internal
 #[test]
 fn a_saved_registry_without_this_devices_key_gains_it_once() {
@@ -80,7 +80,7 @@ fn a_saved_registry_without_this_devices_key_gains_it_once() {
     );
 }
 
-// @scenario: device_sync :: Registry broadcast on device changes
+// @scenario: device_management :: Device-specific keys
 // @internal
 #[test]
 fn a_saved_registry_naming_another_key_for_this_device_is_not_signed() {

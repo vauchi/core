@@ -12,7 +12,7 @@ use vauchi_core::api::ReceiveOutcome;
 use vauchi_core::crypto::SigningKeyPair;
 use vauchi_core::identity::RegistryBroadcast;
 
-// @scenario: multi_device_sync :: A received push persists the registry and asks for an ack
+// @scenario: device_management :: Device-specific keys
 // @internal
 #[test]
 fn a_device_signed_push_is_accepted_and_its_key_pinned() {
@@ -29,7 +29,7 @@ fn a_device_signed_push_is_accepted_and_its_key_pinned() {
     );
 }
 
-// @scenario: multi_device_sync :: A received push persists the registry and asks for an ack
+// @scenario: device_management :: Device-specific keys
 // @internal
 #[test]
 fn a_broadcast_signed_by_the_identity_alone_is_refused() {
@@ -50,7 +50,7 @@ fn a_broadcast_signed_by_the_identity_alone_is_refused() {
     );
 }
 
-// @scenario: multi_device_sync :: A received push persists the registry and asks for an ack
+// @scenario: device_management :: Device-specific keys
 // @internal
 #[test]
 fn a_linked_device_cannot_sign_a_broadcast_as_another_device() {
@@ -79,7 +79,7 @@ fn a_linked_device_cannot_sign_a_broadcast_as_another_device() {
     );
 }
 
-// @scenario: multi_device_sync :: A received push persists the registry and asks for an ack
+// @scenario: device_management :: Device-specific keys
 // @internal
 #[test]
 fn a_signer_that_is_not_an_active_device_is_refused() {
@@ -104,7 +104,7 @@ fn a_signer_that_is_not_an_active_device_is_refused() {
     );
 }
 
-// @scenario: multi_device_sync :: A received push persists the registry and asks for an ack
+// @scenario: device_management :: Device-specific keys
 // @internal
 #[test]
 fn a_known_devices_key_cannot_change_even_with_the_identity_key() {
@@ -143,7 +143,7 @@ fn a_known_devices_key_cannot_change_even_with_the_identity_key() {
     );
 }
 
-// @scenario: multi_device_sync :: A received push persists the registry and asks for an ack
+// @scenario: device_management :: Lost device revocation
 // @internal
 #[test]
 fn a_removed_device_cannot_sign_and_its_pin_is_kept() {

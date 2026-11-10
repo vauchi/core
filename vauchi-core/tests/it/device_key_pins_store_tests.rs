@@ -33,7 +33,7 @@ fn pins_of(pairs: &[([u8; 32], [u8; 32])]) -> PinnedDeviceKeys {
     PinnedDeviceKeys::from_pairs(pairs.iter().copied())
 }
 
-// @scenario: device_sync :: Contact device registry persistence
+// @scenario: device_management :: Device-specific keys
 // @internal
 #[test]
 fn pins_round_trip_per_contact() {
@@ -64,7 +64,7 @@ fn pins_round_trip_per_contact() {
     );
 }
 
-// @scenario: device_sync :: Contact device registry persistence
+// @scenario: device_management :: Device-specific keys
 // @internal
 #[test]
 fn a_later_save_replaces_the_pins_and_the_row_is_sealed() {
@@ -98,7 +98,7 @@ fn a_later_save_replaces_the_pins_and_the_row_is_sealed() {
     );
 }
 
-// @scenario: device_sync :: Contact device registry persistence
+// @scenario: device_management :: Device-specific keys
 // @internal
 #[test]
 fn pins_leave_with_the_contact() {
@@ -116,7 +116,7 @@ fn pins_leave_with_the_contact() {
     );
 }
 
-// @scenario: device_sync :: Contact device registry persistence
+// @scenario: device_management :: Device-specific keys
 // @internal
 #[test]
 fn pins_for_an_unknown_contact_are_refused() {

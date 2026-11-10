@@ -70,7 +70,7 @@ fn refused_as_not_yet_known(result: Result<ReceiveOutcome, CardUpdateError>) {
     }
 }
 
-// @scenario: onboarding :: Exchange success celebration
+// @scenario: sync_updates :: Receive contact card update
 // @internal
 #[test]
 fn a_delta_the_sending_device_signed_is_applied() {
@@ -99,7 +99,7 @@ fn a_delta_the_sending_device_signed_is_applied() {
     assert_eq!(bobs_name_at_alice(&p), "Robert");
 }
 
-// @scenario: onboarding :: Exchange success celebration
+// @scenario: device_management :: Device-specific keys
 // @internal
 #[test]
 fn a_linked_device_cannot_forge_a_card_delta_for_another_device() {
@@ -130,7 +130,7 @@ fn a_linked_device_cannot_forge_a_card_delta_for_another_device() {
     );
 }
 
-// @scenario: onboarding :: Exchange success celebration
+// @scenario: device_management :: Device-specific keys
 // @internal
 #[test]
 fn a_delta_with_no_device_signature_is_refused() {
@@ -146,7 +146,7 @@ fn a_delta_with_no_device_signature_is_refused() {
 /// A signer the contact has never seen is the one refusal a later
 /// registry push can resolve, so it is reported apart from a bad
 /// signature.
-// @scenario: onboarding :: Exchange success celebration
+// @scenario: sync_updates :: Queued updates delivered when contact comes online
 // @internal
 #[test]
 fn a_delta_from_a_device_the_contact_never_pinned_waits_for_its_registry() {
@@ -163,7 +163,7 @@ fn a_delta_from_a_device_the_contact_never_pinned_waits_for_its_registry() {
 /// The same sealed blob, refused before the sender's registry named its
 /// device, applies once the registry arrives: the refusal consumed no
 /// ratchet state and the relay kept the blob.
-// @scenario: onboarding :: Exchange success celebration
+// @scenario: sync_updates :: Queued updates delivered when contact comes online
 // @internal
 #[test]
 fn a_refused_delta_from_a_new_device_applies_once_its_registry_arrives() {
@@ -200,7 +200,7 @@ fn a_refused_delta_from_a_new_device_applies_once_its_registry_arrives() {
     assert_eq!(bobs_name_at_alice(&p), "Robert");
 }
 
-// @scenario: onboarding :: Exchange success celebration
+// @scenario: device_management :: Lost device revocation
 // @internal
 #[test]
 fn a_delta_from_a_removed_device_is_refused() {
@@ -229,7 +229,7 @@ fn a_delta_from_a_removed_device_is_refused() {
     assert_eq!(bobs_name_at_alice(&p), "Bob");
 }
 
-// @scenario: onboarding :: Exchange success celebration
+// @scenario: device_management :: Device-specific keys
 // @internal
 #[test]
 fn a_device_signed_delta_round_trips_and_any_flipped_byte_fails() {

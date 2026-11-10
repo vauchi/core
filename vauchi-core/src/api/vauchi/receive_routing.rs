@@ -500,7 +500,7 @@ mod tests {
 
     /// A refusal the next receive can still resolve keeps the blob on the
     /// relay; a terminal one lets it go (SC-62, vauchi/private#970).
-    // @scenario: receive_phase :: token map resolves contact mailbox tokens
+    // @scenario: sync_updates :: Relay stores updates for offline contacts
     // @internal
     #[test]
     fn only_resolvable_refusals_keep_the_blob_on_the_relay() {

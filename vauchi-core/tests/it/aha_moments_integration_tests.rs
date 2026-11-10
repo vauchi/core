@@ -574,3 +574,124 @@ fn adding_a_first_contact_emits_the_aha_moment_once() {
         "the moment must persist to core's encrypted ux_state, not a frontend file"
     );
 }
+
+fn captured_events(wb: &Vauchi) -> std::sync::Arc<std::sync::Mutex<Vec<VauchiEvent>>> {
+    let events = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let sink = events.clone();
+    wb.add_event_handler(std::sync::Arc::new(move |event: VauchiEvent| {
+        sink.lock().unwrap().push(event);
+    }));
+    events
+}
+
+fn first_contact_moments(events: &std::sync::Mutex<Vec<VauchiEvent>>) -> Vec<AhaMoment> {
+    events
+        .lock()
+        .unwrap()
+        .iter()
+        .filter_map(|e| match e {
+            VauchiEvent::AhaMomentTriggered { moment }
+                if moment.moment_type == AhaMomentType::FirstContactAdded =>
+            {
+                Some(moment.clone())
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+fn exchanged_with(
+    peer: &vauchi_core::Identity,
+    name: &str,
+    timestamp: u64,
+) -> (Contact, vauchi_core::crypto::ratchet::DoubleRatchetState) {
+    let shared = SymmetricKey::generate();
+    let contact = Contact::from_exchange(
+        *peer.signing_public_key(),
+        ContactCard::new(name),
+        shared.clone(),
+        timestamp,
+    );
+    let ratchet = vauchi_core::crypto::ratchet::DoubleRatchetState::initialize_initiator(
+        &shared,
+        *vauchi_core::exchange::X3DHKeyPair::generate().public_key(),
+    )
+    .unwrap();
+    (contact, ratchet)
+}
+
+fn exchanged(
+    name: &str,
+    timestamp: u64,
+) -> (Contact, vauchi_core::crypto::ratchet::DoubleRatchetState) {
+    exchanged_with(&vauchi_core::Identity::create(name, 0), name, timestamp)
+}
+
+/// Test: every transport persists through `save_exchanged_contact`, so the
+/// first-contact milestone must fire there, not only in `add_contact`
+/// (vauchi/private#276, #507).
+// @scenario: onboarding :: Exchange success celebration
+// @internal
+#[test]
+fn a_persisted_exchange_emits_the_first_contact_moment_once() {
+    let mut wb = Vauchi::in_memory().unwrap();
+    wb.create_identity("Owner").unwrap();
+    let events = captured_events(&wb);
+
+    let (bob, bob_ratchet) = exchanged("Bob", 1);
+    wb.save_exchanged_contact(&bob, &bob_ratchet, true).unwrap();
+    let (carol, carol_ratchet) = exchanged("Carol", 2);
+    wb.save_exchanged_contact(&carol, &carol_ratchet, false)
+        .unwrap();
+
+    let moments = first_contact_moments(&events);
+    assert_eq!(
+        moments.len(),
+        1,
+        "the first persisted exchange fires the moment once, the second never; got {moments:?}"
+    );
+    assert_eq!(
+        moments[0].context.as_deref(),
+        Some("Bob"),
+        "the moment names the contact the exchange persisted"
+    );
+    assert!(
+        wb.has_seen_aha_moment(AhaMomentType::FirstContactAdded)
+            .unwrap(),
+        "the exchange seam writes the same encrypted ledger add_contact does"
+    );
+}
+
+/// Test: a persist the seam rejects fires no milestone.
+// @scenario: contact_exchange :: Blocked user attempts exchange
+// @internal
+#[test]
+fn a_rejected_exchange_persist_emits_no_first_contact_moment() {
+    let mut wb = Vauchi::in_memory().unwrap();
+    wb.create_identity("Owner").unwrap();
+    let eve = vauchi_core::Identity::create("Eve", 0);
+    let (first, first_ratchet) = exchanged_with(&eve, "Eve", 1);
+    wb.save_exchanged_contact(&first, &first_ratchet, true)
+        .unwrap();
+    wb.block_contact(first.id()).unwrap();
+    wb.reset_aha_moments().unwrap();
+    let events = captured_events(&wb);
+
+    let (again, again_ratchet) = exchanged_with(&eve, "Eve Again", 2);
+    let result = wb.save_exchanged_contact(&again, &again_ratchet, true);
+
+    assert!(
+        matches!(result, Err(vauchi_core::VauchiError::ContactBlocked(_))),
+        "the blocked re-exchange is rejected, got {result:?}"
+    );
+    assert_eq!(
+        first_contact_moments(&events).len(),
+        0,
+        "a rejected persist celebrates nothing"
+    );
+    assert!(
+        !wb.has_seen_aha_moment(AhaMomentType::FirstContactAdded)
+            .unwrap(),
+        "the ledger stays untouched by a rejected persist"
+    );
+}

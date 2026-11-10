@@ -289,7 +289,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 117] = [
+const MIGRATIONS: [Migration; 118] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -875,7 +875,34 @@ const MIGRATIONS: [Migration; 117] = [
         name: "locked_kept_blobs",
         action: MigrationAction::Sql(MIGRATION_V117_LOCKED_KEPT_BLOBS),
     },
+    Migration {
+        version: 118,
+        name: "ratchet_row_version",
+        action: MigrationAction::Callback(migrate_v118_ratchet_row_version),
+    },
 ];
+
+/// v118 (vauchi/private#1093): a version on each ratchet row, so a save from
+/// a connection that read the session before another saved it is refused
+/// instead of overwriting the newer session. Skipped where the column is
+/// there already: the upgrades in `duress_at_rest_tests` meet such a table.
+fn migrate_v118_ratchet_row_version(
+    conn: &Connection,
+    _key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    let present: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('contact_ratchets') WHERE name = 'row_version'",
+        [],
+        |row| row.get(0),
+    )?;
+    if present == 0 {
+        conn.execute(
+            "ALTER TABLE contact_ratchets ADD COLUMN row_version INTEGER NOT NULL DEFAULT 0",
+            [],
+        )?;
+    }
+    Ok(())
+}
 
 /// v117 (vauchi/private#1093): the blobs a locked run kept, by a tag keyed
 /// under the Background Receive Key, so a blob whose ack was lost is

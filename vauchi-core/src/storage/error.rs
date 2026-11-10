@@ -88,6 +88,12 @@ pub enum StorageError {
     #[error("The storage key does not open this database")]
     WrongKey,
 
+    /// The ratchet session was saved by another connection, such as a locked
+    /// run, since this one read it; read it again before saving
+    /// (vauchi/private#1093).
+    #[error("The session changed since it was read")]
+    RatchetMoved,
+
     /// The row is sealed under the Background Receive Key, which this
     /// storage was not given (vauchi/private#1093).
     #[error("Receive state needs the background receive key")]

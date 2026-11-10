@@ -32,6 +32,8 @@ pub(super) struct ConcealedDuress {
     /// by the real engine when it next runs (ADR-080 point 5, amended
     /// 2026-11-09): random bytes, each the length of an edit's item.
     pub(super) owed_journal_cover: Vec<crate::sync::SyncItem>,
+    /// The branch a duress session set duress up under, while `enabled`.
+    pub(super) unlock: crate::emergency::DuressUnlock,
 }
 
 pub(super) type ConcealedDuressCell = Mutex<ConcealedDuress>;

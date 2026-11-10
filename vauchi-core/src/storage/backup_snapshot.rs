@@ -85,9 +85,11 @@ impl DuressSection {
             .identity()
             .save_app_password(&password.hash, &password.salt)?;
         if let Some(pin) = self.duress_pin().map_err(invalid)? {
-            storage
-                .identity()
-                .save_duress_password(&pin.credential.hash, &pin.credential.salt)?;
+            storage.identity().save_duress_password(
+                &pin.credential.hash,
+                &pin.credential.salt,
+                crate::emergency::DuressUnlock::Biometric,
+            )?;
             if pin.copy_in_use {
                 storage.identity().mark_duress_copy_in_use()?;
             }

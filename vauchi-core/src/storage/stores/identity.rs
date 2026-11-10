@@ -127,11 +127,31 @@ impl IdentityStore<'_> {
         &self,
         hash: &[u8; 32],
         salt: &[u8; 16],
+        unlock: crate::emergency::DuressUnlock,
     ) -> Result<(), StorageError> {
         let copy_in_use = self
             .load_duress_seal()?
             .map_or(0, |seal| seal.flags & DURESS_COPY_IN_USE);
-        self.write_duress_seal(DURESS_PIN_SET | copy_in_use, hash, salt)
+        let branch = match unlock {
+            crate::emergency::DuressUnlock::Biometric => 0,
+            crate::emergency::DuressUnlock::Passwords => DURESS_PASSWORD_BRANCH,
+        };
+        self.write_duress_seal(DURESS_PIN_SET | copy_in_use | branch, hash, salt)
+    }
+    /// The branch the duress credential was set up under, or `None` without
+    /// one. A seal from before the branch existed reads as biometric: every
+    /// PIN set then was six digits.
+    pub fn duress_unlock(&self) -> Result<Option<crate::emergency::DuressUnlock>, StorageError> {
+        Ok(self
+            .load_duress_seal()?
+            .filter(|seal| seal.flags & DURESS_PIN_SET != 0)
+            .map(|seal| {
+                if seal.flags & DURESS_PASSWORD_BRANCH != 0 {
+                    crate::emergency::DuressUnlock::Passwords
+                } else {
+                    crate::emergency::DuressUnlock::Biometric
+                }
+            }))
     }
     /// Whether a duress session has taken the own-card copy over since the
     /// PIN was set; until then the copy starts again from the real card.
@@ -271,6 +291,9 @@ impl IdentityStore<'_> {
 pub(crate) const DURESS_PIN_SET: u8 = 1;
 /// Seal flag: a duress session has taken the own-card copy over.
 pub(crate) const DURESS_COPY_IN_USE: u8 = 2;
+/// Seal flag: the duress credential was set up under the password branch
+/// (ADR-032, amended 2026-11-10); without it, the biometric branch.
+const DURESS_PASSWORD_BRANCH: u8 = 4;
 
 /// The duress hash with its flags, as sealed in `duress_hash_encrypted`.
 struct DuressSeal {

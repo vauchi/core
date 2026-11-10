@@ -106,11 +106,12 @@ pub enum BiometricUnlockOutcome {
 /// (ADR-032, amended 2026-11-10). A 6-digit PIN alone is guessed too
 /// quickly, so a duress credential needs biometric unlock in front of it,
 /// or a real password for both credentials.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub enum DuressUnlock {
     /// The biometric check comes first; then a 6-digit PIN picks the
     /// profile.
+    #[default]
     Biometric,
     /// The app password and the duress credential both pass the backup
     /// password's strength rule.

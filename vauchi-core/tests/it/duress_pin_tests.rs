@@ -325,6 +325,7 @@ fn test_save_load_duress_password_roundtrip() {
             password_config
                 .duress_salt()
                 .expect("duress salt should exist"),
+            vauchi_core::api::DuressUnlock::Biometric,
         )
         .expect("save duress should succeed");
 
@@ -369,6 +370,7 @@ fn test_disable_duress_clears_data() {
         .save_duress_password(
             password_config.duress_hash().expect("duress hash"),
             password_config.duress_salt().expect("duress salt"),
+            vauchi_core::api::DuressUnlock::Biometric,
         )
         .expect("save duress should succeed");
 

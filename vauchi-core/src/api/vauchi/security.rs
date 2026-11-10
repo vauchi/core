@@ -9,8 +9,9 @@ use std::time::{Duration, Instant};
 use super::super::app_password::{AppPasswordConfig, AuthResult};
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventCallback, VauchiEvent};
+use super::duress_policy::require_real_password;
 use super::{AuthMode, BiometricUnlockOutcome, ProfileEngine};
-use crate::emergency::DURESS_PIN_LENGTH;
+use crate::emergency::{DURESS_PIN_LENGTH, DuressUnlock, WeakCredential};
 use crate::sleeper::Sleeper;
 use crate::storage::ActivityLogRow;
 
@@ -282,6 +283,9 @@ impl ProfileEngine {
                 return Err(VauchiError::InvalidState("invalid password".into()));
             }
         }
+        if self.storage.identity().duress_unlock()? == Some(DuressUnlock::Passwords) {
+            require_real_password(new_password, WeakCredential::AppPassword)?;
+        }
 
         config.change_password(new_password)?;
 
@@ -303,8 +307,20 @@ impl ProfileEngine {
         duress_password: &str,
     ) -> VauchiResult<()> {
         validate_duress_pin(duress_password)?;
+        self.save_duress_credential(duress_password, DuressUnlock::Biometric)
+    }
+
+    /// Hashes and stores the duress credential under `unlock`'s branch;
+    /// under duress only the concealed view changes (#462).
+    pub(super) fn save_duress_credential(
+        &mut self,
+        duress_password: &str,
+        unlock: DuressUnlock,
+    ) -> VauchiResult<()> {
         if self.in_duress_mode() {
-            self.concealed_duress().enabled = true;
+            let mut concealed = self.concealed_duress();
+            concealed.enabled = true;
+            concealed.unlock = unlock;
             return Ok(());
         }
 
@@ -323,7 +339,7 @@ impl ProfileEngine {
 
         self.storage
             .identity()
-            .save_duress_password(duress_hash, duress_salt)?;
+            .save_duress_password(duress_hash, duress_salt, unlock)?;
 
         Ok(())
     }

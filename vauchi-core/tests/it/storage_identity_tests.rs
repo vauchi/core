@@ -153,7 +153,11 @@ fn test_save_duress_password() {
     let duress_salt = [0xCDu8; 16];
     storage
         .identity()
-        .save_duress_password(&duress_hash, &duress_salt)
+        .save_duress_password(
+            &duress_hash,
+            &duress_salt,
+            vauchi_core::api::DuressUnlock::Biometric,
+        )
         .unwrap();
 
     let config = storage
@@ -182,7 +186,11 @@ fn test_disable_duress() {
         .unwrap();
     storage
         .identity()
-        .save_duress_password(&[0x99u8; 32], &[0xCDu8; 16])
+        .save_duress_password(
+            &[0x99u8; 32],
+            &[0xCDu8; 16],
+            vauchi_core::api::DuressUnlock::Biometric,
+        )
         .unwrap();
 
     let config = storage.identity().load_password_config().unwrap().unwrap();

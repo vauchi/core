@@ -135,6 +135,19 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
     )
     .unwrap();
 
+    // ── contact_device_key_pins (keyed by contact) ─────────────
+    conn.execute(
+        "INSERT INTO contact_device_key_pins \
+         (contact_id, pins_encrypted, updated_at) \
+         VALUES (?1, ?2, ?3)",
+        params![
+            CONTACT_ID,
+            enc("contact_device_key_pins", "pins_encrypted"),
+            now,
+        ],
+    )
+    .unwrap();
+
     // ── safety_alert_facts (keyed by contact + nonce) ──────────
     conn.execute(
         "INSERT INTO safety_alert_facts \
@@ -637,6 +650,14 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
     check_one(
         "contact_device_registries",
         "broadcast_encrypted",
+        "contact_id = ?1",
+        by_contact,
+    );
+
+    // ── contact_device_key_pins ─────────────────────────────
+    check_one(
+        "contact_device_key_pins",
+        "pins_encrypted",
         "contact_id = ?1",
         by_contact,
     );

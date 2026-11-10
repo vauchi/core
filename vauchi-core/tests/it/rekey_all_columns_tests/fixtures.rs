@@ -15,6 +15,11 @@ pub(super) fn fixtures() -> Vec<(&'static str, &'static str, &'static [u8])> {
             b"signed-registry-broadcast-json",
         ),
         (
+            "contact_device_key_pins",
+            "pins_encrypted",
+            b"[[[1,1],[2,2]]]",
+        ),
+        (
             "safety_alert_facts",
             "signed_payload_encrypted",
             b"signed-duress-alert-payload",

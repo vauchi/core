@@ -42,6 +42,17 @@ fn make_party(seed: [u8; 32], name: &str, email: &str, n: u32) -> Party {
     }
     let signing_public_key = *devices[0].identity().unwrap().signing_public_key();
     let card = devices[0].own_card().unwrap().unwrap();
+    // Every sibling holds the owner-synced registry naming all devices with
+    // their own keys, as a linked device does; without it a sibling's push
+    // carries a fresh version-1 registry a contact already holds.
+    let full = registry_of(&devices, &seed, devices.len());
+    for device in &devices {
+        device
+            .storage()
+            .device()
+            .save_device_registry(&full)
+            .unwrap();
+    }
     Party {
         devices,
         seed,
@@ -50,32 +61,44 @@ fn make_party(seed: [u8; 32], name: &str, email: &str, n: u32) -> Party {
     }
 }
 
-/// Broadcast covering only the first `count` devices of the party — models a
-/// peer that has learned a partial device registry.
-fn broadcast_for(party: &Party, count: usize, now: u64) -> RegistryBroadcast {
-    let keypair = party.devices[0].identity().unwrap().signing_keypair();
-    let device_key = |index: usize| {
-        let mut seed = party.seed;
-        seed[31] ^= 0x80 + index as u8;
-        SigningKeyPair::from_seed(&seed)
-    };
+/// The key each device really signs with, so the deltas the production
+/// sealer signs verify under the pins a broadcast sets.
+fn stored_device_key(device: &Vauchi) -> SigningKeyPair {
+    device
+        .storage()
+        .device()
+        .load_or_create_device_signing_key()
+        .unwrap()
+}
+
+/// Registry naming the first `count` devices with their own keys, signed by
+/// the identity; each added device bumps the version, as owner sync does.
+fn registry_of(devices: &[Vauchi], seed: &[u8; 32], count: usize) -> DeviceRegistry {
+    let keypair = devices[0].identity().unwrap().signing_keypair();
     let registered = |index: usize| {
-        party.devices[index]
+        devices[index]
             .identity()
             .unwrap()
             .device_info()
-            .to_registered(&party.seed)
-            .with_signing_key(*device_key(index).public_key().as_bytes())
+            .to_registered(seed)
+            .with_signing_key(*stored_device_key(&devices[index]).public_key().as_bytes())
     };
     let mut registry = DeviceRegistry::new(registered(0), keypair);
-    for index in 1..count.min(party.devices.len()) {
+    for index in 1..count.min(devices.len()) {
         registry.add_device(registered(index), keypair).unwrap();
     }
+    registry
+}
+
+/// Broadcast covering only the first `count` devices of the party — models a
+/// peer that has learned a partial device registry. Signed by device 0.
+fn broadcast_for(party: &Party, count: usize, now: u64) -> RegistryBroadcast {
+    let registry = registry_of(&party.devices, &party.seed, count);
     RegistryBroadcast::signed_by_device(
         &registry,
-        keypair,
+        party.devices[0].identity().unwrap().signing_keypair(),
         *party.devices[0].identity().unwrap().device_id(),
-        &device_key(0),
+        &stored_device_key(&party.devices[0]),
         now,
     )
 }

@@ -13,6 +13,7 @@
 
 use crate::common;
 
+use common::device_sync::device_signed_broadcast;
 use common::helpers::create_vauchi_with_identity;
 use vauchi_core::SymmetricKey;
 use vauchi_core::api::{ReceiveOutcome, process_single_card_update};
@@ -80,11 +81,7 @@ fn genesis_alert_blob(
     )
     .unwrap();
     let payload = VersionedPayload::encode_alert(&alert);
-    let broadcast = RegistryBroadcast::new(
-        &alice_identity.initial_device_registry(),
-        alice_identity.signing_keypair(),
-        1_753_000_000,
-    );
+    let broadcast = device_signed_broadcast(alice_wb);
     let (message, _session) = GenesisEnvelope::seal(
         shared,
         alice_identity,
@@ -110,11 +107,7 @@ fn genesis_zero_cek_blob(
         nonce: [0xC3u8; 32],
     };
     let payload = VersionedPayload::encode_cek(&wrapped);
-    let broadcast = RegistryBroadcast::new(
-        &alice_identity.initial_device_registry(),
-        alice_identity.signing_keypair(),
-        1_753_000_000,
-    );
+    let broadcast = device_signed_broadcast(alice_wb);
     let (message, _session) = GenesisEnvelope::seal(
         shared,
         alice_identity,
@@ -264,13 +257,26 @@ fn handshake_ack_stays_on_the_legacy_session_before_activation() {
     let device_seed = [77u8; 32];
     let first = DeviceInfo::derive(&device_seed, 0, "A phone".into(), 1);
     let second = DeviceInfo::derive(&device_seed, 1, "A tablet".into(), 1);
-    let mut registry = DeviceRegistry::new(first.to_registered(&device_seed), &alice_identity_kp);
+    let first_key = SigningKeyPair::generate();
+    let mut registry = DeviceRegistry::new(
+        first
+            .to_registered(&device_seed)
+            .with_signing_key(*first_key.public_key().as_bytes()),
+        &alice_identity_kp,
+    );
     registry
-        .add_device(second.to_registered(&device_seed), &alice_identity_kp)
+        .add_device(
+            second
+                .to_registered(&device_seed)
+                .with_signing_key(*SigningKeyPair::generate().public_key().as_bytes()),
+            &alice_identity_kp,
+        )
         .unwrap();
-    let broadcast = RegistryBroadcast::new(
+    let broadcast = RegistryBroadcast::signed_by_device(
         &registry,
         &alice_identity_kp,
+        *first.device_id(),
+        &first_key,
         bob_wb.storage().clock().unix_seconds(),
     );
     bob_wb
@@ -593,11 +599,7 @@ fn genesis_receive_tolerates_an_already_newer_held_registry() {
         .unwrap();
 
     // Bob already holds Alice's registry (e.g. via an earlier vouched push).
-    let held = RegistryBroadcast::new(
-        &alice_identity.initial_device_registry(),
-        alice_identity.signing_keypair(),
-        1_753_000_100,
-    );
+    let held = device_signed_broadcast(&alice_wb);
     bob_wb
         .storage()
         .device()

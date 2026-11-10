@@ -4,6 +4,7 @@
 
 //! Device linking transfers signed peer topology, never live ratchet chains.
 
+use crate::common::device_sync::device_signed_broadcast_of;
 use vauchi_core::api::sync::DeviceSyncOrchestrator;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
@@ -36,10 +37,18 @@ fn identity_and_registry(
 fn linked_device_receives_signed_peer_registry_but_no_live_ratchet() {
     let source_storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let (alice1, alice_registry) = identity_and_registry([10u8; 32], "Alice", 0);
-    let (bob, mut bob_registry) = identity_and_registry([20u8; 32], "Bob", 0);
+    let (bob, _) = identity_and_registry([20u8; 32], "Bob", 0);
+    let bob_device_key = SigningKeyPair::generate();
+    let mut bob_registry =
+        bob.initial_device_registry_naming(*bob_device_key.public_key().as_bytes());
     let bob_second = DeviceInfo::derive(&[20u8; 32], 1, "Bob laptop".into(), 1);
     bob_registry
-        .add_device(bob_second.to_registered(&[20u8; 32]), bob.signing_keypair())
+        .add_device(
+            bob_second
+                .to_registered(&[20u8; 32])
+                .with_signing_key(*SigningKeyPair::generate().public_key().as_bytes()),
+            bob.signing_keypair(),
+        )
         .unwrap();
 
     let relationship = SymmetricKey::from_bytes([30u8; 32]);
@@ -54,7 +63,8 @@ fn linked_device_receives_signed_peer_registry_but_no_live_ratchet() {
         .contacts()
         .save_contact(&bob_contact)
         .unwrap();
-    let broadcast = RegistryBroadcast::new(&bob_registry, bob.signing_keypair(), 1);
+    let broadcast =
+        device_signed_broadcast_of(&bob_registry, &bob, *bob.device_id(), &bob_device_key, 1);
     source_storage
         .device()
         .save_contact_device_registry(&bob_id, &broadcast, bob.signing_public_key(), u64::MAX)
@@ -166,18 +176,33 @@ fn owner_sync_replaces_an_older_peer_registry_with_the_newer_one() {
     let contact =
         Contact::from_exchange(bob_pk, ContactCard::new("Bob"), SymmetricKey::generate(), 1);
     let contact_id = contact.id().to_string();
+    let bob_phone = DeviceInfo::derive(&bob_seed, 0, "Phone".into(), 1);
+    let bob_phone_key = SigningKeyPair::generate();
     let mut bob_registry = DeviceRegistry::new(
-        DeviceInfo::derive(&bob_seed, 0, "Phone".into(), 1).to_registered(&bob_seed),
+        bob_phone
+            .to_registered(&bob_seed)
+            .with_signing_key(*bob_phone_key.public_key().as_bytes()),
         &bob,
     );
-    let older = RegistryBroadcast::new(&bob_registry, &bob, 1);
+    let sign_as_phone = |registry: &DeviceRegistry, now: u64| {
+        RegistryBroadcast::signed_by_device(
+            registry,
+            &bob,
+            *bob_phone.device_id(),
+            &bob_phone_key,
+            now,
+        )
+    };
+    let older = sign_as_phone(&bob_registry, 1);
     bob_registry
         .add_device(
-            DeviceInfo::derive(&bob_seed, 1, "Laptop".into(), 1).to_registered(&bob_seed),
+            DeviceInfo::derive(&bob_seed, 1, "Laptop".into(), 1)
+                .to_registered(&bob_seed)
+                .with_signing_key(*SigningKeyPair::generate().public_key().as_bytes()),
             &bob,
         )
         .unwrap();
-    let newer = RegistryBroadcast::new(&bob_registry, &bob, 2);
+    let newer = sign_as_phone(&bob_registry, 2);
     assert!(newer.version() > older.version());
 
     let source_storage = Storage::in_memory(SymmetricKey::generate()).unwrap();

@@ -82,12 +82,27 @@ fn test_contact_device_registry_accepts_only_newer_identity_signed_broadcasts() 
 
     let seed = [11u8; 32];
     let primary = DeviceInfo::derive(&seed, 0, "Phone".into(), 1);
-    let mut registry = DeviceRegistry::new(primary.to_registered(&seed), &signing);
+    let primary_key = SigningKeyPair::generate();
+    let mut registry = DeviceRegistry::new(
+        primary
+            .to_registered(&seed)
+            .with_signing_key(*primary_key.public_key().as_bytes()),
+        &signing,
+    );
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs();
-    let first = RegistryBroadcast::new(&registry, &signing, now);
+    let sign_as_primary = |registry: &DeviceRegistry, signer: &SigningKeyPair, now: u64| {
+        RegistryBroadcast::signed_by_device(
+            registry,
+            signer,
+            *primary.device_id(),
+            &primary_key,
+            now,
+        )
+    };
+    let first = sign_as_primary(&registry, &signing, now);
     storage
         .device()
         .save_contact_device_registry(contact.id(), &first, signing.public_key().as_bytes(), 60)
@@ -102,7 +117,7 @@ fn test_contact_device_registry_accepts_only_newer_identity_signed_broadcasts() 
     );
 
     let attacker = SigningKeyPair::from_seed(&[99u8; 32]);
-    let forged = RegistryBroadcast::new(&registry, &attacker, now);
+    let forged = sign_as_primary(&registry, &attacker, now);
     assert!(
         storage
             .device()
@@ -129,9 +144,14 @@ fn test_contact_device_registry_accepts_only_newer_identity_signed_broadcasts() 
 
     let second = DeviceInfo::derive(&seed, 1, "Laptop".into(), 1);
     registry
-        .add_device(second.to_registered(&seed), &signing)
+        .add_device(
+            second
+                .to_registered(&seed)
+                .with_signing_key(*SigningKeyPair::generate().public_key().as_bytes()),
+            &signing,
+        )
         .unwrap();
-    let newer = RegistryBroadcast::new(&registry, &signing, now);
+    let newer = sign_as_primary(&registry, &signing, now);
     storage
         .device()
         .save_contact_device_registry(contact.id(), &newer, signing.public_key().as_bytes(), 60)
@@ -158,7 +178,7 @@ fn test_contact_device_registry_accepts_only_newer_identity_signed_broadcasts() 
     registry
         .revoke_device(&revoked_id, &signing, now + 1)
         .unwrap();
-    let pruned = RegistryBroadcast::new(&registry, &signing, now + 1);
+    let pruned = sign_as_primary(&registry, &signing, now + 1);
     storage
         .device()
         .save_contact_device_registry(contact.id(), &pruned, signing.public_key().as_bytes(), 60)
@@ -246,15 +266,35 @@ fn test_contact_device_registry_prune_failure_rolls_back_registry() {
     let primary = DeviceInfo::derive(&seed, 0, "Phone".into(), 1);
     let secondary = DeviceInfo::derive(&seed, 1, "Laptop".into(), 1);
     let secondary_id = *secondary.device_id();
-    let mut registry = DeviceRegistry::new(primary.to_registered(&seed), &signing);
+    let primary_key = SigningKeyPair::generate();
+    let mut registry = DeviceRegistry::new(
+        primary
+            .to_registered(&seed)
+            .with_signing_key(*primary_key.public_key().as_bytes()),
+        &signing,
+    );
     registry
-        .add_device(secondary.to_registered(&seed), &signing)
+        .add_device(
+            secondary
+                .to_registered(&seed)
+                .with_signing_key(*SigningKeyPair::generate().public_key().as_bytes()),
+            &signing,
+        )
         .unwrap();
+    let sign_as_primary = |registry: &DeviceRegistry, now: u64| {
+        RegistryBroadcast::signed_by_device(
+            registry,
+            &signing,
+            *primary.device_id(),
+            &primary_key,
+            now,
+        )
+    };
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs();
-    let current = RegistryBroadcast::new(&registry, &signing, now);
+    let current = sign_as_primary(&registry, now);
     storage
         .device()
         .save_contact_device_registry(contact.id(), &current, signing.public_key().as_bytes(), 60)
@@ -283,7 +323,7 @@ fn test_contact_device_registry_prune_failure_rolls_back_registry() {
     registry
         .revoke_device(&secondary_id, &signing, now + 1)
         .unwrap();
-    let pruned = RegistryBroadcast::new(&registry, &signing, now + 1);
+    let pruned = sign_as_primary(&registry, now + 1);
     let error = storage
         .device()
         .save_contact_device_registry(contact.id(), &pruned, signing.public_key().as_bytes(), 60)

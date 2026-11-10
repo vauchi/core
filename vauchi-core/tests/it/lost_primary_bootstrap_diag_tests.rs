@@ -9,7 +9,6 @@
 //! OHTTP-split e2e cert (`multi_device_sync.rs:780`) fails identically across
 //! three core versions and cannot run locally (OHTTP 502).
 
-use vauchi_core::SymmetricKey;
 use vauchi_core::api::Vauchi;
 use vauchi_core::api::vauchi::process_received_blobs;
 use vauchi_core::contact::Contact;
@@ -19,6 +18,7 @@ use vauchi_core::network::mailbox_token::{
     compute_device_mailbox_token, compute_mailbox_token, current_day_epoch, token_hex,
 };
 use vauchi_core::sync::registry_activation::ActivationState;
+use vauchi_core::{SigningKeyPair, SymmetricKey};
 
 struct Party {
     devices: Vec<Vauchi>,
@@ -54,27 +54,30 @@ fn make_party(seed: [u8; 32], name: &str, email: &str, n: u32) -> Party {
 /// peer that has learned a partial device registry.
 fn broadcast_for(party: &Party, count: usize, now: u64) -> RegistryBroadcast {
     let keypair = party.devices[0].identity().unwrap().signing_keypair();
-    let mut registry = DeviceRegistry::new(
-        party.devices[0]
+    let device_key = |index: usize| {
+        let mut seed = party.seed;
+        seed[31] ^= 0x80 + index as u8;
+        SigningKeyPair::from_seed(&seed)
+    };
+    let registered = |index: usize| {
+        party.devices[index]
             .identity()
             .unwrap()
             .device_info()
-            .to_registered(&party.seed),
-        keypair,
-    );
-    for device in party.devices.iter().take(count).skip(1) {
-        registry
-            .add_device(
-                device
-                    .identity()
-                    .unwrap()
-                    .device_info()
-                    .to_registered(&party.seed),
-                keypair,
-            )
-            .unwrap();
+            .to_registered(&party.seed)
+            .with_signing_key(*device_key(index).public_key().as_bytes())
+    };
+    let mut registry = DeviceRegistry::new(registered(0), keypair);
+    for index in 1..count.min(party.devices.len()) {
+        registry.add_device(registered(index), keypair).unwrap();
     }
-    RegistryBroadcast::new(&registry, keypair, now)
+    RegistryBroadcast::signed_by_device(
+        &registry,
+        keypair,
+        *party.devices[0].identity().unwrap().device_id(),
+        &device_key(0),
+        now,
+    )
 }
 
 /// The deposit mailbox token the send phase would use for a pending update:

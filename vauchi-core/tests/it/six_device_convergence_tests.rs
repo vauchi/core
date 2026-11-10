@@ -4,17 +4,18 @@
 
 //! Alice A1/A2/A3 ↔ Bob B1/B2/B3 convergence using production card-update paths.
 
-use vauchi_core::SymmetricKey;
 use vauchi_core::api::Vauchi;
 use vauchi_core::api::sync::process_card_updates;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::identity::{DeviceRegistry, Identity, RegistryBroadcast};
 use vauchi_core::network::{compute_anonymous_id_for_device, current_epoch};
+use vauchi_core::{SigningKeyPair, SymmetricKey};
 
 struct Party {
     devices: Vec<Vauchi>,
     registry: DeviceRegistry,
+    first_device_key: SigningKeyPair,
     signing_public_key: [u8; 32],
     card: ContactCard,
 }
@@ -38,15 +39,22 @@ fn make_party(seed: [u8; 32], name: &str, email: &str) -> Party {
         devices.push(device);
     }
     let first_identity = devices[0].identity().unwrap();
+    let first_device_key = SigningKeyPair::generate();
     let mut registry = DeviceRegistry::new(
-        first_identity.device_info().to_registered(&seed),
+        first_identity
+            .device_info()
+            .to_registered(&seed)
+            .with_signing_key(*first_device_key.public_key().as_bytes()),
         first_identity.signing_keypair(),
     );
     for device in devices.iter().skip(1) {
         let identity = device.identity().unwrap();
         registry
             .add_device(
-                identity.device_info().to_registered(&seed),
+                identity
+                    .device_info()
+                    .to_registered(&seed)
+                    .with_signing_key(*SigningKeyPair::generate().public_key().as_bytes()),
                 first_identity.signing_keypair(),
             )
             .unwrap();
@@ -56,6 +64,7 @@ fn make_party(seed: [u8; 32], name: &str, email: &str) -> Party {
     Party {
         devices,
         registry,
+        first_device_key,
         signing_public_key,
         card,
     }
@@ -63,14 +72,18 @@ fn make_party(seed: [u8; 32], name: &str, email: &str) -> Party {
 
 fn connect_parties(alice: &mut Party, bob: &mut Party, relationship: &SymmetricKey) {
     let now = alice.devices[0].storage().clock().unix_seconds();
-    let alice_broadcast = RegistryBroadcast::new(
+    let alice_broadcast = RegistryBroadcast::signed_by_device(
         &alice.registry,
         alice.devices[0].identity().unwrap().signing_keypair(),
+        *alice.devices[0].identity().unwrap().device_id(),
+        &alice.first_device_key,
         now,
     );
-    let bob_broadcast = RegistryBroadcast::new(
+    let bob_broadcast = RegistryBroadcast::signed_by_device(
         &bob.registry,
         bob.devices[0].identity().unwrap().signing_keypair(),
+        *bob.devices[0].identity().unwrap().device_id(),
+        &bob.first_device_key,
         now,
     );
 

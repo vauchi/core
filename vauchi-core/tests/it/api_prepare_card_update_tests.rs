@@ -203,12 +203,30 @@ fn test_prepare_card_update_fans_out_to_contact_devices() {
     let device_seed = [44u8; 32];
     let first = DeviceInfo::derive(&device_seed, 0, "Bob phone".into(), 1);
     let second = DeviceInfo::derive(&device_seed, 1, "Bob laptop".into(), 1);
-    let mut registry = DeviceRegistry::new(first.to_registered(&device_seed), &signing);
+    let first_key = SigningKeyPair::generate();
+    let second_key = SigningKeyPair::generate();
+    let mut registry = DeviceRegistry::new(
+        first
+            .to_registered(&device_seed)
+            .with_signing_key(*first_key.public_key().as_bytes()),
+        &signing,
+    );
     registry
-        .add_device(second.to_registered(&device_seed), &signing)
+        .add_device(
+            second
+                .to_registered(&device_seed)
+                .with_signing_key(*second_key.public_key().as_bytes()),
+            &signing,
+        )
         .unwrap();
     let now = wb.storage().clock().unix_seconds();
-    let broadcast = RegistryBroadcast::new(&registry, &signing, now);
+    let broadcast = RegistryBroadcast::signed_by_device(
+        &registry,
+        &signing,
+        *first.device_id(),
+        &first_key,
+        now,
+    );
     wb.storage()
         .device()
         .save_contact_device_registry(&contact_id, &broadcast, signing.public_key().as_bytes(), 60)
@@ -261,12 +279,29 @@ fn test_propagate_card_update_queue_failure_rolls_back_all_device_state() {
     let first = DeviceInfo::derive(&device_seed, 0, "Bob phone".into(), 1);
     let second = DeviceInfo::derive(&device_seed, 1, "Bob laptop".into(), 1);
     let device_ids = [*first.device_id(), *second.device_id()];
-    let mut registry = DeviceRegistry::new(first.to_registered(&device_seed), &signing);
+    let first_key = SigningKeyPair::generate();
+    let second_key = SigningKeyPair::generate();
+    let mut registry = DeviceRegistry::new(
+        first
+            .to_registered(&device_seed)
+            .with_signing_key(*first_key.public_key().as_bytes()),
+        &signing,
+    );
     registry
-        .add_device(second.to_registered(&device_seed), &signing)
+        .add_device(
+            second
+                .to_registered(&device_seed)
+                .with_signing_key(*second_key.public_key().as_bytes()),
+            &signing,
+        )
         .unwrap();
-    let broadcast =
-        RegistryBroadcast::new(&registry, &signing, wb.storage().clock().unix_seconds());
+    let broadcast = RegistryBroadcast::signed_by_device(
+        &registry,
+        &signing,
+        *first.device_id(),
+        &first_key,
+        wb.storage().clock().unix_seconds(),
+    );
     wb.storage()
         .device()
         .save_contact_device_registry(&contact_id, &broadcast, signing.public_key().as_bytes(), 60)

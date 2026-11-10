@@ -41,6 +41,7 @@ use crate::common;
 
 use common::device_sync::{
     create_test_contact, create_test_device, create_test_registry, create_test_storage,
+    device_signed_broadcast, device_signed_broadcast_for,
 };
 use common::helpers::{create_vauchi_with_identity, setup_alice_bob_exchange, setup_ratchets};
 use vauchi_core::api::sync::DeviceSyncOrchestrator;
@@ -342,7 +343,7 @@ fn active_responder_device_genesis_seals_emergency_alert() {
         Identity::from_device_link(sender_seed, "Alice".into(), 0, "Alice phone".into(), 1);
     let sender_pk = *sender_identity.signing_public_key();
 
-    let (recipient_seed, recipient_identity) = (1u32..=100_000)
+    let (_, recipient_identity) = (1u32..=100_000)
         .find_map(|value| {
             let mut seed = [0u8; 32];
             seed[..4].copy_from_slice(&value.to_le_bytes());
@@ -365,17 +366,8 @@ fn active_responder_device_genesis_seals_emergency_alert() {
     let recipient_id = recipient_contact.id().to_string();
     sender.add_contact(recipient_contact).unwrap();
 
-    let recipient_registry = DeviceRegistry::new(
-        recipient_identity
-            .device_info()
-            .to_registered(&recipient_seed),
-        recipient_identity.signing_keypair(),
-    );
-    let recipient_broadcast = RegistryBroadcast::new(
-        &recipient_registry,
-        recipient_identity.signing_keypair(),
-        sender.storage().clock().unix_seconds(),
-    );
+    let (recipient_broadcast, _) =
+        device_signed_broadcast_for(&recipient_identity, sender.storage().clock().unix_seconds());
     sender
         .storage()
         .device()
@@ -430,19 +422,7 @@ fn active_responder_device_genesis_seals_emergency_alert() {
     let sender_contact = Contact::from_exchange(sender_pk, ContactCard::new("Alice"), shared, 0);
     let sender_id = sender_contact.id().to_string();
     recipient.add_contact(sender_contact).unwrap();
-    let sender_registry = DeviceRegistry::new(
-        sender
-            .identity()
-            .unwrap()
-            .device_info()
-            .to_registered(&sender_seed),
-        sender.identity().unwrap().signing_keypair(),
-    );
-    let sender_broadcast = RegistryBroadcast::new(
-        &sender_registry,
-        sender.identity().unwrap().signing_keypair(),
-        recipient.storage().clock().unix_seconds(),
-    );
+    let sender_broadcast = device_signed_broadcast(&sender);
     recipient
         .storage()
         .device()

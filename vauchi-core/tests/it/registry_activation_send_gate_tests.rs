@@ -63,12 +63,29 @@ fn contact_with_registry_and_legacy_ratchet(wb: &Vauchi) -> SeededPeer {
     let device_seed = [44u8; 32];
     let first = DeviceInfo::derive(&device_seed, 0, "Bob phone".into(), 1);
     let second = DeviceInfo::derive(&device_seed, 1, "Bob laptop".into(), 1);
-    let mut registry = DeviceRegistry::new(first.to_registered(&device_seed), &signing);
+    let first_key = SigningKeyPair::generate();
+    let mut registry = DeviceRegistry::new(
+        first
+            .to_registered(&device_seed)
+            .with_signing_key(*first_key.public_key().as_bytes()),
+        &signing,
+    );
     registry
-        .add_device(second.to_registered(&device_seed), &signing)
+        .add_device(
+            second
+                .to_registered(&device_seed)
+                .with_signing_key(*SigningKeyPair::generate().public_key().as_bytes()),
+            &signing,
+        )
         .unwrap();
     let now = wb.storage().clock().unix_seconds();
-    let broadcast = RegistryBroadcast::new(&registry, &signing, now);
+    let broadcast = RegistryBroadcast::signed_by_device(
+        &registry,
+        &signing,
+        *first.device_id(),
+        &first_key,
+        now,
+    );
     wb.storage()
         .device()
         .save_contact_device_registry(&contact_id, &broadcast, signing.public_key().as_bytes(), 60)

@@ -14,7 +14,6 @@
 use crate::common;
 
 use common::helpers::create_vauchi_with_identity;
-use vauchi_core::SymmetricKey;
 use vauchi_core::api::{ReceiveOutcome, process_single_card_update};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
@@ -23,6 +22,7 @@ use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::identity::{DeviceRegistry, Identity, RegistryBroadcast};
 use vauchi_core::storage::{PendingUpdate, UpdateStatus};
 use vauchi_core::sync::registry_activation::{ActivationState, ActivationTracker};
+use vauchi_core::{SigningKeyPair, SymmetricKey};
 
 /// Build a three-device peer (Alice) as a signed registry broadcast — the
 /// state a surviving sibling inherits via owner-sync, holding the peer's
@@ -41,19 +41,32 @@ fn three_device_peer(now: u64) -> (RegistryBroadcast, [u8; 32], Vec<[u8; 32]>) {
         })
         .collect();
     let first = &identities[0];
+    let first_key = SigningKeyPair::generate();
     let mut registry = DeviceRegistry::new(
-        first.device_info().to_registered(&seed),
+        first
+            .device_info()
+            .to_registered(&seed)
+            .with_signing_key(*first_key.public_key().as_bytes()),
         first.signing_keypair(),
     );
     for identity in identities.iter().skip(1) {
         registry
             .add_device(
-                identity.device_info().to_registered(&seed),
+                identity
+                    .device_info()
+                    .to_registered(&seed)
+                    .with_signing_key(*SigningKeyPair::generate().public_key().as_bytes()),
                 first.signing_keypair(),
             )
             .unwrap();
     }
-    let broadcast = RegistryBroadcast::new(&registry, first.signing_keypair(), now);
+    let broadcast = RegistryBroadcast::signed_by_device(
+        &registry,
+        first.signing_keypair(),
+        *first.device_id(),
+        &first_key,
+        now,
+    );
     let signing_pk = *first.signing_public_key();
     let device_ids = identities.iter().map(|i| *i.device_id()).collect();
     (broadcast, signing_pk, device_ids)

@@ -12,6 +12,7 @@
 
 use crate::common;
 
+use common::device_sync::device_signed_broadcast;
 use common::helpers::create_vauchi_with_identity;
 use vauchi_core::api::{ReceiveOutcome, process_single_card_update};
 use vauchi_core::contact::Contact;
@@ -39,19 +40,20 @@ fn device_with_contact() -> (vauchi_core::Vauchi, vauchi_core::Vauchi, String) {
 /// Registers a second device on `wb`'s own registry so the sibling journal
 /// has a peer (copied from api_personal_notes_tests.rs).
 fn install_linked_registry(wb: &Vauchi) -> (vauchi_core::identity::DeviceRegistry, [u8; 32]) {
-    use vauchi_core::crypto::SigningKeyPair;
-    use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
+    use vauchi_core::identity::DeviceInfo;
 
     const SEED: [u8; 32] = [9u8; 32];
-    let signing = SigningKeyPair::from_seed(&SEED);
-    let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
-        &signing,
-    );
+    let identity = wb.identity().unwrap();
+    let device_key = wb
+        .storage()
+        .device()
+        .load_or_create_device_signing_key()
+        .unwrap();
+    let mut registry = identity.initial_device_registry_naming(*device_key.public_key().as_bytes());
     let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
     let tablet_id = *tablet.device_id();
     registry
-        .add_device_unsigned(tablet.to_registered(&SEED))
+        .add_device(tablet.to_registered(&SEED), identity.signing_keypair())
         .unwrap();
     wb.storage()
         .device()
@@ -239,12 +241,7 @@ fn full_sync_transfers_activation_state_to_a_joining_device() {
 }
 
 fn bob_broadcast(bob_wb: &vauchi_core::Vauchi) -> RegistryBroadcast {
-    let bob_identity = bob_wb.identity().unwrap();
-    RegistryBroadcast::new(
-        &bob_identity.initial_device_registry(),
-        bob_identity.signing_keypair(),
-        1_753_000_000,
-    )
+    device_signed_broadcast(bob_wb)
 }
 
 // @scenario: multi_device_sync :: Siblings learn a contact's registry through owner sync

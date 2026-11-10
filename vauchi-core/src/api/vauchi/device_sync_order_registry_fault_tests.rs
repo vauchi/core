@@ -16,9 +16,20 @@ fn signed_peer_registry(pair: &Pair, retain_older: bool) -> (String, String, u64
     );
     let contact_id = contact.id().to_string();
     pair.receiver.add_contact(contact).unwrap();
-    let mut registry = peer.initial_device_registry();
+    let peer_device_key = crate::crypto::SigningKeyPair::generate();
+    let mut registry =
+        peer.initial_device_registry_naming(*peer_device_key.public_key().as_bytes());
+    let sign_as_peer_device = |registry: &crate::identity::DeviceRegistry| {
+        RegistryBroadcast::signed_by_device(
+            registry,
+            peer.signing_keypair(),
+            *peer.device_id(),
+            &peer_device_key,
+            NOW,
+        )
+    };
     if retain_older {
-        let older = RegistryBroadcast::new(&registry, peer.signing_keypair(), NOW);
+        let older = sign_as_peer_device(&registry);
         pair.receiver
             .storage()
             .device()
@@ -34,11 +45,18 @@ fn signed_peer_registry(pair: &Pair, retain_older: bool) -> (String, String, u64
     );
     registry
         .add_device(
-            sibling.device_info().to_registered(peer.master_seed()),
+            sibling
+                .device_info()
+                .to_registered(peer.master_seed())
+                .with_signing_key(
+                    *crate::crypto::SigningKeyPair::generate()
+                        .public_key()
+                        .as_bytes(),
+                ),
             peer.signing_keypair(),
         )
         .unwrap();
-    let broadcast = RegistryBroadcast::new(&registry, peer.signing_keypair(), NOW);
+    let broadcast = sign_as_peer_device(&registry);
     (contact_id, broadcast.to_json(), broadcast.version())
 }
 

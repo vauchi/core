@@ -15,7 +15,7 @@ use vauchi_core::clock::FakeClock;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::identity::{DeviceInfo, DeviceRegistry, RegistryBroadcast};
 use vauchi_core::sync::registry_activation::ActivationTracker;
-use vauchi_core::{ContactField, FieldType, Vauchi, VauchiError};
+use vauchi_core::{ContactField, FieldType, SigningKeyPair, Vauchi, VauchiError};
 
 use crate::common::meeting::signing_pk;
 use crate::common::recovered_phone::{World, recovered};
@@ -38,12 +38,29 @@ fn dave_active_with_the_old_identity() -> (World, Vec<u8>) {
     let device_seed = [44u8; 32];
     let first = DeviceInfo::derive(&device_seed, 0, "Alice phone".into(), 1);
     let second = DeviceInfo::derive(&device_seed, 1, "Alice laptop".into(), 1);
-    let mut registry = DeviceRegistry::new(first.to_registered(&device_seed), signing);
+    let first_key = SigningKeyPair::generate();
+    let mut registry = DeviceRegistry::new(
+        first
+            .to_registered(&device_seed)
+            .with_signing_key(*first_key.public_key().as_bytes()),
+        signing,
+    );
     registry
-        .add_device(second.to_registered(&device_seed), signing)
+        .add_device(
+            second
+                .to_registered(&device_seed)
+                .with_signing_key(*SigningKeyPair::generate().public_key().as_bytes()),
+            signing,
+        )
         .unwrap();
     let now = dave.storage().clock().unix_seconds();
-    let broadcast = RegistryBroadcast::new(&registry, signing, now);
+    let broadcast = RegistryBroadcast::signed_by_device(
+        &registry,
+        signing,
+        *first.device_id(),
+        &first_key,
+        now,
+    );
     dave.storage()
         .device()
         .save_contact_device_registry(&old_id, &broadcast, signing.public_key().as_bytes(), 60)

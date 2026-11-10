@@ -626,10 +626,18 @@ fn test_sync_send_does_not_downgrade_modern_peer_without_local_device_info() {
 
     let peer_seed = [0x62; 32];
     let peer_device = DeviceInfo::derive(&peer_seed, 0, "Peer phone".into(), 1);
-    let peer_registry = DeviceRegistry::new(peer_device.to_registered(&peer_seed), &peer_signing);
-    let broadcast = RegistryBroadcast::new(
+    let peer_device_key = SigningKeyPair::generate();
+    let peer_registry = DeviceRegistry::new(
+        peer_device
+            .to_registered(&peer_seed)
+            .with_signing_key(*peer_device_key.public_key().as_bytes()),
+        &peer_signing,
+    );
+    let broadcast = RegistryBroadcast::signed_by_device(
         &peer_registry,
         &peer_signing,
+        *peer_device.device_id(),
+        &peer_device_key,
         storage.clock().unix_seconds(),
     );
     storage
@@ -715,10 +723,18 @@ fn storage_with_known_peer_device(
 
     let peer_seed = [peer_seed_byte.wrapping_add(1); 32];
     let peer_device = DeviceInfo::derive(&peer_seed, 0, "Peer phone".into(), 1);
-    let peer_registry = DeviceRegistry::new(peer_device.to_registered(&peer_seed), &peer_signing);
-    let broadcast = RegistryBroadcast::new(
+    let peer_device_key = SigningKeyPair::generate();
+    let peer_registry = DeviceRegistry::new(
+        peer_device
+            .to_registered(&peer_seed)
+            .with_signing_key(*peer_device_key.public_key().as_bytes()),
+        &peer_signing,
+    );
+    let broadcast = RegistryBroadcast::signed_by_device(
         &peer_registry,
         &peer_signing,
+        *peer_device.device_id(),
+        &peer_device_key,
         storage.clock().unix_seconds(),
     );
     storage

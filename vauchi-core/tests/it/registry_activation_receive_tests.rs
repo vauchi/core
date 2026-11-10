@@ -13,6 +13,7 @@
 
 use crate::common;
 
+use common::device_sync::device_signed_broadcast;
 use common::helpers::create_vauchi_with_identity;
 use vauchi_core::SymmetricKey;
 use vauchi_core::api::{ReceiveOutcome, process_single_card_update};
@@ -68,13 +69,7 @@ fn setup_two_party() -> (vauchi_core::Vauchi, vauchi_core::Vauchi, String, Strin
 }
 
 fn bob_signed_broadcast(bob_wb: &vauchi_core::Vauchi) -> RegistryBroadcast {
-    let bob_identity = bob_wb.identity().unwrap();
-    let registry = bob_identity.initial_device_registry();
-    RegistryBroadcast::new(
-        &registry,
-        bob_identity.signing_keypair(),
-        bob_wb.storage().clock().unix_seconds(),
-    )
+    device_signed_broadcast(bob_wb)
 }
 
 /// Seal a raw versioned payload with Bob's ratchet — the same wire envelope

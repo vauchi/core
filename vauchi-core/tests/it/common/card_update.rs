@@ -29,21 +29,31 @@ pub fn seal_update(
     version: u32,
 ) -> Vec<u8> {
     let sender_identity = sender.identity().expect("sender has an identity");
+    let recipient_pk = recipient_pk(sender, recipient_id_at_sender);
 
-    let recipient_pk = *sender
+    let mut delta = CardDelta::compute(old_card, new_card, 0);
+    delta.set_version(version);
+    delta.sign(sender_identity, &recipient_pk);
+    seal_delta(sender, recipient_id_at_sender, &delta)
+}
+
+/// The recipient's identity key as the sender stored it.
+pub fn recipient_pk(sender: &Vauchi, recipient_id_at_sender: &str) -> [u8; 32] {
+    *sender
         .storage()
         .contacts()
         .load_contact(recipient_id_at_sender)
         .expect("load recipient contact")
         .expect("recipient contact exists in sender storage")
         .public_key()
-        .expect("recipient contact carries a signing key");
+        .expect("recipient contact carries a signing key")
+}
 
-    let mut delta = CardDelta::compute(old_card, new_card, 0);
-    delta.set_version(version);
-    delta.sign(sender_identity, &recipient_pk);
-
-    let delta_bytes = serde_json::to_vec(&delta).unwrap();
+/// Wraps an already signed delta in a fresh CEK and the sender's ratchet
+/// session with the recipient, as the production sealing does; callers
+/// build the delta so tests can sign it well or badly.
+pub fn seal_delta(sender: &Vauchi, recipient_id_at_sender: &str, delta: &CardDelta) -> Vec<u8> {
+    let delta_bytes = serde_json::to_vec(delta).unwrap();
     let cek = ContentEncryptionKey::generate();
     let cek_ciphertext = cek.encrypt(&delta_bytes).unwrap();
     let wrapped = CekWrappedPayload {
@@ -70,9 +80,6 @@ pub fn seal_update(
     serde_json::to_vec(&ratchet_msg).unwrap()
 }
 
-/// Default-version (`1`) seal, matching the historical
-/// `prepare_card_update_for_contact` behavior for tests that don't exercise
-/// the #42 version floor.
 pub fn seal_update_default(
     sender: &Vauchi,
     recipient_id_at_sender: &str,

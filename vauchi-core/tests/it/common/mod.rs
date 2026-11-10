@@ -65,6 +65,7 @@ pub mod meeting;
 #[cfg(feature = "network-http")]
 #[allow(dead_code)]
 pub mod mock_relay;
+pub mod per_device;
 #[allow(dead_code)]
 pub mod recovered_phone;
 #[cfg(feature = "network-http")]

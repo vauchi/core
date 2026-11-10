@@ -12,7 +12,7 @@ use vauchi_core::api::sync::DeviceSyncOrchestrator;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::{SigningKeyPair, SymmetricKey};
-use vauchi_core::identity::{DeviceInfo, DeviceRegistry, RegistryBroadcast};
+use vauchi_core::identity::{DeviceInfo, DeviceRegistry, Identity, RegistryBroadcast};
 use vauchi_core::sync::SyncItem;
 use vauchi_core::{Storage, Vauchi};
 
@@ -82,4 +82,42 @@ pub fn device_signed_broadcast(vauchi: &Vauchi) -> RegistryBroadcast {
     vauchi
         .own_registry_broadcast(identity)
         .expect("own registry broadcast")
+}
+
+/// A broadcast for an identity that has no `Vauchi` behind it: its single
+/// device named with a fresh key and signed by that key, the way a real
+/// device signs (vauchi/private#970). The key comes back so a test can sign
+/// more broadcasts as that device.
+pub fn device_signed_broadcast_for(
+    identity: &Identity,
+    now: u64,
+) -> (RegistryBroadcast, SigningKeyPair) {
+    let device_key = SigningKeyPair::generate();
+    let registry = identity.initial_device_registry_naming(*device_key.public_key().as_bytes());
+    let broadcast = RegistryBroadcast::signed_by_device(
+        &registry,
+        identity.signing_keypair(),
+        *identity.device_id(),
+        &device_key,
+        now,
+    );
+    (broadcast, device_key)
+}
+
+/// A broadcast of `registry` signed by `device_id`, whose entry must name
+/// `device_key`'s public key.
+pub fn device_signed_broadcast_of(
+    registry: &DeviceRegistry,
+    identity: &Identity,
+    device_id: [u8; 32],
+    device_key: &SigningKeyPair,
+    now: u64,
+) -> RegistryBroadcast {
+    RegistryBroadcast::signed_by_device(
+        registry,
+        identity.signing_keypair(),
+        device_id,
+        device_key,
+        now,
+    )
 }

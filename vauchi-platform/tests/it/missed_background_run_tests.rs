@@ -82,6 +82,25 @@ fn a_locked_scheduler_run_is_shown_at_the_next_unlocked_open() {
     assert!(batch.contains(MISSED_COPY), "got {batch}");
 }
 
+// The phone's case: the worker and the app share one process, so the
+// engine that started locked is the one the person unlocks.
+// @internal
+#[test]
+fn a_locked_scheduler_run_is_shown_when_the_same_engine_unlocks() {
+    let dir = tempfile::tempdir().unwrap();
+    let keychain = onboarded(&dir);
+    keychain.locked.store(true, Ordering::SeqCst);
+    let engine = open(&dir, &keychain);
+    assert!(engine.periodic_sync_tick().is_err());
+    engine.initial_commands_json().unwrap();
+    keychain.locked.store(false, Ordering::SeqCst);
+
+    let event = serde_json::to_string(&vauchi_core::Event::BiometricUnlockSucceeded).unwrap();
+    let batch = engine.dispatch_json(event).unwrap();
+
+    assert!(batch.contains(MISSED_COPY), "got {batch}");
+}
+
 // @internal
 #[test]
 fn an_unlocked_open_alone_records_no_missed_run() {

@@ -176,6 +176,8 @@ pub(crate) fn apply_opened_update(
         return Err(CardUpdateError::SignatureInvalid);
     }
 
+    verify_delta_device_signature(storage, sender_id, &delta)?;
+
     // 7. Replay detection
     if storage.replay().is_replay_nonce(sender_id, &delta.nonce)? {
         return Err(CardUpdateError::ReplayDetected);

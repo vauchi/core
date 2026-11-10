@@ -387,6 +387,7 @@ fn reject_category(e: &CardUpdateError) -> &'static str {
         CardUpdateError::CekDecryptionFailed => "cek",
         CardUpdateError::InvalidDelta => "bad_delta",
         CardUpdateError::SignatureInvalid => "signature",
+        CardUpdateError::DeviceSignatureInvalid => "device_signature",
         CardUpdateError::ReplayDetected => "replay",
         CardUpdateError::GenesisRateLimited => "genesis_rate",
         // Deterministic integrity conflict — ACKable (not "storage"/"genesis_rate"),

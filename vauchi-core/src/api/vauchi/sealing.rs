@@ -87,6 +87,8 @@ impl ProfileEngine {
             .public_key()
             .ok_or_else(|| VauchiError::InvalidState("Contact has no public key".into()))?;
         delta.sign(identity, &recipient_pk);
+        let device_key = self.storage.device().load_or_create_device_signing_key()?;
+        delta.sign_by_device(*identity.device_id(), &device_key);
 
         let delta_bytes =
             serde_json::to_vec(&delta).map_err(|e| VauchiError::Serialization(e.to_string()))?;

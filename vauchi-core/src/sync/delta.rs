@@ -201,6 +201,12 @@ pub struct CardDelta {
     /// Optional for backward compatibility with older clients.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub validation_summary: Option<HashMap<String, ValidationSummary>>,
+    /// The device that signed this delta, under `device_signature`, with the
+    /// key the recipient pinned for it (SC-62, vauchi/private#970).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signer_device_id: Option<[u8; 32]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_signature: Option<Vec<u8>>,
 }
 
 /// Represents a single field change.
@@ -277,6 +283,8 @@ impl CardDelta {
             nonce,
             signature: [0u8; 64], // Will be set during signing
             validation_summary: None,
+            signer_device_id: None,
+            device_signature: None,
         }
     }
 
@@ -309,6 +317,45 @@ impl CardDelta {
         let pubkey = PublicKey::from_bytes(*sender_pk);
 
         pubkey.verify(&message, &signature)
+    }
+
+    /// Signs the identity-signed delta as `device_id`. The device signature
+    /// covers the identity signature, which covers everything else, so a
+    /// device attests exactly the delta the identity signed. Call after
+    /// [`CardDelta::sign`].
+    pub fn sign_by_device(
+        &mut self,
+        device_id: [u8; 32],
+        device_key: &crate::crypto::SigningKeyPair,
+    ) {
+        let signature = device_key.sign(&self.device_signing_data(&device_id));
+        self.signer_device_id = Some(device_id);
+        self.device_signature = Some(signature.as_bytes().to_vec());
+    }
+
+    /// Whether `device_id` signed this delta with the key behind `device_pk`.
+    pub fn verify_device(&self, device_id: &[u8; 32], device_pk: &[u8; 32]) -> bool {
+        if self.signer_device_id != Some(*device_id) {
+            return false;
+        }
+        let Some(signature) = self
+            .device_signature
+            .as_deref()
+            .and_then(|bytes| <[u8; 64]>::try_from(bytes).ok())
+        else {
+            return false;
+        };
+        crate::crypto::PublicKey::from_bytes(*device_pk).verify(
+            &self.device_signing_data(device_id),
+            &crate::crypto::Signature::from_bytes(signature),
+        )
+    }
+
+    fn device_signing_data(&self, device_id: &[u8; 32]) -> Vec<u8> {
+        let mut data = b"vauchi-delta-device-v1:".to_vec();
+        data.extend_from_slice(device_id);
+        data.extend_from_slice(&self.signature);
+        data
     }
 
     /// Applies this delta to a contact card.
@@ -398,6 +445,8 @@ impl CardDelta {
             nonce: self.nonce,
             signature: self.signature,
             validation_summary: self.validation_summary.clone(),
+            signer_device_id: self.signer_device_id,
+            device_signature: self.device_signature.clone(),
         }
     }
 
@@ -428,6 +477,8 @@ impl CardDelta {
             nonce: self.nonce,
             signature: self.signature,
             validation_summary: self.validation_summary.clone(),
+            signer_device_id: self.signer_device_id,
+            device_signature: self.device_signature.clone(),
         }
     }
 

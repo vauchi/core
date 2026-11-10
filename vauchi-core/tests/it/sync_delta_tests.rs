@@ -224,6 +224,8 @@ fn test_delta_apply_display_name() {
         nonce: [0u8; 32],
         signature: [0u8; 64],
         validation_summary: None,
+        signer_device_id: None,
+        device_signature: None,
     };
 
     delta.apply(&mut card).unwrap();
@@ -245,6 +247,8 @@ fn test_delta_apply_add_field() {
         nonce: [0u8; 32],
         signature: [0u8; 64],
         validation_summary: None,
+        signer_device_id: None,
+        device_signature: None,
     };
 
     delta.apply(&mut card).unwrap();
@@ -271,6 +275,8 @@ fn test_delta_apply_rejects_stale_repropagated_field() {
         nonce: [0u8; 32],
         signature: [0u8; 64],
         validation_summary: None,
+        signer_device_id: None,
+        device_signature: None,
     };
 
     delta.apply(&mut card).unwrap();
@@ -295,6 +301,8 @@ fn test_delta_apply_remove_field() {
         nonce: [0u8; 32],
         signature: [0u8; 64],
         validation_summary: None,
+        signer_device_id: None,
+        device_signature: None,
     };
 
     delta.apply(&mut card).unwrap();

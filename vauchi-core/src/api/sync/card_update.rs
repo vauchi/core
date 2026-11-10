@@ -61,6 +61,10 @@ pub enum CardUpdateError {
     InvalidDelta,
     /// Ed25519 signature verification failed.
     SignatureInvalid,
+    /// The delta names no signing device, one the contact never pinned or
+    /// no longer holds active, or its device signature does not verify
+    /// under the pinned key (SC-62).
+    DeviceSignatureInvalid,
     /// Replay attack detected (nonce already seen).
     ReplayDetected,
     /// A genesis decrypt attempt was rate-limited (ADR-068). Retriable — the
@@ -772,6 +776,7 @@ fn receive_genesis_card_delta(
     if !delta.verify(peer_identity, identity.signing_public_key()) {
         return Err(CardUpdateError::SignatureInvalid);
     }
+    verify_delta_device_signature(storage, sender_id, &delta)?;
     if storage.replay().is_replay_nonce(sender_id, &delta.nonce)? {
         return Err(CardUpdateError::ReplayDetected);
     }
@@ -956,3 +961,33 @@ pub(crate) fn alert_event(
 #[cfg(test)]
 #[path = "card_update_decode_tests.rs"]
 mod decode_tests;
+
+/// A contact that holds a sender's registry accepts a delta only from a
+/// device it pinned, still active, that signed it with that key
+/// (SC-62, vauchi/private#970). The delta's signer id is the authority:
+/// the mailbox-token device guess is never authenticated.
+pub(crate) fn verify_delta_device_signature(
+    storage: &Storage,
+    sender_id: &str,
+    delta: &CardDelta,
+) -> Result<(), CardUpdateError> {
+    let Some(pins) = storage.device().load_contact_device_pins(sender_id)? else {
+        // No registry held yet: the identity signature is all a contact can
+        // check, as before the first device-signed broadcast arrives.
+        return Ok(());
+    };
+    let signer = delta
+        .signer_device_id
+        .ok_or(CardUpdateError::DeviceSignatureInvalid)?;
+    let key = pins
+        .pinned(&signer)
+        .ok_or(CardUpdateError::DeviceSignatureInvalid)?;
+    let active = storage.device().load_contact_active_devices(sender_id)?;
+    if !active.iter().any(|device| device.device_id == signer) {
+        return Err(CardUpdateError::DeviceSignatureInvalid);
+    }
+    if !delta.verify_device(&signer, &key) {
+        return Err(CardUpdateError::DeviceSignatureInvalid);
+    }
+    Ok(())
+}

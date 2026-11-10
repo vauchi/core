@@ -344,6 +344,8 @@ impl<'a> SyncManager<'a> {
             nonce,
             signature: [0u8; 64],     // Will be signed before transmission
             validation_summary: None, // Coalesced deltas re-compute summaries before send
+            signer_device_id: None,
+            device_signature: None,
         };
 
         let payload = serde_json::to_vec(&merged_delta)

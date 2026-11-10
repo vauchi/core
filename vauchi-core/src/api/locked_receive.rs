@@ -26,8 +26,8 @@ pub enum LockedReceipt {
     /// In the inbox, the ratchet saved with it: the blob can be
     /// acknowledged.
     Stored,
-    /// Not opened on any session held, or not a ratchet message: it stays
-    /// on the relay for the unlock.
+    /// Not opened on any session held, not a ratchet message, or the inbox
+    /// is full: it stays on the relay for the unlock.
     LeftForUnlock,
 }
 
@@ -119,7 +119,7 @@ pub fn store_locked_update(
             received_at,
         }
         .encode()?;
-        storage.in_transaction(|storage| {
+        let kept = storage.in_transaction(|storage| {
             storage.ratchets().save_ratchet_state_for_device(
                 contact_id,
                 &peer_device_id,
@@ -128,8 +128,12 @@ pub fn store_locked_update(
             )?;
             storage.receive_inbox().put(&item)?;
             storage.kept_blobs().record(blob_id, received_at)
-        })?;
-        return Ok(LockedReceipt::Stored);
+        });
+        return match kept {
+            Ok(()) => Ok(LockedReceipt::Stored),
+            Err(StorageError::ReceiveInboxFull) => Ok(LockedReceipt::LeftForUnlock),
+            Err(e) => Err(e),
+        };
     }
     Ok(LockedReceipt::LeftForUnlock)
 }

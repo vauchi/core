@@ -124,6 +124,6 @@ impl LockedReceiveStorage {
 
     /// The inbox, to put items in; reading it needs the storage key.
     pub fn receive_inbox(&self) -> ReceiveInboxStore<'_> {
-        ReceiveInboxStore::write_only(&self.conn)
+        ReceiveInboxStore::write_only(&self.conn, &self.receive_key)
     }
 }

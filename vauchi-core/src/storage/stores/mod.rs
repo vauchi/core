@@ -74,7 +74,7 @@ pub use own_card::OwnCardStore;
 pub use pending::PendingStore;
 pub use place::PlaceStore;
 pub use ratchet::RatchetStore;
-pub use receive_inbox::{InboxItem, InboxItems, ReceiveInboxStore};
+pub use receive_inbox::{InboxItem, InboxItems, RECEIVE_INBOX_CAPACITY, ReceiveInboxStore};
 pub use receive_tokens::ReceiveTokenStore;
 pub use recovery::RecoveryStore;
 pub use replay::ReplayStore;

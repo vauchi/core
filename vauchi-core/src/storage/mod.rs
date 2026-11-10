@@ -84,7 +84,7 @@ pub use stores::{
 pub use secure::MemoryKeyStorage;
 
 pub use stores::ReceiveTokenStore;
-pub use stores::{InboxItem, InboxItems, KeptBlobStore, ReceiveInboxStore};
+pub use stores::{InboxItem, InboxItems, KeptBlobStore, RECEIVE_INBOX_CAPACITY, ReceiveInboxStore};
 
 pub use contact_move::{CONTACT_REFERENCES, ContactReference};
 #[cfg(feature = "testing")]

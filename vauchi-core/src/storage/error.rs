@@ -105,6 +105,11 @@ pub enum StorageError {
     #[error("This needs the storage key, available after the unlock")]
     StorageKeyUnavailable,
 
+    /// The receive inbox holds as many items as it may until the unlock
+    /// merges them (vauchi/private#1093).
+    #[error("The receive inbox is full until the unlock")]
+    ReceiveInboxFull,
+
     /// Secure storage cannot be read until the user authenticates or the
     /// device unlocks; the keys are intact (vauchi/private#580).
     #[error("Secure storage is locked")]

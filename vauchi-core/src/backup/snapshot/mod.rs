@@ -22,7 +22,7 @@ use super::{BackupError, FullBackupEnvelope, IdentitySection};
 use contacts::SnapshotContact;
 
 pub(crate) use codec::{Payload, SNAPSHOT_VERSION, decode, encode, encode_with_decoy};
-pub(crate) use duress::DuressSection;
+pub(crate) use duress::{DuressPinFlags, DuressSection};
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

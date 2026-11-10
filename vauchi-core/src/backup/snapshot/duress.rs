@@ -31,6 +31,19 @@ struct DuressCredential {
     hash_b64: String,
     salt_b64: String,
     copy_in_use: bool,
+    /// Set up under the password branch (ADR-032, amended 2026-11-10).
+    /// Written only when true, so a biometric-branch section is the same
+    /// as before the field existed.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    password_branch: bool,
+}
+
+/// What the duress section records about the duress credential besides
+/// its hash.
+#[derive(Clone, Copy)]
+pub(crate) struct DuressPinFlags {
+    pub copy_in_use: bool,
+    pub password_branch: bool,
 }
 
 /// A stored credential's hash and salt, borrowed.
@@ -47,6 +60,7 @@ pub(crate) struct Credential {
 pub(crate) struct DuressPin {
     pub credential: Credential,
     pub copy_in_use: bool,
+    pub password_branch: bool,
 }
 
 impl Drop for DuressSection {
@@ -81,17 +95,18 @@ impl DuressSection {
         mask_key: &SymmetricKey,
         mask_body: &[u8],
         password: CredentialRef<'_>,
-        duress_pin: Option<(CredentialRef<'_>, bool)>,
+        duress_pin: Option<(CredentialRef<'_>, DuressPinFlags)>,
     ) -> Self {
         Self {
             mask_key_b64: BASE64.encode(mask_key.as_bytes()),
             mask_body_b64: BASE64.encode(mask_body),
             password_hash_b64: BASE64.encode(password.0),
             password_salt_b64: BASE64.encode(password.1),
-            duress: duress_pin.map(|((hash, salt), copy_in_use)| DuressCredential {
+            duress: duress_pin.map(|((hash, salt), flags)| DuressCredential {
                 hash_b64: BASE64.encode(hash),
                 salt_b64: BASE64.encode(salt),
-                copy_in_use,
+                copy_in_use: flags.copy_in_use,
+                password_branch: flags.password_branch,
             }),
         }
     }
@@ -120,6 +135,8 @@ impl DuressSection {
                 Ok(DuressPin {
                     credential: decode_credential(&d.hash_b64, &d.salt_b64)?,
                     copy_in_use: d.copy_in_use,
+
+                    password_branch: d.password_branch,
                 })
             })
             .transpose()

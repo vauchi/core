@@ -6,8 +6,9 @@
 use super::{MaskTransfer, Storage, StorageError};
 use crate::backup::{
     BackupError,
-    snapshot::{BackupSnapshot, DuressSection, VisibilityOverride},
+    snapshot::{BackupSnapshot, DuressPinFlags, DuressSection, VisibilityOverride},
 };
+use crate::emergency::DuressUnlock;
 use crate::identity::Identity;
 use crate::identity::password_config::AppPasswordConfig;
 
@@ -63,9 +64,14 @@ impl DuressSection {
             config.duress_hash(),
             config.duress_salt(),
         ) {
-            (true, Some(hash), Some(salt)) => {
-                Some(((hash, salt), storage.identity().duress_copy_in_use()?))
-            }
+            (true, Some(hash), Some(salt)) => Some((
+                (hash, salt),
+                DuressPinFlags {
+                    copy_in_use: storage.identity().duress_copy_in_use()?,
+                    password_branch: storage.identity().duress_unlock()?
+                        == Some(DuressUnlock::Passwords),
+                },
+            )),
             _ => None,
         };
         Ok(Self::new(
@@ -88,7 +94,11 @@ impl DuressSection {
             storage.identity().save_duress_password(
                 &pin.credential.hash,
                 &pin.credential.salt,
-                crate::emergency::DuressUnlock::Biometric,
+                if pin.password_branch {
+                    DuressUnlock::Passwords
+                } else {
+                    DuressUnlock::Biometric
+                },
             )?;
             if pin.copy_in_use {
                 storage.identity().mark_duress_copy_in_use()?;

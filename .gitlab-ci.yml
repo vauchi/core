@@ -655,18 +655,24 @@ build:tests:
       grep "private#794" dev-build-guard.log
     # One archive per package and feature set a test job runs; the features
     # are the ones the jobs passed to `cargo nextest run` before, with the
-    # reasons kept at those jobs.
+    # reasons kept at those jobs. The archives stay on the runner host
+    # (every shell job runs on it): as artifacts the nine files were 413
+    # Payload Too Large for gitlab.com (job 17902464819), and a round trip
+    # through the coordinator would cost each test job minutes for files
+    # it has on local disk. Older pipelines' archives are pruned here.
     - echo "── test archives ──"
-    - mkdir -p archives
-    - cargo nextest archive -p vauchi-core --features test-kdf,testing --archive-file archives/core.tar.zst
-    - cargo nextest archive -p vauchi-core --features testing --archive-file archives/core-vectors.tar.zst
-    - cargo nextest archive -p vauchi-app --features test-kdf,network-http,testing --archive-file archives/app.tar.zst
-    - cargo nextest archive -p vauchi-app --features vauchi-app/test-support --test reachability --archive-file archives/app-reachability.tar.zst
-    - cargo nextest archive -p vauchi-platform --features test-kdf --archive-file archives/platform.tar.zst
-    - cargo nextest archive -p vauchi-cabi --features vauchi-cabi/dev-logging --archive-file archives/cabi-dev-logging.tar.zst
-    - cargo nextest archive -p vauchi-platform --features vauchi-platform/dev-logging --archive-file archives/platform-dev-logging.tar.zst
+    - export ARCHIVE_DIR="$HOME/.cache/vauchi-ci/archives/$CI_PROJECT_NAME/$CI_PIPELINE_ID"
+    - find "$HOME/.cache/vauchi-ci/archives" -mindepth 2 -maxdepth 2 -type d -mmin +1440 -exec rm -rf {} + 2>/dev/null || true
+    - rm -rf "$ARCHIVE_DIR" && mkdir -p "$ARCHIVE_DIR"
+    - cargo nextest archive -p vauchi-core --features test-kdf,testing --archive-file "$ARCHIVE_DIR/core.tar.zst"
+    - cargo nextest archive -p vauchi-core --features testing --archive-file "$ARCHIVE_DIR/core-vectors.tar.zst"
+    - cargo nextest archive -p vauchi-app --features test-kdf,network-http,testing --archive-file "$ARCHIVE_DIR/app.tar.zst"
+    - cargo nextest archive -p vauchi-app --features vauchi-app/test-support --test reachability --archive-file "$ARCHIVE_DIR/app-reachability.tar.zst"
+    - cargo nextest archive -p vauchi-platform --features test-kdf --archive-file "$ARCHIVE_DIR/platform.tar.zst"
+    - cargo nextest archive -p vauchi-cabi --features vauchi-cabi/dev-logging --archive-file "$ARCHIVE_DIR/cabi-dev-logging.tar.zst"
+    - cargo nextest archive -p vauchi-platform --features vauchi-platform/dev-logging --archive-file "$ARCHIVE_DIR/platform-dev-logging.tar.zst"
     # Cucumber is harness=false, which nextest cannot archive: build the
-    # binary and ship it as is.
+    # binary and keep it as is.
     - |
       cucumber="$(cargo test --test cucumber_tests --features testing,test-kdf --no-run --message-format=json \
         | python3 -c 'import json, sys
@@ -674,12 +680,9 @@ build:tests:
           message = json.loads(line)
           if message.get("reason") == "compiler-artifact" and message.get("executable") and message["target"]["name"] == "cucumber_tests":
               print(message["executable"])')"
-      cp "$cucumber" archives/cucumber_tests
-    - ls -la archives
-  artifacts:
-    paths:
-      - archives/
-    expire_in: 1 day
+      cp "$cucumber" "$ARCHIVE_DIR/cucumber_tests"
+    - hostname > "$ARCHIVE_DIR/built-on"
+    - ls -la "$ARCHIVE_DIR"
 
 # SemVer compatibility check — catch breaking API changes before they cascade
 # to 10+ downstream consumers (cli, tui, e2e, relay, linux-gtk, mobile bindings).
@@ -890,18 +893,35 @@ metric:audit-mobile-surface:
 # Cucumber tests use cargo test (not nextest) because harness=false output
 # is incompatible with nextest's test listing format.
 # The test jobs run build:tests' archives: no compiler, no lock, any
-# runner slot. `--workspace-remap` points the binaries' CARGO_MANIFEST_DIR
-# at this checkout, so fixtures and the sibling locales/themes resolve;
-# the junit report still lands in target/nextest/ci/.
+# runner slot of the one shell runner. `--workspace-remap` points the
+# binaries' CARGO_MANIFEST_DIR at this checkout, so fixtures and the
+# sibling locales/themes resolve; the junit report still lands in
+# target/nextest/ci/. A second shell runner would need the archives as
+# artifacts instead; the built-on check names that case.
 .run-archive:
   extends: [.linux-runner, .timeout-standard]
   stage: test
   needs:
     - job: build:tests
+      artifacts: false
   variables:
     # Word-split by the shell at use, so no quotes: the checkout path has
     # no spaces on the shell runners.
     NEXTEST_ARCHIVE_ARGS: --profile ci --workspace-remap $CI_PROJECT_DIR --extract-to target/archive-run --extract-overwrite
+
+# The first script lines of every archive-running job (their before_script
+# lists differ, so this is a script reference, not a before_script).
+.archive-setup:
+  script:
+    - export ARCHIVE_DIR="$HOME/.cache/vauchi-ci/archives/$CI_PROJECT_NAME/$CI_PIPELINE_ID"
+    - |
+      if [ ! -d "$ARCHIVE_DIR" ]; then
+        echo "ERROR: build:tests' archives are not on this host ($ARCHIVE_DIR missing)."
+        echo "  The test jobs read them from the runner's disk; a build on another runner needs them as artifacts."
+        exit 1
+      fi
+      [ "$(cat "$ARCHIVE_DIR/built-on")" = "$(hostname)" ] || { echo "ERROR: archives were built on $(cat "$ARCHIVE_DIR/built-on"), this job runs on $(hostname)"; exit 1; }
+    - mkdir -p target/archive-run
 
 test:core:
   extends: [.run-archive, .validation-rust]
@@ -916,8 +936,8 @@ test:core:
     # 5 stale multistage tests all shipped this way. See backlog
     # 2026-07-27-f4-bounded-skew-convergence-regression. The features are
     # in build:tests' archive.
-    - mkdir -p target/archive-run
-    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file archives/core.tar.zst
+    - !reference [.archive-setup, script]
+    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file "$ARCHIVE_DIR"/core.tar.zst
   artifacts:
     when: always
     reports:
@@ -934,8 +954,8 @@ test:vectors:
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
   script:
-    - mkdir -p target/archive-run
-    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file archives/core-vectors.tar.zst -E 'test(protocol_test_vectors)'
+    - !reference [.archive-setup, script]
+    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file "$ARCHIVE_DIR"/core-vectors.tar.zst -E 'test(protocol_test_vectors)'
   rules:
     - if: $CI_MERGE_REQUEST_IID
       changes:
@@ -1183,7 +1203,8 @@ test:cucumber:
     # creation fast. Both features are in build:tests' cucumber binary; the
     # binary finds ../features through CARGO_MANIFEST_DIR, which cargo
     # would set and a direct run must.
-    - CARGO_MANIFEST_DIR="$CI_PROJECT_DIR/vauchi-core" archives/cucumber_tests --tags "not @wip and not @ui"
+    - !reference [.archive-setup, script]
+    - CARGO_MANIFEST_DIR="$CI_PROJECT_DIR/vauchi-core" "$ARCHIVE_DIR/cucumber_tests" --tags "not @wip and not @ui"
 
 test:platform:
   extends: [.run-archive, .validation-platform]
@@ -1192,8 +1213,8 @@ test:platform:
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
   script:
-    - mkdir -p target/archive-run
-    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file archives/platform.tar.zst
+    - !reference [.archive-setup, script]
+    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file "$ARCHIVE_DIR"/platform.tar.zst
   artifacts:
     when: always
     reports:
@@ -1230,8 +1251,8 @@ test:app:
     # `just test core`, so 14 tests ran nowhere. One had gone stale and one
     # failed one run in four, unnoticed (2026-10-02, vauchi/private#438).
     # The features are in build:tests' archive.
-    - mkdir -p target/archive-run
-    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file archives/app.tar.zst
+    - !reference [.archive-setup, script]
+    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file "$ARCHIVE_DIR"/app.tar.zst
   artifacts:
     when: always
     reports:
@@ -1252,9 +1273,9 @@ test:dev-logging:
   script:
     # The tag guard (a dev-only feature must not build in a tag pipeline,
     # private#794) runs in build:tests with the other compile-time checks.
-    - mkdir -p target/archive-run
-    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file archives/cabi-dev-logging.tar.zst
-    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file archives/platform-dev-logging.tar.zst
+    - !reference [.archive-setup, script]
+    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file "$ARCHIVE_DIR"/cabi-dev-logging.tar.zst
+    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file "$ARCHIVE_DIR"/platform-dev-logging.tar.zst
 
 # Layer 1 ScreenModel reachability gate — catches orphan handler arms
 # (declared but no affordance emits the action_id) and orphan
@@ -1274,8 +1295,8 @@ test:reachability:
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
   script:
-    - mkdir -p target/archive-run
-    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file archives/app-reachability.tar.zst
+    - !reference [.archive-setup, script]
+    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file "$ARCHIVE_DIR"/app-reachability.tar.zst
   artifacts:
     when: always
     reports:

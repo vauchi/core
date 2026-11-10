@@ -42,7 +42,7 @@ fn flatten(value: &serde_json::Value, path: &str, out: &mut Vec<(String, String)
     }
 }
 
-// @scenario: generic_presentation_protocol :: Commands are complete
+// @scenario: generic_presentation_protocol :: Every shell renders the same prepared presentation
 // @internal
 #[test]
 fn an_outline_keeps_the_structure_and_replaces_every_text_with_its_length() {

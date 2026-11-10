@@ -8,7 +8,7 @@
     { "repo": "linux-app", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
     { "repo": "web-demo", "kind": "cargo", "file": "wasm/Cargo.toml", "bumped_by": "bump:consumer-pins" },
     { "repo": "relay", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
-    { "repo": "linux-qt", "kind": "ref-file", "file": "core-ref", "bumped_by": "bump:consumer-pins" },
+    { "repo": "qt-display", "kind": "ref-file", "file": "core-ref", "bumped_by": "bump:consumer-pins" },
     { "repo": "windows", "kind": "cabi-json", "file": "cabi-version.json", "bumped_by": "trigger:windows" },
     { "repo": "vauchi-platform-swift", "kind": "swift-let-version", "file": "Package.swift", "bumped_by": "update:swift-bindings" },
     { "repo": "ios", "kind": "xcode-spm", "file": "Vauchi.xcodeproj/project.pbxproj", "bumped_by": "trigger:ios" },

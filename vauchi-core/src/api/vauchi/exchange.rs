@@ -9,6 +9,7 @@ use crate::contact::Contact;
 use crate::crypto::ratchet::DoubleRatchetState;
 use crate::exchange::{ExchangeEvent, ExchangeSession, ManualConfirmationVerifier};
 
+use super::super::contact_manager::ContactManager;
 use super::super::error::{VauchiError, VauchiResult};
 use super::ProfileEngine;
 
@@ -148,6 +149,8 @@ impl ProfileEngine {
             self.storage.recovery().mark_rekey_met_again(contact.id())?;
         } else {
             self.save_exchanged_card(contact)?;
+            ContactManager::new(&self.storage, self.events.clone())
+                .trigger_first_contact_moment(contact.card().display_name());
         }
         self.save_exchange_ratchet(contact.id(), ratchet, is_initiator)?;
         // Bootstrap card-update sync to the freshly-exchanged contact. The

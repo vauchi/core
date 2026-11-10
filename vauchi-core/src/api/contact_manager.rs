@@ -370,7 +370,7 @@ impl<'a> ContactManager<'a> {
     /// A failure here must not fail the add: the contact is already saved,
     /// and a milestone is decoration. Swallowing keeps a storage hiccup from
     /// rolling back a successful exchange.
-    fn trigger_first_contact_moment(&self, display_name: &str) {
+    pub(crate) fn trigger_first_contact_moment(&self, display_name: &str) {
         let Ok(mut tracker) = self.storage.ux().load_or_create_aha_tracker() else {
             return;
         };

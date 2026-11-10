@@ -12,6 +12,7 @@ mod card;
 mod contact_block;
 mod contact_detail;
 mod contact_lifecycle;
+mod duress_setup;
 mod emergency_broadcast;
 mod recovery;
 mod settings;

@@ -9,14 +9,14 @@
 use vauchi_core::VauchiError;
 use vauchi_core::api::{VauchiResult, WeakCredential};
 
-use super::{AppEngine, AppScreen};
+use super::super::{AppEngine, AppScreen};
 use crate::ui::EngineUpdate;
 use crate::ui::action::{ActionResult, UserAction};
 
 impl AppEngine {
     /// `None` when duress was set up; otherwise the result that shows
     /// Core's refusal on its field.
-    pub(super) fn duress_app_password_refused(
+    pub(in crate::ui::app_engine) fn duress_app_password_refused(
         &mut self,
         outcome: VauchiResult<()>,
     ) -> Option<ActionResult> {
@@ -44,10 +44,15 @@ impl AppEngine {
         })
     }
 
-    pub(super) fn intercept_duress_change_app_password(
+    /// The Decoy Contacts screen's actions, and the duress setup's offer
+    /// to change a weak app password.
+    pub(in crate::ui::app_engine) fn intercept_duress_screens_action(
         &mut self,
         action: &UserAction,
     ) -> Option<ActionResult> {
+        if let Some(result) = self.intercept_decoy_contacts_action(action) {
+            return Some(result);
+        }
         if self.screen != AppScreen::DuressPin {
             return None;
         }
@@ -65,7 +70,7 @@ impl AppEngine {
 impl AppEngine {
     /// The password branch's first step takes the app password, and Core
     /// checks it as the session PIN gate would, so the gate is skipped.
-    pub(super) fn duress_setup_carries_the_app_password(&self) -> bool {
+    pub(in crate::ui::app_engine) fn duress_setup_carries_the_app_password(&self) -> bool {
         matches!(
             self.engine.engine_output(),
             Some(crate::ui::EngineOutput::DuressPin(setup))

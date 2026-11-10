@@ -9,9 +9,12 @@
 //!
 //! Traces to: features/storage_key_upgrade.feature
 
+use chacha20poly1305::aead::{Aead, KeyInit};
+use chacha20poly1305::{XChaCha20Poly1305, XNonce};
 use proptest::prelude::*;
-use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::storage::{Storage, StorageError};
+use vauchi_core::crypto::{HKDF, SymmetricKey};
+use vauchi_core::storage::{RECEIVE_INBOX_CAPACITY, Storage, StorageError};
+use x25519_dalek::{PublicKey, StaticSecret};
 
 const UPDATE: &[u8] = b"an update received while the phone was locked";
 
@@ -151,6 +154,73 @@ fn a_damaged_item_is_reported_and_the_others_still_open() {
             .collect::<Vec<_>>(),
         vec![UPDATE.to_vec()]
     );
+}
+
+/// What someone who can write the file but holds no key can add: an item
+/// sealed to the inbox public key stored beside it.
+fn forge_item(dir: &tempfile::TempDir, update: &[u8]) {
+    let conn = rusqlite::Connection::open(db(dir)).unwrap();
+    let public_key: Vec<u8> = conn
+        .query_row("SELECT public_key FROM inbox_key WHERE id = 1", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    let public_key = PublicKey::from(<[u8; 32]>::try_from(public_key).unwrap());
+    let ephemeral = StaticSecret::from([9; 32]);
+    let shared = ephemeral.diffie_hellman(&public_key);
+    let key = HKDF::derive_key(None, shared.as_bytes(), b"Vauchi_Receive_Inbox_Seal_v1");
+    let nonce = [7; 24];
+    let ciphertext = XChaCha20Poly1305::new_from_slice(key.as_ref())
+        .unwrap()
+        .encrypt(&XNonce::from(nonce), update)
+        .unwrap();
+    let mut sealed = PublicKey::from(&ephemeral).as_bytes().to_vec();
+    sealed.extend_from_slice(&nonce);
+    sealed.extend_from_slice(&ciphertext);
+    conn.execute(
+        "INSERT INTO receive_inbox (sealed_update) VALUES (?1)",
+        [sealed],
+    )
+    .unwrap();
+}
+
+// @internal
+#[test]
+fn an_item_added_without_the_receive_key_is_not_read() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = with_receive_key(&dir, &SymmetricKey::generate(), &SymmetricKey::generate());
+    storage.receive_inbox().put(UPDATE).unwrap();
+    forge_item(&dir, b"a forged update");
+
+    let items = storage.receive_inbox().items().unwrap();
+
+    assert_eq!(
+        items
+            .readable
+            .iter()
+            .map(|item| item.update.to_vec())
+            .collect::<Vec<_>>(),
+        vec![UPDATE.to_vec()]
+    );
+    assert_eq!(items.unreadable.len(), 1);
+}
+
+// @internal
+#[test]
+fn a_full_inbox_refuses_another_item_until_one_is_removed() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = with_receive_key(&dir, &SymmetricKey::generate(), &SymmetricKey::generate());
+    for _ in 0..RECEIVE_INBOX_CAPACITY {
+        storage.receive_inbox().put(UPDATE).unwrap();
+    }
+
+    let refused = storage.receive_inbox().put(UPDATE);
+    let first = storage.receive_inbox().items().unwrap().readable[0].id;
+    storage.receive_inbox().remove(first).unwrap();
+
+    assert!(matches!(refused, Err(StorageError::ReceiveInboxFull)));
+    assert!(matches!(storage.receive_inbox().put(UPDATE), Ok(())));
+    assert_eq!(readable(&storage).len(), RECEIVE_INBOX_CAPACITY);
 }
 
 proptest! {

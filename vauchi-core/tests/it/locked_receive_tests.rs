@@ -15,7 +15,7 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey};
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::identity::Identity;
-use vauchi_core::storage::{LockedReceiveStorage, Storage, StorageError};
+use vauchi_core::storage::{LockedReceiveStorage, RECEIVE_INBOX_CAPACITY, Storage, StorageError};
 
 const MESSAGE: &[u8] = b"an update from the contact";
 const NOW: u64 = 1_760_000_000;
@@ -128,6 +128,37 @@ fn a_blob_on_the_shared_session_is_stored_for_the_unlock() {
     assert!(
         world.session_follows(&SHARED),
         "the ratchet was saved advanced"
+    );
+}
+
+// @internal
+#[test]
+fn a_blob_is_left_for_the_unlock_when_the_inbox_is_full() {
+    let mut world = world_with_session_on(SHARED);
+    {
+        let unlocked = world.unlocked();
+        for _ in 0..RECEIVE_INBOX_CAPACITY {
+            unlocked.receive_inbox().put(b"an earlier update").unwrap();
+        }
+    }
+    let blob = world.next_blob();
+
+    let receipt =
+        store_locked_update(&world.locked(), "blob-1", &world.contact, &blob, NOW).unwrap();
+
+    assert_eq!(receipt, LockedReceipt::LeftForUnlock);
+    assert!(!world.unlocked().kept_blobs().was_kept("blob-1").unwrap());
+    let (mut ours, _) = world
+        .unlocked()
+        .ratchets()
+        .load_ratchet_state_for_device(&world.contact, &SHARED)
+        .unwrap()
+        .unwrap();
+    let message = serde_json::from_slice(&blob).unwrap();
+    assert_eq!(
+        ours.decrypt(&message).unwrap(),
+        MESSAGE,
+        "the session did not move, so the unlock still opens the blob"
     );
 }
 

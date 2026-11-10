@@ -117,7 +117,7 @@ fn colors_after_unlocking_with(secret: &str) -> (AuthMode, PresentationColors) {
     vauchi.setup_app_password(PASSWORD).expect("app password");
     vauchi.authenticate(PASSWORD).expect("unlock");
     vauchi
-        .setup_duress_password(DURESS_PIN)
+        .setup_duress_pin_with_biometric_unlock(DURESS_PIN)
         .expect("duress PIN");
     let mode = vauchi.authenticate(secret).expect("unlock");
     let mut engine = engine_with_picked_theme(vauchi);

@@ -50,7 +50,7 @@ fn setup_duress_password_rejects_anything_but_six_ascii_digits() {
         wb.setup_app_password("my-pin-1234")
             .expect("app password should be set first");
 
-        let result = wb.setup_duress_password(pin);
+        let result = wb.setup_duress_pin_with_biometric_unlock(pin);
 
         assert!(
             result.is_err(),
@@ -68,7 +68,7 @@ fn setup_duress_password_accepts_six_ascii_digits() {
     wb.setup_app_password("my-pin-1234")
         .expect("app password should be set first");
 
-    wb.setup_duress_password("654321")
+    wb.setup_duress_pin_with_biometric_unlock("654321")
         .expect("six ASCII digits is the documented shape and must be accepted");
 
     assert!(
@@ -90,7 +90,7 @@ fn rejected_duress_pin_leaves_duress_disabled() {
     wb.setup_app_password("my-pin-1234")
         .expect("app password should be set first");
 
-    let _ = wb.setup_duress_password("undefined");
+    let _ = wb.setup_duress_pin_with_biometric_unlock("undefined");
 
     assert!(
         !wb.is_duress_enabled().expect("duress status should load"),

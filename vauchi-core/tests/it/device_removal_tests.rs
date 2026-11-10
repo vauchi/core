@@ -110,7 +110,10 @@ fn offline_the_removal_stops_before_wiping_until_told_to_erase_anyway() {
 fn removing_my_identity_in_duress_mode_is_the_emergency_wipe_and_sends_nothing() {
     let mut phone = phone_with_a_tablet(true);
     phone.vauchi.setup_app_password("app-pin-1234").unwrap();
-    phone.vauchi.setup_duress_password("135790").unwrap();
+    phone
+        .vauchi
+        .setup_duress_pin_with_biometric_unlock("135790")
+        .unwrap();
     phone.vauchi.authenticate("135790").unwrap();
     let before = phone.outer.received().len();
 

@@ -11,7 +11,7 @@ impl AppEngine {
     /// Create the reducer at the duress-setup entry point.
     ///
     /// Core picks the starting step because the choice is derived from
-    /// domain state: `Vauchi::setup_duress_password` rejects an identity
+    /// domain state: `Vauchi::setup_duress_pin_with_biometric_unlock` rejects an identity
     /// with no app password (`VauchiError::InvalidState`), so the flow
     /// opens password setup first and chains into the PIN step. A shell
     /// deriving that itself would have to import `AppScreen`, which

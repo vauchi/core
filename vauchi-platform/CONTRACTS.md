@@ -178,7 +178,7 @@ Representative subset (the full list is enumerable via
 
 11 methods. **All PENDING B7.**
 
-`setup_app_password`, `setup_duress_password`, `authenticate`,
+`setup_app_password`, `setup_duress_pin_with_biometric_unlock`, `authenticate`,
 `is_password_enabled`, `is_duress_enabled`, `disable_duress`,
 `configure_duress_alerts`, `get_duress_settings`,
 `add_decoy_contact`, `list_decoy_contacts`, `delete_decoy_contact`.

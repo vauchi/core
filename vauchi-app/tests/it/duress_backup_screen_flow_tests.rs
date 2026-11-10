@@ -34,7 +34,9 @@ fn the_backup_screens_under_duress_export_a_backup_that_is_not_the_real_identity
     vauchi
         .setup_app_password("normal-pin-1234")
         .expect("app password");
-    vauchi.setup_duress_password("112233").expect("duress PIN");
+    vauchi
+        .setup_duress_pin_with_biometric_unlock("112233")
+        .expect("duress PIN");
     vauchi
         .add_decoy_contact("decoy", "Decoy", &ContactCard::new("Decoy"))
         .expect("decoy");

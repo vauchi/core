@@ -126,7 +126,9 @@ fn a_voucher_threshold_change_makes_the_backup_stale() {
 fn a_duress_session_never_refreshes_and_the_next_normal_one_does() {
     let (mut alice, clock, mut guardians) = alice_with_three_guardians();
     alice.setup_app_password("normal-pin").unwrap();
-    alice.setup_duress_password("112233").unwrap();
+    alice
+        .setup_duress_pin_with_biometric_unlock("112233")
+        .unwrap();
     add_a_contact(&alice);
     assert_eq!(alice.authenticate("112233").unwrap(), AuthMode::Duress);
     clock.advance(DAY * 2);

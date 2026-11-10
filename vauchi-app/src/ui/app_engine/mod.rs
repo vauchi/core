@@ -361,7 +361,7 @@ pub struct AppEngine {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum EntryFlow {
     /// Configure the duress PIN, setting the app password first when core's
-    /// `setup_duress_password` precondition is unmet.
+    /// `setup_duress_pin_with_biometric_unlock` precondition is unmet.
     DuressSetup,
 }
 

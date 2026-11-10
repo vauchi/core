@@ -178,7 +178,7 @@ fn the_key_survives_a_storage_rekey() {
 fn a_duress_session_holds_the_same_key() {
     let mut wb = create_vauchi_with_identity("Alice");
     wb.setup_app_password("my-pin-1234").unwrap();
-    wb.setup_duress_password("654321").unwrap();
+    wb.setup_duress_pin_with_biometric_unlock("654321").unwrap();
     let before = public_key_of(wb.storage());
 
     let mode = wb.authenticate("654321").unwrap();

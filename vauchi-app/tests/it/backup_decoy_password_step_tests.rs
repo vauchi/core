@@ -47,7 +47,7 @@ fn engine(with_duress_pin: bool, unlock: &str) -> AppEngine {
     vauchi.setup_app_password(APP_PIN).expect("app password");
     if with_duress_pin {
         vauchi
-            .setup_duress_password(DURESS_PIN)
+            .setup_duress_pin_with_biometric_unlock(DURESS_PIN)
             .expect("duress PIN");
         vauchi
             .add_decoy_contact("decoy-dana", "Decoy Dana", &ContactCard::new("Decoy Dana"))

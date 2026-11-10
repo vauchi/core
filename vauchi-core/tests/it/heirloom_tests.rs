@@ -262,7 +262,7 @@ fn duress_mode_book_holds_only_decoys() {
     let mut wb = setup();
     add_contact(&wb, "Bob", &[], EXCHANGED_2026_10_08);
     wb.setup_app_password("normal-pin").unwrap();
-    wb.setup_duress_password("112233").unwrap();
+    wb.setup_duress_pin_with_biometric_unlock("112233").unwrap();
     wb.add_decoy_contact("decoy-dana", "Decoy Dana", &ContactCard::new("Decoy Dana"))
         .unwrap();
     assert_eq!(wb.authenticate("112233").unwrap(), AuthMode::Duress);

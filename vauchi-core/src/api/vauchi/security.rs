@@ -298,7 +298,10 @@ impl ProfileEngine {
     /// exactly [`DURESS_PIN_LENGTH`] ASCII digits — see
     /// [`validate_duress_pin`] for why the check lives here and not in the
     /// shells.
-    pub fn setup_duress_password(&mut self, duress_password: &str) -> VauchiResult<()> {
+    pub fn setup_duress_pin_with_biometric_unlock(
+        &mut self,
+        duress_password: &str,
+    ) -> VauchiResult<()> {
         validate_duress_pin(duress_password)?;
         if self.in_duress_mode() {
             self.concealed_duress().enabled = true;

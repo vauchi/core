@@ -170,7 +170,10 @@ fn duress_mismatched_confirmation_is_rejected() {
 #[test]
 fn duress_unlock_enters_decoy_mode_without_wiping() {
     let mut engine = engine_ready();
-    engine.vauchi_mut().setup_duress_password(PIN).unwrap();
+    engine
+        .vauchi_mut()
+        .setup_duress_pin_with_biometric_unlock(PIN)
+        .unwrap();
 
     // A ratcheted contact that was once an alert recipient.
     let shared = vauchi_core::SymmetricKey::generate();
@@ -255,7 +258,10 @@ fn duress_unlock_enters_decoy_mode_without_wiping() {
 fn unlocked_with(pin: &str) -> AppEngine {
     let mut engine = engine_ready();
     add_contact(&engine, "Ally");
-    engine.vauchi_mut().setup_duress_password(PIN).unwrap();
+    engine
+        .vauchi_mut()
+        .setup_duress_pin_with_biometric_unlock(PIN)
+        .unwrap();
     engine
         .vauchi()
         .add_decoy_contact("decoy-dora", "Dora", &ContactCard::new("Dora"))
@@ -345,7 +351,10 @@ fn duress_mode_screens_show_no_real_data() {
         .vauchi()
         .add_decoy_contact("decoy-dora", "Dora", &ContactCard::new("Dora"))
         .unwrap();
-    engine.vauchi_mut().setup_duress_password(PIN).unwrap();
+    engine
+        .vauchi_mut()
+        .setup_duress_pin_with_biometric_unlock(PIN)
+        .unwrap();
     let _ = engine.vauchi_mut().authenticate(PIN).unwrap();
 
     let markers = ["RealRita", "RealTagX", "RealPlaceY", "RealGroupZ"];
@@ -389,7 +398,10 @@ fn duress_mode_gdpr_export_holds_no_real_contacts() {
         .vauchi()
         .add_decoy_contact("decoy-dora", "Dora", &ContactCard::new("Dora"))
         .unwrap();
-    engine.vauchi_mut().setup_duress_password(PIN).unwrap();
+    engine
+        .vauchi_mut()
+        .setup_duress_pin_with_biometric_unlock(PIN)
+        .unwrap();
     let _ = engine.vauchi_mut().authenticate(PIN).unwrap();
 
     engine.navigate_to(AppScreen::Privacy);

@@ -229,7 +229,7 @@ fn turning_off_the_duress_pin_waits_for_the_session_pin() {
     let mut engine = engine_with_password();
     engine
         .vauchi_mut()
-        .setup_duress_password(DURESS_PIN)
+        .setup_duress_pin_with_biometric_unlock(DURESS_PIN)
         .unwrap();
     engine.navigate_to(AppScreen::DuressPin);
     let _ = select(&mut engine, "duress_actions", "turn_off");
@@ -248,7 +248,7 @@ fn a_duress_session_confirms_with_its_own_pin() {
     let mut engine = engine_with_password();
     engine
         .vauchi_mut()
-        .setup_duress_password(DURESS_PIN)
+        .setup_duress_pin_with_biometric_unlock(DURESS_PIN)
         .unwrap();
     assert_eq!(
         engine.vauchi_mut().authenticate(DURESS_PIN).unwrap(),

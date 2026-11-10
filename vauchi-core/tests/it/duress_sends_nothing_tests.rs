@@ -16,7 +16,7 @@ use crate::common::helpers::create_vauchi_with_identity;
 fn a_duress_unlock_queues_nothing_for_a_ratcheted_contact() {
     let mut wb = create_vauchi_with_identity("Alice");
     wb.setup_app_password("my-pin-1234").unwrap();
-    wb.setup_duress_password("654321").unwrap();
+    wb.setup_duress_pin_with_biometric_unlock("654321").unwrap();
     let friend = Contact::from_exchange(
         [7; 32],
         ContactCard::new("Trusted Friend"),
@@ -73,7 +73,7 @@ fn an_emergency_alert_still_decodes() {
 fn a_duress_pin_alone_counts_as_duress_set_up() {
     let mut wb = create_vauchi_with_identity("Alice");
     wb.setup_app_password("my-pin-1234").unwrap();
-    wb.setup_duress_password("654321").unwrap();
+    wb.setup_duress_pin_with_biometric_unlock("654321").unwrap();
 
     let status = wb.get_emergency_wipe_status().unwrap();
 

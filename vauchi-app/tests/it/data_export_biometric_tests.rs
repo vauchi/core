@@ -200,7 +200,7 @@ fn export_in_session(pin: &str) -> (Vec<&'static str>, bool) {
     engine.vauchi_mut().authenticate(APP_PIN).unwrap();
     engine
         .vauchi_mut()
-        .setup_duress_password(DURESS_PIN)
+        .setup_duress_pin_with_biometric_unlock(DURESS_PIN)
         .unwrap();
     let mode = engine.vauchi_mut().authenticate(pin).unwrap();
     assert_eq!(

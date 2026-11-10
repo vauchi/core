@@ -672,7 +672,10 @@ impl AppEngine {
         };
         if let Some(setup) = setup {
             if setup.enabled {
-                if let Err(e) = self.vauchi.setup_duress_password(&setup.pin) {
+                if let Err(e) = self
+                    .vauchi
+                    .setup_duress_pin_with_biometric_unlock(&setup.pin)
+                {
                     return ActionResult::ShowAlert {
                         title: self.t("error.title"),
                         message: format!("Failed to set duress PIN: {e}"),

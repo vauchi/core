@@ -203,7 +203,10 @@ fn ready_with_contact() -> (AppEngine, String) {
 #[test]
 fn a_pin_alone_reads_as_set_up() {
     let (mut engine, _) = ready_with_contact();
-    engine.vauchi_mut().setup_duress_password(PIN).unwrap();
+    engine
+        .vauchi_mut()
+        .setup_duress_pin_with_biometric_unlock(PIN)
+        .unwrap();
     let screen = engine.navigate_to(AppScreen::DuressPin);
     assert_eq!(
         rows(&screen),
@@ -218,7 +221,10 @@ fn a_pin_alone_reads_as_set_up() {
 #[test]
 fn the_decoy_row_opens_decoy_contacts() {
     let (mut engine, _) = ready_with_contact();
-    engine.vauchi_mut().setup_duress_password(PIN).unwrap();
+    engine
+        .vauchi_mut()
+        .setup_duress_pin_with_biometric_unlock(PIN)
+        .unwrap();
     let _ = engine.navigate_to(AppScreen::DuressPin);
     let result = select(&mut engine, "duress_rows", "decoys");
     let ActionResult::NavigateTo(screen) = result else {

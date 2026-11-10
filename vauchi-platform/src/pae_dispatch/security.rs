@@ -246,7 +246,7 @@ impl PlatformAppEngine {
             DomainCommand::SetupDuressPassword { duress_password } => {
                 engine
                     .vauchi_mut()
-                    .setup_duress_password(&duress_password)
+                    .setup_duress_pin_with_biometric_unlock(&duress_password)
                     .map_err(|e| MobileError::Other {
                         detail: e.to_string(),
                     })?;

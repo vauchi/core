@@ -30,7 +30,9 @@ struct World {
 fn world(credential: &str, expected_mode: AuthMode) -> World {
     let mut alice = create_vauchi_with_identity("Alice");
     alice.setup_app_password(APP_PASSWORD).unwrap();
-    alice.setup_duress_password(DURESS_PIN).unwrap();
+    alice
+        .setup_duress_pin_with_biometric_unlock(DURESS_PIN)
+        .unwrap();
     let bob = create_vauchi_with_identity("Bob");
     let shared = SymmetricKey::generate();
     let bob_dh = X3DHKeyPair::generate();

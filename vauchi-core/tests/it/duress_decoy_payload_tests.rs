@@ -45,7 +45,7 @@ fn alice(with_duress_pin: bool) -> Alice {
     let mut mask_key = [0; 32];
     if with_duress_pin {
         vauchi
-            .setup_duress_password(DURESS_PIN)
+            .setup_duress_pin_with_biometric_unlock(DURESS_PIN)
             .expect("duress PIN");
         vauchi
             .add_decoy_contact("decoy-dana", "Decoy Dana", &ContactCard::new("Decoy Dana"))

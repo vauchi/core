@@ -158,7 +158,9 @@ fn duress_pin_disable_persists_via_handle_completion() {
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("123456").unwrap();
     vauchi.authenticate("123456").unwrap(); // settings open in an unlocked app (#639)
-    vauchi.setup_duress_password("654321").unwrap();
+    vauchi
+        .setup_duress_pin_with_biometric_unlock("654321")
+        .unwrap();
     assert!(vauchi.is_duress_enabled().unwrap());
     let mut engine = AppEngine::new(vauchi);
 

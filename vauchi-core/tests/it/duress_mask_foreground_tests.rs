@@ -31,7 +31,9 @@ fn duress_session() -> DuressSession {
     alice
         .setup_app_password("normal-pin-1234")
         .expect("app password");
-    alice.setup_duress_password("112233").expect("duress PIN");
+    alice
+        .setup_duress_pin_with_biometric_unlock("112233")
+        .expect("duress PIN");
     alice
         .add_decoy_contact("decoy-dana", "Decoy Dana", &ContactCard::new("Decoy Dana"))
         .expect("decoy");

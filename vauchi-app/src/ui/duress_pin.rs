@@ -23,7 +23,7 @@ pub struct DuressConfig {
 /// Taken from core so the reducer and the API cannot disagree about how
 /// long a PIN is. A local copy is how they drifted: this reducer capped
 /// typed input at six while a pasted value bypassed the cap entirely and
-/// `setup_duress_password` accepted whatever arrived.
+/// `setup_duress_pin_with_biometric_unlock` accepted whatever arrived.
 use vauchi_core::emergency::DURESS_PIN_LENGTH as PIN_LENGTH;
 
 /// What a PIN field holds after an edit; `value` is the whole field.

@@ -241,7 +241,7 @@ fn duress_unlock_lists_only_decoys_in_both_outputs() {
         .setup_app_password("real-password")
         .expect("app password");
     vauchi
-        .setup_duress_password("432198")
+        .setup_duress_pin_with_biometric_unlock("432198")
         .expect("duress password");
     vauchi
         .add_decoy_contact("decoy-1", "Safe Name", &ContactCard::new("Safe Name"))
@@ -366,7 +366,7 @@ fn duress_unlock_shows_no_real_archive() {
         .setup_app_password("real-password")
         .expect("app password");
     vauchi
-        .setup_duress_password("432198")
+        .setup_duress_pin_with_biometric_unlock("432198")
         .expect("duress password");
     vauchi.authenticate("432198").expect("duress unlock");
 

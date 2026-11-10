@@ -19,7 +19,8 @@ const DURESS_PIN: &str = "654321";
 fn alice_under_duress() -> Vauchi {
     let mut wb = create_vauchi_with_identity("Alice");
     wb.setup_app_password(APP_PASSWORD).unwrap();
-    wb.setup_duress_password(DURESS_PIN).unwrap();
+    wb.setup_duress_pin_with_biometric_unlock(DURESS_PIN)
+        .unwrap();
     let friend = Contact::from_exchange(
         [7; 32],
         ContactCard::new("Trusted Friend"),
@@ -92,7 +93,8 @@ fn disabling_duress_discards_the_copy() {
     assert_eq!(wb.authenticate(APP_PASSWORD).unwrap(), AuthMode::Normal);
 
     wb.disable_duress().unwrap();
-    wb.setup_duress_password(DURESS_PIN).unwrap();
+    wb.setup_duress_pin_with_biometric_unlock(DURESS_PIN)
+        .unwrap();
     assert_eq!(wb.authenticate(DURESS_PIN).unwrap(), AuthMode::Duress);
 
     let card = wb

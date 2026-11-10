@@ -43,7 +43,9 @@ fn exported_from_the_real_profile() -> Exported {
     alice
         .setup_app_password(APP_PASSWORD)
         .expect("app password");
-    alice.setup_duress_password(DURESS_PIN).expect("duress PIN");
+    alice
+        .setup_duress_pin_with_biometric_unlock(DURESS_PIN)
+        .expect("duress PIN");
     for (id, name) in [("decoy-dana", "Decoy Dana"), ("decoy-eli", "Decoy Eli")] {
         alice
             .add_decoy_contact(id, name, &ContactCard::new(name))

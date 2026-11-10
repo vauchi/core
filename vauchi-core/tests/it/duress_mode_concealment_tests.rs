@@ -20,7 +20,8 @@ const DURESS_PIN: &str = "135790";
 fn in_duress_mode() -> Vauchi {
     let mut wb = create_vauchi_with_identity("Alice");
     wb.setup_app_password(APP_PIN).unwrap();
-    wb.setup_duress_password(DURESS_PIN).unwrap();
+    wb.setup_duress_pin_with_biometric_unlock(DURESS_PIN)
+        .unwrap();
     wb.add_decoy_contact("decoy-dora", "Dora", &ContactCard::new("Dora"))
         .unwrap();
     assert_eq!(wb.authenticate(DURESS_PIN).unwrap(), AuthMode::Duress);
@@ -50,7 +51,7 @@ fn duress_mode_reads_the_duress_setup_as_not_set_up() {
 fn duress_mode_writes_never_reach_the_real_setup() {
     let mut wb = in_duress_mode();
 
-    wb.setup_duress_password("999999").unwrap();
+    wb.setup_duress_pin_with_biometric_unlock("999999").unwrap();
     wb.add_decoy_contact("decoy-x", "Xavier", &ContactCard::new("Xavier"))
         .unwrap();
     wb.remove_decoy_contact("decoy-dora").unwrap();
@@ -76,7 +77,7 @@ fn duress_mode_writes_never_reach_the_real_setup() {
 #[test]
 fn duress_mode_changes_look_like_they_worked_for_the_session() {
     let mut wb = in_duress_mode();
-    wb.setup_duress_password("999999").unwrap();
+    wb.setup_duress_pin_with_biometric_unlock("999999").unwrap();
     wb.add_decoy_contact("decoy-x", "Xavier", &ContactCard::new("Xavier"))
         .unwrap();
     assert!(wb.is_duress_enabled().unwrap());
@@ -123,7 +124,8 @@ fn verified_contact(wb: &Vauchi, name: &str) -> String {
 fn duress_mode_emergency_snapshot_reads_as_not_set_up() {
     let mut wb = create_vauchi_with_identity("Alice");
     wb.setup_app_password(APP_PIN).unwrap();
-    wb.setup_duress_password(DURESS_PIN).unwrap();
+    wb.setup_duress_pin_with_biometric_unlock(DURESS_PIN)
+        .unwrap();
     let ally = verified_contact(&wb, "Ally");
     wb.toggle_recovery_trust(&ally).unwrap();
 

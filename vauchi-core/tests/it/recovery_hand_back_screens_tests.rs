@@ -100,7 +100,9 @@ fn a_duress_session_is_not_offered_the_hand_back() {
     let claim = phone.begin_recovery(&alice_pk_hex(&owner)).unwrap();
     let mut guardian = owner.guardians.remove(0).into_vauchi();
     guardian.setup_app_password("normal-pin").unwrap();
-    guardian.setup_duress_password("112233").unwrap();
+    guardian
+        .setup_duress_pin_with_biometric_unlock("112233")
+        .unwrap();
     assert_eq!(guardian.authenticate("112233").unwrap(), AuthMode::Duress);
     let parsed = guardian.parse_recovery_claim_b64(&claim).unwrap();
 

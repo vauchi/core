@@ -18,7 +18,8 @@ const DURESS_PIN: &str = "654321";
 fn alice_under_duress() -> Vauchi {
     let mut wb = create_vauchi_with_identity("Alice");
     wb.setup_app_password(APP_PIN).unwrap();
-    wb.setup_duress_password(DURESS_PIN).unwrap();
+    wb.setup_duress_pin_with_biometric_unlock(DURESS_PIN)
+        .unwrap();
     assert_eq!(wb.authenticate(DURESS_PIN).unwrap(), AuthMode::Duress);
     wb
 }
@@ -65,7 +66,8 @@ fn the_real_vocabulary_stays_untouched_and_the_duress_one_goes_with_duress() {
     assert!(wb.list_tags().unwrap().is_empty());
 
     wb.disable_duress().unwrap();
-    wb.setup_duress_password(DURESS_PIN).unwrap();
+    wb.setup_duress_pin_with_biometric_unlock(DURESS_PIN)
+        .unwrap();
     assert_eq!(wb.authenticate(DURESS_PIN).unwrap(), AuthMode::Duress);
     assert!(
         wb.list_groups().unwrap().is_empty(),

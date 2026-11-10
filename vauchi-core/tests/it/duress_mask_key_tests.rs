@@ -36,7 +36,9 @@ fn alice_with_a_decoy() -> OnDisk {
     let mut vauchi = Vauchi::new(config).unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("my-pin-1234").unwrap();
-    vauchi.setup_duress_password("654321").unwrap();
+    vauchi
+        .setup_duress_pin_with_biometric_unlock("654321")
+        .unwrap();
     vauchi
         .add_decoy_contact("decoy-1", "Sam", &ContactCard::new("Sam"))
         .unwrap();

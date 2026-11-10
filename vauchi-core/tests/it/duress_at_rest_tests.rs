@@ -44,7 +44,9 @@ fn alice(with_duress_pin: bool) -> OnDisk {
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password(APP_PASSWORD).unwrap();
     if with_duress_pin {
-        vauchi.setup_duress_password(DURESS_PIN).unwrap();
+        vauchi
+            .setup_duress_pin_with_biometric_unlock(DURESS_PIN)
+            .unwrap();
     }
     disk
 }

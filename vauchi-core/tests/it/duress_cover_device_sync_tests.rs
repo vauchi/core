@@ -23,7 +23,8 @@ const DURESS_PIN: &str = "654321";
 fn alice(credential: &str, expected_mode: AuthMode) -> (Vauchi, DeviceRegistry, [u8; 32]) {
     let mut wb = create_vauchi_with_identity("Alice");
     wb.setup_app_password(APP_PASSWORD).unwrap();
-    wb.setup_duress_password(DURESS_PIN).unwrap();
+    wb.setup_duress_pin_with_biometric_unlock(DURESS_PIN)
+        .unwrap();
     let (registry, tablet_id) = link_tablet(&wb, [9u8; 32]);
     assert_eq!(wb.authenticate(credential).unwrap(), expected_mode);
     (wb, registry, tablet_id)

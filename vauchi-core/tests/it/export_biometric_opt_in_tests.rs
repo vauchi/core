@@ -17,7 +17,9 @@ fn alice() -> Vauchi {
     alice
         .setup_app_password(APP_PASSWORD)
         .expect("app password");
-    alice.setup_duress_password(DURESS_PIN).expect("duress PIN");
+    alice
+        .setup_duress_pin_with_biometric_unlock(DURESS_PIN)
+        .expect("duress PIN");
     assert_eq!(
         alice.authenticate(APP_PASSWORD).expect("unlock"),
         AuthMode::Normal

@@ -34,7 +34,7 @@ fn duress_format_choice() -> AppEngine {
     engine.vauchi_mut().setup_app_password(APP_PIN).unwrap();
     engine
         .vauchi_mut()
-        .setup_duress_password(DURESS_PIN)
+        .setup_duress_pin_with_biometric_unlock(DURESS_PIN)
         .unwrap();
     assert_eq!(
         engine.vauchi_mut().authenticate(DURESS_PIN).unwrap(),

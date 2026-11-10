@@ -206,7 +206,7 @@ fn a_duress_session_hands_back_nothing_and_answers_as_one_with_no_backup() {
     };
     let mut g = guardians.remove(0).into_vauchi();
     g.setup_app_password("normal-pin").unwrap();
-    g.setup_duress_password("112233").unwrap();
+    g.setup_duress_pin_with_biometric_unlock("112233").unwrap();
     assert_eq!(g.authenticate("112233").unwrap(), AuthMode::Duress);
 
     assert!(matches!(

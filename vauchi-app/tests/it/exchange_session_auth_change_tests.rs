@@ -23,7 +23,7 @@ fn engine_with_duress_pin() -> AppEngine {
     engine.vauchi_mut().setup_app_password(PASSWORD).unwrap();
     engine
         .vauchi_mut()
-        .setup_duress_password(DURESS_PIN)
+        .setup_duress_pin_with_biometric_unlock(DURESS_PIN)
         .unwrap();
     engine
 }

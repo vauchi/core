@@ -30,7 +30,7 @@ fn locked_after_backgrounding(pin: &str) -> AppEngine {
     engine.vauchi_mut().setup_app_password(PASSWORD).unwrap();
     engine
         .vauchi_mut()
-        .setup_duress_password(DURESS_PIN)
+        .setup_duress_pin_with_biometric_unlock(DURESS_PIN)
         .unwrap();
     engine.vauchi_mut().authenticate(pin).unwrap();
     engine.navigate_to(AppScreen::Settings);

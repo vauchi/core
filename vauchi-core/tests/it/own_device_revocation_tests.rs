@@ -138,7 +138,9 @@ fn in_duress_mode_this_device_never_revokes_itself_in_the_real_registry() {
     let (mut phone, _tablet, _laptop) = phone_with_tablet_and_laptop();
     let this_phone = *phone.identity().unwrap().device_id();
     phone.setup_app_password("app-pin-1234").unwrap();
-    phone.setup_duress_password("135790").unwrap();
+    phone
+        .setup_duress_pin_with_biometric_unlock("135790")
+        .unwrap();
     assert_eq!(
         phone.authenticate("135790").unwrap(),
         vauchi_core::AuthMode::Duress

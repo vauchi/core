@@ -52,7 +52,8 @@ fn in_duress_mode() -> World {
     let ugo = met_elsewhere.id().to_string();
     wb.add_contact(met_elsewhere).unwrap();
     wb.set_exchange_location(&ugo, 46.0, 9.0).unwrap();
-    wb.setup_duress_password(DURESS_PIN).unwrap();
+    wb.setup_duress_pin_with_biometric_unlock(DURESS_PIN)
+        .unwrap();
     assert_eq!(wb.authenticate(DURESS_PIN).unwrap(), AuthMode::Duress);
     World {
         wb,

@@ -240,7 +240,9 @@ fn the_mask_seed_outlives_disabling_duress_and_a_new_app_password() {
     let seed = disk.storage().mask_seed().load().unwrap();
     let mut vauchi = disk.vauchi();
     vauchi.authenticate("my-pin-1234").unwrap();
-    vauchi.setup_duress_password("654321").unwrap();
+    vauchi
+        .setup_duress_pin_with_biometric_unlock("654321")
+        .unwrap();
     vauchi.disable_duress().unwrap();
     vauchi
         .change_app_password("my-pin-1234", "new-pin-5678")

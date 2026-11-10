@@ -579,7 +579,7 @@ fn test_authenticate_duress_password_sets_mode() {
 
     wb.setup_app_password("my-pin-1234")
         .expect("setup should succeed");
-    wb.setup_duress_password("654321")
+    wb.setup_duress_pin_with_biometric_unlock("654321")
         .expect("setup duress should succeed");
 
     let mode = wb.authenticate("654321").expect("auth should succeed");
@@ -597,7 +597,7 @@ fn test_authenticate_duress_password_sets_mode() {
 fn test_setup_duress_password_requires_app_password_first() {
     let mut wb = create_vauchi_with_identity("Alice");
 
-    let result = wb.setup_duress_password("654321");
+    let result = wb.setup_duress_pin_with_biometric_unlock("654321");
     assert!(
         result.is_err(),
         "setting up duress without app password should fail"
@@ -611,7 +611,7 @@ fn test_disable_duress() {
 
     wb.setup_app_password("my-pin-1234")
         .expect("setup should succeed");
-    wb.setup_duress_password("654321")
+    wb.setup_duress_pin_with_biometric_unlock("654321")
         .expect("setup duress should succeed");
 
     assert!(wb.is_duress_enabled().expect("check should succeed"));
@@ -691,7 +691,8 @@ fn test_change_app_password_duress_unlock_cannot_change_password() {
     // access; it must never escalate to credential management.
     let mut wb = create_vauchi_with_identity("Alice");
     wb.setup_app_password("real-pin-1234").expect("setup");
-    wb.setup_duress_password("654322").expect("setup duress");
+    wb.setup_duress_pin_with_biometric_unlock("654322")
+        .expect("setup duress");
 
     let err = wb
         .change_app_password("654322", "attacker-pin")
@@ -768,7 +769,8 @@ fn biometric_unlock_decision_unlocked_when_no_duress() {
 fn biometric_unlock_decision_prompts_for_pin_when_duress_enabled() {
     let mut wb = create_vauchi_with_identity("Alice");
     wb.setup_app_password("my-pin-1234").expect("setup app pw");
-    wb.setup_duress_password("654321").expect("setup duress");
+    wb.setup_duress_pin_with_biometric_unlock("654321")
+        .expect("setup duress");
 
     let outcome = wb
         .biometric_unlock_check()
@@ -820,7 +822,7 @@ fn biometric_unlock_check_constant_time_across_duress_states() {
     let mut wb_with_duress = create_vauchi_with_identity("Bob");
     wb_with_duress.setup_app_password("pw").expect("setup");
     wb_with_duress
-        .setup_duress_password("654321")
+        .setup_duress_pin_with_biometric_unlock("654321")
         .expect("setup duress");
 
     let t_no = {
@@ -932,7 +934,7 @@ fn test_list_contacts_duress_mode_returns_decoy() {
         .setup_app_password("my-pin")
         .expect("setup should succeed");
     alice_wb
-        .setup_duress_password("112233")
+        .setup_duress_pin_with_biometric_unlock("112233")
         .expect("setup duress should succeed");
 
     let decoy_card = ContactCard::new("Decoy Contact");
@@ -968,7 +970,7 @@ fn test_full_duress_flow_sends_nothing() {
         .expect("setup app password should succeed");
 
     // 2. Set up duress password
-    wb.setup_duress_password("654321")
+    wb.setup_duress_pin_with_biometric_unlock("654321")
         .expect("setup duress should succeed");
 
     // 3. Add decoy contacts

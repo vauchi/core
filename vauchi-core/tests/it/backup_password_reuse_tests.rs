@@ -22,7 +22,7 @@ fn alice() -> Vauchi {
         .setup_app_password(APP_PASSWORD)
         .expect("app password");
     alice
-        .setup_duress_password(DURESS_PIN)
+        .setup_duress_pin_with_biometric_unlock(DURESS_PIN)
         .expect("duress password");
     alice
         .add_decoy_contact("decoy-dana", "Decoy Dana", &ContactCard::new("Decoy Dana"))

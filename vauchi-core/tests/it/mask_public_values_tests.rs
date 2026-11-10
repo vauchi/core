@@ -95,7 +95,9 @@ fn a_rename_under_duress_leaves_the_real_name_in_the_mask() {
         let mut vauchi = disk.open();
         vauchi.create_identity("Alice").unwrap();
         vauchi.setup_app_password(APP_PASSWORD).unwrap();
-        vauchi.setup_duress_password(DURESS_PIN).unwrap();
+        vauchi
+            .setup_duress_pin_with_biometric_unlock(DURESS_PIN)
+            .unwrap();
         vauchi.public_id().unwrap()
     };
     {

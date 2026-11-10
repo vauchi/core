@@ -51,7 +51,7 @@ fn duress_with_real_annotations() -> (Vauchi, String /* bob_real_id */) {
     assert_eq!(wb.get_failed_deliveries().unwrap().len(), 1);
 
     wb.setup_app_password("normal-pin").unwrap();
-    wb.setup_duress_password("112233").unwrap();
+    wb.setup_duress_pin_with_biometric_unlock("112233").unwrap();
     wb.add_decoy_contact("decoy-dana", "Decoy Dana", &ContactCard::new("Decoy Dana"))
         .unwrap();
     assert_eq!(wb.authenticate("112233").unwrap(), AuthMode::Duress);

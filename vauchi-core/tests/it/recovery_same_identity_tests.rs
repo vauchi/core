@@ -164,7 +164,9 @@ fn a_duress_session_hands_back_nothing_and_answers_as_one_with_no_backup() {
     let mut guardian = lost.guardians.remove(0).into_vauchi();
     let no_backup = format!("{:?}", guardian.hand_back_in_person(&stranger_claim));
     guardian.setup_app_password("normal-pin").unwrap();
-    guardian.setup_duress_password("112233").unwrap();
+    guardian
+        .setup_duress_pin_with_biometric_unlock("112233")
+        .unwrap();
     assert_eq!(guardian.authenticate("112233").unwrap(), AuthMode::Duress);
 
     let coerced = guardian.hand_back_in_person(&claim);

@@ -154,7 +154,9 @@ fn world_on(alice_install: Install, credential: &str, expected_mode: AuthMode) -
     bob.create_identity("Bob").unwrap();
     let linked = link_contacts(&alice, &bob, "Bob");
     alice.setup_app_password(APP_PIN).unwrap();
-    alice.setup_duress_password(DURESS_PIN).unwrap();
+    alice
+        .setup_duress_pin_with_biometric_unlock(DURESS_PIN)
+        .unwrap();
     assert_eq!(alice.authenticate(credential).unwrap(), expected_mode);
     World {
         relays,

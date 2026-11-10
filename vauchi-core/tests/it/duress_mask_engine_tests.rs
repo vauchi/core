@@ -24,7 +24,9 @@ fn alice_with_a_duress_pin() -> Real {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password(APP_PASSWORD).unwrap();
-    vauchi.setup_duress_password(DURESS_PIN).unwrap();
+    vauchi
+        .setup_duress_pin_with_biometric_unlock(DURESS_PIN)
+        .unwrap();
     Real {
         public_id: vauchi.public_id().unwrap(),
         fingerprint: vauchi.own_fingerprint().unwrap(),

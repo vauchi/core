@@ -30,7 +30,8 @@ fn in_duress_mode() -> Vauchi {
         .device()
         .save_device_registry(&registry)
         .unwrap();
-    wb.setup_duress_password(DURESS_PIN).unwrap();
+    wb.setup_duress_pin_with_biometric_unlock(DURESS_PIN)
+        .unwrap();
     assert_eq!(wb.authenticate(DURESS_PIN).unwrap(), AuthMode::Duress);
     wb
 }
@@ -132,7 +133,8 @@ fn tablet_in_duress_mode() -> Vauchi {
         .device()
         .save_device_registry(&registry)
         .unwrap();
-    wb.setup_duress_password(DURESS_PIN).unwrap();
+    wb.setup_duress_pin_with_biometric_unlock(DURESS_PIN)
+        .unwrap();
     assert_eq!(wb.authenticate(DURESS_PIN).unwrap(), AuthMode::Duress);
     wb
 }

@@ -652,7 +652,9 @@ fn in_duress_mode_visibility_changes_are_journaled_only_as_cover() {
     vauchi.add_own_field(field).unwrap();
     let (registry, tablet_id) = link_tablet(&vauchi, [31u8; 32]);
     vauchi.setup_app_password("app-password-123").unwrap();
-    vauchi.setup_duress_password("135790").unwrap();
+    vauchi
+        .setup_duress_pin_with_biometric_unlock("135790")
+        .unwrap();
     let before = journal_for_tablet(&vauchi, registry.clone(), &tablet_id).len();
     vauchi.authenticate("135790").unwrap();
 

@@ -49,7 +49,8 @@ pub enum EngineOutput {
     Backup(BackupFormSnapshot),
     /// PIN/password typed on the lock screen (redacted in `Debug`).
     /// Absent (engine returns `None`) while the entry is empty.
-    Lock { pin: String },
+    /// `biometric_passed`: a biometric check passed since the lock.
+    Lock { pin: String, biometric_passed: bool },
     /// PIN typed to confirm a device link (redacted in `Debug`). Absent
     /// while the entry is empty or the screen is past the PIN step.
     DeviceLinkPin { pin: String },

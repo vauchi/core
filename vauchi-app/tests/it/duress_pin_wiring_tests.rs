@@ -201,6 +201,10 @@ fn duress_unlock_enters_decoy_mode_without_wiping() {
         .unwrap();
 
     engine.set_initial_screen(AppScreen::Lock);
+    // The biometric branch: the PIN counts after the biometric pass.
+    let _ = engine
+        .dispatch(vauchi_core::Event::BiometricUnlockSucceeded)
+        .unwrap();
     // The lock screen's TextInput carries the full value per TextChanged
     // (unlike the setup flow's per-digit PinInput).
     let _ = engine.handle_action(UserAction::TextChanged {

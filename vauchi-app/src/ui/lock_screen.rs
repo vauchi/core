@@ -164,6 +164,7 @@ impl WorkflowEngine for LockScreenEngine {
         } else {
             Some(EngineOutput::Lock {
                 pin: self.entered_pin.clone(),
+                biometric_passed: self.biometric_passed,
             })
         }
     }

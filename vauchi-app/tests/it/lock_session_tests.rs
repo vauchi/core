@@ -178,6 +178,8 @@ fn the_password_unlocks_the_session() {
 fn the_duress_pin_unlocks_the_session_in_duress_mode() {
     let mut engine = engine_with_password(true);
     engine.bootstrap();
+    // The biometric branch: the PIN counts after the biometric pass.
+    let _ = engine.dispatch(Event::BiometricUnlockSucceeded).unwrap();
     unlock_with(&mut engine, DURESS_PIN);
 
     engine.navigate_to(AppScreen::Contacts);

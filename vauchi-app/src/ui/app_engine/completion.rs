@@ -148,8 +148,11 @@ impl AppEngine {
 
     /// Lock screen complete: authenticate with the entered password.
     pub(super) fn complete_lock(&mut self) -> ActionResult {
-        let pin = match self.engine.engine_output() {
-            Some(crate::ui::EngineOutput::Lock { pin }) => pin,
+        let (pin, biometric_passed) = match self.engine.engine_output() {
+            Some(crate::ui::EngineOutput::Lock {
+                pin,
+                biometric_passed,
+            }) => (pin, biometric_passed),
             _ => {
                 return ActionResult::ValidationError {
                     component_id: "pin".into(),
@@ -157,7 +160,11 @@ impl AppEngine {
                 };
             }
         };
-        match self.vauchi.authenticate(&pin) {
+        let device_has_biometrics = self.device_capabilities.has_biometrics;
+        match self
+            .vauchi
+            .authenticate_at_lock(&pin, biometric_passed, device_has_biometrics)
+        {
             Ok(_) => {
                 self.unlock_session();
                 // The duress-setup entry flow asked for the password to

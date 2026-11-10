@@ -58,13 +58,30 @@ impl ProfileEngine {
 }
 
 impl super::Vauchi {
-    /// The lock screen's unlock.
+    /// The lock screen's unlock. Under the biometric branch the PIN counts
+    /// only after a biometric pass on a device that has biometrics. Every
+    /// install with biometric unlock shows the same lock screen, so a PIN
+    /// typed before the pass is refused as a wrong one, after the same
+    /// Argon2id work, and neither the answer nor its time shows that duress
+    /// is set. The real setup decides, as for
+    /// [`Self::biometric_unlock_check`], so a lock after a duress session
+    /// behaves the same.
     pub fn authenticate_at_lock(
         &mut self,
         password: &str,
-        _biometric_passed: bool,
-        _device_has_biometrics: bool,
+        biometric_passed: bool,
+        device_has_biometrics: bool,
     ) -> VauchiResult<super::AuthMode> {
+        let real = self.real_engine_mut();
+        let waits_for_the_pass = device_has_biometrics
+            && !biometric_passed
+            && real.storage.identity().duress_unlock()? == Some(DuressUnlock::Biometric);
+        if waits_for_the_pass {
+            if let Some(config) = real.password_config()? {
+                let _same_work_as_a_wrong_pin = config.verify(password);
+            }
+            return Err(VauchiError::InvalidState("invalid password".into()));
+        }
         self.authenticate(password)
     }
 }

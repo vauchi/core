@@ -93,7 +93,13 @@ fn lock_output_carries_credential_and_redacts_debug() {
         });
     }
     let output = engine.engine_output().expect("credential output");
-    assert_eq!(output, EngineOutput::Lock { pin: "1234".into() });
+    assert_eq!(
+        output,
+        EngineOutput::Lock {
+            pin: "1234".into(),
+            biometric_passed: false
+        }
+    );
     let debug = format!("{output:?}");
     assert!(
         !debug.contains("1234") && debug.contains("<redacted>"),
@@ -137,7 +143,8 @@ fn lock_screen_accepts_long_alphanumeric_password() {
     assert_eq!(
         engine.engine_output().expect("credential output"),
         EngineOutput::Lock {
-            pin: password.into()
+            pin: password.into(),
+            biometric_passed: false
         },
         "the full free-text password must reach authenticate() unchanged"
     );

@@ -255,7 +255,8 @@ fn lock_screen_accepts_long_alphanumeric_password() {
     assert_eq!(
         engine.engine_output(),
         Some(EngineOutput::Lock {
-            pin: password.into()
+            pin: password.into(),
+            biometric_passed: false
         }),
         "the full password must reach authenticate() unchanged"
     );

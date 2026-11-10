@@ -186,6 +186,50 @@ impl Storage {
         Ok(())
     }
 
+    /// Re-encrypt every contact's pinned device keys (SC-62).
+    pub(super) fn rekey_contact_device_key_pins(
+        &self,
+        old_key: &SymmetricKey,
+        new_key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT contact_id, pins_encrypted FROM contact_device_key_pins")
+            .map_err(|e| StorageError::Migration(format!("Read contact device pins: {}", e)))?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?))
+            })
+            .map_err(|e| StorageError::Migration(format!("Query contact device pins: {}", e)))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| StorageError::Migration(format!("Collect contact device pins: {}", e)))?;
+        drop(stmt);
+
+        for (contact_id, encrypted) in rows {
+            let plain = decrypt(old_key, &encrypted).map_err(|e| {
+                StorageError::Migration(format!(
+                    "Decrypt contact device pins {}: {}",
+                    contact_id, e
+                ))
+            })?;
+            let reencrypted = encrypt(new_key, &plain).map_err(|e| {
+                StorageError::Migration(format!(
+                    "Encrypt contact device pins {}: {}",
+                    contact_id, e
+                ))
+            })?;
+            self.conn
+                .execute(
+                    "UPDATE contact_device_key_pins SET pins_encrypted = ?1 WHERE contact_id = ?2",
+                    params![reencrypted, contact_id],
+                )
+                .map_err(|e| {
+                    StorageError::Migration(format!("Update contact device pins: {}", e))
+                })?;
+        }
+        Ok(())
+    }
+
     /// Re-encrypt device_info: device_info_encrypted
     pub(super) fn rekey_device_info(
         &self,

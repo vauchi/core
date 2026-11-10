@@ -70,6 +70,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("public_values", "display_name_encrypted"),
     ("device_registry", "registry_json_encrypted"),
     ("contact_device_registries", "broadcast_encrypted"),
+    // V118 pinned device keys per contact (SC-62)
+    ("contact_device_key_pins", "pins_encrypted"),
     // V62 received safety-alert facts
     ("safety_alert_facts", "signed_payload_encrypted"),
     ("device_sync_state", "state_json_encrypted"),
@@ -300,6 +302,9 @@ impl Storage {
 
         self.rekey_contact_device_registries(old_key, new_key)?;
         report("contact_device_registries");
+
+        self.rekey_contact_device_key_pins(old_key, new_key)?;
+        report("contact_device_key_pins");
 
         self.rekey_safety_alert_facts(old_key, new_key)?;
         report("safety_alert_facts");

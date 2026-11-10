@@ -1273,7 +1273,7 @@
                       {
                         "title": "mobile",
                         "subtitle": "+44 20 7946 0958",
-                        "detail": "All contacts by default",
+                        "detail": null,
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "M",
@@ -1288,7 +1288,23 @@
                           "shortcut": null
                         },
                         "secondary_actions": [],
-                        "controls": [],
+                        "controls": [
+                          {
+                            "Status": {
+                              "id": null,
+                              "title": "All contacts by default",
+                              "detail": null,
+                              "icon_token": null,
+                              "badge": null,
+                              "tone": "neutral",
+                              "activation": null,
+                              "accessibility": {
+                                "label": "All contacts by default",
+                                "description": null
+                              }
+                            }
+                          }
+                        ],
                         "accessibility": {
                           "label": "mobile: +44 20 7946 0958",
                           "description": null
@@ -1297,7 +1313,7 @@
                       {
                         "title": "work",
                         "subtitle": "ada@analytical.example.org",
-                        "detail": "All contacts by default",
+                        "detail": null,
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "W",
@@ -1312,7 +1328,23 @@
                           "shortcut": null
                         },
                         "secondary_actions": [],
-                        "controls": [],
+                        "controls": [
+                          {
+                            "Status": {
+                              "id": null,
+                              "title": "All contacts by default",
+                              "detail": null,
+                              "icon_token": null,
+                              "badge": null,
+                              "tone": "neutral",
+                              "activation": null,
+                              "accessibility": {
+                                "label": "All contacts by default",
+                                "description": null
+                              }
+                            }
+                          }
+                        ],
                         "accessibility": {
                           "label": "work: ada@analytical.example.org",
                           "description": null
@@ -1321,7 +1353,7 @@
                       {
                         "title": "homepage",
                         "subtitle": "https://ada.example.org",
-                        "detail": "All contacts by default",
+                        "detail": null,
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "H",
@@ -1336,7 +1368,23 @@
                           "shortcut": null
                         },
                         "secondary_actions": [],
-                        "controls": [],
+                        "controls": [
+                          {
+                            "Status": {
+                              "id": null,
+                              "title": "All contacts by default",
+                              "detail": null,
+                              "icon_token": null,
+                              "badge": null,
+                              "tone": "neutral",
+                              "activation": null,
+                              "accessibility": {
+                                "label": "All contacts by default",
+                                "description": null
+                              }
+                            }
+                          }
+                        ],
                         "accessibility": {
                           "label": "homepage: https://ada.example.org",
                           "description": null
@@ -1345,7 +1393,7 @@
                       {
                         "title": "home",
                         "subtitle": "12 St James's Square, London",
-                        "detail": "Family",
+                        "detail": null,
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "H",
@@ -1360,7 +1408,23 @@
                           "shortcut": null
                         },
                         "secondary_actions": [],
-                        "controls": [],
+                        "controls": [
+                          {
+                            "Status": {
+                              "id": null,
+                              "title": "Family",
+                              "detail": null,
+                              "icon_token": null,
+                              "badge": null,
+                              "tone": "neutral",
+                              "activation": null,
+                              "accessibility": {
+                                "label": "Family",
+                                "description": null
+                              }
+                            }
+                          }
+                        ],
                         "accessibility": {
                           "label": "home: 12 St James's Square, London",
                           "description": null
@@ -1369,7 +1433,7 @@
                       {
                         "title": "birthday",
                         "subtitle": "1815-12-10",
-                        "detail": "Cycling club, Family",
+                        "detail": null,
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "B",
@@ -1384,7 +1448,23 @@
                           "shortcut": null
                         },
                         "secondary_actions": [],
-                        "controls": [],
+                        "controls": [
+                          {
+                            "Status": {
+                              "id": null,
+                              "title": "Cycling club, Family",
+                              "detail": null,
+                              "icon_token": null,
+                              "badge": null,
+                              "tone": "neutral",
+                              "activation": null,
+                              "accessibility": {
+                                "label": "Cycling club, Family",
+                                "description": null
+                              }
+                            }
+                          }
+                        ],
                         "accessibility": {
                           "label": "birthday: 1815-12-10",
                           "description": null
@@ -2483,7 +2563,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_179f0950bf8563a6",
+                    "id": "field_bf77c39a42edbbb9",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2521,13 +2601,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:179f0950bf8563a6",
+                    "id": "field_note:bf77c39a42edbbb9",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:179f0950bf8563a6",
+                          "id": "field_note:bf77c39a42edbbb9",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2567,7 +2647,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_a49013b647d51aad",
+                    "id": "field_ffa1c858faeacd5d",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2605,13 +2685,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:a49013b647d51aad",
+                    "id": "field_note:ffa1c858faeacd5d",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:a49013b647d51aad",
+                          "id": "field_note:ffa1c858faeacd5d",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2651,7 +2731,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_9f24ff65ef9b2699",
+                    "id": "field_f36002afba59eddd",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2689,13 +2769,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:9f24ff65ef9b2699",
+                    "id": "field_note:f36002afba59eddd",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:9f24ff65ef9b2699",
+                          "id": "field_note:f36002afba59eddd",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -5058,10 +5138,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "88A4 3879 021B DE0E 3245 7FB6 57C1 5CAE 0A38 CBF4 4233 6395 B8F4 0802 04B3 A5BD",
+                    "content": "C470 4918 F136 ABA7 5627 910A 9577 E4E2 3E96 F46A 4D84 5A38 7822 3A09 0779 A055",
                     "style": "body",
                     "accessibility": {
-                      "label": "88A4 3879 021B DE0E 3245 7FB6 57C1 5CAE 0A38 CBF4 4233 6395 B8F4 0802 04B3 A5BD",
+                      "label": "C470 4918 F136 ABA7 5627 910A 9577 E4E2 3E96 F46A 4D84 5A38 7822 3A09 0779 A055",
                       "description": null
                     }
                   }
@@ -5080,10 +5160,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "8008 AB16 0C92 E713 B656 9A27 05DF 7347 9C4E 45E4 0C14 F765 E975 CADB 088B B09D",
+                    "content": "EC4E E659 E3CE 2026 F5C5 37DB D95F 3060 3398 3DD6 9BF8 5885 CA18 A365 6C27 79AB",
                     "style": "body",
                     "accessibility": {
-                      "label": "8008 AB16 0C92 E713 B656 9A27 05DF 7347 9C4E 45E4 0C14 F765 E975 CADB 088B B09D",
+                      "label": "EC4E E659 E3CE 2026 F5C5 37DB D95F 3060 3398 3DD6 9BF8 5885 CA18 A365 6C27 79AB",
                       "description": null
                     }
                   }
@@ -14345,7 +14425,7 @@
                       {
                         "title": "mobile",
                         "subtitle": "+44 20 7946 0958",
-                        "detail": "All contacts by default",
+                        "detail": null,
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "M",
@@ -14360,7 +14440,23 @@
                           "shortcut": null
                         },
                         "secondary_actions": [],
-                        "controls": [],
+                        "controls": [
+                          {
+                            "Status": {
+                              "id": null,
+                              "title": "All contacts by default",
+                              "detail": null,
+                              "icon_token": null,
+                              "badge": null,
+                              "tone": "neutral",
+                              "activation": null,
+                              "accessibility": {
+                                "label": "All contacts by default",
+                                "description": null
+                              }
+                            }
+                          }
+                        ],
                         "accessibility": {
                           "label": "mobile: +44 20 7946 0958",
                           "description": null
@@ -14369,7 +14465,7 @@
                       {
                         "title": "work",
                         "subtitle": "ada@analytical.example.org",
-                        "detail": "All contacts by default",
+                        "detail": null,
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "W",
@@ -14384,7 +14480,23 @@
                           "shortcut": null
                         },
                         "secondary_actions": [],
-                        "controls": [],
+                        "controls": [
+                          {
+                            "Status": {
+                              "id": null,
+                              "title": "All contacts by default",
+                              "detail": null,
+                              "icon_token": null,
+                              "badge": null,
+                              "tone": "neutral",
+                              "activation": null,
+                              "accessibility": {
+                                "label": "All contacts by default",
+                                "description": null
+                              }
+                            }
+                          }
+                        ],
                         "accessibility": {
                           "label": "work: ada@analytical.example.org",
                           "description": null
@@ -14393,7 +14505,7 @@
                       {
                         "title": "homepage",
                         "subtitle": "https://ada.example.org",
-                        "detail": "All contacts by default",
+                        "detail": null,
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "H",
@@ -14408,7 +14520,23 @@
                           "shortcut": null
                         },
                         "secondary_actions": [],
-                        "controls": [],
+                        "controls": [
+                          {
+                            "Status": {
+                              "id": null,
+                              "title": "All contacts by default",
+                              "detail": null,
+                              "icon_token": null,
+                              "badge": null,
+                              "tone": "neutral",
+                              "activation": null,
+                              "accessibility": {
+                                "label": "All contacts by default",
+                                "description": null
+                              }
+                            }
+                          }
+                        ],
                         "accessibility": {
                           "label": "homepage: https://ada.example.org",
                           "description": null
@@ -14417,7 +14545,7 @@
                       {
                         "title": "home",
                         "subtitle": "12 St James's Square, London",
-                        "detail": "Family",
+                        "detail": null,
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "H",
@@ -14432,7 +14560,23 @@
                           "shortcut": null
                         },
                         "secondary_actions": [],
-                        "controls": [],
+                        "controls": [
+                          {
+                            "Status": {
+                              "id": null,
+                              "title": "Family",
+                              "detail": null,
+                              "icon_token": null,
+                              "badge": null,
+                              "tone": "neutral",
+                              "activation": null,
+                              "accessibility": {
+                                "label": "Family",
+                                "description": null
+                              }
+                            }
+                          }
+                        ],
                         "accessibility": {
                           "label": "home: 12 St James's Square, London",
                           "description": null
@@ -14441,7 +14585,7 @@
                       {
                         "title": "birthday",
                         "subtitle": "1815-12-10",
-                        "detail": "Cycling club, Family",
+                        "detail": null,
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "B",
@@ -14456,7 +14600,23 @@
                           "shortcut": null
                         },
                         "secondary_actions": [],
-                        "controls": [],
+                        "controls": [
+                          {
+                            "Status": {
+                              "id": null,
+                              "title": "Cycling club, Family",
+                              "detail": null,
+                              "icon_token": null,
+                              "badge": null,
+                              "tone": "neutral",
+                              "activation": null,
+                              "accessibility": {
+                                "label": "Cycling club, Family",
+                                "description": null
+                              }
+                            }
+                          }
+                        ],
                         "accessibility": {
                           "label": "birthday: 1815-12-10",
                           "description": null
@@ -18383,7 +18543,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "https://vauchi.app/x#pk=WJCSicJK-6oNTGHmcflP4wkE3rMlozI3HEGGxJnbD08&n=UQjzeEWr7FBW8ls1C1DBMOQeA3OS8x3MnsEIyG5X6eA&v=2&nm=QWRhIExvdmVsYWNl",
+                    "content": "https://vauchi.app/x#pk=FZvm16QRAGQw-T98DWFwnUBqCvGufti4_dB-rkKL_no&n=LIBMAhQj4sG_Mh_k4MOol1nGZDRMEXvekYUmM5FLslU&v=2&nm=QWRhIExvdmVsYWNl",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -18394,7 +18554,7 @@
                 {
                   "Text": {
                     "id": "link_code",
-                    "content": "742 643",
+                    "content": "986 577",
                     "style": "heading",
                     "accessibility": {
                       "label": "Confirmation code",
@@ -18971,7 +19131,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,79,65,67,75,115,87,68,74,76,110,69,55,90,87,109,105,99,70,51,51,78,72,110,69,53,70,53,65,119,85,57,50,88,112,100,99,114,98,67,73,117,119,110,97,98,77,102,71,87,82,51,116,108,66,88,106,82,104,65,101,67,90,106,53,100,112,120,80,101,77,116,54,75,105,71,122,100,67,102,80,49,108,118,56,66,90,52,116,77,75,83,101,83,88,50,48,84,113,98,79,55,114,83,66,111,71,73,68,114,77,109,66,55,88,114,89,90,105,88,84,53,75,111,115,79,47,78,116,98,117,112,121,51,84,47,65,85,112,103,50,51,55,67,54,65,72,112,54,76,85,65,65,65,65,65,71,114,121,104,67,73,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,65,57,78,120,117,118,70,80,116,57,76,57,48,67,74,114,86,74,57,109,67,117,98,88,48,116,77,65,71,111,57,80,66,81,97,89,75,52,109,98,49,105,50,81,84,65,103,52,116,79,89,80,87,117,69,117,102,54,73,121,88,119,79,108,87,120,81,101,120,119,103,79,52,66,102,111,112,53,66,90,43,78,110,117,69,73],
+            "payload": [86,48,74,70,87,65,80,115,84,117,90,90,52,56,52,103,74,118,88,70,78,57,118,90,88,122,66,103,77,53,103,57,49,112,118,52,87,73,88,75,71,75,78,108,98,67,100,53,113,49,78,71,104,79,111,74,107,97,67,66,51,80,74,74,121,66,77,83,98,47,88,81,121,43,90,80,114,55,78,53,102,116,106,85,53,120,118,84,85,112,108,83,71,81,88,82,66,118,73,55,69,75,87,54,69,113,72,120,51,50,109,90,81,70,55,56,87,67,51,121,103,87,81,82,102,88,75,97,120,90,104,103,57,109,103,111,87,89,97,43,120,75,98,75,97,119,102,110,48,83,74,77,48,113,51,48,65,65,65,65,65,71,114,122,72,52,56,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,67,101,54,66,108,114,83,55,69,120,114,50,68,73,112,90,90,76,115,71,105,70,73,70,122,55,55,85,121,97,66,97,56,89,75,90,88,82,117,110,97,71,99,79,110,55,107,56,104,67,66,118,111,77,103,65,49,68,109,51,83,121,120,80,56,49,75,101,86,82,84,109,116,108,50,86,79,82,97,50,106,71,68,82,103,75],
             "is_initiator": true,
             "endpoint": {
               "service_type": "_vauchi-exchange._tcp.local.",
@@ -19059,7 +19219,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI30:0:0:00LDMPBO13J1D9W46RC964D7QUL$I26J:/BH*S*QMQN82DAI3G*53*6FJOI-%V.FV3VQPR4%ZP5$R9KQZT84ZPDXCNV4H*2999K+UJZKI*7:Y3U:C5 0.9IP5L11Vauchi User00"
+                      "INI30:0:0:00QGN72VE70CHAOM3UYQ:+N4PIWZPZBRXSGZM7OPAPFIMKQC+S%*8Q-E/498X07SQRMN-A1K%4-7UAXIMHFZ9FJHH+B8Y9CR7HI6OANJAO5I/9XFHV.7-BHSOE11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -19267,8 +19427,8 @@
             "earliest_secs": 1,
             "deadline_secs": 1,
             "min_interval_secs": 1,
-            "earliest_millis": 91,
-            "delay_millis": 91
+            "earliest_millis": 115,
+            "delay_millis": 115
           }
         }
       ]
@@ -20027,7 +20187,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [55,189,145,162,151,125,250,40,89,13,192,167,216,116,175,129,136,44,121,164,239,44,201,227,154,119,20,17,243,106,24,206]
+            "payload": [30,74,32,173,23,210,199,216,120,163,245,72,79,189,131,63,61,166,96,16,147,26,183,49,235,243,81,50,157,165,32,192]
           }
         },
         {
@@ -20232,7 +20392,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [36,183,46,149,98,14,63,161,247,240,209,12,163,142,10,248,172,197,243,210,110,55,7,85,24,157,202,82,16,76,164,59]
+            "payload": [127,193,52,233,44,125,78,81,149,32,108,132,73,128,145,232,88,13,178,228,152,221,39,42,122,19,254,241,237,65,134,189]
           }
         },
         {
@@ -20437,7 +20597,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [164,46,145,33,185,58,119,216,163,217,20,248,254,87,113,248,214,240,103,20,139,213,96,99,131,52,196,255,170,124,5,47]
+            "payload": [56,231,225,147,132,147,20,33,93,153,171,196,54,151,29,84,180,70,250,185,217,169,241,252,75,83,7,198,115,166,212,40]
           }
         },
         {
@@ -23015,7 +23175,7 @@
                       {
                         "title": "mobile",
                         "subtitle": "+44 20 7946 0958",
-                        "detail": "Standardmäßig alle Kontakte",
+                        "detail": null,
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "M",
@@ -23030,7 +23190,23 @@
                           "shortcut": null
                         },
                         "secondary_actions": [],
-                        "controls": [],
+                        "controls": [
+                          {
+                            "Status": {
+                              "id": null,
+                              "title": "Standardmäßig alle Kontakte",
+                              "detail": null,
+                              "icon_token": null,
+                              "badge": null,
+                              "tone": "neutral",
+                              "activation": null,
+                              "accessibility": {
+                                "label": "Standardmäßig alle Kontakte",
+                                "description": null
+                              }
+                            }
+                          }
+                        ],
                         "accessibility": {
                           "label": "mobile: +44 20 7946 0958",
                           "description": null
@@ -23039,7 +23215,7 @@
                       {
                         "title": "work",
                         "subtitle": "ada@analytical.example.org",
-                        "detail": "Standardmäßig alle Kontakte",
+                        "detail": null,
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "W",
@@ -23054,7 +23230,23 @@
                           "shortcut": null
                         },
                         "secondary_actions": [],
-                        "controls": [],
+                        "controls": [
+                          {
+                            "Status": {
+                              "id": null,
+                              "title": "Standardmäßig alle Kontakte",
+                              "detail": null,
+                              "icon_token": null,
+                              "badge": null,
+                              "tone": "neutral",
+                              "activation": null,
+                              "accessibility": {
+                                "label": "Standardmäßig alle Kontakte",
+                                "description": null
+                              }
+                            }
+                          }
+                        ],
                         "accessibility": {
                           "label": "work: ada@analytical.example.org",
                           "description": null
@@ -23063,7 +23255,7 @@
                       {
                         "title": "homepage",
                         "subtitle": "https://ada.example.org",
-                        "detail": "Standardmäßig alle Kontakte",
+                        "detail": null,
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "H",
@@ -23078,7 +23270,23 @@
                           "shortcut": null
                         },
                         "secondary_actions": [],
-                        "controls": [],
+                        "controls": [
+                          {
+                            "Status": {
+                              "id": null,
+                              "title": "Standardmäßig alle Kontakte",
+                              "detail": null,
+                              "icon_token": null,
+                              "badge": null,
+                              "tone": "neutral",
+                              "activation": null,
+                              "accessibility": {
+                                "label": "Standardmäßig alle Kontakte",
+                                "description": null
+                              }
+                            }
+                          }
+                        ],
                         "accessibility": {
                           "label": "homepage: https://ada.example.org",
                           "description": null
@@ -23087,7 +23295,7 @@
                       {
                         "title": "home",
                         "subtitle": "12 St James's Square, London",
-                        "detail": "Family",
+                        "detail": null,
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "H",
@@ -23102,7 +23310,23 @@
                           "shortcut": null
                         },
                         "secondary_actions": [],
-                        "controls": [],
+                        "controls": [
+                          {
+                            "Status": {
+                              "id": null,
+                              "title": "Family",
+                              "detail": null,
+                              "icon_token": null,
+                              "badge": null,
+                              "tone": "neutral",
+                              "activation": null,
+                              "accessibility": {
+                                "label": "Family",
+                                "description": null
+                              }
+                            }
+                          }
+                        ],
                         "accessibility": {
                           "label": "home: 12 St James's Square, London",
                           "description": null
@@ -23111,7 +23335,7 @@
                       {
                         "title": "birthday",
                         "subtitle": "1815-12-10",
-                        "detail": "Cycling club, Family",
+                        "detail": null,
                         "icon_token": null,
                         "image_data": null,
                         "fallback_text": "B",
@@ -23126,7 +23350,23 @@
                           "shortcut": null
                         },
                         "secondary_actions": [],
-                        "controls": [],
+                        "controls": [
+                          {
+                            "Status": {
+                              "id": null,
+                              "title": "Cycling club, Family",
+                              "detail": null,
+                              "icon_token": null,
+                              "badge": null,
+                              "tone": "neutral",
+                              "activation": null,
+                              "accessibility": {
+                                "label": "Cycling club, Family",
+                                "description": null
+                              }
+                            }
+                          }
+                        ],
                         "accessibility": {
                           "label": "birthday: 1815-12-10",
                           "description": null
@@ -24317,7 +24557,7 @@
                   "Qr": {
                     "id": "surface.1.claim_qr",
                     "payloads": [
-                      "AaqemcUEbQZvPuxL6cRDVZURV0BK4kS8Qnf2oQnC2SLz8d+/PkUCw+Xf9jVppw+xtS30mbaf3X6eUOpwfvov238A8VNlAAAAAA=="
+                      "AdFWTR9Mb5Nlz5UzcA6SUXtUhhsCbdghOGompRKF5y8OjdZzZGQMXwb0N/Fm0PvUb2D2ApzPgFjCHN1YJEceC1kA8VNlAAAAAA=="
                     ],
                     "purpose": "display",
                     "label": "Recovery claim — scan to vouch",
@@ -24345,10 +24585,10 @@
                 {
                   "Text": {
                     "id": "claim_data",
-                    "content": "AaqemcUEbQZvPuxL6cRDVZURV0BK4kS8Qnf2oQnC2SLz8d+/PkUCw+Xf9jVppw+xtS30mbaf3X6eUOpwfvov238A8VNlAAAAAA==",
+                    "content": "AdFWTR9Mb5Nlz5UzcA6SUXtUhhsCbdghOGompRKF5y8OjdZzZGQMXwb0N/Fm0PvUb2D2ApzPgFjCHN1YJEceC1kA8VNlAAAAAA==",
                     "style": "caption",
                     "accessibility": {
-                      "label": "AaqemcUEbQZvPuxL6cRDVZURV0BK4kS8Qnf2oQnC2SLz8d+/PkUCw+Xf9jVppw+xtS30mbaf3X6eUOpwfvov238A8VNlAAAAAA==",
+                      "label": "AdFWTR9Mb5Nlz5UzcA6SUXtUhhsCbdghOGompRKF5y8OjdZzZGQMXwb0N/Fm0PvUb2D2ApzPgFjCHN1YJEceC1kA8VNlAAAAAA==",
                       "description": null
                     }
                   }

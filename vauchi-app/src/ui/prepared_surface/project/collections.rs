@@ -3,7 +3,7 @@
 
 use vauchi_core::{
     AccessibilitySpec, ActionTone, ChoiceOption, PresentationImageShape, PresentationListStyle,
-    PresentationNode, PresentationPaging, PresentationRow,
+    PresentationNode, PresentationPaging, PresentationRow, PresentationTone,
 };
 
 use super::{
@@ -52,10 +52,29 @@ impl Projection {
                     },
                 )?);
             }
+            // An item's status (who sees a card entry) is a state, not a
+            // third line of text: as a Status control it carries a tone, so
+            // a shell can draw it as a chip instead of muted sub-text
+            // (vauchi/private#1206).
+            let controls = item
+                .status
+                .as_ref()
+                .map(|status| PresentationNode::Status {
+                    id: None,
+                    title: status.clone(),
+                    detail: None,
+                    icon_token: None,
+                    badge: None,
+                    tone: PresentationTone::Neutral,
+                    activation: None,
+                    accessibility: AccessibilitySpec::label(status),
+                })
+                .into_iter()
+                .collect();
             rows.push(PresentationRow {
                 title: item.name.clone(),
                 subtitle: item.subtitle.clone(),
-                detail: item.status.clone(),
+                detail: None,
                 icon_token: None,
                 image_data: None,
                 fallback_text: Some(item.initials.clone()),
@@ -64,7 +83,7 @@ impl Projection {
                 activation: Some(activation),
                 secondary_actions,
                 info: None,
-                controls: Vec::new(),
+                controls,
                 accessibility: accessibility(&item.a11y, &item.name),
             });
         }

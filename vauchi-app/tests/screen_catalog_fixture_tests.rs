@@ -466,12 +466,14 @@ fn my_info_visibility_by_label(entry: &ScreenCatalogEntry) -> BTreeMap<String, S
         })
         .flatten()
         .map(|row| {
-            (
-                row.title.clone(),
-                row.detail
-                    .clone()
-                    .expect("own entry row carries a visibility chip"),
-            )
+            let chip = match row.controls.as_slice() {
+                [PresentationNode::Status { title, .. }] => title.clone(),
+                other => panic!(
+                    "{} carries its visibility as one Status control, got {other:?}",
+                    row.title
+                ),
+            };
+            (row.title.clone(), chip)
         })
         .collect()
 }

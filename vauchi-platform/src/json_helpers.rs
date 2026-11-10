@@ -65,6 +65,15 @@ pub(crate) fn batch_to_json(
     commands: &[Command],
     hardware: &[Command],
 ) -> Result<String, MobileError> {
+    // Dev builds log the batch's outline (structure only, every text as
+    // its length) so two shells' envelopes can be diffed; store builds have
+    // no log backend (vauchi/private#1206).
+    #[cfg(feature = "dev-logging")]
+    tracing::info!(
+        target: "vauchi.presentation.outline",
+        "{}",
+        vauchi_app::ui::outline_json(commands)
+    );
     serde_json::to_string(&CommandsEnvelope { commands, hardware }).map_err(|e| {
         MobileError::Other {
             detail: format!("Failed to serialize CommandsEnvelope: {e}"),

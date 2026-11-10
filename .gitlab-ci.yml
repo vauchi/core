@@ -653,6 +653,12 @@ build:tests:
         exit 1
       fi
       grep "private#794" dev-build-guard.log
+    # Guard: no diagnostic_* UniFFI exports in the default-feature binding
+    # surface. Diagnostics ship only in --features diagnostic-scanner
+    # builds (2026-04-19-diagnostics-out-of-production-plan.md). It builds
+    # vauchi-platform and the binding generator on this tree.
+    - echo "── no diagnostic exports in the default binding surface ──"
+    - bash scripts/check-no-diagnostic-in-default.sh
     # One archive per package and feature set a test job runs; the features
     # are the ones the jobs passed to `cargo nextest run` before, with the
     # reasons kept at those jobs. The archives stay on the runner host
@@ -1393,24 +1399,6 @@ lint:module-boundaries:
 # Guard: no diagnostic_* UniFFI exports in default-feature binding surface.
 # Diagnostics must only ship in --features diagnostic-scanner builds
 # (test/debug). See 2026-04-19-diagnostics-out-of-production-plan.md.
-lint:no-diagnostic-in-default:
-  # This guard compiles the platform and binding generator from scratch.
-  # Share the cold-build queue and pull cache instead of competing unbounded.
-  extends: [.linux-runner-readonly, .timeout-cold-rebuild]
-  stage: lint
-  needs: []
-  script:
-    - bash scripts/check-no-diagnostic-in-default.sh
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        compare_to: refs/heads/$CI_DEFAULT_BRANCH
-        paths:
-          - "vauchi-platform/src/**/*.rs"
-          - "vauchi-core/src/**/*.rs"
-          - "vauchi-platform/Cargo.toml"
-          - "scripts/check-no-diagnostic-in-default.sh"
-
 # Coverage job: run on main merges only (not MRs) — llvm-cov is too slow
 # for per-push feedback but still needed for coverage tracking/badges.
 # Measures both vauchi-core and vauchi-platform in a single instrumentation

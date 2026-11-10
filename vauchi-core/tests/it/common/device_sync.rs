@@ -12,7 +12,7 @@ use vauchi_core::api::sync::DeviceSyncOrchestrator;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::{SigningKeyPair, SymmetricKey};
-use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
+use vauchi_core::identity::{DeviceInfo, DeviceRegistry, RegistryBroadcast};
 use vauchi_core::sync::SyncItem;
 use vauchi_core::{Storage, Vauchi};
 
@@ -72,4 +72,14 @@ pub fn journal_for_tablet(
     .unwrap()
     .pending_for_device(tablet_id)
     .to_vec()
+}
+
+/// The registry broadcast this identity's device sends to contacts, built
+/// by the production producer so tests follow it when it changes how it
+/// signs (vauchi/private#970).
+pub fn device_signed_broadcast(vauchi: &Vauchi) -> RegistryBroadcast {
+    let identity = vauchi.identity().expect("identity");
+    vauchi
+        .own_registry_broadcast(identity)
+        .expect("own registry broadcast")
 }

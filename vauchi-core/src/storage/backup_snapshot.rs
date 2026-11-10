@@ -91,7 +91,7 @@ impl DuressSection {
             .identity()
             .save_app_password(&password.hash, &password.salt)?;
         if let Some(pin) = self.duress_pin().map_err(invalid)? {
-            storage.identity().save_duress_password(
+            storage.identity().save_duress_password_under(
                 &pin.credential.hash,
                 &pin.credential.salt,
                 if pin.password_branch {

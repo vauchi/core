@@ -119,11 +119,21 @@ impl IdentityStore<'_> {
         self.storage.mask_seed().ensure()?;
         self.storage.seal_mask()
     }
-    /// Saves the duress password hash and salt, and enables duress mode.
+    /// Saves the duress password hash and salt under the biometric branch,
+    /// and enables duress mode.
+    pub fn save_duress_password(
+        &self,
+        hash: &[u8; 32],
+        salt: &[u8; 16],
+    ) -> Result<(), StorageError> {
+        self.save_duress_password_under(hash, salt, crate::emergency::DuressUnlock::Biometric)
+    }
+    /// Saves the duress password hash and salt under `unlock`'s branch, and
+    /// enables duress mode.
     ///
     /// The hash is sealed with the storage key together with the flags; a
     /// duress session's hold on the own-card copy survives a new PIN.
-    pub fn save_duress_password(
+    pub fn save_duress_password_under(
         &self,
         hash: &[u8; 32],
         salt: &[u8; 16],

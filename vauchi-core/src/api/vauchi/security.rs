@@ -339,7 +339,7 @@ impl ProfileEngine {
 
         self.storage
             .identity()
-            .save_duress_password(duress_hash, duress_salt, unlock)?;
+            .save_duress_password_under(duress_hash, duress_salt, unlock)?;
 
         Ok(())
     }

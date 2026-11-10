@@ -61,10 +61,14 @@ pub enum CardUpdateError {
     InvalidDelta,
     /// Ed25519 signature verification failed.
     SignatureInvalid,
-    /// The delta names no signing device, one the contact never pinned or
-    /// no longer holds active, or its device signature does not verify
-    /// under the pinned key (SC-62).
+    /// The delta names no signing device, one the contact no longer holds
+    /// active, or its device signature does not verify under the pinned
+    /// key (SC-62). Final: no later message changes it.
     DeviceSignatureInvalid,
+    /// The delta names a signing device the contact has never seen. The
+    /// sender's registry push can still name it, so the blob is kept for
+    /// a later receive (SC-62).
+    DeviceNotYetKnown,
     /// Replay attack detected (nonce already seen).
     ReplayDetected,
     /// A genesis decrypt attempt was rate-limited (ADR-068). Retriable — the
@@ -981,7 +985,7 @@ pub(crate) fn verify_delta_device_signature(
         .ok_or(CardUpdateError::DeviceSignatureInvalid)?;
     let key = pins
         .pinned(&signer)
-        .ok_or(CardUpdateError::DeviceSignatureInvalid)?;
+        .ok_or(CardUpdateError::DeviceNotYetKnown)?;
     let active = storage.device().load_contact_active_devices(sender_id)?;
     if !active.iter().any(|device| device.device_id == signer) {
         return Err(CardUpdateError::DeviceSignatureInvalid);

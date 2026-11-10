@@ -119,13 +119,14 @@ impl BlobOutcome {
     /// back, so nothing local remembers the blob existed). A rate-limited
     /// genesis attempt is likewise retriable — the blob is retained until the
     /// window resets (plan §REVISION F6). A delta whose signing device the
-    /// contact does not hold yet is retained too: the sender's registry
-    /// push can still name that device, and only a holder of the identity
-    /// key reaches this check at all (SC-62, vauchi/private#970).
+    /// contact has never seen is retained too: the sender's registry push
+    /// can still name that device, and only a holder of the identity key
+    /// reaches that check at all. A bad device signature or a revoked
+    /// signer is final and is acknowledged (SC-62, vauchi/private#970).
     pub(crate) fn should_ack(&self) -> bool {
         !matches!(
             self.reject_reason,
-            Some("storage") | Some("genesis_rate") | Some("device_signature")
+            Some("storage") | Some("genesis_rate") | Some("device_unknown")
         )
     }
 }
@@ -394,6 +395,7 @@ fn reject_category(e: &CardUpdateError) -> &'static str {
         CardUpdateError::InvalidDelta => "bad_delta",
         CardUpdateError::SignatureInvalid => "signature",
         CardUpdateError::DeviceSignatureInvalid => "device_signature",
+        CardUpdateError::DeviceNotYetKnown => "device_unknown",
         CardUpdateError::ReplayDetected => "replay",
         CardUpdateError::GenesisRateLimited => "genesis_rate",
         // Deterministic integrity conflict — ACKable (not "storage"/"genesis_rate"),

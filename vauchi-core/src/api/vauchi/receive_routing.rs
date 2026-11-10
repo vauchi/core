@@ -118,9 +118,15 @@ impl BlobOutcome {
     /// into permanent silent loss (the alert/nonce transaction was rolled
     /// back, so nothing local remembers the blob existed). A rate-limited
     /// genesis attempt is likewise retriable — the blob is retained until the
-    /// window resets (plan §REVISION F6).
+    /// window resets (plan §REVISION F6). A delta whose signing device the
+    /// contact does not hold yet is retained too: the sender's registry
+    /// push can still name that device, and only a holder of the identity
+    /// key reaches this check at all (SC-62, vauchi/private#970).
     pub(crate) fn should_ack(&self) -> bool {
-        !matches!(self.reject_reason, Some("storage") | Some("genesis_rate"))
+        !matches!(
+            self.reject_reason,
+            Some("storage") | Some("genesis_rate") | Some("device_signature")
+        )
     }
 }
 

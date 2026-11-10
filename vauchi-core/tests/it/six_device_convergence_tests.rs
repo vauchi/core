@@ -38,8 +38,17 @@ fn make_party(seed: [u8; 32], name: &str, email: &str) -> Party {
         device.set_own_field_public(&field_id).unwrap();
         devices.push(device);
     }
+    // Each entry names the key its device really signs with, so the deltas
+    // the production sealer signs verify under the pins the broadcast sets.
+    let stored_key = |device: &Vauchi| -> SigningKeyPair {
+        device
+            .storage()
+            .device()
+            .load_or_create_device_signing_key()
+            .unwrap()
+    };
     let first_identity = devices[0].identity().unwrap();
-    let first_device_key = SigningKeyPair::generate();
+    let first_device_key = stored_key(&devices[0]);
     let mut registry = DeviceRegistry::new(
         first_identity
             .device_info()
@@ -54,9 +63,17 @@ fn make_party(seed: [u8; 32], name: &str, email: &str) -> Party {
                 identity
                     .device_info()
                     .to_registered(&seed)
-                    .with_signing_key(*SigningKeyPair::generate().public_key().as_bytes()),
+                    .with_signing_key(*stored_key(device).public_key().as_bytes()),
                 first_identity.signing_keypair(),
             )
+            .unwrap();
+    }
+    // Every sibling holds the owner-synced registry, as a linked device does.
+    for device in &devices {
+        device
+            .storage()
+            .device()
+            .save_device_registry(&registry)
             .unwrap();
     }
     let signing_public_key = *first_identity.signing_public_key();

@@ -197,10 +197,7 @@ fn test_existing_database_permissions_preserved() {
 // 257 ms (debug) for one search plus one page. The 1 s bound catches an
 // algorithmic regression; the fastest of three runs is measured, because a
 // single run took 3.2 s once on a loaded CI runner (#625).
-// @internal
-#[test]
-fn search_and_paging_over_1000_encrypted_contacts_stay_interactive() {
-    use std::time::Instant;
+fn storage_with_1000_contacts() -> Storage {
     use vauchi_core::ContactCard;
     use vauchi_core::contact::Contact;
 
@@ -216,6 +213,37 @@ fn search_and_paging_over_1000_encrypted_contacts_stay_interactive() {
         );
         storage.contacts().save_contact(&contact).unwrap();
     }
+    storage
+}
+
+// @internal
+#[test]
+fn search_and_paging_over_1000_encrypted_contacts_find_the_right_rows() {
+    use vauchi_core::contact::Contact;
+
+    let storage = storage_with_1000_contacts();
+
+    let found = storage.contacts().search_contacts("user 05").unwrap();
+    let page = storage.contacts().list_contacts_paginated(500, 20).unwrap();
+
+    assert_eq!(found.len(), 100);
+    assert_eq!(page.len(), 20);
+    assert_eq!(page.first().map(Contact::display_name), Some("User 0500"));
+}
+
+// The wall-clock bound ran on every MR and still tripped on a loaded runner
+// (1.15 s on 2026-11-04, 1.69 s on 2026-11-10 with three pipelines sharing
+// it; #625): it measures the runner, not the code. It runs in the nightly
+// test:slow job with the other #[ignore] timing tests; the fast test above
+// keeps the rows right on every MR.
+// @internal
+#[test]
+#[ignore = "wall-clock bound: nightly test:slow only (#625)"]
+fn search_and_paging_over_1000_encrypted_contacts_stay_interactive() {
+    use std::time::Instant;
+    use vauchi_core::contact::Contact;
+
+    let storage = storage_with_1000_contacts();
 
     let mut fastest = std::time::Duration::MAX;
     for _ in 0..3 {

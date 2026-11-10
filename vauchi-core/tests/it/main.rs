@@ -239,6 +239,7 @@ mod duress_cover_tests;
 mod duress_decoy_backup_tests;
 mod duress_decoy_payload_tests;
 mod duress_lock_policy_tests;
+mod duress_lock_screen_tests;
 mod duress_mask_engine_tests;
 mod duress_mask_foreground_tests;
 mod duress_mask_key_tests;

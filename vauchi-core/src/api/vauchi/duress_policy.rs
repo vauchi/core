@@ -56,3 +56,15 @@ impl ProfileEngine {
         Ok(self.storage.identity().duress_unlock()?)
     }
 }
+
+impl super::Vauchi {
+    /// The lock screen's unlock.
+    pub fn authenticate_at_lock(
+        &mut self,
+        password: &str,
+        _biometric_passed: bool,
+        _device_has_biometrics: bool,
+    ) -> VauchiResult<super::AuthMode> {
+        self.authenticate(password)
+    }
+}

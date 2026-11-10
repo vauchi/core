@@ -22,9 +22,12 @@ import sys
 consumers = json.loads(Path(sys.argv[1]).read_text())["consumers"]
 cargo_consumers = {entry["repo"] for entry in consumers if entry["kind"] == "cargo"}
 assert "linux-app" in cargo_consumers, "linux-app must receive Core version bumps"
-assert "linux-gtk" not in cargo_consumers, "the GTK display depends on the contract alone"
+assert "gtk-display" not in cargo_consumers, "the GTK display depends on the contract alone"
+repos = {entry["repo"] for entry in consumers}
+assert "qt-display" in repos, "the Qt display's core-ref is bumped under its project name (ADR-078)"
+assert not repos & {"linux-gtk", "linux-qt"}, "GitLab's API does not find a project by its earlier path"
 matrix = [line for line in Path(sys.argv[2]).read_text().splitlines() if "DOWNSTREAM:" in line]
-assert all("vauchi/linux-gtk" not in line for line in matrix), "Core RC verification must not target the display"
+assert all("vauchi/gtk-display" not in line for line in matrix), "Core RC verification must not target the display"
 PY
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
@@ -66,7 +69,7 @@ vauchi-contract = { git = "https://gitlab.com/vauchi/contract.git", tag = "v0.1.
 ' Cargo.lock "# lock
 " supply-chain/config.toml "# vet
 "
-remote linux-qt core-ref "v0.70.0
+remote qt-display core-ref "v0.70.0
 "
 remote tui Cargo.toml "$CARGO_TOML" Cargo.lock "# lock
 "
@@ -76,21 +79,21 @@ remote e2e README.md "no manifest
 remote relay Cargo.toml "$CARGO_TOML" Cargo.lock "# lock
 "
 git_quiet -C "$T/src/relay" push -q "$T/remotes/relay.git" HEAD:refs/heads/chore/bump-core-0.70.0
-# web-demo: GitLab refuses the MR. linux-gtk: cargo update fails.
+# web-demo: GitLab refuses the MR. gtk-display: cargo update fails.
 remote web-demo Cargo.toml "$CARGO_TOML" Cargo.lock "# lock
 "
-remote linux-gtk Cargo.toml "$CARGO_TOML" Cargo.lock "# lock
+remote gtk-display Cargo.toml "$CARGO_TOML" Cargo.lock "# lock
 "
 
 cat > "$T/table.json" <<'EOF'
 { "consumers": [
   { "repo": "cli", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
-  { "repo": "linux-qt", "kind": "ref-file", "file": "core-ref", "bumped_by": "bump:consumer-pins" },
+  { "repo": "qt-display", "kind": "ref-file", "file": "core-ref", "bumped_by": "bump:consumer-pins" },
   { "repo": "tui", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
   { "repo": "e2e", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
   { "repo": "relay", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
   { "repo": "web-demo", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
-  { "repo": "linux-gtk", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
+  { "repo": "gtk-display", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
   { "repo": "android", "kind": "gradle", "file": "app/build.gradle.kts", "bumped_by": "trigger:android" }
 ] }
 EOF
@@ -145,7 +148,7 @@ if [ "$1" = vet ]; then
     esac
     echo "Vetting Succeeded (3 fully audited)"; exit 0
 fi
-case "$PWD" in */linux-gtk) echo "error: failed to select a version" >&2; exit 101 ;; esac
+case "$PWD" in */gtk-display) echo "error: failed to select a version" >&2; exit 101 ;; esac
 if [ -f cli-display/Cargo.toml ]; then
     grep -q "tag = \"$EXPECTED_CONTRACT_TAG\"" cli-display/Cargo.toml \
         || { echo "contract pin must align before Cargo resolves" >&2; exit 101; }
@@ -164,14 +167,14 @@ PATH="$T/bin:$PATH" FAKE_LOG="$T/log" PROJECT_ACCESS_TOKEN=token \
 cat "$T/out"
 
 [ "$status" -ne 0 ] || fail "a consumer that cannot be bumped (e2e) must make the job red"
-grep -qx "Not bumped: e2e relay web-demo linux-gtk" "$T/out" \
-    || fail "the failure summary must name exactly e2e, relay, web-demo and linux-gtk"
+grep -qx "Not bumped: e2e relay web-demo gtk-display" "$T/out" \
+    || fail "the failure summary must name exactly e2e, relay, web-demo and gtk-display"
 grep -q "web-demo: ERROR: pushed chore/bump-core-0.70.0 but opening the MR failed (HTTP 500)" "$T/out" \
     || fail "a refused MR must be reported with its HTTP status"
-if git -C "$T/remotes/linux-gtk.git" rev-parse -q --verify "refs/heads/chore/bump-core-0.70.0" >/dev/null; then
+if git -C "$T/remotes/gtk-display.git" rev-parse -q --verify "refs/heads/chore/bump-core-0.70.0" >/dev/null; then
     fail "a failed cargo update must push nothing"
 fi
-grep -q 'vauchi%2Flinux-gtk/merge_requests' "$T/log" && fail "a failed cargo update must open no MR"
+grep -q 'vauchi%2Fgtk-display/merge_requests' "$T/log" && fail "a failed cargo update must open no MR"
 grep -q 'vauchi%2Fe2e/merge_requests' "$T/log" && fail "e2e has no manifest and must get no MR"
 if git -C "$T/remotes/e2e.git" rev-parse -q --verify "refs/heads/chore/bump-core-0.70.0" >/dev/null; then
     fail "e2e must get no branch"
@@ -206,7 +209,7 @@ for crate in 'libsqlite3-sys 0.39.1' 'rusqlite 0.41.1' 'exemptions' 'never'; do
     printf '%s' "$vet_note" | grep -qF -- "$crate" || fail "the cargo-vet note must mention: $crate"
 done
 grep "cargo vet --locked (in cli)" "$T/log" > /dev/null || fail "cargo vet must run on the bumped lockfile"
-grep '^POST .*vauchi%2Flinux-qt/merge_requests/41/notes' "$T/log" | grep -q 'cargo-vet' \
+grep '^POST .*vauchi%2Fqt-display/merge_requests/41/notes' "$T/log" | grep -q 'cargo-vet' \
     && fail "a consumer without supply-chain/ must get no cargo-vet note"
 grep -q "cli: opened https://gitlab.example/mr/new (Draft, waiting behind !3)" "$T/out" \
     || fail "the job must say cli's bump MR is waiting"
@@ -215,10 +218,10 @@ grep '^POST .*vauchi%2Fcli/merge_requests' "$T/log" | grep -q '"source_branch": 
 grep '^POST .*vauchi%2Fcli/merge_requests' "$T/log" | grep -q '"target_branch": *"main"' \
     || fail "cli's MR must target main"
 
-if git -C "$T/remotes/linux-qt.git" rev-parse -q --verify "refs/heads/$branch" >/dev/null; then
-    fail "linux-qt already pins v0.70.0 and must get no branch"
+if git -C "$T/remotes/qt-display.git" rev-parse -q --verify "refs/heads/$branch" >/dev/null; then
+    fail "qt-display already pins v0.70.0 and must get no branch"
 fi
-grep -q 'vauchi%2Flinux-qt/merge_requests' "$T/log" && fail "linux-qt must get no MR"
+grep -q 'vauchi%2Fqt-display/merge_requests' "$T/log" && fail "qt-display must get no MR"
 
 grep -q '^POST .*vauchi%2Ftui/merge_requests' "$T/log" && fail "tui already has an open MR and must not get another"
 grep -q "merge_requests/7" "$T/out" || fail "the job must point at tui's open MR"
@@ -228,7 +231,7 @@ grep -q "relay" "$T/out" || fail "relay's orphan branch must be reported"
 
 grep -q 'android' "$T/log" && fail "android is bumped by trigger:android, not this job"
 
-for repo in cli linux-qt tui relay; do
+for repo in cli qt-display tui relay; do
     [ "$(git -C "$T/remotes/$repo.git" rev-parse main)" = "$(git -C "$T/src/$repo" rev-parse HEAD)" ] \
         || fail "$repo's main must be untouched"
 done

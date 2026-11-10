@@ -141,9 +141,7 @@ impl AppEngine {
                 if self.backup_is_restore() {
                     self.execute_backup()
                 } else {
-                    self.confirm_session_pin_then(
-                        super::credential_gate::CredentialChange::BackupExport,
-                    )
+                    self.confirm_backup_export()
                 }
             }
             ActionResult::SetGroupFieldVisibility {

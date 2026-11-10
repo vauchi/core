@@ -20,6 +20,7 @@ impl AppEngine {
         vauchi: &Vauchi,
         screen: &AppScreen,
         render_context: &crate::ui::RenderContext,
+        device_capabilities: &vauchi_core::exchange::capability::types::DeviceCapabilities,
     ) -> Box<dyn WorkflowEngine> {
         match screen {
             AppScreen::Recovery => {
@@ -142,6 +143,12 @@ impl AppEngine {
                 .with_decoy_offer(
                     vauchi.auth_mode() == vauchi_core::AuthMode::Normal
                         && vauchi.is_duress_enabled().unwrap_or(false),
+                )
+                .with_biometric_opt_in(
+                    device_capabilities
+                        .biometric_type
+                        .is_some()
+                        .then(|| vauchi.confirms_exports_with_biometrics().unwrap_or(false)),
                 ),
             ),
             _ => unreachable!("create_security_engine called for {screen:?}"),

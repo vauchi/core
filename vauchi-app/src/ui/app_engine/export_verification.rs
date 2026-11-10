@@ -100,6 +100,9 @@ impl AppEngine {
     /// The shell's answer to the user-presence check. `None` unless an
     /// export is waiting on it: a secret nobody asked for confirms nothing.
     pub(super) fn handle_user_presence_event(&mut self, event: &Event) -> Option<ActionResult> {
+        if self.pending_backup_presence {
+            return self.handle_backup_presence(event);
+        }
         if self.pending_first_password.is_some() {
             return self.handle_first_password_presence(event);
         }

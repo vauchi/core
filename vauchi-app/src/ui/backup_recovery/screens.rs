@@ -58,40 +58,97 @@ impl BackupRecoveryEngine {
             a11y: None,
             info_key: None,
         };
+        let mut components = vec![
+            Component::Text {
+                id: "backup_intro".into(),
+                content: self.t("backup.manage.intro"),
+                style: TextStyle::Body,
+                a11y: None,
+            },
+            Component::ActionList {
+                id: "backup_rows".into(),
+                items: vec![
+                    row(
+                        "create",
+                        "backup.manage.export_title",
+                        "backup.manage.export_detail",
+                    ),
+                    row(
+                        "restore",
+                        "backup.manage.restore_title",
+                        "backup.manage.restore_detail",
+                    ),
+                ],
+            },
+            Component::Text {
+                id: "last_backup".into(),
+                content: self.last_backup_line(),
+                style: TextStyle::Caption,
+                a11y: None,
+            },
+        ];
+        if let Some(on) = self.biometric_opt_in {
+            components.push(self.biometric_toggle(on));
+        }
         ScreenModel {
             screen_id: "backup_choose".into(),
             title: self.t("backup.wizard.title"),
             subtitle: None,
-            components: vec![
-                Component::Text {
-                    id: "backup_intro".into(),
-                    content: self.t("backup.manage.intro"),
-                    style: TextStyle::Body,
-                    a11y: None,
+            components,
+            contextual_actions: vec![],
+            progress: None,
+            ..Default::default()
+        }
+    }
+
+    fn biometric_toggle(&self, on: bool) -> Component {
+        let label = self.t("backup.biometric_toggle_label");
+        Component::ToggleList {
+            id: "biometric_export".into(),
+            label: label.clone(),
+            items: vec![ToggleItem {
+                id: "biometric_toggle".into(),
+                label: label.clone(),
+                selected: on,
+                subtitle: None,
+                a11y: Some(A11y {
+                    label: Some(label),
+                    hint: None,
+                    role: Some(AccessibilityRole::Toggle),
+                }),
+                info_key: None,
+            }],
+            a11y: None,
+        }
+    }
+
+    pub(super) fn explain_biometric_screen(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "backup_explain_biometric".into(),
+            title: self.t("backup.biometric_explanation_title"),
+            subtitle: None,
+            components: vec![Component::Text {
+                id: "biometric_explanation".into(),
+                content: self.t("backup.biometric_explanation"),
+                style: TextStyle::Body,
+                a11y: None,
+            }],
+            contextual_actions: vec![
+                ScreenAction {
+                    id: "back".into(),
+                    label: self.t("action.back"),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: Some(A11y::labeled(self.t("action.back"))),
                 },
-                Component::ActionList {
-                    id: "backup_rows".into(),
-                    items: vec![
-                        row(
-                            "create",
-                            "backup.manage.export_title",
-                            "backup.manage.export_detail",
-                        ),
-                        row(
-                            "restore",
-                            "backup.manage.restore_title",
-                            "backup.manage.restore_detail",
-                        ),
-                    ],
-                },
-                Component::Text {
-                    id: "last_backup".into(),
-                    content: self.last_backup_line(),
-                    style: TextStyle::Caption,
-                    a11y: None,
+                ScreenAction {
+                    id: "turn_on".into(),
+                    label: self.t("backup.biometric_toggle_label"),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: Some(A11y::labeled(self.t("backup.biometric_toggle_label"))),
                 },
             ],
-            contextual_actions: vec![],
             progress: None,
             ..Default::default()
         }

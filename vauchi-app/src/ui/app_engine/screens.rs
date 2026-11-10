@@ -303,7 +303,7 @@ impl AppEngine {
                 .with_locale(render_context.resolved_locale()),
             ),
             AppScreen::Backup | AppScreen::DuressPin | AppScreen::Recovery => {
-                Self::create_security_engine(vauchi, screen, render_context)
+                Self::create_security_engine(vauchi, screen, render_context, device_capabilities)
             }
             AppScreen::Lock => Box::new(
                 LockScreenEngine::new(DEFAULT_LOCK_MAX_ATTEMPTS)

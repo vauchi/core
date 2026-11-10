@@ -53,6 +53,9 @@ pub struct BackupRecoveryEngine {
     /// Whether this export asks for a decoy password: the real profile
     /// with a duress PIN set (ADR-080 point 7, amended 2026-11-09).
     offers_decoy: bool,
+    /// The export biometric opt-in, or `None` on a device without
+    /// biometrics, which shows no toggle.
+    biometric_opt_in: Option<bool>,
     decoy_password: String,
     confirm_decoy_password: String,
     has_identity: bool,
@@ -85,6 +88,9 @@ enum BackupStep {
     /// duress PIN set (ADR-080 point 7).
     EnterDecoyPassword,
     ConfirmDecoyPassword,
+    /// What the export biometric check does and does not protect, shown
+    /// before the opt-in takes effect (ADR-080 point 7).
+    ExplainBiometric,
     Processing,
     Complete,
     Failed,
@@ -107,6 +113,7 @@ impl BackupRecoveryEngine {
             password: String::new(),
             confirm_password: String::new(),
             offers_decoy: false,
+            biometric_opt_in: None,
             decoy_password: String::new(),
             confirm_decoy_password: String::new(),
             has_identity,
@@ -121,6 +128,12 @@ impl BackupRecoveryEngine {
     /// profile with a duress PIN, never under duress.
     pub fn with_decoy_offer(mut self, offers_decoy: bool) -> Self {
         self.offers_decoy = offers_decoy;
+        self
+    }
+
+    /// The export biometric opt-in as stored, on a device with biometrics.
+    pub fn with_biometric_opt_in(mut self, opt_in: Option<bool>) -> Self {
+        self.biometric_opt_in = opt_in;
         self
     }
 
@@ -186,7 +199,9 @@ impl BackupRecoveryEngine {
 
     fn progress(&self) -> Option<Progress> {
         let current_step = match self.step {
-            BackupStep::ChooseMode | BackupStep::RestoreNeedsEmptyApp => return None,
+            BackupStep::ChooseMode
+            | BackupStep::RestoreNeedsEmptyApp
+            | BackupStep::ExplainBiometric => return None,
             BackupStep::EnterPassword => 1,
             BackupStep::ConfirmPassword => 2,
             BackupStep::EnterDecoyPassword => 3,
@@ -214,6 +229,7 @@ impl WorkflowEngine for BackupRecoveryEngine {
             restore_data: self.restore_data().trim().to_string(),
             password: self.password().to_string(),
             full_level: *self.level() == BackupLevel::Full,
+            biometric_opt_in: self.biometric_opt_in,
             decoy_password: if self.asks_for_decoy() {
                 self.decoy_password.clone()
             } else {
@@ -230,6 +246,7 @@ impl WorkflowEngine for BackupRecoveryEngine {
             BackupStep::ConfirmPassword => self.confirm_screen(),
             BackupStep::EnterDecoyPassword => self.decoy_password_screen(),
             BackupStep::ConfirmDecoyPassword => self.decoy_confirm_screen(),
+            BackupStep::ExplainBiometric => self.explain_biometric_screen(),
             BackupStep::Processing => self.processing_screen(),
             BackupStep::Complete => self.complete_screen(),
             BackupStep::Failed => self.failed_screen(),
@@ -457,6 +474,40 @@ impl WorkflowEngine for BackupRecoveryEngine {
                 if action_id == "back" =>
             {
                 self.step = BackupStep::EnterPassword;
+                ActionResult::NavigateTo(self.current_screen())
+            }
+
+            // The export biometric opt-in: on only after its explanation.
+            (
+                BackupStep::ChooseMode,
+                UserAction::ItemToggled {
+                    component_id,
+                    item_id,
+                },
+            ) if component_id == "biometric_export" && item_id == "biometric_toggle" => {
+                match self.biometric_opt_in {
+                    Some(false) => {
+                        self.step = BackupStep::ExplainBiometric;
+                        ActionResult::NavigateTo(self.current_screen())
+                    }
+                    Some(true) => {
+                        self.biometric_opt_in = Some(false);
+                        ActionResult::UpdateScreen(self.current_screen())
+                    }
+                    None => ActionResult::UpdateScreen(self.current_screen()),
+                }
+            }
+            (BackupStep::ExplainBiometric, UserAction::ActionPressed { action_id })
+                if action_id == "turn_on" =>
+            {
+                self.biometric_opt_in = Some(true);
+                self.step = BackupStep::ChooseMode;
+                ActionResult::NavigateTo(self.current_screen())
+            }
+            (BackupStep::ExplainBiometric, UserAction::ActionPressed { action_id })
+                if action_id == "back" =>
+            {
+                self.step = BackupStep::ChooseMode;
                 ActionResult::NavigateTo(self.current_screen())
             }
 

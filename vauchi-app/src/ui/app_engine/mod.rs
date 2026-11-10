@@ -9,6 +9,7 @@
 
 mod app_screen;
 mod auth_mode_sessions;
+mod backup_presence;
 mod ble_handshake;
 mod completion;
 #[cfg(feature = "content-updates")]
@@ -290,6 +291,8 @@ pub struct AppEngine {
     session_locked: bool,
     /// The auth mode the cached engines and sessions were built under.
     sessions_auth_mode: vauchi_core::api::AuthMode,
+    /// A backup export is waiting on the opt-in OS check (ADR-080 point 7).
+    pending_backup_presence: bool,
     /// Glance (one-sided QR) OOB state. `glance_display_nonce` is the nonce
     /// this device shows in its QR and must require as the responder;
     /// `glance_scanned` is the scanner-side binding built from a scanned QR —
@@ -606,6 +609,7 @@ impl AppEngine {
             storage_shredded: false,
             session_locked,
             sessions_auth_mode,
+            pending_backup_presence: false,
             glance_display_nonce: None,
             glance_scanned: None,
             glance_pre_scan_discoveries: Vec::new(),
@@ -893,6 +897,7 @@ impl WorkflowEngine for AppEngine {
         }
 
         let result = self.engine.handle_action(action);
+        self.persist_backup_biometric_opt_in();
         self.finish_engine_result(result)
     }
 }

@@ -2483,7 +2483,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_b8fe8dd340eee512",
+                    "id": "field_179f0950bf8563a6",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2521,13 +2521,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:b8fe8dd340eee512",
+                    "id": "field_note:179f0950bf8563a6",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:b8fe8dd340eee512",
+                          "id": "field_note:179f0950bf8563a6",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2567,7 +2567,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_751109d3f2d11f49",
+                    "id": "field_a49013b647d51aad",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2605,13 +2605,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:751109d3f2d11f49",
+                    "id": "field_note:a49013b647d51aad",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:751109d3f2d11f49",
+                          "id": "field_note:a49013b647d51aad",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2651,7 +2651,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_f8bf5638cd0f1524",
+                    "id": "field_9f24ff65ef9b2699",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2689,13 +2689,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:f8bf5638cd0f1524",
+                    "id": "field_note:9f24ff65ef9b2699",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:f8bf5638cd0f1524",
+                          "id": "field_note:9f24ff65ef9b2699",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -5058,10 +5058,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "2E3A 7F65 DDB3 F88C 8F3F E717 06ED B614 4D97 0563 6F56 4F4D F6FE B966 D9FF A015",
+                    "content": "88A4 3879 021B DE0E 3245 7FB6 57C1 5CAE 0A38 CBF4 4233 6395 B8F4 0802 04B3 A5BD",
                     "style": "body",
                     "accessibility": {
-                      "label": "2E3A 7F65 DDB3 F88C 8F3F E717 06ED B614 4D97 0563 6F56 4F4D F6FE B966 D9FF A015",
+                      "label": "88A4 3879 021B DE0E 3245 7FB6 57C1 5CAE 0A38 CBF4 4233 6395 B8F4 0802 04B3 A5BD",
                       "description": null
                     }
                   }
@@ -5080,10 +5080,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "DAD8 432D 285C 6471 FD77 5BA5 CE0A 5603 D44D BF19 332E 6B4B BF0C 4451 9219 65DB",
+                    "content": "8008 AB16 0C92 E713 B656 9A27 05DF 7347 9C4E 45E4 0C14 F765 E975 CADB 088B B09D",
                     "style": "body",
                     "accessibility": {
-                      "label": "DAD8 432D 285C 6471 FD77 5BA5 CE0A 5603 D44D BF19 332E 6B4B BF0C 4451 9219 65DB",
+                      "label": "8008 AB16 0C92 E713 B656 9A27 05DF 7347 9C4E 45E4 0C14 F765 E975 CADB 088B B09D",
                       "description": null
                     }
                   }
@@ -9523,6 +9523,31 @@
                     "style": "caption",
                     "accessibility": {
                       "label": "No backup yet",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "Group": {
+                    "id": "biometric_export",
+                    "label": "Confirm exports with biometrics",
+                    "axis": "vertical",
+                    "children": [
+                      {
+                        "Toggle": {
+                          "binding_id": "surface.1.binding.0",
+                          "label": "Confirm exports with biometrics",
+                          "value": false,
+                          "enabled": true,
+                          "accessibility": {
+                            "label": "Confirm exports with biometrics",
+                            "description": null
+                          }
+                        }
+                      }
+                    ],
+                    "accessibility": {
+                      "label": "Confirm exports with biometrics",
                       "description": null
                     }
                   }
@@ -18358,7 +18383,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "https://vauchi.app/x#pk=T0VN14nLzVF2lSsPz6Cl3OupdQO43x7mKrFgXG6yq2Q&n=jpF0vqYOuwkIPQ6R53gWqzEmbk8f_xVprMnBeDTtq1k&v=2&nm=QWRhIExvdmVsYWNl",
+                    "content": "https://vauchi.app/x#pk=WJCSicJK-6oNTGHmcflP4wkE3rMlozI3HEGGxJnbD08&n=UQjzeEWr7FBW8ls1C1DBMOQeA3OS8x3MnsEIyG5X6eA&v=2&nm=QWRhIExvdmVsYWNl",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -18369,7 +18394,7 @@
                 {
                   "Text": {
                     "id": "link_code",
-                    "content": "976 912",
+                    "content": "742 643",
                     "style": "heading",
                     "accessibility": {
                       "label": "Confirmation code",
@@ -18946,7 +18971,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,80,97,50,69,77,116,75,70,120,107,99,102,49,51,87,54,88,79,67,108,89,68,49,69,50,47,71,84,77,117,97,48,117,47,68,69,82,82,107,104,108,108,50,48,68,88,84,84,50,81,121,108,80,67,107,68,72,89,108,81,74,78,100,121,75,49,48,69,51,81,101,122,97,47,51,72,53,100,67,86,82,107,72,68,48,115,118,67,51,48,65,120,100,85,84,107,122,122,119,74,114,77,107,100,57,77,102,47,52,100,49,56,99,104,80,81,103,68,73,90,54,112,54,80,57,79,100,116,104,106,100,120,112,89,103,79,52,78,115,110,65,106,86,104,89,114,69,87,109,117,65,65,65,65,65,71,114,117,89,67,77,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,68,115,70,81,86,88,76,112,118,65,76,52,87,120,55,98,109,105,109,108,73,116,83,56,48,114,53,101,117,54,122,117,109,103,68,103,50,67,115,57,69,76,67,118,70,49,81,85,77,69,103,52,100,47,106,57,47,66,89,77,69,54,53,70,76,71,107,90,50,111,77,120,113,113,77,83,71,78,111,78,102,70,77,109,107,65],
+            "payload": [86,48,74,70,87,65,79,65,67,75,115,87,68,74,76,110,69,55,90,87,109,105,99,70,51,51,78,72,110,69,53,70,53,65,119,85,57,50,88,112,100,99,114,98,67,73,117,119,110,97,98,77,102,71,87,82,51,116,108,66,88,106,82,104,65,101,67,90,106,53,100,112,120,80,101,77,116,54,75,105,71,122,100,67,102,80,49,108,118,56,66,90,52,116,77,75,83,101,83,88,50,48,84,113,98,79,55,114,83,66,111,71,73,68,114,77,109,66,55,88,114,89,90,105,88,84,53,75,111,115,79,47,78,116,98,117,112,121,51,84,47,65,85,112,103,50,51,55,67,54,65,72,112,54,76,85,65,65,65,65,65,71,114,121,104,67,73,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,65,57,78,120,117,118,70,80,116,57,76,57,48,67,74,114,86,74,57,109,67,117,98,88,48,116,77,65,71,111,57,80,66,81,97,89,75,52,109,98,49,105,50,81,84,65,103,52,116,79,89,80,87,117,69,117,102,54,73,121,88,119,79,108,87,120,81,101,120,119,103,79,52,66,102,111,112,53,66,90,43,78,110,117,69,73],
             "is_initiator": true,
             "endpoint": {
               "service_type": "_vauchi-exchange._tcp.local.",
@@ -19034,7 +19059,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI30:0:0:00E*84%Q$MKKSSEZMJ:H9SQEGS.TA:2CV85%9SOYHGOE9ZEP4BTOEB7KU%07.DJ-L:XUUF2AWE-6SLMQ5CG:O5EDJU%HSN6OATL+VMWJ4CDREF6*D1R0DB0P:611Vauchi User00"
+                      "INI30:0:0:00LDMPBO13J1D9W46RC964D7QUL$I26J:/BH*S*QMQN82DAI3G*53*6FJOI-%V.FV3VQPR4%ZP5$R9KQZT84ZPDXCNV4H*2999K+UJZKI*7:Y3U:C5 0.9IP5L11Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -19242,8 +19267,8 @@
             "earliest_secs": 1,
             "deadline_secs": 1,
             "min_interval_secs": 1,
-            "earliest_millis": 93,
-            "delay_millis": 93
+            "earliest_millis": 91,
+            "delay_millis": 91
           }
         }
       ]
@@ -20002,7 +20027,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [78,238,0,245,49,142,108,171,189,87,9,113,55,149,181,38,26,127,182,30,182,8,154,208,77,61,249,61,133,165,219,149]
+            "payload": [55,189,145,162,151,125,250,40,89,13,192,167,216,116,175,129,136,44,121,164,239,44,201,227,154,119,20,17,243,106,24,206]
           }
         },
         {
@@ -20207,7 +20232,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [82,10,108,65,67,30,246,18,181,38,103,65,235,130,141,125,214,27,133,52,12,139,172,245,73,24,7,245,72,242,54,211]
+            "payload": [36,183,46,149,98,14,63,161,247,240,209,12,163,142,10,248,172,197,243,210,110,55,7,85,24,157,202,82,16,76,164,59]
           }
         },
         {
@@ -20412,7 +20437,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [85,236,208,187,137,163,55,18,160,181,0,136,13,177,188,82,73,62,52,246,189,132,43,110,9,165,96,94,226,156,125,246]
+            "payload": [164,46,145,33,185,58,119,216,163,217,20,248,254,87,113,248,214,240,103,20,139,213,96,99,131,52,196,255,170,124,5,47]
           }
         },
         {
@@ -24292,7 +24317,7 @@
                   "Qr": {
                     "id": "surface.1.claim_qr",
                     "payloads": [
-                      "AXI+RW7Uoje6OcHKCQ2F8Qb64kwUZcmvZNvik4nruK2wSBfMhsP2x7xcFeP8w5MO2VCMF68vIkmjhY+WY6wBEqUA8VNlAAAAAA=="
+                      "AaqemcUEbQZvPuxL6cRDVZURV0BK4kS8Qnf2oQnC2SLz8d+/PkUCw+Xf9jVppw+xtS30mbaf3X6eUOpwfvov238A8VNlAAAAAA=="
                     ],
                     "purpose": "display",
                     "label": "Recovery claim — scan to vouch",
@@ -24320,10 +24345,10 @@
                 {
                   "Text": {
                     "id": "claim_data",
-                    "content": "AXI+RW7Uoje6OcHKCQ2F8Qb64kwUZcmvZNvik4nruK2wSBfMhsP2x7xcFeP8w5MO2VCMF68vIkmjhY+WY6wBEqUA8VNlAAAAAA==",
+                    "content": "AaqemcUEbQZvPuxL6cRDVZURV0BK4kS8Qnf2oQnC2SLz8d+/PkUCw+Xf9jVppw+xtS30mbaf3X6eUOpwfvov238A8VNlAAAAAA==",
                     "style": "caption",
                     "accessibility": {
-                      "label": "AXI+RW7Uoje6OcHKCQ2F8Qb64kwUZcmvZNvik4nruK2wSBfMhsP2x7xcFeP8w5MO2VCMF68vIkmjhY+WY6wBEqUA8VNlAAAAAA==",
+                      "label": "AaqemcUEbQZvPuxL6cRDVZURV0BK4kS8Qnf2oQnC2SLz8d+/PkUCw+Xf9jVppw+xtS30mbaf3X6eUOpwfvov238A8VNlAAAAAA==",
                       "description": null
                     }
                   }

@@ -694,6 +694,9 @@ pub struct BackupFormSnapshot {
     /// The decoy password of a full export from the real profile with a
     /// duress PIN; empty otherwise (ADR-080 point 7).
     pub decoy_password: String,
+    /// The export biometric opt-in as the screen holds it, or `None` on a
+    /// device without biometrics.
+    pub biometric_opt_in: Option<bool>,
 }
 
 impl std::fmt::Debug for BackupFormSnapshot {
@@ -704,6 +707,7 @@ impl std::fmt::Debug for BackupFormSnapshot {
             .field("password", &"<redacted>")
             .field("full_level", &self.full_level)
             .field("decoy_password", &"<redacted>")
+            .field("biometric_opt_in", &self.biometric_opt_in)
             .finish()
     }
 }

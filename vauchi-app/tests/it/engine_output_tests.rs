@@ -60,6 +60,7 @@ fn backup_output_redacts_password_in_debug() {
             password: String::new(),
             full_level: true,
             decoy_password: String::new(),
+            biometric_opt_in: None,
         }
     );
     let debug = format!("{output:?}");

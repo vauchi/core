@@ -68,7 +68,7 @@ fn opting_out_on_the_real_profile_shows_under_duress() {
     assert!(!opted_in(&alice));
 }
 
-// @scenario: duress_mode :: Edits in duress mode are discarded
+// @scenario: duress_mode :: Edits in duress mode stay in the decoy profile
 #[test]
 fn a_change_under_duress_does_not_reach_the_real_profile() {
     let mut alice = alice();

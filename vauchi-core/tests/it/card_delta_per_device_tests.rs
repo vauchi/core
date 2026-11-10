@@ -147,6 +147,7 @@ fn a_delta_from_a_device_the_contact_never_pinned_is_refused() {
     delta.sign_by_device([7u8; 32], &stranger);
 
     refused_as_device_signature(deliver(&p, &delta));
+    assert_eq!(bobs_name_at_alice(&p), "Bob");
 }
 
 // @scenario: onboarding :: Exchange success celebration
@@ -175,6 +176,7 @@ fn a_delta_from_a_removed_device_is_refused() {
     delta.sign_by_device([7u8; 32], &tablet_key);
 
     refused_as_device_signature(deliver(&p, &delta));
+    assert_eq!(bobs_name_at_alice(&p), "Bob");
 }
 
 // @scenario: onboarding :: Exchange success celebration

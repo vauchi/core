@@ -72,6 +72,11 @@ fn a_linked_device_cannot_sign_a_broadcast_as_another_device() {
     let result = p.push_to_alice(&phone_claims_tablet);
 
     refused_with(result, "Invalid device signature");
+    assert_eq!(
+        p.alice_pin_for(&[7u8; 32]),
+        None,
+        "a refused broadcast pins nothing"
+    );
 }
 
 // @scenario: multi_device_sync :: A received push persists the registry and asks for an ack
@@ -92,6 +97,11 @@ fn a_signer_that_is_not_an_active_device_is_refused() {
     let result = p.push_to_alice(&as_unknown_device);
 
     refused_with(result, "not an active device");
+    assert_eq!(
+        p.alice_pin_for(&[7u8; 32]),
+        None,
+        "an unknown signer is not pinned"
+    );
 }
 
 // @scenario: multi_device_sync :: A received push persists the registry and asks for an ack

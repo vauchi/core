@@ -98,17 +98,26 @@ fn two_connections_racing_to_create_the_key_get_the_same_one() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("vauchi.db");
         let key = SymmetricKey::generate();
-        drop(Storage::open(&path, key.clone()).unwrap());
+        // Both connections are opened before the race: two opens of one file
+        // contend on the schema check behind a 5 s busy timeout, and twenty
+        // such rounds under coverage on a loaded runner took longer than the
+        // 180 s test timeout (private#1207). The race under test is the key
+        // creation, which starts at the barrier.
+        let first_storage = Storage::open(&path, key.clone()).unwrap();
+        let second_storage = Storage::open(&path, key.clone()).unwrap();
         let start = std::sync::Barrier::new(2);
+        let start = &start;
 
+        // Each connection moves into its own thread: a Storage is Send, not Sync.
         let (first, second) = std::thread::scope(|scope| {
-            let race = || {
-                let storage = Storage::open(&path, key.clone()).unwrap();
+            let first = scope.spawn(move || {
                 start.wait();
-                public_key_of(&storage)
-            };
-            let first = scope.spawn(race);
-            let second = scope.spawn(race);
+                public_key_of(&first_storage)
+            });
+            let second = scope.spawn(move || {
+                start.wait();
+                public_key_of(&second_storage)
+            });
             (first.join().unwrap(), second.join().unwrap())
         });
 

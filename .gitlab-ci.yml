@@ -613,29 +613,73 @@ lint:format:
   extends: [.linux-runner-nocache, .lint-format, .validation-rust, .timeout-quick]
   needs: []
 
-lint:clippy:
-  # .timeout-cold-rebuild: checks --all-targets across the full dep tree —
-  # see the template comment for the cold-runner evidence.
-  extends: [.linux-runner, .lint-clippy, .validation-rust, .timeout-cold-rebuild]
+# The MR pipeline's one compile (vauchi/private#1212). The test jobs below
+# run the binaries this job archives, so this is the only MR job that
+# holds the cold-rebuild-tree lock: one build per pipeline waits for the
+# lock instead of a dozen one-to-six-minute warm jobs across every open
+# pipeline (core pipeline 3049298754: 39 minutes of shell jobs, 2,021
+# minutes of waiting). The checks that need a compiled tree and nothing
+# else run here too, with the commands they had as jobs of their own.
+build:tests:
+  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
+  stage: lint
+  needs: []
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
-
-# vauchi-app with default features off is the wasm/web-demo configuration —
-# no other build exercises it, so feature-gate drift only surfaces at the
-# next downstream lock bump (web-demo froze 773 commits on exactly this,
-# 2026-06-12-web-demo-core-lock-freeze). Deny warnings so cross-feature
-# dead code is caught here too.
-lint:no-default-features:
-  # .timeout-cold-rebuild: checks the full dep tree under a DISTINCT feature
-  # set (--no-default-features), so it rarely hits the warm default-features
-  # cache — see the template comment.
-  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
-  stage: lint
-  needs: []
   script:
+    - echo "── clippy, --all-targets across the full dependency tree ──"
+    - cargo clippy --all-targets -- -D warnings
+    # CABI header freshness — catch stale headers after export changes (T0-11)
+    - echo "── vauchi-cabi header ──"
+    - cargo build -p vauchi-cabi
+    - git diff --exit-code vauchi-cabi/include/vauchi.h || { echo "CABI header is stale — rebuild with 'cargo build -p vauchi-cabi' and commit the updated include/vauchi.h"; exit 1; }
+    # vauchi-app with default features off is the wasm/web-demo configuration —
+    # no other build exercises it, so feature-gate drift only surfaces at the
+    # next downstream lock bump (web-demo froze 773 commits on exactly this,
+    # 2026-06-12-web-demo-core-lock-freeze). Deny warnings so cross-feature
+    # dead code is caught here too.
+    - echo "── vauchi-app without default features ──"
     - RUSTFLAGS="-D warnings" cargo check -p vauchi-app --no-default-features
+    - echo "── vauchi-cabi with secure-storage ──"
+    - cargo check --features secure-storage -p vauchi-cabi
+    # Release bindings are built in tag pipelines, so a dev-only feature
+    # must fail the build there (private#794).
+    - echo "── dev-logging refuses a tagged build ──"
+    - |
+      if CI_COMMIT_TAG=v0.0.0-guard cargo check -p vauchi-cabi --features vauchi-cabi/dev-logging > dev-build-guard.log 2>&1; then
+        echo "a tagged build with dev-logging compiled; the dev-build guard is missing"
+        exit 1
+      fi
+      grep "private#794" dev-build-guard.log
+    # One archive per package and feature set a test job runs; the features
+    # are the ones the jobs passed to `cargo nextest run` before, with the
+    # reasons kept at those jobs.
+    - echo "── test archives ──"
+    - mkdir -p archives
+    - cargo nextest archive -p vauchi-core --features test-kdf,testing --archive-file archives/core.tar.zst
+    - cargo nextest archive -p vauchi-core --features testing --archive-file archives/core-vectors.tar.zst
+    - cargo nextest archive -p vauchi-app --features test-kdf,network-http,testing --archive-file archives/app.tar.zst
+    - cargo nextest archive -p vauchi-app --features vauchi-app/test-support --test reachability --archive-file archives/app-reachability.tar.zst
+    - cargo nextest archive -p vauchi-platform --features test-kdf --archive-file archives/platform.tar.zst
+    - cargo nextest archive -p vauchi-cabi --features vauchi-cabi/dev-logging --archive-file archives/cabi-dev-logging.tar.zst
+    - cargo nextest archive -p vauchi-platform --features vauchi-platform/dev-logging --archive-file archives/platform-dev-logging.tar.zst
+    # Cucumber is harness=false, which nextest cannot archive: build the
+    # binary and ship it as is.
+    - |
+      cucumber="$(cargo test --test cucumber_tests --features testing,test-kdf --no-run --message-format=json \
+        | python3 -c 'import json, sys
+      for line in sys.stdin:
+          message = json.loads(line)
+          if message.get("reason") == "compiler-artifact" and message.get("executable") and message["target"]["name"] == "cucumber_tests":
+              print(message["executable"])')"
+      cp "$cucumber" archives/cucumber_tests
+    - ls -la archives
+  artifacts:
+    paths:
+      - archives/
+    expire_in: 1 day
 
 # SemVer compatibility check — catch breaking API changes before they cascade
 # to 10+ downstream consumers (cli, tui, e2e, relay, linux-gtk, mobile bindings).
@@ -699,16 +743,6 @@ lint:duplicates:
 # Unused dependency check (advisory — detects unused crates via cargo-machete)
 lint:machete:
   extends: [.linux-runner-nocache, .lint-machete-job, .timeout-quick]
-
-# CABI header freshness — catch stale headers after export changes (T0-11)
-lint:cabi-header:
-  # .timeout-cold-rebuild: see the template comment.
-  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
-  stage: lint
-  needs: []
-  script:
-    - cargo build -p vauchi-cabi
-    - git diff --exit-code vauchi-cabi/include/vauchi.h || { echo "CABI header is stale — rebuild with 'cargo build -p vauchi-cabi' and commit the updated include/vauchi.h"; exit 1; }
 
 # Fail closed when the pinned analyzer or its source inputs are missing.
 lint:architecture:
@@ -855,15 +889,22 @@ metric:audit-mobile-surface:
 # avoids llvm-cov instrumentation rebuild). Coverage runs on main only.
 # Cucumber tests use cargo test (not nextest) because harness=false output
 # is incompatible with nextest's test listing format.
-test:core:
-  # .timeout-cold-rebuild: see the template comment.
-  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
+# The test jobs run build:tests' archives: no compiler, no lock, any
+# runner slot. `--workspace-remap` points the binaries' CARGO_MANIFEST_DIR
+# at this checkout, so fixtures and the sibling locales/themes resolve;
+# the junit report still lands in target/nextest/ci/.
+.run-archive:
+  extends: [.linux-runner, .timeout-standard]
   stage: test
   needs:
-    - job: lint:format
-      optional: true
-    - job: lint:clippy
-      optional: true
+    - job: build:tests
+  variables:
+    # Word-split by the shell at use, so no quotes: the checkout path has
+    # no spaces on the shell runners.
+    NEXTEST_ARCHIVE_ARGS: --profile ci --workspace-remap $CI_PROJECT_DIR --extract-to target/archive-run --extract-overwrite
+
+test:core:
+  extends: [.run-archive, .validation-rust]
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
@@ -873,8 +914,10 @@ test:core:
     # ["testing"]); without it the ~5000-test suite never ran in CI and
     # regressions merged green — F4 convergence, a V2 wire-format break, and
     # 5 stale multistage tests all shipped this way. See backlog
-    # 2026-07-27-f4-bounded-skew-convergence-regression.
-    - cargo nextest run --profile ci -p vauchi-core --features test-kdf,testing
+    # 2026-07-27-f4-bounded-skew-convergence-regression. The features are
+    # in build:tests' archive.
+    - mkdir -p target/archive-run
+    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file archives/core.tar.zst
   artifacts:
     when: always
     reports:
@@ -885,15 +928,14 @@ test:core:
 # Argon2id, which `test-kdf` above compiles out; this runs the vector tests
 # alone without it (vauchi/private#119).
 test:vectors:
-  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
-  stage: test
-  needs: []
+  extends: [.run-archive]
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
   script:
-    - cargo nextest run --profile ci -p vauchi-core --features testing --test it -E 'test(protocol_test_vectors)'
+    - mkdir -p target/archive-run
+    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file archives/core-vectors.tar.zst -E 'test(protocol_test_vectors)'
   rules:
     - if: $CI_MERGE_REQUEST_IID
       changes:
@@ -923,8 +965,6 @@ test:protocol:
   needs:
     - job: lint:format
       optional: true
-    - job: lint:clippy
-      optional: true
   before_script:
     - !reference [.self-hosted, before_script]
   script:
@@ -946,8 +986,6 @@ test:core-32bit:
   tags: [docker]
   needs:
     - job: lint:format
-      optional: true
-    - job: lint:clippy
       optional: true
   variables:
     CARGO_HOME: ${CI_PROJECT_DIR}/.cargo-i386
@@ -1124,16 +1162,8 @@ test:e2e-smoke:
           - Cargo.lock
 
 test:cucumber:
-  # .timeout-cold-rebuild: compiles the full workspace before running
-  # cucumber — see the template comment.
-  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
-  stage: test
+  extends: [.run-archive, .validation-rust]
   allow_failure: false
-  needs:
-    - job: lint:format
-      optional: true
-    - job: lint:clippy
-      optional: true
   before_script:
     - !reference [.self-hosted, before_script]
     # Force the cached ../features checkout to the tip of main. A plain
@@ -1150,24 +1180,20 @@ test:cucumber:
     # only core-eligible scenarios.
     # `testing` exposes the exchange test seams (MockProximityVerifier) the
     # two-party exchange steps drive; `test-kdf` keeps per-scenario identity
-    # creation fast.
-    - cargo test --test cucumber_tests --features testing,test-kdf -- --tags "not @wip and not @ui"
+    # creation fast. Both features are in build:tests' cucumber binary; the
+    # binary finds ../features through CARGO_MANIFEST_DIR, which cargo
+    # would set and a direct run must.
+    - CARGO_MANIFEST_DIR="$CI_PROJECT_DIR/vauchi-core" archives/cucumber_tests --tags "not @wip and not @ui"
 
 test:platform:
-  # .timeout-cold-rebuild: see the template comment.
-  extends: [.linux-runner, .validation-platform, .timeout-cold-rebuild]
-  stage: test
-  needs:
-    - job: lint:format
-      optional: true
-    - job: lint:clippy
-      optional: true
+  extends: [.run-archive, .validation-platform]
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
   script:
-    - cargo nextest run --profile ci -p vauchi-platform --features test-kdf
+    - mkdir -p target/archive-run
+    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file archives/platform.tar.zst
   artifacts:
     when: always
     reports:
@@ -1183,14 +1209,7 @@ test:platform:
 # its `required-features = ["test-support"]` filter rejects
 # default-feature builds; it runs in `test:reachability` below.
 test:app:
-  # .timeout-cold-rebuild: see the template comment.
-  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
-  stage: test
-  needs:
-    - job: lint:format
-      optional: true
-    - job: lint:clippy
-      optional: true
+  extends: [.run-archive, .validation-rust]
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
@@ -1210,7 +1229,9 @@ test:app:
     # under its `testing` feature) compiled out here and in
     # `just test core`, so 14 tests ran nowhere. One had gone stale and one
     # failed one run in four, unnoticed (2026-10-02, vauchi/private#438).
-    - cargo nextest run --profile ci -p vauchi-app --features test-kdf,network-http,testing
+    # The features are in build:tests' archive.
+    - mkdir -p target/archive-run
+    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file archives/app.tar.zst
   artifacts:
     when: always
     reports:
@@ -1225,27 +1246,15 @@ test:app:
 # their own binding builds. The vauchi-platform leg is compile-coverage
 # for the feature on a non-mobile target.
 test:dev-logging:
-  # .timeout-cold-rebuild: see the template comment.
-  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
-  stage: test
-  needs:
-    - job: lint:format
-      optional: true
-    - job: lint:clippy
-      optional: true
+  extends: [.run-archive, .validation-rust]
   before_script:
     - !reference [.self-hosted, before_script]
   script:
-    - cargo nextest run --profile ci -p vauchi-cabi --features vauchi-cabi/dev-logging
-    - cargo nextest run --profile ci -p vauchi-platform --features vauchi-platform/dev-logging
-    # Release bindings are built in tag pipelines, so a dev-only feature
-    # must fail the build there (private#794).
-    - |
-      if CI_COMMIT_TAG=v0.0.0-guard cargo check -p vauchi-cabi --features vauchi-cabi/dev-logging > dev-build-guard.log 2>&1; then
-        echo "a tagged build with dev-logging compiled; the dev-build guard is missing"
-        exit 1
-      fi
-      grep "private#794" dev-build-guard.log
+    # The tag guard (a dev-only feature must not build in a tag pipeline,
+    # private#794) runs in build:tests with the other compile-time checks.
+    - mkdir -p target/archive-run
+    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file archives/cabi-dev-logging.tar.zst
+    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file archives/platform-dev-logging.tar.zst
 
 # Layer 1 ScreenModel reachability gate — catches orphan handler arms
 # (declared but no affordance emits the action_id) and orphan
@@ -1259,44 +1268,19 @@ test:dev-logging:
 #   _private/docs/planning/todo/2026-04-20-frontend-correctness-strategy-plan.md
 #   Phase 1 Task 1.4.
 test:reachability:
-  # .timeout-cold-rebuild: see the template comment.
-  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
-  stage: test
-  needs:
-    - job: lint:format
-      optional: true
-    - job: lint:clippy
-      optional: true
+  extends: [.run-archive, .validation-rust]
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
   script:
-    - cargo nextest run --profile ci -p vauchi-app --features vauchi-app/test-support --test reachability
+    - mkdir -p target/archive-run
+    - cargo nextest run $NEXTEST_ARCHIVE_ARGS --archive-file archives/app-reachability.tar.zst
   artifacts:
     when: always
     reports:
       junit: target/nextest/ci/junit.xml
     expire_in: 1 week
-
-validate:secure-storage:
-  # .timeout-cold-rebuild: see the template comment.
-  extends: [.linux-runner, .timeout-cold-rebuild]
-  stage: test
-  needs:
-    - job: lint:format
-      optional: true
-  script:
-    - cargo check --features secure-storage -p vauchi-cabi
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        compare_to: refs/heads/$CI_DEFAULT_BRANCH
-        paths:
-          - "vauchi-cabi/src/**/*.rs"
-          - "vauchi-core/src/storage/**/*.rs"
-          - "vauchi-core/Cargo.toml"
-          - "vauchi-cabi/Cargo.toml"
 
 # WASM compatibility guard — verifies no C FFI crate (aws-lc-rs, ring, openssl)
 # appears in vauchi-core's non-TLS dependency path. Compilation check is not
@@ -1472,8 +1456,6 @@ security:audit:
   extends: [.linux-runner-readonly, .security-audit, .validation-deps, .timeout-quick]
   needs:
     - job: lint:format
-      optional: true
-    - job: lint:clippy
       optional: true
   before_script:
     - !reference [.self-hosted, before_script]

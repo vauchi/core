@@ -72,6 +72,7 @@ fn restored(backup: &str, password: &str) -> Vauchi {
 }
 
 // @scenario: duress_mode :: Backup includes duress profile
+// @scenario: duress_mode :: A decoy backup password opens only the decoy profile
 #[test]
 fn the_decoy_password_restores_the_decoys_under_the_mask_identity() {
     let alice = alice(true);
@@ -87,6 +88,7 @@ fn the_decoy_password_restores_the_decoys_under_the_mask_identity() {
 }
 
 // @scenario: duress_mode :: Backup includes duress profile
+// @scenario: duress_mode :: A decoy backup password opens only the decoy profile
 #[test]
 fn a_restored_decoy_backup_locks_with_the_duress_pin_and_has_no_duress() {
     let alice = alice(true);

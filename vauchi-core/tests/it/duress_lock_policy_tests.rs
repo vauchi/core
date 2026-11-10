@@ -67,6 +67,7 @@ fn a_pin_set_for_biometric_unlock_records_the_biometric_branch() {
 }
 
 // @scenario: duress_mode :: Enable duress PIN in settings
+// @scenario: duress_mode :: Duress password strength requirements
 #[test]
 fn two_real_passwords_set_up_duress_under_the_password_branch() {
     let mut vauchi = install_with_app_password(STRONG_APP_PASSWORD);
@@ -91,6 +92,7 @@ fn two_real_passwords_set_up_duress_under_the_password_branch() {
 }
 
 // @scenario: duress_mode :: Enable duress PIN in settings
+// @scenario: duress_mode :: Duress password strength requirements
 #[test]
 fn the_password_branch_refuses_a_weak_app_password() {
     for (weak, why) in weak_passwords() {
@@ -113,6 +115,7 @@ fn the_password_branch_refuses_a_weak_app_password() {
 }
 
 // @scenario: duress_mode :: Enable duress PIN in settings
+// @scenario: duress_mode :: Duress password strength requirements
 #[test]
 fn the_password_branch_refuses_a_weak_duress_password() {
     for (weak, why) in weak_passwords() {
@@ -164,6 +167,7 @@ fn the_password_branch_refuses_the_app_password_as_the_duress_password() {
 }
 
 // @scenario: duress_mode :: Enable duress PIN in settings
+// @scenario: duress_mode :: Duress password strength requirements
 #[test]
 fn under_the_password_branch_the_app_password_cannot_become_weak() {
     let mut vauchi = install_with_app_password(STRONG_APP_PASSWORD);

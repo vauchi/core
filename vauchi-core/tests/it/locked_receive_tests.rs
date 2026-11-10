@@ -229,3 +229,73 @@ fn when_the_inbox_write_fails_the_ratchet_does_not_move() {
         "the saved session still opens the blob that was not stored"
     );
 }
+
+// @internal
+#[test]
+fn an_unlocked_save_of_a_session_a_locked_run_moved_is_refused() {
+    let mut world = world_with_session_on(SHARED);
+    let unlocked = world.unlocked();
+    let (read_before, is_initiator) = unlocked
+        .ratchets()
+        .load_ratchet_state_for_device(&world.contact, &SHARED)
+        .unwrap()
+        .unwrap();
+    let blob = world.next_blob();
+    let receipt =
+        store_locked_update(&world.locked(), "blob-1", &world.contact, &blob, NOW).unwrap();
+
+    let stale_save = unlocked.ratchets().save_ratchet_state_for_device(
+        &world.contact,
+        &SHARED,
+        &read_before,
+        is_initiator,
+    );
+
+    assert_eq!(receipt, LockedReceipt::Stored);
+    assert!(
+        matches!(stale_save, Err(StorageError::RatchetMoved)),
+        "{stale_save:?}"
+    );
+    let (mut kept, _) = world
+        .unlocked()
+        .ratchets()
+        .load_ratchet_state_for_device(&world.contact, &SHARED)
+        .unwrap()
+        .unwrap();
+    let message = serde_json::from_slice(&blob).unwrap();
+    assert!(
+        kept.decrypt(&message).is_err(),
+        "the stored session is the locked run's, already past the blob"
+    );
+}
+
+// @internal
+#[test]
+fn a_session_read_again_after_a_locked_run_saves() {
+    let mut world = world_with_session_on(SHARED);
+    let unlocked = world.unlocked();
+    unlocked
+        .ratchets()
+        .load_ratchet_state_for_device(&world.contact, &SHARED)
+        .unwrap();
+    let blob = world.next_blob();
+    store_locked_update(&world.locked(), "blob-1", &world.contact, &blob, NOW).unwrap();
+
+    let (current, is_initiator) = unlocked
+        .ratchets()
+        .load_ratchet_state_for_device(&world.contact, &SHARED)
+        .unwrap()
+        .unwrap();
+
+    for _ in 0..2 {
+        assert!(matches!(
+            unlocked.ratchets().save_ratchet_state_for_device(
+                &world.contact,
+                &SHARED,
+                &current,
+                is_initiator,
+            ),
+            Ok(())
+        ));
+    }
+}

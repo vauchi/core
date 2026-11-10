@@ -10,8 +10,11 @@ use vauchi_app::ui::{AppEngine, AppScreen, Component};
 use vauchi_core::api::Vauchi;
 
 fn published_catalog() -> Vec<u8> {
-    let path =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../themes/generated/themes.json");
+    let path = std::path::PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR")
+            .expect("CARGO_MANIFEST_DIR is set by cargo test and cargo nextest"),
+    )
+    .join("../../themes/generated/themes.json");
     std::fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
 }
 

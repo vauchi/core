@@ -215,7 +215,11 @@ pub(crate) struct Argon2Params {
 }
 
 fn fixture_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(FIXTURE)
+    PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR")
+            .expect("CARGO_MANIFEST_DIR is set by cargo test and cargo nextest"),
+    )
+    .join(FIXTURE)
 }
 
 fn writing() -> bool {

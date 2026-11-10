@@ -161,11 +161,15 @@ fn main() {
     // `problems/2026-07-04-cucumber-backgrounds-fail-silently`.
     //
     //   cargo test --test cucumber_tests -- --tags @contact-card
-    let features_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../features");
+    let features_dir = format!(
+        "{}/../../features",
+        std::env::var("CARGO_MANIFEST_DIR")
+            .expect("CARGO_MANIFEST_DIR is set by cargo test and cargo nextest")
+    );
 
     // CI clones the sibling features/ repo before this job; locally it may be
     // absent until `just setup`. Skip gracefully instead of failing.
-    if !std::path::Path::new(features_dir).exists() {
+    if !std::path::Path::new(&features_dir).exists() {
         eprintln!(
             "Skipping cucumber tests: features directory not found at {features_dir}. \
              Run `just setup` to clone the features repo."

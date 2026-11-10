@@ -18,7 +18,11 @@ use sha2::{Digest, Sha256};
 use vauchi_core::qr_decode::{ScannerBackend, scan_qr_from_luma};
 
 fn corpus() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/qr-camera-corpus")
+    PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR")
+            .expect("CARGO_MANIFEST_DIR is set by cargo test and cargo nextest"),
+    )
+    .join("tests/fixtures/qr-camera-corpus")
 }
 
 /// Frame type, length and the first 8 hex of the SHA-256: enough to tell

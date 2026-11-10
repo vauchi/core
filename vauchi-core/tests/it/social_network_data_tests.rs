@@ -350,8 +350,11 @@ fn the_cdn_networks_file_passes_core_validation() {
     let path = std::env::var("VAUCHI_NETWORKS_PATH")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| {
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../website/app-files-src/networks.json")
+            std::path::PathBuf::from(
+                std::env::var("CARGO_MANIFEST_DIR")
+                    .expect("CARGO_MANIFEST_DIR is set by cargo test and cargo nextest"),
+            )
+            .join("../../website/app-files-src/networks.json")
         });
     let Ok(data) = std::fs::read(&path) else {
         return;

@@ -16,7 +16,10 @@
 use vauchi_app::ui::*;
 
 fn init_fixture_i18n() {
-    let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let manifest_dir = std::path::PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR")
+            .expect("CARGO_MANIFEST_DIR is set by cargo test and cargo nextest"),
+    );
     let locales_dir = manifest_dir
         .ancestors()
         .map(|ancestor| ancestor.join("locales"))

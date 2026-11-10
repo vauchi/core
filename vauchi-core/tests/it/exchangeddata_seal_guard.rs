@@ -17,10 +17,14 @@
 //! (CC-21).
 
 use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 
 fn read_src(rel: &str) -> String {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(rel);
+    let path = PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR")
+            .expect("CARGO_MANIFEST_DIR is set by cargo test and cargo nextest"),
+    )
+    .join(rel);
     fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()))
 }
 

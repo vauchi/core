@@ -34,5 +34,9 @@ pub fn collapse_number_arrays(pretty: &str) -> String {
 }
 
 pub fn journey_fixtures_dir() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/journeys")
+    std::path::PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR")
+            .expect("CARGO_MANIFEST_DIR is set by cargo test and cargo nextest"),
+    )
+    .join("fixtures/journeys")
 }

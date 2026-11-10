@@ -201,8 +201,11 @@ fn fresh_fixture() -> Value {
 }
 
 fn fixture_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../vauchi-app/fixtures/journeys/recovery_ceremony_v1.json")
+    PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR")
+            .expect("CARGO_MANIFEST_DIR is set by cargo test and cargo nextest"),
+    )
+    .join("../vauchi-app/fixtures/journeys/recovery_ceremony_v1.json")
 }
 
 fn differing_scenario(recorded: &Value, fresh: &Value) -> String {

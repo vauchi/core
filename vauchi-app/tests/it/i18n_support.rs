@@ -101,7 +101,11 @@ pub fn locales_dir() -> std::path::PathBuf {
     let (dir, source) = match std::env::var_os("VAUCHI_LOCALES_DIR") {
         Some(dir) => (std::path::PathBuf::from(dir), "VAUCHI_LOCALES_DIR"),
         None => (
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales"),
+            std::path::PathBuf::from(
+                std::env::var("CARGO_MANIFEST_DIR")
+                    .expect("CARGO_MANIFEST_DIR is set by cargo test and cargo nextest"),
+            )
+            .join("../../locales"),
             "the sibling checkout beside core",
         ),
     };

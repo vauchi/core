@@ -79,7 +79,11 @@ pub mod two_recipient;
 pub fn locales_dir() -> std::path::PathBuf {
     checked_locales_dir(
         std::env::var_os("VAUCHI_LOCALES_DIR").map(std::path::PathBuf::from),
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales"),
+        std::path::PathBuf::from(
+            std::env::var("CARGO_MANIFEST_DIR")
+                .expect("CARGO_MANIFEST_DIR is set by cargo test and cargo nextest"),
+        )
+        .join("../../locales"),
     )
 }
 

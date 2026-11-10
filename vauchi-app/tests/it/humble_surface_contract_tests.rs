@@ -82,7 +82,8 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
 /// points at `core/vauchi-app/`. The platform sources live in the
 /// sibling crate.
 fn platform_src_dir() -> PathBuf {
-    let manifest = env!("CARGO_MANIFEST_DIR");
+    let manifest = std::env::var("CARGO_MANIFEST_DIR")
+        .expect("CARGO_MANIFEST_DIR is set by cargo test and cargo nextest");
     PathBuf::from(manifest)
         .join("..")
         .join("vauchi-platform")

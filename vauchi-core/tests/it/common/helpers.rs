@@ -18,7 +18,11 @@ use vauchi_core::{
 fn themes_checkout_dir() -> std::path::PathBuf {
     match std::env::var_os("VAUCHI_THEMES_DIR") {
         Some(dir) => std::path::PathBuf::from(dir),
-        None => std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../themes"),
+        None => std::path::PathBuf::from(
+            std::env::var("CARGO_MANIFEST_DIR")
+                .expect("CARGO_MANIFEST_DIR is set by cargo test and cargo nextest"),
+        )
+        .join("../../themes"),
     }
 }
 

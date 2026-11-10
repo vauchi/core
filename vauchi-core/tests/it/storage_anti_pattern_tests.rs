@@ -29,9 +29,11 @@ fn collect_source_files(dir: &Path, files: &mut Vec<std::path::PathBuf>) {
 }
 
 fn source_files() -> Vec<std::path::PathBuf> {
-    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("workspace root");
+    let manifest = std::path::PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR")
+            .expect("CARGO_MANIFEST_DIR is set by cargo test and cargo nextest"),
+    );
+    let workspace = manifest.parent().expect("workspace root");
     let mut files = Vec::new();
     // Scan all three crates (vauchi-core, vauchi-platform, vauchi-cabi)
     for crate_name in &["vauchi-core", "vauchi-platform", "vauchi-cabi"] {

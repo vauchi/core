@@ -194,6 +194,7 @@ mod local_rendezvous_tests;
 mod local_wire_tests;
 mod locale_provenance_tests;
 mod lock_screen_back_tests;
+mod lock_screen_biometric_first_tests;
 mod lock_screen_biometric_unlock_tests;
 mod lock_screen_feedback_tests;
 mod lock_session_tests;

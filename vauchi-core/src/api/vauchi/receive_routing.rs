@@ -502,10 +502,17 @@ mod tests {
     // @internal
     #[test]
     fn only_resolvable_refusals_keep_the_blob_on_the_relay() {
-        for retried in ["storage", "genesis_rate", "device_signature"] {
+        for retried in ["storage", "genesis_rate", "device_unknown"] {
             assert!(!rejected(retried).should_ack(), "{retried} is retried");
         }
-        for terminal in ["signature", "replay", "bad_delta", "stale", "blocked"] {
+        for terminal in [
+            "signature",
+            "device_signature",
+            "replay",
+            "bad_delta",
+            "stale",
+            "blocked",
+        ] {
             assert!(rejected(terminal).should_ack(), "{terminal} is final");
         }
     }

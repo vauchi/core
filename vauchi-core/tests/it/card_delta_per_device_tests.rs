@@ -63,6 +63,13 @@ fn refused_as_device_signature(result: Result<ReceiveOutcome, CardUpdateError>) 
     }
 }
 
+fn refused_as_not_yet_known(result: Result<ReceiveOutcome, CardUpdateError>) {
+    match result {
+        Err(CardUpdateError::DeviceNotYetKnown) => {}
+        other => panic!("expected DeviceNotYetKnown, got {other:?}"),
+    }
+}
+
 // @scenario: onboarding :: Exchange success celebration
 // @internal
 #[test]
@@ -136,18 +143,61 @@ fn a_delta_with_no_device_signature_is_refused() {
     assert_eq!(bobs_name_at_alice(&p), "Bob");
 }
 
+/// A signer the contact has never seen is the one refusal a later
+/// registry push can resolve, so it is reported apart from a bad
+/// signature.
 // @scenario: onboarding :: Exchange success celebration
 // @internal
 #[test]
-fn a_delta_from_a_device_the_contact_never_pinned_is_refused() {
+fn a_delta_from_a_device_the_contact_never_pinned_waits_for_its_registry() {
     let p = two_parties();
     alice_holds_bobs_registry(&p);
     let stranger = SigningKeyPair::generate();
     let mut delta = identity_signed_delta(&p, 1);
     delta.sign_by_device([7u8; 32], &stranger);
 
-    refused_as_device_signature(deliver(&p, &delta));
+    refused_as_not_yet_known(deliver(&p, &delta));
     assert_eq!(bobs_name_at_alice(&p), "Bob");
+}
+
+/// The same sealed blob, refused before the sender's registry named its
+/// device, applies once the registry arrives: the refusal consumed no
+/// ratchet state and the relay kept the blob.
+// @scenario: onboarding :: Exchange success celebration
+// @internal
+#[test]
+fn a_refused_delta_from_a_new_device_applies_once_its_registry_arrives() {
+    let p = two_parties();
+    alice_holds_bobs_registry(&p);
+    let identity_key = p.bob.identity().unwrap().signing_keypair();
+    let tablet_key = SigningKeyPair::generate();
+    let mut delta = identity_signed_delta(&p, 1);
+    delta.sign_by_device([7u8; 32], &tablet_key);
+    let blob = seal_delta(&p.bob, &p.alice_at_bob, &delta);
+    let deliver_blob = || {
+        process_single_card_update(
+            p.alice.identity().unwrap(),
+            p.alice.storage(),
+            &p.bob_at_alice,
+            &blob,
+        )
+    };
+
+    refused_as_not_yet_known(deliver_blob());
+    assert_eq!(bobs_name_at_alice(&p), "Bob");
+
+    let mut registry = p.bob_registry();
+    registry
+        .add_device(tablet_entry(&tablet_key), identity_key)
+        .unwrap();
+    let (phone_id, phone_key, now) = (p.bob_device_id(), p.bob_device_key(), p.now());
+    let with_tablet =
+        RegistryBroadcast::signed_by_device(&registry, identity_key, phone_id, &phone_key, now);
+    p.push_to_alice(&with_tablet).unwrap();
+
+    let outcome = deliver_blob().expect("the retried blob applies");
+    assert!(matches!(outcome, ReceiveOutcome::CardDelta));
+    assert_eq!(bobs_name_at_alice(&p), "Robert");
 }
 
 // @scenario: onboarding :: Exchange success celebration

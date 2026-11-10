@@ -167,7 +167,7 @@ fn set_up_duress_pin(shell: Shell, keys: &str) -> AppEngine {
     vauchi.create_identity("Alice").expect("identity");
     vauchi.setup_app_password(PASSWORD).expect("app password");
     vauchi.authenticate(PASSWORD).expect("unlock");
-    let mut app = AppEngine::for_duress_setup(vauchi);
+    let mut app = with_biometrics(AppEngine::for_duress_setup(vauchi));
     let mut commands = app.initial_commands().expect("initial commands");
 
     commands = activate_next(&mut app, &commands); // overview → enter PIN
@@ -334,7 +334,7 @@ fn the_pin_field_never_carries_the_digits_back_to_the_shell() {
     vauchi.create_identity("Alice").expect("identity");
     vauchi.setup_app_password(PASSWORD).expect("app password");
     vauchi.authenticate(PASSWORD).expect("unlock");
-    let mut app = AppEngine::for_duress_setup(vauchi);
+    let mut app = with_biometrics(AppEngine::for_duress_setup(vauchi));
     let commands = app.initial_commands().expect("initial commands");
     let commands = activate_next(&mut app, &commands);
 
@@ -355,7 +355,7 @@ fn a_duress_pin_typed_before_an_invalidation_is_the_pin_set() {
     vauchi.create_identity("Alice").expect("identity");
     vauchi.setup_app_password(PASSWORD).expect("app password");
     vauchi.authenticate(PASSWORD).expect("unlock");
-    let mut app = AppEngine::for_duress_setup(vauchi);
+    let mut app = with_biometrics(AppEngine::for_duress_setup(vauchi));
     let mut commands = app.initial_commands().expect("initial commands");
 
     commands = activate_next(&mut app, &commands); // overview → enter PIN
@@ -378,4 +378,14 @@ fn a_duress_pin_typed_before_an_invalidation_is_the_pin_set() {
     let _ = activate_next(&mut app, &commands); // save
 
     assert_eq!(unlocks_as(&mut app, DURESS_PIN), Some(AuthMode::Duress));
+}
+
+/// The 6-digit duress PIN is the biometric branch (ADR-032, amended
+/// 2026-11-10): these tests drive it, so the device reports biometrics.
+fn with_biometrics(mut app: AppEngine) -> AppEngine {
+    app.set_device_capabilities(vauchi_core::exchange::capability::DeviceCapabilities {
+        has_biometrics: true,
+        ..Default::default()
+    });
+    app
 }

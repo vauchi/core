@@ -13,6 +13,8 @@ use crate::ui::*;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
+mod passwords;
+
 /// Configuration for the duress PIN feature.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -58,6 +60,12 @@ pub struct DuressPinEngine {
     new_pin: String,
     confirm_pin: String,
     pending_disable: bool,
+    /// No biometric unlock on this device: duress needs two real
+    /// passwords (ADR-032, amended 2026-11-10), and `new_pin` and
+    /// `confirm_pin` hold the duress password.
+    password_branch: bool,
+    app_password: String,
+    app_password_weak: bool,
     /// Number of decoy contacts, for the overview's decoy row.
     decoy_count: usize,
     locale: Locale,
@@ -70,6 +78,7 @@ impl Drop for DuressPinEngine {
     fn drop(&mut self) {
         self.new_pin.zeroize();
         self.confirm_pin.zeroize();
+        self.app_password.zeroize();
     }
 }
 
@@ -78,6 +87,9 @@ enum DuressPinStep {
     Overview,
     EnterPin,
     ConfirmPin,
+    EnterAppPassword,
+    EnterPassword,
+    ConfirmPassword,
 }
 
 impl DuressPinEngine {
@@ -88,9 +100,19 @@ impl DuressPinEngine {
             new_pin: String::new(),
             confirm_pin: String::new(),
             pending_disable: false,
+            password_branch: false,
+            app_password: String::new(),
+            app_password_weak: false,
             decoy_count: 0,
             locale,
         }
+    }
+
+    /// Set duress up under the password branch: the device has no
+    /// biometric unlock in front of a 6-digit PIN.
+    pub fn with_password_branch(mut self, password_branch: bool) -> Self {
+        self.password_branch = password_branch;
+        self
     }
 
     /// Set the number of decoy contacts shown on the overview.
@@ -108,6 +130,9 @@ impl DuressPinEngine {
     }
 
     fn start_pin_entry(&mut self) -> ActionResult {
+        if self.password_branch {
+            return self.start_password_entry();
+        }
         self.step = DuressPinStep::EnterPin;
         self.new_pin.clear();
         self.confirm_pin.clear();
@@ -133,10 +158,13 @@ impl DuressPinEngine {
             DuressPinStep::Overview => return None,
             DuressPinStep::EnterPin => 1,
             DuressPinStep::ConfirmPin => 2,
+            DuressPinStep::EnterAppPassword => 1,
+            DuressPinStep::EnterPassword => 2,
+            DuressPinStep::ConfirmPassword => 3,
         };
         Some(Progress {
             current_step,
-            total_steps: 2,
+            total_steps: if self.password_branch { 3 } else { 2 },
             label: None,
         })
     }
@@ -342,12 +370,31 @@ impl DuressPinEngine {
 }
 
 impl WorkflowEngine for DuressPinEngine {
+    fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
+        match update {
+            crate::ui::EngineUpdate::DuressAppPasswordRefused => {
+                self.refuse_app_password();
+                true
+            }
+            // A shell may report its hardware after the screen was built;
+            // the branch follows it until setup starts.
+            crate::ui::EngineUpdate::DeviceCapabilities(capabilities)
+                if self.step == DuressPinStep::Overview =>
+            {
+                self.password_branch = !capabilities.has_biometrics;
+                true
+            }
+            _ => false,
+        }
+    }
+
     fn engine_output(&self) -> Option<crate::ui::EngineOutput> {
         let config = self.config();
         Some(crate::ui::EngineOutput::DuressPin(
             crate::ui::DuressPinSetup {
                 enabled: config.enabled,
                 pin: self.pin().to_string(),
+                app_password: self.password_branch.then(|| self.app_password.clone()),
             },
         ))
     }
@@ -357,10 +404,21 @@ impl WorkflowEngine for DuressPinEngine {
             DuressPinStep::Overview => self.overview_screen(),
             DuressPinStep::EnterPin => self.enter_pin_screen(),
             DuressPinStep::ConfirmPin => self.confirm_pin_screen(),
+            DuressPinStep::EnterAppPassword => self.enter_app_password_screen(),
+            DuressPinStep::EnterPassword => self.enter_password_screen(),
+            DuressPinStep::ConfirmPassword => self.confirm_password_screen(),
         }
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
+        if matches!(
+            self.step,
+            DuressPinStep::EnterAppPassword
+                | DuressPinStep::EnterPassword
+                | DuressPinStep::ConfirmPassword
+        ) {
+            return self.handle_password_action(action);
+        }
         match (&self.step, action) {
             // --- Overview ---
             (

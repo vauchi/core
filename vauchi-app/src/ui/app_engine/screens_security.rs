@@ -122,7 +122,8 @@ impl AppEngine {
                         DuressConfig { enabled },
                         render_context.resolved_locale(),
                     )
-                    .with_decoy_count(decoy_count),
+                    .with_decoy_count(decoy_count)
+                    .with_password_branch(!device_capabilities.has_biometrics),
                 )
             }
             AppScreen::Backup => Box::new(

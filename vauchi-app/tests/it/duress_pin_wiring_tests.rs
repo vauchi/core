@@ -34,7 +34,7 @@ fn engine_ready() -> AppEngine {
         .setup_app_password(APP_PASSWORD)
         .unwrap();
     engine.vauchi_mut().authenticate(APP_PASSWORD).unwrap();
-    engine
+    with_biometrics(engine)
 }
 
 /// Adds a contact and returns the id the picker will present it under.
@@ -435,7 +435,7 @@ fn duress_mode_gdpr_export_holds_no_real_contacts() {
 fn without_an_app_password_the_duress_pin_is_refused_and_says_why() {
     let mut vauchi: Vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
-    let mut engine = AppEngine::new(vauchi);
+    let mut engine = with_biometrics(AppEngine::new(vauchi));
     engine.navigate_to(AppScreen::DuressPin);
     let _ = start_setup(&mut engine);
     type_into(&mut engine, "pin", PIN);
@@ -449,4 +449,14 @@ fn without_an_app_password_the_duress_pin_is_refused_and_says_why() {
     };
     assert!(message.contains("app password"), "{message}");
     assert!(!engine.vauchi().is_duress_enabled().unwrap());
+}
+
+/// The 6-digit duress PIN is the biometric branch (ADR-032, amended
+/// 2026-11-10): these tests drive it, so the device reports biometrics.
+fn with_biometrics(mut app: AppEngine) -> AppEngine {
+    app.set_device_capabilities(vauchi_core::exchange::capability::DeviceCapabilities {
+        has_biometrics: true,
+        ..Default::default()
+    });
+    app
 }

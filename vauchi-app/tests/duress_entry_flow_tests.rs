@@ -191,7 +191,7 @@ fn optional_primary_interaction(
 // @scenario: generic_presentation_protocol.feature :: Release contains only the generic action system
 #[test]
 fn duress_entry_without_an_app_password_opens_password_setup_first() {
-    let mut app = AppEngine::for_duress_setup(identity_core());
+    let mut app = with_biometrics(AppEngine::for_duress_setup(identity_core()));
 
     let commands = app
         .initial_commands()
@@ -220,7 +220,7 @@ fn duress_entry_unlocked_with_the_app_password_opens_the_duress_pin_surface_dire
         .setup_app_password("existing-pin-1234")
         .expect("app password");
     vauchi.authenticate("existing-pin-1234").expect("unlock");
-    let mut app = AppEngine::for_duress_setup(vauchi);
+    let mut app = with_biometrics(AppEngine::for_duress_setup(vauchi));
 
     let commands = app
         .initial_commands()
@@ -242,7 +242,7 @@ fn duress_entry_with_an_app_password_asks_for_it_first() {
     vauchi
         .setup_app_password("existing-pin-1234")
         .expect("app password");
-    let mut app = AppEngine::for_duress_setup(vauchi);
+    let mut app = with_biometrics(AppEngine::for_duress_setup(vauchi));
     let commands = app
         .initial_commands()
         .expect("initial duress-entry commands");
@@ -269,7 +269,7 @@ fn duress_entry_with_an_app_password_asks_for_it_first() {
 // @scenario: generic_presentation_protocol.feature :: Release contains only the generic action system
 #[test]
 fn completing_password_setup_chains_into_the_duress_pin_surface() {
-    let mut app = AppEngine::for_duress_setup(identity_core());
+    let mut app = with_biometrics(AppEngine::for_duress_setup(identity_core()));
     let commands = app
         .initial_commands()
         .expect("initial duress-entry commands");
@@ -302,7 +302,7 @@ fn completing_duress_setup_terminates_the_entry_flow() {
         .setup_app_password("existing-pin-1234")
         .expect("app password");
     vauchi.authenticate("existing-pin-1234").expect("unlock");
-    let mut app = AppEngine::for_duress_setup(vauchi);
+    let mut app = with_biometrics(AppEngine::for_duress_setup(vauchi));
     let commands = app
         .initial_commands()
         .expect("initial duress-entry commands");
@@ -330,7 +330,7 @@ fn completing_duress_setup_terminates_the_entry_flow() {
 // @internal
 #[test]
 fn a_password_set_in_this_flow_passes_the_step_before_the_duress_pin() {
-    let mut app = AppEngine::for_duress_setup(identity_core());
+    let mut app = with_biometrics(AppEngine::for_duress_setup(identity_core()));
     let commands = app
         .initial_commands()
         .expect("initial duress-entry commands");
@@ -353,7 +353,7 @@ fn a_password_set_in_this_flow_passes_the_step_before_the_duress_pin() {
 // @scenario: generic_presentation_protocol.feature :: Every shell renders the same prepared presentation
 #[test]
 fn a_filled_password_input_reports_as_filled_to_the_shell() {
-    let mut app = AppEngine::for_duress_setup(identity_core());
+    let mut app = with_biometrics(AppEngine::for_duress_setup(identity_core()));
     let commands = app
         .initial_commands()
         .expect("initial duress-entry commands");
@@ -400,7 +400,7 @@ fn find_input_value(nodes: &[PresentationNode], wanted: &BindingId) -> Option<St
 // @scenario: generic_presentation_protocol.feature :: Release contains only the generic action system
 #[test]
 fn duress_entry_flow_never_requires_the_shell_to_name_a_screen() {
-    let mut app = AppEngine::for_duress_setup(identity_core());
+    let mut app = with_biometrics(AppEngine::for_duress_setup(identity_core()));
 
     let commands = app
         .initial_commands()
@@ -418,4 +418,14 @@ fn duress_entry_flow_never_requires_the_shell_to_name_a_screen() {
         binding.is_some(),
         "the shell must be able to bind input by Core-minted binding id alone"
     );
+}
+
+/// The 6-digit duress PIN is the biometric branch (ADR-032, amended
+/// 2026-11-10): these tests drive it, so the device reports biometrics.
+fn with_biometrics(mut app: AppEngine) -> AppEngine {
+    app.set_device_capabilities(vauchi_core::exchange::capability::DeviceCapabilities {
+        has_biometrics: true,
+        ..Default::default()
+    });
+    app
 }

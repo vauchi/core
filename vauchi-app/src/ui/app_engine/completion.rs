@@ -671,7 +671,14 @@ impl AppEngine {
             }
         };
         if let Some(setup) = setup {
-            if setup.enabled {
+            if let (true, Some(app_password)) = (setup.enabled, setup.app_password.as_deref()) {
+                let outcome = self
+                    .vauchi
+                    .setup_duress_password_with_app_password(app_password, &setup.pin);
+                if let Some(refused) = self.duress_app_password_refused(outcome) {
+                    return refused;
+                }
+            } else if setup.enabled {
                 if let Err(e) = self
                     .vauchi
                     .setup_duress_pin_with_biometric_unlock(&setup.pin)

@@ -107,7 +107,7 @@ fn duress_pin_setup_persists_via_handle_completion() {
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("123456").unwrap();
     vauchi.authenticate("123456").unwrap(); // settings open in an unlocked app (#639)
-    let mut engine = AppEngine::new(vauchi);
+    let mut engine = with_biometrics(AppEngine::new(vauchi));
 
     engine.navigate_to(AppScreen::DuressPin);
 
@@ -689,4 +689,14 @@ fn lock_screen_gains_biometric_unlock_once_the_shell_reports_the_capability() {
         .find(|a| a.id == "unlock_biometric")
         .expect("the capability event must re-prepare the lock screen");
     assert_eq!(action.label, "Unlock with Face ID");
+}
+
+/// The 6-digit duress PIN is the biometric branch (ADR-032, amended
+/// 2026-11-10): these tests drive it, so the device reports biometrics.
+fn with_biometrics(mut app: AppEngine) -> AppEngine {
+    app.set_device_capabilities(vauchi_core::exchange::capability::DeviceCapabilities {
+        has_biometrics: true,
+        ..Default::default()
+    });
+    app
 }

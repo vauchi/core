@@ -206,6 +206,9 @@ pub enum EngineUpdate {
     BiometricUnlockPassed,
     /// The PIN typed at a session PIN step was not the session's (#777).
     SessionPinRejected,
+    /// The app password typed at the duress setup's password branch did
+    /// not open the profile in front; the setup returns to that step.
+    DuressAppPasswordRefused,
     GdprExport(GdprExportUpdate),
     /// Removing the identity from this device could not tell the other
     /// devices; nothing is wiped yet (#915).
@@ -556,6 +559,7 @@ impl EngineUpdate {
             Self::ConfirmPendingDelete => "ConfirmPendingDelete",
             Self::DeviceCapabilities(_) => "DeviceCapabilities",
             Self::BiometricUnlockPassed => "BiometricUnlockPassed",
+            Self::DuressAppPasswordRefused => "DuressAppPasswordRefused",
             Self::SessionPinRejected => "SessionPinRejected",
             Self::DeviceRemovalNotTold => "DeviceRemovalNotTold",
             Self::EmergencyBroadcastSent { .. } => "EmergencyBroadcastSent",
@@ -615,6 +619,9 @@ impl std::fmt::Debug for PendingBackup {
 pub struct DuressPinSetup {
     pub enabled: bool,
     pub pin: String,
+    /// The current app password, set only under the password branch
+    /// (ADR-032, amended 2026-11-10); `pin` is then the duress password.
+    pub app_password: Option<String>,
 }
 
 impl std::fmt::Debug for DuressPinSetup {
@@ -622,6 +629,10 @@ impl std::fmt::Debug for DuressPinSetup {
         f.debug_struct("DuressPinSetup")
             .field("enabled", &self.enabled)
             .field("pin", &"<redacted>")
+            .field(
+                "app_password",
+                &self.app_password.as_ref().map(|_| "<redacted>"),
+            )
             .finish()
     }
 }

@@ -540,6 +540,9 @@ impl AppEngine {
             AppScreen::Privacy => self.complete_privacy(),
             AppScreen::FormDialog { dialog_type } => self.complete_form_dialog(dialog_type),
             AppScreen::ChangePassword => self.complete_change_password(),
+            AppScreen::DuressPin if self.duress_setup_carries_the_app_password() => {
+                self.complete_duress_pin()
+            }
             AppScreen::DuressPin => self.confirm_session_pin_then(CredentialChange::DuressPin),
             AppScreen::DeviceManagement if self.revoke_is_confirmed() => {
                 self.confirm_session_pin_then(CredentialChange::DeviceRevoke)

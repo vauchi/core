@@ -36,6 +36,7 @@ mod device_link_initiator;
 #[cfg(all(feature = "network-http", feature = "storage"))]
 mod device_link_responder;
 mod dispatch;
+mod duress_setup;
 mod entry_points;
 mod entry_viewers;
 mod export_verification;
@@ -853,6 +854,10 @@ impl WorkflowEngine for AppEngine {
         }
 
         if let Some(result) = self.intercept_decoy_contacts_action(&action) {
+            return result;
+        }
+
+        if let Some(result) = self.intercept_duress_change_app_password(&action) {
             return result;
         }
 

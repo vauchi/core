@@ -21,7 +21,7 @@ fn engine_with_password() -> AppEngine {
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password(APP_PIN).unwrap();
     assert_eq!(vauchi.authenticate(APP_PIN).unwrap(), AuthMode::Normal);
-    AppEngine::new(vauchi)
+    with_biometrics(AppEngine::new(vauchi))
 }
 
 fn press(engine: &mut AppEngine, action_id: &str) -> ActionResult {
@@ -326,4 +326,14 @@ fn without_an_app_password_revoking_asks_for_no_pin() {
 
     assert!(!at_session_pin_step(&engine));
     assert!(!laptop_is_active(&engine));
+}
+
+/// The 6-digit duress PIN is the biometric branch (ADR-032, amended
+/// 2026-11-10): these tests drive it, so the device reports biometrics.
+fn with_biometrics(mut app: AppEngine) -> AppEngine {
+    app.set_device_capabilities(vauchi_core::exchange::capability::DeviceCapabilities {
+        has_biometrics: true,
+        ..Default::default()
+    });
+    app
 }

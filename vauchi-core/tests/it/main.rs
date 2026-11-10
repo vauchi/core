@@ -231,6 +231,7 @@ mod duplicate_detection_engine_tests;
 mod duress_alert_secondary_device_tests;
 mod duress_at_rest_tests;
 mod duress_backup_restore_tests;
+mod duress_backup_unlock_branch_tests;
 mod duress_contact_api_tests;
 mod duress_contact_reads_by_id_tests;
 mod duress_cover_device_sync_tests;

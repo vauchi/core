@@ -9,7 +9,7 @@
 //! these functions add locale-aware variants using the i18n system.
 
 use crate::i18n::{Locale, get_string};
-use vauchi_core::AhaMomentType;
+use vauchi_core::{AhaMoment, AhaMomentType};
 
 /// Get the localized title for an aha moment type.
 ///
@@ -39,8 +39,8 @@ pub fn aha_moment_title_localized(moment: AhaMomentType, locale: Locale) -> Stri
 /// Get the localized message for an aha moment type.
 ///
 /// Falls back to the hardcoded English message if no i18n key is found.
-pub fn aha_moment_message_localized(moment: AhaMomentType, locale: Locale) -> String {
-    let key = match moment {
+fn message_key(moment: AhaMomentType) -> &'static str {
+    match moment {
         AhaMomentType::CardCreationComplete => "aha.card_creation_complete.message",
         AhaMomentType::FirstEdit => "aha.first_edit.message",
         AhaMomentType::FirstContactAdded => "aha.first_contact_added.message",
@@ -50,11 +50,29 @@ pub fn aha_moment_message_localized(moment: AhaMomentType, locale: Locale) -> St
         AhaMomentType::ThreeContactsReached => "aha.three_contacts_reached.message",
         AhaMomentType::DeviceLinked => "aha.device_linked.message",
         _ => "aha.unknown.message",
-    };
+    }
+}
+
+pub fn aha_moment_message_localized(moment: AhaMomentType, locale: Locale) -> String {
+    let key = message_key(moment);
     let s = get_string(locale, key);
     if s == key {
         moment.message().to_string()
     } else {
         s
     }
+}
+
+/// The one-line toast a shell shows for a milestone: title, then the
+/// message, personalized when the locale has a `_with_name` variant for
+/// the moment's context.
+pub fn aha_moment_toast_localized(moment: &AhaMoment, locale: Locale) -> String {
+    let title = aha_moment_title_localized(moment.moment_type, locale);
+    let personalized = moment.context.as_deref().and_then(|name| {
+        let key = format!("{}_with_name", message_key(moment.moment_type));
+        crate::i18n::try_get_string(locale, &key).map(|s| s.replace("{name}", name))
+    });
+    let message =
+        personalized.unwrap_or_else(|| aha_moment_message_localized(moment.moment_type, locale));
+    format!("{title} {message}")
 }

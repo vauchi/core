@@ -111,6 +111,7 @@ impl AppEngine {
         if events.is_empty() {
             return Vec::new();
         }
+        self.queue_milestone_toasts(&events);
 
         let now = self.vauchi.clock().unix_seconds();
 
@@ -121,6 +122,25 @@ impl AppEngine {
                 Vec::new()
             }
         }
+    }
+
+    /// A milestone Core's ledger fired reaches every shell as a prepared
+    /// toast (ADR-066: no shell asks Core whether one fired). Appended, so a
+    /// `Celebrate` already queued by the exchange that caused it plays first
+    /// (vauchi/private#276 D2.5).
+    fn queue_milestone_toasts(&mut self, events: &[vauchi_core::api::VauchiEvent]) {
+        let locale = self.render_context.resolved_locale();
+        let toasts = events.iter().filter_map(|event| match event {
+            vauchi_core::api::VauchiEvent::AhaMomentTriggered { moment } => {
+                Some(vauchi_core::Command::ShowToast {
+                    toast: vauchi_core::ToastSpec {
+                        message: crate::aha_moments::aha_moment_toast_localized(moment, locale),
+                    },
+                })
+            }
+            _ => None,
+        });
+        self.pending_commands.extend(toasts);
     }
 
     /// Drops card-update entries from ignored contacts before notification

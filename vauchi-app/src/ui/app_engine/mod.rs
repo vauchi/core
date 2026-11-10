@@ -637,6 +637,7 @@ impl AppEngine {
     /// pick up brightness, idle-timer, and (Phase 2c) orientation-lock
     /// commands that core has emitted in response to screen transitions.
     pub fn drain_pending_commands(&mut self) -> Vec<vauchi_core::Command> {
+        self.drain_events_to_log();
         let commands = self.pending_commands.drain(..).collect();
         let commands = self.correlate_file_commands(commands);
         self.route_to_shells(commands)

@@ -66,6 +66,8 @@ pub struct DuressPinEngine {
     password_branch: bool,
     app_password: String,
     app_password_weak: bool,
+    /// Duress is set with a 6-digit PIN behind biometric unlock.
+    set_up_behind_biometrics: bool,
     /// Number of decoy contacts, for the overview's decoy row.
     decoy_count: usize,
     locale: Locale,
@@ -103,6 +105,7 @@ impl DuressPinEngine {
             password_branch: false,
             app_password: String::new(),
             app_password_weak: false,
+            set_up_behind_biometrics: false,
             decoy_count: 0,
             locale,
         }
@@ -113,6 +116,18 @@ impl DuressPinEngine {
     pub fn with_password_branch(mut self, password_branch: bool) -> Self {
         self.password_branch = password_branch;
         self
+    }
+
+    /// Duress is set with a 6-digit PIN behind biometric unlock; on a
+    /// device without biometrics the overview then says the PIN has no
+    /// check in front of it (ADR-032, amended 2026-11-10).
+    pub fn with_set_up_behind_biometrics(mut self, behind_biometrics: bool) -> Self {
+        self.set_up_behind_biometrics = behind_biometrics;
+        self
+    }
+
+    fn pin_lost_its_biometric_check(&self) -> bool {
+        self.config.enabled && self.set_up_behind_biometrics && self.password_branch
     }
 
     /// Set the number of decoy contacts shown on the overview.
@@ -215,12 +230,25 @@ impl DuressPinEngine {
                     ),
                 ],
             });
+            let mut actions = vec![
+                button("how_it_looks", "resistance.duress.how_it_looks_button"),
+                button("turn_off", "resistance.duress.turn_off_button"),
+            ];
+            if self.pin_lost_its_biometric_check() {
+                components.push(Component::Text {
+                    id: "no_biometric_check".into(),
+                    content: self.t("resistance.duress.no_biometric_check"),
+                    style: TextStyle::Body,
+                    a11y: None,
+                });
+                actions.insert(
+                    0,
+                    button("move_to_passwords", "resistance.duress.move_to_passwords"),
+                );
+            }
             components.push(Component::ButtonList {
                 id: ACTIONS_ID.into(),
-                items: vec![
-                    button("how_it_looks", "resistance.duress.how_it_looks_button"),
-                    button("turn_off", "resistance.duress.turn_off_button"),
-                ],
+                items: actions,
             });
         } else {
             // A read-only status states "not set up" plainly; a toggle here
@@ -427,7 +455,8 @@ impl WorkflowEngine for DuressPinEngine {
                     component_id,
                     item_id,
                 },
-            ) if (component_id == ACTIONS_ID && item_id == "set_up")
+            ) if (component_id == ACTIONS_ID
+                && (item_id == "set_up" || item_id == "move_to_passwords"))
                 || (component_id == ROWS_ID && item_id == "pin") =>
             {
                 self.start_pin_entry()

@@ -123,7 +123,11 @@ impl AppEngine {
                         render_context.resolved_locale(),
                     )
                     .with_decoy_count(decoy_count)
-                    .with_password_branch(!device_capabilities.has_biometrics),
+                    .with_password_branch(!device_capabilities.has_biometrics)
+                    .with_set_up_behind_biometrics(
+                        vauchi.duress_unlock().ok().flatten()
+                            == Some(vauchi_core::api::DuressUnlock::Biometric),
+                    ),
                 )
             }
             AppScreen::Backup => Box::new(

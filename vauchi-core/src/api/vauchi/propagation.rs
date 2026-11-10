@@ -305,9 +305,12 @@ impl ProfileEngine {
         identity: &crate::identity::Identity,
     ) -> VauchiResult<crate::identity::RegistryBroadcast> {
         let registry = self.storage.device().own_device_registry(identity)?;
-        Ok(crate::identity::RegistryBroadcast::new(
+        let device_key = self.storage.device().load_or_create_device_signing_key()?;
+        Ok(crate::identity::RegistryBroadcast::signed_by_device(
             &registry,
             identity.signing_keypair(),
+            *identity.device_id(),
+            &device_key,
             self.clock.unix_seconds(),
         ))
     }

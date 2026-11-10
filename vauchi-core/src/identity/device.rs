@@ -351,6 +351,33 @@ impl DeviceRegistry {
     ///
     /// `now` is stamped into the revoked device's `revoked_at`. Sourced
     /// from the caller's [`Clock`](crate::clock::Clock).
+    /// Names a device's signing key in its entry. A missing key is set, the
+    /// same key is a no-op, another key is refused: a device's key never
+    /// changes under its id (SC-62 pin rule). Re-signed and bumped only when
+    /// something changed.
+    pub fn name_device_key(
+        &mut self,
+        device_id: &[u8; 32],
+        signing_public_key: [u8; 32],
+        signing_key: &SigningKeyPair,
+    ) -> Result<bool, DeviceError> {
+        let device = self
+            .devices
+            .iter_mut()
+            .find(|device| device.device_id == *device_id)
+            .ok_or(DeviceError::DeviceNotFound)?;
+        match device.signing_public_key {
+            Some(named) if named == signing_public_key => Ok(false),
+            Some(_) => Err(DeviceError::DeviceKeyChanged),
+            None => {
+                device.signing_public_key = Some(signing_public_key);
+                self.version = self.version.saturating_add(1);
+                self.sign(signing_key);
+                Ok(true)
+            }
+        }
+    }
+
     pub fn revoke_device(
         &mut self,
         device_id: &[u8; 32],

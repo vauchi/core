@@ -181,11 +181,38 @@ impl DeviceStore<'_> {
     /// The saved registry, or a new one naming this device and its key. Takes
     /// the identity so the key is only ever created while one is loaded.
     pub fn own_device_registry(&self, identity: &Identity) -> Result<DeviceRegistry, StorageError> {
-        if let Some(saved) = self.load_device_registry()? {
-            return Ok(saved);
-        }
         let device_key = self.load_or_create_device_signing_key()?;
-        Ok(identity.initial_device_registry_naming(*device_key.public_key().as_bytes()))
+        let device_public_key = *device_key.public_key().as_bytes();
+        let Some(mut saved) = self.load_device_registry()? else {
+            return Ok(identity.initial_device_registry_naming(device_public_key));
+        };
+        // A registry saved before this device had a key (a link from an
+        // older host, hand-back recovery) names it here, once. A registry
+        // whose entry for this device names another key is a database
+        // restored onto a device with a fresh key: signing as that entry
+        // would attribute this device's broadcasts to a key it does not
+        // hold, so it is refused until the device takes a new index.
+        let changed = saved
+            .name_device_key(
+                identity.device_id(),
+                device_public_key,
+                identity.signing_keypair(),
+            )
+            .map_err(|error| match error {
+                crate::identity::device::DeviceError::DeviceKeyChanged => {
+                    StorageError::InvalidData(
+                        "this device's registry entry names another signing key".into(),
+                    )
+                }
+                crate::identity::device::DeviceError::DeviceNotFound => {
+                    StorageError::InvalidData("this device is not in its own saved registry".into())
+                }
+                other => StorageError::InvalidData(other.to_string()),
+            })?;
+        if changed {
+            self.save_device_registry(&saved)?;
+        }
+        Ok(saved)
     }
 
     fn stored_device_signing_key(&self) -> Result<Option<Vec<u8>>, StorageError> {

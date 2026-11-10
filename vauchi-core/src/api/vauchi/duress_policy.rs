@@ -21,6 +21,15 @@ pub(super) fn require_real_password(password: &str, which: WeakCredential) -> Va
 }
 
 impl ProfileEngine {
+    /// The old name of [`Self::setup_duress_pin_with_biometric_unlock`],
+    /// kept so consumers pinned to an older Core build until their next
+    /// bump moves them to the new name (e2e's smoke builds against this
+    /// branch).
+    #[deprecated(note = "use setup_duress_pin_with_biometric_unlock")]
+    pub fn setup_duress_password(&mut self, duress_password: &str) -> VauchiResult<()> {
+        self.setup_duress_pin_with_biometric_unlock(duress_password)
+    }
+
     /// Sets up a duress credential under the password branch. Core keeps
     /// only the app password's hash, so the caller passes the app password
     /// itself: it must open the profile in front, and both it and

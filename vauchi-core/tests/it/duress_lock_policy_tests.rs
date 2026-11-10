@@ -223,3 +223,26 @@ fn under_the_biometric_branch_the_app_password_may_stay_a_pin() {
         AuthMode::Normal
     );
 }
+
+/// The old name stays until e2e and cli move off it at their next Core
+/// bump: e2e's smoke builds e2e main against this branch, and failed to
+/// compile without it (core pipeline 3049199003, job 17893670345).
+// @scenario: duress_mode :: Enable duress PIN in settings
+#[test]
+#[allow(deprecated)]
+fn the_old_setup_name_still_sets_a_pin_behind_biometric_unlock() {
+    let mut vauchi = install_with_app_password("2468");
+
+    vauchi
+        .setup_duress_password(DURESS_PIN)
+        .expect("the old name still sets the biometric branch's PIN");
+
+    assert_eq!(
+        vauchi.duress_unlock().expect("branch loads"),
+        Some(DuressUnlock::Biometric)
+    );
+    assert_eq!(
+        vauchi.authenticate(DURESS_PIN).expect("unlock"),
+        AuthMode::Duress
+    );
+}

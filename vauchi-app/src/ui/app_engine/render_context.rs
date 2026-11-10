@@ -54,6 +54,8 @@ impl AppEngine {
         self.kept_state_file = Some(crate::ui::restorable_state::KeptStateFile::in_dir(data_dir));
         if let Some(at) = crate::ui::missed_background_run::take_missed_background_run(data_dir) {
             self.vauchi.note_missed_background_run(at);
+            // The engine built My Info before this note, when it opened.
+            self.invalidate_screen(&AppScreen::MyInfo);
         }
         let ctx = crate::ui::RenderContext {
             restorable_state: None,

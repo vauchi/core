@@ -481,6 +481,35 @@ mod tests {
     const OWN_PK: [u8; 32] = [0xAA; 32];
     const OWN_DEVICE: [u8; 32] = [0xBB; 32];
 
+    fn rejected(reason: &'static str) -> BlobOutcome {
+        BlobOutcome {
+            message_id: "m".into(),
+            token_resolved: true,
+            decrypted: true,
+            reject_reason: Some(reason),
+            contact_id: None,
+            device_fanout_contact_id: None,
+            alert: None,
+            registry_reply: None,
+            reciprocity_answer: None,
+            resync_requested_by: None,
+        }
+    }
+
+    /// A refusal the next receive can still resolve keeps the blob on the
+    /// relay; a terminal one lets it go (SC-62, vauchi/private#970).
+    // @scenario: receive_phase :: token map resolves contact mailbox tokens
+    // @internal
+    #[test]
+    fn only_resolvable_refusals_keep_the_blob_on_the_relay() {
+        for retried in ["storage", "genesis_rate", "device_signature"] {
+            assert!(!rejected(retried).should_ack(), "{retried} is retried");
+        }
+        for terminal in ["signature", "replay", "bad_delta", "stale", "blocked"] {
+            assert!(rejected(terminal).should_ack(), "{terminal} is final");
+        }
+    }
+
     // @scenario: receive_phase :: token map resolves contact mailbox tokens
     #[test]
     fn test_build_token_to_contact_map_resolves_today_and_yesterday() {

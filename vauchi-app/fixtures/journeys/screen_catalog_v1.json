@@ -11305,7 +11305,7 @@
                 {
                   "Confirmation": {
                     "id": "shred",
-                    "warning": "Shred everything on this device now?",
+                    "warning": "Destroy this device's data and its storage key now?",
                     "confirm": {
                       "interaction_id": "surface.1.interaction.1",
                       "label": "Shred Everything",
@@ -11324,7 +11324,7 @@
                       "shortcut": null
                     },
                     "accessibility": {
-                      "label": "Shred everything on this device now?",
+                      "label": "Destroy this device's data and its storage key now?",
                       "description": null
                     }
                   }

@@ -168,9 +168,6 @@ pub enum DeltaError {
     #[error("Cannot apply change: {0}")]
     ApplyError(String),
 
-    #[error("Compression error: {0}")]
-    CompressionError(String),
-
     #[error("Unknown payload version: 0x{0:02X}")]
     UnknownPayloadVersion(u8),
 
@@ -432,54 +429,6 @@ impl CardDelta {
             signature: self.signature,
             validation_summary: self.validation_summary.clone(),
         }
-    }
-
-    /// Compresses a payload using DEFLATE compression.
-    ///
-    /// Useful for reducing the size of delta payloads before transmission.
-    // INVARIANT: writing into a Vec cannot fail (vauchi/private#761).
-    #[allow(clippy::expect_used)]
-    pub fn compress_payload(payload: &[u8]) -> Vec<u8> {
-        use flate2::Compression;
-        use flate2::write::DeflateEncoder;
-        use std::io::Write;
-
-        let mut encoder = DeflateEncoder::new(Vec::new(), Compression::default());
-        encoder
-            .write_all(payload)
-            .expect("Writing to Vec should not fail");
-        encoder.finish().expect("Finishing deflate should not fail")
-    }
-
-    /// Maximum decompressed payload size (10 MB).
-    ///
-    /// Limits decompression output to prevent zip-bomb denial-of-service attacks
-    /// where a small compressed payload expands to exhaust memory.
-    const MAX_DECOMPRESSED_SIZE: u64 = 10 * 1024 * 1024;
-
-    /// Decompresses a DEFLATE-compressed payload.
-    ///
-    /// Returns the decompressed bytes, or an error if the data is malformed
-    /// or exceeds `Self::MAX_DECOMPRESSED_SIZE`.
-    pub fn decompress_payload(compressed: &[u8]) -> Result<Vec<u8>, DeltaError> {
-        use flate2::read::DeflateDecoder;
-        use std::io::Read;
-
-        let decoder = DeflateDecoder::new(compressed);
-        let mut limited = decoder.take(Self::MAX_DECOMPRESSED_SIZE + 1);
-        let mut decompressed = Vec::new();
-        limited
-            .read_to_end(&mut decompressed)
-            .map_err(|e| DeltaError::CompressionError(e.to_string()))?;
-
-        if decompressed.len() as u64 > Self::MAX_DECOMPRESSED_SIZE {
-            return Err(DeltaError::CompressionError(format!(
-                "decompressed payload exceeds maximum size of {} bytes",
-                Self::MAX_DECOMPRESSED_SIZE
-            )));
-        }
-
-        Ok(decompressed)
     }
 
     /// Returns the bytes to be signed/verified.

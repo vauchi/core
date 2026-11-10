@@ -289,7 +289,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 118] = [
+const MIGRATIONS: [Migration; 119] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -880,6 +880,11 @@ const MIGRATIONS: [Migration; 118] = [
         name: "ratchet_row_version",
         action: MigrationAction::Callback(migrate_v118_ratchet_row_version),
     },
+    Migration {
+        version: 119,
+        name: "contact_device_key_pins",
+        action: MigrationAction::Sql(MIGRATION_V119_CONTACT_DEVICE_KEY_PINS),
+    },
 ];
 
 /// v118 (vauchi/private#1093): a version on each ratchet row, so a save from
@@ -903,6 +908,19 @@ fn migrate_v118_ratchet_row_version(
     }
     Ok(())
 }
+
+/// v119 (vauchi/private#970, SC-62): the signing key a contact's device
+/// showed first, kept per contact so a later broadcast cannot change a
+/// known device's key, sealed like the broadcast it came from, and gone
+/// with the contact row. A removed device keeps its pin: the key may not
+/// come back under that id.
+const MIGRATION_V119_CONTACT_DEVICE_KEY_PINS: &str = "
+    CREATE TABLE IF NOT EXISTS contact_device_key_pins (
+        contact_id TEXT PRIMARY KEY REFERENCES contacts(id) ON DELETE CASCADE,
+        pins_encrypted BLOB NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+";
 
 /// v117 (vauchi/private#1093): the blobs a locked run kept, by a tag keyed
 /// under the Background Receive Key, so a blob whose ack was lost is

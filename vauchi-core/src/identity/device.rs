@@ -543,6 +543,20 @@ pub struct PinnedDeviceKeys {
 }
 
 impl PinnedDeviceKeys {
+    pub fn from_pairs(pairs: impl IntoIterator<Item = ([u8; 32], [u8; 32])>) -> Self {
+        Self {
+            keys: pairs.into_iter().collect(),
+        }
+    }
+
+    pub fn pairs(&self) -> impl Iterator<Item = ([u8; 32], [u8; 32])> + '_ {
+        self.keys.iter().map(|(id, key)| (*id, *key))
+    }
+
+    pub fn pinned(&self, device_id: &[u8; 32]) -> Option<[u8; 32]> {
+        self.keys.get(device_id).copied()
+    }
+
     /// Verifies a broadcast against these pins, then pins the keys it names.
     ///
     /// One call on purpose: pinning before verifying would let an attacker

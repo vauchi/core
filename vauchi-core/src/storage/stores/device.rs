@@ -19,7 +19,9 @@ use super::super::{Storage, StorageError};
 use crate::clock::Clock;
 use crate::crypto::{PublicKey, SigningKeyPair, SymmetricKey};
 use crate::identity::Identity;
-use crate::identity::device::{BroadcastDevice, DeviceRegistry, MAX_DEVICES, RegistryBroadcast};
+use crate::identity::device::{
+    BroadcastDevice, DeviceRegistry, MAX_DEVICES, PinnedDeviceKeys, RegistryBroadcast,
+};
 
 /// Scoped persistence view for the device domain: this device's info record and
 /// the device registry.
@@ -393,6 +395,54 @@ impl DeviceStore<'_> {
     }
 
     /// Loads the last verified signed registry retained for a contact.
+    /// The signing keys this contact's devices showed first, or `None`
+    /// before any device-signed broadcast was accepted from it.
+    pub fn load_contact_device_pins(
+        &self,
+        contact_id: &str,
+    ) -> Result<Option<PinnedDeviceKeys>, StorageError> {
+        let sealed: Option<Vec<u8>> = match self.conn.query_row(
+            "SELECT pins_encrypted FROM contact_device_key_pins WHERE contact_id = ?1",
+            params![contact_id],
+            |row| row.get(0),
+        ) {
+            Ok(sealed) => Some(sealed),
+            Err(rusqlite::Error::QueryReturnedNoRows) => None,
+            Err(e) => return Err(StorageError::Database(e)),
+        };
+        let Some(sealed) = sealed else {
+            return Ok(None);
+        };
+        let json = crate::crypto::decrypt(self.key, &sealed)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let pairs: Vec<([u8; 32], [u8; 32])> = serde_json::from_slice(&json)
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        Ok(Some(PinnedDeviceKeys::from_pairs(pairs)))
+    }
+
+    /// Replaces the contact's pins. Callers only ever grow them through
+    /// `PinnedDeviceKeys::accept`, so a replacement never forgets a key.
+    pub fn save_contact_device_pins(
+        &self,
+        contact_id: &str,
+        pins: &PinnedDeviceKeys,
+    ) -> Result<(), StorageError> {
+        let pairs: Vec<([u8; 32], [u8; 32])> = pins.pairs().collect();
+        let json =
+            serde_json::to_vec(&pairs).map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let sealed = crate::crypto::encrypt(self.key, &json)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        self.conn.execute(
+            "INSERT INTO contact_device_key_pins (contact_id, pins_encrypted, updated_at)
+             VALUES (?1, ?2, ?3)
+             ON CONFLICT(contact_id) DO UPDATE SET
+                pins_encrypted = excluded.pins_encrypted,
+                updated_at = excluded.updated_at",
+            params![contact_id, sealed, self.now_secs() as i64],
+        )?;
+        Ok(())
+    }
+
     pub fn load_contact_device_registry(
         &self,
         contact_id: &str,

@@ -106,6 +106,12 @@ pub enum VauchiError {
     /// Contact limit reached.
     #[error("contact limit reached: maximum {0} contacts allowed")]
     ContactLimitReached(usize),
+
+    /// A credential is below the backup password's strength rule where
+    /// the duress lock policy needs a real password (ADR-032, amended
+    /// 2026-11-10).
+    #[error("credential below the password strength rule: {0:?}")]
+    WeakCredential(crate::emergency::WeakCredential),
 }
 
 impl VauchiError {

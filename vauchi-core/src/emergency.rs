@@ -102,6 +102,30 @@ pub enum BiometricUnlockOutcome {
     PromptForDuressPin,
 }
 
+/// What guards the lock screen of an install with a duress credential
+/// (ADR-032, amended 2026-11-10). A 6-digit PIN alone is guessed too
+/// quickly, so a duress credential needs biometric unlock in front of it,
+/// or a real password for both credentials.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum DuressUnlock {
+    /// The biometric check comes first; then a 6-digit PIN picks the
+    /// profile.
+    Biometric,
+    /// The app password and the duress credential both pass the backup
+    /// password's strength rule.
+    Passwords,
+}
+
+/// Which credential failed the strength rule when a duress credential was
+/// set up, or when the app password changed under the password branch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum WeakCredential {
+    AppPassword,
+    DuressPassword,
+}
+
 /// Geographic location with optional accuracy.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GeoLocation {

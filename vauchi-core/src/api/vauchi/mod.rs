@@ -17,6 +17,7 @@ mod device_sync_loop;
 mod devices;
 mod duress_concealment;
 mod duress_cover;
+mod duress_policy;
 #[cfg(feature = "network-http")]
 mod duress_worker;
 mod emergency;
@@ -153,7 +154,7 @@ pub enum AuthMode {
     Unauthenticated,
 }
 
-pub use crate::emergency::BiometricUnlockOutcome;
+pub use crate::emergency::{BiometricUnlockOutcome, DuressUnlock, WeakCredential};
 
 /// Outcome of a `Vauchi::sync()` call.
 #[derive(Debug)]

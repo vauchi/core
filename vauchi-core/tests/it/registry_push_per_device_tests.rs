@@ -197,15 +197,15 @@ fn a_broadcast_signed_by_the_identity_alone_is_refused() {
 #[test]
 fn a_linked_device_cannot_sign_a_broadcast_as_another_device() {
     let p = two_parties();
-    let identity_key = p.bob.identity().unwrap().signing_keypair().clone();
+    let identity_key = p.bob.identity().unwrap().signing_keypair();
     let tablet_key = SigningKeyPair::generate();
     let mut registry = p.bob_registry();
     registry
-        .add_device(tablet_entry(&tablet_key), &identity_key)
+        .add_device(tablet_entry(&tablet_key), identity_key)
         .unwrap();
     let phone_claims_tablet = RegistryBroadcast::signed_by_device(
         &registry,
-        &identity_key,
+        identity_key,
         [7u8; 32],
         &p.bob_device_key(),
         p.now(),
@@ -221,11 +221,11 @@ fn a_linked_device_cannot_sign_a_broadcast_as_another_device() {
 #[test]
 fn a_signer_that_is_not_an_active_device_is_refused() {
     let p = two_parties();
-    let identity_key = p.bob.identity().unwrap().signing_keypair().clone();
+    let identity_key = p.bob.identity().unwrap().signing_keypair();
     let stranger = SigningKeyPair::generate();
     let as_unknown_device = RegistryBroadcast::signed_by_device(
         &p.bob_registry(),
-        &identity_key,
+        identity_key,
         [7u8; 32],
         &stranger,
         p.now(),
@@ -241,7 +241,7 @@ fn a_signer_that_is_not_an_active_device_is_refused() {
 #[test]
 fn a_known_devices_key_cannot_change_even_with_the_identity_key() {
     let p = two_parties();
-    let identity_key = p.bob.identity().unwrap().signing_keypair().clone();
+    let identity_key = p.bob.identity().unwrap().signing_keypair();
     let honest = device_signed_broadcast(&p.bob);
     p.push_to_alice(&honest).unwrap();
     let rekey = SigningKeyPair::generate();
@@ -250,7 +250,7 @@ fn a_known_devices_key_cannot_change_even_with_the_identity_key() {
         .name_device_key(
             &p.bob_device_id(),
             *rekey.public_key().as_bytes(),
-            &identity_key,
+            identity_key,
         )
         .unwrap();
     assert!(
@@ -259,7 +259,7 @@ fn a_known_devices_key_cannot_change_even_with_the_identity_key() {
     );
     let rekeyed = RegistryBroadcast::signed_by_device(
         &rewritten,
-        &identity_key,
+        identity_key,
         p.bob_device_id(),
         &rekey,
         p.now(),
@@ -280,15 +280,15 @@ fn a_known_devices_key_cannot_change_even_with_the_identity_key() {
 #[test]
 fn a_removed_device_cannot_sign_and_its_pin_is_kept() {
     let p = two_parties();
-    let identity_key = p.bob.identity().unwrap().signing_keypair().clone();
+    let identity_key = p.bob.identity().unwrap().signing_keypair();
     let tablet_key = SigningKeyPair::generate();
     let mut registry = p.bob_registry();
     registry
-        .add_device(tablet_entry(&tablet_key), &identity_key)
+        .add_device(tablet_entry(&tablet_key), identity_key)
         .unwrap();
     let with_tablet = RegistryBroadcast::signed_by_device(
         &registry,
-        &identity_key,
+        identity_key,
         [7u8; 32],
         &tablet_key,
         p.now(),
@@ -299,12 +299,12 @@ fn a_removed_device_cannot_sign_and_its_pin_is_kept() {
         Some(*tablet_key.public_key().as_bytes())
     );
     registry
-        .revoke_device(&[7u8; 32], &identity_key, p.now())
+        .revoke_device(&[7u8; 32], identity_key, p.now())
         .unwrap();
 
     let removed_signs = RegistryBroadcast::signed_by_device(
         &registry,
-        &identity_key,
+        identity_key,
         [7u8; 32],
         &tablet_key,
         p.now(),
@@ -314,7 +314,7 @@ fn a_removed_device_cannot_sign_and_its_pin_is_kept() {
 
     let (phone_id, phone_key, now) = (p.bob_device_id(), p.bob_device_key(), p.now());
     let phone_signs =
-        RegistryBroadcast::signed_by_device(&registry, &identity_key, phone_id, &phone_key, now);
+        RegistryBroadcast::signed_by_device(&registry, identity_key, phone_id, &phone_key, now);
     p.push_to_alice(&phone_signs).unwrap();
     assert_eq!(
         p.alice_pin_for(&[7u8; 32]),

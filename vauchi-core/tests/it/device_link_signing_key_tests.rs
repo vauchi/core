@@ -357,11 +357,20 @@ fn a_first_device_names_its_stored_key_in_the_registry_it_offers() {
     assert!(registry.verify(&identity.signing_keypair().public_key()));
 }
 
+/// A saved registry whose entry for this device names the key this
+/// device holds is returned as saved; one that lacks the key gains it, and
+/// one naming another key is refused (`own_registry_broadcast_tests`,
+/// vauchi/private#970).
 // @internal
 #[test]
 fn a_saved_registry_is_returned_as_saved() {
     let host = host();
     let vauchi = Vauchi::in_memory().unwrap();
+    vauchi
+        .storage()
+        .device()
+        .adopt_device_signing_key(&zeroize::Zeroizing::new([0x07; 32]))
+        .unwrap();
     let saved = host.registry.clone();
     vauchi
         .storage()

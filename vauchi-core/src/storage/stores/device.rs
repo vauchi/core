@@ -371,13 +371,35 @@ impl DeviceStore<'_> {
             StorageError::InvalidData("stored contact device registry version is negative".into())
         })?;
 
+        let contact_identity = PublicKey::from_bytes(*contact_signing_key);
         broadcast
             .verify_with_freshness(
-                &PublicKey::from_bytes(*contact_signing_key),
+                &contact_identity,
                 last_version,
                 self.now_secs(),
                 max_age_secs,
             )
+            .map_err(|error| StorageError::InvalidData(error.to_string()))?;
+        // SC-62: the broadcast is accepted per device. The signer must be an
+        // active device of this broadcast and have signed it with its own
+        // key, and no key a device showed before may change under its id
+        // (vauchi/private#970). A key is checked before it is pinned: the
+        // link checks keys on the way in, a contact's broadcast has not been
+        // through that.
+        if broadcast
+            .active_devices()
+            .iter()
+            .filter_map(|device| device.signing_public_key)
+            .any(|key| !crate::crypto::signing::is_usable_public_key(&key))
+        {
+            return Err(StorageError::InvalidData(
+                "contact device registry names an unusable signing key".into(),
+            ));
+        }
+        let mut pins = self
+            .load_contact_device_pins(contact_id)?
+            .unwrap_or_default();
+        pins.accept(&contact_identity, broadcast)
             .map_err(|error| StorageError::InvalidData(error.to_string()))?;
 
         let json = serde_json::to_vec(broadcast)
@@ -396,6 +418,7 @@ impl DeviceStore<'_> {
                     updated_at = excluded.updated_at",
                 params![contact_id, encrypted, stored_version, self.now_secs() as i64],
             )?;
+            self.save_contact_device_pins(contact_id, &pins)?;
             for removed in previously_active.iter().filter(|old| {
                 !broadcast
                     .active_devices()

@@ -99,7 +99,7 @@ fn identity_rows_with_and_without_a_duress_pin_are_indistinguishable_without_the
     );
 }
 
-// @internal
+// @scenario: duress_mode :: No trace of duress mode after logout
 #[test]
 fn a_duress_session_leaves_the_rows_shaped_as_without_a_duress_pin() {
     let without = alice(false);

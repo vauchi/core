@@ -247,6 +247,7 @@ fn sent_by_an_edit_and_sync(credential: &str, expected_mode: AuthMode) -> usize 
 }
 
 // @scenario: duress_mode :: Duress mode looks identical to normal mode
+// @scenario: duress_mode :: Duress mode sync is real but carries nothing real
 #[test]
 fn the_cover_a_duress_edit_owes_leaves_with_the_workers_sync() {
     let real = sent_by_an_edit_and_sync(APP_PIN, AuthMode::Normal);

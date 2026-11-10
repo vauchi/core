@@ -66,6 +66,7 @@ fn the_mask_seed_s_identity_is_the_same_in_every_duress_session() {
 }
 
 // @scenario: duress_mode :: Normal credential shows real contacts
+// @scenario: duress_mode :: No trace of duress mode after logout
 #[test]
 fn an_unlock_with_the_app_password_after_duress_brings_the_real_identity_back() {
     let mut real = alice_with_a_duress_pin();

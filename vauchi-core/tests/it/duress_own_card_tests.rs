@@ -49,6 +49,7 @@ fn has_phone(card: &ContactCard) -> bool {
 }
 
 // @scenario: duress_mode :: Cannot access real contacts from duress mode
+// @scenario: duress_mode :: Edits in duress mode stay in the decoy profile
 #[test]
 fn a_duress_edit_survives_a_lock_and_a_second_duress_unlock() {
     let mut wb = alice_under_duress();
@@ -64,6 +65,7 @@ fn a_duress_edit_survives_a_lock_and_a_second_duress_unlock() {
 }
 
 // @scenario: duress_mode :: Cannot access real contacts from duress mode
+// @scenario: duress_mode :: Edits in duress mode stay in the decoy profile
 #[test]
 fn a_duress_edit_leaves_the_real_card_untouched() {
     let mut wb = alice_under_duress();
@@ -86,6 +88,7 @@ fn a_duress_edit_leaves_the_real_card_untouched() {
 /// Every own-card writer a screen reaches: none queues anything for a
 /// real contact.
 // @scenario: duress_mode :: Cannot access real contacts from duress mode
+// @scenario: duress_mode :: Edits in duress mode stay in the decoy profile
 #[test]
 fn disabling_duress_discards_the_copy() {
     let mut wb = alice_under_duress();

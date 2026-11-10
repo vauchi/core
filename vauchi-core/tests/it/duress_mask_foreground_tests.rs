@@ -104,6 +104,7 @@ fn an_identity_backup_made_under_duress_does_not_hold_the_real_seed() {
 }
 
 // @scenario: duress_mode :: Settings reflect decoy state
+// @scenario: duress_mode :: Real database cryptographically inaccessible in duress mode
 #[test]
 fn the_real_emergency_message_is_not_readable_under_duress() {
     let session = duress_session();

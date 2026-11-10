@@ -87,6 +87,7 @@ fn test_verify_duress_password_returns_duress() {
 }
 
 // @scenario: duress_mode :: Both databases use strong encryption
+// @scenario: duress_mode :: Credentials processed identically at UI level
 #[test]
 fn test_verify_constant_time_both_checked() {
     // Both hashes should always be checked to prevent timing attacks.
@@ -810,7 +811,7 @@ fn biometric_unlock_check_pads_to_minimum_duration() {
     );
 }
 
-// @internal
+// @scenario: duress_mode :: Credentials processed identically at UI level
 #[test]
 fn biometric_unlock_check_constant_time_across_duress_states() {
     use std::time::Instant;

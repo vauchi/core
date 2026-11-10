@@ -152,6 +152,8 @@ fn add_and_annotate_bob(wb: &Vauchi) {
 
 // @claim: S14
 // @scenario: duress_mode :: Duress mode looks identical to normal mode
+// @scenario: duress_mode :: Decoy contacts are static (no sync)
+// @scenario: duress_mode :: Duress mode sync is real but carries nothing real
 #[test]
 fn a_duress_session_never_journals_a_non_cover_item() {
     let (normal, normal_registry, tablet) = alice(APP_PASSWORD, AuthMode::Normal);

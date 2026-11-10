@@ -43,6 +43,7 @@ fn rejected_pins() -> Vec<(&'static str, &'static str)> {
 }
 
 // @scenario: duress_mode :: Enable duress PIN in settings
+// @scenario: duress_mode :: Duress credential is six digits
 #[test]
 fn setup_duress_password_rejects_anything_but_six_ascii_digits() {
     for (pin, why) in rejected_pins() {

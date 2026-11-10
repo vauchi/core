@@ -89,7 +89,7 @@ fn duress_mode_changes_look_like_they_worked_for_the_session() {
     assert!(!wb.is_duress_enabled().unwrap());
 }
 
-// @scenario: duress_mode :: Biometric unlock still asks for the PIN
+// @scenario: duress_mode :: Biometric unlock with duress
 // @internal
 #[test]
 fn biometric_unlock_after_a_duress_session_still_asks_for_the_pin() {

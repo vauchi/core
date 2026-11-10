@@ -219,7 +219,7 @@ mod tests {
         assert_ne!(a.0, b.0, "created_at collision between distinct decoys");
     }
 
-    // @internal
+    // @scenario: duress_mode :: Decoy profile has realistic timestamps
     #[test]
     fn decoy_created_at_is_inside_the_documented_window() {
         let now = fixed_now();
@@ -239,7 +239,7 @@ mod tests {
         }
     }
 
-    // @internal
+    // @scenario: duress_mode :: Decoy profile has realistic timestamps
     #[test]
     fn decoy_updated_at_is_at_least_a_week_old_and_after_created() {
         let now = fixed_now();

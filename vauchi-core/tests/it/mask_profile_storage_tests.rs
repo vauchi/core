@@ -48,6 +48,7 @@ fn decoy_contact_id(decoy_id: &str) -> String {
 }
 
 // @scenario: duress_mode :: Decoy profile has separate database
+// @scenario: duress_mode :: Decoy contacts are static (no sync)
 #[test]
 fn a_decoy_is_a_contact_of_the_mask_profile_and_a_real_contact_is_not() {
     let disk = OnDisk::new();

@@ -66,6 +66,7 @@ fn decoy_names(disk: &OnDisk) -> Vec<String> {
 }
 
 // @scenario: duress_mode :: Decoy profile has separate database
+// @scenario: duress_mode :: Real database cryptographically inaccessible in duress mode
 #[test]
 fn the_duress_content_opens_under_the_mask_key_and_not_under_the_storage_key() {
     let disk = alice_with_a_decoy();

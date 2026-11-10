@@ -347,10 +347,6 @@ impl DeviceRegistry {
         Ok(())
     }
 
-    /// Revokes a device by ID.
-    ///
-    /// `now` is stamped into the revoked device's `revoked_at`. Sourced
-    /// from the caller's [`Clock`](crate::clock::Clock).
     /// Names a device's signing key in its entry. A missing key is set, the
     /// same key is a no-op, another key is refused: a device's key never
     /// changes under its id (SC-62 pin rule). Re-signed and bumped only when
@@ -378,6 +374,10 @@ impl DeviceRegistry {
         }
     }
 
+    /// Revokes a device by ID.
+    ///
+    /// `now` is stamped into the revoked device's `revoked_at`. Sourced
+    /// from the caller's [`Clock`](crate::clock::Clock).
     pub fn revoke_device(
         &mut self,
         device_id: &[u8; 32],

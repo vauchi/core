@@ -104,6 +104,7 @@ mod block_contact_api_tests;
 mod blocked_reexchange_tests;
 mod both_initiator_ratchet_tests;
 mod capability_tests;
+mod card_delta_per_device_tests;
 mod card_revocation_tests;
 mod cek_aware_storage_tests;
 mod cek_integration_tests;

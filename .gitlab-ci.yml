@@ -695,12 +695,16 @@ build:tests:
 # Advisory while pre-1.0 (no deployed clients, SP-33 allows intentional breaks).
 # Flip to allow_failure: false when version reaches 1.0.0.
 lint:semver:
-  # .timeout-cold-rebuild: semver-checks rustdoc-builds BOTH the current and
-  # baseline crate graphs — the heaviest cold build here (60m timeout hit in
-  # pipeline 2699666347). See the template comment.
-  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
+  # semver-checks rustdoc-builds BOTH the current and baseline crate graphs,
+  # the heaviest cold build here (60m timeout hit in pipeline 2699666347).
+  # It runs after build:tests instead of holding the lock: the build has
+  # already warmed the tree and sccache by then, so a cold runner cannot
+  # herd it against the build, and the MR pipeline holds the lock once.
+  extends: [.linux-runner, .validation-rust, .timeout-long]
   stage: lint
-  needs: []
+  needs:
+    - job: build:tests
+      artifacts: false
   allow_failure: true
   script:
     # Refresh the binary: shell runners persist a preinstalled

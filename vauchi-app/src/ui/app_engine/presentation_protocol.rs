@@ -225,6 +225,9 @@ impl AppEngine {
         if let Event::ApplicationMenuAvailabilityChanged { available } = event {
             return self.set_application_menu_available(available);
         }
+        if let Event::StatusItemAvailabilityChanged { available } = event {
+            return self.set_status_item_available(available);
+        }
         if matches!(event, Event::WakeupFired) {
             self.absorb_applied_content();
             let link_changed_screen = self.poll_recovery_link();
@@ -609,6 +612,7 @@ impl AppEngine {
             commands.push(profile);
         }
         commands.extend(self.application_menu_command()?);
+        commands.extend(self.status_item_command()?);
         Ok(commands)
     }
 

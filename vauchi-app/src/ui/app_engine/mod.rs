@@ -55,6 +55,7 @@ mod link_reentry_tests;
 mod link_responder;
 mod multi_stage_exchange;
 mod native_menu;
+mod native_status_item;
 mod navigation;
 mod notifications;
 // INLINE_TEST_REQUIRED: pushes a field that fails to save into the private
@@ -324,6 +325,7 @@ pub struct AppEngine {
     /// Monotonic generation of the atomic generic surface command.
     surface_revision: u64,
     native_menu_available: bool,
+    status_item_available: bool,
     pending_contact_import: bool,
     correlated_file_picker: bool,
     pending_file_pick: Option<file_picker::PendingFilePick>,
@@ -621,6 +623,7 @@ impl AppEngine {
             retained_detail_screen: None,
             surface_revision: 1,
             native_menu_available: false,
+            status_item_available: false,
             pending_contact_import: false,
             correlated_file_picker: false,
             pending_file_pick: None,

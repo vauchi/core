@@ -282,15 +282,18 @@ impl Identity {
     ///
     /// Format: same as backup plaintext — `name_len (4) || name || master_seed (32)
     /// || device_index (4) || device_name_len (4) || device_name`
-    pub fn to_storage_bytes(&self) -> Vec<u8> {
+    pub fn to_storage_bytes(&self) -> Zeroizing<Vec<u8>> {
         let name_bytes = self.display_name.as_bytes();
         let name_len = (name_bytes.len() as u32).to_le_bytes();
         let device_name_bytes = self.device_info.device_name().as_bytes();
         let device_name_len = (device_name_bytes.len() as u32).to_le_bytes();
         let device_index = self.device_info.device_index().to_le_bytes();
 
-        let mut buf =
-            Vec::with_capacity(4 + name_bytes.len() + 32 + 4 + 4 + device_name_bytes.len());
+        // Sized exactly up front: a growing Vec would reallocate and leave
+        // an unwiped copy of the master seed behind (vauchi/private#1216).
+        let mut buf = Zeroizing::new(Vec::with_capacity(
+            4 + name_bytes.len() + 32 + 4 + 4 + device_name_bytes.len(),
+        ));
         buf.extend_from_slice(&name_len);
         buf.extend_from_slice(name_bytes);
         buf.extend_from_slice(&self.master_seed);

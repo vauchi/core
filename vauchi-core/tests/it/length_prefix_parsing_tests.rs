@@ -34,7 +34,7 @@ fn a_link_request_with_a_maximal_name_length_is_refused() {
 fn identity_bytes_with_a_maximal_name_length_are_refused() {
     let bytes = Identity::create("Alice", 0).to_storage_bytes();
     for len in [u32::MAX, u32::MAX - 3, u32::MAX - 35] {
-        assert!(Identity::from_storage_bytes(&with_name_len(bytes.clone(), len), 0).is_err());
+        assert!(Identity::from_storage_bytes(&with_name_len(bytes.to_vec(), len), 0).is_err());
     }
 }
 

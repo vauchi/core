@@ -324,7 +324,7 @@ impl AppEngine {
 fn reconstruct_identity_via_storage_bytes(
     id_ref: &vauchi_core::identity::Identity,
 ) -> Option<vauchi_core::identity::Identity> {
-    let bytes = zeroize::Zeroizing::new(id_ref.to_storage_bytes());
+    let bytes = id_ref.to_storage_bytes();
     match vauchi_core::identity::Identity::from_storage_bytes(
         &bytes,
         vauchi_core::clock::SystemClock::shared().unix_seconds(),

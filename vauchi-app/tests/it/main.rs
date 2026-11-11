@@ -41,6 +41,7 @@ mod common;
 mod contact_detail_delivery_tests;
 mod contact_list_engine_tests;
 mod contact_visibility_engine_tests;
+mod content;
 mod content_publisher_key_tests;
 mod content_scheduler_tests;
 mod content_update_cycle_tests;

@@ -18,7 +18,6 @@ fn _flame_install() {
 mod common;
 mod contact_import_scenario_tests;
 mod contact_move_tests;
-mod content;
 mod content_over_ohttp_tests;
 mod content_update_setting_tests;
 mod duress_vocabulary_persistence_tests;

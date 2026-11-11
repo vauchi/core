@@ -180,6 +180,7 @@ mod help_engine_wiring_tests;
 mod humble_surface_contract_tests;
 mod i18n_support;
 mod native_application_menu_tests;
+mod native_status_item_tests;
 // A direct-HTTP relay stub needs the testing build (OHTTP otherwise).
 #[cfg(feature = "testing")]
 mod identity_deletion_purge_tests;

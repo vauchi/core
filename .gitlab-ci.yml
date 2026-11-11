@@ -1226,6 +1226,8 @@ test:cucumber:
   allow_failure: false
   before_script:
     - !reference [.self-hosted, before_script]
+    # The language scenarios compare Core's screens with the shipped files.
+    - !reference [.clone-locales, before_script]
     # Force the cached ../features checkout to the tip of main. A plain
     # `pull --ff-only … || true` silently kept a STALE checkout on any
     # runner whose cache had diverged, so cucumber ran against old .feature

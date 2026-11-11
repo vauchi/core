@@ -238,11 +238,6 @@ fn search_or_filter(world: &mut VauchiWorld) {
 #[then("no full table scans for common operations")]
 fn perf_noop_query_efficiency(_world: &mut VauchiWorld) {}
 
-#[then("memory usage should be under 50MB")]
-#[then("memory should be stable over time")]
-#[then("no memory leaks should occur")]
-fn perf_noop_memory(_world: &mut VauchiWorld) {}
-
 // ── Imported contact management ────────────────────────────────────────────
 
 /// Creates an imported contact via VCF data and registers it by name.

@@ -222,7 +222,10 @@ fn main() {
     // only to no-op steps (`perf_noop_memory` and its kin: action menu,
     // clipboard toast, language override, regional phone format, RTL for
     // Arabic and Hebrew, small-list memory), so they passed without checking
-    // anything; the floor drops by exactly those seven.
+    // anything; the floor drops by exactly those seven. Their Then steps,
+    // bound by no other scenario, are deleted, so they stop binding before
+    // features removes them (its lint:wired-scenarios refuses to drop a
+    // scenario core still runs).
     const MIN_WIRED_SCENARIOS: usize = 122;
     if scenarios.passed < MIN_WIRED_SCENARIOS {
         eprintln!(

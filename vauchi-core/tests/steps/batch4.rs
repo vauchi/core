@@ -612,12 +612,6 @@ fn status_indicated_not_just_color(_world: &mut VauchiWorld) {}
 #[then("all actions should be accessible via keyboard")]
 fn actions_accessible_keyboard(_world: &mut VauchiWorld) {}
 
-#[then("the action menu should be announced")]
-fn action_menu_announced(_world: &mut VauchiWorld) {}
-
-#[then("each option should be focusable and labeled")]
-fn options_focusable_and_labeled(_world: &mut VauchiWorld) {}
-
 #[then("VoiceOver should announce the current screen title")]
 fn voiceover_announces_title(_world: &mut VauchiWorld) {}
 
@@ -654,12 +648,6 @@ fn all_functionality_available(_world: &mut VauchiWorld) {}
 #[then("the app should display in French")]
 fn display_in_french(_world: &mut VauchiWorld) {}
 
-#[then("this preference should persist")]
-fn preference_persists(_world: &mut VauchiWorld) {}
-
-#[then("I should be able to return to system default")]
-fn return_to_system_default(_world: &mut VauchiWorld) {}
-
 #[then("the UI should update immediately")]
 fn ui_updates_immediately(_world: &mut VauchiWorld) {}
 
@@ -681,18 +669,6 @@ fn current_language_indicated(_world: &mut VauchiWorld) {}
 #[then("the layout should be mirrored (RTL)")]
 fn layout_mirrored_rtl(_world: &mut VauchiWorld) {}
 
-#[then("text should align to the right")]
-fn text_aligns_right(_world: &mut VauchiWorld) {}
-
-#[then("navigation should flow right-to-left")]
-fn navigation_rtl(_world: &mut VauchiWorld) {}
-
-#[then("icons that indicate direction should be mirrored")]
-fn direction_icons_mirrored(_world: &mut VauchiWorld) {}
-
-#[then("the app should feel natural for RTL users")]
-fn natural_for_rtl_users(_world: &mut VauchiWorld) {}
-
 #[then("each text block should use appropriate direction")]
 fn text_block_direction(_world: &mut VauchiWorld) {}
 
@@ -711,20 +687,8 @@ fn non_directional_icons_not_mirrored(_world: &mut VauchiWorld) {}
 #[then("the visual flow should be consistent")]
 fn visual_flow_consistent(_world: &mut VauchiWorld) {}
 
-#[then("the phone number should display in German format")]
-fn phone_in_german_format(_world: &mut VauchiWorld) {}
-
-#[then("international format should be available")]
-fn international_format_available(_world: &mut VauchiWorld) {}
-
-#[then("the format should be familiar to the user")]
-fn format_familiar_to_user(_world: &mut VauchiWorld) {}
-
 #[then(expr = "the password strength indicator should show {string}")]
 fn password_strength_shows(_world: &mut VauchiWorld, _strength: String) {}
-
-#[then("the toast should auto-dismiss after 2 seconds")]
-fn toast_auto_dismisses(_world: &mut VauchiWorld) {}
 
 #[then(expr = "I should see the profile URL {string}")]
 fn see_profile_url(_world: &mut VauchiWorld, _url: String) {}

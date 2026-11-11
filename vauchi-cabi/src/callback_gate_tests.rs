@@ -11,7 +11,6 @@ use std::ffi::{c_char, c_void};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Barrier};
 use std::thread;
-use std::time::{Duration, Instant};
 
 use crate::app::EventCallbackHandler;
 use crate::callback_gate::CallbackGate;
@@ -57,12 +56,16 @@ fn counting(probe: &Arc<Counting>) -> EventCallbackHandler {
     EventCallbackHandler::new(counting_cb, Arc::as_ptr(probe) as *mut c_void)
 }
 
-/// Spins until `done` or the gate has a thread waiting to replace; the
-/// deadline only bounds a failure, a passing run never reaches it.
+/// Yields the processor at most this often while waiting for another thread;
+/// it only bounds a failing run (Core code reads no clock, tests included).
+const SPIN_LIMIT: u64 = 50_000_000;
+
+/// Spins until `done` or the gate has a thread waiting to replace.
 fn until_waiting_or_done(gate: &CallbackGate, done: &thread::JoinHandle<bool>) {
-    let deadline = Instant::now() + Duration::from_secs(10);
+    let mut spins = 0u64;
     while !done.is_finished() && gate.replacers_waiting() == 0 {
-        assert!(Instant::now() < deadline, "neither returned nor waited");
+        spins += 1;
+        assert!(spins < SPIN_LIMIT, "neither returned nor waited");
         thread::yield_now();
     }
 }

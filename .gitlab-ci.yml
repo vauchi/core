@@ -621,9 +621,33 @@ lint:format:
 # minutes of waiting). The checks that need a compiled tree and nothing
 # else run here too, with the commands they had as jobs of their own.
 build:tests:
-  extends: [.linux-runner, .validation-rust, .timeout-cold-rebuild]
+  extends: [.linux-runner, .timeout-cold-rebuild]
   stage: lint
   needs: []
+  # This job must exist in every pipeline that holds a job needing it, or
+  # GitLab creates the pipeline with no jobs and fails it ("'test:vectors'
+  # job needs 'build:tests' job, but 'build:tests' does not exist in the
+  # pipeline": twelve main pipelines in a row after the #1212 merge,
+  # 2026-11-10/11, which .validation-rust's merge-request-only rule caused).
+  # So its rule is the union of its dependents': .validation-rust's and
+  # .validation-platform's paths, lint:semver's two scripts, test:vectors'
+  # fixture corpus, and the default branch, where test:vectors runs.
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - "**/*.rs"
+          - "**/Cargo.toml"
+          - "**/Cargo.lock"
+          - ".gitlab-ci.yml"
+          - "rust-toolchain.toml"
+          - "vauchi-platform/**/*"
+          - "scripts/build-bindings.sh"
+          - "ci/semver-baseline.sh"
+          - "ci/tests/semver-baseline.test.py"
+          - "vauchi-core/tests/fixtures/test-vectors/**"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]

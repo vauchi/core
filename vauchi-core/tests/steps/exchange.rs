@@ -235,7 +235,13 @@ fn both_want_exchange(_world: &mut VauchiWorld) {}
 
 #[given("Alice and Bob are performing an exchange")]
 #[given("Alice and Bob are completing an exchange")]
-fn parties_are_exchanging(_world: &mut VauchiWorld) {}
+fn parties_are_exchanging(world: &mut VauchiWorld) {
+    for name in ["Alice", "Bob"] {
+        if !world.parties.contains_key(name) {
+            a_user(world, name.to_string());
+        }
+    }
+}
 
 #[given(expr = "{word} is scanning a QR code")]
 #[given(expr = "{word} is displaying her exchange QR code")]
@@ -249,7 +255,9 @@ fn qr_already_generated(_world: &mut VauchiWorld, _party: String) {}
 fn confirm_exchange(_world: &mut VauchiWorld) {}
 
 #[when("contact cards are received")]
-fn contact_cards_received(_world: &mut VauchiWorld) {}
+fn contact_cards_received(world: &mut VauchiWorld) {
+    qr_exchange(world.party("Alice"), world.party("Bob"));
+}
 
 /// Party-specific UI assertions — no "display text" concept in core.
 /// Binds "Alice/Bob should see X" and "both should see X" from exchange features.
@@ -265,11 +273,70 @@ fn uses_mutual_flow(_world: &mut VauchiWorld) {}
 
 /// "X should verify Y's card is signed…" — verification happens inside the
 /// exchange state machine; the fact that qr_exchange completed is the proof.
+/// The contact `owner` saved is bound to the identity key whose signature on
+/// the exchange QR the session verified before it agreed on keys.
 #[then(expr = "{word} should verify {word}'s card is signed by {word}'s public key")]
-fn card_verified_noop(_world: &mut VauchiWorld, _a: String, _b: String, _c: String) {}
+fn card_bound_to_signer(world: &mut VauchiWorld, owner: String, peer: String, signer: String) {
+    assert_eq!(
+        peer, signer,
+        "the scenario names one party as sender and signer"
+    );
+    let saved = world
+        .party(&owner)
+        .list_contacts()
+        .unwrap()
+        .into_iter()
+        .find(|c| c.display_name() == peer)
+        .unwrap_or_else(|| panic!("{owner} saved no contact named {peer}"));
+    let signer_key = *world
+        .party(&signer)
+        .identity()
+        .unwrap()
+        .signing_public_key();
+    assert_eq!(
+        saved.public_key(),
+        Some(&signer_key),
+        "{owner}'s contact {peer}"
+    );
+}
+
+/// Bob's exchange QR with its signature or a signed field altered, as Alice
+/// would scan it.
+fn tampered_qrs(bob: &Vauchi) -> Vec<(&'static str, String)> {
+    use base64::Engine as _;
+    let base64 = base64::engine::general_purpose::STANDARD;
+    let genuine = base64
+        .decode(make_session(bob).qr().unwrap().to_data_string())
+        .unwrap();
+    let signature_start = genuine.len() - 64;
+    let mut wrong_signature = genuine.clone();
+    wrong_signature[genuine.len() - 1] ^= 0x01;
+    let mut zero_signature = genuine.clone();
+    zero_signature[signature_start..].fill(0);
+    let mut altered_exchange_key = genuine.clone();
+    altered_exchange_key[40] ^= 0x01;
+    vec![
+        ("a flipped signature bit", base64.encode(wrong_signature)),
+        ("no signature", base64.encode(zero_signature)),
+        (
+            "an altered exchange key",
+            base64.encode(altered_exchange_key),
+        ),
+    ]
+}
 
 #[then("unsigned or incorrectly signed cards should be rejected")]
-fn bad_cards_rejected_noop(_world: &mut VauchiWorld) {}
+fn bad_cards_rejected(world: &mut VauchiWorld) {
+    for (tampering, data) in tampered_qrs(world.party("Bob")) {
+        let mut alice = make_session(world.party("Alice"));
+        let result = vauchi_core::exchange::ExchangeQR::from_data_string(&data)
+            .and_then(|qr| alice.apply(ExchangeEvent::ProcessQR(qr)));
+        assert!(
+            matches!(result, Err(ExchangeError::InvalidSignature)),
+            "QR with {tampering}: {result:?}"
+        );
+    }
+}
 
 #[then("these keys should be derived from the same shared secret")]
 #[then("forward secrecy should be established via ratcheting")]

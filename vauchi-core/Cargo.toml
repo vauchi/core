@@ -36,7 +36,7 @@ testing = []
 # MUST NOT be enabled in production builds — only for test/dev profiles.
 test-kdf = []
 # JSON Schema generation for UI types (dev tooling only)
-schema-gen = ["schemars", "vauchi-app/schema-gen", "vauchi-contract/schema-gen"]
+schema-gen = ["schemars", "vauchi-contract/schema-gen"]
 # Diagnostic QR scanner benchmarking (rqrr decoder + image preprocessing)
 diagnostic-scanner = ["imageproc", "fast_image_resize"]
 # YOLO-based QR detector for diagnostic scanner (adds ~15MB ONNX runtime)
@@ -184,16 +184,9 @@ winapi-util = "=0.1.11"
 [dev-dependencies]
 # OHTTP server features for roundtrip tests (merged with optional ohttp dep)
 ohttp = { version = "0.7", default-features = false, features = ["server", "rust-hpke"] }
-# App-layer modules (tests reference ui, theme, help, i18n, content)
-# Use rustls (not native-tls) — native-tls requires OpenSSL, which is unavailable on Android/WASM targets.
-# network-http is REQUIRED so vauchi-app's core-driven link poll
-# (advance_link_initiator/responder_session, #[cfg(all(network-http, storage))])
-# compiles in — without it the whole ADR-049/050 escrow poll is cfg'd out and
-# link_{initiator,responder}_poll_tests fail (broke the nightly mutation baseline).
-vauchi-app = { workspace = true, features = ["content-updates", "network-rustls", "network-http"] }
-# Temporary directories for storage tests
 # Shared arrange helpers for tests/it (vauchi/private#1230).
 vauchi-core-testkit.workspace = true
+# Temporary directories for storage tests
 tempfile = "3.0"
 # Property-based testing
 proptest = "1.4"
@@ -201,7 +194,6 @@ proptest = "1.4"
 rstest = "0.26"
 # Benchmarking (default features disabled: no plotters/rayon)
 criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }
-# BDD testing (executable Gherkin)
 
 [[test]]
 name = "it"

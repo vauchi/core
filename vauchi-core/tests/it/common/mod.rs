@@ -7,7 +7,6 @@
 //! The shared arrange helpers live in `vauchi-core-testkit` (its crate docs
 //! hold the idiom-to-helper table); they are re-exported here so every
 //! `common::` path in this test crate stays as it was (vauchi/private#1230).
-//! What depends on vauchi-app stays here until its tests move there.
 
 #[allow(unused_imports)]
 pub use vauchi_core_testkit::{

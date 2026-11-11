@@ -4229,7 +4229,6 @@ dependencies = [
  "ureq",
  "url",
  "uuid",
- "vauchi-app",
  "vauchi-contract",
  "vauchi-core-testkit",
  "vauchi-protocol",

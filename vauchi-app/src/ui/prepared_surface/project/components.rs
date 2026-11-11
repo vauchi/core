@@ -300,8 +300,11 @@ impl Projection {
                         .as_ref()
                         .map(|action_id| {
                             self.action(
-                                "Edit",
-                                accessibility(a11y, "Edit image"),
+                                &crate::i18n::get_string(self.locale, "action.edit"),
+                                accessibility(
+                                    a11y,
+                                    &crate::i18n::get_string(self.locale, "a11y.edit_avatar"),
+                                ),
                                 ActionTone::Standard,
                                 UserAction::ActionPressed {
                                     action_id: action_id.clone(),

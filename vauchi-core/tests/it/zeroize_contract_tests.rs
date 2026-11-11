@@ -64,3 +64,23 @@ fn secret_type_contract() {
     assert!(has_zeroizing_drop::<vauchi_core::platform::SealedSecret>());
     assert!(has_zeroizing_drop::<vauchi_core::api::RelayExchangeOffer>());
 }
+
+fn wiped_when_dropped<T: ZeroizeOnDrop>(_: &T) -> bool {
+    std::mem::needs_drop::<T>()
+}
+
+/// A buffer a function returns holding the master seed is secret material
+/// too: its callers drop it as a temporary (vauchi/private#1216).
+// @internal
+#[test]
+fn identity_storage_bytes_are_wiped_when_dropped() {
+    let identity = vauchi_core::Identity::create("Alice", 0);
+    let bytes = identity.to_storage_bytes();
+    assert!(wiped_when_dropped(&bytes));
+    let restored = vauchi_core::Identity::from_storage_bytes(&bytes, 0).unwrap();
+    assert_eq!(
+        restored.signing_public_key(),
+        identity.signing_public_key(),
+        "the wiped buffer still round-trips the identity"
+    );
+}

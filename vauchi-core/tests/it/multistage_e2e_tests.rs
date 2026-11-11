@@ -331,14 +331,17 @@ fn test_e2e_grace_period_keeps_showing_the_final_frame() {
     assert_eq!(alice.get_state(), ProtocolState::Finalized);
     assert_eq!(bob.get_state(), ProtocolState::Finalized);
 
-    // After finalization the final frame is still displayed, as DONE, so
-    // the peer can also finalize (C3 fix: prevents asymmetric failure);
-    // a phone that already read its peer's DONE shows BOTH instead (design
-    // D6). DATA may be interleaved while chunks are unacked; the guarantee
-    // is that an ending frame keeps coming.
+    // After finalization the confirm is still displayed (as DONE once the
+    // app saved), so the peer can also finalize (C3 fix: prevents asymmetric
+    // failure). DATA may be interleaved while chunks are unacked; the
+    // guarantee is that an ending frame keeps coming.
     let ending_frames = (0..50)
         .filter_map(|_| alice.get_display_qr())
-        .filter(|qr| qr.data.starts_with("DON3") || qr.data.starts_with("BTH3"))
+        .filter(|qr| {
+            ["CNF4", "DON4", "BTH3"]
+                .iter()
+                .any(|p| qr.data.starts_with(p))
+        })
         .count();
     assert!(
         ending_frames > 0,
@@ -510,12 +513,11 @@ fn test_atomicity_without_peer_finalization_frame_no_finalize() {
     alice.process_scanned_qr(&bi.data);
     bob.process_scanned_qr(&ai.data);
 
-    // Bob reads everything Alice shows except her final frame.
+    // Bob reads everything Alice shows except her confirm.
     let mut withheld = 0;
     for _ in 0..500 {
         if let Some(aq) = alice.get_display_qr() {
-            // Once saved, Alice shows her final frame as DONE (design D6).
-            if aq.data.starts_with("FIN3") || aq.data.starts_with("DON3") {
+            if aq.data.starts_with("CNF4") || aq.data.starts_with("DON4") {
                 withheld += 1;
             } else {
                 bob.process_scanned_qr(&aq.data);
@@ -532,12 +534,12 @@ fn test_atomicity_without_peer_finalization_frame_no_finalize() {
         assert_eq!(bob.get_received_data(), None);
     }
 
-    assert!(withheld > 0, "Alice never showed a final frame to withhold");
+    assert!(withheld > 0, "Alice never showed a confirm to withhold");
     assert_eq!(alice.get_state(), ProtocolState::Finalized);
     assert_eq!(
         bob.get_state(),
-        ProtocolState::Verifying,
-        "Bob holds every chunk and waits for the reveal key"
+        ProtocolState::Confirming,
+        "Bob accepted Alice and waits for her confirm"
     );
 }
 
@@ -561,13 +563,14 @@ fn test_asymmetric_finalization_both_reach_finalized() {
     alice.process_scanned_qr(&bi.data);
     bob.process_scanned_qr(&ai.data);
 
-    // Alice may finalize without ever showing FIN3: when Bob's FIN3 reaches
-    // her first, she saves at once. Either way her final frame is withheld.
+    // Alice's confirm is withheld from Bob; her reveal is not, so he can
+    // check her and confirm.
     for _ in 0..500 {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
         if let Some(aq) = &aq
-            && !aq.data.starts_with("FIN3")
+            && !aq.data.starts_with("CNF4")
+            && !aq.data.starts_with("DON4")
         {
             bob.process_scanned_qr(&aq.data);
         }
@@ -685,23 +688,20 @@ fn test_fail_qr_roundtrip() {
     }
 }
 
-/// S5: FAIL QR causes peer to abort when not yet Finalized.
+/// S5: a FAIL from no bound peer changes nothing (vauchi/private#1217);
+/// from the bound peer, see `multistage_fail_frame_tests.rs`.
 // @internal
 #[test]
-fn test_fail_qr_aborts_peer() {
+fn test_fail_qr_from_no_bound_peer_is_ignored() {
     let mut alice = MultiStageSession::new(b"Alice".to_vec());
 
     let _ai = alice.get_display_qr().unwrap();
     assert_eq!(alice.get_state(), ProtocolState::Advertising);
 
-    // Receive FAIL while in Advertising → should abort
     use vauchi_core::exchange::multistage::qr_codec;
     let fail_qr = qr_codec::format_fail_qr(&[0u8; 16]);
     let state = alice.process_scanned_qr(&fail_qr);
-    assert_eq!(
-        state,
-        ProtocolState::Failed("peer reported failure".to_string())
-    );
+    assert_eq!(state, ProtocolState::Advertising);
 }
 
 /// S5: FAIL QR does NOT override Finalized state.

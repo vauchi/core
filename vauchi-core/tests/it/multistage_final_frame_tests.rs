@@ -2,11 +2,13 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! The ending is one frame: the reveal key and one value that confirms the
-//! card and both session ids. One read of it takes a peer that holds every
-//! chunk to Finalized, whatever finalization state it is in (design D5).
+//! The confirm: the reveal key and a tag keyed from the transport key that
+//! confirms both payloads, session ids, ephemerals and commitments. One read
+//! of it takes a peer that holds every chunk to Finalized, whatever
+//! finalization state it is in (design D5); a phone shows it only once its
+//! own checks of the peer passed (vauchi/private#1217).
 
-use sha2::{Digest, Sha256};
+use vauchi_core::exchange::multistage::confirmation::{self, Side, TagLabel};
 use vauchi_core::exchange::multistage::qr_codec::{self, StageQr, parse_qr};
 use vauchi_core::exchange::multistage::session::MultiStageSession;
 use vauchi_core::exchange::multistage::types::{AccelerometerProximityState, ProtocolState};
@@ -18,14 +20,20 @@ struct Staged {
     alice: MultiStageSession,
     bob: MultiStageSession,
     alice_final: String,
+    alice_init: String,
+    bob_init: String,
 }
 
-fn is_final(frame: &str) -> bool {
-    frame.starts_with("FIN3")
+fn is_confirm(frame: &str) -> bool {
+    frame.starts_with("CNF4")
+}
+
+fn is_reveal_or_confirm(frame: &str) -> bool {
+    frame.starts_with("RVL4") || is_confirm(frame)
 }
 
 /// Drives both sessions until Bob holds every chunk and waits in Verifying,
-/// with Alice's final frame captured but never shown to him.
+/// with Alice's confirm captured but never shown to him.
 fn bob_verifying_with_alice_final_withheld() -> Staged {
     let mut alice = MultiStageSession::new(ALICE_CARD.to_vec());
     let mut bob = MultiStageSession::new(BOB_CARD.to_vec());
@@ -37,17 +45,19 @@ fn bob_verifying_with_alice_final_withheld() -> Staged {
 
     let mut alice_final = None;
     for _ in 0..500 {
+        // Bob reads neither Alice's reveal nor her confirm, so he holds her
+        // chunks without the key to open them.
         if let Some(aq) = alice.get_display_qr() {
-            if is_final(&aq.data) {
+            if is_confirm(&aq.data) {
                 alice_final = Some(aq.data);
-            } else {
+            } else if !is_reveal_or_confirm(&aq.data) {
                 bob.process_scanned_qr(&aq.data);
             }
         }
-        // Bob's own final frame stays with him, so Alice cannot finish and
-        // keeps showing hers.
+        // Alice reads Bob's reveal, so she can check him and confirm; his
+        // confirm stays with him, so she cannot finish.
         if let Some(bq) = bob.get_display_qr()
-            && !is_final(&bq.data)
+            && !is_confirm(&bq.data)
         {
             alice.process_scanned_qr(&bq.data);
         }
@@ -60,20 +70,55 @@ fn bob_verifying_with_alice_final_withheld() -> Staged {
     Staged {
         alice,
         bob,
-        alice_final: alice_final.expect("Alice never showed a final frame"),
+        alice_final: alice_final.expect("Alice never showed a confirm"),
+        alice_init: ai.data,
+        bob_init: bi.data,
     }
 }
 
-/// The value Alice's final frame confirms: her card and both session ids.
-fn final_tag(card: &[u8], one: [u8; 16], other: [u8; 16]) -> [u8; 32] {
-    let card_hash: [u8; 32] = Sha256::digest(card).into();
-    let (first, second) = if one <= other {
-        (one, other)
-    } else {
-        (other, one)
+fn init_of(frame: &str) -> ([u8; 16], [u8; 32], [u8; 32]) {
+    let Ok(StageQr::Init {
+        session_id,
+        ephemeral,
+        commitment_hash,
+        ..
+    }) = parse_qr(frame)
+    else {
+        panic!("not an opening frame");
     };
-    let ready_hash: [u8; 32] = Sha256::digest([first, second].concat()).into();
-    Sha256::digest([card_hash, ready_hash].concat()).into()
+    (session_id, ephemeral, commitment_hash)
+}
+
+/// The tag Alice sends Bob, over the payloads and session ids given, keyed
+/// from the session's transport key.
+fn alice_tag(
+    staged: &Staged,
+    label: TagLabel,
+    alice_payload: &[u8],
+    bob_session_id: [u8; 16],
+) -> [u8; 32] {
+    let (a_sid, a_eph, a_ch) = init_of(&staged.alice_init);
+    let (_, b_eph, b_ch) = init_of(&staged.bob_init);
+    let transport_key = staged
+        .bob
+        .get_transport_key()
+        .expect("the transport key exists once the opening frames are read");
+    confirmation::tag(
+        &transport_key,
+        label,
+        &Side {
+            session_id: &a_sid,
+            ephemeral: &a_eph,
+            commitment_hash: &a_ch,
+            payload: alice_payload,
+        },
+        &Side {
+            session_id: &bob_session_id,
+            ephemeral: &b_eph,
+            commitment_hash: &b_ch,
+            payload: BOB_CARD,
+        },
+    )
 }
 
 fn reveal_key_of(final_frame: &str) -> [u8; 32] {
@@ -113,15 +158,12 @@ fn the_final_frame_is_the_size_of_the_opening_frame() {
 // @internal
 #[test]
 fn the_final_frame_confirms_the_card_and_both_session_ids() {
-    let Staged {
-        alice,
-        bob,
-        alice_final,
-    } = bob_verifying_with_alice_final_withheld();
+    let staged = bob_verifying_with_alice_final_withheld();
+    let (alice, bob) = (&staged.alice, &staged.bob);
 
     let Ok(StageQr::Final {
         session_id, tag, ..
-    }) = parse_qr(&alice_final)
+    }) = parse_qr(&staged.alice_final)
     else {
         panic!("not a final frame");
     };
@@ -129,66 +171,84 @@ fn the_final_frame_confirms_the_card_and_both_session_ids() {
     assert_eq!(session_id, alice.session_id());
     assert_eq!(
         tag,
-        final_tag(ALICE_CARD, alice.session_id(), bob.session_id())
+        alice_tag(&staged, TagLabel::Confirm, ALICE_CARD, bob.session_id())
     );
 }
 
 // @internal
 #[test]
-fn a_final_frame_confirming_another_card_fails_closed() {
-    let Staged {
-        alice,
-        mut bob,
-        alice_final,
-    } = bob_verifying_with_alice_final_withheld();
+fn a_confirm_whose_tag_covers_another_card_is_ignored() {
+    let staged = bob_verifying_with_alice_final_withheld();
     let forged = qr_codec::format_final_qr(
-        &alice.session_id(),
-        &reveal_key_of(&alice_final),
-        &final_tag(b"not Alice's card", alice.session_id(), bob.session_id()),
+        &staged.alice.session_id(),
+        &reveal_key_of(&staged.alice_final),
+        &alice_tag(
+            &staged,
+            TagLabel::Confirm,
+            b"not Alice's card",
+            staged.bob.session_id(),
+        ),
     );
+    let alice_final = staged.alice_final.clone();
+    let mut bob = staged.bob;
 
     bob.process_scanned_qr(&forged);
 
-    assert!(
-        matches!(bob.get_state(), ProtocolState::Failed(_)),
-        "got {:?}",
-        bob.get_state()
+    assert_eq!(
+        bob.get_state(),
+        ProtocolState::Confirming,
+        "ignored, as a misread is"
     );
     assert_eq!(bob.get_received_data(), None);
+    assert_eq!(
+        bob.process_scanned_qr(&alice_final),
+        ProtocolState::Finalized,
+        "Alice's real confirm still finalizes"
+    );
 }
 
 // @internal
 #[test]
-fn a_final_frame_confirming_other_session_ids_fails_closed() {
-    let Staged {
-        alice,
-        mut bob,
-        alice_final,
-    } = bob_verifying_with_alice_final_withheld();
+fn a_confirm_whose_tag_covers_other_session_ids_is_ignored() {
+    let staged = bob_verifying_with_alice_final_withheld();
     let forged = qr_codec::format_final_qr(
-        &alice.session_id(),
-        &reveal_key_of(&alice_final),
-        &final_tag(ALICE_CARD, alice.session_id(), [9u8; 16]),
+        &staged.alice.session_id(),
+        &reveal_key_of(&staged.alice_final),
+        &alice_tag(&staged, TagLabel::Confirm, ALICE_CARD, [9u8; 16]),
     );
+    let alice_final = staged.alice_final.clone();
+    let mut bob = staged.bob;
 
     bob.process_scanned_qr(&forged);
 
-    assert!(
-        matches!(bob.get_state(), ProtocolState::Failed(_)),
-        "got {:?}",
-        bob.get_state()
+    assert_eq!(
+        bob.get_state(),
+        ProtocolState::Confirming,
+        "ignored, as a misread is"
+    );
+    assert_eq!(bob.get_received_data(), None);
+    assert_eq!(
+        bob.process_scanned_qr(&alice_final),
+        ProtocolState::Finalized,
+        "Alice's real confirm still finalizes"
     );
 }
 
 // @internal
 #[test]
 fn a_final_frame_with_a_wrong_reveal_key_fails_closed() {
-    let Staged { alice, mut bob, .. } = bob_verifying_with_alice_final_withheld();
+    let staged = bob_verifying_with_alice_final_withheld();
     let forged = qr_codec::format_final_qr(
-        &alice.session_id(),
+        &staged.alice.session_id(),
         &[0x5Au8; 32],
-        &final_tag(ALICE_CARD, alice.session_id(), bob.session_id()),
+        &alice_tag(
+            &staged,
+            TagLabel::Confirm,
+            ALICE_CARD,
+            staged.bob.session_id(),
+        ),
     );
+    let mut bob = staged.bob;
 
     bob.process_scanned_qr(&forged);
 
@@ -209,11 +269,7 @@ fn a_final_frame_from_another_session_changes_nothing() {
         ..
     } = bob_verifying_with_alice_final_withheld();
     let stranger = [0x77u8; 16];
-    let foreign = qr_codec::format_final_qr(
-        &stranger,
-        &reveal_key_of(&alice_final),
-        &final_tag(ALICE_CARD, stranger, bob.session_id()),
-    );
+    let foreign = qr_codec::format_final_qr(&stranger, &reveal_key_of(&alice_final), &[0x11; 32]);
 
     bob.process_scanned_qr(&foreign);
 
@@ -227,7 +283,7 @@ fn a_final_frame_from_another_session_changes_nothing() {
 
 /// Bob holds all of Alice's chunks but has not seen her ACK for his own,
 /// so he is still Transferring; Alice has reached Verifying and shown her
-/// final frame.
+/// reveal.
 fn bob_still_transferring_with_all_of_alices_chunks() -> Staged {
     let mut alice = MultiStageSession::new(ALICE_CARD.to_vec());
     let mut bob = MultiStageSession::new(vec![0xB2; 400]);
@@ -252,23 +308,21 @@ fn bob_still_transferring_with_all_of_alices_chunks() -> Staged {
             break;
         }
     }
-    // Then Alice reads Bob until she reaches Verifying and shows her final
-    // frame; Bob reads nothing more of hers.
-    let mut alice_final = None;
+    // Then Alice reads Bob until she reaches Verifying and shows her
+    // reveal; Bob reads nothing more of hers.
+    let mut alice_reveal = None;
     for _ in 0..400 {
-        if let Some(bq) = bob.get_display_qr()
-            && !is_final(&bq.data)
-        {
+        if let Some(bq) = bob.get_display_qr() {
             alice.process_scanned_qr(&bq.data);
         }
         if let Some(aq) = alice.get_display_qr()
-            && is_final(&aq.data)
+            && aq.data.starts_with("RVL4")
         {
-            alice_final = Some(aq.data);
+            alice_reveal = Some(aq.data);
             break;
         }
     }
-    let alice_final = alice_final.expect("Alice showed her final frame");
+    let alice_final = alice_reveal.expect("Alice showed her reveal");
     assert!(
         matches!(bob.get_state(), ProtocolState::Transferring { .. }),
         "precondition: Bob still transferring, got {:?}",
@@ -279,45 +333,71 @@ fn bob_still_transferring_with_all_of_alices_chunks() -> Staged {
         alice,
         bob,
         alice_final,
+        alice_init: ai.data,
+        bob_init: bi.data,
     }
+}
+
+fn revealed_key(frame: &str) -> [u8; 32] {
+    match parse_qr(frame) {
+        Ok(StageQr::Reveal { reveal_key, .. } | StageQr::Final { reveal_key, .. }) => reveal_key,
+        other => panic!("no reveal key in {other:?}"),
+    }
+}
+
+/// Each phone reads the other's next frame until Bob finalizes.
+fn run_until_bob_finalizes(alice: &mut MultiStageSession, bob: &mut MultiStageSession) {
+    for _ in 0..200 {
+        if let Some(bq) = bob.get_display_qr() {
+            alice.process_scanned_qr(&bq.data);
+        }
+        if let Some(aq) = alice.get_display_qr() {
+            bob.process_scanned_qr(&aq.data);
+        }
+        if bob.get_state() == ProtocolState::Finalized {
+            return;
+        }
+    }
+    panic!("Bob never finalized: {:?}", bob.get_state());
 }
 
 // @internal
 #[test]
-fn a_final_frame_read_while_still_transferring_finalizes_once_the_card_opens() {
+fn a_reveal_read_while_still_transferring_opens_the_card_once_shown() {
     let Staged {
+        mut alice,
         mut bob,
-        alice_final,
+        alice_final: alice_reveal,
         ..
     } = bob_still_transferring_with_all_of_alices_chunks();
 
-    bob.process_scanned_qr(&alice_final);
-    assert_ne!(bob.get_state(), ProtocolState::Finalized);
-    assert_eq!(bob.get_received_data(), None);
-    // Showing his next frame is when Bob opens the card with the kept key;
-    // the tag read with it completes the exchange without a second read.
+    bob.process_scanned_qr(&alice_reveal);
+    assert_ne!(bob.get_state(), ProtocolState::Confirming);
+    // Showing his next frame is when Bob opens the card with the kept key.
     let _ = bob.get_display_qr();
+    assert_eq!(bob.get_state(), ProtocolState::Confirming);
 
-    assert_eq!(bob.get_state(), ProtocolState::Finalized);
+    run_until_bob_finalizes(&mut alice, &mut bob);
     assert_eq!(bob.get_received_data().as_deref(), Some(ALICE_CARD));
 }
 
-/// A peer about to re-handshake still shows final frames bound to its old
+/// A peer about to re-handshake still shows confirms bound to its old
 /// partner (ADR-071). Such a tag, kept from before Confirming, must not
 /// fail the exchange once the card opens; it is dropped, and the peer's
-/// next final frame decides.
+/// next confirm decides.
 // @internal
 #[test]
 fn a_tag_kept_from_before_confirming_that_does_not_match_is_dropped_not_fatal() {
     let Staged {
-        alice,
+        mut alice,
         mut bob,
-        alice_final,
+        alice_final: alice_reveal,
+        ..
     } = bob_still_transferring_with_all_of_alices_chunks();
     let bound_elsewhere = qr_codec::format_final_qr(
         &alice.session_id(),
-        &reveal_key_of(&alice_final),
-        &final_tag(ALICE_CARD, alice.session_id(), [9u8; 16]),
+        &revealed_key(&alice_reveal),
+        &[0x42; 32],
     );
 
     bob.process_scanned_qr(&bound_elsewhere);
@@ -328,9 +408,34 @@ fn a_tag_kept_from_before_confirming_that_does_not_match_is_dropped_not_fatal() 
         "the card opened; the stale tag neither finalized nor failed"
     );
 
+    run_until_bob_finalizes(&mut alice, &mut bob);
+    assert_eq!(bob.get_received_data().as_deref(), Some(ALICE_CARD));
+}
+
+// @internal
+#[test]
+fn a_done_tag_shown_as_a_confirm_is_ignored() {
+    let staged = bob_verifying_with_alice_final_withheld();
+    let relabelled = qr_codec::format_final_qr(
+        &staged.alice.session_id(),
+        &reveal_key_of(&staged.alice_final),
+        &alice_tag(&staged, TagLabel::Done, ALICE_CARD, staged.bob.session_id()),
+    );
+    let alice_final = staged.alice_final.clone();
+    let mut bob = staged.bob;
+
+    bob.process_scanned_qr(&relabelled);
+
+    assert_eq!(
+        bob.get_state(),
+        ProtocolState::Confirming,
+        "ignored, as a misread is"
+    );
+    assert_eq!(bob.get_received_data(), None);
     assert_eq!(
         bob.process_scanned_qr(&alice_final),
-        ProtocolState::Finalized
+        ProtocolState::Finalized,
+        "Alice's real confirm still finalizes"
     );
 }
 
@@ -358,37 +463,46 @@ fn a_session_still_recording_a_shake_holds_the_final_frame_until_it_stops() {
     assert_eq!(
         bob.get_state(),
         ProtocolState::Finalized,
-        "once the shake stops, the kept final frame completes the exchange"
+        "once the shake stops, the kept confirm completes the exchange"
     );
 }
 
 // @internal
 #[test]
-fn from_verifying_on_a_session_shows_only_data_shake_and_final_frames() {
+fn a_session_shows_its_confirm_only_after_its_checks_and_done_only_once_saved() {
     let Staged {
         mut bob,
         alice_final,
         ..
     } = bob_verifying_with_alice_final_withheld();
-    let mut shown = std::collections::BTreeSet::new();
     let mut note = |session: &mut MultiStageSession| {
+        let mut shown = std::collections::BTreeSet::new();
         for _ in 0..60 {
             if let Some(frame) = session.get_display_qr() {
                 shown.insert(frame.data[..4].to_string());
             }
         }
+        shown
     };
 
-    note(&mut bob);
+    let verifying = note(&mut bob);
     bob.process_scanned_qr(&alice_final);
     assert_eq!(bob.get_state(), ProtocolState::Finalized);
-    note(&mut bob);
+    let finalized = note(&mut bob);
+    bob.mark_saved();
+    let saved = note(&mut bob);
 
-    assert!(shown.contains("FIN3"), "{shown:?}");
+    assert!(verifying.contains("RVL4"), "{verifying:?}");
     assert!(
-        shown
+        verifying
             .iter()
-            .all(|p| ["FIN3", "DON3", "DAT4", "SHK3"].contains(&p.as_str())),
-        "{shown:?}"
+            .all(|p| ["RVL4", "DAT4", "SHK3"].contains(&p.as_str())),
+        "no confirm before the checks: {verifying:?}"
     );
+    assert!(finalized.contains("CNF4"), "{finalized:?}");
+    assert!(
+        !finalized.contains("DON4"),
+        "no done before saving: {finalized:?}"
+    );
+    assert!(saved.contains("DON4"), "{saved:?}");
 }

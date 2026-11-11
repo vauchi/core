@@ -129,14 +129,7 @@ impl ProfileEngine {
             // rekey has no relationship on this device, only an old shared
             // key a thief may also hold; meeting it in person gives it one
             // (vauchi/private#796, D20).
-            let restored_waiting = self
-                .storage
-                .recovery()
-                .rekey_pending()?
-                .iter()
-                .any(|id| id == contact.id())
-                && !self.storage.recovery().rekey_met_again(contact.id())?;
-            if !restored_waiting {
+            if !self.restored_waiting_for_rekey(contact.id())? {
                 return self.save_exchanged_card(&stored);
             }
             let shared = contact.shared_key().ok_or_else(|| {
@@ -171,5 +164,34 @@ impl ProfileEngine {
         // cannot send yet owes it to the next sync.
         self.hand_back_owed()?;
         Ok(())
+    }
+
+    /// [`Self::save_exchanged_contact`] for an exchange whose peer has not
+    /// yet said it saved us. A contact restored from a guardian backup and
+    /// waiting for its rekey gets the new card but keeps its old key and
+    /// stays waiting: adopting a key the peer may never store would cut the
+    /// only channel left (vauchi/private#1217). Returns whether it did; call
+    /// [`Self::save_exchanged_contact`] once the peer's done is read.
+    pub fn save_exchanged_contact_before_peer_saved(
+        &self,
+        contact: &Contact,
+        ratchet: &DoubleRatchetState,
+        is_initiator: bool,
+    ) -> VauchiResult<bool> {
+        if self.restored_waiting_for_rekey(contact.id())?
+            && let Some(mut stored) = self.storage.contacts().load_contact(contact.id())?
+        {
+            stored.update_card(contact.card().clone(), self.clock.unix_seconds());
+            self.save_exchanged_card(&stored)?;
+            return Ok(true);
+        }
+        self.save_exchanged_contact(contact, ratchet, is_initiator)?;
+        Ok(false)
+    }
+
+    fn restored_waiting_for_rekey(&self, contact_id: &str) -> VauchiResult<bool> {
+        let recovery = self.storage.recovery();
+        Ok(recovery.rekey_pending()?.iter().any(|id| id == contact_id)
+            && !recovery.rekey_met_again(contact_id)?)
     }
 }

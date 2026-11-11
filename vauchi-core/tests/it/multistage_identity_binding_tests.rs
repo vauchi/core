@@ -136,12 +136,20 @@ fn a_peer_carrying_our_own_identity_is_refused() {
 
     exchange(&mut a, &mut twin);
 
+    // Whichever refuses first stops showing frames, so the other may be
+    // left waiting rather than failed; neither finalizes.
+    for session in [&a, &twin] {
+        assert_ne!(session.get_state(), ProtocolState::Finalized);
+        assert!(session.received_peer().is_none());
+    }
     assert!(
-        matches!(a.get_state(), ProtocolState::Failed(_)),
-        "{:?}",
-        a.get_state()
+        [&a, &twin]
+            .iter()
+            .any(|s| matches!(s.get_state(), ProtocolState::Failed(_))),
+        "one of them refused the other: {:?} / {:?}",
+        a.get_state(),
+        twin.get_state()
     );
-    assert!(a.received_peer().is_none());
 }
 
 // @internal
@@ -150,7 +158,8 @@ fn an_init_carrying_the_ciphertext_in_clear_moves_nothing() {
     let alice = Identity::create("Alice", 0);
     let mut a = MultiStageSession::for_identity(&alice, &card("Alice", "a@a.example"), None);
     let before = a.get_state();
-    let in3d = qr_codec::format_in2d_qr(&[7; 16], &[9; 32], &[3; 32], "Bob", None, &[1, 2, 3]);
+    let init = qr_codec::format_ini2_qr_with_relay(&[7; 16], &[9; 32], &[3; 32], "Bob", None);
+    let in3d = format!("IN3D{}", &init[4..]);
 
     a.process_scanned_qr(&in3d);
 
@@ -159,4 +168,46 @@ fn an_init_carrying_the_ciphertext_in_clear_moves_nothing() {
         before,
         "IN3D bypasses transport encryption and is refused"
     );
+}
+
+// @internal
+#[test]
+fn bobs_frames_recorded_in_an_exchange_with_mallory_and_replayed_to_alice_never_finalize() {
+    // Mallory exchanged with Bob honestly and recorded every frame he showed;
+    // shown to Alice, they carry Bob's signed payload, but Mallory holds
+    // neither Bob's ephemeral secret nor a key to confirm with.
+    let bob = Identity::create("Bob", 0);
+    let mallory = Identity::create("Mallory", 0);
+    let mut b = MultiStageSession::for_identity(&bob, &card("Bob", "b@b.example"), None);
+    let mut m = MultiStageSession::for_identity(&mallory, &card("M", "m@m.example"), None);
+    let mut recorded = vec![b.get_display_qr().unwrap().data];
+    m.process_scanned_qr(&recorded[0]);
+    b.process_scanned_qr(&m.get_display_qr().unwrap().data);
+    for _ in 0..200 {
+        if let Some(q) = b.get_display_qr() {
+            m.process_scanned_qr(&q.data);
+            recorded.push(q.data);
+        }
+        if let Some(q) = m.get_display_qr() {
+            b.process_scanned_qr(&q.data);
+        }
+    }
+    assert_eq!(
+        b.get_state(),
+        ProtocolState::Finalized,
+        "the recording is complete"
+    );
+    let alice = Identity::create("Alice", 0);
+    let mut a = MultiStageSession::for_identity(&alice, &card("Alice", "a@a.example"), None);
+    a.get_display_qr();
+
+    for _ in 0..3 {
+        for frame in &recorded {
+            a.process_scanned_qr(frame);
+            a.get_display_qr();
+        }
+    }
+
+    assert_ne!(a.get_state(), ProtocolState::Finalized);
+    assert!(a.received_peer().is_none());
 }

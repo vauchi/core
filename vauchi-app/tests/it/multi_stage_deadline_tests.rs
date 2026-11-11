@@ -21,17 +21,15 @@ use vauchi_app::orchestrator::multi_stage_machine::{
 };
 use vauchi_core::Event;
 
+use crate::signed_session::signed_session;
+
 /// Unix-millis base, mirroring the poll-cadence test anchor. A non-zero
 /// base catches any `now - phase_entered` math that assumes `now > 0`.
 const NOW: u64 = 1_700_000_000_000;
 
-fn local_card() -> Vec<u8> {
-    b"name:Alice\nemail:alice@example.com".to_vec()
-}
-
 /// Drive the machine to a live, peerless `Advertising` phase.
 fn advertising_machine() -> MultiStageMachine {
-    let mut machine = MultiStageMachine::new_glance(local_card(), NOW);
+    let mut machine = MultiStageMachine::new_glance(signed_session("Alice"), NOW);
     let _ = machine.advance(NOW);
     assert!(
         matches!(machine.phase(), MultiStagePhase::Advertising),
@@ -86,8 +84,8 @@ fn advertising_just_before_discovery_budget_does_not_fail() {
 /// peer's frames (the two-party pattern), then return it with the time
 /// cursor. Bounded — engagement must happen within a minute of ticks.
 fn peer_engaged_machine() -> (MultiStageMachine, u64) {
-    let mut alice = MultiStageMachine::new_glance(local_card(), NOW);
-    let mut bob = MultiStageMachine::new_glance(b"name:Bob\nemail:bob@example.com".to_vec(), NOW);
+    let mut alice = MultiStageMachine::new_glance(signed_session("Alice"), NOW);
+    let mut bob = MultiStageMachine::new_glance(signed_session("Bob"), NOW);
 
     let mut now = NOW;
     loop {
@@ -218,8 +216,8 @@ fn frame_stall_after_bound_with_no_decoded_frame() {
 // @internal
 #[test]
 fn frame_not_stalled_while_frames_keep_arriving() {
-    let mut alice = MultiStageMachine::new_glance(local_card(), NOW);
-    let mut bob = MultiStageMachine::new_glance(b"name:Bob\nemail:bob@example.com".to_vec(), NOW);
+    let mut alice = MultiStageMachine::new_glance(signed_session("Alice"), NOW);
+    let mut bob = MultiStageMachine::new_glance(signed_session("Bob"), NOW);
 
     let mut now = NOW;
     // Drive well past the stall bound in small steps, cross-feeding every

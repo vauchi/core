@@ -36,15 +36,11 @@ fn one_frame_of_every_type() -> Vec<(&'static str, String, StageQr)> {
             },
         ),
         (
-            "opening with data",
-            format_in2d_qr(&session_id, &key, &hash, "Alice", None, &[9, 8, 7]),
-            StageQr::Inid {
+            "reveal",
+            format_reveal_qr(&session_id, &key),
+            StageQr::Reveal {
                 session_id,
-                ephemeral: key,
-                commitment_hash: hash,
-                display_name: "Alice".into(),
-                relay_url: None,
-                ciphertext: vec![9, 8, 7],
+                reveal_key: key,
             },
         ),
         (
@@ -63,6 +59,15 @@ fn one_frame_of_every_type() -> Vec<(&'static str, String, StageQr)> {
             "final",
             format_final_qr(&session_id, &key, &other),
             StageQr::Final {
+                session_id,
+                reveal_key: key,
+                tag: other,
+            },
+        ),
+        (
+            "done",
+            format_done_qr(&session_id, &key, &other),
+            StageQr::Done {
                 session_id,
                 reveal_key: key,
                 tag: other,

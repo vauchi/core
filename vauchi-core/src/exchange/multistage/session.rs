@@ -27,7 +27,6 @@ use crate::monotonic::{MonotonicClock, SystemMonotonicClock};
 use chacha20poly1305::ChaCha20Poly1305;
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use rand_core::OsRng;
-use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 use x25519_dalek::{PublicKey as X25519Public, StaticSecret as X25519Secret};
 use zeroize::Zeroize;
@@ -35,17 +34,21 @@ use zeroize::Zeroize;
 use super::accel_envelope;
 use super::chunker::{Chunker, ReassemblyBuffer};
 use super::commitment::Commitment;
+use super::confirmation::{self, Side, TagLabel};
 use super::link_trainer::{self, LinkTrainer};
+use super::payload::{self, PeerPayload};
 use super::qr_codec::{self, Frame, QrCodecError, StageQr};
 use super::training_header::TrainingHeader;
 use super::types::{
     AccelerometerProximityState, AudioProximityState, ChunkBitmap, LinkFeedback, ProtocolState,
     QrPayload,
 };
+use crate::card::ContactCard;
+use crate::identity::Identity;
 
 use crate::crypto::x3dh::X3DHKeyPair;
 use crate::crypto::{DoubleRatchetState, SymmetricKey};
-use crate::exchange::{key_order, ratchet_bootstrap};
+use crate::exchange::ratchet_bootstrap;
 
 /// ADR-071. A session past `Advertising` re-handshakes when its peer restarts.
 /// Two people never tap the same second, so whichever side scans first runs
@@ -76,6 +79,11 @@ const FINALIZED_GRACE_DURATION: Duration = Duration::from_secs(60);
 /// How long a saved phone shows BOTH, so its peer can read it and stop too
 /// (design D6, maintainer 2026-10-01).
 pub const BOTH_LINGER: Duration = Duration::from_secs(3);
+
+/// How long a phone that rejected its peer, or could not save it, shows
+/// FAIL, so the peer stops instead of waiting out its timeout
+/// (vauchi/private#1217).
+pub const FAIL_LINGER: Duration = Duration::from_secs(3);
 
 /// How long after `set_audio_proximity(Listening)` to wait for an
 /// audio response before the cycle thread transitions the inner
@@ -250,6 +258,13 @@ enum TransportDecryptError {
 /// 7. **Complete** — both sides confirmed, peer data available
 pub struct MultiStageSession {
     local_card: Vec<u8>,
+    /// Our identity key when the payload is signed (`for_identity`): the
+    /// peer's payload must then verify, and must not carry it.
+    own_identity: Option<[u8; 32]>,
+    /// The peer's payload once opened and verified.
+    peer_payload: Option<PeerPayload>,
+    /// The app saved the peer's contact: DONE may be shown.
+    saved: bool,
     display_name: String,
     commitment: Commitment,
     session_id: [u8; 16],
@@ -289,14 +304,19 @@ pub struct MultiStageSession {
     transport_decrypt_failures: u32,
 
     peer_reveal_key: Option<[u8; 32]>,
-    /// The tag of a peer final frame that could not be checked when it was
-    /// read, applied once it can be: read before the card was opened, or in
-    /// Confirming while a shake was still recording.
-    kept_peer_final_tag: Option<KeptFinalTag>,
+    /// The tag of a peer confirm or done that could not be checked when it
+    /// was read, applied once it can be: read before the card was opened, or
+    /// in Confirming while a shake was still recording.
+    kept_peer_final_tag: Option<(TagLabel, [u8; 32])>,
     /// The peer showed DONE: it has saved.
     peer_saved: bool,
     /// When this phone first showed BOTH; it stops `BOTH_LINGER` later.
     both_shown_at: Option<Instant>,
+    /// When this phone first showed FAIL; `None` until it does.
+    fail_shown_at: Option<Instant>,
+    /// This phone failed on a check of its peer, or on the save: it shows
+    /// FAIL for `FAIL_LINGER`.
+    tells_peer_failed: bool,
     /// The peer showed BOTH after this phone saved: stop at once.
     peer_showed_both: bool,
 
@@ -412,16 +432,6 @@ pub struct MultiStageSession {
     monotonic: Arc<dyn MonotonicClock>,
 }
 
-/// A peer final-frame tag waiting to be checked.
-#[derive(Debug, Clone, Copy)]
-enum KeptFinalTag {
-    /// Read before the peer's card could be opened. A mismatch drops it.
-    ReadEarlier([u8; 32]),
-    /// Read with the card open, or opening it in the same step; held only
-    /// for a shake still recording. A mismatch fails the exchange.
-    ReadInConfirming([u8; 32]),
-}
-
 /// Errors building the post-finalize Double Ratchet for a multi-stage exchange.
 #[derive(Debug, thiserror::Error)]
 pub enum RatchetSetupError {
@@ -436,20 +446,107 @@ pub enum RatchetSetupError {
 }
 
 impl MultiStageSession {
-    /// Create a new session for exchanging the given contact card data.
+    /// A session for `identity` exchanging `card`: the payload is signed by
+    /// the identity over this session's id, ephemeral and relay URL, and the
+    /// peer's payload must verify the same way (vauchi/private#1217). The
+    /// signing key is used here and not kept.
+    pub fn for_identity(
+        identity: &Identity,
+        card: &ContactCard,
+        relay_url: Option<String>,
+    ) -> Self {
+        let mut session = Self::build(relay_url, |session_id, ephemeral, relay| {
+            payload::build(identity, session_id, ephemeral, relay, card)
+        });
+        session.own_identity = Some(*identity.signing_public_key());
+        session
+    }
+
+    /// A session committing to opaque bytes, whose peer's payload is not
+    /// checked. Tests only: production sessions are built with
+    /// [`Self::for_identity`].
+    #[cfg(any(test, feature = "testing"))]
     pub fn new(local_card: Vec<u8>) -> Self {
         Self::new_with_relay(local_card, None)
     }
 
-    /// Create a new session with optional relay metadata.
-    ///
-    /// The relay URL will be included in our INIT QR so the peer can
-    /// route future messages to our relay.
+    /// [`Self::new`] with relay metadata in our INIT. Tests only.
+    #[cfg(any(test, feature = "testing"))]
     pub fn new_with_relay(local_card: Vec<u8>, relay_url: Option<String>) -> Self {
+        Self::build(relay_url, |_, _, _| local_card)
+    }
+
+    /// The peer's verified identity and card, once the exchange finalized.
+    pub fn received_peer(&self) -> Option<&PeerPayload> {
+        if matches!(self.state, ProtocolState::Finalized) {
+            self.peer_payload.as_ref()
+        } else {
+            None
+        }
+    }
+
+    /// The app saved the peer's contact: show DONE from now on. A phone
+    /// shows DONE only after a save that succeeded (vauchi/private#1217).
+    pub fn mark_saved(&mut self) {
+        if matches!(self.state, ProtocolState::Finalized) {
+            self.saved = true;
+        }
+    }
+
+    /// The app could not save the peer's contact: the exchange failed here.
+    pub fn save_failed(&mut self) {
+        if matches!(self.state, ProtocolState::Finalized) && !self.saved {
+            self.fail_and_tell_peer("the contact could not be saved");
+        }
+    }
+
+    /// Whether this phone is showing FAIL to its peer: it failed on a check
+    /// of the peer or on the save, and `FAIL_LINGER` has not run out.
+    pub fn shows_fail_frame(&self) -> bool {
+        self.tells_peer_failed
+            && self
+                .fail_shown_at
+                .is_none_or(|shown| self.monotonic.now().duration_since(shown) < FAIL_LINGER)
+    }
+
+    /// A failure the peer cannot fix by restarting, so ADR-071 recovery
+    /// does not apply and the peer is told: a payload that did not verify,
+    /// or a save that did not succeed.
+    fn fail_and_tell_peer(&mut self, reason: &str) {
+        self.failed_from_mismatch = false;
+        self.tells_peer_failed = true;
+        self.state = ProtocolState::Failed(reason.to_string());
+    }
+
+    fn fail_frame_qr(&mut self) -> Option<QrPayload> {
+        if !self.tells_peer_failed {
+            return None;
+        }
+        let now = self.monotonic.now();
+        let shown = *self.fail_shown_at.get_or_insert(now);
+        (now.duration_since(shown) < FAIL_LINGER).then(|| QrPayload {
+            data: qr_codec::format_fail_qr(&self.session_id),
+            error_correction: FRAME_ERROR_CORRECTION.to_string(),
+            display_duration_ms: jittered(DISPLAY_MS_FINAL),
+            layout: 0,
+        })
+    }
+
+    /// Makes the session's id and ephemeral, asks `make_payload` for the
+    /// payload they bind, and commits to it.
+    fn build(
+        relay_url: Option<String>,
+        make_payload: impl FnOnce(&[u8; 16], &[u8; 32], Option<&str>) -> Vec<u8>,
+    ) -> Self {
         let session_id: [u8; 16] = crate::crypto::random_bytes();
 
         let ephemeral_secret = X25519Secret::random_from_rng(OsRng);
         let ephemeral_public = X25519Public::from(&ephemeral_secret);
+        let local_card = make_payload(
+            &session_id,
+            ephemeral_public.as_bytes(),
+            relay_url.as_deref(),
+        );
 
         // Create commitment from local card, binding our relay metadata (T1.7).
         //
@@ -467,6 +564,9 @@ impl MultiStageSession {
 
         MultiStageSession {
             local_card,
+            own_identity: None,
+            peer_payload: None,
+            saved: false,
             display_name: "Vauchi User".to_string(),
             commitment,
             session_id,
@@ -488,6 +588,8 @@ impl MultiStageSession {
             kept_peer_final_tag: None,
             peer_saved: false,
             both_shown_at: None,
+            fail_shown_at: None,
+            tells_peer_failed: false,
             peer_showed_both: false,
             state: ProtocolState::Idle,
             received_data: None,
@@ -530,6 +632,13 @@ impl MultiStageSession {
     /// here only.
     pub fn peer_confirmed(&self) -> bool {
         self.peer_saved || self.peer_showed_both
+    }
+
+    /// Whether this phone read the peer's DONE and its keyed tag verified.
+    /// Unlike [`Self::peer_confirmed`], a BOTH (unkeyed) does not count:
+    /// it gates a restored contact's rekey (vauchi/private#1217).
+    pub fn peer_saved(&self) -> bool {
+        self.peer_saved
     }
 
     /// What the status line can say about the link to the other phone.
@@ -1239,7 +1348,7 @@ impl MultiStageSession {
                 if self.peer_showed_both || now.duration_since(entered) > FINALIZED_GRACE_DURATION {
                     return None;
                 }
-                if self.peer_saved {
+                if self.peer_saved && self.saved {
                     let shown_at = *self.both_shown_at.get_or_insert(now);
                     if now.duration_since(shown_at) >= BOTH_LINGER {
                         return None;
@@ -1261,7 +1370,7 @@ impl MultiStageSession {
                     Some(self.final_frame_qr())
                 }
             }
-            ProtocolState::Failed(_) => None,
+            ProtocolState::Failed(_) => self.fail_frame_qr(),
         }
     }
 
@@ -1324,21 +1433,17 @@ impl MultiStageSession {
                 tag,
             } => self.handle_done(session_id, reveal_key, tag),
             StageQr::Both { session_id } => self.handle_both(session_id),
-            StageQr::Inid {
+            StageQr::Reveal {
                 session_id,
-                ephemeral,
-                commitment_hash,
-                display_name: _,
-                relay_url,
-                ciphertext,
-            } => self.handle_inid(
-                session_id,
-                ephemeral,
-                commitment_hash,
-                relay_url,
-                ciphertext,
-            ),
-            StageQr::Fail { session_id: _ } => self.handle_fail(),
+                reveal_key,
+            } => {
+                if self.peer_session_id == Some(session_id) {
+                    self.handle_verify(reveal_key)
+                } else {
+                    self.state.clone()
+                }
+            }
+            StageQr::Fail { session_id } => self.handle_fail(session_id),
             StageQr::Shake {
                 session_id: _,
                 sealed_envelope,
@@ -1434,36 +1539,6 @@ impl MultiStageSession {
         self.prepare_outbound_chunks();
 
         // Transition to Transferring (skip Discovered for efficiency)
-        self.update_transfer_state();
-        self.state.clone()
-    }
-
-    /// Handle INID (INIT+Data) — processes INIT fields and stores embedded ciphertext.
-    /// Eliminates the DATA phase for small payloads (1 chunk).
-    fn handle_inid(
-        &mut self,
-        session_id: [u8; 16],
-        ephemeral: [u8; 32],
-        commitment_hash: [u8; 32],
-        relay_url: Option<String>,
-        ciphertext: Vec<u8>,
-    ) -> ProtocolState {
-        let state = self.handle_init(session_id, ephemeral, commitment_hash, relay_url);
-
-        if matches!(state, ProtocolState::Failed(_)) {
-            return state;
-        }
-
-        // Store ciphertext directly (already commitment-encrypted).
-        // Set up inbound tracking as if we received all DATA chunks.
-        self.inbound_buffer = Some(ReassemblyBuffer::from_complete(ciphertext));
-        self.inbound_bitmap = Some({
-            let mut b = ChunkBitmap::new(1);
-            b.mark_received(0);
-            b
-        });
-        self.peer_chunks_total = Some(1);
-        // All chunks received — should advance to Verifying
         self.update_transfer_state();
         self.state.clone()
     }
@@ -1639,6 +1714,29 @@ impl MultiStageSession {
 
         match Commitment::open_with_key(&reveal_key, &ciphertext) {
             Ok(plaintext) => {
+                if let Some(own) = self.own_identity {
+                    let (Some(peer_sid), Some(peer_eph)) =
+                        (self.peer_session_id, self.peer_ephemeral)
+                    else {
+                        self.fail_from_mismatch("payload opened before the peer's INIT");
+                        return self.state.clone();
+                    };
+                    match payload::open(
+                        &plaintext,
+                        &peer_sid,
+                        &peer_eph,
+                        self.peer_relay_url.as_deref(),
+                        &own,
+                    ) {
+                        Ok(peer) => self.peer_payload = Some(peer),
+                        Err(_) => {
+                            // No confirm leaves this phone for a payload it
+                            // could not verify (vauchi/private#1217).
+                            self.fail_and_tell_peer("peer payload did not verify");
+                            return self.state.clone();
+                        }
+                    }
+                }
                 self.received_data = Some(plaintext);
                 self.peer_reveal_key = Some(reveal_key);
                 self.state = ProtocolState::Confirming;
@@ -1673,34 +1771,42 @@ impl MultiStageSession {
         {
             return;
         }
-        match self.kept_peer_final_tag.take() {
-            Some(KeptFinalTag::ReadInConfirming(tag)) => self.confirm_final_tag(tag),
-            // A peer about to re-handshake (ADR-071) shows final frames
-            // bound to its old partner until it does. Such a tag is not
-            // evidence against this exchange: drop it and let the peer's
-            // next final frame decide. Failing on it broke the
-            // staggered-start recovery in about half of the runs.
-            Some(KeptFinalTag::ReadEarlier(tag)) if self.final_tag_matches(&tag) => {
-                self.confirm_final_tag(tag);
-            }
-            Some(KeptFinalTag::ReadEarlier(_)) | None => {}
+        // A tag that does not match is dropped, as a misread is, and the
+        // peer's next frame decides (vauchi/private#1217). A peer about to
+        // re-handshake (ADR-071) shows frames bound to its old partner until
+        // it does; failing on those broke the staggered-start recovery in
+        // about half of the runs.
+        if let Some((label, tag)) = self.kept_peer_final_tag.take()
+            && self.peer_tag_matches(label, &tag)
+        {
+            self.finalize_on_peer_tag(label);
         }
     }
 
-    /// Handle the peer's final frame: its reveal key and the tag that
-    /// confirms its card and both session ids. One read takes a session
-    /// that holds every chunk to Finalized (design D5).
+    /// Handle the peer's confirm: its reveal key and the tag saying it
+    /// checked our payload and accepted us. One read takes a session that
+    /// holds every chunk to Finalized (design D5).
     ///
-    /// Read before the card can be opened, the key and the tag are kept:
-    /// the peer may not be read again soon (rig run L7-1).
+    /// Read before our checks of the peer's payload are done, the key and
+    /// the tag are kept: the peer may not be read again soon (rig run L7-1).
     fn handle_final(
         &mut self,
         sender: [u8; 16],
         reveal_key: [u8; 32],
         tag: [u8; 32],
     ) -> ProtocolState {
-        // The tag binds both session ids, so a final frame from any session
-        // but our peer's could only ever mismatch. Ignoring it keeps a
+        self.handle_tagged(TagLabel::Confirm, sender, reveal_key, tag)
+    }
+
+    fn handle_tagged(
+        &mut self,
+        label: TagLabel,
+        sender: [u8; 16],
+        reveal_key: [u8; 32],
+        tag: [u8; 32],
+    ) -> ProtocolState {
+        // The tag binds both session ids, so a frame from any session but
+        // our peer's could only ever mismatch. Ignoring it keeps a
         // bystander's frame from failing a live exchange.
         if self.peer_session_id != Some(sender) {
             return self.state.clone();
@@ -1716,49 +1822,54 @@ impl MultiStageSession {
         if !matches!(self.state, ProtocolState::Confirming) {
             self.handle_verify(reveal_key);
         }
-        // Checked against the card in this same call: a mismatch fails
-        // closed. Only a tag that has to wait for the card is lenient.
-        self.kept_peer_final_tag = Some(if matches!(self.state, ProtocolState::Confirming) {
-            KeptFinalTag::ReadInConfirming(tag)
-        } else {
-            KeptFinalTag::ReadEarlier(tag)
-        });
+        self.kept_peer_final_tag = Some((label, tag));
         self.apply_kept_final_tag();
         self.state.clone()
     }
 
-    fn final_tag_matches(&self, tag: &[u8; 32]) -> bool {
-        self.received_data.as_ref().is_some_and(|data| {
-            let expected = self.final_tag(&self.compute_card_hash(data));
-            bool::from(tag.ct_eq(&expected))
-        })
+    fn peer_tag_matches(&self, label: TagLabel, tag: &[u8; 32]) -> bool {
+        self.tag_for(label, false)
+            .is_some_and(|expected| bool::from(tag.ct_eq(&expected)))
     }
 
-    /// Check the peer's final tag against the card we opened and finalize.
-    fn confirm_final_tag(&mut self, tag: [u8; 32]) {
-        let Some(data) = &self.received_data else {
-            self.state = ProtocolState::Failed("no received data to confirm".to_string());
-            return;
-        };
-        let expected = self.final_tag(&self.compute_card_hash(data));
-        if bool::from(tag.ct_eq(&expected)) {
-            self.state = ProtocolState::Finalized;
-            // Start of the finalized grace period (wall-clock based).
-            self.phase_entered_at = Some(self.monotonic.now());
-            self.display_cycle = 0;
-        } else {
-            self.fail_from_mismatch("confirmation mismatch");
+    /// Finalize on the peer's verified confirm (or done, which implies it).
+    /// We reach Confirming only after our own checks of the peer passed, so
+    /// both sides have accepted each other (vauchi/private#1217).
+    fn finalize_on_peer_tag(&mut self, label: TagLabel) {
+        self.state = ProtocolState::Finalized;
+        // Start of the finalized grace period (wall-clock based).
+        self.phase_entered_at = Some(self.monotonic.now());
+        self.display_cycle = 0;
+        if label == TagLabel::Done {
+            self.peer_saved = true;
         }
     }
 
-    /// What a final frame confirms: `SHA-256(card hash ‖ ready hash)`, the
-    /// sender's card and the two session ids. Unkeyed, as the separate
-    /// confirmation hashes it replaces were.
-    fn final_tag(&self, card_hash: &[u8; 32]) -> [u8; 32] {
-        let mut hasher = Sha256::new();
-        hasher.update(card_hash);
-        hasher.update(self.compute_ready_hash());
-        hasher.finalize().into()
+    /// The tag `label` from us to the peer (`sender_is_us`) or from the
+    /// peer to us: keyed from the transport key over both sides
+    /// (`confirmation.rs`). `None` until the peer's payload is open, so no
+    /// confirm can leave this phone before its checks of the peer passed.
+    fn tag_for(&self, label: TagLabel, sender_is_us: bool) -> Option<[u8; 32]> {
+        let transport_key = self.transport_key.as_ref()?;
+        let peer_payload = self.received_data.as_deref()?;
+        let own_commitment = self.commitment.hash();
+        let own = Side {
+            session_id: &self.session_id,
+            ephemeral: self.ephemeral_public.as_bytes(),
+            commitment_hash: own_commitment,
+            payload: &self.local_card,
+        };
+        let peer = Side {
+            session_id: self.peer_session_id.as_ref()?,
+            ephemeral: self.peer_ephemeral.as_ref()?,
+            commitment_hash: self.peer_commitment_hash.as_ref()?,
+            payload: peer_payload,
+        };
+        Some(if sender_is_us {
+            confirmation::tag(transport_key, label, &own, &peer)
+        } else {
+            confirmation::tag(transport_key, label, &peer, &own)
+        })
     }
 
     fn prepare_outbound_chunks(&mut self) {
@@ -1998,13 +2109,6 @@ impl MultiStageSession {
             .map_err(|_| TransportDecryptError::AeadFailure)
     }
 
-    fn compute_card_hash(&self, data: &[u8]) -> [u8; 32] {
-        let d = Sha256::digest(data);
-        let mut hash = [0u8; 32];
-        hash.copy_from_slice(d.as_ref());
-        hash
-    }
-
     /// Build commitment context from relay metadata (T1.7).
     ///
     /// Both sides must use the same context construction when creating and
@@ -2024,7 +2128,14 @@ impl MultiStageSession {
     }
 
     /// Handle a FAIL QR from the peer — abort immediately.
-    fn handle_fail(&mut self) -> ProtocolState {
+    fn handle_fail(&mut self, sender: [u8; 16]) -> ProtocolState {
+        // FAIL is unkeyed and shows its sender's session id on screen, so
+        // only the peer we are bound to may end this exchange with it; a
+        // bystander's phone failing nearby changes nothing
+        // (vauchi/private#1217).
+        if self.peer_session_id != Some(sender) {
+            return self.state.clone();
+        }
         // Don't overwrite Finalized — if we already succeeded, ignore peer's failure.
         if matches!(self.state, ProtocolState::Finalized) {
             return self.state.clone();
@@ -2037,17 +2148,19 @@ impl MultiStageSession {
         self.state.clone()
     }
 
-    /// The final frame: our reveal key and the tag confirming our card and
-    /// both session ids.
-    /// The final frame, or DONE once this phone has saved (design D6).
+    /// Our final frame for where the exchange stands: the reveal key alone
+    /// until our checks of the peer passed; then a confirm; DONE only once
+    /// the app saved the peer (vauchi/private#1217).
     fn final_frame_qr(&self) -> QrPayload {
-        let tag = self.final_tag(&self.compute_card_hash(&self.local_card));
         let reveal_key = self.commitment.reveal_key();
-        let data = if matches!(self.state, ProtocolState::Finalized) {
-            qr_codec::format_done_qr(&self.session_id, reveal_key, &tag)
+        let data = if matches!(self.state, ProtocolState::Finalized) && self.saved {
+            self.tag_for(TagLabel::Done, true)
+                .map(|tag| qr_codec::format_done_qr(&self.session_id, reveal_key, &tag))
         } else {
-            qr_codec::format_final_qr(&self.session_id, reveal_key, &tag)
-        };
+            self.tag_for(TagLabel::Confirm, true)
+                .map(|tag| qr_codec::format_final_qr(&self.session_id, reveal_key, &tag))
+        }
+        .unwrap_or_else(|| qr_codec::format_reveal_qr(&self.session_id, reveal_key));
         QrPayload {
             data,
             error_correction: FRAME_ERROR_CORRECTION.to_string(),
@@ -2065,7 +2178,8 @@ impl MultiStageSession {
         }
     }
 
-    /// The peer's DONE: its final frame, and word that it has saved.
+    /// The peer's DONE: its confirm, and word that it has saved. Counted as
+    /// saved only when its tag verifies (vauchi/private#1217).
     fn handle_done(
         &mut self,
         sender: [u8; 16],
@@ -2075,14 +2189,20 @@ impl MultiStageSession {
         if self.peer_session_id != Some(sender) {
             return self.state.clone();
         }
-        let state = self.handle_final(sender, reveal_key, tag);
-        if !self.peer_saved {
+        let was_saved = self.peer_saved;
+        if matches!(self.state, ProtocolState::Finalized) {
+            if self.peer_tag_matches(TagLabel::Done, &tag) {
+                self.peer_saved = true;
+            }
+        } else {
+            self.handle_tagged(TagLabel::Done, sender, reveal_key, tag);
+        }
+        if self.peer_saved && !was_saved {
             // Dev instrumentation (dev-logging only; no PII): times the
             // DONE / BOTH ending on the rig (design D6).
             tracing::info!("[MSX] ending: peer saved (DONE read)");
         }
-        self.peer_saved = true;
-        state
+        self.state.clone()
     }
 
     /// The peer's BOTH ends this phone's display only once this phone has
@@ -2090,6 +2210,7 @@ impl MultiStageSession {
     fn handle_both(&mut self, sender: [u8; 16]) -> ProtocolState {
         if self.peer_session_id == Some(sender)
             && matches!(self.state, ProtocolState::Finalized)
+            && self.saved
             && !self.peer_showed_both
         {
             tracing::info!("[MSX] ending: BOTH read, stopping");
@@ -2107,25 +2228,6 @@ impl MultiStageSession {
     pub fn finalization_qr(&self) -> QrPayload {
         let header = self.trainer.current_frame(self.monotonic.now());
         Self::with_training_header(self.final_frame_qr(), &header)
-    }
-
-    /// Compute the READY acknowledgment hash.
-    ///
-    /// SHA-256(min(our_session_id, peer_session_id) || max(our_session_id, peer_session_id))
-    ///
-    /// Using sorted session IDs ensures both sides compute the same hash
-    /// regardless of who initiated the exchange.
-    fn compute_ready_hash(&self) -> [u8; 32] {
-        let peer_sid = self.peer_session_id.unwrap_or([0u8; 16]);
-        let (first, second) = key_order::sorted_pair(&self.session_id, &peer_sid);
-
-        let mut input = Vec::with_capacity(32);
-        input.extend_from_slice(first);
-        input.extend_from_slice(second);
-        let d = Sha256::digest(&input);
-        let mut hash = [0u8; 32];
-        hash.copy_from_slice(d.as_ref());
-        hash
     }
 
     /// Fail in a way a peer restart can explain, and so a way ADR-071 may
@@ -2251,6 +2353,8 @@ impl MultiStageSession {
         self.inbound_buffer = None;
         self.inbound_bitmap = None;
         self.received_data = None;
+        self.peer_payload = None;
+        self.saved = false;
         // Encrypted under the transport key we just discarded.
         self.outbound_chunks.clear();
         self.outbound_total = 0;

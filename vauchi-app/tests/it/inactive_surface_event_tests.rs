@@ -172,10 +172,13 @@ fn replaced_surface(commands: Vec<Command>) -> SurfaceSpec {
         .expect("the scan re-renders the surface")
 }
 
-/// A peer's FAIL frame for session id `[7; 16]`, as
-/// `qr_codec::format_fail_qr` writes it. A literal, because that module is
-/// public only under the `testing` feature and these tests must run in the
-/// standard suite.
+/// A peer's opening frame for session id `[7; 16]` (ephemeral `[9; 32]`,
+/// commitment `[3; 32]`, name `PEER`) and its FAIL frame, as `qr_codec`
+/// writes them. Literals, because that module is public only under the
+/// `testing` feature and these tests must run in the standard suite. Only
+/// the bound peer's FAIL ends an exchange (vauchi/private#1217), so the
+/// opening frame comes first.
+const PEER_INIT_FRAME: &str = "INI30:0:0:00:*0:*0:*0:*0:*0:*0:*0:*0I61I61I61I61I61I61I61I61I61I61I61I61I61I61I61I616H06H06H06H06H06H06H06H06H06H06H06H06H06H06H06H004PEER00";
 const PEER_FAIL_FRAME: &str = "FAI30:0:0:00:*0:*0:*0:*0:*0:*0:*0:*0";
 
 /// The scan that ends an exchange (here the peer's FAIL frame; on device
@@ -183,6 +186,14 @@ const PEER_FAIL_FRAME: &str = "FAI30:0:0:00:*0:*0:*0:*0:*0:*0:*0:*0";
 /// on.
 fn hover_ended_by_a_scan() -> (AppEngine, SurfaceSpec, SurfaceSpec) {
     let mut engine = on_hover_with_camera();
+    let opening = rendered(&mut engine);
+    let _ = engine
+        .dispatch(Event::ValueChanged {
+            surface_id: opening.surface_id.clone(),
+            binding_id: capture_binding(&opening),
+            value: InputValue::Text(PEER_INIT_FRAME.to_string()),
+        })
+        .expect("the peer's opening frame is accepted");
     let scanning = rendered(&mut engine);
     let ended = replaced_surface(
         engine

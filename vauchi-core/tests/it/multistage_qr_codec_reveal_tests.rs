@@ -2,88 +2,73 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! INID, READY, COMBO, and FAIL roundtrips for `qr_codec`.
+//! REVEAL and FAIL roundtrips for `qr_codec`, and the retired frames.
 //!
-//! `multistage_qr_codec_tests.rs` covers INIT/DATA/VERIFY/CONFIRM but
-//! not these four variants. They were 0% covered before this file.
+//! `multistage_qr_codec_tests.rs` covers INIT/DATA/VERIFY/CONFIRM.
 
 use vauchi_core::exchange::multistage::qr_codec::{
-    StageQr, format_fail_qr, format_in2d_qr, parse_qr,
+    QrCodecError, StageQr, format_done_qr, format_fail_qr, format_final_qr,
+    format_ini2_qr_with_relay, format_reveal_qr, parse_qr,
 };
 
 const SID: [u8; 16] = [0x11; 16];
 const EPH: [u8; 32] = [0x33; 32];
 const COMMITMENT: [u8; 32] = [0x44; 32];
+const REVEAL_KEY: [u8; 32] = [0x55; 32];
+const TAG: [u8; 32] = [0x66; 32];
 
 // ============================================================
-// INID — INIT-with-embedded-data, single-chunk fast path
+// REVEAL — the reveal key before this phone's checks passed
 // ============================================================
 
 // @internal
 #[test]
-fn inid_qr_roundtrips_without_relay_fields() {
-    let ciphertext = vec![0xAB; 64];
-    let qr = format_in2d_qr(&SID, &EPH, &COMMITMENT, "Alice", None, &ciphertext);
+fn reveal_qr_roundtrips_the_session_id_and_reveal_key() {
+    let qr = format_reveal_qr(&SID, &REVEAL_KEY);
 
-    assert!(
-        qr.starts_with("IN3D"),
-        "QR must carry IN2D prefix, got: {}",
-        &qr[..4]
-    );
-
-    let parsed = parse_qr(&qr).unwrap();
-    match parsed {
-        StageQr::Inid {
+    assert_eq!(&qr[..4], "RVL4");
+    match parse_qr(&qr).unwrap() {
+        StageQr::Reveal {
             session_id,
-            ephemeral,
-            commitment_hash,
-            display_name,
-            relay_url,
-            ciphertext: parsed_ct,
+            reveal_key,
         } => {
             assert_eq!(session_id, SID);
-            assert_eq!(ephemeral, EPH);
-            assert_eq!(commitment_hash, COMMITMENT);
-            assert_eq!(display_name, "Alice");
-            assert_eq!(relay_url, None);
-            assert_eq!(parsed_ct, ciphertext);
+            assert_eq!(reveal_key, REVEAL_KEY);
         }
-        other => panic!("expected Inid, got {:?}", other),
+        other => panic!("expected Reveal, got {other:?}"),
     }
 }
 
 // @internal
 #[test]
-fn inid_qr_roundtrips_with_relay_url_and_noise_pubkey() {
-    let ciphertext = vec![0xCD; 32];
-    let relay_url = "https://relay.example.com";
-    let qr = format_in2d_qr(&SID, &EPH, &COMMITMENT, "Bob", Some(relay_url), &ciphertext);
+fn a_truncated_reveal_qr_is_an_error() {
+    let qr = format_reveal_qr(&SID, &REVEAL_KEY);
 
-    let parsed = parse_qr(&qr).unwrap();
-    match parsed {
-        StageQr::Inid {
-            display_name,
-            relay_url: parsed_url,
-            ciphertext: parsed_ct,
-            ..
-        } => {
-            assert_eq!(display_name, "Bob");
-            assert_eq!(parsed_url.as_deref(), Some(relay_url));
-            assert_eq!(parsed_ct, ciphertext);
-        }
-        other => panic!("expected Inid, got {:?}", other),
-    }
+    assert!(parse_qr(&qr[..qr.len() - 1]).is_err());
 }
 
 // @internal
 #[test]
-fn inid_qr_handles_empty_ciphertext() {
-    let qr = format_in2d_qr(&SID, &EPH, &COMMITMENT, "Alice", None, &[]);
-    let parsed = parse_qr(&qr).unwrap();
-    if let StageQr::Inid { ciphertext, .. } = parsed {
-        assert!(ciphertext.is_empty());
-    } else {
-        panic!("expected Inid");
+fn confirm_and_done_carry_their_own_prefixes() {
+    assert_eq!(&format_final_qr(&SID, &REVEAL_KEY, &TAG)[..4], "CNF4");
+    assert_eq!(&format_done_qr(&SID, &REVEAL_KEY, &TAG)[..4], "DON4");
+}
+
+// ============================================================
+// Retired frames (vauchi/private#1217)
+// ============================================================
+
+// @internal
+#[test]
+fn the_retired_in3d_fin3_and_don3_frames_read_as_an_older_version() {
+    let init = format_ini2_qr_with_relay(&SID, &EPH, &COMMITMENT, "Alice", None);
+    for retired in ["IN3D", "FIN3", "DON3"] {
+        let frame = format!("{retired}{}", &init[4..]);
+
+        assert!(
+            matches!(parse_qr(&frame), Err(QrCodecError::OldFormat)),
+            "{retired} must be reported as an older version"
+        );
     }
 }
 
@@ -112,8 +97,6 @@ fn fail_qr_with_extra_trailing_chars_does_not_panic() {
     // on malformed input the parser still recognises the FAIL prefix
     // (i.e. it does not return UnknownPrefix), and a successful parse
     // produces a Fail variant rather than something else.
-    use vauchi_core::exchange::multistage::qr_codec::QrCodecError;
-
     let mut qr = format_fail_qr(&SID);
     qr.push_str("extra-data");
     let result = parse_qr(&qr);

@@ -44,31 +44,18 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::AccelerometerProximityState;
 use vauchi_core::exchange::AudioProximityState;
 use vauchi_core::exchange::LinkFeedback;
+use vauchi_core::exchange::MultiStageSession;
 use vauchi_core::exchange::mode::ExchangeMode;
 
-/// Exchange payload format version byte. Mirrors the constant in
-/// `vauchi-platform/src/mobile_exchange.rs` (which T3.1 retires);
-/// kept inline here so vauchi-app doesn't depend on the binding
-/// crate. The wire format is shared with the cycle-thread path
-/// during T1.2b/T1.2c coexistence — both serializers must agree
-/// byte-for-byte.
-const EXCHANGE_PAYLOAD_VERSION: u8 = 1;
-
-/// Serialize identity public key + contact card into the
-/// multi-stage exchange payload `MultiStageSession::new` expects.
-/// Format: `[version: 1][public_key: 32][card_json: rest]`.
-fn serialize_exchange_payload(public_key: &[u8; 32], card: &ContactCard) -> Vec<u8> {
-    let card_json = serde_json::to_vec(card).expect("ContactCard serialization should not fail");
-    let mut payload = Vec::with_capacity(1 + 32 + card_json.len());
-    payload.push(EXCHANGE_PAYLOAD_VERSION);
-    payload.extend_from_slice(public_key);
-    payload.extend_from_slice(&card_json);
-    payload
+/// What the success screen needs from a contact just saved.
+struct SavedExchange {
+    contact_id: String,
+    peer_name: String,
+    received_fields: Vec<(String, String, String)>,
 }
 
-/// Wraps the machine + the local exchange payload it was constructed
-/// for. The payload is rebuilt on each session (the identity may
-/// have rotated) so we don't cache it across screen entries.
+/// Wraps the machine. Its session is rebuilt on each screen entry (the
+/// identity or card may have changed), so nothing is cached across them.
 pub(crate) struct MultiStageHolder {
     machine: MultiStageMachine,
     /// How long the frame we last put on screen is meant to be shown. The
@@ -76,6 +63,9 @@ pub(crate) struct MultiStageHolder {
     /// advance, so the display runs at the protocol's own cadence instead of
     /// the idle app heartbeat.
     last_frame_ms: Option<u32>,
+    /// A restored contact saved before the peer's DONE was read, still
+    /// waiting for its rekey: it adopts the exchange's key once DONE is.
+    rekey_awaiting_peer: Option<vauchi_core::Contact>,
 }
 
 impl AppEngine {
@@ -107,8 +97,8 @@ impl AppEngine {
         if self.multi_stage_session.is_some() {
             return;
         }
-        let payload = match self.build_multi_stage_payload() {
-            Some(p) => p,
+        let session = match self.build_multi_stage_session() {
+            Some(s) => s,
             None => {
                 tracing::warn!("multi-stage: cannot start session — no identity / card");
                 return;
@@ -120,11 +110,11 @@ impl AppEngine {
         // (2026-06-03-multistage-qr-exchange-stalls-init-on-device).
         let now = self.vauchi.clock().unix_millis();
         let machine = match mode {
-            ExchangeMode::Hover => MultiStageMachine::new_hover(payload, now),
-            ExchangeMode::TapHoverShake => MultiStageMachine::new_tap_hover_shake(payload, now),
+            ExchangeMode::Hover => MultiStageMachine::new_hover(session, now),
+            ExchangeMode::TapHoverShake => MultiStageMachine::new_tap_hover_shake(session, now),
             // Every remaining mode that lands on this screen (Glance)
             // maps to the Glance constructor — no proximity handshake.
-            _ => MultiStageMachine::new_glance(payload, now),
+            _ => MultiStageMachine::new_glance(session, now),
         };
         let machine = match self.last_good_qr_layout {
             Some(layout) => machine.with_start_layout(layout),
@@ -133,6 +123,7 @@ impl AppEngine {
         self.multi_stage_session = Some(MultiStageHolder {
             machine,
             last_frame_ms: None,
+            rekey_awaiting_peer: None,
         });
         // Build our QR now rather than on the next heartbeat. Until it exists
         // the machine is still `Idle`, and `handle_init` accepts a peer INIT
@@ -283,14 +274,27 @@ impl AppEngine {
                 self.apply_multi_stage_state(vauchi_core::exchange::ProtocolState::Confirming)
             }
             MultiStageEvent::Finalized { peer_name } => {
+                // Save first: DONE tells the peer we saved it, so it may be
+                // shown only after a save that succeeded (vauchi/private#1217).
+                // A failed save shows FAIL to the peer for its linger; the
+                // machine reports the failure when it ends.
+                let Some(saved) = self.persist_exchanged_contact() else {
+                    if let Some(holder) = self.multi_stage_session.as_mut() {
+                        holder.machine.save_failed();
+                    }
+                    return false;
+                };
+                if let Some(holder) = self.multi_stage_session.as_mut() {
+                    holder.machine.mark_saved();
+                }
                 // Seed the success-screen broadcast with the final frame
                 // *before* any Finalized screen builds. The first build reads
                 // `current_qr_data`; without this it shows whatever that last
                 // held — a stale DATA chunk — until the next frame tick, and a
                 // peer still waiting can lock onto DATA and time out with no
                 // contact (device-proven half-exchange, 2026-07-25
-                // Pixel↔Samsung Hover). The final frame (DONE once saved) is
-                // the only one the trailing peer needs to finalize.
+                // Pixel↔Samsung Hover). DONE is the only frame the trailing
+                // peer needs to finalize.
                 if let Some(final_frame) = self
                     .multi_stage_session
                     .as_ref()
@@ -309,10 +313,7 @@ impl AppEngine {
                 }
                 let state_applied =
                     self.apply_multi_stage_state(vauchi_core::exchange::ProtocolState::Finalized);
-                // Persist the exchanged contact now (atomic — both sides
-                // confirmed). Was the cycle thread's `on_finalized` job;
-                // the poll path dropped it (Part B of the stall bug).
-                self.persist_exchanged_contact();
+                self.finish_exchanged_contact(saved);
                 if !peer_name.is_empty() {
                     let _ = self.apply_multi_stage_finalized(peer_name);
                 }
@@ -392,24 +393,21 @@ impl AppEngine {
         Vec::new()
     }
 
-    /// Build the local exchange payload (identity public key + own
-    /// card) required by [`MultiStageMachine::new_glance`] /
-    /// [`MultiStageMachine::new_hover`].
+    /// The session for our identity and own card, whose payload the
+    /// identity signs (vauchi/private#1217).
     ///
     /// Returns `None` when no identity exists (the screen falls back
     /// to the engine's default chrome — the user must complete
     /// onboarding before reaching this screen anyway).
-    fn build_multi_stage_payload(&self) -> Option<Vec<u8>> {
+    fn build_multi_stage_session(&self) -> Option<MultiStageSession> {
         let identity = self.vauchi.identity()?;
-        let signing_key = *identity.signing_public_key();
-        let display_name = identity.display_name().to_string();
         let card = self
             .vauchi
             .own_card()
             .ok()
             .flatten()
-            .unwrap_or_else(|| ContactCard::new(&display_name));
-        Some(serialize_exchange_payload(&signing_key, &card))
+            .unwrap_or_else(|| ContactCard::new(identity.display_name()));
+        Some(MultiStageSession::for_identity(identity, &card, None))
     }
 
     /// Persist the just-finalized peer as an exchanged contact + ratchet.
@@ -419,40 +417,27 @@ impl AppEngine {
     /// the exchange finalized internally but no contact was ever saved
     /// (2026-06-03-multistage-qr-exchange-stalls-init-on-device, Part B).
     ///
-    /// Best-effort: a missing payload / malformed card / storage error
-    /// leaves the exchange finalized on-screen but uncreated — never
-    /// panics on the hot finalize path. `get_received_data` only returns
-    /// `Some` in `Finalized` (both sides confirmed), so this is atomic.
-    fn persist_exchanged_contact(&mut self) {
-        // Pull the session-owned bytes off under a short borrow so the
-        // `self.vauchi` persistence calls below don't fight the borrow.
-        let Some((payload, transport_key)) = self.multi_stage_session.as_ref().and_then(|h| {
+    /// `None` when nothing was saved: the caller fails the exchange, so
+    /// the peer never reads a DONE for a contact this phone does not hold
+    /// (vauchi/private#1217). The identity saved is the one the peer's
+    /// payload signature verified for, never a self-asserted one.
+    fn persist_exchanged_contact(&mut self) -> Option<SavedExchange> {
+        // Copy the peer off under a short borrow so the `self.vauchi`
+        // persistence calls below don't fight the borrow.
+        let Some((peer, transport_key)) = self.multi_stage_session.as_ref().and_then(|h| {
             Some((
-                h.machine.received_exchange_payload()?,
+                h.machine.received_peer()?.clone(),
                 h.machine.transport_key()?,
             ))
         }) else {
             // Dev instrumentation (no PII). Reaching "Exchange Complete" without
-            // received data / transport key means we finalized without the
-            // decrypted peer card, so no contact is saved — the exact 2026-07-25
-            // Samsung half-exchange symptom (finalized on-screen, empty contacts).
-            tracing::info!("[MSX] persist SKIP: no received_payload/transport_key at Finalized");
-            return;
+            // the verified peer / transport key means we finalized without the
+            // decrypted peer card — the 2026-07-25 Samsung half-exchange symptom.
+            tracing::info!("[MSX] persist SKIP: no received peer/transport_key at Finalized");
+            return None;
         };
-        // `[version: 1][peer_pk: 32][card_json: rest]` — mirrors
-        // `serialize_exchange_payload`.
-        if payload.len() < 33 || payload[0] != EXCHANGE_PAYLOAD_VERSION {
-            tracing::info!("[MSX] persist SKIP: bad payload len={}", payload.len());
-            return;
-        }
-        let Ok(peer_pk) = <[u8; 32]>::try_from(&payload[1..33]) else {
-            tracing::info!("[MSX] persist SKIP: peer_pk parse");
-            return;
-        };
-        let Ok(card) = serde_json::from_slice::<ContactCard>(&payload[33..]) else {
-            tracing::info!("[MSX] persist SKIP: card json parse");
-            return;
-        };
+        let peer_pk = peer.identity_pk;
+        let card = peer.card;
         // Pull the success-screen content off the peer card before it is
         // moved into the contact (2026-06-04-exchange-terminal-screens).
         let peer_name = card.display_name().to_string();
@@ -467,10 +452,7 @@ impl AppEngine {
                 )
             })
             .collect();
-        let Some(identity) = self.vauchi.identity() else {
-            return;
-        };
-        let our_identity = *identity.signing_public_key();
+        let our_identity = *self.vauchi.identity()?.signing_public_key();
         let now = self.vauchi.clock().unix_seconds();
         let mut contact = vauchi_core::Contact::from_exchange(
             peer_pk,
@@ -513,24 +495,80 @@ impl AppEngine {
         // returned before the ratchet was saved. Repeat-exchange decision
         // 2026-06-27.
         self.exchange_was_reconnection = self.contact_already_held(contact.id());
+        let peer_saved = self
+            .multi_stage_session
+            .as_ref()
+            .is_some_and(|h| h.machine.peer_saved());
         let persisted = match ratchet {
-            Some((ratchet, is_initiator)) => {
+            Some((ratchet, is_initiator)) if peer_saved => {
                 self.vauchi
                     .save_exchanged_contact(&contact, &ratchet, is_initiator)
             }
+            Some((ratchet, is_initiator)) => self
+                .vauchi
+                .save_exchanged_contact_before_peer_saved(&contact, &ratchet, is_initiator)
+                .map(|awaiting| {
+                    if awaiting && let Some(holder) = self.multi_stage_session.as_mut() {
+                        holder.rekey_awaiting_peer = Some(contact.clone());
+                    }
+                }),
             // No session ratchet at completion — upsert the card alone; the
             // channel can't be (re)keyed without the session.
             None => self.vauchi.save_exchanged_card(&contact),
         };
         if let Err(e) = persisted {
             tracing::warn!("multi-stage: failed to persist exchanged contact: {e}");
-            return;
+            return None;
         }
         // Dev instrumentation (no PII): the persist landed. Pairs with the
         // SKIP logs above so a device run shows definitively whether each side
         // saved the exchanged contact (2026-07-25 Samsung half-exchange).
         tracing::info!("[MSX] persist OK: exchanged contact saved");
+        Some(SavedExchange {
+            contact_id,
+            peer_name,
+            received_fields,
+        })
+    }
 
+    /// A restored contact saved before the peer's DONE adopts the
+    /// exchange's key once that DONE is read (vauchi/private#1217).
+    fn adopt_rekey_once_peer_saved(&mut self) {
+        let Some(holder) = self.multi_stage_session.as_mut() else {
+            return;
+        };
+        if !holder.machine.peer_saved() {
+            return;
+        }
+        let Some(contact) = holder.rekey_awaiting_peer.take() else {
+            return;
+        };
+        let Some(our_identity) = self.vauchi.identity().map(|i| *i.signing_public_key()) else {
+            return;
+        };
+        let ratchet = self.multi_stage_session.as_ref().and_then(|h| {
+            h.machine
+                .build_exchange_ratchet(&our_identity, contact.public_key()?)
+        });
+        let Some((ratchet, is_initiator)) = ratchet else {
+            tracing::warn!("multi-stage: no ratchet for the restored contact's rekey");
+            return;
+        };
+        if let Err(e) = self
+            .vauchi
+            .save_exchanged_contact(&contact, &ratchet, is_initiator)
+        {
+            tracing::warn!("multi-stage: restored contact's rekey failed: {e}");
+        }
+    }
+
+    /// The saved exchange's location request, ceremony and success screen.
+    fn finish_exchanged_contact(&mut self, saved: SavedExchange) {
+        let SavedExchange {
+            contact_id,
+            peer_name,
+            received_fields,
+        } = saved;
         // Capture-at-exchange (ADR-051): ask the frontend for the current
         // location so we can record where this contact was met. The reply
         // (Event::LocationResult) is consumed in handle_hardware_event.
@@ -769,6 +807,7 @@ impl AppEngine {
     /// feedback, before the tick's event, so the final screen built on
     /// `Completed` already knows how the exchange ended (plan 5.3).
     fn apply_multi_stage_peer_confirmed(&mut self) -> bool {
+        self.adopt_rekey_once_peer_saved();
         let confirmed = self
             .multi_stage_session
             .as_ref()

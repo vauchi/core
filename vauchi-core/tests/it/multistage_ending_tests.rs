@@ -5,6 +5,7 @@
 //! The ending after Finalized: a saved phone shows DONE, a saved phone that
 //! read its peer's DONE shows BOTH for a short linger, and a phone that
 //! reads BOTH stops at once. The 60 s grace stays the ceiling (design D6).
+//! A phone is saved only once its app says so (vauchi/private#1217).
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -33,12 +34,6 @@ fn pair() -> Pair {
     }
 }
 
-fn is_ending(frame: &str) -> bool {
-    ["FIN3", "DON3", "BTH3"]
-        .iter()
-        .any(|p| frame.starts_with(p))
-}
-
 /// What a camera hands its session for a frame, if anything.
 type Reader = fn(&str) -> Option<String>;
 
@@ -46,17 +41,13 @@ fn reads_everything(frame: &str) -> Option<String> {
     Some(frame.to_owned())
 }
 
+/// Reads the reveal key a confirm or DONE carries but never its tag, so the
+/// reader can check its peer and confirm yet never finalize.
 fn reads_no_ending(frame: &str) -> Option<String> {
-    (!is_ending(frame)).then(|| frame.to_owned())
-}
-
-/// A DONE is read as the plain final frame it carries, as if caught just
-/// before its sender saved; a BOTH is not read at all. Lets both sessions
-/// save without either learning that the other has.
-fn reads_final_but_not_done(frame: &str) -> Option<String> {
+    const REVEAL_END: usize = 4 + 8 + 24 + 48;
     match frame.get(..4) {
+        Some("CNF4" | "DON4") => frame.get(4..REVEAL_END).map(|rest| format!("RVL4{rest}")),
         Some("BTH3") => None,
-        Some("DON3") => Some(format!("FIN3{}", &frame[4..])),
         _ => Some(frame.to_owned()),
     }
 }
@@ -81,9 +72,9 @@ fn run(p: &mut Pair, alice_reads: Reader, bob_reads: Reader, done: impl Fn(&Pair
     panic!("the exchange never reached the staged point");
 }
 
-/// Alice has saved; Bob has never read any of her ending frames, so he has
-/// not.
-fn alice_saved_bob_not() -> Pair {
+/// Alice has finalized but her app has not saved yet; Bob has never read
+/// any of her ending frames.
+fn alice_finalized_bob_not() -> Pair {
     let mut p = pair();
     run(&mut p, reads_everything, reads_no_ending, |p| {
         p.alice.get_state() == ProtocolState::Finalized
@@ -92,18 +83,24 @@ fn alice_saved_bob_not() -> Pair {
     p
 }
 
-/// Both have saved, and neither has read the other's DONE yet.
+/// Alice has saved; Bob has never read any of her ending frames, so he has
+/// not.
+fn alice_saved_bob_not() -> Pair {
+    let mut p = alice_finalized_bob_not();
+    p.alice.mark_saved();
+    p
+}
+
+/// Both have saved, and neither has read the other's DONE yet: neither
+/// showed one before both finalized.
 fn both_saved() -> Pair {
     let mut p = pair();
-    run(
-        &mut p,
-        reads_final_but_not_done,
-        reads_final_but_not_done,
-        |p| {
-            p.alice.get_state() == ProtocolState::Finalized
-                && p.bob.get_state() == ProtocolState::Finalized
-        },
-    );
+    run(&mut p, reads_everything, reads_everything, |p| {
+        p.alice.get_state() == ProtocolState::Finalized
+            && p.bob.get_state() == ProtocolState::Finalized
+    });
+    p.alice.mark_saved();
+    p.bob.mark_saved();
     p
 }
 
@@ -134,7 +131,7 @@ fn a_done_frame_carries_the_final_frame_under_its_own_prefix() {
     let tag = [3u8; 32];
     let frame = format_done_qr(&sid, &reveal_key, &tag);
 
-    assert!(frame.starts_with("DON3"));
+    assert!(frame.starts_with("DON4"));
     assert_eq!(
         frame.len(),
         qr_codec::format_final_qr(&sid, &reveal_key, &tag).len()
@@ -170,7 +167,7 @@ fn a_saved_session_shows_done_in_place_of_the_final_frame() {
     for _ in 0..20 {
         let frame = next_ending_frame(&mut p.alice);
         assert!(
-            frame.starts_with("DON3"),
+            frame.starts_with("DON4"),
             "saved Alice showed {}",
             &frame[..4]
         );
@@ -276,7 +273,7 @@ fn done_and_both_from_another_session_change_nothing() {
 
     let frame = next_ending_frame(&mut p.alice);
     assert!(
-        frame.starts_with("DON3"),
+        frame.starts_with("DON4"),
         "a stranger's DONE moved Alice to {}",
         &frame[..4]
     );
@@ -295,8 +292,80 @@ fn a_saved_session_is_confirmed_once_it_reads_done_or_both() {
     p.bob.process_scanned_qr(&alice_done);
     assert_eq!(p.bob.get_state(), ProtocolState::Finalized);
     assert!(p.bob.peer_confirmed(), "Bob read Alice's DONE");
+    p.bob.mark_saved();
 
     let bob_both = next_ending_frame(&mut p.bob);
     p.alice.process_scanned_qr(&bob_both);
     assert!(p.alice.peer_confirmed(), "Alice read Bob's BOTH");
+}
+
+// @internal
+#[test]
+fn a_finalized_session_shows_its_confirm_until_its_app_saved() {
+    let mut p = alice_finalized_bob_not();
+
+    for _ in 0..20 {
+        let frame = next_ending_frame(&mut p.alice);
+        assert!(
+            frame.starts_with("CNF4"),
+            "unsaved Alice showed {}",
+            &frame[..4]
+        );
+    }
+    p.alice.mark_saved();
+    assert!(next_ending_frame(&mut p.alice).starts_with("DON4"));
+}
+
+// @internal
+#[test]
+fn a_session_whose_app_could_not_save_fails_and_shows_fail_never_done() {
+    let mut p = alice_finalized_bob_not();
+
+    p.alice.save_failed();
+
+    assert!(
+        matches!(p.alice.get_state(), ProtocolState::Failed(_)),
+        "{:?}",
+        p.alice.get_state()
+    );
+    let frame = p.alice.get_display_qr().expect("FAIL is shown").data;
+    assert!(frame.starts_with("FAI3"), "showed {}", &frame[..4]);
+    p.alice.mark_saved();
+    assert!(
+        p.alice
+            .get_display_qr()
+            .is_some_and(|q| q.data.starts_with("FAI3"))
+    );
+}
+
+// @internal
+#[test]
+fn a_finalized_session_that_has_not_saved_neither_shows_nor_obeys_both() {
+    let mut p = both_saved_but_bob();
+    let alice_done = next_ending_frame(&mut p.alice);
+    p.bob.process_scanned_qr(&alice_done);
+    let alice_sid = parse_qr(&alice_done)
+        .expect("alice's frame parses")
+        .session_id()
+        .to_owned();
+
+    p.bob.process_scanned_qr(&format_both_qr(&alice_sid));
+
+    let frame = next_ending_frame(&mut p.bob);
+    assert!(
+        frame.starts_with("CNF4"),
+        "unsaved Bob showed {}",
+        &frame[..4]
+    );
+}
+
+/// Both finalized; only Alice's app has saved.
+fn both_saved_but_bob() -> Pair {
+    let mut p = pair();
+    run(&mut p, reads_everything, reads_everything, |p| {
+        p.alice.get_state() == ProtocolState::Finalized
+            && p.bob.get_state() == ProtocolState::Finalized
+    });
+    p.alice.mark_saved();
+    p
 }

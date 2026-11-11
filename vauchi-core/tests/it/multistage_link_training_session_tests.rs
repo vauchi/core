@@ -516,11 +516,17 @@ fn every_frame_a_session_shows_fits_the_module_count_the_design_names() {
         if let Some(bq) = &bq {
             alice.process_scanned_qr(&bq.data);
         }
+        // The app saves on Finalized; DONE and BOTH follow from it.
+        for session in [&mut alice, &mut bob] {
+            if session.get_state() == ProtocolState::Finalized {
+                session.mark_saved();
+            }
+        }
     }
 
     assert_eq!(
         seen.into_iter().collect::<Vec<_>>(),
-        ["BTH3", "DAT4", "DON3", "FIN3", "INI3"],
+        ["BTH3", "CNF4", "DAT4", "DON4", "INI3", "RVL4"],
         "the run showed every frame type"
     );
 }

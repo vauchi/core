@@ -45,6 +45,8 @@ use vauchi_core::exchange::{
 };
 use vauchi_core::{Command, Event};
 
+use crate::signed_session::signed_session;
+
 /// Strategy: arbitrary non-fatal events. Used by the I1 reachability
 /// test so the post-`Preparing` assertion is not vacuously skipped
 /// by an early fatal event (the broad `arb_event` strategy hits a
@@ -138,12 +140,6 @@ fn arb_event() -> impl Strategy<Value = Event> {
     ]
 }
 
-/// Tiny opaque card payload for the proptest. Production code never
-/// observes this — it's parsed by [`MultiStageSession`] internally.
-fn fixture_local_card() -> Vec<u8> {
-    (0u8..64).collect()
-}
-
 proptest! {
     /// **I1:** A long non-fatal event sequence with a guaranteed
     /// `QrScanned` first event must drive the machine past
@@ -163,7 +159,7 @@ proptest! {
             data: "vauchi://multistage/peer/00".into(),
         }];
         all_events.extend(events);
-        let mut machine = MultiStageMachine::new_glance(fixture_local_card(), 0);
+        let mut machine = MultiStageMachine::new_glance(signed_session("Alice"), 0);
         let mut now: u64 = 0;
         for event in &all_events {
             now += tick_ms;
@@ -190,7 +186,7 @@ proptest! {
         ticks in 10usize..40,
         tick_ms in 50u64..400,
     ) {
-        let mut machine = MultiStageMachine::new_glance(fixture_local_card(), 0);
+        let mut machine = MultiStageMachine::new_glance(signed_session("Alice"), 0);
         let mut now: u64 = 0;
         let mut saw_qr_frame = false;
         for _ in 0..ticks {
@@ -218,7 +214,7 @@ proptest! {
         post_events in proptest::collection::vec(arb_event(), 0..15),
         tick_ms in 50u64..400,
     ) {
-        let mut machine = MultiStageMachine::new_glance(fixture_local_card(), 0);
+        let mut machine = MultiStageMachine::new_glance(signed_session("Alice"), 0);
         let mut now: u64 = 0;
         for event in &events {
             now += tick_ms;
@@ -259,7 +255,7 @@ proptest! {
         events in proptest::collection::vec(arb_event(), 0..20),
         tick_ms in 50u64..400,
     ) {
-        let mut machine = MultiStageMachine::new_glance(fixture_local_card(), 0);
+        let mut machine = MultiStageMachine::new_glance(signed_session("Alice"), 0);
         let mut now: u64 = 0;
         for event in &events {
             now += tick_ms;
@@ -288,8 +284,8 @@ proptest! {
         events in proptest::collection::vec(arb_event(), 0..20),
         tick_ms in 50u64..400,
     ) {
-        let mut glance = MultiStageMachine::new_glance(fixture_local_card(), 0);
-        let mut hover = MultiStageMachine::new_hover(fixture_local_card(), 0);
+        let mut glance = MultiStageMachine::new_glance(signed_session("Alice"), 0);
+        let mut hover = MultiStageMachine::new_hover(signed_session("Alice"), 0);
         let mut now: u64 = 0;
         for event in &events {
             now += tick_ms;
@@ -311,7 +307,7 @@ proptest! {
 // @internal
 #[test]
 fn finalized_phase_strictly_precedes_completed_in_constructor_walk() {
-    let machine = MultiStageMachine::new_glance(fixture_local_card(), 0);
+    let machine = MultiStageMachine::new_glance(signed_session("Alice"), 0);
     assert!(!matches!(machine.phase(), MultiStagePhase::Completed));
 }
 
@@ -320,7 +316,7 @@ fn finalized_phase_strictly_precedes_completed_in_constructor_walk() {
 // @internal
 #[test]
 fn cancel_is_idempotent_and_absorbing() {
-    let mut machine = MultiStageMachine::new_glance(fixture_local_card(), 0);
+    let mut machine = MultiStageMachine::new_glance(signed_session("Alice"), 0);
     let first = machine.cancel();
     let second = machine.cancel();
     assert!(matches!(first, MultiStageEvent::None));
@@ -340,7 +336,7 @@ fn cancel_is_idempotent_and_absorbing() {
 // @internal
 #[test]
 fn failed_phase_is_absorbing_under_advance() {
-    let mut machine = MultiStageMachine::new_glance(fixture_local_card(), 0);
+    let mut machine = MultiStageMachine::new_glance(signed_session("Alice"), 0);
     let _ = machine.handle_hardware_event(
         &Event::PermissionDenied {
             transport: "camera".into(),
@@ -358,7 +354,7 @@ fn failed_phase_is_absorbing_under_advance() {
 // @internal
 #[test]
 fn glance_machine_emits_no_audio_commands() {
-    let mut machine = MultiStageMachine::new_glance(fixture_local_card(), 0);
+    let mut machine = MultiStageMachine::new_glance(signed_session("Alice"), 0);
     let cmds = machine.try_audio_handshake_start();
     assert!(
         cmds.is_empty(),
@@ -374,7 +370,7 @@ fn glance_machine_emits_no_audio_commands() {
 // @internal
 #[test]
 fn hover_machine_emits_paired_audio_commands_once() {
-    let mut machine = MultiStageMachine::new_hover(fixture_local_card(), 0);
+    let mut machine = MultiStageMachine::new_hover(signed_session("Alice"), 0);
     let cmds = machine.try_audio_handshake_start();
     assert_eq!(cmds.len(), 2, "Hover must emit exactly 2 audio commands");
     assert!(matches!(cmds[0], Command::AudioEmitChallenge { .. }));
@@ -393,7 +389,7 @@ fn hover_machine_emits_paired_audio_commands_once() {
 // @internal
 #[test]
 fn glance_machine_ignores_audio_samples() {
-    let mut machine = MultiStageMachine::new_glance(fixture_local_card(), 0);
+    let mut machine = MultiStageMachine::new_glance(signed_session("Alice"), 0);
     let event = machine.handle_hardware_event(
         &Event::AudioSamplesRecorded {
             samples: vec![0.1; 32],
@@ -411,7 +407,7 @@ fn glance_machine_ignores_audio_samples() {
 // @internal
 #[test]
 fn hover_machine_ignores_audio_samples_before_handshake_starts() {
-    let mut machine = MultiStageMachine::new_hover(fixture_local_card(), 0);
+    let mut machine = MultiStageMachine::new_hover(signed_session("Alice"), 0);
     let event = machine.handle_hardware_event(
         &Event::AudioSamplesRecorded {
             samples: vec![0.1; 32],
@@ -429,7 +425,7 @@ fn hover_machine_ignores_audio_samples_before_handshake_starts() {
 // @internal
 #[test]
 fn hover_machine_transitions_to_failed_on_malformed_audio() {
-    let mut machine = MultiStageMachine::new_hover(fixture_local_card(), 0);
+    let mut machine = MultiStageMachine::new_hover(signed_session("Alice"), 0);
     let _ = machine.try_audio_handshake_start();
     // 32 zero samples decode to nothing — preamble not found.
     let event = machine.handle_hardware_event(
@@ -453,7 +449,7 @@ fn hover_machine_transitions_to_failed_on_malformed_audio() {
 // @internal
 #[test]
 fn tap_hover_shake_machine_emits_paired_audio_commands_once() {
-    let mut machine = MultiStageMachine::new_tap_hover_shake(fixture_local_card(), 0);
+    let mut machine = MultiStageMachine::new_tap_hover_shake(signed_session("Alice"), 0);
     assert_eq!(machine.mode(), MultiStageMode::TapHoverShake);
     let cmds = machine.try_audio_handshake_start();
     assert_eq!(
@@ -476,7 +472,7 @@ fn tap_hover_shake_machine_emits_paired_audio_commands_once() {
 // @internal
 #[test]
 fn tap_hover_shake_machine_transitions_to_failed_on_malformed_audio() {
-    let mut machine = MultiStageMachine::new_tap_hover_shake(fixture_local_card(), 0);
+    let mut machine = MultiStageMachine::new_tap_hover_shake(signed_session("Alice"), 0);
     let _ = machine.try_audio_handshake_start();
     let event = machine.handle_hardware_event(
         &Event::AudioSamplesRecorded {
@@ -522,7 +518,7 @@ fn event_to_commands_audio_proximity_emits_no_commands() {
 // @internal
 #[test]
 fn tap_hover_shake_accel_capture_emits_start_once() {
-    let mut machine = MultiStageMachine::new_tap_hover_shake(fixture_local_card(), 0);
+    let mut machine = MultiStageMachine::new_tap_hover_shake(signed_session("Alice"), 0);
     let cmds = machine.try_accel_capture_start();
     assert_eq!(cmds.len(), 1, "TapHoverShake must emit one accel command");
     assert!(matches!(cmds[0], Command::AccelerometerStart));
@@ -537,12 +533,12 @@ fn tap_hover_shake_accel_capture_emits_start_once() {
 // @internal
 #[test]
 fn glance_and_hover_emit_no_accel_commands() {
-    let mut glance = MultiStageMachine::new_glance(fixture_local_card(), 0);
+    let mut glance = MultiStageMachine::new_glance(signed_session("Alice"), 0);
     assert!(
         glance.try_accel_capture_start().is_empty(),
         "Glance must not start accel capture (mode gate)",
     );
-    let mut hover = MultiStageMachine::new_hover(fixture_local_card(), 0);
+    let mut hover = MultiStageMachine::new_hover(signed_session("Alice"), 0);
     assert!(
         hover.try_accel_capture_start().is_empty(),
         "Hover must not start accel capture (accel is TapHoverShake-only)",
@@ -552,7 +548,7 @@ fn glance_and_hover_emit_no_accel_commands() {
 // @internal
 #[test]
 fn accel_data_accumulates_into_envelope_when_listening() {
-    let mut machine = MultiStageMachine::new_tap_hover_shake(fixture_local_card(), 0);
+    let mut machine = MultiStageMachine::new_tap_hover_shake(signed_session("Alice"), 0);
     let _ = machine.try_accel_capture_start();
     assert_eq!(machine.accel_sample_count(), 0);
     for i in 0..3u64 {
@@ -579,7 +575,7 @@ fn accel_data_ignored_before_capture_start() {
     // Without try_accel_capture_start, accel_proximity is still Pending — the
     // state gate drops incoming samples so a stray reading can't build an
     // envelope before the capture window opens.
-    let mut machine = MultiStageMachine::new_tap_hover_shake(fixture_local_card(), 0);
+    let mut machine = MultiStageMachine::new_tap_hover_shake(signed_session("Alice"), 0);
     let _ = machine.handle_hardware_event(
         &Event::AccelerometerData {
             timestamp_ms: 0,
@@ -622,8 +618,8 @@ fn impulse_event(i: u64, amp: i32) -> Event {
 /// Drive two TapHoverShake machines via advance/QrScanned until both reach
 /// `Confirming` (transport_key derived on both inner sessions).
 fn drive_two_to_confirming() -> (MultiStageMachine, MultiStageMachine, u64) {
-    let mut a = MultiStageMachine::new_tap_hover_shake(fixture_local_card(), 0);
-    let mut b = MultiStageMachine::new_tap_hover_shake(fixture_local_card(), 0);
+    let mut a = MultiStageMachine::new_tap_hover_shake(signed_session("Alice"), 0);
+    let mut b = MultiStageMachine::new_tap_hover_shake(signed_session("Alice"), 0);
     for i in 0..4000u64 {
         let t = i * 1_000; // step past the per-frame display-duration gate
         // The engine starts the shake capture once the peer is discovered,

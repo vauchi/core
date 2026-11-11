@@ -223,10 +223,13 @@ fn session_stranded_in_verifying() -> (MultiStageSession, MultiStageSession, Str
         }
         let aq = ahead.get_display_qr();
         let bq = gone.get_display_qr();
-        // One read of the peer's final frame would finalize `ahead`; it is
-        // the frame that never arrives from a peer that went away.
+        // One read of the peer's reveal or confirm would move `ahead` past
+        // Verifying; they are the frames that never arrive from a peer that
+        // went away.
         if let Some(bq) = &bq
-            && !bq.data.starts_with("FIN3")
+            && !["RVL4", "CNF4", "DON4"]
+                .iter()
+                .any(|p| bq.data.starts_with(p))
         {
             ahead.process_scanned_qr(&bq.data);
         }

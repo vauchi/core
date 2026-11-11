@@ -71,19 +71,13 @@ use vauchi_core::exchange::{
 
 #[path = "multi_stage_machine_link_layout.rs"]
 mod link_layout;
-#[path = "multi_stage_machine_peer_name.rs"]
-mod peer_name;
+#[path = "multi_stage_machine_save.rs"]
+mod save;
 
 /// Audio-listen window default (ms). Mirrors the cycle-thread's
 /// `MobileMultiStageSession::AUDIO_LISTEN_TIMEOUT_MS`. Kept private
 /// to this module — the platform binding never reads it directly.
 const AUDIO_LISTEN_TIMEOUT_MS: u64 = 5000;
-
-/// Exchange-payload format version byte. Mirrors the constant in
-/// `vauchi-platform/src/mobile_exchange.rs` (which T3.1 retires) and
-/// the inverse in `app_engine::multi_stage_exchange::serialize_exchange_payload`.
-/// Format: `[version: 1][public_key: 32][card_json: rest]`.
-const EXCHANGE_PAYLOAD_VERSION: u8 = 1;
 
 /// Maximum a single non-terminal, peer-engaged exchange phase may persist
 /// with no forward progress before the machine fails to a retry/cancel
@@ -270,8 +264,8 @@ impl MultiStageMachine {
     /// Construct a Glance-mode machine — bilateral QR scan, no
     /// ultrasonic proximity handshake. **No I/O.** The first
     /// [`advance`](Self::advance) emits the first QR frame.
-    pub fn new_glance(local_card: Vec<u8>, now: u64) -> Self {
-        Self::with_mode(MultiStageMode::Glance, local_card, now)
+    pub fn new_glance(session: MultiStageSession, now: u64) -> Self {
+        Self::with_mode(MultiStageMode::Glance, session, now)
     }
 
     /// Construct a Hover-mode machine — QR + ultrasonic proximity
@@ -279,8 +273,8 @@ impl MultiStageMachine {
     /// commands fire on the `Confirming` transition (per T0.2
     /// design); the listening window restarts on retry. T1.2b
     /// wires the audio command emission via `event_to_commands`.
-    pub fn new_hover(local_card: Vec<u8>, now: u64) -> Self {
-        Self::with_mode(MultiStageMode::Hover, local_card, now)
+    pub fn new_hover(session: MultiStageSession, now: u64) -> Self {
+        Self::with_mode(MultiStageMode::Hover, session, now)
     }
 
     /// Construct a TapHoverShake-mode machine — QR + ultrasonic audio
@@ -290,13 +284,13 @@ impl MultiStageMachine {
     /// the accel capture + envelope cross-correlation is a follow-up
     /// (needs the envelope-over-transport protocol — see the TapHoverShake
     /// graduation plan P2.C / the accel-envelope ADR).
-    pub fn new_tap_hover_shake(local_card: Vec<u8>, now: u64) -> Self {
-        Self::with_mode(MultiStageMode::TapHoverShake, local_card, now)
+    pub fn new_tap_hover_shake(session: MultiStageSession, now: u64) -> Self {
+        Self::with_mode(MultiStageMode::TapHoverShake, session, now)
     }
 
-    fn with_mode(mode: MultiStageMode, local_card: Vec<u8>, now: u64) -> Self {
+    fn with_mode(mode: MultiStageMode, session: MultiStageSession, now: u64) -> Self {
         Self {
-            inner: MultiStageSession::new(local_card),
+            inner: session,
             mode,
             phase: MultiStagePhase::Preparing,
             current_frame_started_at: None,
@@ -480,6 +474,12 @@ impl MultiStageMachine {
                     self.phase = MultiStagePhase::Completed;
                     return phase_transition_event(&prior, &self.phase);
                 }
+                // FAIL shown for its linger: the failure surfaces now.
+                if matches!(self.phase, MultiStagePhase::Failed { .. })
+                    && !matches!(prior, MultiStagePhase::Failed { .. })
+                {
+                    return phase_transition_event(&prior, &self.phase);
+                }
                 return MultiStageEvent::None;
             }
         };
@@ -641,16 +641,6 @@ impl MultiStageMachine {
     /// Mode marker — read-only.
     pub fn mode(&self) -> MultiStageMode {
         self.mode
-    }
-
-    /// Received exchange payload (`[version][peer_pk:32][card_json]`),
-    /// available only once the inner session is `Finalized` (atomic —
-    /// both sides confirmed). The AppEngine deserializes this to persist
-    /// the exchanged contact — the job the retired cycle thread's
-    /// `on_finalized` listener used to do
-    /// (2026-06-03-multistage-qr-exchange-stalls-init-on-device).
-    pub fn received_exchange_payload(&self) -> Option<Vec<u8>> {
-        self.inner.get_received_data()
     }
 
     /// Transport key (shared-secret seed) for the exchanged contact's
@@ -860,13 +850,22 @@ impl MultiStageMachine {
             return;
         }
         let mut new_phase = phase_from_protocol_state(&self.inner.get_state());
+        // A session that tells its peer it failed keeps the frame loop
+        // running until FAIL has been shown (vauchi/private#1217).
+        if matches!(new_phase, MultiStagePhase::Failed { .. }) && self.inner.shows_fail_frame() {
+            return;
+        }
         // Late-bind the peer display name on the Finalized
         // transition. `phase_from_protocol_state` returns an empty
         // name because the mapping is a pure function of the
         // protocol state; the name lives in the just-received
         // payload, which only the session has.
         if matches!(new_phase, MultiStagePhase::Finalized { .. }) {
-            let peer_name = peer_name::extract_peer_name(&self.inner);
+            let peer_name = self
+                .inner
+                .received_peer()
+                .map(|peer| peer.card.display_name().to_string())
+                .unwrap_or_default();
             new_phase = MultiStagePhase::Finalized { peer_name };
         }
         // Preserve `Failed { reason }` already set by a hardware

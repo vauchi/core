@@ -386,46 +386,6 @@ fn listening_stages_time_out_exactly_at_their_limit() {
     assert!(session.check_and_apply_accel_timeout(accel_limit).unwrap());
 }
 
-// INID (INIT with the whole payload) is no longer sent, but a peer that sends
-// one still completes Stage 1 and delivers its whole payload in a single
-// frame; we then only have our own chunks left to send.
-// @internal
-#[test]
-fn a_received_inid_frame_delivers_the_peer_payload_in_one_read() {
-    use vauchi_core::exchange::X3DHKeyPair;
-    use vauchi_core::exchange::multistage::commitment::Commitment;
-    use vauchi_core::exchange::multistage::qr_codec::format_in2d_qr;
-
-    let mut bob = MultiStageSession::new(b"name:Bob".to_vec());
-    bob.get_display_qr().unwrap();
-    let peer_sid = [5u8; 16];
-    let commitment = Commitment::create(b"name:Peer").unwrap();
-    let inid = format_in2d_qr(
-        &peer_sid,
-        X3DHKeyPair::generate().public_key(),
-        commitment.hash(),
-        "Peer",
-        None,
-        commitment.ciphertext(),
-    );
-
-    bob.process_scanned_qr(&inid);
-
-    assert_eq!(bob.peer_session_id(), Some(peer_sid));
-    assert!(
-        matches!(
-            bob.get_state(),
-            ProtocolState::Transferring {
-                chunks_received: 1,
-                peer_chunks_total: 1,
-                ..
-            }
-        ),
-        "{:?}",
-        bob.get_state()
-    );
-}
-
 /// Runs an exchange where Alice advertises `https://alice.relay` and Bob
 /// reads her first INIT with its relay URL replaced by `bob_sees` (or as
 /// sent, when `None`). Returns Bob's state once he fails, finalizes, or the

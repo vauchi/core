@@ -31,19 +31,26 @@ use vauchi_app::orchestrator::multi_stage_machine::{
 };
 use vauchi_core::Event;
 
+use crate::signed_session::signed_session;
+
+/// What the AppEngine does on `Finalized`: save, then tell the machine.
+fn save_when_finalized(machines: [&mut MultiStageMachine; 2]) {
+    for machine in machines {
+        if matches!(machine.phase(), MultiStagePhase::Finalized { .. }) {
+            machine.mark_saved();
+        }
+    }
+}
+
 /// Drive two Glance machines against each other through the wrapper API
 /// and return the finalized machines. Each "tick" advances a wall-clock-ms
 /// `now` past the longest frame window so every `advance` emits the next
 /// frame, then cross-feeds each emitted frame to the peer as a
 /// `QrScanned` hardware event — mirroring the device's poll + camera
 /// loop. Breaks as soon as both reach a terminal phase.
-fn drive_two_party_glance(
-    alice_card: Vec<u8>,
-    bob_card: Vec<u8>,
-    max_ticks: usize,
-) -> (MultiStageMachine, MultiStageMachine, usize) {
-    let mut alice = MultiStageMachine::new_glance(alice_card, 0);
-    let mut bob = MultiStageMachine::new_glance(bob_card, 0);
+fn drive_two_party_glance(max_ticks: usize) -> (MultiStageMachine, MultiStageMachine, usize) {
+    let mut alice = MultiStageMachine::new_glance(signed_session("Alice"), 0);
+    let mut bob = MultiStageMachine::new_glance(signed_session("Bob"), 0);
 
     let mut now: u64 = 0;
     let mut alice_frame: Option<String> = None;
@@ -70,6 +77,7 @@ fn drive_two_party_glance(
             let _ = bob.handle_hardware_event(&Event::QrScanned { data }, now);
         }
 
+        save_when_finalized([&mut alice, &mut bob]);
         if alice.is_terminal() && bob.is_terminal() {
             return (alice, bob, tick + 1);
         }
@@ -80,10 +88,7 @@ fn drive_two_party_glance(
 // @internal
 #[test]
 fn two_party_glance_reaches_completed_through_the_wrapper() {
-    let alice_card = b"name:Alice\nemail:alice@example.com".to_vec();
-    let bob_card = b"name:Bob\nemail:bob@example.com".to_vec();
-
-    let (alice, bob, ticks) = drive_two_party_glance(alice_card, bob_card, 4000);
+    let (alice, bob, ticks) = drive_two_party_glance(4000);
 
     // Success is `Finalized` — the contact-creating transition. A phone
     // that reads its peer's BOTH stops at once and surfaces `Completed`;
@@ -117,13 +122,11 @@ fn two_party_glance_reaches_completed_through_the_wrapper() {
 /// "still Transferring → stash the reveal key" path that the lockstep
 /// test never hits.
 fn drive_asymmetric_glance(
-    alice_card: Vec<u8>,
-    bob_card: Vec<u8>,
     slow_factor: usize,
     max_ticks: usize,
 ) -> (MultiStageMachine, MultiStageMachine, usize) {
-    let mut alice = MultiStageMachine::new_glance(alice_card, 0);
-    let mut bob = MultiStageMachine::new_glance(bob_card, 0);
+    let mut alice = MultiStageMachine::new_glance(signed_session("Alice"), 0);
+    let mut bob = MultiStageMachine::new_glance(signed_session("Bob"), 0);
 
     let mut now: u64 = 0;
     let mut alice_frame: Option<String> = None;
@@ -147,6 +150,7 @@ fn drive_asymmetric_glance(
         {
             let _ = bob.handle_hardware_event(&Event::QrScanned { data }, now);
         }
+        save_when_finalized([&mut alice, &mut bob]);
         if alice.is_terminal() && bob.is_terminal() {
             return (alice, bob, tick + 1);
         }
@@ -157,11 +161,8 @@ fn drive_asymmetric_glance(
 // @internal
 #[test]
 fn asymmetric_camera_glance_still_finalizes_both_sides() {
-    let alice_card = b"name:Alice\nemail:alice@example.com".to_vec();
-    let bob_card = b"name:Bob\nemail:bob@example.com".to_vec();
-
     // Bob 5× lossier — Pixel-vs-S7-class asymmetry.
-    let (alice, bob, ticks) = drive_asymmetric_glance(alice_card, bob_card, 5, 8000);
+    let (alice, bob, ticks) = drive_asymmetric_glance(5, 8000);
 
     // `Completed` once a side has read its peer's BOTH (design D6).
     assert!(
@@ -194,10 +195,8 @@ fn both_machines_emit_the_finalized_event_that_triggers_persist() {
     // contact list; Pixel persisted fine). Both sides must emit it exactly
     // once. Lossy (asymmetric) delivery is used because that is when the two
     // sides reach Finalized via different paths (scan vs stashed-key advance).
-    let alice_card = b"name:Alice\nemail:alice@example.com".to_vec();
-    let bob_card = b"name:Bob\nemail:bob@example.com".to_vec();
-    let mut alice = MultiStageMachine::new_glance(alice_card, 0);
-    let mut bob = MultiStageMachine::new_glance(bob_card, 0);
+    let mut alice = MultiStageMachine::new_glance(signed_session("Alice"), 0);
+    let mut bob = MultiStageMachine::new_glance(signed_session("Bob"), 0);
 
     let mut now: u64 = 0;
     let mut alice_frame: Option<String> = None;
@@ -237,6 +236,7 @@ fn both_machines_emit_the_finalized_event_that_triggers_persist() {
                 bob_final += 1;
             }
         }
+        save_when_finalized([&mut alice, &mut bob]);
         if alice.is_terminal() && bob.is_terminal() {
             break;
         }
@@ -265,9 +265,7 @@ fn finalized_machine_exposes_combo_for_broadcast_seed() {
     // Hover: Pixel finalized + persisted, Samsung read DATA for 58s then timed
     // out). The AppEngine seeds that broadcast with this COMBO so the trailing
     // peer always scans our RDYY.
-    let alice_card = b"name:Alice\nemail:alice@example.com".to_vec();
-    let bob_card = b"name:Bob\nemail:bob@example.com".to_vec();
-    let (alice, bob, ticks) = drive_two_party_glance(alice_card, bob_card, 4000);
+    let (alice, bob, ticks) = drive_two_party_glance(4000);
 
     // A saved session shows its final frame as DONE (design D6); `Completed`
     // means it has also read the peer's BOTH, and the seed is unchanged.
@@ -281,7 +279,7 @@ fn finalized_machine_exposes_combo_for_broadcast_seed() {
     );
     let seed = alice.finalization_qr();
     assert!(
-        seed.data.starts_with("DON3"),
+        seed.data.starts_with("DON4"),
         "the broadcast seed must be the final frame, got prefix {:?}",
         &seed.data[..seed.data.len().min(4)],
     );
@@ -290,7 +288,7 @@ fn finalized_machine_exposes_combo_for_broadcast_seed() {
         MultiStagePhase::Finalized { .. } | MultiStagePhase::Completed
     ) {
         assert!(
-            bob.finalization_qr().data.starts_with("DON3"),
+            bob.finalization_qr().data.starts_with("DON4"),
             "the slow peer's broadcast seed must also be the final frame",
         );
     }
@@ -357,20 +355,69 @@ fn assert_finalized_pair_builds_matching_ratchet(
 // @scenario: contact_exchange :: Multi-stage wrapper builds a working ratchet (lockstep)
 #[test]
 fn lockstep_glance_builds_matching_ratchet_pair() {
-    let alice_card = b"name:Alice\nemail:alice@example.com".to_vec();
-    let bob_card = b"name:Bob\nemail:bob@example.com".to_vec();
-
-    let (alice, bob, _ticks) = drive_two_party_glance(alice_card, bob_card, 4000);
+    let (alice, bob, _ticks) = drive_two_party_glance(4000);
     assert_finalized_pair_builds_matching_ratchet(&alice, &bob);
 }
 
 // @scenario: contact_exchange :: Multi-stage wrapper builds a working ratchet (asymmetric camera)
 #[test]
 fn asymmetric_glance_builds_matching_ratchet_pair() {
-    let alice_card = b"name:Alice\nemail:alice@example.com".to_vec();
-    let bob_card = b"name:Bob\nemail:bob@example.com".to_vec();
-
     // Bob 5× lossier — the Pixel-vs-S7 asymmetry the device exhibited.
-    let (alice, bob, _ticks) = drive_asymmetric_glance(alice_card, bob_card, 5, 8000);
+    let (alice, bob, _ticks) = drive_asymmetric_glance(5, 8000);
     assert_finalized_pair_builds_matching_ratchet(&alice, &bob);
+}
+
+// FAIL's linger runs on the session's monotonic clock, which only the
+// `testing` feature lets a test move.
+// @internal
+#[cfg(feature = "testing")]
+#[test]
+fn a_machine_whose_save_failed_shows_fail_then_reports_the_failure() {
+    let clock = std::sync::Arc::new(vauchi_core::monotonic::FakeMonotonicClock::new());
+    let mut alice =
+        MultiStageMachine::new_glance(signed_session("Alice").with_monotonic(clock.clone()), 0);
+    let mut bob = MultiStageMachine::new_glance(signed_session("Bob"), 0);
+    let mut now: u64 = 0;
+    let mut alice_frame: Option<String> = None;
+    let mut bob_frame: Option<String> = None;
+    for _ in 0..4000 {
+        now += 500;
+        if let MultiStageEvent::QrFrameReady(p) = alice.advance(now) {
+            alice_frame = Some(p.data);
+        }
+        if let MultiStageEvent::QrFrameReady(p) = bob.advance(now) {
+            bob_frame = Some(p.data);
+        }
+        if let Some(data) = bob_frame.clone() {
+            let _ = alice.handle_hardware_event(&Event::QrScanned { data }, now);
+        }
+        if matches!(alice.phase(), MultiStagePhase::Finalized { .. }) {
+            break;
+        }
+        if let Some(data) = alice_frame.clone() {
+            let _ = bob.handle_hardware_event(&Event::QrScanned { data }, now);
+        }
+    }
+    assert!(matches!(alice.phase(), MultiStagePhase::Finalized { .. }));
+
+    alice.save_failed();
+    let mut fail_frames = 0;
+    let mut failed = false;
+    for _ in 0..40 {
+        now += 500;
+        clock.advance(std::time::Duration::from_millis(500));
+        match alice.advance(now) {
+            MultiStageEvent::QrFrameReady(p) => {
+                assert!(p.data.starts_with("FAI3"), "showed {}", &p.data[..4]);
+                assert!(!failed, "no frame after the failure is reported");
+                fail_frames += 1;
+            }
+            MultiStageEvent::Failed { .. } => failed = true,
+            _ => {}
+        }
+    }
+
+    assert!(fail_frames > 0, "FAIL was shown");
+    assert!(failed, "the failure was reported once FAIL had been shown");
+    assert!(matches!(alice.phase(), MultiStagePhase::Failed { .. }));
 }

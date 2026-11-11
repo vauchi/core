@@ -29,7 +29,6 @@ use vauchi_app::ui::{AppEngine, AppScreen, Component, UserAction, WorkflowEngine
 use vauchi_core::Event;
 use vauchi_core::api::Vauchi;
 use vauchi_core::clock::{Clock, FakeClock};
-use vauchi_core::exchange::MultiStageSession;
 
 /// Extract the `own_qr` display component's payload from the engine's
 /// current screen, if present.
@@ -80,7 +79,7 @@ fn multi_stage_poll_advances_frame_after_peer_scan_and_frame_window() {
     // A peer (Bob) advertises; we scan his INIT. This moves our session
     // Advertising → Discovered, so the next display frame is a DATA chunk
     // (a different payload than the INIT frame).
-    let mut bob = MultiStageSession::new(b"name:Bob\nemail:bob@example.com".to_vec());
+    let mut bob = crate::signed_session::signed_session("Bob");
     let bob_init = bob.get_display_qr().expect("bob INIT frame").data;
     let scan_event =
         engine.forward_multi_stage_hardware_event(&Event::QrScanned { data: bob_init });

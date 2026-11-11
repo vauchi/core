@@ -74,17 +74,24 @@ pub enum StageQr {
         crc: u16,
         payload: Vec<u8>,
     },
-    /// The final frame: the sender's reveal key and one value confirming
-    /// its card and both session ids, `SHA-256(card hash ‖ ready hash)`.
-    /// One read takes a peer that holds every chunk to Finalized.
+    /// REVEAL: the sender's reveal key, shown until its checks of the peer's
+    /// payload passed; no tag yet (vauchi/private#1217).
+    Reveal {
+        session_id: [u8; 16],
+        reveal_key: [u8; 32],
+    },
+    /// CONFIRM: the reveal key and a tag keyed from the transport key
+    /// saying the sender checked and accepted the reader's payload. One
+    /// read takes a peer that holds every chunk and has checked the sender
+    /// to Finalized.
     Final {
         session_id: [u8; 16],
         reveal_key: [u8; 32],
         tag: [u8; 32],
     },
-    /// DONE: the final frame shown by a phone that has saved. A peer that
-    /// has not saved reads it as the final frame; a saved peer learns that
-    /// both have (design D6).
+    /// DONE: shown by a phone that has saved, with its own keyed tag. A
+    /// peer that has not finalized reads it as a confirm; a saved peer
+    /// learns that both have (design D6).
     Done {
         session_id: [u8; 16],
         reveal_key: [u8; 32],
@@ -93,25 +100,6 @@ pub enum StageQr {
     /// BOTH: shown by a saved phone that read its peer's DONE. The reader
     /// stops at once (design D6). Unkeyed by owner decision 2026-10-04.
     Both { session_id: [u8; 16] },
-    /// INIT with embedded data: for small payloads (1 chunk), includes the
-    /// raw commitment ciphertext. Eliminates the DATA phase entirely.
-    /// Peer goes directly from Advertising → has all data in one scan.
-    ///
-    /// v2 (`IN2D` prefix, this variant): the redundant `pubkey: [u8; 32]`
-    /// field has been removed. The v1 `INID` prefix carried both an
-    /// `ephemeral` X25519 key and a `pubkey` (a 32-byte identity stand-in)
-    /// even though the multi-stage protocol authenticates via the
-    /// commitment hash + reveal key, not via the identity pubkey on the
-    /// wire. See `_private/docs/problems/2026-05-21-multistage-identity-pubkey-footgun/`.
-    Inid {
-        session_id: [u8; 16],
-        ephemeral: [u8; 32],
-        commitment_hash: [u8; 32],
-        display_name: String,
-        relay_url: Option<String>,
-        /// Raw commitment ciphertext (not transport-encrypted).
-        ciphertext: Vec<u8>,
-    },
     /// Failure notification — tells peer to abort immediately.
     Fail { session_id: [u8; 16] },
     /// SHAK stage: an AEAD-sealed accelerometer magnitude envelope for the
@@ -137,7 +125,7 @@ impl StageQr {
             | Self::Final { session_id, .. }
             | Self::Done { session_id, .. }
             | Self::Both { session_id }
-            | Self::Inid { session_id, .. }
+            | Self::Reveal { session_id, .. }
             | Self::Fail { session_id }
             | Self::Shake { session_id, .. } => session_id,
         }
@@ -167,7 +155,7 @@ const FLAG_HAS_RELAY_URL: u8 = 0x01;
 /// Stage prefixes (4 chars each).
 const PREFIX_LEN: usize = 4;
 const PREFIXES: [&str; 8] = [
-    "INI3", "IN3D", "DAT4", "FIN3", "DON3", "BTH3", "FAI3", "SHK3",
+    "INI3", "RVL4", "DAT4", "CNF4", "DON4", "BTH3", "FAI3", "SHK3",
 ];
 
 fn decode_fixed<const N: usize>(encoded: &str) -> Result<[u8; N], QrCodecError> {
@@ -209,10 +197,14 @@ fn frame(prefix: &str, body: &str) -> String {
 }
 
 /// Stage prefixes of the format used before every frame carried a header.
-const OLD_FORMAT_PREFIXES: [&str; 10] = [
+const OLD_FORMAT_PREFIXES: [&str; 13] = [
     "INI2", "IN2D", "DATA", "VRFY", "CONF", "RDYY", "FAIL", "SHAK", "CMBO",
     // DAT3 chunks did not authenticate the ACK they carried (#676).
     "DAT3",
+    // IN3D carried the commitment ciphertext outside transport encryption,
+    // and FIN3/DON3 an unkeyed tag: together they let a recorded payload be
+    // replayed in another session (#1217).
+    "IN3D", "FIN3", "DON3",
 ];
 
 /// Split a frame into its stage prefix, training header and body.
@@ -297,67 +289,6 @@ pub fn format_ini2_qr_with_relay(
     result
 }
 
-#[allow(clippy::too_many_arguments)]
-/// Format an INID (INIT+Data) QR for small payloads.
-///
-/// v2 layout (`IN2D` prefix): same as `format_ini2_qr_with_relay` but
-/// with appended ciphertext:
-/// `IN2D<sid:24><eph:48><ch:48><name_len:2><name><flags:2>[relay]<ct_len:3><ct>`
-///
-/// The v1 `INID` layout carried a redundant `<pk:48>` identity stand-in
-/// field which has been removed for v2. See
-/// `_private/docs/problems/2026-05-21-multistage-identity-pubkey-footgun/`.
-///
-/// The ciphertext is the raw commitment ciphertext (NOT transport-encrypted).
-/// Security: the commitment scheme provides confidentiality (ChaCha20-Poly1305
-/// with random reveal key) and integrity (commitment hash). Transport encryption
-/// is redundant for single-chunk payloads bound to this session's commitment hash.
-#[allow(dead_code)]
-pub fn format_in2d_qr(
-    session_id: &[u8; 16],
-    ephemeral: &[u8; 32],
-    commitment_hash: &[u8; 32],
-    display_name: &str,
-    relay_url: Option<&str>,
-    ciphertext: &[u8],
-) -> String {
-    assert!(
-        display_name.len() <= 99,
-        "display_name exceeds 99-byte limit"
-    );
-
-    let mut flags: u8 = 0;
-    if relay_url.is_some() {
-        flags |= FLAG_HAS_RELAY_URL;
-    }
-
-    let ct_encoded = base45::encode(ciphertext);
-
-    // Build same as INIT but with INID prefix, then append ciphertext at the end
-    let mut result = frame(
-        "IN3D",
-        &format!(
-            "{sid}{eph}{ch}{name_len:02}{name}{flags}",
-            sid = base45::encode(session_id),
-            eph = base45::encode(ephemeral),
-            ch = base45::encode(commitment_hash),
-            name_len = display_name.len(),
-            name = display_name,
-            flags = base45::encode(&[flags]),
-        ),
-    );
-
-    // Relay fields (same position as INIT)
-    if let Some(url) = relay_url {
-        result.push_str(&format!("{:03}{}", url.len(), url));
-    }
-
-    // Ciphertext appended at the very end with length prefix
-    result.push_str(&format!("{:03}{}", ct_encoded.len(), ct_encoded));
-
-    result
-}
-
 /// Format a DATA stage QR string with CRC-16 integrity check.
 ///
 /// Layout: `DAT4<header:8><sid:24><idx:4>/<total:4><ack_len:2><ack:variable><crc:3><payload>`
@@ -394,16 +325,29 @@ pub fn format_data_qr(
     )
 }
 
-/// Format a final frame: `FIN3<header:8><sid:24><rk:48><tag:48>`, 132
-/// characters, the density of the opening frame.
-pub fn format_final_qr(session_id: &[u8; 16], reveal_key: &[u8; 32], tag: &[u8; 32]) -> String {
-    frame("FIN3", &final_body(session_id, reveal_key, tag))
+/// Format a REVEAL frame: `RVL4<header:8><sid:24><rk:48>`, shown until the
+/// sender's checks of the peer's payload passed (#1217).
+pub fn format_reveal_qr(session_id: &[u8; 16], reveal_key: &[u8; 32]) -> String {
+    frame(
+        "RVL4",
+        &format!(
+            "{sid}{rk}",
+            sid = base45::encode(session_id),
+            rk = base45::encode(reveal_key),
+        ),
+    )
 }
 
-/// Format a DONE frame: the final frame's body under `DON3`, shown once
-/// the sender has saved.
+/// Format a CONFIRM frame: `CNF4<header:8><sid:24><rk:48><tag:48>`, 132
+/// characters, the density of the opening frame. The tag is keyed (#1217).
+pub fn format_final_qr(session_id: &[u8; 16], reveal_key: &[u8; 32], tag: &[u8; 32]) -> String {
+    frame("CNF4", &final_body(session_id, reveal_key, tag))
+}
+
+/// Format a DONE frame: the confirm's layout under `DON4`, with its own
+/// keyed tag, shown once the sender has saved.
 pub fn format_done_qr(session_id: &[u8; 16], reveal_key: &[u8; 32], tag: &[u8; 32]) -> String {
-    frame("DON3", &final_body(session_id, reveal_key, tag))
+    frame("DON4", &final_body(session_id, reveal_key, tag))
 }
 
 /// Format a BOTH frame: `BTH3<header:8><sid:24>`.
@@ -420,12 +364,9 @@ fn final_body(session_id: &[u8; 16], reveal_key: &[u8; 32], tag: &[u8; 32]) -> S
     )
 }
 
-/// Format a FAIL QR: `FAIL<sid:24>`
-///
-/// Tells the peer to abort immediately. No session sends it since the
-/// wait-for-RDYY timeout went with the one final frame (#450); sessions
-/// still accept it, and tests build it.
-#[allow(dead_code)]
+/// Format a FAIL frame: `FAI3<header:8><sid:24>`. A phone that rejected
+/// its peer's payload, or could not save it, shows it so the peer stops at
+/// once (vauchi/private#1217).
 pub fn format_fail_qr(session_id: &[u8; 16]) -> String {
     frame("FAI3", &base45::encode(session_id))
 }
@@ -462,14 +403,14 @@ pub fn parse_frame(raw: &str) -> Result<Frame, QrCodecError> {
 
     let stage = match prefix {
         "INI3" => parse_ini2(body),
-        "IN3D" => parse_in2d(body),
+        "RVL4" => parse_reveal(body),
         "DAT4" => parse_data(body),
-        "FIN3" => parse_final_body(body).map(|(session_id, reveal_key, tag)| StageQr::Final {
+        "CNF4" => parse_final_body(body).map(|(session_id, reveal_key, tag)| StageQr::Final {
             session_id,
             reveal_key,
             tag,
         }),
-        "DON3" => parse_final_body(body).map(|(session_id, reveal_key, tag)| StageQr::Done {
+        "DON4" => parse_final_body(body).map(|(session_id, reveal_key, tag)| StageQr::Done {
             session_id,
             reveal_key,
             tag,
@@ -524,49 +465,6 @@ fn parse_ini2(body: &str) -> Result<StageQr, QrCodecError> {
         commitment_hash: decode_fixed(ch)?,
         display_name: name.to_string(),
         relay_url,
-    })
-}
-
-fn parse_in2d(body: &str) -> Result<StageQr, QrCodecError> {
-    let mut pos = 0;
-    let sid = take(body, &mut pos, SID_LEN)?;
-    let eph = take(body, &mut pos, F32_LEN)?;
-    let ch = take(body, &mut pos, F32_LEN)?;
-    let name_len_str = take(body, &mut pos, NAME_LEN_LEN)?;
-    let name_len: usize = name_len_str
-        .parse()
-        .map_err(|_| QrCodecError::InvalidFieldCount)?;
-    let name = take(body, &mut pos, name_len)?;
-    let flags_encoded = take(body, &mut pos, FLAGS_LEN)?;
-    let flags_bytes: [u8; 1] = decode_fixed(flags_encoded)?;
-    let flags = flags_bytes[0];
-
-    let relay_url = if flags & FLAG_HAS_RELAY_URL != 0 {
-        let url_len_str = take(body, &mut pos, URL_LEN_LEN)?;
-        let url_len: usize = url_len_str
-            .parse()
-            .map_err(|_| QrCodecError::InvalidFieldCount)?;
-        let url = take(body, &mut pos, url_len)?;
-        Some(url.to_string())
-    } else {
-        None
-    };
-
-    // Ciphertext with length prefix (at the end)
-    let ct_len_str = take(body, &mut pos, 3)?;
-    let ct_len: usize = ct_len_str
-        .parse()
-        .map_err(|_| QrCodecError::InvalidFieldCount)?;
-    let ct_encoded = take(body, &mut pos, ct_len)?;
-    let ciphertext = base45::decode(ct_encoded)?;
-
-    Ok(StageQr::Inid {
-        session_id: decode_fixed(sid)?,
-        ephemeral: decode_fixed(eph)?,
-        commitment_hash: decode_fixed(ch)?,
-        display_name: name.to_string(),
-        relay_url,
-        ciphertext,
     })
 }
 
@@ -634,6 +532,16 @@ fn parse_final_body(body: &str) -> Result<FinalBody, QrCodecError> {
     let tag = take(body, &mut pos, F32_LEN)?;
 
     Ok((decode_fixed(sid)?, decode_fixed(rk)?, decode_fixed(tag)?))
+}
+
+fn parse_reveal(body: &str) -> Result<StageQr, QrCodecError> {
+    let mut pos = 0;
+    let sid = take(body, &mut pos, SID_LEN)?;
+    let rk = take(body, &mut pos, F32_LEN)?;
+    Ok(StageQr::Reveal {
+        session_id: decode_fixed(sid)?,
+        reveal_key: decode_fixed(rk)?,
+    })
 }
 
 fn parse_session_id_only(body: &str) -> Result<[u8; 16], QrCodecError> {

@@ -79,6 +79,13 @@ test-kdf = ["vauchi-core/test-kdf"]
 ignored = ["tokio"]  # Optional dep behind content-updates feature
 
 [[test]]
+name = "cucumber_tests"
+harness = false
+# Needs the `testing` exchange seams (MockProximityVerifier) for the two-party
+# exchange steps; run with `--features testing,test-kdf`.
+required-features = ["testing"]
+
+[[test]]
 name = "reachability"
 path = "tests/reachability/main.rs"
 # Runs via `just reachability` — requires test-support to access
@@ -95,6 +102,8 @@ required-features = ["testing"]
 # Shared arrange helpers for tests/it (vauchi/private#1230).
 vauchi-core-testkit.workspace = true
 vauchi-protocol.workspace = true
+cucumber = "0.21"
+futures = "0.3"
 tempfile = "3.0"
 proptest = "1.4"
 

@@ -202,18 +202,9 @@ rstest = "0.26"
 # Benchmarking (default features disabled: no plotters/rayon)
 criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }
 # BDD testing (executable Gherkin)
-cucumber = "0.21"
-futures = "0.3"
 
 [[test]]
 name = "it"
-required-features = ["testing"]
-
-[[test]]
-name = "cucumber_tests"
-harness = false
-# Needs the `testing` exchange seams (MockProximityVerifier) for the two-party
-# exchange steps; run with `--features testing,test-kdf`.
 required-features = ["testing"]
 
 [[bench]]

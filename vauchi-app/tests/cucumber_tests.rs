@@ -14,8 +14,8 @@
 //!
 //! Usage (needs `testing` for the two-party exchange seams; `test-kdf` for
 //! fast per-scenario identity creation):
-//!   cargo test --test cucumber_tests --features testing,test-kdf
-//!   cargo test --test cucumber_tests --features testing,test-kdf -- --tags @contact-card
+//!   cargo test -p vauchi-app --test cucumber_tests --features testing,test-kdf
+//!   cargo test -p vauchi-app --test cucumber_tests --features testing,test-kdf -- --tags @contact-card
 
 use cucumber::{World, writer::Stats as _};
 use vauchi_core::{ContactCard, Vauchi};
@@ -163,7 +163,7 @@ fn main() {
     // exclusion is explicit rather than implicit. See
     // `problems/2026-07-04-cucumber-backgrounds-fail-silently`.
     //
-    //   cargo test --test cucumber_tests -- --tags @contact-card
+    //   cargo test -p vauchi-app --test cucumber_tests -- --tags @contact-card
     let features_dir = format!(
         "{}/../../features",
         std::env::var("CARGO_MANIFEST_DIR")

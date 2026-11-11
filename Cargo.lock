@@ -4134,7 +4134,9 @@ name = "vauchi-app"
 version = "0.104.0"
 dependencies = [
  "base64",
+ "cucumber",
  "flate2",
+ "futures",
  "hex",
  "proptest",
  "schemars 0.8.22",
@@ -4189,11 +4191,9 @@ dependencies = [
  "crc32fast",
  "criterion",
  "ctor",
- "cucumber",
  "ed25519-dalek",
  "fast_image_resize",
  "flate2",
- "futures",
  "getrandom 0.2.17",
  "hex",
  "hkdf",

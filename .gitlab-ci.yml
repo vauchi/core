@@ -654,10 +654,11 @@ build:tests:
     - !reference [.clone-themes, before_script]
   script:
     - echo "── clippy, --all-targets across the full dependency tree ──"
-    # `testing` is on so the targets that require it (vauchi-core's `it`
-    # suite and cucumber runner) are linted too: without it cargo skips
-    # them silently, and they had gathered 302 findings (private#1230).
-    - cargo clippy --all-targets --features vauchi-core/testing -- -D warnings
+    # `testing` is on for both crates so the targets that require it
+    # (vauchi-core's `it` suite and vauchi-app's cucumber runner) are linted
+    # too: without them cargo skips those targets silently, and they had
+    # gathered 302 findings (private#1230).
+    - cargo clippy --all-targets --features vauchi-core/testing,vauchi-app/testing -- -D warnings
     # CABI header freshness — catch stale headers after export changes (T0-11)
     - echo "── vauchi-cabi header ──"
     - cargo build -p vauchi-cabi
@@ -710,7 +711,7 @@ build:tests:
     # Cucumber is harness=false, which nextest cannot archive: build the
     # binary and keep it as is.
     - |
-      cucumber="$(cargo test --test cucumber_tests --features testing,test-kdf --no-run --message-format=json \
+      cucumber="$(cargo test -p vauchi-app --test cucumber_tests --features testing,test-kdf --no-run --message-format=json \
         | python3 -c 'import json, sys
       for line in sys.stdin:
           message = json.loads(line)
@@ -1247,7 +1248,7 @@ test:cucumber:
     # binary finds ../features through CARGO_MANIFEST_DIR, which cargo
     # would set and a direct run must.
     - !reference [.archive-setup, script]
-    - CARGO_MANIFEST_DIR="$CI_PROJECT_DIR/vauchi-core" "$ARCHIVE_DIR/cucumber_tests" --tags "not @wip and not @ui"
+    - CARGO_MANIFEST_DIR="$CI_PROJECT_DIR/vauchi-app" "$ARCHIVE_DIR/cucumber_tests" --tags "not @wip and not @ui"
 
 test:platform:
   extends: [.run-archive, .validation-platform]

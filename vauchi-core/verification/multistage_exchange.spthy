@@ -1,0 +1,340 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Multi-stage ("Hover") QR exchange, v3 (vauchi/private#1217;
+ * problem record 2026-11-11-multistage-identity-binding):
+ *
+ *   - each side makes a session id, an X25519 ephemeral key and a reveal
+ *     key; its payload carries its identity key, its card and a signature
+ *     by that identity over (own session id, own ephemeral, identity,
+ *     relay URL, card); the payload is committed under the reveal key and
+ *     INIT shows (session id, ephemeral, commitment hash, relay URL);
+ *   - the commitment ciphertext travels encrypted under the transport key
+ *     HKDF(DH(ephemerals)); INIT with the ciphertext in clear (IN3D) is not
+ *     accepted;
+ *   - REVEAL shows the reveal key; each side opens the peer payload and
+ *     checks the commitment, the signature over the PEER's session id,
+ *     ephemeral and relay URL, and that the identity is not its own;
+ *   - only then CONFIRM: a tag keyed from the transport key over a label,
+ *     the transcript (sender then receiver: session ids, ephemerals,
+ *     commitment hashes) and both payloads; a side saves on the peer's
+ *     CONFIRM and shows DONE, a tag with its own label.
+ *
+ * The attacker controls every channel (the QR is shown on a screen anyone
+ * may film). Card validity, self-exchange by a linked device, the rekey
+ * deferral and reciprocity are outside this model (reciprocity.spthy);
+ * the lost last frame is liveness, not safety: a phone may save while its
+ * peer never does, and no lemma here claims otherwise.
+ *
+ * Run: tamarin-prover --prove multistage_exchange.spthy
+ * Prove it can fail (each must be falsified):
+ *   -DNO_PAYLOAD_SIG         card_authentic: anyone can claim an identity
+ *   -DLEGACY_TAG             peer_accepted_before_save: today's unkeyed
+ *                            tag plus IN3D lets a recorded session replay
+ *   -DCONFIRM_BEFORE_VERIFY  peer_accepted_before_save: v2's ordering lets
+ *                            a side save while its peer rejected it
+ *   -DNO_LABEL               peer_saved_is_true: CONFIRM and DONE share
+ *                            one tag shape, so a CONFIRM reads as DONE
+ * ADR-071 rebind (-DREBIND): the safety lemmas must stay verified with up
+ *   to two bindings of one advertisement (executable is not run there).
+ * Defence in depth (must stay verified):
+ *   -DACCEPT_IN3D            peer_accepted_before_save: accepting IN3D
+ *                            again does not break the keyed confirm
+ */
+
+theory VauchiMultistageExchange
+begin
+
+builtins: diffie-hellman, signing, hashing, symmetric-encryption, multiset
+
+functions: mac/2
+
+restriction Equality:
+  "All x y #i. Eq(x, y) @ i ==> x = y"
+
+restriction Inequality:
+  "All x #i. Neq(x, x) @ i ==> F"
+
+rule Register_identity:
+  [ Fr(~ltk) ]
+  --[ Identity($P, pk(~ltk)) ]->
+  [ !Ltk($P, ~ltk), !Pk($P, pk(~ltk)), Out(pk(~ltk)) ]
+
+rule Reveal_identity:
+  [ !Ltk($P, ltk) ]
+  --[ RevealIdentity($P) ]->
+  [ Out(ltk) ]
+
+/* Start a session: payload, commitment and INIT. */
+#ifdef REBIND
+/* ADR-071 recovery (`rehandshake_after_peer_restart`) keeps our session
+   id, ephemeral, reveal key and committed payload and binds them to
+   another peer. The advertisement is permanent; each binding is a sibling
+   with its own fresh binding id, used only to tell bindings apart, never
+   sent. At most two bindings per advertisement: the smallest case in
+   which a frame of one binding can reach the other, and enough bound for
+   the prover to terminate. */
+rule Start:
+  let epk = 'g' ^ ~e
+      signed = <'pl2', ~sid, epk, pk(ltk), $relay, ~card>
+      pl = <pk(ltk), sign(signed, ltk), ~card>
+      c = senc(pl, ~rk)
+      ch = h(<c, $relay>)
+  in
+  [ !Ltk($A, ltk), Fr(~sid), Fr(~e), Fr(~rk), Fr(~card) ]
+  --[ Started($A, pk(ltk), ~sid, ~card) ]->
+  [ !Advert($A, ltk, ~sid, ~e, ~rk, pl, c, ch, $relay)
+  , Out(<'INIT', ~sid, epk, ch, $relay>) ]
+
+rule Bind:
+  [ !Advert($A, ltk, sid, e, rk, pl, c, ch, relay), Fr(~bid) ]
+  --[ Bound($A, sid, ~bid) ]->
+  [ St_init($A, ltk, sid, e, rk, pl, c, ch, relay) ]
+
+restriction At_most_two_bindings:
+  "All A s b1 b2 b3 #i #j #k.
+     Bound(A, s, b1) @ i & Bound(A, s, b2) @ j & Bound(A, s, b3) @ k
+     ==> #i = #j | #i = #k | #j = #k"
+#else
+rule Start:
+  let epk = 'g' ^ ~e
+      signed = <'pl2', ~sid, epk, pk(ltk), $relay, ~card>
+      pl = <pk(ltk), sign(signed, ltk), ~card>
+      c = senc(pl, ~rk)
+      ch = h(<c, $relay>)
+  in
+  [ !Ltk($A, ltk), Fr(~sid), Fr(~e), Fr(~rk), Fr(~card) ]
+  --[ Started($A, pk(ltk), ~sid, ~card) ]->
+  [ St_init($A, ltk, ~sid, ~e, ~rk, pl, c, ch, $relay)
+  , Out(<'INIT', ~sid, epk, ch, $relay>) ]
+#endif
+
+/* Read the peer's INIT, derive the transport key, send the ciphertext. */
+rule Read_init:
+  let tk = h(<'transport', epk_b ^ e>)
+  in
+  [ St_init($A, ltk, sid, e, rk, pl, c, ch, relay)
+  , In(<'INIT', sid_b, epk_b, ch_b, relay_b>) ]
+  --[ Neq(sid_b, sid) ]->
+  [ St_xfer($A, ltk, sid, e, rk, pl, c, ch, relay,
+            sid_b, epk_b, ch_b, relay_b, tk)
+  , Out(<'DATA', sid, senc(c, tk)>) ]
+
+/* Receive the peer's ciphertext and show our reveal key. */
+#ifdef LEGACY_TAG | ACCEPT_IN3D
+rule Read_data_in_clear:
+  [ St_xfer($A, ltk, sid, e, rk, pl, c, ch, relay,
+            sid_b, epk_b, ch_b, relay_b, tk)
+  , In(<'IN3D', sid_b, c_b>) ]
+  --[ ]->
+  [ St_reveal($A, ltk, sid, e, rk, pl, c, ch, relay,
+              sid_b, epk_b, ch_b, relay_b, tk, c_b)
+  , Out(<'REVEAL', sid, rk>) ]
+#endif
+
+#ifdef CONFIRM_BEFORE_VERIFY
+/* v2: the tag leaves with the reveal key, before any check of the peer,
+   and covers only the sender's own payload. */
+rule Read_data:
+  let epk = 'g' ^ e
+      k = h(<'k_confirm', tk>)
+      tr_out = <sid, sid_b, epk, epk_b, ch, ch_b>
+  in
+  [ St_xfer($A, ltk, sid, e, rk, pl, c, ch, relay,
+            sid_b, epk_b, ch_b, relay_b, tk)
+  , In(<'DATA', sid_b, senc(c_b, tk)>) ]
+  --[ ]->
+  [ St_reveal($A, ltk, sid, e, rk, pl, c, ch, relay,
+              sid_b, epk_b, ch_b, relay_b, tk, c_b)
+  , Out(<'REVEAL', sid, rk>)
+  , Out(<'CONFIRM', sid, mac(k, <'CNF', tr_out, h(pl)>)>) ]
+#endif
+#ifdef not CONFIRM_BEFORE_VERIFY
+rule Read_data:
+  [ St_xfer($A, ltk, sid, e, rk, pl, c, ch, relay,
+            sid_b, epk_b, ch_b, relay_b, tk)
+  , In(<'DATA', sid_b, senc(c_b, tk)>) ]
+  --[ ]->
+  [ St_reveal($A, ltk, sid, e, rk, pl, c, ch, relay,
+              sid_b, epk_b, ch_b, relay_b, tk, c_b)
+  , Out(<'REVEAL', sid, rk>) ]
+#endif
+
+
+/* The transcript a CONFIRM or DONE from `snd` to `rcv` covers. */
+/* tr(snd, rcv) = <sid_snd, sid_rcv, epk_snd, epk_rcv, ch_snd, ch_rcv> */
+
+
+/* Open the peer payload and check it; only then confirm. */
+#ifdef NO_PAYLOAD_SIG
+rule Verify_and_confirm:
+  let epk = 'g' ^ e
+      pl_b = <pk_b, sig_b, card_b>
+      c_b = senc(pl_b, rk_b)
+      k = h(<'k_confirm', tk>)
+      tr_out = <sid, sid_b, epk, epk_b, ch, ch_b>
+  in
+  [ St_reveal($A, ltk, sid, e, rk, pl, c, ch, relay,
+              sid_b, epk_b, ch_b, relay_b, tk, c_b)
+  , In(<'REVEAL', sid_b, rk_b>) ]
+  --[ Eq(ch_b, h(<c_b, relay_b>))
+    , Neq(pk_b, pk(ltk))
+    , Accepted($A, pk(ltk), pk_b, sid, sid_b, card_b)
+    ]->
+  [ St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
+                 pk_b, card_b, pl_b, k)
+  , Out(<'CONFIRM', sid, mac(k, <'CNF', tr_out, h(pl), h(pl_b)>)>) ]
+#endif
+#ifdef CONFIRM_BEFORE_VERIFY
+rule Verify_and_confirm:
+  let epk = 'g' ^ e
+      pl_b = <pk_b, sig_b, card_b>
+      c_b = senc(pl_b, rk_b)
+      signed_b = <'pl2', sid_b, epk_b, pk_b, relay_b, card_b>
+      k = h(<'k_confirm', tk>)
+  in
+  [ St_reveal($A, ltk, sid, e, rk, pl, c, ch, relay,
+              sid_b, epk_b, ch_b, relay_b, tk, c_b)
+  , In(<'REVEAL', sid_b, rk_b>) ]
+  --[ Eq(ch_b, h(<c_b, relay_b>))
+    , Eq(verify(sig_b, signed_b, pk_b), true)
+    , Neq(pk_b, pk(ltk))
+    , Accepted($A, pk(ltk), pk_b, sid, sid_b, card_b)
+    ]->
+  [ St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
+                 pk_b, card_b, pl_b, k) ]
+#endif
+#ifdef not NO_PAYLOAD_SIG & not CONFIRM_BEFORE_VERIFY
+rule Verify_and_confirm:
+  let epk = 'g' ^ e
+      pl_b = <pk_b, sig_b, card_b>
+      c_b = senc(pl_b, rk_b)
+      signed_b = <'pl2', sid_b, epk_b, pk_b, relay_b, card_b>
+      k = h(<'k_confirm', tk>)
+      tr_out = <sid, sid_b, epk, epk_b, ch, ch_b>
+  in
+  [ St_reveal($A, ltk, sid, e, rk, pl, c, ch, relay,
+              sid_b, epk_b, ch_b, relay_b, tk, c_b)
+  , In(<'REVEAL', sid_b, rk_b>) ]
+  --[ Eq(ch_b, h(<c_b, relay_b>))
+    , Eq(verify(sig_b, signed_b, pk_b), true)
+    , Neq(pk_b, pk(ltk))
+    , Accepted($A, pk(ltk), pk_b, sid, sid_b, card_b)
+    ]->
+  [ St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
+                 pk_b, card_b, pl_b, k)
+  , Out(<'CONFIRM', sid, mac(k, <'CNF', tr_out, h(pl), h(pl_b)>)>) ]
+#endif
+
+/* The tag a peer sends us: sender first in the transcript. */
+#ifdef LEGACY_TAG
+rule Save_on_confirm:
+  [ St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
+                 pk_b, card_b, pl_b, k)
+  , In(<'CONFIRM', sid_b, t>) ]
+  --[ Eq(t, h(<h(pl_b), sid + sid_b>))
+    , Saved($A, pk(ltk), pk_b, sid, sid_b, card_b)
+    ]->
+  [ St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  , Out(<'DONE', sid, h(<h(pl), sid + sid_b>)>) ]
+#endif
+#ifdef NO_LABEL
+rule Save_on_confirm:
+  let tr_in = <sid_b, sid, epk_b, epk, ch_b, ch>
+      tr_out = <sid, sid_b, epk, epk_b, ch, ch_b>
+  in
+  [ St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
+                 pk_b, card_b, pl_b, k)
+  , In(<'CONFIRM', sid_b, t>) ]
+  --[ Eq(t, mac(k, <'CNF', tr_in, h(pl_b), h(pl)>))
+    , Saved($A, pk(ltk), pk_b, sid, sid_b, card_b)
+    ]->
+  [ St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  , Out(<'DONE', sid, mac(k, <'CNF', tr_out, h(pl), h(pl_b)>)>) ]
+#endif
+#ifdef CONFIRM_BEFORE_VERIFY
+/* v2: the peer's tag covers only its own payload. */
+rule Save_on_confirm:
+  let tr_in = <sid_b, sid, epk_b, epk, ch_b, ch>
+      tr_out = <sid, sid_b, epk, epk_b, ch, ch_b>
+  in
+  [ St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
+                 pk_b, card_b, pl_b, k)
+  , In(<'CONFIRM', sid_b, t>) ]
+  --[ Eq(t, mac(k, <'CNF', tr_in, h(pl_b)>))
+    , Saved($A, pk(ltk), pk_b, sid, sid_b, card_b)
+    ]->
+  [ St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  , Out(<'DONE', sid, mac(k, <'DON', tr_out, h(pl), h(pl_b)>)>) ]
+#endif
+#ifdef not LEGACY_TAG & not NO_LABEL & not CONFIRM_BEFORE_VERIFY
+rule Save_on_confirm:
+  let tr_in = <sid_b, sid, epk_b, epk, ch_b, ch>
+      tr_out = <sid, sid_b, epk, epk_b, ch, ch_b>
+  in
+  [ St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
+                 pk_b, card_b, pl_b, k)
+  , In(<'CONFIRM', sid_b, t>) ]
+  --[ Eq(t, mac(k, <'CNF', tr_in, h(pl_b), h(pl)>))
+    , Saved($A, pk(ltk), pk_b, sid, sid_b, card_b)
+    ]->
+  [ St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  , Out(<'DONE', sid, mac(k, <'DON', tr_out, h(pl), h(pl_b)>)>) ]
+#endif
+
+/* A saved phone reads the peer's DONE: the peer has saved too. */
+#ifdef NO_LABEL
+rule Read_done:
+  let tr_in = <sid_b, sid, epk_b, epk, ch_b, ch>
+  in
+  [ St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  , In(<'DONE', sid_b, t>) ]
+  --[ Eq(t, mac(k, <'CNF', tr_in, h(pl_b), h(pl)>))
+    , PeerSaved($A, pk(ltk), pk_b, sid, sid_b)
+    ]->
+  [ ]
+#else
+rule Read_done:
+  let tr_in = <sid_b, sid, epk_b, epk, ch_b, ch>
+  in
+  [ St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  , In(<'DONE', sid_b, t>) ]
+  --[ Eq(t, mac(k, <'DON', tr_in, h(pl_b), h(pl)>))
+    , PeerSaved($A, pk(ltk), pk_b, sid, sid_b)
+    ]->
+  [ ]
+#endif
+
+/* Two honest phones can both save each other. */
+lemma executable:
+  exists-trace
+  "Ex A B pka pkb sa sb ca cb #i #j.
+     Saved(A, pka, pkb, sa, sb, cb) @ i & Saved(B, pkb, pka, sb, sa, ca) @ j
+     & not (Ex P #r. RevealIdentity(P) @ r)"
+
+/* A saved card is a card the holder of that identity committed, unless
+   that identity's key leaked before the save. */
+lemma card_authentic:
+  "All A B pka pkb sa sb card #i #r.
+     Saved(A, pka, pkb, sa, sb, card) @ i & Identity(B, pkb) @ r
+     ==> (Ex #j. Started(B, pkb, sb, card) @ j)
+         | (Ex #l. RevealIdentity(B) @ l & l < i)"
+
+/* No save on a failed check: a phone saves only after its peer, in the
+   very session it saved from, accepted it. */
+lemma peer_accepted_before_save:
+  "All A B pka pkb sa sb card #i #r.
+     Saved(A, pka, pkb, sa, sb, card) @ i & Identity(B, pkb) @ r
+     ==> (Ex ca #j. Accepted(B, pkb, pka, sb, sa, ca) @ j & j < i)
+         | (Ex #l. RevealIdentity(B) @ l & l < i)"
+
+/* A DONE that a phone takes as "the peer saved" is true. */
+lemma peer_saved_is_true:
+  "All A B pka pkb sa sb #i #r.
+     PeerSaved(A, pka, pkb, sa, sb) @ i & Identity(B, pkb) @ r
+     ==> (Ex ca #j. Saved(B, pkb, pka, sb, sa, ca) @ j & j < i)
+         | (Ex #l. RevealIdentity(B) @ l & l < i)"
+
+end

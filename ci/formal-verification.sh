@@ -215,6 +215,26 @@ tamarin_expect "$models/qr_exchange.spthy" verified "" \
 # Without identity binding an attacker re-signs the peer's ephemeral key.
 tamarin_expect "$models/qr_exchange.spthy" falsified "-DNO_IDENTITY_BINDING" \
     no_misbinding
+# Multi-stage exchange v3 (#1217): a saved card is the one its identity's
+# holder committed, a phone saves only after its peer accepted it, and a
+# peer's DONE means it saved. Each control removes one mechanism; the
+# controls and the ADR-071 rebind run one lemma per prover run.
+tamarin_expect "$models/multistage_exchange.spthy" verified "" \
+    executable card_authentic peer_accepted_before_save peer_saved_is_true
+tamarin_lemma_expect "$models/multistage_exchange.spthy" card_authentic \
+    falsified "-DNO_PAYLOAD_SIG"
+tamarin_lemma_expect "$models/multistage_exchange.spthy" peer_accepted_before_save \
+    falsified "-DLEGACY_TAG"
+tamarin_lemma_expect "$models/multistage_exchange.spthy" peer_accepted_before_save \
+    falsified "-DCONFIRM_BEFORE_VERIFY"
+tamarin_lemma_expect "$models/multistage_exchange.spthy" peer_saved_is_true \
+    falsified "-DNO_LABEL"
+# Accepting IN3D again does not break the keyed confirm (defence in depth).
+tamarin_lemma_expect "$models/multistage_exchange.spthy" peer_accepted_before_save \
+    verified "-DACCEPT_IN3D"
+for l in card_authentic peer_accepted_before_save peer_saved_is_true; do
+    tamarin_lemma_expect "$models/multistage_exchange.spthy" "$l" verified "-DREBIND"
+done
 tamarin_expect "$models/device_link.spthy" verified "" \
     executable seed_secrecy initiator_agreement joiner_agreement \
     qr_leak_exposes_seed qr_leak_lets_attacker_choose_joiner_identity

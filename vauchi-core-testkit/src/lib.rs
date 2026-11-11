@@ -54,7 +54,6 @@ pub mod lost_phone;
 mod mailbox_store;
 #[allow(dead_code)]
 pub mod meeting;
-#[allow(dead_code)]
 pub mod mock_relay;
 #[allow(dead_code)]
 pub mod per_device;

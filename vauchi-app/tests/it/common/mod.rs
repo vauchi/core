@@ -11,8 +11,9 @@
 
 #[allow(unused_imports)]
 pub use vauchi_core_testkit::{
-    card_update, device_sync, field_validation_helpers, fixtures, linked_peer, lost_phone, meeting,
-    mock_relay, per_device, recovered_phone, signed_gateway, strategies, two_recipient, verifiers,
+    card_update, checked_locales_dir, device_sync, field_validation_helpers, fixtures, linked_peer,
+    locales_dir, lost_phone, meeting, mock_relay, per_device, recovered_phone, signed_gateway,
+    strategies, two_recipient, verifiers,
 };
 
 #[allow(dead_code)]

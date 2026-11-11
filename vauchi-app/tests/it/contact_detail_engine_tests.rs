@@ -7,10 +7,21 @@
 //! Imported contacts must use InlineConfirm → hard delete (irrevocable).
 //! Exchanged contacts keep ShowToast + undo for archive (unchanged).
 
-use vauchi_app::ui::{
-    AccessibilityRole, ActionResult, Component, ContactDetailEngine, ContactTag, Field, Item,
-    UiFieldVisibility, UserAction, WorkflowEngine,
-};
+use vauchi_app::ui::AccessibilityRole;
+use vauchi_app::ui::ActionResult;
+use vauchi_app::ui::Component;
+use vauchi_app::ui::ContactDetailEngine;
+use vauchi_app::ui::ContactTag;
+use vauchi_app::ui::Field;
+use vauchi_app::ui::Item;
+use vauchi_app::ui::UiFieldVisibility;
+use vauchi_app::ui::UserAction;
+use vauchi_app::ui::WorkflowEngine;
+use vauchi_app::ui::*;
+use vauchi_core::api::Vauchi;
+use vauchi_core::contact::Contact;
+use vauchi_core::contact_card::ContactCard;
+use vauchi_core::crypto::SymmetricKey;
 
 fn sample_contact() -> Item {
     Item {
@@ -451,4 +462,496 @@ fn suggestions_render_as_add_tag_actions_and_echo_query() {
         _ => None,
     });
     assert_eq!(value, Some("cl".into()), "input echoes the typed query");
+}
+
+// ── Test helpers ────────────────────────────────────────────────────
+
+fn sample_contact_with_email() -> Item {
+    Item {
+        id: "c1".into(),
+        name: "Alice".into(),
+        subtitle: Some("alice@example.com".into()),
+        initials: "AL".into(),
+        status: None,
+        actions: vec![],
+        a11y: None,
+    }
+}
+
+fn sample_fields_with_email() -> Vec<Field> {
+    vec![Field {
+        id: "f1".into(),
+        label: "Email".into(),
+        value: "alice@example.com".into(),
+        field_type: "email".into(),
+        icon: "envelope".into(),
+        visibility_label: String::new(),
+        visibility: UiFieldVisibility::Shown,
+        a11y: None,
+    }]
+}
+
+fn make_detail_engine() -> ContactDetailEngine {
+    ContactDetailEngine::new(
+        sample_contact_with_email(),
+        sample_fields_with_email(),
+        String::new(),
+    )
+}
+
+// ── Personal note tests (Task 7) ─────────────────────────────────────
+
+/// @scenario: contacts_management :: ContactDetail shows personal note
+///
+/// Verifies that a saved personal note is surfaced as an editable text
+/// component on the ContactDetail screen when it is loaded.
+#[cfg(feature = "network-rustls")]
+// @internal
+#[test]
+fn contact_detail_shows_personal_note() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+
+    let card = ContactCard::new("Bob");
+    let shared_key = SymmetricKey::generate();
+    let contact = Contact::from_exchange([2u8; 32], card, shared_key, 0);
+    let bob_id = contact.id().to_string();
+    vauchi.add_contact(contact).unwrap();
+
+    // Save a personal note (plain UTF-8 bytes — app layer does not encrypt)
+    let note_text = "Met at the Rust conference";
+    vauchi
+        .save_personal_notes(&bob_id, note_text.as_bytes())
+        .unwrap();
+
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: bob_id.clone(),
+    });
+
+    assert_eq!(screen.screen_id, "contact_detail");
+
+    // The screen must contain an EditableText component with id "personal_note"
+    let note_component = screen.components.iter().find(|c| {
+        matches!(c, Component::EditableText { id, ..
+        } if id == "personal_note")
+    });
+    assert!(
+        note_component.is_some(),
+        "ContactDetail screen must contain an EditableText component with id 'personal_note', \
+         got components: {:?}",
+        screen
+            .components
+            .iter()
+            .map(|c| match c {
+                Component::EditableText { id, .. } => format!("EditableText({id})"),
+                Component::InfoPanel { id, .. } => format!("InfoPanel({id})"),
+                Component::FieldList { id, .. } => format!("FieldList({id})"),
+                _ => "other".into(),
+            })
+            .collect::<Vec<_>>()
+    );
+
+    // The component must contain the saved note text
+    if let Some(Component::EditableText { value, .. }) = note_component {
+        assert_eq!(
+            value, note_text,
+            "personal_note component must display the saved note text"
+        );
+    }
+}
+
+/// @scenario: contacts_management :: ContactDetail shows empty note when none saved
+#[cfg(feature = "network-rustls")]
+// @internal
+#[test]
+fn contact_detail_shows_empty_note_when_no_note_saved() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+
+    let card = ContactCard::new("Carol");
+    let shared_key = SymmetricKey::generate();
+    let contact = Contact::from_exchange([3u8; 32], card, shared_key, 0);
+    let carol_id = contact.id().to_string();
+    vauchi.add_contact(contact).unwrap();
+
+    // No note saved — personal_note component should be present but empty
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: carol_id,
+    });
+
+    let note_component = screen.components.iter().find(|c| {
+        matches!(c, Component::EditableText { id, ..
+        } if id == "personal_note")
+    });
+
+    assert!(
+        note_component.is_some(),
+        "ContactDetail screen must always have a personal_note EditableText component"
+    );
+    if let Some(Component::EditableText { value, .. }) = note_component {
+        assert_eq!(
+            value, "",
+            "personal_note must be empty when no note is saved"
+        );
+    }
+}
+
+/// @scenario: contacts_management :: Edit personal note persists via AppEngine
+#[cfg(feature = "network-rustls")]
+// @internal
+#[test]
+fn contact_detail_explicit_save_persists_personal_note() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+
+    let card = ContactCard::new("Dave");
+    let shared_key = SymmetricKey::generate();
+    let contact = Contact::from_exchange([4u8; 32], card, shared_key, 0);
+    let dave_id = contact.id().to_string();
+    vauchi.add_contact(contact).unwrap();
+
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: dave_id.clone(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "edit_personal_note".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "edit_personal_note should return UpdateScreen, got {result:?}"
+    );
+
+    let result = engine.handle_action(UserAction::TextChanged {
+        component_id: "personal_note".into(),
+        value: "Colleague at Acme Corp".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "TextChanged on personal_note should return UpdateScreen, got {result:?}"
+    );
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "save_personal_note".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "save_personal_note should return UpdateScreen, got {result:?}"
+    );
+
+    let new_screen = engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: dave_id,
+    });
+    let note_component = new_screen.components.iter().find(|c| {
+        matches!(c, Component::EditableText { id, ..
+        } if id == "personal_note")
+    });
+    assert!(
+        note_component.is_some(),
+        "personal_note component must be present after save"
+    );
+    if let Some(Component::EditableText { value, .. }) = note_component {
+        assert_eq!(
+            value, "Colleague at Acme Corp",
+            "saved note must be reflected when screen reloads"
+        );
+    }
+}
+
+// ── Field notes tests (Task 9) ────────────────────────────────────────
+
+/// @scenario: contacts_management :: ContactDetail shows per-field private notes
+///
+/// Verifies that a saved field note is surfaced as an editable text
+/// component (id `field_note:{field_id}`) on the ContactDetail screen.
+#[cfg(feature = "network-rustls")]
+// @internal
+#[test]
+fn contact_detail_shows_field_notes() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+
+    // Add a contact with a phone field so there is a real field_id to attach the note to
+    let mut card = ContactCard::new("Bob");
+    let field = vauchi_core::contact_card::ContactField::new(
+        vauchi_core::contact_card::FieldType::Phone,
+        "Mobile",
+        "+41 79 111 22 33",
+        0,
+    );
+    let field_id = field.id().to_string();
+    card.add_field(field).unwrap();
+    let shared_key = SymmetricKey::generate();
+    let contact = Contact::from_exchange([10u8; 32], card, shared_key, 0);
+    let bob_id = contact.id().to_string();
+    vauchi.add_contact(contact).unwrap();
+
+    // Save a field note (plain UTF-8 bytes — same convention as personal_note)
+    let note_text = "Work number, call after 9am";
+    vauchi
+        .save_contact_field_note(&bob_id, &field_id, note_text.as_bytes())
+        .unwrap();
+
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: bob_id.clone(),
+    });
+
+    assert_eq!(screen.screen_id, "contact_detail");
+
+    let expected_id = format!("field_note:{field_id}");
+
+    // The screen must contain an EditableText component with id "field_note:{field_id}"
+    let field_note_component = screen.components.iter().find(|c| {
+        matches!(c, Component::EditableText { id, ..
+        } if id == &expected_id)
+    });
+
+    assert!(
+        field_note_component.is_some(),
+        "ContactDetail screen must contain an EditableText component with id '{expected_id}', \
+         got components: {:?}",
+        screen
+            .components
+            .iter()
+            .map(|c| match c {
+                Component::EditableText { id, .. } => format!("EditableText({id})"),
+                Component::InfoPanel { id, .. } => format!("InfoPanel({id})"),
+                Component::FieldList { id, .. } => format!("FieldList({id})"),
+                _ => "other".into(),
+            })
+            .collect::<Vec<_>>()
+    );
+
+    // The component must contain the saved note text
+    if let Some(Component::EditableText { value, .. }) = field_note_component {
+        assert_eq!(
+            value, note_text,
+            "field_note component must display the saved note text"
+        );
+    }
+}
+
+/// @scenario: contacts_management :: ContactDetail shows empty field note when none saved
+#[cfg(feature = "network-rustls")]
+// @internal
+#[test]
+fn contact_detail_shows_empty_field_note_when_none_saved() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+
+    let mut card = ContactCard::new("Carol");
+    let field = vauchi_core::contact_card::ContactField::new(
+        vauchi_core::contact_card::FieldType::Email,
+        "Work",
+        "carol@example.com",
+        0,
+    );
+    let field_id = field.id().to_string();
+    card.add_field(field).unwrap();
+    let shared_key = SymmetricKey::generate();
+    let contact = Contact::from_exchange([11u8; 32], card, shared_key, 0);
+    let carol_id = contact.id().to_string();
+    vauchi.add_contact(contact).unwrap();
+
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: carol_id,
+    });
+
+    let expected_id = format!("field_note:{field_id}");
+    let field_note_component = screen.components.iter().find(|c| {
+        matches!(c, Component::EditableText { id, ..
+        } if id == &expected_id)
+    });
+
+    assert!(
+        field_note_component.is_some(),
+        "ContactDetail must always show a field_note EditableText for each shared field"
+    );
+    if let Some(Component::EditableText { value, .. }) = field_note_component {
+        assert_eq!(value, "", "field_note must be empty when no note is saved");
+    }
+}
+
+/// @scenario: contacts_management :: Explicitly saving a field note persists it
+#[cfg(feature = "network-rustls")]
+// @internal
+#[test]
+fn contact_detail_explicit_save_persists_field_note() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+
+    let mut card = ContactCard::new("Dave");
+    let field = vauchi_core::contact_card::ContactField::new(
+        vauchi_core::contact_card::FieldType::Phone,
+        "Home",
+        "+41 79 222 33 44",
+        0,
+    );
+    let field_id = field.id().to_string();
+    card.add_field(field).unwrap();
+    let shared_key = SymmetricKey::generate();
+    let contact = Contact::from_exchange([12u8; 32], card, shared_key, 0);
+    let dave_id = contact.id().to_string();
+    vauchi.add_contact(contact).unwrap();
+
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: dave_id.clone(),
+    });
+
+    let component_id = format!("field_note:{field_id}");
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: format!("edit_field_note:{field_id}"),
+    });
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "edit_field_note should return UpdateScreen, got {result:?}"
+    );
+
+    let result = engine.handle_action(UserAction::TextChanged {
+        component_id: component_id.clone(),
+        value: "Prefers text messages".into(),
+    });
+
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "TextChanged on field_note should return UpdateScreen, got {result:?}"
+    );
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: format!("save_field_note:{field_id}"),
+    });
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "save_field_note should return UpdateScreen, got {result:?}"
+    );
+
+    let new_screen = engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: dave_id,
+    });
+    let field_note_component = new_screen.components.iter().find(|c| {
+        matches!(c, Component::EditableText { id, ..
+        } if id == &component_id)
+    });
+
+    assert!(
+        field_note_component.is_some(),
+        "field_note component must be present after save"
+    );
+    if let Some(Component::EditableText { value, .. }) = field_note_component {
+        assert_eq!(
+            value, "Prefers text messages",
+            "saved field note must be reflected when screen reloads"
+        );
+    }
+}
+
+// ── ContactDetailEngine tests ───────────────────────────────────────
+
+// @internal
+#[test]
+fn contact_detail_screen_id() {
+    let engine = make_detail_engine();
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "contact_detail");
+}
+
+// @internal
+#[test]
+fn contact_detail_shows_contact_name_as_title() {
+    let engine = make_detail_engine();
+    let screen = engine.current_screen();
+    assert_eq!(screen.title, "Alice");
+}
+
+// @internal
+#[test]
+fn contact_detail_edit_returns_edit_contact() {
+    let mut engine = make_detail_engine();
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "edit".into(),
+    });
+
+    match result {
+        ActionResult::EditContact { contact_id } => {
+            assert_eq!(contact_id, "c1");
+        }
+        other => panic!("Expected EditContact, got {:?}", other),
+    }
+}
+
+// @internal
+#[test]
+fn contact_detail_main_screen_has_no_back_action() {
+    // Back is the frontend's core-driven chrome now (gated on can_go_back),
+    // not a footer action — 2026-06-05-core-driven-back-chrome. The
+    // not-found error screen keeps its own explicit Back.
+    let engine = make_detail_engine();
+    let screen = engine.current_screen();
+    assert!(
+        !screen.contextual_actions.iter().any(|a| a.id == "back"),
+        "main contact-detail must not offer a footer back action"
+    );
+}
+
+// @internal
+#[test]
+fn contact_detail_unknown_action_returns_update_screen() {
+    let mut engine = make_detail_engine();
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "nonexistent".into(),
+    });
+
+    match result {
+        ActionResult::UpdateScreen(screen) => {
+            assert_eq!(screen.screen_id, "contact_detail");
+        }
+        other => panic!("Expected UpdateScreen, got {:?}", other),
+    }
+}
+
+// ── ContactNotFoundEngine tests ─────────────────────────────────────
+
+// @internal
+#[test]
+fn contact_not_found_screen_id() {
+    let engine = ContactNotFoundEngine::new("missing_id".into());
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "contact_not_found");
+}
+
+// @internal
+#[test]
+fn contact_not_found_shows_contact_id_in_error() {
+    let engine = ContactNotFoundEngine::new("xyz_123".into());
+    let screen = engine.current_screen();
+
+    match &screen.components[0] {
+        Component::InfoPanel { items, .. } => {
+            let error_item = &items[0];
+            assert!(
+                error_item.detail.contains("xyz_123"),
+                "Error detail should contain the contact id, got: {}",
+                error_item.detail
+            );
+        }
+        other => panic!("Expected InfoPanel, got {:?}", other),
+    }
+}
+
+// @internal
+#[test]
+fn contact_not_found_back_completes() {
+    let mut engine = ContactNotFoundEngine::new("missing".into());
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "back".into(),
+    });
+
+    assert_eq!(result, ActionResult::Complete);
 }

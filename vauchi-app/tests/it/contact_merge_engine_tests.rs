@@ -11,7 +11,13 @@
 //! - Caches are invalidated after merge
 //! - Missing pending_merge state returns a safe fallback
 
-use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, Component, UserAction, WorkflowEngine};
+use vauchi_app::ui::ActionResult;
+use vauchi_app::ui::AppEngine;
+use vauchi_app::ui::AppScreen;
+use vauchi_app::ui::Component;
+use vauchi_app::ui::UserAction;
+use vauchi_app::ui::WorkflowEngine;
+use vauchi_app::ui::*;
 use vauchi_core::ImportSource;
 use vauchi_core::api::Vauchi;
 use vauchi_core::contact::Contact;
@@ -169,4 +175,104 @@ fn merge_action_with_no_duplicates_does_not_navigate_to_merge_screen() {
         !matches!(result, ActionResult::NavigateTo(ref s) if s.screen_id == "contact_merge"),
         "merge with no duplicate pairs must not navigate to contact_merge, got: {result:?}"
     );
+}
+
+// ── Test helpers ────────────────────────────────────────────────────
+
+fn sample_preview() -> MergePreview {
+    MergePreview {
+        primary_name: "Alice".into(),
+        primary_fields: vec!["Email: alice@example.com".into(), "Phone: +1234".into()],
+        secondary_name: "Alicia".into(),
+        secondary_fields: vec!["Email: alicia@work.com".into()],
+    }
+}
+
+fn make_engine() -> ContactMergeEngine {
+    ContactMergeEngine::new(sample_preview())
+}
+
+// ── Tests ───────────────────────────────────────────────────────────
+
+// @internal
+#[test]
+fn contact_merge_screen_id() {
+    let engine = make_engine();
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "contact_merge");
+}
+
+// @internal
+#[test]
+fn contact_merge_title_is_merge_contacts() {
+    let engine = make_engine();
+    let screen = engine.current_screen();
+    assert_eq!(screen.title, "Merge Contacts");
+}
+
+// @internal
+#[test]
+fn contact_merge_shows_both_contact_names() {
+    let engine = make_engine();
+    let screen = engine.current_screen();
+
+    // The first Text component contains both names
+    match &screen.components[0] {
+        Component::Text { content, .. } => {
+            assert!(
+                content.contains("Alice"),
+                "Expected content to contain 'Alice', got: {}",
+                content
+            );
+            assert!(
+                content.contains("Alicia"),
+                "Expected content to contain 'Alicia', got: {}",
+                content
+            );
+        }
+        other => panic!("Expected Text component, got {:?}", other),
+    }
+}
+
+// @internal
+#[test]
+fn contact_merge_confirm_completes() {
+    let mut engine = make_engine();
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "confirm".into(),
+    });
+
+    assert_eq!(result, ActionResult::Complete);
+}
+
+// @internal
+#[test]
+fn contact_merge_cancel_stays_on_screen() {
+    let mut engine = make_engine();
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel".into(),
+    });
+
+    match result {
+        ActionResult::UpdateScreen(screen) => {
+            assert_eq!(screen.screen_id, "contact_merge");
+        }
+        other => panic!("Expected UpdateScreen, got {:?}", other),
+    }
+}
+
+// @internal
+#[test]
+fn contact_merge_unknown_action_returns_update_screen() {
+    let mut engine = make_engine();
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "nonexistent".into(),
+    });
+
+    match result {
+        ActionResult::UpdateScreen(screen) => {
+            assert_eq!(screen.screen_id, "contact_merge");
+        }
+        other => panic!("Expected UpdateScreen, got {:?}", other),
+    }
 }

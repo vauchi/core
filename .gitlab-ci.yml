@@ -654,7 +654,10 @@ build:tests:
     - !reference [.clone-themes, before_script]
   script:
     - echo "── clippy, --all-targets across the full dependency tree ──"
-    - cargo clippy --all-targets -- -D warnings
+    # `testing` is on so the targets that require it (vauchi-core's `it`
+    # suite and cucumber runner) are linted too: without it cargo skips
+    # them silently, and they had gathered 302 findings (private#1230).
+    - cargo clippy --all-targets --features vauchi-core/testing -- -D warnings
     # CABI header freshness — catch stale headers after export changes (T0-11)
     - echo "── vauchi-cabi header ──"
     - cargo build -p vauchi-cabi

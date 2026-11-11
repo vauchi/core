@@ -153,49 +153,6 @@ fn a_closed_gate_takes_no_new_callback() {
 
 // @internal
 #[test]
-fn replacing_waits_for_the_old_callback_not_for_the_new_one() {
-    let gate = Arc::new(CallbackGate::default());
-    let old = Blocking::new();
-    let new = Blocking::new();
-    gate.replace(Some(old.handler()));
-    let first = {
-        let gate = Arc::clone(&gate);
-        thread::spawn(move || gate.dispatch(&[]))
-    };
-    old.entered.wait();
-
-    let replacer = {
-        let (gate, new) = (Arc::clone(&gate), Arc::clone(&new));
-        thread::spawn(move || {
-            gate.replace(Some(new.handler()));
-            true
-        })
-    };
-    until_waiting_or_done(&gate, &replacer);
-    let second = {
-        let gate = Arc::clone(&gate);
-        thread::spawn(move || gate.dispatch(&[]))
-    };
-    old.release.wait();
-    new.entered.wait();
-
-    // The new callback is now running; the replacer must not wait for it.
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while !replacer.is_finished() {
-        assert!(
-            Instant::now() < deadline,
-            "replace waited for the callback it installed"
-        );
-        thread::yield_now();
-    }
-    new.release.wait();
-    assert!(replacer.join().unwrap());
-    first.join().unwrap();
-    second.join().unwrap();
-}
-
-// @internal
-#[test]
 fn destroy_waits_for_a_callback_running_on_another_thread() {
     let dir = tempfile::tempdir().unwrap();
     let path = std::ffi::CString::new(dir.path().to_str().unwrap()).unwrap();

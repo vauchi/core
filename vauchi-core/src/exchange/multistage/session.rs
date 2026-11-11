@@ -2222,13 +2222,12 @@ impl MultiStageSession {
         !same_peer && self.foreign_inits >= REJOIN_INIT_THRESHOLD && idle && !cooling
     }
 
-    /// Abandon the current peer binding and advertise a brand-new session.
+    /// Abandon the current peer binding and advertise again (ADR-071).
     ///
-    /// A full fresh handshake, never a partial reuse: new session id, new
-    /// ephemeral, new commitment, with the old transport and reveal keys
-    /// zeroized first (ADR-002). Local configuration — our card, relay,
-    /// display name, clock — is carried across; everything peer-derived is
-    /// discarded.
+    /// Everything peer-derived is discarded, the old transport and peer
+    /// reveal keys zeroized first (ADR-002). Our own session id, ephemeral
+    /// and commitment are kept on purpose, for the reason given in the body:
+    /// minting new ones made two stranded phones reset past each other.
     fn rehandshake_after_peer_restart(&mut self) {
         tracing::info!(
             "[MSX] peer restarted — rebinding from {:?} (ADR-071)",

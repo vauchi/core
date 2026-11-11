@@ -534,6 +534,9 @@ impl AppEngine {
     /// A restored contact saved before the peer's DONE adopts the
     /// exchange's key once that DONE is read (vauchi/private#1217).
     fn adopt_rekey_once_peer_saved(&mut self) {
+        let Some(our_identity) = self.vauchi.identity().map(|i| *i.signing_public_key()) else {
+            return;
+        };
         let Some(holder) = self.multi_stage_session.as_mut() else {
             return;
         };
@@ -543,22 +546,25 @@ impl AppEngine {
         let Some(contact) = holder.rekey_awaiting_peer.take() else {
             return;
         };
-        let Some(our_identity) = self.vauchi.identity().map(|i| *i.signing_public_key()) else {
-            return;
-        };
         let ratchet = self.multi_stage_session.as_ref().and_then(|h| {
             h.machine
                 .build_exchange_ratchet(&our_identity, contact.public_key()?)
         });
-        let Some((ratchet, is_initiator)) = ratchet else {
-            tracing::warn!("multi-stage: no ratchet for the restored contact's rekey");
-            return;
+        let adopted = match ratchet {
+            Some((ratchet, is_initiator)) => self
+                .vauchi
+                .save_exchanged_contact(&contact, &ratchet, is_initiator)
+                .map_err(|e| tracing::warn!("multi-stage: restored contact's rekey failed: {e}"))
+                .is_ok(),
+            None => {
+                tracing::warn!("multi-stage: no ratchet for the restored contact's rekey");
+                false
+            }
         };
-        if let Err(e) = self
-            .vauchi
-            .save_exchanged_contact(&contact, &ratchet, is_initiator)
-        {
-            tracing::warn!("multi-stage: restored contact's rekey failed: {e}");
+        // Kept for the next scan: a failure here must not lose the rekey
+        // the peer's DONE allowed.
+        if !adopted && let Some(holder) = self.multi_stage_session.as_mut() {
+            holder.rekey_awaiting_peer = Some(contact);
         }
     }
 

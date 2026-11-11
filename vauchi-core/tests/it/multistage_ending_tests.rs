@@ -47,7 +47,7 @@ fn reads_no_ending(frame: &str) -> Option<String> {
     const REVEAL_END: usize = 4 + 8 + 24 + 48;
     match frame.get(..4) {
         Some("CNF4" | "DON4") => frame.get(4..REVEAL_END).map(|rest| format!("RVL4{rest}")),
-        Some("BTH3") => None,
+        Some("BTH4") => None,
         _ => Some(frame.to_owned()),
     }
 }
@@ -148,15 +148,21 @@ fn a_done_frame_carries_the_final_frame_under_its_own_prefix() {
 
 // @internal
 #[test]
-fn a_both_frame_carries_only_the_session_id() {
+fn a_both_frame_carries_the_done_tag_under_its_own_prefix() {
     let sid = [5u8; 16];
-    let frame = format_both_qr(&sid);
+    let reveal_key = [9u8; 32];
+    let tag = [3u8; 32];
+    let frame = format_both_qr(&sid, &reveal_key, &tag);
 
-    assert!(frame.starts_with("BTH3"));
-    assert_eq!(frame.len(), 4 + 8 + 24, "prefix, header, session id");
+    assert!(frame.starts_with("BTH4"));
+    assert_eq!(frame.len(), format_done_qr(&sid, &reveal_key, &tag).len());
     assert_eq!(
         parse_qr(&frame).expect("a both frame parses"),
-        StageQr::Both { session_id: sid }
+        StageQr::Both {
+            session_id: sid,
+            reveal_key,
+            tag
+        }
     );
 }
 
@@ -194,7 +200,7 @@ fn a_saved_session_that_reads_the_peers_done_shows_both() {
     p.bob.process_scanned_qr(&alice_done);
 
     let frame = next_ending_frame(&mut p.bob);
-    assert!(frame.starts_with("BTH3"), "Bob showed {}", &frame[..4]);
+    assert!(frame.starts_with("BTH4"), "Bob showed {}", &frame[..4]);
 }
 
 // @internal
@@ -208,6 +214,46 @@ fn a_session_that_reads_both_stops_at_once() {
     p.alice.process_scanned_qr(&bob_both);
 
     assert_eq!(p.alice.get_display_qr().map(|q| q.data), None);
+}
+
+/// The phone that reads BOTH stops before it may ever read a DONE, so BOTH
+/// itself must prove the peer saved: a restored contact adopts its new key
+/// on it (vauchi/private#1217).
+// @internal
+#[test]
+fn a_saved_session_that_reads_its_peers_both_knows_the_peer_saved() {
+    let mut p = both_saved();
+    let alice_done = next_ending_frame(&mut p.alice);
+    p.bob.process_scanned_qr(&alice_done);
+    let bob_both = next_ending_frame(&mut p.bob);
+    assert!(!p.alice.peer_saved(), "precondition: Alice read no DONE");
+
+    p.alice.process_scanned_qr(&bob_both);
+
+    assert!(p.alice.peer_saved());
+}
+
+// @internal
+#[test]
+fn a_both_whose_tag_does_not_verify_neither_stops_nor_counts() {
+    let mut p = both_saved();
+    let alice_done = next_ending_frame(&mut p.alice);
+    p.bob.process_scanned_qr(&alice_done);
+    let Ok(StageQr::Both {
+        session_id,
+        reveal_key,
+        ..
+    }) = parse_qr(&next_ending_frame(&mut p.bob))
+    else {
+        panic!("Bob shows BOTH");
+    };
+
+    p.alice
+        .process_scanned_qr(&format_both_qr(&session_id, &reveal_key, &[0x42; 32]));
+
+    assert!(!p.alice.peer_saved());
+    assert!(!p.alice.peer_confirmed());
+    assert!(p.alice.get_display_qr().is_some(), "Alice keeps showing");
 }
 
 // @internal
@@ -250,12 +296,14 @@ fn both_read_before_saving_does_not_stop_the_session() {
         .to_owned();
     let bob_state = p.bob.get_state();
 
-    p.bob.process_scanned_qr(&format_both_qr(&bob_sid));
+    p.bob
+        .process_scanned_qr(&format_both_qr(&bob_sid, &[1u8; 32], &[2u8; 32]));
     let alice_sid = parse_qr(&next_ending_frame(&mut p.alice))
         .expect("alice's frame parses")
         .session_id()
         .to_owned();
-    p.bob.process_scanned_qr(&format_both_qr(&alice_sid));
+    p.bob
+        .process_scanned_qr(&format_both_qr(&alice_sid, &[1u8; 32], &[2u8; 32]));
 
     assert_eq!(p.bob.get_state(), bob_state);
     assert!(p.bob.get_display_qr().is_some());
@@ -269,7 +317,8 @@ fn done_and_both_from_another_session_change_nothing() {
 
     p.alice
         .process_scanned_qr(&format_done_qr(&stranger, &[1u8; 32], &[2u8; 32]));
-    p.alice.process_scanned_qr(&format_both_qr(&stranger));
+    p.alice
+        .process_scanned_qr(&format_both_qr(&stranger, &[1u8; 32], &[2u8; 32]));
 
     let frame = next_ending_frame(&mut p.alice);
     assert!(
@@ -349,7 +398,8 @@ fn a_finalized_session_that_has_not_saved_neither_shows_nor_obeys_both() {
         .session_id()
         .to_owned();
 
-    p.bob.process_scanned_qr(&format_both_qr(&alice_sid));
+    p.bob
+        .process_scanned_qr(&format_both_qr(&alice_sid, &[1u8; 32], &[2u8; 32]));
 
     let frame = next_ending_frame(&mut p.bob);
     assert!(

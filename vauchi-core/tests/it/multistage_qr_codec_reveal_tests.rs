@@ -60,9 +60,9 @@ fn confirm_and_done_carry_their_own_prefixes() {
 
 // @internal
 #[test]
-fn the_retired_in3d_fin3_and_don3_frames_read_as_an_older_version() {
+fn the_retired_in3d_fin3_don3_and_bth3_frames_read_as_an_older_version() {
     let init = format_ini2_qr_with_relay(&SID, &EPH, &COMMITMENT, "Alice", None);
-    for retired in ["IN3D", "FIN3", "DON3"] {
+    for retired in ["IN3D", "FIN3", "DON3", "BTH3"] {
         let frame = format!("{retired}{}", &init[4..]);
 
         assert!(

@@ -338,7 +338,7 @@ fn test_e2e_grace_period_keeps_showing_the_final_frame() {
     let ending_frames = (0..50)
         .filter_map(|_| alice.get_display_qr())
         .filter(|qr| {
-            ["CNF4", "DON4", "BTH3"]
+            ["CNF4", "DON4", "BTH4"]
                 .iter()
                 .any(|p| qr.data.starts_with(p))
         })

@@ -628,15 +628,14 @@ impl MultiStageSession {
     }
 
     /// Whether the other phone has said it saved too: this phone read its
-    /// DONE or its BOTH (design D6). Until then a saved exchange is saved
-    /// here only.
+    /// DONE or its BOTH, and the DONE tag either carries verified (design
+    /// D6). Until then a saved exchange is saved here only.
     pub fn peer_confirmed(&self) -> bool {
-        self.peer_saved || self.peer_showed_both
+        self.peer_saved
     }
 
-    /// Whether this phone read the peer's DONE and its keyed tag verified.
-    /// Unlike [`Self::peer_confirmed`], a BOTH (unkeyed) does not count:
-    /// it gates a restored contact's rekey (vauchi/private#1217).
+    /// Whether this phone verified the peer's DONE tag, read in a DONE or a
+    /// BOTH. Gates a restored contact's rekey (vauchi/private#1217).
     pub fn peer_saved(&self) -> bool {
         self.peer_saved
     }
@@ -1432,7 +1431,9 @@ impl MultiStageSession {
                 reveal_key,
                 tag,
             } => self.handle_done(session_id, reveal_key, tag),
-            StageQr::Both { session_id } => self.handle_both(session_id),
+            StageQr::Both {
+                session_id, tag, ..
+            } => self.handle_both(session_id, tag),
             StageQr::Reveal {
                 session_id,
                 reveal_key,
@@ -2170,8 +2171,11 @@ impl MultiStageSession {
     }
 
     fn both_frame_qr(&self) -> QrPayload {
+        let Some(tag) = self.tag_for(TagLabel::Done, true) else {
+            return self.final_frame_qr();
+        };
         QrPayload {
-            data: qr_codec::format_both_qr(&self.session_id),
+            data: qr_codec::format_both_qr(&self.session_id, self.commitment.reveal_key(), &tag),
             error_correction: FRAME_ERROR_CORRECTION.to_string(),
             display_duration_ms: jittered(DISPLAY_MS_FINAL),
             layout: 0,
@@ -2206,14 +2210,18 @@ impl MultiStageSession {
     }
 
     /// The peer's BOTH ends this phone's display only once this phone has
-    /// saved; before that it can only be a stray or forged frame.
-    fn handle_both(&mut self, sender: [u8; 16]) -> ProtocolState {
+    /// saved and the DONE tag it carries verifies; anything else is a stray
+    /// or forged frame. It also says the peer saved: the phone that stops on
+    /// it may never have read a DONE (vauchi/private#1217).
+    fn handle_both(&mut self, sender: [u8; 16], tag: [u8; 32]) -> ProtocolState {
         if self.peer_session_id == Some(sender)
             && matches!(self.state, ProtocolState::Finalized)
             && self.saved
             && !self.peer_showed_both
+            && self.peer_tag_matches(TagLabel::Done, &tag)
         {
             tracing::info!("[MSX] ending: BOTH read, stopping");
+            self.peer_saved = true;
             self.peer_showed_both = true;
         }
         self.state.clone()

@@ -12,9 +12,11 @@
 //! Layout:
 //! - `INIT<sid:24><pk:48><eph:48><ch:48><display_name>`
 //! - `DATA<sid:24><idx:3>/<total:3><ack_len:2><ack:variable><crc:3><payload>`
-//! - `FIN3<header:8><sid:24><rk:48><tag:48>`
-//! - `DON3<header:8><sid:24><rk:48><tag:48>`, the final frame once saved
-//! - `BTH3<header:8><sid:24>`
+//! - `RVL4<header:8><sid:24><rk:48>`
+//! - `CNF4<header:8><sid:24><rk:48><tag:48>`
+//! - `DON4<header:8><sid:24><rk:48><tag:48>`, the confirm once saved
+//! - `BTH4<header:8><sid:24><rk:48><tag:48>`, DONE's tag once the peer's
+//!   DONE was read
 //!
 //! All binary fields are base45-encoded (fixed-width for known-size inputs).
 //! The only non-positional field is `display_name` at the tail of INIT,
@@ -97,9 +99,15 @@ pub enum StageQr {
         reveal_key: [u8; 32],
         tag: [u8; 32],
     },
-    /// BOTH: shown by a saved phone that read its peer's DONE. The reader
-    /// stops at once (design D6). Unkeyed by owner decision 2026-10-04.
-    Both { session_id: [u8; 16] },
+    /// BOTH: shown by a saved phone that read its peer's DONE. It carries
+    /// the sender's DONE tag, so the reader that stops at once on it, maybe
+    /// before reading a DONE, still knows the peer saved (owner decision
+    /// 2026-11-11, vauchi/private#1217; unkeyed since 2026-10-04 until then).
+    Both {
+        session_id: [u8; 16],
+        reveal_key: [u8; 32],
+        tag: [u8; 32],
+    },
     /// Failure notification — tells peer to abort immediately.
     Fail { session_id: [u8; 16] },
     /// SHAK stage: an AEAD-sealed accelerometer magnitude envelope for the
@@ -124,7 +132,7 @@ impl StageQr {
             | Self::Data { session_id, .. }
             | Self::Final { session_id, .. }
             | Self::Done { session_id, .. }
-            | Self::Both { session_id }
+            | Self::Both { session_id, .. }
             | Self::Reveal { session_id, .. }
             | Self::Fail { session_id }
             | Self::Shake { session_id, .. } => session_id,
@@ -155,7 +163,7 @@ const FLAG_HAS_RELAY_URL: u8 = 0x01;
 /// Stage prefixes (4 chars each).
 const PREFIX_LEN: usize = 4;
 const PREFIXES: [&str; 8] = [
-    "INI3", "RVL4", "DAT4", "CNF4", "DON4", "BTH3", "FAI3", "SHK3",
+    "INI3", "RVL4", "DAT4", "CNF4", "DON4", "BTH4", "FAI3", "SHK3",
 ];
 
 fn decode_fixed<const N: usize>(encoded: &str) -> Result<[u8; N], QrCodecError> {
@@ -197,7 +205,7 @@ fn frame(prefix: &str, body: &str) -> String {
 }
 
 /// Stage prefixes of the format used before every frame carried a header.
-const OLD_FORMAT_PREFIXES: [&str; 13] = [
+const OLD_FORMAT_PREFIXES: [&str; 14] = [
     "INI2", "IN2D", "DATA", "VRFY", "CONF", "RDYY", "FAIL", "SHAK", "CMBO",
     // DAT3 chunks did not authenticate the ACK they carried (#676).
     "DAT3",
@@ -205,6 +213,8 @@ const OLD_FORMAT_PREFIXES: [&str; 13] = [
     // and FIN3/DON3 an unkeyed tag: together they let a recorded payload be
     // replayed in another session (#1217).
     "IN3D", "FIN3", "DON3",
+    // BTH3 carried no tag, so it could not prove the peer saved (#1217).
+    "BTH3",
 ];
 
 /// Split a frame into its stage prefix, training header and body.
@@ -350,9 +360,9 @@ pub fn format_done_qr(session_id: &[u8; 16], reveal_key: &[u8; 32], tag: &[u8; 3
     frame("DON4", &final_body(session_id, reveal_key, tag))
 }
 
-/// Format a BOTH frame: `BTH3<header:8><sid:24>`.
-pub fn format_both_qr(session_id: &[u8; 16]) -> String {
-    frame("BTH3", &base45::encode(session_id))
+/// Format a BOTH frame: DONE's layout and tag under `BTH4`.
+pub fn format_both_qr(session_id: &[u8; 16], reveal_key: &[u8; 32], tag: &[u8; 32]) -> String {
+    frame("BTH4", &final_body(session_id, reveal_key, tag))
 }
 
 fn final_body(session_id: &[u8; 16], reveal_key: &[u8; 32], tag: &[u8; 32]) -> String {
@@ -415,7 +425,11 @@ pub fn parse_frame(raw: &str) -> Result<Frame, QrCodecError> {
             reveal_key,
             tag,
         }),
-        "BTH3" => parse_session_id_only(body).map(|session_id| StageQr::Both { session_id }),
+        "BTH4" => parse_final_body(body).map(|(session_id, reveal_key, tag)| StageQr::Both {
+            session_id,
+            reveal_key,
+            tag,
+        }),
         "FAI3" => parse_fail(body),
         "SHK3" => parse_shake(body),
         _ => Err(QrCodecError::UnknownPrefix),

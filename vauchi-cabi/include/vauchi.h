@@ -224,8 +224,17 @@ int32_t vauchi_app_create_identity(struct VauchiApp *handle, const char *display
  * When this returns, the callback it replaced (or removed, with null) is
  * not running on any other thread and will not be called again, so its
  * `user_data` may be freed. The same holds once `vauchi_app_destroy`
- * returns. Called from inside the callback itself, it does not wait for
- * that call to end (vauchi/private#1218).
+ * returns (vauchi/private#1218).
+ *
+ * Both may therefore block until a running callback returns. A callback
+ * must not wait for a thread that might be inside either call (for
+ * example, synchronously for the UI thread that destroys the app): post
+ * the work and return instead.
+ *
+ * Called from inside the callback itself, neither waits for that call:
+ * it continues after they return, and core touches neither the app nor
+ * `user_data` once it does. What that invocation still uses must stay
+ * valid until it returns.
  *
  * # Safety
  * `handle` must be a valid `VauchiApp` pointer. `callback` (if non-null)

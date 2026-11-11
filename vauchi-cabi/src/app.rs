@@ -668,8 +668,17 @@ pub type VauchiEventCallback =
 /// When this returns, the callback it replaced (or removed, with null) is
 /// not running on any other thread and will not be called again, so its
 /// `user_data` may be freed. The same holds once `vauchi_app_destroy`
-/// returns. Called from inside the callback itself, it does not wait for
-/// that call to end (vauchi/private#1218).
+/// returns (vauchi/private#1218).
+///
+/// Both may therefore block until a running callback returns. A callback
+/// must not wait for a thread that might be inside either call (for
+/// example, synchronously for the UI thread that destroys the app): post
+/// the work and return instead.
+///
+/// Called from inside the callback itself, neither waits for that call:
+/// it continues after they return, and core touches neither the app nor
+/// `user_data` once it does. What that invocation still uses must stay
+/// valid until it returns.
 ///
 /// # Safety
 /// `handle` must be a valid `VauchiApp` pointer. `callback` (if non-null)
@@ -704,7 +713,6 @@ pub unsafe extern "C" fn vauchi_app_set_event_callback(
 /// disconnects them when none is registered. The callback itself lives in
 /// the gate; this only (re)installs the engine side, so it never waits.
 pub(crate) fn wire_engine_events(app: &VauchiApp) {
-    let registered = app.event_callback.is_set();
     let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let Ok(mut engine_slot) = app.lock_engine() else {
             return;
@@ -715,6 +723,10 @@ pub(crate) fn wire_engine_events(app: &VauchiApp) {
         let Ok(mut handler_id_slot) = app.event_handler_id.lock() else {
             return;
         };
+        // Read under the engine lock: two wirings that overlap then run one
+        // after the other, and the last sees the gate as it is now, so a
+        // callback set meanwhile is never left disconnected.
+        let registered = app.event_callback.is_set();
 
         if let Some(old_id) = handler_id_slot.take() {
             engine.vauchi().remove_event_handler(old_id);

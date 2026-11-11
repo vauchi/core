@@ -45,8 +45,10 @@ in the room.
 
 ## Key Principles
 
-- **In-Person Exchange** - Contact cards can only be
-  exchanged when physically together (QR code scan)
+- **In-Person Exchange** - Contact cards are exchanged
+  in person (QR code scan, NFC, BLE); a one-off Link
+  covers the case when you cannot meet, with weaker
+  assurance
 - **Selective Sharing** - Control which contacts see
   which fields (work email vs personal)
 - **No Messages** - This is not a messenger; it only syncs contact information

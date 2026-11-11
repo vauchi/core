@@ -54,7 +54,8 @@ in the room.
 - **No Messages** - This is not a messenger; it only syncs contact information
 - **End-to-End Encrypted** - No server can read your data
 - **Decentralized** - Relay servers only pass encrypted
-  blobs; the relay is oblivious to content and identities
+  blobs; the relay is oblivious to content and routes
+  mailboxes by rotating tokens, not identities
 
 ## Development
 

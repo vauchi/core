@@ -29,8 +29,9 @@ information
 
 ## Project Status
 
-The core library is feature-complete with 420+ tests. Ready for platform
-integration (mobile apps, CLI tools).
+The core library is under active development with 7,000+ tests;
+some features are still planned. Ready for platform integration
+(mobile apps, CLI tools).
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for technical design and [STRUCTURE.md](STRUCTURE.md) for code organization.
 

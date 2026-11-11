@@ -192,6 +192,8 @@ ohttp = { version = "0.7", default-features = false, features = ["server", "rust
 # link_{initiator,responder}_poll_tests fail (broke the nightly mutation baseline).
 vauchi-app = { workspace = true, features = ["content-updates", "network-rustls", "network-http"] }
 # Temporary directories for storage tests
+# Shared arrange helpers for tests/it (vauchi/private#1230).
+vauchi-core-testkit.workspace = true
 tempfile = "3.0"
 # Property-based testing
 proptest = "1.4"

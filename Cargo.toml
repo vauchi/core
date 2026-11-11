@@ -8,6 +8,7 @@ members = [
     "vauchi-app",
     "vauchi-cabi",
     "vauchi-core",
+    "vauchi-core-testkit",
     "vauchi-platform",
     "vauchi-protocol",
 ]
@@ -24,6 +25,7 @@ authors = ["Vauchi Contributors"]
 vauchi-core = { path = "vauchi-core", version = "0.104.0", default-features = false }
 vauchi-app = { path = "vauchi-app", version = "0.104.0", default-features = false }
 vauchi-protocol = { path = "vauchi-protocol", version = "0.104.0" }
+vauchi-core-testkit = { path = "vauchi-core-testkit" }
 # The shell contract (ADR-078): the Command/Event types, their schema and the
 # fixture corpus; a git tag with a declared range, since there is no registry.
 vauchi-contract = { git = "https://gitlab.com/vauchi/contract.git", tag = "v0.98.0", version = "^0.98" }

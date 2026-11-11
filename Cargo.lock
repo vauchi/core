@@ -4229,11 +4229,28 @@ dependencies = [
  "uuid",
  "vauchi-app",
  "vauchi-contract",
+ "vauchi-core-testkit",
  "vauchi-protocol",
  "webpki-roots",
  "winapi-util",
  "x25519-dalek",
  "zeroize",
+]
+
+[[package]]
+name = "vauchi-core-testkit"
+version = "0.104.0"
+dependencies = [
+ "base64",
+ "ed25519-dalek",
+ "flate2",
+ "hex",
+ "ohttp",
+ "proptest",
+ "serde_json",
+ "sha2",
+ "vauchi-core",
+ "vauchi-protocol",
 ]
 
 [[package]]

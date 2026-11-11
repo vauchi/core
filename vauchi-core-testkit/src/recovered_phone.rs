@@ -16,9 +16,9 @@ use vauchi_core::recovery::authorization::RecoveryAuthorization;
 use vauchi_core::recovery::rekey::RekeyOffer;
 use vauchi_core::{SymmetricKey, Vauchi};
 
-use crate::common::helpers::create_vauchi_with_identity;
-use crate::common::meeting::{deliver, meet, signing_pk};
-use crate::common::two_recipient::{Recipient, add_recipient, add_recipient_from, receive};
+use crate::helpers::create_vauchi_with_identity;
+use crate::meeting::{deliver, meet, signing_pk};
+use crate::two_recipient::{Recipient, add_recipient, add_recipient_from, receive};
 
 pub const PASSPHRASE: &str = "the owl flies at noon";
 pub const FAMILY_FIELD: &str = "home-phone";

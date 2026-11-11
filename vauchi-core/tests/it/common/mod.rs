@@ -4,74 +4,27 @@
 
 //! Common Test Utilities
 //!
-//! Shared helpers, fixtures, and utilities used across test modules.
-//! This module provides reusable test infrastructure to reduce duplication.
-//!
-//! ## Reach for a helper before hand-rolling an arrange phase
-//!
-//! Most `tests/it` files that hand-roll identity/key setup can lean on
-//! one of the modules below. When you are already editing such a file,
-//! migrating its arrange phase here is a sanctioned `tidy:` heal (see
-//! `.claude/rules/self-healing.md`). Crypto stays real — these helpers
-//! wrap real key derivation and exchange (ADR-002 forbids mocking it),
-//! they never fake it.
-//!
-//! | Hand-rolled idiom | Use instead |
-//! |---|---|
-//! | A `Vauchi` with an identity | [`helpers::create_vauchi_with_identity`] |
-//! | A `Vauchi` with a populated card | [`helpers::create_vauchi_with_card`] |
-//! | Two-party exchange + shared key | [`helpers::setup_alice_bob_exchange`] |
-//! | A Double-Ratchet state pair | [`helpers::setup_ratchets`] |
-//! | Three linked users | [`helpers::setup_three_users`] |
-//! | Sample / max / diverse contact card | [`fixtures::sample_contact_card`], [`fixtures::max_fields_card`], [`fixtures::diverse_fields_card`] |
-//! | Proptest input generators | `strategies::*_strategy` (names, emails, phones, urls, ids) |
-//! | Sharer→recipient share + deliver | [`two_recipient::add_recipient`], [`two_recipient::deliver`] |
-//! | `AppEngine` onboarding / PIN drive | [`app_engine_helpers::drive_onboarding`], [`app_engine_helpers::enter_pin`] |
-//! | A linked sibling and its pending sync journal | [`device_sync::link_tablet`], [`device_sync::journal_for_tablet`] |
-//! | An owner who lost her phone, with guardians holding her backup | [`lost_phone::lost`] |
-//! | A sealed card-update envelope | [`card_update::seal_update`], [`card_update::seal_update_default`] |
-//! | A relay HTTP response stub | [`mock_relay::CannedResponse`] (feature `network-http`) |
-//! | Contact-count / card-field assertions | [`helpers::assert_contact_count`], [`helpers::assert_card_has_field`] |
-//!
-//! Guardrail: keep helpers per-concept. Do not grow a god-builder that
-//! accretes parameters — that recreates the long-parameter smell inside
-//! the test tree. A genuinely unique arrange phase stays inline.
+//! The shared arrange helpers live in `vauchi-core-testkit` (its crate docs
+//! hold the idiom-to-helper table); they are re-exported here so every
+//! `common::` path in this test crate stays as it was (vauchi/private#1230).
+//! What depends on vauchi-app stays here until its tests move there.
 
-#[allow(dead_code)]
-pub mod fixtures;
-#[allow(dead_code)]
-pub mod helpers;
-#[allow(dead_code)]
-pub mod strategies;
-#[allow(dead_code)]
-pub mod verifiers;
+#[allow(unused_imports)]
+pub use vauchi_core_testkit::{
+    card_update, device_sync, field_validation_helpers, fixtures, linked_peer, lost_phone, meeting,
+    mock_relay, per_device, recovered_phone, signed_gateway, strategies, two_recipient, verifiers,
+};
+
+/// The testkit's helpers plus the theme helpers, which read vauchi-app.
+pub mod helpers {
+    pub use super::app_themes::*;
+    pub use vauchi_core_testkit::helpers::*;
+}
 
 #[allow(dead_code)]
 pub mod app_engine_helpers;
 #[allow(dead_code)]
-pub mod card_update;
-#[allow(dead_code)]
-pub mod device_sync;
-#[allow(dead_code)]
-pub mod field_validation_helpers;
-#[allow(dead_code)]
-pub mod linked_peer;
-#[allow(dead_code)]
-pub mod lost_phone;
-#[cfg(feature = "network-http")]
-mod mailbox_store;
-#[allow(dead_code)]
-pub mod meeting;
-#[cfg(feature = "network-http")]
-pub mod mock_relay;
-pub mod per_device;
-#[allow(dead_code)]
-pub mod recovered_phone;
-#[cfg(feature = "network-http")]
-#[allow(dead_code)]
-pub mod signed_gateway;
-#[allow(dead_code)]
-pub mod two_recipient;
+mod app_themes;
 
 /// The sibling `locales` checkout. Prefers `VAUCHI_LOCALES_DIR` (exported by
 /// CI and `just mutants-diff`) because cargo-mutants builds a temp copy where

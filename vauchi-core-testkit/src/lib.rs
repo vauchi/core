@@ -1,0 +1,70 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! Shared integration-test helpers for vauchi-core and vauchi-app
+//!
+//! Shared helpers, fixtures and utilities for the integration tests of
+//! both crates; a dev-dependency only (vauchi/private#1230). The `AppEngine`
+//! and theme helpers depend on vauchi-app and live in its tests instead.
+//!
+//! ## Reach for a helper before hand-rolling an arrange phase
+//!
+//! Most `tests/it` files that hand-roll identity/key setup can lean on
+//! one of the modules below. When you are already editing such a file,
+//! migrating its arrange phase here is a sanctioned `tidy:` heal (see
+//! `.claude/rules/self-healing.md`). Crypto stays real — these helpers
+//! wrap real key derivation and exchange (ADR-002 forbids mocking it),
+//! they never fake it.
+//!
+//! | Hand-rolled idiom | Use instead |
+//! |---|---|
+//! | A `Vauchi` with an identity | [`helpers::create_vauchi_with_identity`] |
+//! | A `Vauchi` with a populated card | [`helpers::create_vauchi_with_card`] |
+//! | Two-party exchange + shared key | [`helpers::setup_alice_bob_exchange`] |
+//! | A Double-Ratchet state pair | [`helpers::setup_ratchets`] |
+//! | Three linked users | [`helpers::setup_three_users`] |
+//! | Sample / max / diverse contact card | [`fixtures::sample_contact_card`], [`fixtures::max_fields_card`], [`fixtures::diverse_fields_card`] |
+//! | Proptest input generators | `strategies::*_strategy` (names, emails, phones, urls, ids) |
+//! | Sharer→recipient share + deliver | [`two_recipient::add_recipient`], [`two_recipient::deliver`] |
+//! | A linked sibling and its pending sync journal | [`device_sync::link_tablet`], [`device_sync::journal_for_tablet`] |
+//! | An owner who lost her phone, with guardians holding her backup | [`lost_phone::lost`] |
+//! | A sealed card-update envelope | [`card_update::seal_update`], [`card_update::seal_update_default`] |
+//! | A relay HTTP response stub | [`mock_relay::CannedResponse`] (feature `network-http`) |
+//! | Contact-count / card-field assertions | [`helpers::assert_contact_count`], [`helpers::assert_card_has_field`] |
+//!
+//! Guardrail: keep helpers per-concept. Do not grow a god-builder that
+//! accretes parameters — that recreates the long-parameter smell inside
+//! the test tree. A genuinely unique arrange phase stays inline.
+
+#[allow(dead_code)]
+pub mod card_update;
+#[allow(dead_code)]
+pub mod device_sync;
+#[allow(dead_code)]
+pub mod field_validation_helpers;
+#[allow(dead_code)]
+pub mod fixtures;
+#[allow(dead_code)]
+pub mod helpers;
+#[allow(dead_code)]
+pub mod linked_peer;
+#[allow(dead_code)]
+pub mod lost_phone;
+mod mailbox_store;
+#[allow(dead_code)]
+pub mod meeting;
+#[allow(dead_code)]
+pub mod mock_relay;
+#[allow(dead_code)]
+pub mod per_device;
+#[allow(dead_code)]
+pub mod recovered_phone;
+#[allow(dead_code)]
+pub mod signed_gateway;
+#[allow(dead_code)]
+pub mod strategies;
+#[allow(dead_code)]
+pub mod two_recipient;
+#[allow(dead_code)]
+pub mod verifiers;

@@ -5,7 +5,7 @@
 //! in the test's hands, for the per-device signing tests
 //! (vauchi/private#970, SC-62).
 
-use super::helpers::create_vauchi_with_identity;
+use crate::helpers::create_vauchi_with_identity;
 use vauchi_core::SymmetricKey;
 use vauchi_core::api::{CardUpdateError, ReceiveOutcome, process_single_card_update};
 use vauchi_core::contact::Contact;

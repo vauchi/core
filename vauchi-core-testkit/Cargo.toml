@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Arrange helpers shared by vauchi-core's and vauchi-app's integration
+# tests (vauchi/private#1230). Only ever a dev-dependency: no library in
+# the workspace depends on it, and it is never published.
+[package]
+name = "vauchi-core-testkit"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Shared integration-test helpers for vauchi-core and vauchi-app (dev-only)"
+
+[dependencies]
+# The helpers drive the real API with real crypto (ADR-002); `testing`
+# opens the exchange seams the two-party helpers use, and `network-http`
+# backs the relay stub and the signed OHTTP gateway, as vauchi-core's
+# own test build had them through its defaults.
+vauchi-core = { workspace = true, default-features = true, features = ["testing"] }
+vauchi-protocol.workspace = true
+ohttp = { version = "0.7", default-features = false, features = ["server", "rust-hpke"] }
+serde_json = "1.0"
+hex = "0.4"
+flate2 = "1.0"
+base64 = "0.22"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+sha2 = "0.10"
+proptest = "1.4"
+
+[lints]
+workspace = true

@@ -33,7 +33,6 @@ mod integration;
 
 mod accelerometer_correlation_tests;
 mod accept_encrypted_exchange_tests;
-mod accessibility_tests;
 mod activity_log_storage_tests;
 mod activity_log_writer_tests;
 mod activity_notification_claim_tests;
@@ -622,8 +621,6 @@ mod sync_store_tests;
 mod tag_tests;
 mod tcp_transport_tests;
 mod text_normalization_tests;
-mod theme_integration_tests;
-mod theming_tests;
 mod tier2_api_tests;
 mod timing_obfuscation_tests;
 mod transport_protocol_tests;

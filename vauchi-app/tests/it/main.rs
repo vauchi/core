@@ -4,6 +4,7 @@
 
 //! Consolidated integration test binary for vauchi-app.
 
+mod accessibility_tests;
 mod accessibility_tokens_tests;
 mod activity_log_engine_tests;
 mod affected_screens_tests;
@@ -234,6 +235,8 @@ mod tags_intercepts_tests;
 mod tags_list_i18n_tests;
 mod tags_screen_tests;
 mod theme_catalog_options_tests;
+mod theme_integration_tests;
+mod theming_tests;
 mod transport_readiness_wiring_tests;
 // Needs `FakeClock`, behind `vauchi-core/testing`. Gated so plain
 // `cargo clippy --all-targets` (no testing feature) still compiles.

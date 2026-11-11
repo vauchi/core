@@ -11,18 +11,10 @@
 
 #[allow(unused_imports)]
 pub use vauchi_core_testkit::{
-    card_update, device_sync, field_validation_helpers, fixtures, linked_peer, lost_phone, meeting,
-    mock_relay, per_device, recovered_phone, signed_gateway, strategies, two_recipient, verifiers,
+    card_update, device_sync, field_validation_helpers, fixtures, helpers, linked_peer, lost_phone,
+    meeting, mock_relay, per_device, recovered_phone, signed_gateway, strategies, two_recipient,
+    verifiers,
 };
-
-/// The testkit's helpers plus the theme helpers, which read vauchi-app.
-pub mod helpers {
-    pub use super::app_themes::*;
-    pub use vauchi_core_testkit::helpers::*;
-}
-
-#[allow(dead_code)]
-mod app_themes;
 
 /// The sibling `locales` checkout. Prefers `VAUCHI_LOCALES_DIR` (exported by
 /// CI and `just mutants-diff`) because cargo-mutants builds a temp copy where

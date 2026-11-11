@@ -216,13 +216,21 @@ int32_t vauchi_app_create_identity(struct VauchiApp *handle, const char *display
  * The callback runs on a dedicated core thread, never under the engine
  * lock, so it may call back into `vauchi_app_*` (vauchi/private#677).
  * Events that arrive before it runs are merged into one call whose
- * `screen_ids_json` lists every affected screen. UI work still belongs on
- * the shell's own UI thread.
+ * `screen_ids_json` lists every affected screen. Calls never overlap. UI
+ * work still belongs on the shell's own UI thread.
+ *
+ * # Lifetime
+ *
+ * When this returns, the callback it replaced (or removed, with null) is
+ * not running on any other thread and will not be called again, so its
+ * `user_data` may be freed. The same holds once `vauchi_app_destroy`
+ * returns. Called from inside the callback itself, it does not wait for
+ * that call to end (vauchi/private#1218).
  *
  * # Safety
  * `handle` must be a valid `VauchiApp` pointer. `callback` (if non-null)
  * must be safe to call from any thread. `user_data` must remain valid
- * until the callback is unregistered.
+ * until the callback is replaced or removed, or the app destroyed.
  */
 void vauchi_app_set_event_callback(struct VauchiApp *handle,
                                    VauchiEventCallback callback,

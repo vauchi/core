@@ -207,6 +207,10 @@ pub unsafe extern "C" fn vauchi_app_destroy(handle: *mut VauchiApp) {
     unsafe {
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if !handle.is_null() {
+                // The shell frees the callback's user_data next: no callback
+                // may still run, or be registered again, once this returns
+                // (vauchi/private#1218).
+                (*handle).event_callback.close();
                 drop(Box::from_raw(handle));
             }
         }));
@@ -656,13 +660,21 @@ pub type VauchiEventCallback =
 /// The callback runs on a dedicated core thread, never under the engine
 /// lock, so it may call back into `vauchi_app_*` (vauchi/private#677).
 /// Events that arrive before it runs are merged into one call whose
-/// `screen_ids_json` lists every affected screen. UI work still belongs on
-/// the shell's own UI thread.
+/// `screen_ids_json` lists every affected screen. Calls never overlap. UI
+/// work still belongs on the shell's own UI thread.
+///
+/// # Lifetime
+///
+/// When this returns, the callback it replaced (or removed, with null) is
+/// not running on any other thread and will not be called again, so its
+/// `user_data` may be freed. The same holds once `vauchi_app_destroy`
+/// returns. Called from inside the callback itself, it does not wait for
+/// that call to end (vauchi/private#1218).
 ///
 /// # Safety
 /// `handle` must be a valid `VauchiApp` pointer. `callback` (if non-null)
 /// must be safe to call from any thread. `user_data` must remain valid
-/// until the callback is unregistered.
+/// until the callback is replaced or removed, or the app destroyed.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_set_event_callback(
     handle: *mut VauchiApp,
@@ -677,18 +689,22 @@ pub unsafe extern "C" fn vauchi_app_set_event_callback(
     let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         // SAFETY: handle is checked for null above
         let app = unsafe { &*handle };
-        let Some(handler) = app.keep_event_callback_while_locked(handler) else {
+        // Before any lock is taken: a running callback this waits for may
+        // itself need the engine or the locked-start lock.
+        app.event_callback.replace(handler);
+        if app.is_locked() {
+            // Storage still closed: the open wires the engine to the gate.
             return;
-        };
-        register_event_callback(app, handler);
+        }
+        wire_engine_events(app);
     }));
 }
 
-/// Registers `handler` on the open engine (or clears it with `None`).
-pub(crate) fn register_event_callback(app: &VauchiApp, handler: Option<EventCallbackHandler>) {
-    if let Ok(mut current) = app.event_callback.lock() {
-        *current = handler;
-    }
+/// Connects the open engine's events to the registered callback, or
+/// disconnects them when none is registered. The callback itself lives in
+/// the gate; this only (re)installs the engine side, so it never waits.
+pub(crate) fn wire_engine_events(app: &VauchiApp) {
+    let registered = app.event_callback.is_set();
     let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let Ok(mut engine_slot) = app.lock_engine() else {
             return;
@@ -704,12 +720,15 @@ pub(crate) fn register_event_callback(app: &VauchiApp, handler: Option<EventCall
             engine.vauchi().remove_event_handler(old_id);
         }
 
-        if let Some(handler) = handler {
+        if registered {
             // The engine handler only records the event; the notifier's
             // thread calls the C callback, outside the engine lock, so a
             // callback may call back into vauchi_app_* (vauchi/private#677).
+            // It reads the callback from the gate at each delivery, never a
+            // copy, so a replaced callback is not called (vauchi/private#1218).
+            let gate = std::sync::Arc::clone(&app.event_callback);
             let Ok(notifier) = vauchi_app::event_notifier::EventNotifier::spawn(move |screens| {
-                handler.dispatch(&screens);
+                gate.dispatch(&screens);
             }) else {
                 return;
             };
@@ -742,6 +761,16 @@ unsafe impl Send for EventCallbackHandler {}
 unsafe impl Sync for EventCallbackHandler {}
 
 impl EventCallbackHandler {
+    #[cfg(test)]
+    pub(crate) fn new(
+        cb: unsafe extern "C" fn(*const c_char, *mut std::ffi::c_void),
+        user_data: *mut std::ffi::c_void,
+    ) -> Self {
+        Self { cb, user_data }
+    }
+
+    /// Calls the C callback. Only [`crate::callback_gate::CallbackGate`]
+    /// calls this, so no call can outlive a replacement.
     pub(crate) fn dispatch(&self, screens: &[String]) {
         // Defensive: validate callback pointer before dereferencing (C14).
         // The C API contract says the caller guarantees validity, but

@@ -22,6 +22,7 @@ mod app_locked;
 #[cfg(test)]
 mod app_navigation;
 mod app_presentation;
+mod callback_gate;
 #[cfg(test)]
 mod callback_gate_tests;
 mod config;
@@ -54,8 +55,8 @@ pub struct VauchiApp {
     pub(crate) locked: Mutex<Option<app_locked::LockedStart>>,
     /// Active event handler ID for cleanup on replacement or destroy.
     pub(crate) event_handler_id: Mutex<Option<vauchi_core::api::HandlerId>>,
-    /// The registered event callback, registered again on a reopened engine.
-    pub(crate) event_callback: Arc<Mutex<Option<app::EventCallbackHandler>>>,
+    /// The registered event callback; every call to it goes through here.
+    pub(crate) event_callback: Arc<callback_gate::CallbackGate>,
     /// How this handle opened storage, to reopen a fresh install after a
     /// shred (vauchi/private#599); `None` for handles that cannot reopen.
     pub(crate) reopen: Option<app_locked::KeyringOpen>,
@@ -72,7 +73,7 @@ impl VauchiApp {
             engine: Arc::new(Mutex::new(Some(engine))),
             locked: Mutex::new(None),
             event_handler_id: Mutex::new(None),
-            event_callback: Arc::new(Mutex::new(None)),
+            event_callback: Arc::default(),
             reopen: None,
             content_dir: None,
             content_scheduler: Mutex::new(None),

@@ -17,7 +17,6 @@ use vauchi_app::content::{
 use vauchi_app::ui::AppEngine;
 
 use crate::VauchiApp;
-use crate::app::EventCallbackHandler;
 
 /// The first cycle waits for the app to settle.
 const SETTLE: std::time::Duration = std::time::Duration::from_secs(30);
@@ -54,7 +53,7 @@ fn manager_wanting(
 /// the app, so a cycle in progress never reaches into a destroyed handle.
 pub(crate) struct ScheduledCycle {
     engine: Arc<Mutex<Option<AppEngine>>>,
-    callback: Arc<Mutex<Option<EventCallbackHandler>>>,
+    callback: Arc<crate::callback_gate::CallbackGate>,
     data_dir: PathBuf,
 }
 
@@ -92,10 +91,9 @@ impl ScheduledCycle {
                     engine.themes_updated();
                 }
             }
-            let callback = self.callback.lock().ok().and_then(|c| *c);
-            if let Some(callback) = callback {
-                callback.dispatch(&[]);
-            }
+            // Through the gate, not a copy: a callback removed while this
+            // cycle ran is not called (vauchi/private#1218).
+            self.callback.dispatch(&[]);
         }
         Some(applied)
     }

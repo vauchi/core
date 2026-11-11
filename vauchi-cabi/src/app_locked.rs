@@ -23,7 +23,7 @@ use vauchi_core::storage::SecureStorage;
 use vauchi_core::{Command, Event, StorageError, VauchiError};
 
 use crate::VauchiApp;
-use crate::app::{EventCallbackHandler, open_with_file_key, register_event_callback};
+use crate::app::{open_with_file_key, wire_engine_events};
 
 #[derive(Clone)]
 pub(crate) struct KeyringOpen {
@@ -98,17 +98,11 @@ impl KeyringOpen {
 pub(crate) struct LockedStart {
     presentation: StorageLockPresentation,
     params: KeyringOpen,
-    /// A `vauchi_app_set_event_callback` made while locked, applied on open.
-    pending_callback: Option<Option<EventCallbackHandler>>,
     /// A render context pushed while locked, applied on open.
     pending_render_context: Option<RenderContext>,
 }
 
 impl LockedStart {
-    pub(crate) fn keep_event_callback(&mut self, handler: Option<EventCallbackHandler>) {
-        self.pending_callback = Some(handler);
-    }
-
     pub(crate) fn keep_render_context(&mut self, context: RenderContext) {
         self.presentation.set_render_context(context.clone());
         self.pending_render_context = Some(context);
@@ -134,7 +128,6 @@ pub(crate) fn open_app(
         Opened::Locked(reason) => VauchiApp::locked(LockedStart {
             presentation: lock_keeping_pick(reason, Locale::ENGLISH, data_path),
             params,
-            pending_callback: None,
             pending_render_context: None,
         }),
     };
@@ -149,7 +142,7 @@ impl VauchiApp {
             engine: Arc::new(std::sync::Mutex::new(None)),
             locked: std::sync::Mutex::new(Some(start)),
             event_handler_id: std::sync::Mutex::new(None),
-            event_callback: Arc::new(std::sync::Mutex::new(None)),
+            event_callback: Arc::default(),
             reopen: None,
             content_dir: None,
             content_scheduler: std::sync::Mutex::new(None),
@@ -184,7 +177,6 @@ impl VauchiApp {
         let capabilities = previous.device_capabilities().clone();
         let online = previous.is_network_online();
         drop(previous);
-        let callback = self.event_callback.lock().ok().and_then(|c| *c);
         if let Ok(mut handler_id) = self.event_handler_id.lock() {
             *handler_id = None;
         }
@@ -198,9 +190,11 @@ impl VauchiApp {
                 if let Ok(mut slot) = self.engine.lock() {
                     *slot = Some(engine);
                 }
-                if callback.is_some() {
-                    register_event_callback(self, callback);
-                }
+                // The callback stays in the gate; only the new engine's side
+                // is wired. Re-registering a copy taken before the reopen
+                // could revive a callback the shell removed meanwhile
+                // (vauchi/private#1218).
+                wire_engine_events(self);
             }
             Opened::Locked(reason) => {
                 let mut presentation =
@@ -209,7 +203,6 @@ impl VauchiApp {
                 let start = LockedStart {
                     presentation,
                     params,
-                    pending_callback: callback.map(Some),
                     pending_render_context: Some(render_context),
                 };
                 if let Ok(mut locked) = self.locked.lock() {
@@ -219,22 +212,9 @@ impl VauchiApp {
         }
     }
 
-    /// Keeps `handler` for when storage opens (`None`), or hands it back
-    /// once storage is open.
-    pub(crate) fn keep_event_callback_while_locked(
-        &self,
-        handler: Option<EventCallbackHandler>,
-    ) -> Option<Option<EventCallbackHandler>> {
-        let Ok(mut locked) = self.locked.lock() else {
-            return Some(handler);
-        };
-        match locked.as_mut() {
-            Some(start) => {
-                start.keep_event_callback(handler);
-                None
-            }
-            None => Some(handler),
-        }
+    /// Whether storage is still closed behind Core's lock screens.
+    pub(crate) fn is_locked(&self) -> bool {
+        self.locked.lock().is_ok_and(|locked| locked.is_some())
     }
 
     /// Applies `context` to the open engine, or keeps it for the locked
@@ -339,14 +319,11 @@ impl VauchiApp {
                         .initial_commands()
                         .unwrap_or_else(|_| start.presentation.failure()),
                 );
-                let pending_callback = start.pending_callback.take();
                 if let Ok(mut slot) = self.engine.lock() {
                     *slot = Some(engine);
                 }
                 *locked = None;
-                if let Some(handler) = pending_callback {
-                    register_event_callback(self, handler);
-                }
+                wire_engine_events(self);
                 commands
             }
         };

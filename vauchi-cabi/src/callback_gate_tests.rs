@@ -191,3 +191,63 @@ fn destroy_waits_for_a_callback_running_on_another_thread() {
     dispatcher.join().unwrap();
     assert!(!gate.is_set(), "a destroyed app's gate holds no callback");
 }
+
+/// End to end: a real engine event reaches a callback registered through
+/// the C entry point, via the notifier thread; unregistering through the C
+/// entry point from another thread waits for that delivery to end.
+// @internal
+#[test]
+fn unregistering_through_the_c_api_waits_for_an_engine_event_in_delivery() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = std::ffi::CString::new(dir.path().to_str().unwrap()).unwrap();
+    // SAFETY: `path` is a valid C string; a null relay URL means the default.
+    let app = unsafe { crate::app::vauchi_app_create_with_config(path.as_ptr(), std::ptr::null()) };
+    assert!(!app.is_null());
+    let probe = Blocking::new();
+    // SAFETY: `app` is live; `probe` outlives the registration.
+    unsafe {
+        crate::app::vauchi_app_set_event_callback(
+            app,
+            Some(blocking_cb),
+            Arc::as_ptr(&probe) as *mut c_void,
+        );
+    }
+    // SAFETY: `app` is live until the destroy at the end.
+    let app_ref = unsafe { &*app };
+    {
+        let engine = app_ref.lock_engine().unwrap();
+        let engine = engine.as_ref().expect("storage opens on a fresh directory");
+        engine
+            .vauchi()
+            .dispatch_event(vauchi_core::api::VauchiEvent::contact_added(
+                "probe".into(),
+                vauchi_core::api::EventOrigin::Local,
+            ));
+    }
+    probe.entered.wait();
+
+    let app_addr = app as usize;
+    let unregister = {
+        let probe = Arc::clone(&probe);
+        thread::spawn(move || {
+            // SAFETY: the app stays alive until this thread is joined.
+            unsafe {
+                crate::app::vauchi_app_set_event_callback(
+                    app_addr as *mut crate::VauchiApp,
+                    None,
+                    std::ptr::null_mut(),
+                );
+            }
+            probe.finished.load(Ordering::SeqCst)
+        })
+    };
+    until_waiting_or_done(&app_ref.event_callback, &unregister);
+    probe.release.wait();
+
+    assert!(
+        unregister.join().unwrap(),
+        "set_event_callback(NULL) returned while the engine's event callback was running"
+    );
+    // SAFETY: `app` came from vauchi_app_create_with_config and is not used again.
+    unsafe { crate::app::vauchi_app_destroy(app) };
+}

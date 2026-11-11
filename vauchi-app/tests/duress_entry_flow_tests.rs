@@ -235,7 +235,7 @@ fn duress_entry_unlocked_with_the_app_password_opens_the_duress_pin_surface_dire
 /// Setting a duress PIN must not need less than the password: without it
 /// the flow starts on the lock screen, and the password continues to the
 /// duress PIN rather than the home screen (vauchi/private#639).
-// @scenario: security.feature :: App lock with PIN
+// @internal
 #[test]
 fn duress_entry_with_an_app_password_asks_for_it_first() {
     let mut vauchi = identity_core();

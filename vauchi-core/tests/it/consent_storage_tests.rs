@@ -115,7 +115,7 @@ fn test_consent_upsert_overwrites() {
     assert!(!records[0].2);
 }
 
-// @scenario: privacy_compliance :: View access log
+// @internal
 #[test]
 fn test_audit_log() {
     // allow(zero_assertions): Write-only interface — no read-back API to assert against

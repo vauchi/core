@@ -80,7 +80,7 @@ fn unlocked_on_advanced_settings() -> AppEngine {
     engine
 }
 
-// @scenario: security.feature :: App lock with PIN
+// @internal
 #[test]
 fn back_while_locked_stays_on_the_lock_screen() {
     for pin in [PASSWORD, DURESS_PIN] {
@@ -97,7 +97,7 @@ fn back_while_locked_stays_on_the_lock_screen() {
     }
 }
 
-// @scenario: security.feature :: App lock with PIN
+// @internal
 #[test]
 fn a_direct_navigate_back_while_locked_stays_on_the_lock_screen() {
     let mut engine = locked_after_backgrounding(PASSWORD);
@@ -109,7 +109,7 @@ fn a_direct_navigate_back_while_locked_stays_on_the_lock_screen() {
 
 /// `navigate_back` is public; a caller that skips `can_go_back` must not
 /// pop past the lock either.
-// @scenario: security.feature :: App lock with PIN
+// @internal
 #[test]
 fn navigate_back_called_directly_while_locked_stays_on_the_lock_screen() {
     let mut engine = locked_after_backgrounding(PASSWORD);
@@ -120,7 +120,7 @@ fn navigate_back_called_directly_while_locked_stays_on_the_lock_screen() {
     assert_eq!(engine.current_screen().screen_id, "lock_screen");
 }
 
-// @scenario: security.feature :: App lock with PIN
+// @internal
 #[test]
 fn the_locked_surface_offers_no_back() {
     let mut engine = locked_after_backgrounding(PASSWORD);
@@ -194,7 +194,7 @@ fn a_direct_navigate_back_still_goes_back_when_unlocked() {
 }
 
 /// After the password, the app is where it was before it locked.
-// @scenario: security.feature :: App lock with PIN
+// @internal
 #[test]
 fn unlocking_after_a_refused_back_still_opens_the_app() {
     let mut engine = locked_after_backgrounding(PASSWORD);

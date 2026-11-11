@@ -296,7 +296,7 @@ fn test_widget_panic_shred_loads_pre_signed_before_destruction() {
 // =============================================================================
 
 /// Test that WidgetConfirmationMode variants are properly constructible.
-// @scenario: panic_widget :: Configure widget confirmation mode
+// @internal
 #[test]
 fn test_widget_confirmation_mode_variants() {
     let mode = WidgetConfirmationMode::TapConfirm;
@@ -310,7 +310,7 @@ fn test_widget_confirmation_mode_variants() {
 }
 
 /// Test that WidgetConfirmationMode can be cloned and compared.
-// @scenario: panic_widget :: Configure widget confirmation mode
+// @internal
 #[test]
 fn test_widget_confirmation_mode_clone_eq() {
     let mode1 = WidgetConfirmationMode::TapConfirm;

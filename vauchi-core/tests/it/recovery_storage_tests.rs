@@ -23,7 +23,6 @@ fn record_via_scoped_view(store: &RecoveryStore<'_>, claim_id: &str) -> Option<S
         .map(|(_, response, _)| response)
 }
 
-// @scenario: contact_recovery :: Accept recovery and reconnect
 // @internal
 #[test]
 fn test_save_and_get_recovery_response() {

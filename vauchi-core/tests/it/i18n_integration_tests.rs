@@ -167,7 +167,7 @@ fn test_missing_key_handling() {
 // ============================================================
 
 /// Test: String interpolation with arguments
-// @scenario: internationalization :: Correct pluralization
+// @internal
 #[test]
 fn test_string_interpolation() {
     ensure_init();
@@ -177,7 +177,7 @@ fn test_string_interpolation() {
 }
 
 /// Test: Multiple argument interpolation
-// @scenario: internationalization :: Correct pluralization
+// @internal
 #[test]
 fn test_multiple_args_interpolation() {
     ensure_init();
@@ -192,7 +192,6 @@ fn test_multiple_args_interpolation() {
 
 /// Test: Interpolation works across locales
 // @scenario: internationalization :: Core languages are supported
-// @scenario: internationalization :: Correct pluralization
 #[test]
 fn test_interpolation_across_locales() {
     ensure_init();
@@ -272,8 +271,7 @@ fn test_error_strings() {
 // ============================================================
 
 /// Test: RTL detection for current locales (all LTR)
-// @scenario: internationalization :: RTL layout for Arabic
-// @scenario: internationalization :: RTL layout for Hebrew
+// @internal
 #[test]
 fn test_rtl_detection() {
     // Current locales are all LTR
@@ -294,7 +292,7 @@ fn test_rtl_detection() {
 ///
 /// See: _private/docs/investigations/2026-03-18-frontend-audit-investigation.md (S-04)
 /// See: _private/docs/planning/done/2026-01-20-internationalization-implementation.md (Phase 6)
-// @scenario: internationalization :: RTL layout for Arabic
+// @internal
 #[test]
 fn test_rtl_canary_no_rtl_locales_without_layout_support() {
     let rtl_locales: Vec<_> = get_available_locales()

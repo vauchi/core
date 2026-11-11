@@ -50,7 +50,7 @@ fn activation(menu: &Value) -> Event {
     .unwrap()
 }
 
-// @scenario: generic_presentation_protocol.feature :: Core chooses a capability-compatible presentation
+// @internal
 #[test]
 fn menus_are_opt_in_and_can_be_removed() {
     let mut engine = engine();

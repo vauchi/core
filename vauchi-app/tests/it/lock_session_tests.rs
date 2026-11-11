@@ -65,7 +65,7 @@ fn unlock_with(engine: &mut AppEngine, password: &str) {
     });
 }
 
-// @scenario: security.feature :: App lock with PIN
+// @internal
 #[test]
 fn a_locked_session_refuses_navigation_to_any_screen() {
     for target in [
@@ -87,7 +87,7 @@ fn a_locked_session_refuses_navigation_to_any_screen() {
     }
 }
 
-// @scenario: security.feature :: App lock with PIN
+// @internal
 #[test]
 fn a_cold_start_behind_a_password_refuses_navigation() {
     let mut engine = engine_with_password(false);
@@ -103,7 +103,7 @@ fn a_cold_start_behind_a_password_refuses_navigation() {
     assert_eq!(engine.current_screen().screen_id, "lock_screen");
 }
 
-// @scenario: security.feature :: App lock with PIN
+// @internal
 #[test]
 fn a_locked_session_refuses_a_surface_switch() {
     let mut engine = locked_after_backgrounding();
@@ -118,7 +118,7 @@ fn a_locked_session_refuses_a_surface_switch() {
 /// A shell still holds the surfaces it was shown before the lock (here
 /// Settings and its Advanced child); activating one of them must not leave
 /// the lock screen.
-// @scenario: security.feature :: App lock with PIN
+// @internal
 #[test]
 fn a_locked_session_refuses_switching_to_a_surface_shown_before_the_lock() {
     for surface in ["settings", "settings_advanced"] {
@@ -146,7 +146,7 @@ fn a_locked_session_refuses_switching_to_a_surface_shown_before_the_lock() {
     }
 }
 
-// @scenario: security.feature :: App lock with PIN
+// @internal
 #[test]
 fn a_wrong_password_keeps_the_session_locked() {
     let mut engine = locked_after_backgrounding();

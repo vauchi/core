@@ -217,7 +217,13 @@ fn main() {
     // with them the steps of their generation, inspection and storage
     // scenarios; features !176 rewrote the spec to the purge signed at send
     // time, whose steps wire 129.
-    const MIN_WIRED_SCENARIOS: usize = 129;
+    // 122 since 2026-11-11: the planned scenarios left the public features
+    // repo for a private record (vauchi/private#1229). Seven of them bound
+    // only to no-op steps (`perf_noop_memory` and its kin: action menu,
+    // clipboard toast, language override, regional phone format, RTL for
+    // Arabic and Hebrew, small-list memory), so they passed without checking
+    // anything; the floor drops by exactly those seven.
+    const MIN_WIRED_SCENARIOS: usize = 122;
     if scenarios.passed < MIN_WIRED_SCENARIOS {
         eprintln!(
             "cucumber GATE failed: {} wired scenario(s) passed, expected at least \

@@ -22,6 +22,8 @@ mod app_locked;
 #[cfg(test)]
 mod app_navigation;
 mod app_presentation;
+#[cfg(test)]
+mod callback_gate_tests;
 mod config;
 mod content_updates;
 #[cfg(test)]

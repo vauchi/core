@@ -82,7 +82,7 @@ fn rate_limit_resets_at_one_hour_boundary() {
 fn validate_version_accepts_current_version() {
     let old_pk = [0x01u8; 32];
     let new_pk = [0x02u8; 32];
-    let proof = RecoveryProof::new(&old_pk, &new_pk, 3, 1_700_000_000);
+    let proof = RecoveryProof::new(old_pk, new_pk, 3, 1_700_000_000);
 
     assert_eq!(proof.version(), RECOVERY_PROOF_VERSION);
     assert!(
@@ -98,7 +98,7 @@ fn validate_version_accepts_current_version() {
 fn validate_version_rejects_future_version() {
     let old_pk = [0x01u8; 32];
     let new_pk = [0x02u8; 32];
-    let proof = RecoveryProof::new(&old_pk, &new_pk, 3, 1_700_000_000);
+    let proof = RecoveryProof::new(old_pk, new_pk, 3, 1_700_000_000);
 
     let mut bytes = proof.to_bytes().expect("proof must serialize");
     bytes[0] = RECOVERY_PROOF_VERSION + 1;

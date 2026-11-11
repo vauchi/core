@@ -25,6 +25,7 @@ fn signed_locales_manifest(signer: &SigningKeyPair, codes: &[&str]) -> ContentMa
     signed_named_locales_manifest(signer, &entries)
 }
 
+#[allow(clippy::type_complexity)]
 fn signed_named_locales_manifest(
     signer: &SigningKeyPair,
     entries: &[(&str, Option<(&str, &str, bool)>)],

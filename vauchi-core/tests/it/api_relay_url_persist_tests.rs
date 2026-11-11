@@ -96,7 +96,7 @@ fn relay_url_seed_does_not_clobber_explicit_override() {
 #[test]
 fn set_relay_url_rejects_empty_after_trim() {
     let dir = tempfile::tempdir().unwrap();
-    let config = VauchiConfig::with_storage_path(&dir.path().join("v.db"))
+    let config = VauchiConfig::with_storage_path(dir.path().join("v.db"))
         .with_storage_key(SymmetricKey::generate());
     let mut vauchi = Vauchi::new(config).unwrap();
     assert!(
@@ -109,7 +109,7 @@ fn set_relay_url_rejects_empty_after_trim() {
 #[test]
 fn set_relay_url_overwrites_previous() {
     let dir = tempfile::tempdir().unwrap();
-    let config = VauchiConfig::with_storage_path(&dir.path().join("v.db"))
+    let config = VauchiConfig::with_storage_path(dir.path().join("v.db"))
         .with_storage_key(SymmetricKey::generate());
     let mut vauchi = Vauchi::new(config).unwrap();
     vauchi
@@ -180,7 +180,7 @@ fn a_custom_relay_without_its_anchor_is_refused() {
 #[test]
 fn the_production_relay_needs_no_anchor() {
     let dir = tempfile::tempdir().unwrap();
-    let config = VauchiConfig::with_storage_path(&dir.path().join("v.db"))
+    let config = VauchiConfig::with_storage_path(dir.path().join("v.db"))
         .with_storage_key(SymmetricKey::generate());
     let mut vauchi = Vauchi::new(config).unwrap();
 
@@ -220,7 +220,7 @@ fn a_persisted_url_does_not_replace_a_relay_set_with_its_anchor() {
 #[test]
 fn the_builders_relay_url_drops_the_configured_anchor() {
     let dir = tempfile::tempdir().unwrap();
-    let config = VauchiConfig::with_storage_path(&dir.path().join("v.db"))
+    let config = VauchiConfig::with_storage_path(dir.path().join("v.db"))
         .with_storage_key(SymmetricKey::generate())
         .with_relay("https://one.example", ANCHOR);
 

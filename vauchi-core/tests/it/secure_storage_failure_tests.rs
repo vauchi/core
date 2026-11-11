@@ -51,6 +51,7 @@ fn boot(keychain: Arc<FailingKeychain>) -> (tempfile::TempDir, Result<Vauchi, Va
     (dir, result)
 }
 
+#[allow(clippy::type_complexity)]
 fn failures() -> [(&'static str, fn() -> StorageError); 2] {
     [
         ("locked", || StorageError::SecureStorageLocked),

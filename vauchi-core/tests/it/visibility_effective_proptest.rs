@@ -157,6 +157,8 @@ proptest! {
             }
         }
 
+        // `c` and `f` index the model as well as the id lists.
+        #[allow(clippy::needless_range_loop)]
         for c in 0..N_CONTACTS {
             for f in 0..N_FIELDS {
                 let actual = wb

@@ -103,10 +103,7 @@ fn notification_claims_handle_duplicates_and_an_empty_pruned_table() {
         storage.activity_log().claim_notifications().unwrap(),
         vec![first.clone()]
     );
-    assert_eq!(
-        storage.activity_log().activity_log_insert(&first).unwrap(),
-        false
-    );
+    assert!(!storage.activity_log().activity_log_insert(&first).unwrap());
     assert_eq!(
         storage.activity_log().claim_notifications().unwrap(),
         Vec::new()

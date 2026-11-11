@@ -5,6 +5,8 @@
 use vauchi_core::{api::Vauchi, contact::GroupManager};
 
 #[cfg(test)]
+// The inner module names every test path here; renaming it would rename the tests.
+#[allow(clippy::module_inception)]
 mod visibility_e2e_tests {
     use super::*;
 

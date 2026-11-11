@@ -16,7 +16,7 @@ use vauchi_core::{ActionSpec, Command, Event, SurfaceId, Vauchi};
 
 use crate::VauchiWorld;
 
-fn engine<'w>(world: &'w mut VauchiWorld) -> &'w mut AppEngine {
+fn engine(world: &mut VauchiWorld) -> &mut AppEngine {
     world
         .engine
         .as_mut()
@@ -44,12 +44,11 @@ fn collect_strings(value: &serde_json::Value, out: &mut Vec<String>) {
 /// Finds the action `id` whose sibling `label` equals `label` — the Wire
 /// Humble shape every renderer taps by (`{ id, label, … }`).
 fn find_action_id(value: &serde_json::Value, label: &str) -> Option<String> {
-    if let serde_json::Value::Object(map) = value {
-        if map.get("label").and_then(|v| v.as_str()) == Some(label)
-            && let Some(id) = map.get("id").and_then(|v| v.as_str())
-        {
-            return Some(id.to_string());
-        }
+    if let serde_json::Value::Object(map) = value
+        && map.get("label").and_then(|v| v.as_str()) == Some(label)
+        && let Some(id) = map.get("id").and_then(|v| v.as_str())
+    {
+        return Some(id.to_string());
     }
     match value {
         serde_json::Value::Array(items) => items.iter().find_map(|i| find_action_id(i, label)),

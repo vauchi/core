@@ -196,6 +196,7 @@ fn tamper_check(path: &Path, tamper: impl Fn(Vec<u8>) -> Vec<u8>) {
 // @internal
 #[test]
 fn a_tampered_check_fails_closed_under_the_right_key() {
+    #[allow(clippy::type_complexity)]
     let tamperings: [(&str, fn(Vec<u8>) -> Vec<u8>); 4] = [
         ("empty", |_| Vec::new()),
         ("truncated", |mut s| {

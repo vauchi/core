@@ -55,7 +55,7 @@ fn hash_matches_when_bytes_match() {
 #[test]
 fn display_format_is_lowercase_hex() {
     let key = IdentityKey::from_bytes([0xDE; 32]);
-    let expected: String = std::iter::repeat("de").take(32).collect();
+    let expected: String = std::iter::repeat_n("de", 32).collect();
     assert_eq!(key.to_string(), expected);
 }
 
@@ -68,7 +68,7 @@ fn hex_encode_compatibility_via_asref_bytes() {
     // as the bare-bytes form.
     let bytes = [0x42u8; 32];
     let key = IdentityKey::from_bytes(bytes);
-    assert_eq!(hex::encode(&key), hex::encode(bytes));
+    assert_eq!(hex::encode(key), hex::encode(bytes));
 }
 
 // @internal
@@ -126,7 +126,7 @@ fn dh_pubkey_hash_matches_when_bytes_match() {
 #[test]
 fn dh_pubkey_display_format_is_lowercase_hex() {
     let key = DhPublicKey::from_bytes([0xDE; 32]);
-    let expected: String = std::iter::repeat("de").take(32).collect();
+    let expected: String = std::iter::repeat_n("de", 32).collect();
     assert_eq!(key.to_string(), expected);
 }
 
@@ -389,7 +389,7 @@ fn message_id_display_is_the_underlying_string() {
 fn message_id_forward_partial_eq_with_str_and_string_works() {
     let id = MessageId::from(MESSAGE_ID_UUID);
     assert!(id == MESSAGE_ID_UUID);
-    assert!(id == MESSAGE_ID_UUID.to_string());
+    assert!(id == MESSAGE_ID_UUID);
 }
 
 // @internal
@@ -441,7 +441,7 @@ fn mailbox_token_hash_matches_when_bytes_match() {
 #[test]
 fn mailbox_token_display_format_is_lowercase_hex() {
     let token = MailboxToken::from_bytes([0xDE; 32]);
-    let expected: String = std::iter::repeat("de").take(32).collect();
+    let expected: String = std::iter::repeat_n("de", 32).collect();
     assert_eq!(token.to_string(), expected);
 }
 

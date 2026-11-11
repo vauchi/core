@@ -36,7 +36,7 @@ struct Device {
 fn device() -> Device {
     let dir = tempfile::tempdir().unwrap();
     let clock = Arc::new(FakeClock::new(UNIX_EPOCH + Duration::from_secs(START)));
-    let storage = Storage::open(&dir.path().join("vauchi.db"), SymmetricKey::generate())
+    let storage = Storage::open(dir.path().join("vauchi.db"), SymmetricKey::generate())
         .unwrap()
         .with_clock(clock.clone());
     let keys = MemoryKeyStorage::new();

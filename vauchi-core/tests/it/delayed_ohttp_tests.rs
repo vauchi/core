@@ -452,7 +452,6 @@ fn vauchi_sleeping_on(
     vauchi_waiting_window(outer, delayed, sleeper, None)
 }
 
-#[cfg(feature = "testing")]
 /// These tests count the delay window's sleeps. `FakeSleeper` lets no time
 /// pass, so a real pacer's bucket would never refill between the 30 s polls
 /// and its waits would mix into the count; pacing is tested on consistent

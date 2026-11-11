@@ -52,7 +52,7 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::ratchet::{DoubleRatchetState, RatchetMessage};
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::exchange::genesis::GenesisEnvelope;
-use vauchi_core::identity::{DeviceRegistry, Identity, RegistryBroadcast};
+use vauchi_core::identity::{Identity, RegistryBroadcast};
 use vauchi_core::storage::GENESIS_CONTACT_ATTEMPTS_PER_WINDOW;
 use vauchi_core::sync::DeviceLinkIntent;
 use vauchi_core::sync::delta::VersionedPayload;

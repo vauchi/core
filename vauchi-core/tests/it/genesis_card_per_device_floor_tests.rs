@@ -82,6 +82,7 @@ fn cold_start_world() -> ColdStartWorld {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn genesis_card_blob(
     sender: &Identity,
     bob_pk: &[u8; 32],

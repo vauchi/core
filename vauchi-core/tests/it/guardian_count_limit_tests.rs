@@ -40,7 +40,7 @@ fn a_tenth_recovery_trusted_contact_is_refused_not_dropped() {
         .map(|n| contact_of(&alice, &format!("Helper {n}")))
         .collect();
     for id in &ids[..MAX_GUARDIANS] {
-        assert_eq!(alice.toggle_recovery_trust(id).unwrap(), true);
+        assert!(alice.toggle_recovery_trust(id).unwrap());
     }
 
     let tenth = alice.toggle_recovery_trust(&ids[MAX_GUARDIANS]);
@@ -60,14 +60,12 @@ fn a_tenth_recovery_trusted_contact_is_refused_not_dropped() {
             .unwrap()
             .is_recovery_trusted()
     );
-    assert_eq!(
-        alice.toggle_recovery_trust(&ids[0]).unwrap(),
-        false,
+    assert!(
+        !alice.toggle_recovery_trust(&ids[0]).unwrap(),
         "a held guardian can still be released"
     );
-    assert_eq!(
+    assert!(
         alice.toggle_recovery_trust(&ids[MAX_GUARDIANS]).unwrap(),
-        true,
         "the freed place can be taken"
     );
 }

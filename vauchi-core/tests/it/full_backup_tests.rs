@@ -181,7 +181,15 @@ fn v3_roundtrip_with_avatar() {
     let id_data = test_identity_data();
     let contact = make_contact_with_avatar("AvatarContact");
 
-    let blob = export_full_backup(&id_data, &[contact.clone()], None, &[], PASSWORD, 0).unwrap();
+    let blob = export_full_backup(
+        &id_data,
+        std::slice::from_ref(&contact),
+        None,
+        &[],
+        PASSWORD,
+        0,
+    )
+    .unwrap();
     let envelope = import_full_backup(&blob, PASSWORD).unwrap();
 
     let restored = restore_contacts_from_envelope(&envelope).unwrap();
@@ -390,7 +398,7 @@ fn v2_backward_compat() {
 #[test]
 fn v1_contact_backward_compat() {
     let contact = make_exchanged("BackwardCompat");
-    let blob = export_contact_backup(&[contact.clone()], PASSWORD).unwrap();
+    let blob = export_contact_backup(std::slice::from_ref(&contact), PASSWORD).unwrap();
 
     assert_eq!(blob[0], 0x01, "contact backup must use v1 format");
 

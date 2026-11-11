@@ -143,7 +143,7 @@ fn test_process_incoming_captures_failed_ack_events() {
         message_id: uuid::Uuid::new_v4().to_string().into(),
         timestamp: 0,
         payload: MessagePayload::Acknowledgment(Acknowledgment {
-            message_id: msg_id.into(),
+            message_id: msg_id,
             status: AckStatus::Failed,
             error: Some("relay overloaded".to_string()),
         }),

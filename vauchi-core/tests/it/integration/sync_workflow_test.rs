@@ -46,7 +46,7 @@ fn test_sync_manager_workflow() {
     let update_id = sync_manager
         .queue_card_update(&rng, "contact-1", &old_card, &new_card)
         .unwrap();
-    assert!(!update_id.as_str().is_empty());
+    assert!(!update_id.is_empty());
 
     let pending = sync_manager.get_pending("contact-1").unwrap();
     assert_eq!(pending.len(), 1);

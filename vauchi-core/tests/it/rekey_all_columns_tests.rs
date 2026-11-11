@@ -711,6 +711,7 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
     );
 
     // ── visibility_labels ───────────────────────────────────
+    #[allow(clippy::type_complexity)]
     let (contacts_b, fields_b, name_b, hmac_b, override_b): (
         Vec<u8>,
         Vec<u8>,

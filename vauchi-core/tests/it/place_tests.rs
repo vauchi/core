@@ -100,7 +100,7 @@ fn find_place_near_returns_closest_of_several() {
         Some(close.id),
         "the nearest place within radius wins"
     );
-    assert!(PLACE_MATCH_RADIUS_M > 0.0);
+    const { assert!(PLACE_MATCH_RADIUS_M > 0.0) };
 }
 
 // @scenario: contact-annotations.feature - Name a place

@@ -63,7 +63,6 @@ mod mailbox_store;
 #[allow(dead_code)]
 pub mod meeting;
 #[cfg(feature = "network-http")]
-#[allow(dead_code)]
 pub mod mock_relay;
 pub mod per_device;
 #[allow(dead_code)]

@@ -392,8 +392,8 @@ fn sharpness_subtracts_the_squared_mean_laplacian() {
 // @internal
 #[test]
 fn a_frame_narrower_than_twelve_pixels_measures_no_sharpness() {
-    let column = |x: u32, y: u32| x == 4 && y % 8 == 0;
-    let row = |x: u32, y: u32| y == 4 && x % 8 == 0;
+    let column = |x: u32, y: u32| x == 4 && y.is_multiple_of(8);
+    let row = |x: u32, y: u32| y == 4 && x.is_multiple_of(8);
 
     assert_eq!(sharpness_of(11, 200, &frame(11, 200, column)), 0.0);
     assert_eq!(sharpness_of(200, 11, &frame(200, 11, row)), 0.0);

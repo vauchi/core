@@ -286,18 +286,17 @@ fn done_and_both_from_another_session_change_nothing() {
 #[test]
 fn a_saved_session_is_confirmed_once_it_reads_done_or_both() {
     let mut p = alice_saved_bob_not();
-    assert_eq!(
-        p.alice.peer_confirmed(),
-        false,
+    assert!(
+        !p.alice.peer_confirmed(),
         "saved, but nothing from Bob says he has"
     );
 
     let alice_done = next_ending_frame(&mut p.alice);
     p.bob.process_scanned_qr(&alice_done);
     assert_eq!(p.bob.get_state(), ProtocolState::Finalized);
-    assert_eq!(p.bob.peer_confirmed(), true, "Bob read Alice's DONE");
+    assert!(p.bob.peer_confirmed(), "Bob read Alice's DONE");
 
     let bob_both = next_ending_frame(&mut p.bob);
     p.alice.process_scanned_qr(&bob_both);
-    assert_eq!(p.alice.peer_confirmed(), true, "Alice read Bob's BOTH");
+    assert!(p.alice.peer_confirmed(), "Alice read Bob's BOTH");
 }

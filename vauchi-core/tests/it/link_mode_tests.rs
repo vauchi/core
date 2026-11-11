@@ -821,7 +821,7 @@ proptest::proptest! {
     #[test]
     fn parse_deep_link_never_panics_or_misclassifies(input in ".*") {
         let result = parse_exchange_deep_link(&input);
-        if let Ok(_) = result {
+        if result.is_ok() {
             // The parser only accepts `https://vauchi.app/x#...` and the
             // legacy `vauchi://exchange?...` — anything else MUST be a
             // typed error.

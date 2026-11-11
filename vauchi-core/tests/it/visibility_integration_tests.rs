@@ -8,6 +8,8 @@ use vauchi_core::{
 };
 
 #[cfg(test)]
+// The inner module names every test path here; renaming it would rename the tests.
+#[allow(clippy::module_inception)]
 mod visibility_integration_tests {
     use super::*;
 

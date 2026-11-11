@@ -212,11 +212,11 @@ fn shake_qr_is_emitted_in_confirming_when_recording() {
     // stays in Confirming throughout.
     let mut saw_shake = false;
     for _ in 0..14 {
-        if let Some(p) = alice.get_display_qr() {
-            if matches!(parse_qr(&p.data), Ok(StageQr::Shake { .. })) {
-                saw_shake = true;
-                break;
-            }
+        if let Some(p) = alice.get_display_qr()
+            && matches!(parse_qr(&p.data), Ok(StageQr::Shake { .. }))
+        {
+            saw_shake = true;
+            break;
         }
     }
     assert!(

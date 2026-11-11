@@ -34,7 +34,7 @@ pub(super) fn legacy_backup() -> Vec<u8> {
     );
     vauchi_core::backup::export_full_backup(
         &data,
-        &[bob.clone()],
+        std::slice::from_ref(&bob),
         Some(&ContactCard::new("Alice")),
         &[("work".into(), "Work".into(), vec![bob.id().into()])],
         PASSWORD,

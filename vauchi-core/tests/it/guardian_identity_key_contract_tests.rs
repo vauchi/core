@@ -81,11 +81,11 @@ proptest! {
 /// signing scalar reduced mod L, whereas an X25519 static secret must be the
 /// clamped expanded scalar `clamp(SHA-512(seed)[0..32])`, which is always
 /// >= 2^254 > L. The raw bytes therefore always differ, and
-/// `StaticSecret::from(to_scalar_bytes())` would re-clamp to the wrong value —
-/// so it must never be substituted. Correctness of our construction is pinned
-/// instead by `to_x25519_secret_known_answer` (external libsodium reference)
-/// and the `x25519_secret_public_matches_recipient_for_any_seed` proptest
-/// (derived public key == `VerifyingKey::to_montgomery`).
+/// > `StaticSecret::from(to_scalar_bytes())` would re-clamp to the wrong value —
+/// > so it must never be substituted. Correctness of our construction is pinned
+/// > instead by `to_x25519_secret_known_answer` (external libsodium reference)
+/// > and the `x25519_secret_public_matches_recipient_for_any_seed` proptest
+/// > (derived public key == `VerifyingKey::to_montgomery`).
 // @internal
 #[test]
 fn to_scalar_bytes_is_not_the_x25519_secret() {

@@ -838,11 +838,8 @@ fn backup_v6_vector_decrypts_under_its_header_and_not_under_a_changed_one() {
 fn backup_v6_vector_imports_with_production_argon2id_and_refuses_a_wrong_password() {
     let v = load().backup_v6;
     let salt = hex::decode(&v.salt).expect("salt");
-    let base_key = vauchi_core::crypto::derive_key_argon2id(
-        v.password.as_bytes(),
-        salt.as_slice().try_into().expect("16 bytes"),
-    )
-    .expect("argon2id");
+    let base_key = vauchi_core::crypto::derive_key_argon2id(v.password.as_bytes(), salt.as_slice())
+        .expect("argon2id");
     assert_eq!(hex::encode(base_key.as_bytes()), v.argon2id_base_key);
 
     let mut wrong = Vauchi::in_memory().expect("in-memory vauchi");

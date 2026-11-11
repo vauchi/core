@@ -19,7 +19,7 @@ fn voucher_for(old: &[u8; 32], new: &[u8; 32]) -> RecoveryVoucher {
 
 /// A one-voucher proof for OLD → NEW whose voucher was swapped in transit.
 fn received_proof_with_voucher(voucher: RecoveryVoucher) -> RecoveryProof {
-    let mut proof = RecoveryProof::new(&OLD, &NEW, 1, 0);
+    let mut proof = RecoveryProof::new(OLD, NEW, 1, 0);
     proof.add_voucher(voucher_for(&OLD, &NEW)).unwrap();
     let mut json = serde_json::to_value(&proof).unwrap();
     json["vouchers"][0] = serde_json::to_value(&voucher).unwrap();
@@ -50,7 +50,7 @@ fn a_received_proof_rejects_a_voucher_made_for_another_key_pair() {
 #[test]
 fn recovery_progress_rejects_a_voucher_made_for_another_key_pair() {
     for (old, new) in [(&OLD, &OTHER), (&OTHER, &NEW)] {
-        let mut progress = RecoveryProgress::new(RecoveryClaim::new(&OLD, &NEW, 0), 2, 0);
+        let mut progress = RecoveryProgress::new(RecoveryClaim::new(OLD, NEW, 0), 2, 0);
 
         let result = progress.add_voucher(voucher_for(old, new));
 
@@ -66,17 +66,17 @@ fn recovery_progress_rejects_a_voucher_made_for_another_key_pair() {
 fn a_revocation_applies_only_to_the_recovery_it_names() {
     let old_keys = SigningKeyPair::generate();
     let old = *old_keys.public_key().as_bytes();
-    let revocation = RecoveryRevocation::create(&old, &NEW, &old_keys, 0);
+    let revocation = RecoveryRevocation::create(old, NEW, &old_keys, 0);
 
-    assert!(revocation.applies_to(&RecoveryProof::new(&old, &NEW, 1, 0)));
-    assert!(!revocation.applies_to(&RecoveryProof::new(&old, &OTHER, 1, 0)));
-    assert!(!revocation.applies_to(&RecoveryProof::new(&OTHER, &NEW, 1, 0)));
+    assert!(revocation.applies_to(&RecoveryProof::new(old, NEW, 1, 0)));
+    assert!(!revocation.applies_to(&RecoveryProof::new(old, OTHER, 1, 0)));
+    assert!(!revocation.applies_to(&RecoveryProof::new(OTHER, NEW, 1, 0)));
 }
 
 // @internal
 #[test]
 fn a_truncated_claim_is_refused() {
-    let bytes = RecoveryClaim::new(&OLD, &NEW, 7).to_bytes();
+    let bytes = RecoveryClaim::new(OLD, NEW, 7).to_bytes();
     assert_eq!(bytes.len(), 73);
 
     assert!(RecoveryClaim::from_bytes(&bytes).is_ok());
@@ -164,7 +164,7 @@ fn a_voucher_is_exactly_its_header_or_its_header_and_one_token() {
 }
 
 fn proof_with_vouchers(new: &[u8; 32], count: usize) -> RecoveryProof {
-    let mut proof = RecoveryProof::new(&OLD, new, 1, 0);
+    let mut proof = RecoveryProof::new(OLD, new, 1, 0);
     for _ in 0..count {
         proof.add_voucher(voucher_for(&OLD, new)).unwrap();
     }
@@ -204,7 +204,7 @@ fn a_proof_exposes_the_vouchers_it_collected() {
 // @internal
 #[test]
 fn a_claim_expires_only_after_its_maximum_age() {
-    let claim = RecoveryClaim::new(&OLD, &NEW, 1_000);
+    let claim = RecoveryClaim::new(OLD, NEW, 1_000);
     let limit = 1_000 + RecoveryClaim::MAX_AGE_SECS;
 
     assert_eq!(claim.timestamp(), 1_000);
@@ -219,7 +219,7 @@ fn a_revocation_keeps_the_time_it_was_made() {
     let old = *old_keys.public_key().as_bytes();
 
     assert_eq!(
-        RecoveryRevocation::create(&old, &NEW, &old_keys, 1_234).timestamp(),
+        RecoveryRevocation::create(old, NEW, &old_keys, 1_234).timestamp(),
         1_234
     );
 }
@@ -227,7 +227,7 @@ fn a_revocation_keeps_the_time_it_was_made() {
 // @internal
 #[test]
 fn a_proof_without_a_version_is_refused() {
-    let mut json = serde_json::to_value(RecoveryProof::new(&OLD, &NEW, 1, 0)).unwrap();
+    let mut json = serde_json::to_value(RecoveryProof::new(OLD, NEW, 1, 0)).unwrap();
     json.as_object_mut().unwrap().remove("version");
 
     let err = serde_json::from_value::<RecoveryProof>(json).unwrap_err();
@@ -241,7 +241,7 @@ fn a_proof_without_a_version_is_refused() {
 // @internal
 #[test]
 fn a_recovery_reminder_is_due_after_its_days_have_passed() {
-    let reminder = RecoveryReminder::new(&OLD, 1_000);
+    let reminder = RecoveryReminder::new(OLD, 1_000);
     let due = 1_000 + u64::from(RecoveryReminder::DEFAULT_REMINDER_DAYS) * 86_400;
 
     assert!(!reminder.is_due(due - 1));

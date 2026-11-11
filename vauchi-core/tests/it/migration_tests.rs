@@ -817,7 +817,7 @@ fn test_schema_version_after_all_migrations() {
     let key = SymmetricKey::generate();
 
     let migrations = all_migrations();
-    MigrationRunner::run(&conn, &key, &migrations, None, 0).unwrap();
+    MigrationRunner::run(&conn, &key, migrations, None, 0).unwrap();
 
     let version = MigrationRunner::current_version(&conn).unwrap();
     assert_eq!(
@@ -980,7 +980,7 @@ fn test_add_column_idempotent_via_double_migration() {
 
     // Run all migrations once (creates all columns)
     let migrations = all_migrations();
-    MigrationRunner::run(&conn, &key, &migrations, None, 0).unwrap();
+    MigrationRunner::run(&conn, &key, migrations, None, 0).unwrap();
 
     let has_card_encrypted: bool = conn
         .prepare("PRAGMA table_info(own_card)")
@@ -994,7 +994,7 @@ fn test_add_column_idempotent_via_double_migration() {
     );
 
     // Running migrations again should be a no-op (version guard)
-    MigrationRunner::run(&conn, &key, &migrations, None, 0).unwrap();
+    MigrationRunner::run(&conn, &key, migrations, None, 0).unwrap();
 
     let still_has: bool = conn
         .prepare("PRAGMA table_info(own_card)")
@@ -1042,7 +1042,7 @@ fn test_migration_rejects_newer_schema_version() {
     let key = SymmetricKey::generate();
 
     let migrations = all_migrations();
-    MigrationRunner::run(&conn, &key, &migrations, None, 0).unwrap();
+    MigrationRunner::run(&conn, &key, migrations, None, 0).unwrap();
 
     // Manually bump schema_version to simulate a DB created by a newer app
     let future_version = 999;
@@ -1052,7 +1052,7 @@ fn test_migration_rejects_newer_schema_version() {
     )
     .unwrap();
 
-    let result = MigrationRunner::run(&conn, &key, &migrations, None, 0);
+    let result = MigrationRunner::run(&conn, &key, migrations, None, 0);
     assert!(
         result.is_err(),
         "Should reject database from a newer app version"

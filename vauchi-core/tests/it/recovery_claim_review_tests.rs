@@ -384,7 +384,7 @@ fn verified_proof_context(mutual: usize, threshold: u32) -> ClaimContext {
     let mut proof = RecoveryProof::new(old_pk, new_pk, 3, 0);
     for helper in &helpers {
         proof
-            .add_voucher(RecoveryVoucher::create(&old_pk, &new_pk, helper, None, 0))
+            .add_voucher(RecoveryVoucher::create(old_pk, new_pk, helper, None, 0))
             .expect("voucher");
     }
     let my_contacts: Vec<Contact> = helpers

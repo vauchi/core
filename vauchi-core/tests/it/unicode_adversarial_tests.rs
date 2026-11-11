@@ -386,7 +386,7 @@ fn test_only_null_bytes() {
 fn test_max_length_multibyte_field_value() {
     // CJK characters are 3 bytes each in UTF-8.
     // 333 CJK chars = 999 bytes (under 1000 byte limit).
-    let cjk_value: String = std::iter::repeat('\u{4E00}').take(333).collect();
+    let cjk_value: String = std::iter::repeat_n('\u{4E00}', 333).collect();
     assert_eq!(cjk_value.len(), 999); // byte length
 
     let mut card = ContactCard::new("Test");
@@ -402,7 +402,7 @@ fn test_max_length_multibyte_field_value() {
 #[test]
 fn test_max_length_multibyte_over_limit() {
     // 334 CJK chars = 1002 bytes (over 1000 byte limit).
-    let cjk_value: String = std::iter::repeat('\u{4E00}').take(334).collect();
+    let cjk_value: String = std::iter::repeat_n('\u{4E00}', 334).collect();
     assert_eq!(cjk_value.len(), 1002); // byte length
 
     let mut card = ContactCard::new("Test");
@@ -419,7 +419,7 @@ fn test_max_length_multibyte_over_limit() {
 fn test_max_length_4byte_chars() {
     // Emoji characters are 4 bytes each in UTF-8.
     // 250 emoji = 1000 bytes (at the limit).
-    let emoji_value: String = std::iter::repeat('\u{1F600}').take(250).collect();
+    let emoji_value: String = std::iter::repeat_n('\u{1F600}', 250).collect();
     assert_eq!(emoji_value.len(), 1000); // exactly at byte limit
 
     let mut card = ContactCard::new("Test");
@@ -435,7 +435,7 @@ fn test_max_length_4byte_chars() {
 #[test]
 fn test_max_length_4byte_chars_over() {
     // 251 emoji = 1004 bytes (over limit).
-    let emoji_value: String = std::iter::repeat('\u{1F600}').take(251).collect();
+    let emoji_value: String = std::iter::repeat_n('\u{1F600}', 251).collect();
     assert_eq!(emoji_value.len(), 1004);
 
     let mut card = ContactCard::new("Test");

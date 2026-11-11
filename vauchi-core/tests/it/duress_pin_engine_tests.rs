@@ -45,9 +45,7 @@ fn duress_overview_shows_read_only_status_not_dead_toggle() {
         .components
         .iter()
         .find_map(|c| match c {
-            Component::StatusIndicator { id, status, .. } if id == "duress_status" => {
-                Some(status.clone())
-            }
+            Component::StatusIndicator { id, status, .. } if id == "duress_status" => Some(*status),
             _ => None,
         })
         .expect("overview must show a read-only StatusIndicator for enabled state");

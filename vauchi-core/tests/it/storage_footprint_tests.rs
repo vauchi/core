@@ -33,7 +33,7 @@ fn checkpoint(storage: &Storage) {
 #[test]
 fn a_hundred_contacts_stay_far_under_50_mb_and_deleting_them_shrinks_the_file() {
     let dir = tempfile::tempdir().unwrap();
-    let storage = Storage::open(&dir.path().join("vauchi.db"), SymmetricKey::generate()).unwrap();
+    let storage = Storage::open(dir.path().join("vauchi.db"), SymmetricKey::generate()).unwrap();
     let mut ids = Vec::new();
     for i in 0..100 {
         let name = format!("Contact {i}");

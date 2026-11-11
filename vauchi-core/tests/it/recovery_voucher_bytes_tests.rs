@@ -13,7 +13,7 @@ use vauchi_core::*;
 fn voucher_with_token() -> RecoveryVoucher {
     let old_pk = [0x01u8; 32];
     let new_pk = [0x02u8; 32];
-    let claim = RecoveryClaim::new(&old_pk, &new_pk, 0);
+    let claim = RecoveryClaim::new(old_pk, new_pk, 0);
     let voucher_keys = SigningKeyPair::generate();
     let token = GuardianToken::create(&SigningKeyPair::generate(), voucher_keys.public_key(), 0);
     RecoveryVoucher::create_from_claim(&claim, &voucher_keys, Some(token), 0).unwrap()

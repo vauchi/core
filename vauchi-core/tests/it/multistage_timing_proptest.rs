@@ -83,18 +83,18 @@ fn run_asymmetric_exchange(
             bob_peer_displayed += 1;
         }
 
-        if let Some(bq) = &bq {
-            if alice_peer_displayed - alice_last_scan_at >= alice_scan_every_n as u32 {
-                alice.process_scanned_qr(&bq.data);
-                alice_last_scan_at = alice_peer_displayed;
-            }
+        if let Some(bq) = &bq
+            && alice_peer_displayed - alice_last_scan_at >= alice_scan_every_n as u32
+        {
+            alice.process_scanned_qr(&bq.data);
+            alice_last_scan_at = alice_peer_displayed;
         }
 
-        if let Some(aq) = &aq {
-            if bob_peer_displayed - bob_last_scan_at >= bob_scan_every_n as u32 {
-                bob.process_scanned_qr(&aq.data);
-                bob_last_scan_at = bob_peer_displayed;
-            }
+        if let Some(aq) = &aq
+            && bob_peer_displayed - bob_last_scan_at >= bob_scan_every_n as u32
+        {
+            bob.process_scanned_qr(&aq.data);
+            bob_last_scan_at = bob_peer_displayed;
         }
 
         // Optional per-side delays for wall-clock jitter (Layer 2)

@@ -54,17 +54,6 @@ fn sealed_content(disk: &OnDisk) -> Vec<u8> {
         .unwrap()
 }
 
-fn decoy_names(disk: &OnDisk) -> Vec<String> {
-    Storage::open(&disk.path, disk.key.clone())
-        .unwrap()
-        .decoy()
-        .load_decoy_contacts()
-        .unwrap()
-        .into_iter()
-        .map(|(_, name, _)| name)
-        .collect()
-}
-
 // @scenario: duress_mode :: Decoy profile has separate database
 // @scenario: duress_mode :: Real database cryptographically inaccessible in duress mode
 #[test]

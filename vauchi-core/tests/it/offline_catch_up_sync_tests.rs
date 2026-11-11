@@ -598,7 +598,7 @@ fn an_existing_identity_on_a_new_install_still_catches_up() {
 // @scenario: message_delivery :: Receive pending updates when coming online
 #[test]
 fn a_long_catch_up_is_paced_after_the_burst() {
-    use vauchi_core::monotonic::{FakeMonotonicClock, MonotonicClock};
+    use vauchi_core::monotonic::FakeMonotonicClock;
     use vauchi_core::network::request_pacer::OHTTP_REQUESTS_PER_SECOND;
 
     let outer = MockRelay::start();

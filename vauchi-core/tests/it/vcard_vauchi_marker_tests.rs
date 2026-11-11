@@ -75,7 +75,7 @@ fn contact_export_accepts_existing_reference_and_smart_pointer_callers() {
     assert_eq!(export_contact_vcard(&contact), expected);
     assert_eq!(export_contact_vcard(&boxed), expected);
     assert_eq!(export_contact_vcard(&shared), expected);
-    assert_eq!(export_contact_vcard(&borrowed), expected);
+    assert_eq!(export_contact_vcard(borrowed), expected);
 
     let export = export_contact_vcard;
     assert_eq!(export(&boxed), expected);

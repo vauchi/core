@@ -169,7 +169,7 @@ fn add_recovery_voucher_appends_to_existing_progress() {
 fn add_recovery_voucher_errors_when_no_progress_in_flight() {
     let wb = vauchi_with_identity("Alice");
 
-    let claim = RecoveryClaim::new(&[4u8; 32], wb.identity().unwrap().signing_public_key(), 0);
+    let claim = RecoveryClaim::new([4u8; 32], wb.identity().unwrap().signing_public_key(), 0);
     let helper = Identity::create("Bob", 0);
     let voucher = build_voucher(&claim, &helper);
 
@@ -283,7 +283,7 @@ fn upload_guardian_entries_requires_identity() {
 #[test]
 fn vouch_for_claim_requires_identity() {
     let wb = Vauchi::in_memory().unwrap();
-    let claim = RecoveryClaim::new(&[1u8; 32], &[2u8; 32], 0);
+    let claim = RecoveryClaim::new([1u8; 32], [2u8; 32], 0);
     let result = wb.vouch_for_claim(&claim, "any-contact");
     assert!(matches!(result, Err(VauchiError::IdentityNotInitialized)));
 }
@@ -302,7 +302,7 @@ fn vouch_for_claim_refuses_a_contact_whose_key_the_claim_does_not_carry() {
     let alice_id = alice_contact.id().to_string();
     helper.add_contact(alice_contact).unwrap();
     let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
-    let someone_elses_claim = RecoveryClaim::new(&[0x33u8; 32], &[0x44u8; 32], now);
+    let someone_elses_claim = RecoveryClaim::new([0x33u8; 32], [0x44u8; 32], now);
 
     let result = helper.vouch_for_claim(&someone_elses_claim, &alice_id);
 
@@ -320,7 +320,7 @@ fn vouch_for_claim_refuses_a_contact_whose_key_the_claim_does_not_carry() {
 /// be refused before the confidence rule under test is reached.
 fn build_proof(old_pk: [u8; 32], new_pk: &[u8; 32], helpers: &[&Identity]) -> RecoveryProof {
     let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
-    let claim = RecoveryClaim::new(&old_pk, new_pk, now);
+    let claim = RecoveryClaim::new(old_pk, new_pk, now);
     let mut proof = RecoveryProof::new(old_pk, *new_pk, helpers.len() as u32, now);
     for helper in helpers {
         let voucher =
@@ -436,7 +436,7 @@ fn verify_recovery_proof_rejects_proof_below_its_own_threshold() {
     let new_pk = *wb.identity().unwrap().signing_public_key();
     let bob = Identity::create("Bob", 0);
 
-    let claim = RecoveryClaim::new(&[7u8; 32], &new_pk, 0);
+    let claim = RecoveryClaim::new([7u8; 32], new_pk, 0);
     let mut proof = RecoveryProof::new([7u8; 32], new_pk, 3, 0);
     proof.add_voucher(build_voucher(&claim, &bob)).unwrap();
 

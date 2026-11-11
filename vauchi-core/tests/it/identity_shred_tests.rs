@@ -74,7 +74,7 @@ fn deleting_my_identity_revokes_each_contact_purges_the_relay_and_destroys_every
     let clock = Arc::new(FakeClock::new(
         UNIX_EPOCH + Duration::from_secs(1_700_000_000),
     ));
-    let storage = Storage::open(&dir.path().join("vauchi.db"), SymmetricKey::generate())
+    let storage = Storage::open(dir.path().join("vauchi.db"), SymmetricKey::generate())
         .unwrap()
         .with_clock(clock.clone());
     let keys = MemoryKeyStorage::new();
@@ -122,7 +122,7 @@ fn deleting_my_identity_leaves_no_key_database_or_cached_file_behind() {
     let data_dir = dir.path().join("vauchi");
     std::fs::create_dir_all(data_dir.join("avatars")).unwrap();
     std::fs::write(data_dir.join("avatars").join("bob.webp"), b"cached").unwrap();
-    let storage = Storage::open(&data_dir.join("vauchi.db"), SymmetricKey::generate()).unwrap();
+    let storage = Storage::open(data_dir.join("vauchi.db"), SymmetricKey::generate()).unwrap();
     let keys = MemoryKeyStorage::new();
     keys.save_key(
         SMK_KEY_NAME,

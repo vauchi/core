@@ -142,7 +142,7 @@ fn create_recovery_claim_hex_b64_requires_identity() {
 #[test]
 fn parse_recovery_claim_b64_decodes_valid_payload() {
     let wb = vauchi_with_identity("Alice");
-    let claim_in = RecoveryClaim::new(&[0x01u8; 32], &[0x02u8; 32], 0);
+    let claim_in = RecoveryClaim::new([0x01u8; 32], [0x02u8; 32], 0);
     let payload = b64(&claim_in.to_bytes());
 
     let claim_out = wb.parse_recovery_claim_b64(&payload).unwrap();
@@ -155,7 +155,7 @@ fn parse_recovery_claim_b64_decodes_valid_payload() {
 #[test]
 fn parse_recovery_claim_b64_trims_whitespace() {
     let wb = vauchi_with_identity("Alice");
-    let claim = RecoveryClaim::new(&[0x03u8; 32], &[0x04u8; 32], 0);
+    let claim = RecoveryClaim::new([0x03u8; 32], [0x04u8; 32], 0);
     let padded = format!("\n  {}\t", b64(&claim.to_bytes()));
 
     let parsed = wb.parse_recovery_claim_b64(&padded).unwrap();
@@ -282,7 +282,7 @@ fn recovery_claim_contact_names_the_contact_whose_key_the_claim_carries() {
 #[test]
 fn recovery_claim_contact_refuses_a_key_that_is_no_contact() {
     let helper = vauchi_with_identity("Bob");
-    let claim = RecoveryClaim::new(&[0x33u8; 32], &[0x44u8; 32], now());
+    let claim = RecoveryClaim::new([0x33u8; 32], [0x44u8; 32], now());
 
     assert!(matches!(
         helper.recovery_claim_contact(&claim),
@@ -298,7 +298,7 @@ fn create_voucher_from_claim_b64_rejects_self_vouching() {
     let alice_pk = *alice.identity().unwrap().signing_public_key();
     let old = Identity::create("Alice-Old", 0);
     add_contact(&alice, &old, "Old Alice");
-    let claim = RecoveryClaim::new(old.signing_public_key(), &alice_pk, now());
+    let claim = RecoveryClaim::new(old.signing_public_key(), alice_pk, now());
     let claim_b64 = b64(&claim.to_bytes());
 
     let result = alice.create_voucher_from_claim_b64(&claim_b64);
@@ -317,7 +317,7 @@ fn create_voucher_from_claim_b64_rejects_invalid_claim_payload() {
 #[test]
 fn create_voucher_from_claim_b64_requires_identity() {
     let wb = Vauchi::in_memory().unwrap();
-    let claim = RecoveryClaim::new(&[1u8; 32], &[2u8; 32], 0);
+    let claim = RecoveryClaim::new([1u8; 32], [2u8; 32], 0);
     let result = wb.create_voucher_from_claim_b64(&b64(&claim.to_bytes()));
     assert!(matches!(result, Err(VauchiError::IdentityNotInitialized)));
 }

@@ -135,7 +135,7 @@ fn files_bytes(dir: &std::path::Path) -> Vec<u8> {
 #[test]
 fn a_shredded_contacts_name_can_no_longer_be_read_and_never_sat_on_disk() {
     let dir = tempfile::tempdir().unwrap();
-    let storage = Storage::open(&dir.path().join("bob.db"), SymmetricKey::generate()).unwrap();
+    let storage = Storage::open(dir.path().join("bob.db"), SymmetricKey::generate()).unwrap();
     let alice = make_contact_with_cek("Alice Smith");
     storage.contacts().save_contact(&alice).unwrap();
 

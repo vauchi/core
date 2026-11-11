@@ -37,6 +37,9 @@ audit-as-crates-io = true
 [policy.spake2]
 audit-as-crates-io = true
 
+[policy.vauchi-core-testkit]
+criteria = "safe-to-run"
+
 [[exemptions.ab_glyph]]
 version = "0.2.32"
 criteria = "safe-to-deploy"

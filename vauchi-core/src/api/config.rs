@@ -842,7 +842,7 @@ mod tests {
         );
     }
 
-    // @internal
+    // @scenario: relay_transport_security :: OHTTP is on by default
     #[test]
     fn relay_config_exposes_the_ohttp_endpoint_sync_uses() {
         assert_eq!(

@@ -26,7 +26,7 @@ fn test_contact_mailbox_token_deterministic() {
     assert_eq!(t1.as_bytes().len(), 32);
 }
 
-// @internal
+// @scenario: sealed_mailbox :: Tokens rotate daily
 #[test]
 fn test_contact_mailbox_token_rotates_daily() {
     let shared_key = [0x42u8; 32];
@@ -70,7 +70,7 @@ fn test_device_mailbox_token_is_device_specific_daily_and_distinct_from_identity
     );
 }
 
-// @internal
+// @scenario: sealed_mailbox :: Different contacts produce different tokens
 #[test]
 fn test_different_contacts_produce_different_tokens() {
     let key_a = [0x42u8; 32];

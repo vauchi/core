@@ -689,10 +689,13 @@ build:tests:
     # (every shell job runs on it): as artifacts the nine files were 413
     # Payload Too Large for gitlab.com (job 17902464819), and a round trip
     # through the coordinator would cost each test job minutes for files
-    # it has on local disk. Older pipelines' archives are pruned here.
+    # it has on local disk. Archives older than three hours are pruned here:
+    # with a day's retention 25 builds left 57 GB and the runner's disk at
+    # 93 % in ten hours (2026-11-11). A test job that starts later than that
+    # fails on its archive check and needs build:tests re-run.
     - echo "── test archives ──"
     - export ARCHIVE_DIR="$HOME/.cache/vauchi-ci/archives/$CI_PROJECT_NAME/$CI_PIPELINE_ID"
-    - find "$HOME/.cache/vauchi-ci/archives" -mindepth 2 -maxdepth 2 -type d -mmin +1440 -exec rm -rf {} + 2>/dev/null || true
+    - find "$HOME/.cache/vauchi-ci/archives" -mindepth 2 -maxdepth 2 -type d -mmin +180 -exec rm -rf {} + 2>/dev/null || true
     - rm -rf "$ARCHIVE_DIR" && mkdir -p "$ARCHIVE_DIR"
     - cargo nextest archive -p vauchi-core --features test-kdf,testing --archive-file "$ARCHIVE_DIR/core.tar.zst"
     - cargo nextest archive -p vauchi-core --features testing --archive-file "$ARCHIVE_DIR/core-vectors.tar.zst"

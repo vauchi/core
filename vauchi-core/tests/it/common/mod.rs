@@ -22,8 +22,6 @@ pub mod helpers {
 }
 
 #[allow(dead_code)]
-pub mod app_engine_helpers;
-#[allow(dead_code)]
 mod app_themes;
 
 /// The sibling `locales` checkout. Prefers `VAUCHI_LOCALES_DIR` (exported by

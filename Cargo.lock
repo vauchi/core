@@ -4148,6 +4148,8 @@ dependencies = [
  "tracing",
  "ureq",
  "vauchi-core",
+ "vauchi-core-testkit",
+ "vauchi-protocol",
  "zeroize",
 ]
 

@@ -92,6 +92,9 @@ name = "screen_catalog_fixture_tests"
 required-features = ["testing"]
 
 [dev-dependencies]
+# Shared arrange helpers for tests/it (vauchi/private#1230).
+vauchi-core-testkit.workspace = true
+vauchi-protocol.workspace = true
 tempfile = "3.0"
 proptest = "1.4"
 

@@ -23084,7 +23084,7 @@
                     "brightness": 0.0,
                     "activation": {
                       "interaction_id": "surface.1.interaction.1",
-                      "label": "Edit",
+                      "label": "Bearbeiten",
                       "accessibility_label": "Dein Profilbild",
                       "icon_token": null,
                       "enabled": true,

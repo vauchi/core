@@ -70,7 +70,7 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("public_values", "display_name_encrypted"),
     ("device_registry", "registry_json_encrypted"),
     ("contact_device_registries", "broadcast_encrypted"),
-    // V118 pinned device keys per contact (SC-62)
+    // V119 pinned device keys per contact (SC-62)
     ("contact_device_key_pins", "pins_encrypted"),
     // V62 received safety-alert facts
     ("safety_alert_facts", "signed_payload_encrypted"),

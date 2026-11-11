@@ -10,6 +10,7 @@ pub mod common_context;
 pub mod contacts;
 pub mod demo_contact;
 pub mod exchange;
+pub mod i18n;
 pub mod identity_management;
 pub mod more_context;
 pub mod pre_signed;

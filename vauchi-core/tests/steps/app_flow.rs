@@ -135,11 +135,9 @@ fn dispatch_contextual_action(world: &mut VauchiWorld, label: &str) -> bool {
 }
 
 #[when("I open the app")]
+#[when("I open the app for the first time")]
 fn open_app(world: &mut VauchiWorld) {
-    // AppEngine consumes the Vauchi; the World keeps a fresh placeholder so
-    // pre-open Given-steps configure the instance the engine then hosts.
-    let vauchi = std::mem::replace(&mut world.vauchi, Vauchi::in_memory().unwrap());
-    world.engine = Some(AppEngine::new(vauchi));
+    crate::steps::i18n::open_engine(world);
 }
 
 #[when(expr = "I navigate to the {word} screen")]

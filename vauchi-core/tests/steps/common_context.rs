@@ -202,9 +202,6 @@ fn device_a_and_b_linked(_world: &mut VauchiWorld) {}
 
 // ── Locale / device settings ──────────────────────────────────────────────────
 
-#[given("my device is set to English")]
-fn device_set_to_english(_world: &mut VauchiWorld) {}
-
 #[given("my device is set to Russian")]
 fn device_set_to_russian(_world: &mut VauchiWorld) {}
 

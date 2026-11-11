@@ -11,15 +11,6 @@ use crate::VauchiWorld;
 
 // ── Remaining locale / device-language no-ops ─────────────────────────────────
 
-#[given("my device is set to Spanish")]
-fn device_set_to_spanish(_world: &mut VauchiWorld) {}
-
-#[given("my device is set to Italian")]
-fn device_set_to_italian(_world: &mut VauchiWorld) {}
-
-#[given("my device is set to Portuguese")]
-fn device_set_to_portuguese(_world: &mut VauchiWorld) {}
-
 #[given("my device is set to Japanese")]
 fn device_set_to_japanese(_world: &mut VauchiWorld) {}
 
@@ -46,9 +37,6 @@ fn device_set_to_german_germany(_world: &mut VauchiWorld) {}
 
 #[given("my device is set to a supported language")]
 fn device_set_to_supported_language(_world: &mut VauchiWorld) {}
-
-#[given("my device is set to an unsupported language")]
-fn device_set_to_unsupported_language(_world: &mut VauchiWorld) {}
 
 #[given(expr = "my locale is set to {string}")]
 fn locale_set_to(_world: &mut VauchiWorld, _locale: String) {}
@@ -535,9 +523,6 @@ fn activate_context_menu_a11y(_world: &mut VauchiWorld) {}
 #[when("I view the field details")]
 fn view_field_details(_world: &mut VauchiWorld) {}
 
-#[when("I view the language selection screen")]
-fn view_language_selection(_world: &mut VauchiWorld) {}
-
 #[when("I change the language to Spanish")]
 fn change_language_to_spanish(_world: &mut VauchiWorld) {}
 
@@ -552,9 +537,6 @@ fn view_date_in_app(_world: &mut VauchiWorld) {}
 
 #[when("I navigate to Privacy settings in normal mode")]
 fn navigate_privacy_settings_normal(_world: &mut VauchiWorld) {}
-
-#[when("I open the app for the first time")]
-fn open_app_first_time(_world: &mut VauchiWorld) {}
 
 #[when("I view the contact")]
 fn view_contact(_world: &mut VauchiWorld) {}
@@ -591,12 +573,6 @@ fn link_device_b_android(_world: &mut VauchiWorld) {}
 
 // ── Then no-ops ───────────────────────────────────────────────────────────────
 
-#[then("no English fallback text should appear")]
-fn no_english_fallback(_world: &mut VauchiWorld) {}
-
-#[then("the translation should be complete")]
-fn translation_complete(_world: &mut VauchiWorld) {}
-
 #[then("text should scale according to my preference")]
 fn text_scales_to_preference(_world: &mut VauchiWorld) {}
 
@@ -627,23 +603,8 @@ fn contacts_announced_by_name(_world: &mut VauchiWorld) {}
 #[then(expr = "the display should show {string}")]
 fn display_should_show(_world: &mut VauchiWorld, _text: String) {}
 
-#[then("the app should display in German")]
-fn display_in_german(_world: &mut VauchiWorld) {}
-
-#[then("all UI text should be translated")]
-fn all_ui_text_translated(_world: &mut VauchiWorld) {}
-
-#[then("the language should not need manual configuration")]
-fn language_no_manual_config(_world: &mut VauchiWorld) {}
-
-#[then("the app should display in English")]
-fn display_in_english(_world: &mut VauchiWorld) {}
-
 #[then("a notice should offer to help translate")]
 fn notice_offer_translate(_world: &mut VauchiWorld) {}
-
-#[then("all functionality should remain available")]
-fn all_functionality_available(_world: &mut VauchiWorld) {}
 
 #[then("the app should display in French")]
 fn display_in_french(_world: &mut VauchiWorld) {}
@@ -656,15 +617,6 @@ fn no_restart_needed(_world: &mut VauchiWorld) {}
 
 #[then("all screens should reflect the new language")]
 fn all_screens_reflect_language(_world: &mut VauchiWorld) {}
-
-#[then("I should see a list of available languages")]
-fn see_list_of_languages(_world: &mut VauchiWorld) {}
-
-#[then("each language should be shown in its native script")]
-fn language_in_native_script(_world: &mut VauchiWorld) {}
-
-#[then("the current language should be indicated")]
-fn current_language_indicated(_world: &mut VauchiWorld) {}
 
 #[then("the layout should be mirrored (RTL)")]
 fn layout_mirrored_rtl(_world: &mut VauchiWorld) {}

@@ -56,9 +56,6 @@ fn add_social_field(world: &mut VauchiWorld, network: String) {
 
 // ── Locale / i18n ─────────────────────────────────────────────────────────────
 
-#[then("all UI strings should be translated")]
-fn all_ui_strings_translated(_world: &mut VauchiWorld) {}
-
 // ── Emergency broadcast / safety ─────────────────────────────────────────────
 
 #[given("I am configuring emergency broadcast")]

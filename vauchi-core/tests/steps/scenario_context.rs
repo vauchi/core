@@ -331,16 +331,6 @@ fn using_app_in_french(_world: &mut VauchiWorld) {
     // Locale selection is UI-level; not modelled at the API layer.
 }
 
-#[given("my device is set to German")]
-fn device_set_to_german(_world: &mut VauchiWorld) {
-    // Locale selection is UI-level; not modelled at the API layer.
-}
-
-#[given("my device is set to French")]
-fn device_set_to_french(_world: &mut VauchiWorld) {
-    // Locale selection is UI-level; not modelled at the API layer.
-}
-
 #[given("my device is set to Arabic")]
 fn device_set_to_arabic(_world: &mut VauchiWorld) {
     // Locale selection is UI-level; not modelled at the API layer.

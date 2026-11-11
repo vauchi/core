@@ -57,6 +57,8 @@ pub struct VauchiWorld {
     /// The networks list social entries are checked against: the bundled
     /// copy until a step loads another.
     pub social_networks: vauchi_core::social::SocialNetworkRegistry,
+    /// The OS language tag a shell would push at boot, once a step sets one.
+    pub system_locale: Option<String>,
 }
 
 impl std::fmt::Debug for VauchiWorld {
@@ -94,6 +96,7 @@ impl VauchiWorld {
             sessions: std::collections::BTreeMap::new(),
             engine: None,
             social_networks: vauchi_core::social::SocialNetworkRegistry::with_defaults(),
+            system_locale: None,
         }
     }
 
@@ -226,7 +229,10 @@ fn main() {
     // bound by no other scenario, are deleted, so they stop binding before
     // features removes them (its lint:wired-scenarios refuses to drop a
     // scenario core still runs).
-    const MIN_WIRED_SCENARIOS: usize = 122;
+    // 121 since 2026-11-11: the Portuguese row of "Core languages are
+    // supported" passed on a no-op, though no Portuguese copy ships; its
+    // step is gone and the row no longer binds (vauchi/private#1237).
+    const MIN_WIRED_SCENARIOS: usize = 121;
     if scenarios.passed < MIN_WIRED_SCENARIOS {
         eprintln!(
             "cucumber GATE failed: {} wired scenario(s) passed, expected at least \

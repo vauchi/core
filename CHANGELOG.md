@@ -8,8 +8,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- The duress lock policy (ADR-032 amendment 2026-11-10,
+  vauchi/private#1117): `setup_duress_pin_with_biometric_unlock` sets a
+  6-digit duress PIN behind biometric unlock;
+  `setup_duress_password_with_app_password` sets duress up with two real
+  passwords under the backup password rule; `duress_unlock()` names the
+  branch; `Vauchi::authenticate_at_lock` refuses a PIN typed before the
+  biometric pass as a wrong one. `VauchiError::WeakCredential` names the
+  credential that fell short. A full backup keeps the branch.
+
+### Deprecated
+
+- `setup_duress_password`, the old name of
+  `setup_duress_pin_with_biometric_unlock`. Consumers that deny warnings
+  stop compiling until they move to the new name.
+
 ### Changed
 
+- The next stable Core release is 0.104.0 because 0.103.0's public
+  `vauchi_core::sync::MerkleTree` and `DeltaError::CompressionError` are
+  gone (vauchi/private#880). No consumer used them.
 - The next stable Core release is 0.103.0 because the migration/reset/shred
   safety changes intentionally break Rust source compatibility
   (vauchi/private#1178). `ShredReport` literals must supply

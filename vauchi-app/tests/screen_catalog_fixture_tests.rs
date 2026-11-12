@@ -256,7 +256,7 @@ fn screen_catalog_checked_in_catalog_matches_a_fresh_build_semantically() {
 
     assert!(
         recorded == fresh,
-        "catalog values drifted in {changed:?}; review and run the ignored regenerate_shared_fixture test"
+        "catalog values drifted in {changed:?}; review and run the ignored screen_catalog_regenerate_shared_fixture test (--features testing)"
     );
 }
 

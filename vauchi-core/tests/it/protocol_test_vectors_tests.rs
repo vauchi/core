@@ -862,6 +862,7 @@ fn backup_v6_vector_imports_with_production_argon2id_and_refuses_a_wrong_passwor
     super::protocol_test_vectors_backup_v7_tests::assert_restore_registered_a_fresh_device(
         &vauchi,
         v.device_index,
+        false,
     );
 }
 

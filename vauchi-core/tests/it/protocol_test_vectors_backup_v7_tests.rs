@@ -48,6 +48,36 @@ impl BackupV7Vector {
         let (first, second) = backup[HEADER_LENGTH..].split_at((backup.len() - HEADER_LENGTH) / 2);
         [first, second]
     }
+
+    #[cfg(not(feature = "test-kdf"))]
+    fn retains_backed_up_device(&self) -> bool {
+        let backup = hex::decode(&self.backup).expect("backup");
+        let header = hex::decode(&self.header).expect("header");
+        let key = SymmetricKey::from_bytes(hex32(&self.key));
+        let framed = decrypt_with_ad(&key, self.payloads(&backup)[self.real_slot], &header)
+            .expect("authenticated vector payload");
+        let length =
+            u32::from_be_bytes(framed[..LENGTH_PREFIX].try_into().expect("prefix")) as usize;
+        let compressed = &framed[LENGTH_PREFIX..LENGTH_PREFIX + length];
+        let snapshot: serde_json::Value =
+            serde_json::from_reader(flate2::read::ZlibDecoder::new(compressed)).expect("snapshot");
+        match snapshot
+            .get("device_registry")
+            .filter(|value| !value.is_null())
+        {
+            None => false,
+            Some(registry) => {
+                assert_eq!(
+                    registry["devices"]
+                        .as_array()
+                        .expect("vector devices")
+                        .len(),
+                    1
+                );
+                true
+            }
+        }
+    }
 }
 
 /// Derives the v7 payload key from an Argon2id base key, as D4 states.
@@ -191,11 +221,15 @@ fn backup_v7_vector_imports_with_production_argon2id_and_refuses_a_wrong_passwor
     assert_eq!(hex::encode(identity.master_seed()), v.master_seed);
     assert_eq!(identity.display_name(), v.display_name);
     assert_eq!(identity.device_info().device_name(), v.device_name);
-    assert_restore_registered_a_fresh_device(&vauchi, v.device_index);
+    assert_restore_registered_a_fresh_device(&vauchi, v.device_index, v.retains_backed_up_device());
 }
 
 #[cfg(not(feature = "test-kdf"))]
-pub(crate) fn assert_restore_registered_a_fresh_device(vauchi: &Vauchi, backed_up_index: u32) {
+pub(crate) fn assert_restore_registered_a_fresh_device(
+    vauchi: &Vauchi,
+    backed_up_index: u32,
+    retains_backed_up_device: bool,
+) {
     let identity = vauchi.identity().expect("restored identity");
     let backed_up_device = vauchi_core::identity::device::DeviceInfo::derive(
         identity.master_seed(),
@@ -211,9 +245,15 @@ pub(crate) fn assert_restore_registered_a_fresh_device(vauchi: &Vauchi, backed_u
         .load_device_registry()
         .expect("registry storage")
         .expect("restore persisted its registry");
-    assert_eq!(registry.active_count(), 1);
+    assert_eq!(
+        registry.active_count(),
+        1 + usize::from(retains_backed_up_device)
+    );
     assert!(registry.find_device(identity.device_id()).is_some());
-    assert!(registry.find_device(backed_up_device.device_id()).is_none());
+    assert_eq!(
+        registry.find_device(backed_up_device.device_id()).is_some(),
+        retains_backed_up_device,
+    );
     assert!(registry.verify(&identity.signing_keypair().public_key()));
 }
 
@@ -231,5 +271,5 @@ fn newly_generated_backup_v7_vector_imports_as_a_fresh_device() {
     let identity = vauchi.identity().expect("restored identity");
     assert_eq!(hex::encode(identity.master_seed()), v.master_seed);
     assert_eq!(identity.display_name(), v.display_name);
-    assert_restore_registered_a_fresh_device(&vauchi, v.device_index);
+    assert_restore_registered_a_fresh_device(&vauchi, v.device_index, v.retains_backed_up_device());
 }

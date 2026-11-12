@@ -403,19 +403,6 @@ fn list_gives_username_rule(world: &mut VauchiWorld, network: String, max_len: u
     .expect("valid network data");
 }
 
-#[given("I have previously loaded the social network config")]
-fn previously_loaded_social_config(_world: &mut VauchiWorld) {}
-
-#[when("the app has no network connectivity")]
-fn no_network_connectivity(_world: &mut VauchiWorld) {}
-
-#[when("I open the social field options")]
-fn open_social_field_options(_world: &mut VauchiWorld) {}
-
-#[then("I should see the cached list of social networks")]
-#[then("I should be able to add social fields normally")]
-fn cached_social_networks(_world: &mut VauchiWorld) {}
-
 // ── Field edit & remove (contact_card_management.feature §Edit/Remove) ──────
 
 /// Adds a phone field with the given label and value to the own card.

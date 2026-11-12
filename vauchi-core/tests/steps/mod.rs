@@ -15,4 +15,5 @@ pub mod identity_management;
 pub mod more_context;
 pub mod pre_signed;
 pub mod scenario_context;
+pub mod social_cache;
 pub mod visibility;

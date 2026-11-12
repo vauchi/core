@@ -59,6 +59,10 @@ pub struct VauchiWorld {
     pub social_networks: vauchi_core::social::SocialNetworkRegistry,
     /// The OS language tag a shell would push at boot, once a step sets one.
     pub system_locale: Option<String>,
+    /// The content cache directory a scenario's content manager uses; kept
+    /// here so it lives as long as the scenario.
+    pub content_dir: Option<tempfile::TempDir>,
+    pub content_manager: Option<vauchi_app::content::ContentManager>,
 }
 
 impl std::fmt::Debug for VauchiWorld {
@@ -97,6 +101,8 @@ impl VauchiWorld {
             engine: None,
             social_networks: vauchi_core::social::SocialNetworkRegistry::with_defaults(),
             system_locale: None,
+            content_dir: None,
+            content_manager: None,
         }
     }
 

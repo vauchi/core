@@ -102,11 +102,6 @@ fn am_offline(_world: &mut VauchiWorld) {
     // Offline state is transport-level; not modelled here.
 }
 
-#[given("the app has no network connectivity")]
-fn no_network_connectivity(_world: &mut VauchiWorld) {
-    // Network state is transport-level; not modelled here.
-}
-
 #[given("both devices support BLE")]
 fn both_devices_support_ble(_world: &mut VauchiWorld) {}
 

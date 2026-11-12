@@ -204,6 +204,28 @@ variables:
   #                      with private#718.
   AUDIT_IGNORES: "--ignore RUSTSEC-2026-0192 --ignore RUSTSEC-2026-0374"
 
+# vauchi/scripts is public, but its job-token allowlist rejects core's token.
+# Fetch these scripts without authentication, as check:binding-abi does.
+file-size:check:
+  extends: .linux-runner-nocache
+  script:
+    - |
+      curl --silent --fail \
+        "${CI_API_V4_URL}/projects/77957857/repository/files/scripts%2Fcheck-file-size.sh/raw?ref=${VAUCHI_SCRIPTS_REF}" \
+        -o /tmp/check-file-size.sh
+      chmod +x /tmp/check-file-size.sh
+    - /tmp/check-file-size.sh .
+
+file-size:advisory:
+  extends: .linux-runner-nocache
+  script:
+    - |
+      curl --silent --fail \
+        "${CI_API_V4_URL}/projects/77957857/repository/files/scripts%2Fcheck-file-size.sh/raw?ref=${VAUCHI_SCRIPTS_REF}" \
+        -o /tmp/check-file-size.sh
+      chmod +x /tmp/check-file-size.sh
+    - /tmp/check-file-size.sh --advisory .
+
 # Ceiling for jobs that compile the full dependency tree. On a fresh or
 # reinstalled shell runner ALL warm state is gone at once — per-slot
 # target/ dirs (GIT_STRATEGY:none persistence), sccache, and the

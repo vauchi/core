@@ -92,6 +92,10 @@ fn offered_codes() -> Vec<String> {
         .collect()
 }
 
+/// Core embeds these, so Settings offers them whatever a manifest lists
+/// (vauchi/private#1246).
+const EMBEDDED: [&str; 5] = ["en", "de", "es", "fr", "it"];
+
 // @internal
 #[test]
 fn the_trusted_cached_manifest_lists_its_locale_codes() {
@@ -120,7 +124,7 @@ fn a_manifest_another_key_signed_lists_nothing() {
     assert_eq!(manager.listed_locale_codes(), Vec::<String>::new());
 
     manager.load_cached_locales_into_i18n();
-    assert_eq!(offered_codes(), ["en"]);
+    assert_eq!(offered_codes(), EMBEDDED);
 }
 
 // @internal
@@ -134,7 +138,7 @@ fn loading_cached_locales_offers_the_listed_languages_without_their_files() {
 
     manager.load_cached_locales_into_i18n();
 
-    assert_eq!(offered_codes(), ["en", "pt"]);
+    assert_eq!(offered_codes(), ["en", "de", "es", "fr", "it", "pt"]);
 }
 
 /// Settings names a listed language before its file arrives, from the
@@ -188,7 +192,7 @@ fn a_listed_right_to_left_language_is_not_offered() {
 
     manager.load_cached_locales_into_i18n();
 
-    assert_eq!(offered_codes(), ["en"]);
+    assert_eq!(offered_codes(), EMBEDDED);
 }
 
 // @internal

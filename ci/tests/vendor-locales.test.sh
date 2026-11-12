@@ -135,6 +135,24 @@ gate push
 [ "$rc" -ne 0 ] || fail "a tag lookup that cannot answer is treated as a release, so stale copy fails"
 git_quiet -C "$T/core" remote set-url origin "$T/origin.git"
 
+# The embedded languages beside English vendor and check the same way
+# (private#1246).
+printf '{"a":"un"}\n' > "$LOCALES/fr.json"
+git_quiet -C "$LOCALES" add fr.json
+git_quiet -C "$LOCALES" commit -q -m french
+VAUCHI_LOCALES_DIR="$LOCALES" sh "$T/core/scripts/vendor-locales.sh" >/dev/null
+cmp -s "$LOCALES/fr.json" "$VENDOR/fr.json" || fail "a French catalogue in locales is vendored beside English"
+run --check
+[ "$rc" -eq 0 ] || fail "a freshly vendored French catalogue passes --check; rc=$rc: $(cat "$T/out")"
+run --check-revision
+[ "$rc" -eq 0 ] || fail "a freshly vendored French catalogue passes --check-revision; rc=$rc: $(cat "$T/out")"
+
+printf '{"a":"modifié à la main"}\n' > "$VENDOR/fr.json"
+run --check
+[ "$rc" -ne 0 ] || fail "a hand-edited French copy fails --check"
+run --check-revision
+[ "$rc" -ne 0 ] || fail "a hand-edited French copy fails --check-revision"
+
 if [ "$failures" -ne 0 ]; then
     echo "vendor-locales.test: $failures failure(s)" >&2
     exit 1

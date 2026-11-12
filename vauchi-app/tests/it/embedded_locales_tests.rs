@@ -6,7 +6,7 @@
 //! renders in its own words with no shell file and no content cycle; a
 //! downloaded file still takes over a language (vauchi/private#1246).
 
-use vauchi_app::i18n::{Locale, get_string};
+use vauchi_app::i18n::{Locale, get_available_locales, get_string};
 
 use super::i18n_support::locales_dir;
 
@@ -31,6 +31,22 @@ fn every_embedded_language_renders_its_own_words() {
             rendered,
             file_value("en", "onboarding.welcome_multidevice_title"),
             "locale {code} fell back to English"
+        );
+    }
+}
+
+// @internal
+#[test]
+fn settings_offers_every_embedded_language() {
+    let offered: Vec<String> = get_available_locales()
+        .iter()
+        .map(|locale| locale.code().to_owned())
+        .collect();
+
+    for code in ["en", "de", "fr", "es", "it"] {
+        assert!(
+            offered.iter().any(|offered| offered == code),
+            "{code} missing from {offered:?}"
         );
     }
 }

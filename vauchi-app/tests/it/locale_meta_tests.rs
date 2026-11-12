@@ -122,16 +122,22 @@ fn a_reloaded_file_with_an_unusable_meta_drops_the_earlier_name() {
     assert_eq!(get_locale_info(locale("bg")).name, "bg");
 }
 
-/// Names come only from data (vauchi/private#733 G2): a bundled language
-/// whose file has not loaded is named by its code like any other, and
-/// English by the `_meta` of the copy Core embeds.
+/// Names come only from data (vauchi/private#733 G2): a language with no
+/// file Core embeds or has loaded is named by its code like any other, and
+/// an embedded one by the `_meta` of the copy Core embeds (private#1246).
 // @internal
 #[test]
 fn no_language_is_named_by_a_table_in_code() {
+    let portuguese = get_locale_info(locale("pt"));
+    assert_eq!(
+        (portuguese.name.as_str(), portuguese.english_name.as_str()),
+        ("pt", "pt")
+    );
+
     let german = get_locale_info(Locale::GERMAN);
     assert_eq!(
         (german.name.as_str(), german.english_name.as_str()),
-        ("de", "de")
+        ("Deutsch", "German")
     );
 
     let english = get_locale_info(Locale::ENGLISH);

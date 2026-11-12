@@ -35,6 +35,12 @@ fn offered_ids() -> Vec<String> {
     language_options().into_iter().map(|(id, _)| id).collect()
 }
 
+/// Core embeds these, so Settings offers them with nothing loaded or listed
+/// (vauchi/private#1246).
+fn embedded_ids() -> Vec<String> {
+    ["en", "de", "es", "fr", "it"].map(String::from).to_vec()
+}
+
 // @internal
 #[test]
 fn a_language_whose_file_loaded_is_offered_under_its_own_name() {
@@ -71,15 +77,23 @@ fn a_listed_entry_that_is_not_a_language_code_is_not_offered() {
 
     let offered = offered_ids();
 
-    assert_eq!(offered, vec!["en".to_string()], "{offered:?}");
+    assert_eq!(offered, embedded_ids(), "{offered:?}");
 }
 
 // @internal
 #[test]
-fn english_is_offered_with_no_file_loaded_and_none_listed() {
+fn the_embedded_languages_are_offered_with_no_file_loaded_and_none_listed() {
     assert_eq!(
         language_options(),
-        vec![("en".to_string(), "English".to_string())]
+        [
+            ("en", "English"),
+            ("de", "Deutsch"),
+            ("es", "Español"),
+            ("fr", "Français"),
+            ("it", "Italiano"),
+        ]
+        .map(|(id, name)| (id.to_string(), name.to_string()))
+        .to_vec()
     );
 }
 

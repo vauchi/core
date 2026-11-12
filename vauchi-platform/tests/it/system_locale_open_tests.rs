@@ -10,9 +10,10 @@
 
 use std::sync::Arc;
 
+use vauchi_app::i18n::BUNDLED_LOCALE_JSON;
 use vauchi_platform::PlatformAppEngine;
 
-use crate::support::{FakeKeychain, drive_onboarding, locales_dir};
+use crate::support::{FakeKeychain, drive_onboarding};
 
 const RELAY: &str = "https://relay.test";
 const FRENCH_SYSTEM: &str = r#"{"system_locale":"fr-CH"}"#;
@@ -27,10 +28,12 @@ fn open(dir: &tempfile::TempDir) -> Arc<PlatformAppEngine> {
     .expect("open engine")
 }
 
-fn file_value(code: &str, key: &str) -> String {
-    let path = locales_dir().join(format!("{code}.json"));
-    let bytes = std::fs::read(path).expect("locale catalogue");
-    let file: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+fn bundled_value(code: &str, key: &str) -> String {
+    let (_, json) = BUNDLED_LOCALE_JSON
+        .iter()
+        .find(|(locale, _)| *locale == code)
+        .expect("embedded locale");
+    let file: serde_json::Value = serde_json::from_str(json).unwrap();
     file[key].as_str().expect("key in locale file").to_owned()
 }
 
@@ -57,8 +60,8 @@ fn the_first_screen_follows_a_french_system_language() {
 
     let surface = initial_surface(&engine);
     let title = surface["title"].as_str().expect("surface title");
-    assert_eq!(title, file_value("fr", "onboarding.welcome_title"));
-    assert_ne!(title, file_value("en", "onboarding.welcome_title"));
+    assert_eq!(title, bundled_value("fr", "onboarding.welcome_title"));
+    assert_ne!(title, bundled_value("en", "onboarding.welcome_title"));
 }
 
 // @internal
@@ -78,6 +81,6 @@ fn my_card_after_onboarding_follows_a_french_system_language() {
         .iter()
         .find_map(|node| node["Choice"]["label"].as_str())
         .expect("card view-mode choice label");
-    assert_eq!(label, file_value("fr", "my_info.view_mode_label"));
-    assert_ne!(label, file_value("en", "my_info.view_mode_label"));
+    assert_eq!(label, bundled_value("fr", "my_info.view_mode_label"));
+    assert_ne!(label, bundled_value("en", "my_info.view_mode_label"));
 }

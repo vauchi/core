@@ -37,4 +37,5 @@ mod platform_app_engine_tests;
 mod policies_tests;
 mod render_context_json_tests;
 mod support;
+mod system_locale_open_tests;
 mod validation_tests;

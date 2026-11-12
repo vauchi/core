@@ -6,7 +6,6 @@ use vauchi_app::ui::*;
 
 // --- AddField tests ---
 
-// @internal
 // AddField is a two-step flow per problem record
 // `2026-05-21-add-entry-form-mixes-picker-and-fields` §G1:
 //
@@ -18,6 +17,7 @@ use vauchi_app::ui::*;
 // user isn't asked to fill in fields whose type they haven't picked
 // yet. The previous shape rendered both on one scroll, scrolling a
 // 35-row catalog past the user every time and burying the form below.
+// @internal
 #[test]
 fn form_dialog_add_field_picker_step_shows_only_type_list() {
     let engine = FormDialogEngine::new(FormDialogType::AddField {

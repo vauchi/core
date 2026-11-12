@@ -225,6 +225,7 @@ fn verify_other_shows_the_new_identity_fingerprint_and_calls_it_that() {
     );
 }
 
+// @scenario: contact_recovery :: Reviewing a recovery claim
 #[test]
 fn low_confidence_accept_anyway_shows_confirm() {
     let mut engine = acceptance_engine(Confidence::Low);

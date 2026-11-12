@@ -811,13 +811,13 @@ fn contact_info_corrected_value_then_continue_collects_field() {
 
 // ── Screen 4: WhatNext ─────────────────────────────────────────────
 
-// @scenario: onboarding :: User chooses next action after onboarding
 /// Final onboarding step: one filled primary ("Start using the app"
 /// — the natural finish line) plus two outlined shortcuts (Exchange,
 /// Import). "Read about security" / "Read about backup" came off
 /// this screen 2026-05-21 (problem record
 /// `2026-05-21-mobile-onboarding-final-step-and-skip-fold` G2/G3):
 /// the docs belong in Help, not as peers of the finish line.
+// @scenario: onboarding :: User chooses next action after onboarding
 #[test]
 fn what_next_has_three_actions_with_start_app_as_primary() {
     let mut engine = OnboardingEngine::new();
@@ -892,7 +892,6 @@ fn what_next_import_contacts_emits_onboarding_complete_with_import() {
     ));
 }
 
-// @scenario: onboarding :: User chooses next action after onboarding
 /// "Read about security" / "Read about backup" are no longer surfaced
 /// from the final onboarding step (G3 of
 /// `2026-05-21-mobile-onboarding-final-step-and-skip-fold`). The
@@ -900,6 +899,7 @@ fn what_next_import_contacts_emits_onboarding_complete_with_import() {
 /// indistinguishable from any other unknown action and returns an
 /// `UpdateScreen`, leaving the user on `what_next`. Guards against a
 /// regression that adds them back without restoring the buttons.
+// @scenario: onboarding :: User chooses next action after onboarding
 #[test]
 fn what_next_legacy_docs_action_ids_no_longer_complete() {
     for legacy_id in ["read_security", "read_backup"] {

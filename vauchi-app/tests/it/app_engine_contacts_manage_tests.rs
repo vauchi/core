@@ -331,13 +331,13 @@ fn duplicate_detection_merge_navigates_back() {
     );
 }
 
-// @internal
 // Dismiss now signals Complete from the engine so the AppEngine intercept
 // can perform `vauchi.dismiss_duplicate(id1, id2)` against the
 // user-selected pair. With no pairs (empty Vauchi here), the intercept
 // returns None and the action falls through to handle_completion, which
 // navigates back from ContactDuplicates — same path as merge takes when
 // there are no pairs to operate on.
+// @internal
 #[test]
 fn duplicate_detection_dismiss_with_no_pairs_navigates_back() {
     let mut vauchi = Vauchi::in_memory().unwrap();

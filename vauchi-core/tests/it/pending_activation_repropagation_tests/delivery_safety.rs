@@ -125,3 +125,77 @@ fn failed_full_sync_marker_write_rolls_back_activation_and_can_be_replayed() {
     apply_full_activation(&world).unwrap();
     assert_owed_field_delivered(&world);
 }
+
+// @scenario: visibility_control :: Granting visibility sends update to contact
+// @internal
+#[test]
+fn replaying_incremental_activation_does_not_rearm_a_delivered_update() {
+    let world = pending_activation();
+    wait_for_activation(&world);
+    world
+        .alice
+        .apply_sync_items(vec![activation_item(&world)])
+        .unwrap();
+    assert_owed_field_delivered(&world);
+
+    assert_eq!(
+        world
+            .alice
+            .apply_sync_items(vec![activation_item(&world)])
+            .unwrap(),
+        1
+    );
+    assert!(
+        !world
+            .alice
+            .storage()
+            .ux()
+            .load_own_card_repropagate()
+            .unwrap()
+            .needs_repropagate
+    );
+    world.alice.run_owed_repropagation().unwrap();
+    assert_eq!(
+        world
+            .alice
+            .storage()
+            .pending()
+            .get_pending_updates(&world.bob_at_alice)
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
+// @scenario: visibility_control :: Granting visibility sends update to contact
+// @internal
+#[test]
+fn replaying_full_sync_activation_does_not_rearm_a_delivered_update() {
+    let world = pending_activation();
+    wait_for_activation(&world);
+    apply_full_activation(&world).unwrap();
+    assert_owed_field_delivered(&world);
+
+    apply_full_activation(&world).unwrap();
+
+    assert!(
+        !world
+            .alice
+            .storage()
+            .ux()
+            .load_own_card_repropagate()
+            .unwrap()
+            .needs_repropagate
+    );
+    world.alice.run_owed_repropagation().unwrap();
+    assert_eq!(
+        world
+            .alice
+            .storage()
+            .pending()
+            .get_pending_updates(&world.bob_at_alice)
+            .unwrap()
+            .len(),
+        1
+    );
+}

@@ -363,7 +363,6 @@ fn a_peerless_ble_discovery_offers_nothing_found_via_poll_notifications() {
 /// A Magic screen on a fake clock, with a handshake session held.
 #[cfg(feature = "testing")]
 // @internal
-#[cfg(feature = "testing")]
 #[test]
 fn a_permission_granted_after_the_prompt_restarts_the_glance_search() {
     // The shell raises the OS Bluetooth prompt itself when Glance starts the

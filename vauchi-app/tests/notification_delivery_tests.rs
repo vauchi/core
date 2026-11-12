@@ -69,9 +69,9 @@ fn notification_delivery_repeated_poll_is_empty() {
 fn notification_delivery_action_before_drain_preserves_pending_alert() {
     let (mut engine, _) = engine();
     alert(&engine, 1);
-    engine.handle_action(UserAction::ActionPressed {
+    drop(engine.handle_action(UserAction::ActionPressed {
         action_id: "unknown".into(),
-    });
+    }));
     assert_alert(&engine.drain_pending_notifications(), 1);
     assert_eq!(engine.poll_notifications(), Vec::new());
 }

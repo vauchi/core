@@ -127,10 +127,10 @@ fn wakeup_dispatch_preserves_unsaved_form_input() {
             current_name: "Alice".into(),
         },
     });
-    engine.handle_action(UserAction::TextChanged {
+    drop(engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Edited Alice".into(),
-    });
+    }));
     let commands = wakeup(&mut engine);
     assert_eq!(
         commands
@@ -139,9 +139,9 @@ fn wakeup_dispatch_preserves_unsaved_form_input() {
             .count(),
         0
     );
-    engine.handle_action(UserAction::ActionPressed {
+    drop(engine.handle_action(UserAction::ActionPressed {
         action_id: "submit".into(),
-    });
+    }));
     assert_eq!(
         engine.vauchi().own_card().unwrap().unwrap().display_name(),
         "Edited Alice"

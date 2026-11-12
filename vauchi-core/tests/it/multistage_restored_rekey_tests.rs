@@ -99,12 +99,11 @@ fn once_the_peer_saved_the_restored_contact_adopts_the_exchange_key() {
         shared_key_of(&world.phone, &world.dave_id),
         dave.shared_key().map(|k| *k.as_bytes())
     );
-    assert_eq!(
-        world
+    assert!(
+        !world
             .phone
             .save_exchanged_contact_before_peer_saved(&dave, &ratchet, true)
             .unwrap(),
-        false,
         "met again: nothing waits for the peer any more"
     );
 }

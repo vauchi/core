@@ -475,7 +475,7 @@ fn a_session_shows_its_confirm_only_after_its_checks_and_done_only_once_saved() 
         alice_final,
         ..
     } = bob_verifying_with_alice_final_withheld();
-    let mut note = |session: &mut MultiStageSession| {
+    let note = |session: &mut MultiStageSession| {
         let mut shown = std::collections::BTreeSet::new();
         for _ in 0..60 {
             if let Some(frame) = session.get_display_qr() {

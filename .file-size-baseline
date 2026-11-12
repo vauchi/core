@@ -43,7 +43,7 @@ vauchi-core/tests/it/duress_pin_tests.rs exempt
 vauchi-cabi/src/lib.rs 1606
 vauchi-app/src/ui/exchange/mod.rs 2917
 vauchi-app/src/ui/app_engine/ble_handshake.rs 619
-vauchi-core/tests/it/app_engine_navigation_tests.rs 1224
+vauchi-app/tests/it/app_engine_navigation_tests.rs 1687
 vauchi-core/tests/it/migration_tests.rs 1280
 vauchi-core/tests/it/ble_handshake_tests.rs 1275
 # Card receive/genesis flow + card fan-out — cohesive security-critical
@@ -58,4 +58,4 @@ vauchi-core/src/api/vauchi/propagation.rs 1030
 # should be split — tracked in
 # backlog/2026-08-07-onboarding-rs-screen-builder-split.
 vauchi-app/src/ui/onboarding.rs 1031
-vauchi-core/tests/it/onboarding_engine_tests.rs 1240
+vauchi-app/tests/it/onboarding_engine_tests.rs 1262

@@ -7,7 +7,7 @@
 use crate::api::{AuthResult, VauchiError, VauchiResult};
 use crate::backup::snapshot::{self, BackupSnapshot, DuressSection, Payload};
 use crate::card::ContactCard;
-use crate::identity::Identity;
+use crate::identity::{DeviceInfo, DeviceRegistry, Identity};
 
 use super::ProfileEngine;
 
@@ -140,12 +140,17 @@ impl ProfileEngine {
         let contacts = snapshot.validate().map_err(backup_error)?;
         let groups = snapshot.restore_groups();
         let seed = crate::backup::extract_master_seed(&snapshot.identity).map_err(backup_error)?;
+        let now = self.clock.unix_seconds();
+        let backed_up_device = device_id_at(&seed, snapshot.identity.device_index);
+        // The restored install is a new device of the identity: signing as
+        // the backed-up one with a fresh key would make every contact that
+        // pinned that device refuse its deltas for good (vauchi/private#1247).
         let identity = Identity::from_device_link(
             *seed,
             snapshot.identity.display_name.clone(),
-            snapshot.identity.device_index,
+            restored_device_index(&seed, snapshot.device_registry.as_ref()),
             snapshot.identity.device_name.clone(),
-            self.clock.unix_seconds(),
+            now,
         );
         let fallback_card = ContactCard::new(identity.display_name());
         let own_card = snapshot.own_card.as_ref().unwrap_or(&fallback_card);
@@ -171,6 +176,12 @@ impl ProfileEngine {
             if let Some(duress) = &snapshot.duress {
                 duress.restore(&self.storage)?;
             }
+            self.register_restored_device(
+                &identity,
+                snapshot.device_registry.clone(),
+                &backed_up_device,
+                now,
+            )?;
             self.storage.commit()?;
             Ok(())
         })();
@@ -181,6 +192,62 @@ impl ProfileEngine {
         self.identity = Some(identity);
         Ok(())
     }
+}
+
+impl ProfileEngine {
+    /// Saves the registry the restored install signs: the backed-up one, or
+    /// none for a backup that predates carrying it, with this install added
+    /// as a new device. The next sync pushes it to every contact.
+    fn register_restored_device(
+        &self,
+        identity: &Identity,
+        backed_up: Option<DeviceRegistry>,
+        backed_up_device: &[u8; 32],
+        now: u64,
+    ) -> VauchiResult<()> {
+        let device_key = self.storage.device().load_or_create_device_signing_key()?;
+        let entry = identity
+            .device_info()
+            .to_registered(identity.master_seed())
+            .with_signing_key(*device_key.public_key().as_bytes());
+        let registry = match backed_up {
+            Some(mut registry) => {
+                registry
+                    .register_restored_device(
+                        entry,
+                        backed_up_device,
+                        identity.signing_keypair(),
+                        now,
+                    )
+                    .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+                registry
+            }
+            None => {
+                let mut registry = DeviceRegistry::new(entry, identity.signing_keypair());
+                registry.lift_version_to(now, identity.signing_keypair());
+                registry
+            }
+        };
+        self.storage.device().save_device_registry(&registry)?;
+        Ok(())
+    }
+}
+
+/// A device index no device of this identity has used. Indexes are handed
+/// out from 0 as devices link, so a random one in the upper half of the
+/// range stays clear of them and of any device a stale backup does not list.
+fn restored_device_index(seed: &[u8; 32], registry: Option<&DeviceRegistry>) -> u32 {
+    loop {
+        let index = u32::from_le_bytes(crate::crypto::random_bytes::<4>()) | 0x8000_0000;
+        let device_id = device_id_at(seed, index);
+        if registry.is_none_or(|registry| registry.find_device(&device_id).is_none()) {
+            return index;
+        }
+    }
+}
+
+fn device_id_at(seed: &[u8; 32], index: u32) -> [u8; 32] {
+    *DeviceInfo::derive(seed, index, String::new(), 0).device_id()
 }
 
 fn backup_error(error: crate::backup::BackupError) -> VauchiError {

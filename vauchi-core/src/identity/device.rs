@@ -448,6 +448,37 @@ impl DeviceRegistry {
         data
     }
 
+    /// Adds the install a full backup was restored onto as a new device, and
+    /// lifts the version to at least `version_floor`.
+    ///
+    /// The backup may predate later registry changes its contacts already
+    /// accepted, so a plain `version + 1` could be refused as stale; the
+    /// caller passes the restore time (vauchi/private#1247). The backed-up
+    /// device stays active, unless the registry is full: then it gives its
+    /// place to the install replacing it.
+    pub fn register_restored_device(
+        &mut self,
+        device: RegisteredDevice,
+        backed_up_device: &[u8; 32],
+        signing_key: &SigningKeyPair,
+        version_floor: u64,
+    ) -> Result<(), DeviceError> {
+        if self.active_count() >= MAX_DEVICES {
+            self.revoke_device(backed_up_device, signing_key, version_floor)?;
+        }
+        self.add_device(device, signing_key)?;
+        self.lift_version_to(version_floor, signing_key);
+        Ok(())
+    }
+
+    /// Raises the version to `floor` and re-signs, when it is lower.
+    pub fn lift_version_to(&mut self, floor: u64, signing_key: &SigningKeyPair) {
+        if self.version < floor {
+            self.version = floor;
+            self.sign(signing_key);
+        }
+    }
+
     /// Returns the next available device index.
     pub fn next_device_index(&self) -> u32 {
         self.devices.iter().map(|_| 1u32).sum::<u32>()

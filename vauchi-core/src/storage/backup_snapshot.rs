@@ -40,14 +40,21 @@ impl BackupSnapshot {
                 }));
             }
         }
-        Self::from_captured_state(
+        let mut snapshot = Self::from_captured_state(
             identity,
             now,
             storage.contacts().load_own_card().map_err(map_error)?,
             contacts,
             groups,
             overrides,
-        )
+        )?;
+        snapshot.device_registry = Some(
+            storage
+                .device()
+                .own_device_registry(identity)
+                .map_err(map_error)?,
+        );
+        Ok(snapshot)
     }
 }
 

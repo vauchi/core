@@ -15,7 +15,7 @@ use zeroize::Zeroize;
 
 use crate::card::ContactCard;
 use crate::contact::{Contact, Group};
-use crate::identity::Identity;
+use crate::identity::{DeviceRegistry, Identity};
 use crate::sync::GroupSyncData;
 
 use super::{BackupError, FullBackupEnvelope, IdentitySection};
@@ -39,6 +39,11 @@ pub(crate) struct BackupSnapshot {
     /// point 7); absent from v6 files and from a duress export.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub duress: Option<DuressSection>,
+    /// The registry the backed-up install held, so a restore joins it as a
+    /// new device (vauchi/private#1247); absent from older files and from a
+    /// decoy payload.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_registry: Option<DeviceRegistry>,
 }
 
 impl Drop for BackupSnapshot {
@@ -81,6 +86,7 @@ impl BackupSnapshot {
             groups: groups.iter().map(GroupSyncData::from_group).collect(),
             overrides,
             duress: None,
+            device_registry: None,
         };
         snapshot.normalize_references()?;
         Ok(snapshot)
@@ -127,6 +133,7 @@ impl BackupSnapshot {
             groups,
             overrides: Vec::new(),
             duress: None,
+            device_registry: None,
         };
         snapshot.normalize_references()?;
         Ok(snapshot)

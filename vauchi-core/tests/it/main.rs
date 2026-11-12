@@ -524,6 +524,7 @@ mod replay_detection_api_tests;
 mod replay_detection_tests;
 mod request_pacer_tests;
 mod responder_deferred_send_tests;
+mod restored_install_card_delta_tests;
 mod resync_request_tests;
 mod retry_queue_tests;
 mod revocation_protocol_tests;

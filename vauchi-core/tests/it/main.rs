@@ -432,6 +432,7 @@ mod panic_widget_tests;
 mod parser_panic_safety_tests;
 mod password_kdf_tests;
 mod payload_bounds_tests;
+mod pending_activation_repropagation_tests;
 mod per_contact_relay_routing_tests;
 mod per_device_signing_tests;
 mod performance_batch_sync_tests;

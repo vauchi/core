@@ -501,7 +501,7 @@ fn make_detail_engine() -> ContactDetailEngine {
 
 // ── Personal note tests (Task 7) ─────────────────────────────────────
 
-/// ContactDetail shows personal note
+/// @scenario: navigation :: Add private note to a contact
 ///
 /// Verifies that a saved personal note is surfaced as an editable text
 /// component on the ContactDetail screen when it is loaded.
@@ -598,7 +598,7 @@ fn contact_detail_shows_empty_note_when_no_note_saved() {
     }
 }
 
-/// Edit personal note persists via AppEngine
+/// @scenario: navigation :: Add private note to a contact
 #[cfg(feature = "network-rustls")]
 // @internal
 #[test]
@@ -663,7 +663,7 @@ fn contact_detail_explicit_save_persists_personal_note() {
 
 // ── Field notes tests (Task 9) ────────────────────────────────────────
 
-/// ContactDetail shows per-field private notes
+/// @scenario: navigation :: Add private note to a contact's shared field
 ///
 /// Verifies that a saved field note is surfaced as an editable text
 /// component (id `field_note:{field_id}`) on the ContactDetail screen.
@@ -777,7 +777,7 @@ fn contact_detail_shows_empty_field_note_when_none_saved() {
     }
 }
 
-/// Explicitly saving a field note persists it
+/// @scenario: navigation :: Add private note to a contact's shared field
 #[cfg(feature = "network-rustls")]
 // @internal
 #[test]

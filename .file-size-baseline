@@ -43,7 +43,9 @@ vauchi-core/tests/it/duress_pin_tests.rs exempt
 vauchi-cabi/src/lib.rs 1606
 vauchi-app/src/ui/exchange/mod.rs 2917
 vauchi-app/src/ui/app_engine/ble_handshake.rs 619
-vauchi-app/tests/it/app_engine_navigation_tests.rs 1687
+# One module preserves the relocated navigation tests' identities; splitting
+# only to shorten the file would rename those tests (private#1230).
+vauchi-app/tests/it/app_engine_navigation_tests.rs 1691
 vauchi-core/tests/it/migration_tests.rs 1280
 vauchi-core/tests/it/ble_handshake_tests.rs 1275
 # Card receive/genesis flow + card fan-out — cohesive security-critical

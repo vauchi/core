@@ -3,8 +3,10 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
-# Vendors the English catalogue into vauchi-app so consumers that build
-# this crate do not each have to clone the locales repo.
+# Vendors the catalogues Core embeds (en, de, fr, es, it; private#1246)
+# into vauchi-app so consumers that build this crate do not each have to
+# clone the locales repo. en.json is required; the others are vendored and
+# checked when the source has them, as build.rs embeds them.
 #
 # Why this exists: vauchi-app's build.rs embeds en.json at compile time
 # and, when it cannot find one, silently substitutes a two-key stub
@@ -63,6 +65,19 @@ fi
 
 SOURCE_REV=$(git -C "$SOURCE_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)
 
+# The catalogues build.rs embeds; en.json leads and is required.
+CATALOGUES="en.json de.json fr.json es.json it.json"
+
+# The catalogues this source has, so a checkout without one of the
+# optional languages vendors and checks the rest.
+present_catalogues() {
+    for catalogue in $CATALOGUES; do
+        if [ -f "$SOURCE_DIR/$catalogue" ]; then
+            printf '%s\n' "$catalogue"
+        fi
+    done
+}
+
 if [ "$CHECK_MODE" -eq 2 ]; then
     VENDORED_REV=$(cat "$VENDOR_DIR/REVISION" 2>/dev/null || true)
     if [ -z "$VENDORED_REV" ] || [ "$VENDORED_REV" = unknown ]; then
@@ -75,13 +90,20 @@ if [ "$CHECK_MODE" -eq 2 ]; then
         echo "(a --depth=1 clone needs: git -C $SOURCE_DIR fetch --unshallow origin main)" >&2
         exit 1
     fi
-    VENDORED_BLOB=$(git hash-object "$VENDOR_DIR/en.json" 2>/dev/null || echo missing)
-    if [ "$VENDORED_BLOB" != "$(git -C "$SOURCE_DIR" rev-parse --verify --quiet "$VENDORED_REV:en.json")" ]; then
-        echo "vendor-locales: the vendored en.json is not locales $VENDORED_REV's." >&2
-        echo "Run: core/scripts/vendor-locales.sh" >&2
-        exit 1
-    fi
-    if git -C "$SOURCE_DIR" diff --quiet "$VENDORED_REV" HEAD -- en.json; then
+    BEHIND=0
+    for catalogue in $(present_catalogues); do
+        EXPECTED_BLOB=$(git -C "$SOURCE_DIR" rev-parse --verify --quiet "$VENDORED_REV:$catalogue" || true)
+        # A catalogue newer than the vendored revision is not vendored yet.
+        [ -n "$EXPECTED_BLOB" ] || { BEHIND=1; continue; }
+        VENDORED_BLOB=$(git hash-object "$VENDOR_DIR/$catalogue" 2>/dev/null || echo missing)
+        if [ "$VENDORED_BLOB" != "$EXPECTED_BLOB" ]; then
+            echo "vendor-locales: the vendored $catalogue is not locales $VENDORED_REV's." >&2
+            echo "Run: core/scripts/vendor-locales.sh" >&2
+            exit 1
+        fi
+        git -C "$SOURCE_DIR" diff --quiet "$VENDORED_REV" HEAD -- "$catalogue" || BEHIND=1
+    done
+    if [ "$BEHIND" -eq 0 ]; then
         echo "vendor-locales: vendored catalogue is locales $VENDORED_REV, current"
     else
         echo "vendor-locales: vendored catalogue is locales $VENDORED_REV, behind locales $SOURCE_REV;"
@@ -91,27 +113,33 @@ if [ "$CHECK_MODE" -eq 2 ]; then
 fi
 
 if [ "$CHECK_MODE" -eq 1 ]; then
-    if [ ! -f "$VENDOR_DIR/en.json" ]; then
-        echo "vendor-locales: no vendored copy at $VENDOR_DIR/en.json" >&2
-        echo "Run: core/scripts/vendor-locales.sh" >&2
-        exit 1
-    fi
-    if ! diff -q "$SOURCE_DIR/en.json" "$VENDOR_DIR/en.json" >/dev/null 2>&1; then
-        echo "vendor-locales: the vendored catalogue has drifted from locales." >&2
-        echo "A consumer building without a checkout would ship stale copy." >&2
-        echo "Run: core/scripts/vendor-locales.sh" >&2
-        exit 1
-    fi
+    for catalogue in $(present_catalogues); do
+        if [ ! -f "$VENDOR_DIR/$catalogue" ]; then
+            echo "vendor-locales: no vendored copy at $VENDOR_DIR/$catalogue" >&2
+            echo "Run: core/scripts/vendor-locales.sh" >&2
+            exit 1
+        fi
+        if ! diff -q "$SOURCE_DIR/$catalogue" "$VENDOR_DIR/$catalogue" >/dev/null 2>&1; then
+            echo "vendor-locales: the vendored catalogue has drifted from locales ($catalogue)." >&2
+            echo "A consumer building without a checkout would ship stale copy." >&2
+            echo "Run: core/scripts/vendor-locales.sh" >&2
+            exit 1
+        fi
+    done
     echo "vendor-locales: vendored catalogue matches locales ($SOURCE_REV)"
     exit 0
 fi
 
 mkdir -p "$VENDOR_DIR"
-cp "$SOURCE_DIR/en.json" "$VENDOR_DIR/en.json"
+VENDORED=""
+for catalogue in $(present_catalogues); do
+    cp "$SOURCE_DIR/$catalogue" "$VENDOR_DIR/$catalogue"
+    VENDORED="$VENDORED $catalogue"
+done
 
 # Provenance travels with the copy: it is not a git checkout, so build.rs
 # cannot resolve a revision from it. Without this the build would record
 # core's own revision and misreport it as the locales revision.
 printf '%s\n' "$SOURCE_REV" > "$VENDOR_DIR/REVISION"
 
-echo "vendor-locales: vendored en.json at $SOURCE_REV → $VENDOR_DIR"
+echo "vendor-locales: vendored$VENDORED at $SOURCE_REV → $VENDOR_DIR"

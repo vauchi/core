@@ -6,9 +6,10 @@
 //!
 //! Embeds two compile-time bundles into `OUT_DIR`:
 //!
-//! 1. **`bundled_locale.rs`** — English locale strings from the
-//!    sibling `locales/` repo. Provides a complete fallback when
-//!    runtime locale files aren't loaded.
+//! 1. **`bundled_locale.rs`** — the English, German, French, Spanish and
+//!    Italian locale files from the sibling `locales/` repo (or the
+//!    crate's vendored copy). They render before any runtime locale file
+//!    or content cycle arrives (private#1246).
 //! 2. **`themes.json`** — theme catalog from the sibling `themes/`
 //!    repo. Used by `theme::bundled_themes()` to populate
 //!    `SettingsConfig.available_themes` (problem record
@@ -64,95 +65,7 @@ fn main() {
     refuse_dev_build_in_tag_pipeline();
 
     let out_dir = env::var("OUT_DIR").unwrap();
-    let dest_path = Path::new(&out_dir).join("bundled_locale.rs");
-
-    // Check VAUCHI_LOCALES_DIR env var first (for out-of-tree builds like cargo-mutants),
-    // then fall back to relative sibling repo paths.
-    // Without the rerun declaration, cargo caches the bundled English
-    // across env changes: a build made without the var keeps serving a
-    // stale vendored en.json even after the var is set (surfaced as
-    // phantom 'Missing: <key>' smoke-test failures, 2026-07-11).
-    println!("cargo::rerun-if-env-changed=VAUCHI_LOCALES_DIR");
-    let env_path = env::var("VAUCHI_LOCALES_DIR")
-        .ok()
-        .map(|dir| format!("{}/en.json", dir));
-
-    let relative_paths = [
-        "../../locales/en.json",    // Standard sibling repo layout
-        "../../../locales/en.json", // Alternative layout
-        "locales/en.json",          // Local copy (for crates.io publish)
-    ];
-
-    let mut locale_content = None;
-    let mut found_path = None;
-
-    let all_paths: Vec<String> = env_path
-        .into_iter()
-        .chain(relative_paths.iter().map(|s| s.to_string()))
-        .collect();
-
-    for path in &all_paths {
-        if Path::new(path).exists() {
-            println!("cargo::rerun-if-changed={}", path);
-            if let Ok(content) = fs::read_to_string(path) {
-                locale_content = Some(content);
-                found_path = Some(path.clone());
-                break;
-            }
-        }
-    }
-
-    let locales_rev = found_path.as_deref().map_or_else(
-        || "none".to_string(),
-        |path| locales_revision(path).unwrap_or_else(|| "unknown".to_string()),
-    );
-
-    let generated = if let Some(content) = locale_content {
-        eprintln!(
-            "cargo:warning=Bundling English locale from: {} (rev {})",
-            found_path.clone().unwrap(),
-            locales_rev
-        );
-
-        // Escape for Rust string - convert to bytes representation
-        let escaped = content
-            .replace('\\', "\\\\")
-            .replace('"', "\\\"")
-            .replace('\n', "\\n")
-            .replace('\r', "\\r")
-            .replace('\t', "\\t");
-
-        format!(
-            r#"/// Bundled English locale JSON (embedded at compile time from locales repo)
-pub const BUNDLED_EN_JSON: &str = "{}";
-"#,
-            escaped
-        )
-    } else {
-        eprintln!(
-            "cargo:warning=No locales checkout found (VAUCHI_LOCALES_DIR or ../locales beside core): bundling a two-string English fallback, so i18n tests will fail. Fix: git clone git@gitlab.com:vauchi/locales.git beside core, or run `just setup` (private#879)"
-        );
-
-        r#"/// Minimal fallback when locales repo not available
-pub const BUNDLED_EN_JSON: &str = "{\"app.name\":\"Vauchi\",\"welcome.title\":\"Welcome to Vauchi\"}";
-"#
-        .to_string()
-    };
-
-    let generated = format!(
-        r#"{generated}
-/// Revision of the `locales` checkout this build embedded, or `unknown`
-/// when the checkout is not a git working tree, or `none` when no locale
-/// file was found at all.
-///
-/// Recorded, never enforced: a release can answer which copy it shipped
-/// without freezing what developers get. Pinning would stall translations
-/// behind a manual bump — see
-/// `problems/2026-08-07-locale-content-consumed-from-unpinned-head/`.
-pub const BUNDLED_LOCALES_REV: &str = "{locales_rev}";
-"#
-    );
-    fs::write(&dest_path, generated).unwrap();
+    bundle_locales(&out_dir);
 
     // ── themes.json bundling (Phase 2a/A3a) ───────────────────────
     // Materializes themes/generated/themes.json into OUT_DIR/themes.json so
@@ -260,6 +173,94 @@ pub const BUNDLED_LOCALES_REV: &str = "{locales_rev}";
 /// Best-effort otherwise: a missing git or a tarball checkout yields
 /// `None` and the build records `unknown` rather than failing. This is a
 /// record, not a gate — nothing downstream may depend on it resolving.
+/// The languages Core embeds, English first. A shell's files or a content
+/// cycle still replace each of them and add any other (private#1246).
+const EMBEDDED_LOCALES: [&str; 5] = ["en", "de", "fr", "es", "it"];
+
+/// English when no locales checkout is found, so the crate still builds.
+const FALLBACK_EN_JSON: &str = r#"{"app.name":"Vauchi","welcome.title":"Welcome to Vauchi"}"#;
+
+/// Writes each embedded language beside `bundled_locale.rs` and the table
+/// that `include_str!`s them. The files come from the first locales
+/// directory holding `en.json`: `VAUCHI_LOCALES_DIR`, the sibling repo, or
+/// the crate's vendored copy.
+fn bundle_locales(out_dir: &str) {
+    // Without the rerun declaration, cargo caches the bundled copy across
+    // env changes: a build made without the var keeps serving a stale
+    // vendored file even after the var is set (surfaced as phantom
+    // 'Missing: <key>' smoke-test failures, 2026-07-11).
+    println!("cargo::rerun-if-env-changed=VAUCHI_LOCALES_DIR");
+    let candidates = env::var("VAUCHI_LOCALES_DIR").ok().into_iter().chain(
+        // Sibling repo, alternative layout, the crate's vendored copy.
+        ["../../locales", "../../../locales", "locales"]
+            .iter()
+            .map(|dir| dir.to_string()),
+    );
+    let found_dir = candidates
+        .into_iter()
+        .find(|dir| Path::new(&format!("{dir}/en.json")).exists());
+
+    let locales_rev = found_dir.as_deref().map_or_else(
+        || "none".to_string(),
+        |dir| locales_revision(&format!("{dir}/en.json")).unwrap_or_else(|| "unknown".to_string()),
+    );
+
+    let mut embedded = Vec::new();
+    let mut entries = String::new();
+    for code in EMBEDDED_LOCALES {
+        let path = found_dir.as_deref().map(|dir| format!("{dir}/{code}.json"));
+        let content = path.as_deref().and_then(|path| {
+            Path::new(path).exists().then(|| {
+                println!("cargo::rerun-if-changed={path}");
+                fs::read_to_string(path).unwrap_or_else(|e| panic!("read {path}: {e}"))
+            })
+        });
+        let content = match content {
+            Some(content) => content,
+            None if code == "en" => FALLBACK_EN_JSON.to_string(),
+            None => continue,
+        };
+        let file = format!("bundled-{code}.json");
+        fs::write(Path::new(out_dir).join(&file), content).unwrap();
+        entries.push_str(&format!(
+            "    (\"{code}\", include_str!(concat!(env!(\"OUT_DIR\"), \"/{file}\"))),\n"
+        ));
+        embedded.push(code);
+    }
+
+    match found_dir.as_deref() {
+        Some(dir) => eprintln!(
+            "cargo:warning=Bundling locales {} from: {dir} (rev {locales_rev})",
+            embedded.join(",")
+        ),
+        None => eprintln!(
+            "cargo:warning=No locales checkout found (VAUCHI_LOCALES_DIR or ../locales beside core): bundling a two-string English fallback, so i18n tests will fail. Fix: git clone git@gitlab.com:vauchi/locales.git beside core, or run `just setup` (private#879)"
+        ),
+    }
+
+    let generated = format!(
+        r#"/// The locale files Core embeds, by code, English first (embedded at
+/// compile time from the locales repo or the crate's vendored copy).
+pub const BUNDLED_LOCALE_JSON: &[(&str, &str)] = &[
+{entries}];
+
+/// Bundled English locale JSON.
+pub const BUNDLED_EN_JSON: &str = BUNDLED_LOCALE_JSON[0].1;
+
+/// Revision of the `locales` checkout this build embedded, or `unknown`
+/// when the checkout is not a git working tree, or `none` when no locale
+/// file was found at all.
+///
+/// Recorded, never enforced: a release can answer which copy it shipped
+/// without freezing what developers get. Pinning would stall translations
+/// behind a manual bump — see
+/// `problems/2026-08-07-locale-content-consumed-from-unpinned-head/`.
+pub const BUNDLED_LOCALES_REV: &str = "{locales_rev}";
+"#
+    );
+    fs::write(Path::new(out_dir).join("bundled_locale.rs"), generated).unwrap();
+}
+
 fn locales_revision(locale_path: &str) -> Option<String> {
     let dir = Path::new(locale_path).parent()?;
 

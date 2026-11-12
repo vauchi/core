@@ -5,10 +5,12 @@
 //! Internationalization (i18n) System
 //!
 //! Provides localized strings for the app UI.
-//! Supports English (source), German, French, and Spanish.
 //!
-//! Strings are loaded at runtime from JSON locale files via `init()`.
-//! If no locale files are loaded, a minimal hardcoded English fallback is used.
+//! Core embeds English, German, French, Spanish and Italian at compile time
+//! (build.rs), so they render with no shell file and no download. Files a
+//! shell loads with `init()` or a content cycle delivers through
+//! `load_locale_from_bytes()` replace an embedded language and add any
+//! other (private#1246).
 //!
 //! Feature file: features/internationalization.feature (pending)
 
@@ -115,11 +117,7 @@ pub struct LocaleInfo {
 pub fn get_locale_info(locale: Locale) -> LocaleInfo {
     loaded_locale_info(locale)
         .or_else(|| listed_locale_info(locale))
-        .or_else(|| {
-            (locale == Locale::ENGLISH)
-                .then(bundled_english_info)
-                .flatten()
-        })
+        .or_else(|| embedded_locale_info(locale))
         .unwrap_or_else(|| LocaleInfo {
             code: locale.code().to_string(),
             name: locale.code().to_string(),
@@ -128,14 +126,8 @@ pub fn get_locale_info(locale: Locale) -> LocaleInfo {
         })
 }
 
-fn bundled_english_info() -> Option<LocaleInfo> {
-    static INFO: std::sync::OnceLock<Option<LocaleInfo>> = std::sync::OnceLock::new();
-    INFO.get_or_init(|| {
-        parse_locale_file("en", BUNDLED_EN_JSON.as_bytes())
-            .ok()
-            .and_then(|(_, info)| info)
-    })
-    .clone()
+fn embedded_locale_info(locale: Locale) -> Option<LocaleInfo> {
+    embedded_locale(locale.code()).and_then(|(_, info)| info.clone())
 }
 
 fn loaded_locale_info(locale: Locale) -> Option<LocaleInfo> {
@@ -147,24 +139,13 @@ fn loaded_locale_info(locale: Locale) -> Option<LocaleInfo> {
         .cloned()
 }
 
-/// The languages every shell bundles a file for. They resolve before the
-/// shell has loaded its files, so a screen built at start renders in them.
-const SHELL_BUNDLED_LOCALES: [Locale; 5] = [
-    Locale::ENGLISH,
-    Locale::GERMAN,
-    Locale::FRENCH,
-    Locale::SPANISH,
-    Locale::ITALIAN,
-];
-
-/// The locale `tag` names, if Core can render it: a shell-bundled
-/// language, or one whose file has loaded. Another well-formed tag yields
+/// The locale `tag` names, if Core can render it: a language Core embeds
+/// (private#1246), or one whose file has loaded. Another well-formed tag yields
 /// `None` until its file arrives, so a resolution chain falls through to
 /// its next tag instead of rendering English over a language the person
 /// reads (vauchi/private#733 D4).
 pub fn translated_locale(tag: &str) -> Option<Locale> {
-    Locale::from_code(tag)
-        .filter(|locale| SHELL_BUNDLED_LOCALES.contains(locale) || has_loaded_strings(*locale))
+    Locale::from_code(tag).filter(|locale| is_embedded(*locale) || has_loaded_strings(*locale))
 }
 
 fn has_loaded_strings(locale: Locale) -> bool {
@@ -177,8 +158,9 @@ fn has_loaded_strings(locale: Locale) -> bool {
         .unwrap_or(false)
 }
 
-/// The languages Settings offers: English, every language whose loaded
-/// file has a usable `_meta`, and every language the trusted manifest
+/// The languages Settings offers: English, every language Core embeds,
+/// every language whose loaded file has a usable `_meta`, and every
+/// language the trusted manifest
 /// lists, before its file arrives (vauchi/private#733 D3). English leads,
 /// the rest follow by code. A right-to-left language is left out while no
 /// frontend mirrors its layout (the RTL canary in i18n_integration_tests).
@@ -195,9 +177,11 @@ pub fn get_available_locales() -> Vec<Locale> {
         .read()
         .map(|lock| lock.iter().map(|(locale, _)| *locale).collect())
         .unwrap_or_default();
+    let embedded = embedded_codes().filter_map(exact_locale);
     let mut others: Vec<Locale> = loaded
         .into_iter()
         .chain(listed)
+        .chain(embedded)
         .filter(|&locale| locale != Locale::ENGLISH && !get_locale_info(locale).is_rtl)
         .collect();
     others.sort_by(|a, b| a.code().cmp(b.code()));
@@ -300,7 +284,7 @@ pub fn try_get_string(locale: Locale, key: &str) -> Option<String> {
 /// Single-key lookup — clones only the matched value, never a whole
 /// locale map. A store-loaded locale wins entirely (hit or miss),
 /// matching [`get_strings_for_locale`]'s fallback order; only an
-/// UNLOADED English falls back to the cached bundled set. Screen
+/// UNLOADED locale falls back to Core's embedded copy of it. Screen
 /// builders call this dozens of times per render, so the per-call
 /// full-map clone / full-JSON parse this replaces made engine
 /// proptests time out (M3 S4a, 2026-07-04).
@@ -311,10 +295,7 @@ fn lookup_one(locale: Locale, key: &str) -> Option<String> {
     {
         return strings.get(key).cloned();
     }
-    if locale == Locale::ENGLISH {
-        return bundled_english_cached().get(key).cloned();
-    }
-    None
+    embedded_locale(locale.code()).and_then(|(strings, _)| strings.get(key).cloned())
 }
 
 /// Get a localized string with argument interpolation
@@ -428,14 +409,14 @@ pub fn load_locale_from_bytes(code: &str, data: &[u8]) -> Result<(), I18nError> 
     let store = lock.get_or_insert_with(HashMap::new);
 
     // Preserve keys the downloaded file is missing by backfilling from the
-    // previous store entry, then from the bundled English fallback for en.
+    // previous store entry, then from Core's embedded copy of the language.
     if let Some(existing) = store.get(code) {
         for (key, value) in existing {
             strings.entry(key.clone()).or_insert_with(|| value.clone());
         }
     }
-    if code == "en" {
-        for (key, value) in bundled_english_cached() {
+    if let Some((embedded, _)) = embedded_locale(code) {
+        for (key, value) in embedded {
             strings.entry(key.clone()).or_insert_with(|| value.clone());
         }
     }
@@ -497,7 +478,7 @@ impl RawLocaleMeta {
 }
 
 /// Get strings for a specific locale. Reads from the RwLock store, falling
-/// back to `bundled_english()` if the store is empty or the locale is missing.
+/// back to Core's embedded copy if the store lacks the locale.
 fn get_strings_for_locale(locale: Locale) -> HashMap<String, String> {
     let code = locale.code();
 
@@ -508,36 +489,52 @@ fn get_strings_for_locale(locale: Locale) -> HashMap<String, String> {
         return strings.clone();
     }
 
-    // Fallback: if requesting English and nothing loaded, use bundled minimal set
-    if locale == Locale::ENGLISH {
-        return bundled_english();
-    }
-
-    // For non-English locales with no data, return empty (caller will fall back to English)
-    HashMap::new()
+    // A language Core does not embed and nothing loaded is empty; the
+    // caller falls back to English.
+    embedded_locale(code)
+        .map(|(strings, _)| strings.clone())
+        .unwrap_or_default()
 }
 
 // Include the bundled locale generated by build.rs
 include!(concat!(env!("OUT_DIR"), "/bundled_locale.rs"));
 
-/// Bundled English strings — parsed from embedded locale JSON at compile time.
-/// The JSON is sourced from the sibling `locales/` repo via build.rs.
-fn bundled_english() -> HashMap<String, String> {
-    let raw: HashMap<String, serde_json::Value> =
-        serde_json::from_str(BUNDLED_EN_JSON).unwrap_or_default();
+type EmbeddedLocale = (HashMap<String, String>, Option<LocaleInfo>);
 
-    raw.into_iter()
-        .filter(|(k, _)| k != "_meta")
-        .filter_map(|(k, v)| v.as_str().map(|s| (k, s.to_owned())))
-        .collect()
+/// The codes of the languages Core embeds (build.rs, from the locales
+/// repo), English first.
+fn embedded_codes() -> impl Iterator<Item = &'static str> {
+    BUNDLED_LOCALE_JSON.iter().map(|(code, _)| *code)
 }
 
-/// The bundled set parses once — every fallback lookup after that is a
-/// map read. (Its predecessor's "cached after first call" comment was
-/// aspirational: each call re-parsed the full JSON.)
-fn bundled_english_cached() -> &'static HashMap<String, String> {
-    static BUNDLED: std::sync::OnceLock<HashMap<String, String>> = std::sync::OnceLock::new();
-    BUNDLED.get_or_init(bundled_english)
+fn is_embedded(locale: Locale) -> bool {
+    embedded_codes().any(|code| code == locale.code())
+}
+
+/// An embedded language's strings and `_meta`, parsed on first use and
+/// kept: a process that renders only English parses only English, and
+/// every lookup after the first is a map read. A file that does not parse
+/// yields `None` rather than an empty language.
+fn embedded_locale(code: &str) -> Option<&'static EmbeddedLocale> {
+    type Slot = std::sync::OnceLock<Option<EmbeddedLocale>>;
+    static SLOTS: std::sync::OnceLock<HashMap<&'static str, Slot>> = std::sync::OnceLock::new();
+    let slots = SLOTS.get_or_init(|| embedded_codes().map(|code| (code, Slot::new())).collect());
+    let (code, slot) = slots.get_key_value(code)?;
+    slot.get_or_init(|| {
+        let (_, json) = BUNDLED_LOCALE_JSON
+            .iter()
+            .find(|(embedded, _)| embedded == code)?;
+        parse_locale_file(code, json.as_bytes()).ok()
+    })
+    .as_ref()
+}
+
+/// Core's embedded English strings.
+#[cfg(test)]
+fn bundled_english() -> HashMap<String, String> {
+    embedded_locale("en")
+        .map(|(strings, _)| strings.clone())
+        .unwrap_or_default()
 }
 
 /// Shared test lock: any test that mutates `LOCALE_STORE` (clear, reset, init)

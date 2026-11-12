@@ -13,6 +13,7 @@ extend-exclude = [
     "*.lock",
     "**/vauchi-app/fixtures/journeys/screen_catalog_v1.json", # generated translations and encoded QR payloads
     "**/*_i18n_tests.rs",    # exact non-English string assertions (M3, CC-03) — German is not a typo
+    "**/vauchi-app/locales/*.json", # vendored catalogues; the locales repo checks its own text (private#1246)
 ]
 
 [default.extend-words]

@@ -2563,7 +2563,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_bf77c39a42edbbb9",
+                    "id": "field_07695116b6386399",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2601,13 +2601,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:bf77c39a42edbbb9",
+                    "id": "field_note:07695116b6386399",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:bf77c39a42edbbb9",
+                          "id": "field_note:07695116b6386399",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2647,7 +2647,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_ffa1c858faeacd5d",
+                    "id": "field_46efbcd3ae6b737e",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2685,13 +2685,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:ffa1c858faeacd5d",
+                    "id": "field_note:46efbcd3ae6b737e",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:ffa1c858faeacd5d",
+                          "id": "field_note:46efbcd3ae6b737e",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -2731,7 +2731,7 @@
                 },
                 {
                   "List": {
-                    "id": "field_f36002afba59eddd",
+                    "id": "field_aacbfbe339977ed3",
                     "label": "Contact fields",
                     "rows": [
                       {
@@ -2769,13 +2769,13 @@
                 },
                 {
                   "Group": {
-                    "id": "field_note:f36002afba59eddd",
+                    "id": "field_note:aacbfbe339977ed3",
                     "label": "Private note for this field",
                     "axis": "vertical",
                     "children": [
                       {
                         "Text": {
-                          "id": "field_note:f36002afba59eddd",
+                          "id": "field_note:aacbfbe339977ed3",
                           "content": "",
                           "style": "body",
                           "accessibility": {
@@ -5138,10 +5138,10 @@
                 {
                   "Text": {
                     "id": "their_fingerprint",
-                    "content": "C470 4918 F136 ABA7 5627 910A 9577 E4E2 3E96 F46A 4D84 5A38 7822 3A09 0779 A055",
+                    "content": "AA02 35DA 896B 1E88 AD0B FCD5 7971 3A2F BA24 10FA C8D1 7B1E 1DF5 829F 702C F4D3",
                     "style": "body",
                     "accessibility": {
-                      "label": "C470 4918 F136 ABA7 5627 910A 9577 E4E2 3E96 F46A 4D84 5A38 7822 3A09 0779 A055",
+                      "label": "AA02 35DA 896B 1E88 AD0B FCD5 7971 3A2F BA24 10FA C8D1 7B1E 1DF5 829F 702C F4D3",
                       "description": null
                     }
                   }
@@ -5160,10 +5160,10 @@
                 {
                   "Text": {
                     "id": "our_fingerprint",
-                    "content": "EC4E E659 E3CE 2026 F5C5 37DB D95F 3060 3398 3DD6 9BF8 5885 CA18 A365 6C27 79AB",
+                    "content": "E07F F9A4 ED9D 60EB 78F2 2E60 72EC 8BD7 966A 7CDB F59F 77BB DCCD BE7F 2BB1 BB0F",
                     "style": "body",
                     "accessibility": {
-                      "label": "EC4E E659 E3CE 2026 F5C5 37DB D95F 3060 3398 3DD6 9BF8 5885 CA18 A365 6C27 79AB",
+                      "label": "E07F F9A4 ED9D 60EB 78F2 2E60 72EC 8BD7 966A 7CDB F59F 77BB DCCD BE7F 2BB1 BB0F",
                       "description": null
                     }
                   }
@@ -7916,6 +7916,18 @@
                       {
                         "id": "de",
                         "label": "Deutsch"
+                      },
+                      {
+                        "id": "es",
+                        "label": "Español"
+                      },
+                      {
+                        "id": "fr",
+                        "label": "Français"
+                      },
+                      {
+                        "id": "it",
+                        "label": "Italiano"
                       }
                     ],
                     "enabled": true,
@@ -18543,7 +18555,7 @@
                 {
                   "Text": {
                     "id": "link_url",
-                    "content": "https://vauchi.app/x#pk=FZvm16QRAGQw-T98DWFwnUBqCvGufti4_dB-rkKL_no&n=LIBMAhQj4sG_Mh_k4MOol1nGZDRMEXvekYUmM5FLslU&v=2&nm=QWRhIExvdmVsYWNl",
+                    "content": "https://vauchi.app/x#pk=t4d235WeXxzTS4ThqOept_294HDUHeC6fLdthaBQXxg&n=ctax7XUHQtj7-cRW8m4JOtVhGWyqLe5AEW89XRbwcAg&v=2&nm=QWRhIExvdmVsYWNl",
                     "style": "body",
                     "accessibility": {
                       "label": "Exchange link",
@@ -18554,7 +18566,7 @@
                 {
                   "Text": {
                     "id": "link_code",
-                    "content": "986 577",
+                    "content": "139 100",
                     "style": "heading",
                     "accessibility": {
                       "label": "Confirmation code",
@@ -19131,7 +19143,7 @@
         },
         {
           "DirectSend": {
-            "payload": [86,48,74,70,87,65,80,115,84,117,90,90,52,56,52,103,74,118,88,70,78,57,118,90,88,122,66,103,77,53,103,57,49,112,118,52,87,73,88,75,71,75,78,108,98,67,100,53,113,49,78,71,104,79,111,74,107,97,67,66,51,80,74,74,121,66,77,83,98,47,88,81,121,43,90,80,114,55,78,53,102,116,106,85,53,120,118,84,85,112,108,83,71,81,88,82,66,118,73,55,69,75,87,54,69,113,72,120,51,50,109,90,81,70,55,56,87,67,51,121,103,87,81,82,102,88,75,97,120,90,104,103,57,109,103,111,87,89,97,43,120,75,98,75,97,119,102,110,48,83,74,77,48,113,51,48,65,65,65,65,65,71,114,122,72,52,56,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,67,101,54,66,108,114,83,55,69,120,114,50,68,73,112,90,90,76,115,71,105,70,73,70,122,55,55,85,121,97,66,97,56,89,75,90,88,82,117,110,97,71,99,79,110,55,107,56,104,67,66,118,111,77,103,65,49,68,109,51,83,121,120,80,56,49,75,101,86,82,84,109,116,108,50,86,79,82,97,50,106,71,68,82,103,75],
+            "payload": [86,48,74,70,87,65,80,103,102,47,109,107,55,90,49,103,54,51,106,121,76,109,66,121,55,73,118,88,108,109,112,56,50,47,87,102,100,55,118,99,122,98,53,47,75,55,71,55,68,43,70,79,65,104,102,85,86,77,97,115,75,104,69,116,47,85,87,105,103,117,120,110,88,71,97,72,110,112,112,68,112,70,121,52,52,112,88,56,73,56,119,65,120,78,105,100,122,103,85,52,76,52,87,56,74,117,79,121,120,68,78,54,54,118,88,55,67,77,84,56,80,90,112,81,107,83,72,106,84,68,76,67,50,84,43,49,87,113,115,48,70,72,104,68,43,104,110,49,98,120,65,100,81,103,101,69,65,65,65,65,65,71,114,49,78,67,115,65,68,69,70,107,89,83,66,77,98,51,90,108,98,71,70,106,90,81,65,103,104,116,105,79,65,106,98,117,120,116,70,117,84,100,68,98,121,52,116,68,71,77,69,122,48,104,56,117,74,56,47,99,43,77,80,73,89,84,78,110,84,119,111,121,86,52,56,121,49,99,52,56,85,84,66,71,110,108,114,121,56,43,107,85,100,88,98,73,97,73,103,43,87,66,68,117,114,51,68,80,52,122,81,78],
             "is_initiator": true,
             "endpoint": {
               "service_type": "_vauchi-exchange._tcp.local.",
@@ -19219,7 +19231,7 @@
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
-                      "INI30:0:0:00QGN72VE70CHAOM3UYQ:+N4PIWZPZBRXSGZM7OPAPFIMKQC+S%*8Q-E/498X07SQRMN-A1K%4-7UAXIMHFZ9FJHH+B8Y9CR7HI6OANJAO5I/9XFHV.7-BHSOE11Vauchi User00"
+                      "INI30:0:0:00M/43CUJ%04MRGM2FZL75R45GL+1T:JL4V$34M1M4*KTEQ%BORPT-4JC6TEMON38OQE2K7.JRF%BDJC//0%P2/SIOSU1Z50NOEW51K3H.A+AKN8TE2TMWL F611Vauchi User00"
                     ],
                     "purpose": "display",
                     "label": null,
@@ -19427,8 +19439,8 @@
             "earliest_secs": 1,
             "deadline_secs": 1,
             "min_interval_secs": 1,
-            "earliest_millis": 115,
-            "delay_millis": 115
+            "earliest_millis": 114,
+            "delay_millis": 114
           }
         }
       ]
@@ -20187,7 +20199,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [30,74,32,173,23,210,199,216,120,163,245,72,79,189,131,63,61,166,96,16,147,26,183,49,235,243,81,50,157,165,32,192]
+            "payload": [63,78,110,39,52,116,103,221,21,239,63,180,15,219,197,5,68,30,27,133,50,12,153,33,126,49,124,67,219,42,9,36]
           }
         },
         {
@@ -20392,7 +20404,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [127,193,52,233,44,125,78,81,149,32,108,132,73,128,145,232,88,13,178,228,152,221,39,42,122,19,254,241,237,65,134,189]
+            "payload": [40,163,226,166,53,176,171,191,112,16,30,19,131,243,73,89,55,189,1,77,164,84,215,252,121,228,22,135,99,115,105,164]
           }
         },
         {
@@ -20597,7 +20609,7 @@
         {
           "BleStartAdvertising": {
             "service_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "payload": [56,231,225,147,132,147,20,33,93,153,171,196,54,151,29,84,180,70,250,185,217,169,241,252,75,83,7,198,115,166,212,40]
+            "payload": [143,3,231,201,39,104,17,30,33,26,218,217,81,22,85,212,49,139,100,238,226,112,4,77,64,78,23,26,26,147,44,52]
           }
         },
         {
@@ -24557,7 +24569,7 @@
                   "Qr": {
                     "id": "surface.1.claim_qr",
                     "payloads": [
-                      "AdFWTR9Mb5Nlz5UzcA6SUXtUhhsCbdghOGompRKF5y8OjdZzZGQMXwb0N/Fm0PvUb2D2ApzPgFjCHN1YJEceC1kA8VNlAAAAAA=="
+                      "AfL24yr6LO85hy1DIFik/z/PJ0HIbhOiBhvVr52BiWPnm8OhoxrMrPYuje3wbcA4bFD5vZUOdfkKkeedXOhwaJwA8VNlAAAAAA=="
                     ],
                     "purpose": "display",
                     "label": "Recovery claim — scan to vouch",
@@ -24585,10 +24597,10 @@
                 {
                   "Text": {
                     "id": "claim_data",
-                    "content": "AdFWTR9Mb5Nlz5UzcA6SUXtUhhsCbdghOGompRKF5y8OjdZzZGQMXwb0N/Fm0PvUb2D2ApzPgFjCHN1YJEceC1kA8VNlAAAAAA==",
+                    "content": "AfL24yr6LO85hy1DIFik/z/PJ0HIbhOiBhvVr52BiWPnm8OhoxrMrPYuje3wbcA4bFD5vZUOdfkKkeedXOhwaJwA8VNlAAAAAA==",
                     "style": "caption",
                     "accessibility": {
-                      "label": "AdFWTR9Mb5Nlz5UzcA6SUXtUhhsCbdghOGompRKF5y8OjdZzZGQMXwb0N/Fm0PvUb2D2ApzPgFjCHN1YJEceC1kA8VNlAAAAAA==",
+                      "label": "AfL24yr6LO85hy1DIFik/z/PJ0HIbhOiBhvVr52BiWPnm8OhoxrMrPYuje3wbcA4bFD5vZUOdfkKkeedXOhwaJwA8VNlAAAAAA==",
                       "description": null
                     }
                   }

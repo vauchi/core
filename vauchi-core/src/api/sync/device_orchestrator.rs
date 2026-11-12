@@ -505,11 +505,24 @@ impl<'a> DeviceSyncOrchestrator<'a> {
                     .load_activation(&activation.contact_id)
                     .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
                     .unwrap_or_default();
+                let was_active =
+                    tracker.state() == crate::sync::registry_activation::ActivationState::Active;
                 tracker.merge_snapshot(&incoming);
                 self.storage
                     .registry_activation()
                     .save_activation(&activation.contact_id, &tracker)
                     .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+                if !was_active
+                    && tracker.state() == crate::sync::registry_activation::ActivationState::Active
+                {
+                    self.storage
+                        .ux()
+                        .save_own_card_repropagate(&crate::reminders::OwnCardRepropagateState {
+                            needs_repropagate: true,
+                            failed_attempts: 0,
+                        })
+                        .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+                }
             }
 
             // Restore owner-private tags (ADR-051), preserving their ids.

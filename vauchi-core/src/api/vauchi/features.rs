@@ -548,10 +548,9 @@ impl ProfileEngine {
         Ok(())
     }
 
-    /// Re-propagates to one contact, or leaves it to the contact's first
-    /// incoming message when this side is a responder that cannot send yet:
-    /// that arrival owes a repropagation (`process_single_card_update_for_device`),
-    /// so the wait is neither an error nor a spent retry (vauchi/private#294).
+    /// Re-propagates, or leaves the durable visibility change for activation
+    /// or the responder's first incoming message to re-arm (private#1251,
+    /// private#294). Waiting does not spend the failure retry budget.
     pub(super) fn repropagate_or_defer(&self, contact_id: &str) -> VauchiResult<()> {
         match self.repropagate_to_contact(contact_id) {
             Err(VauchiError::SendDeferred) => Ok(()),

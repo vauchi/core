@@ -353,6 +353,7 @@ impl ProfileEngine {
                 tracker.state() == crate::sync::registry_activation::ActivationState::Active
             })
             .unwrap_or(false);
+        let awaiting_activation = !peer_devices.is_empty() && !activation_confirmed;
         let targets: Vec<Option<crate::identity::BroadcastDevice>> =
             if peer_devices.is_empty() || !activation_confirmed {
                 vec![None]
@@ -386,14 +387,15 @@ impl ProfileEngine {
                     })?
                 }
                 (None, None) => {
-                    // No established session and no peer registry — the
-                    // secondary-device / first-contact case. A safety alert
+                    // No established legacy session — the secondary-device /
+                    // first-contact case. A safety alert
                     // bootstraps a genesis session rooted in shared_key
                     // (ADR-068), and F4 handshake payloads ride the same
                     // stateless envelope (slice 4b — the orphaned sibling's
                     // card-continuity entry point, ADR-064 Amendment
-                    // 2026-07-25); any other payload has no genesis path
-                    // and keeps failing closed.
+                    // 2026-07-25). A card update for a verified device-aware
+                    // peer stays owed until activation; other payloads have
+                    // no genesis path and keep failing closed.
                     if handshake_payload
                         || matches!(
                             crate::sync::delta::VersionedPayload::decode(payload),
@@ -402,6 +404,11 @@ impl ProfileEngine {
                     {
                         prepared.push(self.genesis_seal_for_cold_start(identity, ex, payload)?);
                         continue;
+                    }
+                    if awaiting_activation
+                        && payload.first() == Some(&crate::sync::delta::PAYLOAD_VERSION_CEK)
+                    {
+                        return Err(VauchiError::SendDeferred);
                     }
                     return Err(VauchiError::NotFound("ratchet state".into()));
                 }

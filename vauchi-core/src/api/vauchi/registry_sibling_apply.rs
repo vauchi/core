@@ -89,15 +89,24 @@ impl ProfileEngine {
         };
         let incoming =
             ActivationTracker::from_parts(outstanding, our_version_acked, peer_version_held);
-        let mut tracker = self
-            .storage
-            .registry_activation()
-            .load_activation(contact_id)?
-            .unwrap_or_default();
-        tracker.merge_snapshot(&incoming);
-        self.storage
-            .registry_activation()
-            .save_activation(contact_id, &tracker)
-            .map_err(|e| e.into())
+        self.storage.with_savepoint(|| {
+            let mut tracker = self
+                .storage
+                .registry_activation()
+                .load_activation(contact_id)?
+                .unwrap_or_default();
+            let was_active =
+                tracker.state() == crate::sync::registry_activation::ActivationState::Active;
+            tracker.merge_snapshot(&incoming);
+            self.storage
+                .registry_activation()
+                .save_activation(contact_id, &tracker)?;
+            if !was_active
+                && tracker.state() == crate::sync::registry_activation::ActivationState::Active
+            {
+                self.mark_own_card_repropagate()?;
+            }
+            Ok(())
+        })
     }
 }

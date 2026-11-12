@@ -4,8 +4,8 @@
 
 //! Performance threshold assertion tests.
 //!
-//! Enforces non-functional performance requirements from features/performance.feature.
-//! These tests ARE the implementation — they codify threshold assertions.
+//! Measures storage and cryptographic operations independently of application
+//! responsiveness, delivery, and memory requirements.
 
 use std::time::{Duration, Instant};
 use tempfile::NamedTempFile;
@@ -15,8 +15,7 @@ use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::storage::Storage;
 
 /// Encrypt 64KB payload in under 100ms.
-/// Traces to: features/performance.feature @resources
-// @scenario: performance :: Efficient cryptographic operations
+// @internal
 #[test]
 #[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_encryption_under_100ms() {
@@ -36,8 +35,7 @@ fn test_encryption_under_100ms() {
 }
 
 /// Decrypt 64KB payload in under 100ms.
-/// Traces to: features/performance.feature @resources
-// @scenario: performance :: Efficient cryptographic operations
+// @internal
 #[test]
 #[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_decryption_under_100ms() {
@@ -58,7 +56,6 @@ fn test_decryption_under_100ms() {
 }
 
 /// Search 1000 contacts via search_contacts() in under 50ms.
-/// Traces to: features/performance.feature @resources
 // @internal
 #[test]
 #[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
@@ -105,8 +102,7 @@ fn test_query_under_50ms_with_1000_contacts() {
 }
 
 /// Paginate 500 contacts in pages of 50 — each page under 100ms.
-/// Traces to: features/performance.feature @pagination
-// @scenario: performance :: Batch contact loading with pagination
+// @internal
 #[test]
 #[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_pagination_under_100ms_per_page() {
@@ -174,7 +170,6 @@ fn test_storage_open_under_500ms() {
 }
 
 /// List 1000 contacts from storage in under 500ms.
-/// Traces to: features/performance.feature @contacts @scale
 // @internal
 #[test]
 #[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
@@ -241,8 +236,7 @@ fn test_list_100_contacts_under_100ms() {
 }
 
 /// Queue and retrieve 100 pending updates under 2s.
-/// Traces to: features/performance.feature @sync
-// @scenario: performance :: Sync large batch of updates
+// @internal
 #[test]
 #[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_queue_100_pending_updates_under_2s() {
@@ -283,8 +277,7 @@ fn test_queue_100_pending_updates_under_2s() {
 }
 
 /// 10 sequential ratchet encrypt/decrypt roundtrips complete under 500ms.
-/// Traces to: features/performance.feature @stress
-// @scenario: performance :: Handle many simultaneous operations
+// @internal
 #[test]
 #[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_sequential_ratchet_operations() {

@@ -4,8 +4,7 @@
 
 //! Performance: Batch Sync Coalescing Tests
 //!
-//! Feature file: features/performance.feature @coalesce @batch-encrypt
-//! Tests for rapid edit coalescing and batch encryption pipelines.
+//! Tests for the explicit coalescing API and standalone encryption batches.
 
 use vauchi_core::SyncManager;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
@@ -33,7 +32,7 @@ fn first_field_id(card: &ContactCard) -> String {
 // ============================================================
 // ============================================================
 
-// @scenario: performance :: Coalesce rapid edits before sync
+// @internal
 #[test]
 fn test_rapid_edits_coalesce_into_single_sync_payload() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -79,7 +78,7 @@ fn test_rapid_edits_coalesce_into_single_sync_payload() {
     );
 }
 
-// @scenario: performance :: Coalesce rapid edits before sync
+// @internal
 #[test]
 fn test_coalesce_preserves_final_state() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -125,7 +124,7 @@ fn test_coalesce_preserves_final_state() {
     );
 }
 
-// @scenario: performance :: Coalesce rapid edits before sync
+// @internal
 #[test]
 fn test_coalesce_skips_when_single_update() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -152,7 +151,7 @@ fn test_coalesce_skips_when_single_update() {
 // ============================================================
 // ============================================================
 
-// @scenario: performance :: Batch encryption for multi-contact sync
+// @internal
 #[test]
 fn test_batch_encryption_50_contacts() {
     use vauchi_core::crypto::{SymmetricKey, encrypt};
@@ -177,7 +176,7 @@ fn test_batch_encryption_50_contacts() {
     );
 }
 
-// @scenario: performance :: Batch encryption for multi-contact sync
+// @internal
 #[test]
 fn test_batch_sync_multiple_contacts_pending() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -208,7 +207,7 @@ fn test_batch_sync_multiple_contacts_pending() {
     );
 }
 
-// @scenario: performance :: Coalesce rapid edits before sync
+// @internal
 #[test]
 fn test_coalesce_does_not_affect_other_update_types() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();

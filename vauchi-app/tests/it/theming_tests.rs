@@ -5,14 +5,13 @@
 //! Theming Tests
 //!
 //! Tests for theme system functionality including preview, system integration,
-//! accent color customization, remote updates, and QR code consistency.
+//! remote updates, and QR code consistency.
 //!
 //! Feature file: features/theming.feature
 //!
 //! These tests verify:
 //! - Theme preview before applying (@selection)
 //! - System dark mode following (@system)
-//! - Accent color customization (@accent)
 //! - Remote theme updates (@remote)
 //! - QR code theming consistency (@qr)
 
@@ -23,7 +22,7 @@ use tempfile::TempDir;
 use vauchi_app::content::{
     ContentCache, ContentConfig, ContentManager, ContentType, compute_checksum,
 };
-use vauchi_app::theme::{Theme, ThemeError, ThemeMode, validate_hex_color};
+use vauchi_app::theme::{Theme, ThemeError, ThemeMode};
 
 // ============================================================
 // Feature: theming.feature @selection
@@ -318,187 +317,6 @@ fn test_force_light_preference() {
     let theme = resolver.resolve(false).expect("Should resolve theme");
     assert_eq!(theme.mode, ThemeMode::Light);
     assert_eq!(theme.id, "gruvbox-light");
-}
-
-// ============================================================
-// Feature: theming.feature @accent
-// Scenario: Choose accent color within theme
-// ============================================================
-
-/// Available accent colors for Catppuccin themes
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
-enum CatppuccinAccent {
-    Rosewater,
-    Flamingo,
-    Pink,
-    Mauve,
-    Red,
-    Maroon,
-    Peach,
-    Yellow,
-    Green,
-    Teal,
-    Sky,
-    Sapphire,
-    Blue,
-    Lavender,
-}
-
-impl CatppuccinAccent {
-    /// Get hex color for this accent in Mocha palette
-    fn mocha_hex(&self) -> &'static str {
-        match self {
-            CatppuccinAccent::Rosewater => "#f5e0dc",
-            CatppuccinAccent::Flamingo => "#f2cdcd",
-            CatppuccinAccent::Pink => "#f5c2e7",
-            CatppuccinAccent::Mauve => "#cba6f7",
-            CatppuccinAccent::Red => "#f38ba8",
-            CatppuccinAccent::Maroon => "#eba0ac",
-            CatppuccinAccent::Peach => "#fab387",
-            CatppuccinAccent::Yellow => "#f9e2af",
-            CatppuccinAccent::Green => "#a6e3a1",
-            CatppuccinAccent::Teal => "#94e2d5",
-            CatppuccinAccent::Sky => "#89dceb",
-            CatppuccinAccent::Sapphire => "#74c7ec",
-            CatppuccinAccent::Blue => "#89b4fa",
-            CatppuccinAccent::Lavender => "#b4befe",
-        }
-    }
-
-    /// Get all available accents
-    fn all() -> Vec<CatppuccinAccent> {
-        vec![
-            CatppuccinAccent::Rosewater,
-            CatppuccinAccent::Flamingo,
-            CatppuccinAccent::Pink,
-            CatppuccinAccent::Mauve,
-            CatppuccinAccent::Red,
-            CatppuccinAccent::Maroon,
-            CatppuccinAccent::Peach,
-            CatppuccinAccent::Yellow,
-            CatppuccinAccent::Green,
-            CatppuccinAccent::Teal,
-            CatppuccinAccent::Sky,
-            CatppuccinAccent::Sapphire,
-            CatppuccinAccent::Blue,
-            CatppuccinAccent::Lavender,
-        ]
-    }
-}
-
-/// Customized theme with user-selected accent
-struct CustomizedTheme {
-    base_theme: Theme,
-    custom_accent: Option<String>,
-}
-
-impl CustomizedTheme {
-    fn new(base: Theme) -> Self {
-        CustomizedTheme {
-            base_theme: base,
-            custom_accent: None,
-        }
-    }
-
-    fn with_accent(mut self, accent_hex: &str) -> Result<Self, ThemeError> {
-        validate_hex_color(accent_hex)?;
-        self.custom_accent = Some(accent_hex.to_string());
-        Ok(self)
-    }
-
-    fn effective_accent(&self) -> &str {
-        self.custom_accent
-            .as_deref()
-            .unwrap_or(&self.base_theme.colors.accent)
-    }
-}
-
-/// Test: User-defined accent colors
-/// Feature: theming.feature @accent @future
-/// Scenario: Choose accent color within theme
-// @scenario: theming :: Choose accent color within theme
-#[test]
-fn test_accent_color_customization() {
-    // Given the user has selected "Catppuccin Mocha" theme
-    let base = theme_by_id("catppuccin-mocha").unwrap();
-    let default_accent = base.colors.accent.clone();
-
-    assert_eq!(default_accent, "#89b4fa");
-
-    // When the user selects "mauve" accent
-    let customized = CustomizedTheme::new(base.clone())
-        .with_accent(CatppuccinAccent::Mauve.mocha_hex())
-        .unwrap();
-
-    assert_eq!(customized.effective_accent(), "#cba6f7");
-
-    // The base theme accent is unchanged
-    assert_eq!(base.colors.accent, "#89b4fa");
-}
-
-/// Test: All Catppuccin accent colors are valid hex
-/// Feature: theming.feature @accent
-// @scenario: theming :: Choose accent color within theme
-#[test]
-fn test_catppuccin_accents_valid_hex() {
-    for accent in CatppuccinAccent::all() {
-        let hex = accent.mocha_hex();
-        assert!(
-            validate_hex_color(hex).is_ok(),
-            "Accent {:?} should have valid hex: {}",
-            accent,
-            hex
-        );
-    }
-}
-
-/// Test: Invalid accent color is rejected
-/// Feature: theming.feature @accent
-// @scenario: theming :: Choose accent color within theme
-#[test]
-fn test_invalid_accent_rejected() {
-    let Some(_themes) = try_all_themes() else {
-        eprintln!("SKIP: themes/generated/themes.json not found");
-        return;
-    };
-    let base = theme_by_id("default-dark").unwrap();
-    let customized = CustomizedTheme::new(base);
-
-    assert!(
-        customized.with_accent("not-a-color").is_err(),
-        "expected error"
-    );
-}
-
-/// Test: Custom accent persists (simulation)
-/// Feature: theming.feature @accent @future
-/// Scenario: Custom accent color persists
-// @scenario: theming :: Custom accent color persists
-#[test]
-fn test_custom_accent_persists() {
-    // Simulate persistence by creating a settings struct
-    #[derive(Debug, Clone)]
-    struct ThemeSettings {
-        theme_id: String,
-        custom_accent: Option<String>,
-    }
-
-    // Given the user has selected "Catppuccin Mocha" with "mauve" accent
-    let settings = ThemeSettings {
-        theme_id: "catppuccin-mocha".to_string(),
-        custom_accent: Some(CatppuccinAccent::Mauve.mocha_hex().to_string()),
-    };
-
-    // Simulate app restart by recreating from settings
-    let base = theme_by_id(&settings.theme_id).unwrap();
-    let restored = if let Some(accent) = &settings.custom_accent {
-        CustomizedTheme::new(base).with_accent(accent).unwrap()
-    } else {
-        CustomizedTheme::new(base)
-    };
-
-    assert_eq!(restored.effective_accent(), "#cba6f7");
 }
 
 // ============================================================

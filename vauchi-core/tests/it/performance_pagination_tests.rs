@@ -4,8 +4,7 @@
 
 //! Performance: Pagination and Search Tests
 //!
-//! Feature file: features/performance.feature @pagination @search
-//! Tests for paginated contact listing and SQL-level search.
+//! Tests for paginated contact listing and contact search results.
 
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
@@ -40,7 +39,7 @@ fn populate_contacts(storage: &Storage, count: usize) {
 // ============================================================
 // ============================================================
 
-// @scenario: performance :: Batch contact loading with pagination
+// @internal
 #[test]
 fn test_list_contacts_paginated_returns_correct_subset() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -61,7 +60,7 @@ fn test_list_contacts_paginated_returns_correct_subset() {
     }
 }
 
-// @scenario: performance :: Batch contact loading with pagination
+// @internal
 // @scenario: contacts_management :: Sort contacts alphabetically
 #[test]
 fn test_list_contacts_paginated_respects_ordering() {
@@ -77,7 +76,7 @@ fn test_list_contacts_paginated_respects_ordering() {
     }
 }
 
-// @scenario: performance :: Batch contact loading with pagination
+// @internal
 #[test]
 fn test_list_contacts_paginated_last_page_partial() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -88,7 +87,7 @@ fn test_list_contacts_paginated_last_page_partial() {
     assert_eq!(page.len(), 5, "Last page should have remaining contacts");
 }
 
-// @scenario: performance :: Batch contact loading with pagination
+// @internal
 #[test]
 fn test_list_contacts_paginated_beyond_range_returns_empty() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -98,7 +97,7 @@ fn test_list_contacts_paginated_beyond_range_returns_empty() {
     assert!(page.is_empty(), "Beyond-range offset should return empty");
 }
 
-// @scenario: performance :: Batch contact loading with pagination
+// @internal
 #[test]
 fn test_list_contacts_paginated_zero_limit_returns_empty() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -108,7 +107,7 @@ fn test_list_contacts_paginated_zero_limit_returns_empty() {
     assert!(page.is_empty(), "Zero limit should return empty");
 }
 
-// @scenario: performance :: Batch contact loading with pagination
+// @internal
 #[test]
 fn test_list_contacts_paginated_all_contacts_across_pages() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -219,7 +218,7 @@ fn test_search_contacts_with_1000_contacts() {
 // ============================================================
 // ============================================================
 
-// @scenario: performance :: Batch contact loading with pagination
+// @internal
 #[test]
 fn test_count_contacts_for_pagination() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();

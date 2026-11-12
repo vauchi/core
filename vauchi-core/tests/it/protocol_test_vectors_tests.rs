@@ -858,7 +858,11 @@ fn backup_v6_vector_imports_with_production_argon2id_and_refuses_a_wrong_passwor
     let identity = vauchi.identity().expect("restored identity");
     assert_eq!(hex::encode(identity.master_seed()), v.master_seed);
     assert_eq!(identity.display_name(), v.display_name);
-    assert_eq!(identity.device_index(), v.device_index);
+    assert_eq!(identity.device_info().device_name(), v.device_name);
+    super::protocol_test_vectors_backup_v7_tests::assert_restore_registered_a_fresh_device(
+        &vauchi,
+        v.device_index,
+    );
 }
 
 /// The v6 entry as the fixture holds it: the exporter writes v7 now, so a

@@ -190,5 +190,29 @@ fn backup_v7_vector_imports_with_production_argon2id_and_refuses_a_wrong_passwor
     let identity = vauchi.identity().expect("restored identity");
     assert_eq!(hex::encode(identity.master_seed()), v.master_seed);
     assert_eq!(identity.display_name(), v.display_name);
-    assert_eq!(identity.device_index(), v.device_index);
+    assert_eq!(identity.device_info().device_name(), v.device_name);
+    assert_restore_registered_a_fresh_device(&vauchi, v.device_index);
+}
+
+#[cfg(not(feature = "test-kdf"))]
+pub(crate) fn assert_restore_registered_a_fresh_device(vauchi: &Vauchi, backed_up_index: u32) {
+    let identity = vauchi.identity().expect("restored identity");
+    let backed_up_device = vauchi_core::identity::device::DeviceInfo::derive(
+        identity.master_seed(),
+        backed_up_index,
+        String::new(),
+        0,
+    );
+    assert_ne!(identity.device_id(), backed_up_device.device_id());
+    assert_eq!(identity.device_index() & 0x8000_0000, 0x8000_0000);
+    let registry = vauchi
+        .storage()
+        .device()
+        .load_device_registry()
+        .expect("registry storage")
+        .expect("restore persisted its registry");
+    assert_eq!(registry.active_count(), 1);
+    assert!(registry.find_device(identity.device_id()).is_some());
+    assert!(registry.find_device(backed_up_device.device_id()).is_none());
+    assert!(registry.verify(&identity.signing_keypair().public_key()));
 }

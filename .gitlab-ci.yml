@@ -39,7 +39,7 @@ include:
   - project: 'vauchi/scripts'
     # Pin the commit: ci-templates tags are protected and cut by the
     # maintainer; a SHA needs none (private#994).
-    ref: 090b737c79f25547e53f9b4fbcb8e1f3ad0ac068
+    ref: 05530a91e38a7ad2704c8cf0f3275c2cd89a122a
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -163,7 +163,9 @@ variables:
   # MUST match the include: ref above. The templates come from that ref and
   # the scripts this variable fetches at job runtime come from this one; two
   # different commits would mix template and script versions silently.
-  # Bumped 2026-11-02 to d17972a: .macos-runner targets nell's shell runner
+  # Bumped 2026-11-12 to 05530a9 (= ci-templates-v2026.11.17) in the VSP01
+  # freshness sweep (vauchi/private#1250).
+  # Previously 2026-11-02 to d17972a: .macos-runner targets nell's shell runner
   # by macos-host, the only macOS tag it still carries (vauchi/private#309).
   # Previously c695eab, a bump this history did not record; before that:
   # Bumped 2026-10-16 to 1e039df for the bounded compiler cache probe,
@@ -191,7 +193,7 @@ variables:
   # keeps the SHA form because tags here are not protected), the lint:typos
   # linux tag (vauchi/scripts!552) and retired_boundary_vocabulary
   # (vauchi/scripts!502).
-  VAUCHI_SCRIPTS_REF: "090b737c79f25547e53f9b4fbcb8e1f3ad0ac068"
+  VAUCHI_SCRIPTS_REF: "05530a91e38a7ad2704c8cf0f3275c2cd89a122a"
   # cargo audit runs with --deny warnings; every entry here is an
   # advisory with no fix available to us, not one we chose to skip.
   #   RUSTSEC-2026-0192  ttf-parser unmaintained, reached through

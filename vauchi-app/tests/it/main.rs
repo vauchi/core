@@ -250,6 +250,7 @@ mod navigate_to_tab_tests;
 mod notification_contract_tests;
 mod notification_emitter_tests;
 mod notification_proptest;
+mod offline_social_field_tests;
 mod onboarding_custom_group_tests;
 mod onboarding_flow_tests;
 mod onboarding_i18n_tests;

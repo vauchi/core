@@ -129,7 +129,6 @@ fn test_registry_add_and_remove() {
     assert!(registry.get("custom").is_none());
 }
 
-// @scenario: contact_card_management :: Use cached social network config when offline
 // @internal
 #[test]
 fn test_registry_json_serialization() {

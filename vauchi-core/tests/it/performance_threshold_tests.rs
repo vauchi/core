@@ -156,8 +156,7 @@ fn test_pagination_under_100ms_per_page() {
 }
 
 /// Open a file-based Storage in under 500ms.
-/// Traces to: features/performance.feature @startup
-// @scenario: performance :: Cold start time
+// @internal
 #[test]
 #[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_storage_open_under_500ms() {
@@ -208,9 +207,8 @@ fn test_list_1000_contacts_under_500ms() {
     );
 }
 
-/// List 100 contacts under 100ms — smooth UI scenario.
-/// Traces to: features/performance.feature @contacts @scale
-// @scenario: performance :: Handle 100 contacts smoothly
+/// List 100 contacts from storage in under 100ms.
+// @internal
 #[test]
 #[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_list_100_contacts_under_100ms() {

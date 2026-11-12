@@ -59,10 +59,6 @@ pub struct VauchiWorld {
     pub social_networks: vauchi_core::social::SocialNetworkRegistry,
     /// The OS language tag a shell would push at boot, once a step sets one.
     pub system_locale: Option<String>,
-    /// The content cache directory a scenario's content manager uses; kept
-    /// here so it lives as long as the scenario.
-    pub content_dir: Option<tempfile::TempDir>,
-    pub content_manager: Option<vauchi_app::content::ContentManager>,
 }
 
 impl std::fmt::Debug for VauchiWorld {
@@ -101,8 +97,6 @@ impl VauchiWorld {
             engine: None,
             social_networks: vauchi_core::social::SocialNetworkRegistry::with_defaults(),
             system_locale: None,
-            content_dir: None,
-            content_manager: None,
         }
     }
 
@@ -241,7 +235,7 @@ fn main() {
     // Four remaining no-op scenarios leave the run (#1237): Argon2 costs
     // are checked by a production-parameter vector test; unmeasured list,
     // search and query performance promises move to the private backlog.
-    const MIN_WIRED_SCENARIOS: usize = 117;
+    const MIN_WIRED_SCENARIOS: usize = 116;
     if scenarios.passed < MIN_WIRED_SCENARIOS {
         eprintln!(
             "cucumber GATE failed: {} wired scenario(s) passed, expected at least \

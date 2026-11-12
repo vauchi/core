@@ -190,7 +190,10 @@ impl Storage {
             legacy.convert_into(self, fields_key)?;
             return Ok(true);
         }
-        super::duress_content::insert_tables(&self.conn, tables)?;
+        let restore = self.conn.unchecked_transaction()?;
+        restore.execute_batch("PRAGMA defer_foreign_keys = ON")?;
+        super::duress_content::insert_tables(&restore, tables)?;
+        restore.commit()?;
         Ok(false)
     }
 

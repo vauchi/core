@@ -16,6 +16,7 @@ use vauchi_core::exchange::multistage::qr_codec::{
 use vauchi_core::exchange::multistage::session::{BOTH_LINGER, MultiStageSession};
 use vauchi_core::exchange::multistage::types::ProtocolState;
 use vauchi_core::monotonic::FakeMonotonicClock;
+use vauchi_core::{ContactCard, Identity};
 
 const TICK: Duration = Duration::from_millis(100);
 
@@ -27,9 +28,13 @@ struct Pair {
 
 fn pair() -> Pair {
     let clock = Arc::new(FakeMonotonicClock::new());
+    let alice = Identity::create("Alice (iPhone)", 0);
+    let bob = Identity::create("Bob (Pixel)", 0);
     Pair {
-        alice: MultiStageSession::new(b"Alice (iPhone)".to_vec()).with_monotonic(clock.clone()),
-        bob: MultiStageSession::new(b"Bob (Pixel)".to_vec()).with_monotonic(clock.clone()),
+        alice: MultiStageSession::for_identity(&alice, &ContactCard::new("Alice (iPhone)"), None)
+            .with_monotonic(clock.clone()),
+        bob: MultiStageSession::for_identity(&bob, &ContactCard::new("Bob (Pixel)"), None)
+            .with_monotonic(clock.clone()),
         clock,
     }
 }
@@ -393,19 +398,31 @@ fn a_finalized_session_that_has_not_saved_neither_shows_nor_obeys_both() {
     let mut p = both_saved_but_bob();
     let alice_done = next_ending_frame(&mut p.alice);
     p.bob.process_scanned_qr(&alice_done);
-    let alice_sid = parse_qr(&alice_done)
-        .expect("alice's frame parses")
-        .session_id()
-        .to_owned();
+    let Ok(StageQr::Done {
+        session_id,
+        reveal_key,
+        tag,
+    }) = parse_qr(&alice_done)
+    else {
+        panic!("saved Alice shows an authenticated DONE");
+    };
 
     p.bob
-        .process_scanned_qr(&format_both_qr(&alice_sid, &[1u8; 32], &[2u8; 32]));
+        .process_scanned_qr(&format_both_qr(&session_id, &reveal_key, &tag));
 
     let frame = next_ending_frame(&mut p.bob);
     assert!(
         frame.starts_with("CNF4"),
         "unsaved Bob showed {}",
         &frame[..4]
+    );
+
+    p.bob.mark_saved();
+    assert!(
+        p.bob
+            .get_display_qr()
+            .is_some_and(|q| q.data.starts_with("BTH4")),
+        "the authenticated BOTH received before saving must not stop Bob after saving"
     );
 }
 

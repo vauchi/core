@@ -240,9 +240,26 @@ impl ProfileEngine {
     /// acquired via exchange still reaches the user's other linked devices
     /// (2026-06-27-repeat-exchange-sync-propagation, journal gap).
     pub fn update_contact(&self, contact: &Contact) -> VauchiResult<()> {
+        if let Some(event) = self.persist_contact_upsert(contact)? {
+            self.events.dispatch(event);
+        }
+        Ok(())
+    }
+
+    pub(super) fn persist_contact_upsert(
+        &self,
+        contact: &Contact,
+    ) -> VauchiResult<Option<VauchiEvent>> {
         let manager = ContactManager::new(&self.storage, self.events.clone());
-        match manager.update_contact(contact) {
-            Ok(_) => Ok(()),
+        match manager.persist_contact_update(contact) {
+            Ok(changed_fields) => {
+                Ok(
+                    (!changed_fields.is_empty()).then(|| VauchiEvent::ContactUpdated {
+                        contact_id: contact.id().to_owned(),
+                        changed_fields,
+                    }),
+                )
+            }
             Err(VauchiError::ContactNotFound(_)) => {
                 if let Some(sync_data) = crate::sync::ContactSyncData::from_contact(contact) {
                     self.record_sync_item(crate::sync::SyncItem::ContactAdded {
@@ -251,11 +268,10 @@ impl ProfileEngine {
                     });
                 }
                 self.storage.contacts().save_contact(contact)?;
-                self.events.dispatch(VauchiEvent::contact_added(
+                Ok(Some(VauchiEvent::contact_added(
                     contact.id().to_string(),
                     EventOrigin::Local,
-                ));
-                Ok(())
+                )))
             }
             Err(e) => Err(e),
         }

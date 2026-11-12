@@ -13,6 +13,8 @@ use vauchi_core::exchange::multistage::qr_codec::{
 };
 use vauchi_core::exchange::multistage::session::MultiStageSession;
 use vauchi_core::exchange::multistage::types::ChunkBitmap;
+use vauchi_core::exchange::multistage::types::ProtocolState;
+use vauchi_core::{ContactCard, Identity};
 
 use proptest::prelude::*;
 
@@ -109,6 +111,50 @@ fn an_ack_on_a_frame_whose_chunk_does_not_decrypt_is_not_applied() {
     ));
 
     assert_eq!(chunks_shown(&mut ours), vec![0, 1, 2]);
+}
+
+// @internal
+#[test]
+fn an_unauthenticated_first_data_frame_cannot_poison_a_signed_exchange() {
+    for (total, foreign_sender) in [(0, false), (1, false), (9, false), (9, true)] {
+        let alice = Identity::create("Alice", 0);
+        let bob = Identity::create("Bob", 0);
+        let mut ours = MultiStageSession::for_identity(&alice, &ContactCard::new("Alice"), None);
+        let mut peer = MultiStageSession::for_identity(&bob, &ContactCard::new("Bob"), None);
+        let ours_init = ours.get_display_qr().unwrap();
+        let peer_init = peer.get_display_qr().unwrap();
+        ours.process_scanned_qr(&peer_init.data);
+        peer.process_scanned_qr(&ours_init.data);
+        let mut frame = genuine_frame(&mut peer);
+        assert_ne!(frame.chunk_total, total);
+        if foreign_sender {
+            frame.session_id[0] ^= 0x80;
+        }
+        let forged = format_data_qr(&frame.session_id, 0, total, &frame.ack, &frame.payload);
+        assert!(matches!(parse_qr(&forged), Ok(StageQr::Data { .. })));
+
+        ours.process_scanned_qr(&forged);
+        for _ in 0..1000 {
+            if let Some(qr) = ours.get_display_qr() {
+                peer.process_scanned_qr(&qr.data);
+            }
+            if let Some(qr) = peer.get_display_qr() {
+                ours.process_scanned_qr(&qr.data);
+            }
+            if ours.get_state() == ProtocolState::Finalized
+                && peer.get_state() == ProtocolState::Finalized
+            {
+                break;
+            }
+        }
+
+        assert_eq!(ours.get_state(), ProtocolState::Finalized, "total={total}");
+        assert_eq!(peer.get_state(), ProtocolState::Finalized, "total={total}");
+        assert_eq!(
+            ours.received_peer().unwrap().identity_pk,
+            *bob.signing_public_key()
+        );
+    }
 }
 
 /// The fields of one genuine DATA frame from `peer`.

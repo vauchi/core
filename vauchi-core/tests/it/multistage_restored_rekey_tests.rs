@@ -130,3 +130,137 @@ fn a_contact_not_waiting_for_a_rekey_is_saved_whole_before_the_peer_saved() {
         Some(*shared.as_bytes())
     );
 }
+
+fn reject_ratchet_writes(phone: &Vauchi) {
+    phone
+        .storage()
+        .connection()
+        .execute_batch(
+            "CREATE TEMP TRIGGER reject_exchange_ratchet BEFORE INSERT ON contact_ratchets
+             BEGIN SELECT RAISE(ABORT, 'forced exchange ratchet failure'); END;",
+        )
+        .unwrap();
+}
+
+// @internal
+#[test]
+fn a_failed_restored_exchange_ratchet_write_preserves_the_old_key_and_pending_rekey() {
+    let world = restored();
+    let old_key = shared_key_of(&world.phone, &world.dave_id);
+    let (dave, ratchet) = dave_met_in_person(&world);
+    world
+        .phone
+        .save_exchanged_contact_before_peer_saved(&dave, &ratchet, true)
+        .unwrap();
+    reject_ratchet_writes(&world.phone);
+
+    let error = world
+        .phone
+        .save_exchanged_contact(&dave, &ratchet, true)
+        .unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("forced exchange ratchet failure")
+    );
+    assert_eq!(shared_key_of(&world.phone, &world.dave_id), old_key);
+    assert!(
+        !world
+            .phone
+            .storage()
+            .recovery()
+            .rekey_met_again(&world.dave_id)
+            .unwrap(),
+        "failed adoption must leave the restored contact waiting"
+    );
+}
+
+// @internal
+#[test]
+fn retry_after_a_restored_exchange_ratchet_write_failure_installs_the_exchange_ratchet() {
+    let world = restored();
+    let (dave, ratchet) = dave_met_in_person(&world);
+    world
+        .phone
+        .save_exchanged_contact_before_peer_saved(&dave, &ratchet, true)
+        .unwrap();
+    reject_ratchet_writes(&world.phone);
+    assert!(
+        world
+            .phone
+            .save_exchanged_contact(&dave, &ratchet, true)
+            .is_err()
+    );
+    world
+        .phone
+        .storage()
+        .connection()
+        .execute_batch("DROP TRIGGER reject_exchange_ratchet")
+        .unwrap();
+
+    world
+        .phone
+        .save_exchanged_contact(&dave, &ratchet, true)
+        .unwrap();
+
+    let (stored_ratchet, initiator) = world
+        .phone
+        .storage()
+        .ratchets()
+        .load_ratchet_state(&world.dave_id)
+        .unwrap()
+        .expect("retry installs the exchange ratchet");
+    assert!(initiator);
+    assert_eq!(
+        serde_json::to_vec(&stored_ratchet.serialize()).unwrap(),
+        serde_json::to_vec(&ratchet.serialize()).unwrap()
+    );
+    assert_eq!(
+        shared_key_of(&world.phone, &world.dave_id),
+        dave.shared_key().map(|key| *key.as_bytes())
+    );
+}
+
+// @internal
+#[test]
+fn a_failed_exchange_commit_preserves_pending_rekey_and_allows_retry() {
+    let world = restored();
+    let old_key = shared_key_of(&world.phone, &world.dave_id);
+    let (dave, ratchet) = dave_met_in_person(&world);
+    world.phone.storage().arm_commit_fault();
+
+    assert!(
+        world
+            .phone
+            .save_exchanged_contact(&dave, &ratchet, true)
+            .is_err()
+    );
+
+    assert_eq!(shared_key_of(&world.phone, &world.dave_id), old_key);
+    assert!(
+        !world
+            .phone
+            .storage()
+            .recovery()
+            .rekey_met_again(&world.dave_id)
+            .unwrap()
+    );
+    world
+        .phone
+        .save_exchanged_contact(&dave, &ratchet, true)
+        .unwrap();
+    assert_eq!(
+        shared_key_of(&world.phone, &world.dave_id),
+        dave.shared_key().map(|key| *key.as_bytes())
+    );
+    assert!(
+        world
+            .phone
+            .storage()
+            .ratchets()
+            .load_ratchet_state(&world.dave_id)
+            .unwrap()
+            .is_some()
+    );
+}

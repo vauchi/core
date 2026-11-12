@@ -106,6 +106,158 @@ fn alice_with_an_app_password() -> OnDisk {
     disk
 }
 
+// @internal
+#[test]
+fn an_exchanged_mask_contact_and_ratchet_survive_reopening_without_another_write() {
+    let disk = alice_with_an_app_password();
+    let mut vauchi = disk.vauchi();
+    vauchi.authenticate("my-pin-1234").unwrap();
+    vauchi
+        .setup_duress_pin_with_biometric_unlock("654321")
+        .unwrap();
+    assert_eq!(
+        vauchi.authenticate("654321").unwrap(),
+        vauchi_core::api::AuthMode::Duress
+    );
+    let earlier = vauchi_core::Identity::create("Earlier contact", 0);
+    vauchi
+        .add_contact(vauchi_core::Contact::from_exchange(
+            *earlier.signing_public_key(),
+            ContactCard::new("Earlier contact"),
+            SymmetricKey::generate(),
+            0,
+        ))
+        .unwrap();
+    let bob = vauchi_core::Identity::create("Bob", 0);
+    let shared = SymmetricKey::generate();
+    let expected = *shared.as_bytes();
+    let (ratchet, _) = crate::common::helpers::setup_ratchets(&shared);
+    let contact = vauchi_core::Contact::from_exchange(
+        *bob.signing_public_key(),
+        ContactCard::new("Bob"),
+        shared,
+        0,
+    );
+    let contact_id = contact.id().to_owned();
+
+    vauchi
+        .save_exchanged_contact(&contact, &ratchet, true)
+        .unwrap();
+    drop(vauchi);
+
+    let mut reopened = disk.vauchi();
+    assert_eq!(
+        reopened.authenticate("654321").unwrap(),
+        vauchi_core::api::AuthMode::Duress
+    );
+    let persisted = reopened
+        .get_contact(&contact_id)
+        .unwrap()
+        .expect("exchange was sealed before success");
+    assert_eq!(persisted.display_name(), "Bob");
+    assert_eq!(persisted.shared_key().unwrap().as_bytes(), &expected);
+    let (stored_ratchet, initiator) = reopened
+        .storage()
+        .ratchets()
+        .load_ratchet_state(&contact_id)
+        .unwrap()
+        .expect("exchange ratchet was sealed");
+    assert!(initiator);
+    assert_eq!(
+        serde_json::to_vec(&stored_ratchet.serialize()).unwrap(),
+        serde_json::to_vec(&ratchet.serialize()).unwrap()
+    );
+}
+
+// @internal
+#[test]
+fn an_orphaned_mask_ratchet_is_rejected_without_rewriting_the_sealed_source() {
+    let disk = alice_with_an_app_password();
+    let mask_key = crate::common::helpers::duress_mask_key(&disk.key);
+    let mask = Storage::open_mask_profile(&disk.path, mask_key.clone()).unwrap();
+    let bob = vauchi_core::Identity::create("Bob", 0);
+    let shared = SymmetricKey::generate();
+    let contact = vauchi_core::Contact::from_exchange(
+        *bob.signing_public_key(),
+        ContactCard::new("Bob"),
+        shared.clone(),
+        0,
+    );
+    let contact_id = contact.id().to_owned();
+    let (ratchet, _) = crate::common::helpers::setup_ratchets(&shared);
+    mask.contacts().save_contact(&contact).unwrap();
+    mask.ratchets()
+        .save_ratchet_state(&contact_id, &ratchet, true)
+        .unwrap();
+    let sealed = || -> Vec<u8> {
+        rusqlite::Connection::open(&disk.path)
+            .unwrap()
+            .query_row(
+                "SELECT content_encrypted FROM duress_content WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap()
+    };
+    let valid_seal = sealed();
+    // Corrupt only this test-owned source; the production loader keeps FK validation enabled.
+    mask.connection()
+        .execute_batch("PRAGMA foreign_keys = OFF; DELETE FROM contacts; PRAGMA foreign_keys = ON;")
+        .unwrap();
+    let probe = vauchi_core::Identity::create("Probe", 0);
+    mask.contacts()
+        .save_contact(&vauchi_core::Contact::from_exchange(
+            *probe.signing_public_key(),
+            ContactCard::new("Probe"),
+            SymmetricKey::generate(),
+            0,
+        ))
+        .unwrap();
+    let invalid_seal = sealed();
+    assert!(invalid_seal != valid_seal);
+    drop(mask);
+
+    let Err(error) = Storage::open_mask_profile(&disk.path, mask_key.clone()) else {
+        panic!("orphaned ratchet must fail foreign-key validation");
+    };
+    assert!(
+        matches!(error, vauchi_core::storage::StorageError::Database(rusqlite::Error::SqliteFailure(error, _)) if error.extended_code == 787)
+    );
+    assert!(
+        sealed() == invalid_seal,
+        "failed loading must not rewrite its source"
+    );
+
+    rusqlite::Connection::open(&disk.path)
+        .unwrap()
+        .execute(
+            "UPDATE duress_content SET content_encrypted = ?1 WHERE id = 1",
+            [valid_seal],
+        )
+        .unwrap();
+    let restored = Storage::open_mask_profile(&disk.path, mask_key).unwrap();
+    let restored_contact = restored
+        .contacts()
+        .load_contact(&contact_id)
+        .unwrap()
+        .expect("restored parent contact");
+    assert_eq!(restored_contact.display_name(), "Bob");
+    assert_eq!(
+        restored_contact.shared_key().unwrap().as_bytes(),
+        shared.as_bytes()
+    );
+    let (restored_ratchet, initiator) = restored
+        .ratchets()
+        .load_ratchet_state(&contact_id)
+        .unwrap()
+        .expect("restored child ratchet");
+    assert!(initiator);
+    assert_eq!(
+        serde_json::to_vec(&restored_ratchet.serialize()).unwrap(),
+        serde_json::to_vec(&ratchet.serialize()).unwrap()
+    );
+}
+
 fn real_alert() -> EmergencyBroadcastConfig {
     EmergencyBroadcastConfig {
         trusted_contact_ids: vec!["bob".into()],
@@ -226,11 +378,15 @@ fn an_app_password_alone_gives_the_install_a_mask_seed() {
     assert!(vauchi.storage().mask_seed().load().unwrap().is_none());
 
     vauchi.setup_app_password("my-pin-1234").unwrap();
-    let seed = vauchi.storage().mask_seed().load().unwrap();
+    let seed = vauchi
+        .storage()
+        .mask_seed()
+        .load()
+        .unwrap()
+        .expect("app password creates its mask seed");
     drop(vauchi);
 
-    assert!(seed.is_some());
-    assert_eq!(disk.storage().mask_seed().load().unwrap(), seed);
+    assert_eq!(disk.storage().mask_seed().load().unwrap(), Some(seed));
 }
 
 // @scenario: duress_mode :: Decoy profile has separate database
@@ -274,8 +430,8 @@ fn an_upgraded_install_with_an_app_password_gets_a_mask_seed_on_open() {
     let first = disk.storage().mask_seed().load().unwrap();
     let second = disk.storage().mask_seed().load().unwrap();
 
-    assert!(first.is_some());
-    assert_eq!(first, second);
+    let first = first.expect("upgraded install creates its mask seed");
+    assert_eq!(Some(first), second);
 }
 
 // @scenario: duress_mode :: Decoy profile has separate database

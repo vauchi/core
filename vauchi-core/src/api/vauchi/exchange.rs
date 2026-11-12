@@ -11,6 +11,7 @@ use crate::exchange::{ExchangeEvent, ExchangeSession, ManualConfirmationVerifier
 
 use super::super::contact_manager::ContactManager;
 use super::super::error::{VauchiError, VauchiResult};
+use super::super::events::VauchiEvent;
 use super::ProfileEngine;
 
 /// Exchange QR data with expiration info.
@@ -92,6 +93,13 @@ impl ProfileEngine {
     /// blocked: the re-exchange is rejected before anything is written
     /// (ADR-056, #295), and the caller reports an ordinary failure.
     pub fn save_exchanged_card(&self, contact: &Contact) -> VauchiResult<()> {
+        if let Some(event) = self.persist_exchanged_card(contact)? {
+            self.events.dispatch(event);
+        }
+        Ok(())
+    }
+
+    fn persist_exchanged_card(&self, contact: &Contact) -> VauchiResult<Option<VauchiEvent>> {
         let blocked = self
             .storage
             .contacts()
@@ -100,7 +108,7 @@ impl ProfileEngine {
         if blocked {
             return Err(VauchiError::ContactBlocked(contact.id().to_string()));
         }
-        self.update_contact(contact)
+        self.persist_contact_upsert(contact)
     }
 
     /// Persist a contact established (or re-established) via an in-person
@@ -116,53 +124,67 @@ impl ProfileEngine {
     /// legacy-QR completion paths all route through here, so the policy
     /// lives in core, not per transport in the humble frontends
     /// (ADR-021/043).
+    /// Contact, rekey status, ratchet and queued bootstrap writes commit
+    /// together, so a failed write leaves the exchange safe to retry.
     pub fn save_exchanged_contact(
         &self,
         contact: &Contact,
         ratchet: &DoubleRatchetState,
         is_initiator: bool,
     ) -> VauchiResult<()> {
-        if let Some(mut stored) = self.storage.contacts().load_contact(contact.id())? {
-            stored.update_card(contact.card().clone(), self.clock.unix_seconds());
-            // The one exception to keeping the first exchange's keys: a
-            // contact restored from a guardian backup and waiting for its
-            // rekey has no relationship on this device, only an old shared
-            // key a thief may also hold; meeting it in person gives it one
-            // (vauchi/private#796, D20).
-            if !self.restored_waiting_for_rekey(contact.id())? {
-                return self.save_exchanged_card(&stored);
+        let mut first_contact_name = None;
+        let mut contact_event = None;
+        self.storage.with_transaction(|| -> VauchiResult<()> {
+            if let Some(mut stored) = self.storage.contacts().load_contact(contact.id())? {
+                stored.update_card(contact.card().clone(), self.clock.unix_seconds());
+                // The one exception to keeping the first exchange's keys: a
+                // contact restored from a guardian backup and waiting for its
+                // rekey has no relationship on this device, only an old shared
+                // key a thief may also hold; meeting it in person gives it one
+                // (vauchi/private#796, D20).
+                if !self.restored_waiting_for_rekey(contact.id())? {
+                    contact_event = self.persist_exchanged_card(&stored)?;
+                    return Ok(());
+                }
+                let shared = contact.shared_key().ok_or_else(|| {
+                    VauchiError::InvalidState("An exchanged contact has a shared key".into())
+                })?;
+                stored
+                    .adopt_exchange_shared_key(shared.clone(), self.clock.unix_seconds())
+                    .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+                contact_event = self.persist_exchanged_card(&stored)?;
+                self.storage.recovery().mark_rekey_met_again(contact.id())?;
+            } else {
+                contact_event = self.persist_exchanged_card(contact)?;
+                first_contact_name = Some(contact.card().display_name().to_owned());
             }
-            let shared = contact.shared_key().ok_or_else(|| {
-                VauchiError::InvalidState("An exchanged contact has a shared key".into())
-            })?;
-            stored
-                .adopt_exchange_shared_key(shared.clone(), self.clock.unix_seconds())
-                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-            self.save_exchanged_card(&stored)?;
-            self.storage.recovery().mark_rekey_met_again(contact.id())?;
-        } else {
-            self.save_exchanged_card(contact)?;
-            ContactManager::new(&self.storage, self.events.clone())
-                .trigger_first_contact_moment(contact.card().display_name());
+            self.save_exchange_ratchet(contact.id(), ratchet, is_initiator)?;
+            // Bootstrap card-update sync to the freshly-exchanged contact. The
+            // initiator's first send establishes the responder's Double-Ratchet
+            // sending chain — until the responder receives that message its
+            // `ratchet.encrypt` errors ("no sending chain (responder must receive
+            // first)"), so a responder that edits first can never propagate. Arming
+            // the durable marker makes the next sync repropagate to the new contact
+            // (a no-op for already-synced contacts, whose baseline is current); the
+            // responder's own send is retried by the marker until that first receive
+            // bootstraps its chain. The CLI does this via
+            // `queue_initial_card_for_contact`; the mobile exchange path omitted it,
+            // which silently broke device-to-device sync
+            // (2026-06-30 device root-cause; `2026-06-28-sync-delivery-sent-not-received`).
+            self.mark_own_card_repropagate()?;
+            // A guardian in a recovery meeting hands back as the exchange with
+            // the claim's new key completes (vauchi/private#796, D14); one that
+            // cannot send yet owes it to the next sync.
+            self.hand_back_owed()?;
+            Ok(())
+        })?;
+        if let Some(event) = contact_event {
+            self.events.dispatch(event);
         }
-        self.save_exchange_ratchet(contact.id(), ratchet, is_initiator)?;
-        // Bootstrap card-update sync to the freshly-exchanged contact. The
-        // initiator's first send establishes the responder's Double-Ratchet
-        // sending chain — until the responder receives that message its
-        // `ratchet.encrypt` errors ("no sending chain (responder must receive
-        // first)"), so a responder that edits first can never propagate. Arming
-        // the durable marker makes the next sync repropagate to the new contact
-        // (a no-op for already-synced contacts, whose baseline is current); the
-        // responder's own send is retried by the marker until that first receive
-        // bootstraps its chain. The CLI does this via
-        // `queue_initial_card_for_contact`; the mobile exchange path omitted it,
-        // which silently broke device-to-device sync
-        // (2026-06-30 device root-cause; `2026-06-28-sync-delivery-sent-not-received`).
-        self.mark_own_card_repropagate()?;
-        // A guardian in a recovery meeting hands back as the exchange with
-        // the claim's new key completes (vauchi/private#796, D14); one that
-        // cannot send yet owes it to the next sync.
-        self.hand_back_owed()?;
+        if let Some(name) = first_contact_name {
+            ContactManager::new(&self.storage, self.events.clone())
+                .trigger_first_contact_moment(&name);
+        }
         Ok(())
     }
 

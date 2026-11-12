@@ -1565,6 +1565,19 @@ impl MultiStageSession {
             self.note_dropped_frame("DATA", "wrong-state");
             return self.state.clone();
         }
+        if self.peer_session_id != Some(frame_session_id) {
+            self.note_dropped_frame("DATA", "wrong-peer");
+            return self.state.clone();
+        }
+        if chunk_total == 0
+            || chunk_idx >= chunk_total
+            || self
+                .peer_chunks_total
+                .is_some_and(|total| total != chunk_total)
+        {
+            self.note_dropped_frame("DATA", "invalid-chunk-range");
+            return self.state.clone();
+        }
 
         let transport_key = match &self.transport_key {
             Some(k) => *k,
@@ -1573,12 +1586,6 @@ impl MultiStageSession {
                 return self.state.clone();
             }
         };
-
-        if self.inbound_buffer.is_none() {
-            self.inbound_buffer = Some(ReassemblyBuffer::new(chunk_total));
-            self.inbound_bitmap = Some(ChunkBitmap::new(chunk_total));
-            self.peer_chunks_total = Some(chunk_total);
-        }
 
         // Transport-decrypt the chunk. On AEAD failure or malformed
         // ciphertext, increment `transport_decrypt_failures` so callers can
@@ -1589,6 +1596,11 @@ impl MultiStageSession {
         let ad = data_frame_ad(&frame_session_id, chunk_idx, chunk_total, &ack_bitmap_bytes);
         match self.transport_decrypt(&transport_key, &ad, &encrypted_payload) {
             Ok(decrypted) => {
+                if self.inbound_buffer.is_none() {
+                    self.inbound_buffer = Some(ReassemblyBuffer::new(chunk_total));
+                    self.inbound_bitmap = Some(ChunkBitmap::new(chunk_total));
+                    self.peer_chunks_total = Some(chunk_total);
+                }
                 if let Some(ref mut buffer) = self.inbound_buffer {
                     buffer.insert(chunk_idx, decrypted);
                 }

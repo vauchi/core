@@ -7,8 +7,11 @@
 //! These tests simulate real device exchange flows including edge cases
 //! like abort, duplicate scans, invalid data, and various payload sizes.
 
+use std::sync::Arc;
+use std::time::Duration;
 use vauchi_core::exchange::multistage::session::MultiStageSession;
 use vauchi_core::exchange::multistage::types::ProtocolState;
+use vauchi_core::monotonic::{FakeMonotonicClock, MonotonicClock, SystemMonotonicClock};
 
 /// Helper: run a full exchange between two sessions.
 ///
@@ -18,8 +21,16 @@ fn run_full_exchange(
     alice_card: Vec<u8>,
     bob_card: Vec<u8>,
 ) -> (MultiStageSession, MultiStageSession) {
-    let mut alice = MultiStageSession::new(alice_card);
-    let mut bob = MultiStageSession::new(bob_card);
+    run_full_exchange_with_clock(alice_card, bob_card, SystemMonotonicClock::shared())
+}
+
+fn run_full_exchange_with_clock(
+    alice_card: Vec<u8>,
+    bob_card: Vec<u8>,
+    clock: Arc<dyn MonotonicClock>,
+) -> (MultiStageSession, MultiStageSession) {
+    let mut alice = MultiStageSession::new(alice_card).with_monotonic(clock.clone());
+    let mut bob = MultiStageSession::new(bob_card).with_monotonic(clock);
 
     // Stage 1: INIT — both advertise, then scan each other
     let ai = alice.get_display_qr().unwrap();
@@ -326,7 +337,9 @@ fn test_e2e_invalid_qr_during_transfer_ignored() {
 // @internal
 #[test]
 fn test_e2e_grace_period_keeps_showing_the_final_frame() {
-    let (mut alice, mut bob) = run_full_exchange(b"Alice".to_vec(), b"Bob".to_vec());
+    let clock = Arc::new(FakeMonotonicClock::new());
+    let (mut alice, mut bob) =
+        run_full_exchange_with_clock(b"Alice".to_vec(), b"Bob".to_vec(), clock.clone());
 
     assert_eq!(alice.get_state(), ProtocolState::Finalized);
     assert_eq!(bob.get_state(), ProtocolState::Finalized);
@@ -348,8 +361,7 @@ fn test_e2e_grace_period_keeps_showing_the_final_frame() {
         "Grace period must keep showing the final frame so the peer can finalize"
     );
 
-    // Verify QRs are still produced after a short delay (still within grace).
-    std::thread::sleep(std::time::Duration::from_secs(1));
+    clock.advance(Duration::from_secs(1));
     assert!(
         bob.get_display_qr().is_some(),
         "Grace period should still be active after 1s"
@@ -358,14 +370,14 @@ fn test_e2e_grace_period_keeps_showing_the_final_frame() {
 
 // @internal
 #[test]
-#[ignore] // Wall-clock test: takes 61s. Run with `cargo test -- --ignored`.
 fn test_e2e_grace_period_expires() {
-    let (mut alice, mut bob) = run_full_exchange(b"Alice".to_vec(), b"Bob".to_vec());
+    let clock = Arc::new(FakeMonotonicClock::new());
+    let (mut alice, mut bob) =
+        run_full_exchange_with_clock(b"Alice".to_vec(), b"Bob".to_vec(), clock.clone());
 
     assert_eq!(alice.get_state(), ProtocolState::Finalized);
 
-    // FINALIZED_GRACE_DURATION = 60s — sleep past it.
-    std::thread::sleep(std::time::Duration::from_secs(61));
+    clock.advance(Duration::from_secs(61));
     assert!(
         alice.get_display_qr().is_none(),
         "QRs should stop after grace period"

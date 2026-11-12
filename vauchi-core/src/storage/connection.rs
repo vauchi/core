@@ -234,6 +234,28 @@ impl Storage {
         let _ = self.conn.execute_batch("ROLLBACK");
     }
 
+    /// Owns a write transaction, or a savepoint when the caller already owns one.
+    pub(crate) fn with_transaction<T, E>(
+        &self,
+        operation: impl FnOnce() -> Result<T, E>,
+    ) -> Result<T, E>
+    where
+        E: From<StorageError>,
+    {
+        if !self.conn.is_autocommit() {
+            return self.with_savepoint(operation);
+        }
+        self.begin_transaction().map_err(E::from)?;
+        let result = operation().and_then(|value| {
+            self.commit().map_err(E::from)?;
+            Ok(value)
+        });
+        if result.is_err() {
+            self.rollback();
+        }
+        result
+    }
+
     /// Runs a fallible operation inside a nestable SQLite savepoint.
     pub(crate) fn with_savepoint<T, E>(
         &self,

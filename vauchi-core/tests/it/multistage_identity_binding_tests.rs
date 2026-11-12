@@ -197,6 +197,24 @@ fn bobs_frames_recorded_in_an_exchange_with_mallory_and_replayed_to_alice_never_
         ProtocolState::Finalized,
         "the recording is complete"
     );
+    assert_eq!(m.get_state(), ProtocolState::Finalized);
+    b.mark_saved();
+    m.mark_saved();
+    let bob_done = (0..50)
+        .filter_map(|_| b.get_display_qr())
+        .find(|q| q.data.starts_with("DON4"))
+        .expect("saved Bob emits a genuine DONE");
+    recorded.push(bob_done.data);
+    let mallory_done = (0..50)
+        .filter_map(|_| m.get_display_qr())
+        .find(|q| q.data.starts_with("DON4"))
+        .expect("saved Mallory emits a genuine DONE");
+    b.process_scanned_qr(&mallory_done.data);
+    let bob_both = b
+        .get_display_qr()
+        .expect("Bob lingers after verifying Mallory's save");
+    assert!(bob_both.data.starts_with("BTH4"));
+    recorded.push(bob_both.data);
     let alice = Identity::create("Alice", 0);
     let mut a = MultiStageSession::for_identity(&alice, &card("Alice", "a@a.example"), None);
     a.get_display_qr();

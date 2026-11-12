@@ -44,6 +44,91 @@ fn contact_events(events: &[VauchiEvent]) -> Vec<&VauchiEvent> {
         .collect()
 }
 
+// @internal
+#[test]
+fn a_failed_exchange_emits_no_contact_event_and_retry_emits_exactly_one() {
+    for restored in [false, true] {
+        let alice = create_vauchi_with_card("Alice", vec![]);
+        let bob = create_vauchi_with_card("Bob", vec![]);
+        let bob_pk = *bob.identity().unwrap().signing_public_key();
+        let shared = SymmetricKey::generate();
+        let (ratchet, _) = setup_ratchets(&shared);
+        let contact = Contact::from_exchange(bob_pk, bob.own_card().unwrap().unwrap(), shared, 0);
+        if restored {
+            let old = Contact::from_exchange(
+                bob_pk,
+                vauchi_core::ContactCard::new("Bob before meeting"),
+                SymmetricKey::generate(),
+                0,
+            );
+            alice.storage().contacts().save_contact(&old).unwrap();
+            alice
+                .storage()
+                .recovery()
+                .mark_rekey_pending(contact.id())
+                .unwrap();
+        }
+        let events = capture_events(&alice);
+        alice
+            .storage()
+            .connection()
+            .execute_batch(
+                "CREATE TEMP TRIGGER reject_exchange_ratchet BEFORE INSERT ON contact_ratchets
+             BEGIN SELECT RAISE(ABORT, 'forced exchange ratchet failure'); END;",
+            )
+            .unwrap();
+
+        assert!(
+            alice
+                .save_exchanged_contact(&contact, &ratchet, true)
+                .is_err()
+        );
+
+        {
+            let captured = events.lock().unwrap();
+            assert!(contact_events(&captured).is_empty(), "restored={restored}");
+            assert!(
+                !captured
+                    .iter()
+                    .any(|event| matches!(event, VauchiEvent::AhaMomentTriggered { .. })),
+                "a failed exchange must not announce its first-contact milestone"
+            );
+        }
+        alice
+            .storage()
+            .connection()
+            .execute_batch("DROP TRIGGER reject_exchange_ratchet")
+            .unwrap();
+
+        alice
+            .save_exchanged_contact(&contact, &ratchet, true)
+            .unwrap();
+
+        let captured = events.lock().unwrap();
+        let mutations = contact_events(&captured);
+        assert_eq!(mutations.len(), 1, "restored={restored}");
+        assert!(if restored {
+            matches!(mutations[0], VauchiEvent::ContactUpdated { .. })
+        } else {
+            matches!(
+                mutations[0],
+                VauchiEvent::ContactAdded {
+                    origin: EventOrigin::Local,
+                    ..
+                }
+            )
+        });
+        assert!(
+            alice
+                .storage()
+                .ratchets()
+                .load_ratchet_state(contact.id())
+                .unwrap()
+                .is_some()
+        );
+    }
+}
+
 /// A first exchange persists a NEW contact → exactly one
 /// `ContactAdded { origin: Local }` so `affected_screens` invalidates the
 /// contacts list. RED while `Vauchi::update_contact` is a bare save.

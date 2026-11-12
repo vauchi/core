@@ -35,6 +35,10 @@ fn own_qr_data(engine: &AppEngine) -> Option<String> {
 fn engine_on_hover(name: &str, clock: Arc<dyn Clock>) -> AppEngine {
     let mut vauchi = Vauchi::in_memory_with_clock(clock).expect("in-memory Vauchi");
     vauchi.create_identity(name).expect("identity");
+    engine_on_hover_with_profile(vauchi)
+}
+
+fn engine_on_hover_with_profile(vauchi: Vauchi) -> AppEngine {
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::Exchange);
     let _ = engine.handle_action(UserAction::ListItemSelected {
@@ -46,7 +50,7 @@ fn engine_on_hover(name: &str, clock: Arc<dyn Clock>) -> AppEngine {
             engine.current_app_screen(),
             AppScreen::MultiStageExchange { .. }
         ),
-        "{name}: Hover must land on MultiStageExchange, got {:?}",
+        "Hover must land on MultiStageExchange, got {:?}",
         engine.current_app_screen()
     );
     engine
@@ -56,6 +60,195 @@ fn engine_on_hover(name: &str, clock: Arc<dyn Clock>) -> AppEngine {
 fn scan_into(engine: &mut AppEngine, qr: String) {
     let event = engine.forward_multi_stage_hardware_event(&Event::QrScanned { data: qr });
     engine.apply_multi_stage_event(event);
+}
+
+fn reveal_without_confirmation(qr: String) -> Option<String> {
+    use vauchi_core::exchange::multistage::qr_codec::{StageQr, format_reveal_qr, parse_qr};
+    match parse_qr(&qr).unwrap() {
+        StageQr::Final {
+            session_id,
+            reveal_key,
+            ..
+        }
+        | StageQr::Done {
+            session_id,
+            reveal_key,
+            ..
+        } => Some(format_reveal_qr(&session_id, &reveal_key)),
+        StageQr::Both { .. } => None,
+        _ => Some(qr),
+    }
+}
+
+fn finalize_alice_before_bob(
+    alice: &mut AppEngine,
+    bob: &mut AppEngine,
+    fake_a: &FakeClock,
+    fake_b: &FakeClock,
+    bob_id: &str,
+) {
+    for _ in 0..600 {
+        alice.poll_notifications();
+        bob.poll_notifications();
+        let a_qr = own_qr_data(alice).and_then(reveal_without_confirmation);
+        let b_qr = own_qr_data(bob);
+        if let Some(frame) = b_qr {
+            scan_into(alice, frame);
+        }
+        if let Some(frame) = a_qr {
+            scan_into(bob, frame);
+        }
+        if alice
+            .vauchi()
+            .get_contact(bob_id)
+            .unwrap()
+            .unwrap()
+            .display_name()
+            == "Bob"
+        {
+            return;
+        }
+        fake_a.advance(Duration::from_millis(500));
+        fake_b.advance(Duration::from_millis(500));
+    }
+    panic!("Alice did not finalize while Bob was waiting for her confirmation");
+}
+
+// @internal
+#[test]
+fn a_restored_contact_retries_ratchet_adoption_after_an_authenticated_peer_save() {
+    let start = SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+    let fake_a = Arc::new(FakeClock::new(start));
+    let fake_b = Arc::new(FakeClock::new(start));
+    let mut bob = engine_on_hover("Bob", fake_b.clone());
+    let bob_pk = *bob.vauchi().identity().unwrap().signing_public_key();
+    let old_key = vauchi_core::SymmetricKey::generate();
+    let old_bytes = *old_key.as_bytes();
+    let mut profile = Vauchi::in_memory_with_clock(fake_a.clone()).unwrap();
+    profile.create_identity("Alice").unwrap();
+    let alice_pk = *profile.identity().unwrap().signing_public_key();
+    let restored = vauchi_core::Contact::from_exchange(
+        bob_pk,
+        vauchi_core::ContactCard::new("Bob before meeting"),
+        old_key,
+        0,
+    );
+    let bob_id = restored.id().to_owned();
+    profile
+        .storage()
+        .contacts()
+        .save_contact(&restored)
+        .unwrap();
+    profile
+        .storage()
+        .recovery()
+        .mark_rekey_pending(&bob_id)
+        .unwrap();
+    let mut alice = engine_on_hover_with_profile(profile);
+    finalize_alice_before_bob(&mut alice, &mut bob, &fake_a, &fake_b, &bob_id);
+    assert_eq!(
+        alice
+            .vauchi()
+            .get_contact(&bob_id)
+            .unwrap()
+            .unwrap()
+            .shared_key()
+            .unwrap()
+            .as_bytes(),
+        &old_bytes
+    );
+    assert!(
+        !alice
+            .vauchi()
+            .storage()
+            .recovery()
+            .rekey_met_again(&bob_id)
+            .unwrap()
+    );
+    assert!(bob.vauchi().list_contacts().unwrap().is_empty());
+    alice
+        .vauchi()
+        .storage()
+        .connection()
+        .execute_batch(
+            "CREATE TEMP TRIGGER reject_exchange_ratchet BEFORE INSERT ON contact_ratchets
+         BEGIN SELECT RAISE(ABORT, 'forced exchange ratchet failure'); END;",
+        )
+        .unwrap();
+    let mut authenticated_ending = false;
+
+    for _ in 0..600 {
+        alice.poll_notifications();
+        bob.poll_notifications();
+        let a_qr = own_qr_data(&alice);
+        let b_qr = own_qr_data(&bob);
+        if let Some(frame) = b_qr {
+            authenticated_ending = frame.starts_with("DON4") || frame.starts_with("BTH4");
+            scan_into(&mut alice, frame);
+        }
+        if let Some(frame) = a_qr {
+            scan_into(&mut bob, frame);
+        }
+        alice.poll_notifications();
+        if authenticated_ending {
+            break;
+        }
+        fake_a.advance(Duration::from_millis(500));
+        fake_b.advance(Duration::from_millis(500));
+    }
+    assert!(
+        authenticated_ending,
+        "Bob saved and sent an authenticated ending"
+    );
+    let still_old = alice.vauchi().get_contact(&bob_id).unwrap().unwrap();
+    assert_eq!(still_old.shared_key().unwrap().as_bytes(), &old_bytes);
+    assert!(
+        !alice
+            .vauchi()
+            .storage()
+            .recovery()
+            .rekey_met_again(&bob_id)
+            .unwrap()
+    );
+
+    alice
+        .vauchi()
+        .storage()
+        .connection()
+        .execute_batch("DROP TRIGGER reject_exchange_ratchet")
+        .unwrap();
+    alice.poll_notifications();
+
+    let adopted = alice.vauchi().get_contact(&bob_id).unwrap().unwrap();
+    let bob_view = bob
+        .vauchi()
+        .get_contact(&hex::encode(alice_pk))
+        .unwrap()
+        .unwrap();
+    assert_ne!(adopted.shared_key().unwrap().as_bytes(), &old_bytes);
+    assert_eq!(
+        adopted.shared_key().unwrap().as_bytes(),
+        bob_view.shared_key().unwrap().as_bytes()
+    );
+    assert!(
+        alice
+            .vauchi()
+            .storage()
+            .recovery()
+            .rekey_met_again(&bob_id)
+            .unwrap()
+    );
+    let (_, initiator) = alice
+        .vauchi()
+        .storage()
+        .ratchets()
+        .load_ratchet_state(&bob_id)
+        .unwrap()
+        .expect("retry persisted its ratchet");
+    assert_eq!(
+        initiator,
+        vauchi_core::exchange::key_order::is_initiator(&alice_pk, &bob_pk)
+    );
 }
 
 // P3: a multi-stage exchange persists both contacts as reciprocity Pending —

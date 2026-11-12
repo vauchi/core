@@ -337,6 +337,32 @@ fn first_exchange_journals_contact_added_for_linked_devices() {
     let bob_at_alice = Contact::from_exchange(bob_pk, bob_card, secret, 0);
     let bob_id = bob_at_alice.id().to_string();
     alice
+        .storage()
+        .connection()
+        .execute_batch(
+            "CREATE TEMP TRIGGER reject_exchange_ratchet BEFORE INSERT ON contact_ratchets
+         BEGIN SELECT RAISE(ABORT, 'forced exchange ratchet failure'); END;",
+        )
+        .unwrap();
+    assert!(
+        alice
+            .save_exchanged_contact(&bob_at_alice, &a_rat, true)
+            .is_err()
+    );
+    let device_info = alice.identity().unwrap().create_device_info(0);
+    let rolled_back =
+        DeviceSyncOrchestrator::load(alice.storage(), device_info, registry.clone()).unwrap();
+    assert!(
+        rolled_back.devices_with_pending().is_empty(),
+        "failed exchange must not leave a sibling journal entry"
+    );
+    assert!(alice.get_contact(&bob_id).unwrap().is_none());
+    alice
+        .storage()
+        .connection()
+        .execute_batch("DROP TRIGGER reject_exchange_ratchet")
+        .unwrap();
+    alice
         .save_exchanged_contact(&bob_at_alice, &a_rat, true)
         .unwrap();
 
@@ -357,4 +383,7 @@ fn first_exchange_journals_contact_added_for_linked_devices() {
         "an exchange on a multi-device identity must journal ContactAdded \
          for the linked devices, journaled ids: {queued_added_ids:?}"
     );
+    for device in orchestrator.devices_with_pending() {
+        assert_eq!(orchestrator.pending_for_device(&device).iter().filter(|item| matches!(item, SyncItem::ContactAdded { contact_data, .. } if contact_data.id == bob_id)).count(), 1);
+    }
 }

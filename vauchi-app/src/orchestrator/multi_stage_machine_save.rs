@@ -30,8 +30,8 @@ impl MultiStageMachine {
         self.sync_phase_from_inner_state();
     }
 
-    /// Whether the peer's DONE was read and its tag verified; a BOTH, which
-    /// is unkeyed, does not count. Gates a restored contact's rekey.
+    /// Whether the peer's DONE tag verified in DONE or BOTH.
+    /// Gates a restored contact's rekey.
     pub fn peer_saved(&self) -> bool {
         self.inner.peer_saved()
     }

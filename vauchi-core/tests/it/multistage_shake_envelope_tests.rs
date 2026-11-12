@@ -463,16 +463,30 @@ fn a_relay_url_rewritten_in_transit_fails_the_commitment() {
 // @internal
 #[test]
 fn a_data_chunk_shorter_than_nonce_and_tag_counts_as_a_decrypt_failure() {
-    use vauchi_core::exchange::multistage::qr_codec::format_data_qr;
+    use vauchi_core::exchange::multistage::qr_codec::{StageQr, format_data_qr, parse_qr};
 
-    let (alice, mut bob) = drive_to_transport_key(b"name:Alice".to_vec(), b"name:Bob".to_vec());
+    let (mut alice, mut bob) = drive_to_transport_key(b"name:Alice".to_vec(), b"name:Bob".to_vec());
+    let (chunk_idx, chunk_total, ack_bitmap) = (0..50)
+        .find_map(|_| {
+            let frame = alice.get_display_qr()?;
+            match parse_qr(&frame.data).ok()? {
+                StageQr::Data {
+                    chunk_idx,
+                    chunk_total,
+                    ack_bitmap,
+                    ..
+                } => Some((chunk_idx, chunk_total, ack_bitmap)),
+                _ => None,
+            }
+        })
+        .expect("Alice emits a genuine DATA header for the established transfer");
     let before = bob.transport_decrypt_failure_count();
 
     bob.process_scanned_qr(&format_data_qr(
         &alice.session_id(),
-        0,
-        1,
-        &[],
+        chunk_idx,
+        chunk_total,
+        &ack_bitmap,
         &[1, 2, 3, 4, 5],
     ));
 

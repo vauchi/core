@@ -7,6 +7,12 @@
 use super::*;
 use crate::sync::device_sync::ordering;
 
+impl From<crate::storage::StorageError> for DeviceSyncError {
+    fn from(error: crate::storage::StorageError) -> Self {
+        Self::Serialization(error.to_string())
+    }
+}
+
 impl DeviceSyncOrchestrator<'_> {
     pub(crate) fn pending_batches(
         &self,
@@ -76,23 +82,16 @@ impl DeviceSyncOrchestrator<'_> {
         &mut self,
         operation: impl FnOnce(&mut Self) -> Result<T, DeviceSyncError>,
     ) -> Result<T, DeviceSyncError> {
-        self.storage
-            .begin_transaction()
-            .map_err(|error| DeviceSyncError::Serialization(error.to_string()))?;
         let states = self.device_states.clone();
         let stamps = self.field_timestamps.clone();
         let vector = self.version_vector.clone();
-        let result = (|| {
+        let storage = self.storage;
+        let result = storage.with_transaction(|| {
             // The write lock precedes reload so cached handles cannot reuse sequences or erase newer floors.
             self.refresh_persisted_state()?;
-            let result = operation(self)?;
-            self.storage
-                .commit()
-                .map_err(|error| DeviceSyncError::Serialization(error.to_string()))?;
-            Ok(result)
-        })();
+            operation(self)
+        });
         if result.is_err() {
-            self.storage.rollback();
             self.device_states = states;
             self.field_timestamps = stamps;
             self.version_vector = vector;

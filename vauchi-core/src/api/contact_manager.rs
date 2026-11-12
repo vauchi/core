@@ -388,6 +388,18 @@ impl<'a> ContactManager<'a> {
 
     /// Updates an existing contact.
     pub fn update_contact(&self, contact: &Contact) -> VauchiResult<Vec<String>> {
+        let changed_fields = self.persist_contact_update(contact)?;
+        if !changed_fields.is_empty() {
+            self.events.dispatch(VauchiEvent::ContactUpdated {
+                contact_id: contact.id().to_owned(),
+                changed_fields: changed_fields.clone(),
+            });
+        }
+        Ok(changed_fields)
+    }
+
+    /// Persists an update whose caller dispatches its event after commit.
+    pub(crate) fn persist_contact_update(&self, contact: &Contact) -> VauchiResult<Vec<String>> {
         let contact_id = contact.id().to_string();
 
         let old_contact = self
@@ -399,13 +411,6 @@ impl<'a> ContactManager<'a> {
         let changed_fields = Self::compute_changed_fields(old_contact.card(), contact.card());
 
         self.storage.contacts().save_contact(contact)?;
-
-        if !changed_fields.is_empty() {
-            self.events.dispatch(VauchiEvent::ContactUpdated {
-                contact_id,
-                changed_fields: changed_fields.clone(),
-            });
-        }
 
         Ok(changed_fields)
     }

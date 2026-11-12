@@ -381,6 +381,52 @@ fn a_reveal_read_while_still_transferring_opens_the_card_once_shown() {
     assert_eq!(bob.get_received_data().as_deref(), Some(ALICE_CARD));
 }
 
+// @internal
+#[test]
+fn a_single_genuine_early_confirm_is_applied_after_local_checks_without_another_scan() {
+    for include_tag in [false, true] {
+        let Staged {
+            mut alice, mut bob, ..
+        } = bob_still_transferring_with_all_of_alices_chunks();
+        alice.process_scanned_qr(&bob.finalization_qr().data);
+        let confirm = (0..50)
+            .filter_map(|_| alice.get_display_qr())
+            .find(|frame| frame.data.starts_with("CNF4"))
+            .expect("Alice checked Bob's payload and shows its genuine confirm");
+        assert_eq!(alice.get_state(), ProtocolState::Confirming);
+        assert!(matches!(
+            bob.get_state(),
+            ProtocolState::Transferring { .. }
+        ));
+        let early = if include_tag {
+            confirm.data
+        } else {
+            let StageQr::Final {
+                session_id,
+                reveal_key,
+                ..
+            } = parse_qr(&confirm.data).unwrap()
+            else {
+                panic!("genuine confirm");
+            };
+            qr_codec::format_reveal_qr(&session_id, &reveal_key)
+        };
+
+        bob.process_scanned_qr(&early);
+
+        assert_eq!(bob.get_state(), ProtocolState::Verifying);
+        assert!(bob.get_received_data().is_none());
+        let _ = bob.get_display_qr();
+        if include_tag {
+            assert_eq!(bob.get_state(), ProtocolState::Finalized);
+            assert_eq!(bob.get_received_data().as_deref(), Some(ALICE_CARD));
+        } else {
+            assert_eq!(bob.get_state(), ProtocolState::Confirming);
+            assert!(bob.get_received_data().is_none());
+        }
+    }
+}
+
 /// A peer about to re-handshake still shows confirms bound to its old
 /// partner (ADR-071). Such a tag, kept from before Confirming, must not
 /// fail the exchange once the card opens; it is dropped, and the peer's

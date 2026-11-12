@@ -143,8 +143,7 @@ fn test_list_contacts_paginated_all_contacts_across_pages() {
 // ============================================================
 // ============================================================
 
-// @scenario: performance :: Search performance with many contacts
-// @scenario: performance :: Efficient database queries
+// @internal
 #[test]
 fn test_search_contacts_by_name() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -155,7 +154,7 @@ fn test_search_contacts_by_name() {
     assert_eq!(results[0].display_name(), "Contact 0042");
 }
 
-// @scenario: performance :: Search performance with many contacts
+// @internal
 #[test]
 fn test_search_contacts_partial_match() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -169,7 +168,7 @@ fn test_search_contacts_partial_match() {
     );
 }
 
-// @scenario: performance :: Search performance with many contacts
+// @internal
 #[test]
 fn test_search_contacts_case_insensitive() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -179,7 +178,7 @@ fn test_search_contacts_case_insensitive() {
     assert_eq!(results.len(), 10, "Search should be case-insensitive");
 }
 
-// @scenario: performance :: Search performance with many contacts
+// @internal
 #[test]
 fn test_search_contacts_no_match_returns_empty() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -192,7 +191,7 @@ fn test_search_contacts_no_match_returns_empty() {
     assert!(results.is_empty(), "Non-matching query should return empty");
 }
 
-// @scenario: performance :: Search performance with many contacts
+// @internal
 #[test]
 fn test_search_contacts_empty_query_returns_all() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -202,8 +201,7 @@ fn test_search_contacts_empty_query_returns_all() {
     assert_eq!(results.len(), 10, "Empty query should return all contacts");
 }
 
-// @scenario: performance :: Search performance with many contacts
-// @scenario: performance :: Efficient database queries
+// @internal
 #[test]
 fn test_search_contacts_with_1000_contacts() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();

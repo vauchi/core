@@ -61,8 +61,7 @@ fn test_non_v2_format_rejected() {
 /// Tests that v2 backup import rejects invalid parameters.
 ///
 /// Feature: backup_format_versioning.feature
-/// Scenario: V2 backup uses OWASP-recommended Argon2id parameters
-// @scenario: backup_format_versioning :: V2 backup uses OWASP-recommended Argon2id parameters
+// @scenario: backup_format_versioning :: Corrupted backup is detected
 #[test]
 fn test_v2_parameter_validation() {
     let empty_backup = IdentityBackup::new(vec![]);

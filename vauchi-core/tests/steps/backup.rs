@@ -25,23 +25,6 @@ fn create_v2_backup(world: &mut VauchiWorld) {
     world.backup_data = Some(backup.into_bytes());
 }
 
-// ── Argon2 parameter assertions ─────────────────────────────────────────────
-// These parameters are fixed constants in the backup format (v2 spec);
-// they are verified by the Identity unit tests. At the public API level we
-// confirm only that a backup was produced successfully.
-
-#[then("Argon2id should use memory cost 64 MB")]
-fn argon2_memory_cost(_world: &mut VauchiWorld) {}
-
-#[then("Argon2id should use time cost 3 iterations")]
-fn argon2_time_cost(_world: &mut VauchiWorld) {}
-
-#[then("Argon2id should use parallelism 4")]
-fn argon2_parallelism(_world: &mut VauchiWorld) {}
-
-#[then("the derived key should be 32 bytes")]
-fn argon2_key_size(_world: &mut VauchiWorld) {}
-
 // ── Salt assertions ────────────────────────────────────────────────────────
 
 /// Verifies a non-empty backup blob was produced (the salt is inside it).

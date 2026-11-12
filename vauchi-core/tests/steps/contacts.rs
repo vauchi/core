@@ -203,40 +203,10 @@ fn other_contacts_filtered_out(world: &mut VauchiWorld) {
     );
 }
 
-// ── Performance assertion no-ops ───────────────────────────────────────────
-// WHY: timing and memory constraints are UI/OS concerns not observable at the
-// vauchi-core API layer. These steps verify the operation completes without
-// error; actual latency SLOs are enforced in platform-specific UI test suites.
-
 #[when("I open the contacts list")]
 fn open_contacts_list(world: &mut VauchiWorld) {
     let _ = world.vauchi.list_contacts().unwrap();
 }
-
-#[then("the list should render within 500ms")]
-#[then("scrolling should be smooth")]
-#[then("the app should remain responsive")]
-fn perf_noop_contact_list(_world: &mut VauchiWorld) {}
-
-#[when("I type a search query")]
-fn type_search_query(world: &mut VauchiWorld) {
-    let _ = world.vauchi.search_contacts("").unwrap();
-}
-
-#[then("results should appear within 200ms")]
-#[then("results should update as I type")]
-#[then("there should be no input lag")]
-fn perf_noop_search_timing(_world: &mut VauchiWorld) {}
-
-#[when("I search or filter")]
-fn search_or_filter(world: &mut VauchiWorld) {
-    let _ = world.vauchi.search_contacts("").unwrap();
-}
-
-#[then("queries should complete within 50ms")]
-#[then("indexes should be used properly")]
-#[then("no full table scans for common operations")]
-fn perf_noop_query_efficiency(_world: &mut VauchiWorld) {}
 
 // ── Imported contact management ────────────────────────────────────────────
 

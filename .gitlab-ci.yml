@@ -1002,6 +1002,7 @@ test:vectors:
         compare_to: refs/heads/$CI_DEFAULT_BRANCH
         paths:
           - vauchi-core/tests/it/protocol_test_vectors_tests.rs
+          - vauchi-core/tests/it/protocol_test_vectors_backup_v2_tests.rs
           - vauchi-core/tests/it/protocol_test_vectors_backup_v7_tests.rs
           - "vauchi-core/tests/fixtures/test-vectors/**"
           - "vauchi-core/src/crypto/**"

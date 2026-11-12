@@ -238,7 +238,10 @@ fn main() {
     // 121 since 2026-11-11: the Portuguese row of "Core languages are
     // supported" passed on a no-op, though no Portuguese copy ships; its
     // step is gone and the row no longer binds (vauchi/private#1237).
-    const MIN_WIRED_SCENARIOS: usize = 121;
+    // Four remaining no-op scenarios leave the run (#1237): Argon2 costs
+    // are checked by a production-parameter vector test; unmeasured list,
+    // search and query performance promises move to the private backlog.
+    const MIN_WIRED_SCENARIOS: usize = 117;
     if scenarios.passed < MIN_WIRED_SCENARIOS {
         eprintln!(
             "cucumber GATE failed: {} wired scenario(s) passed, expected at least \

@@ -59,8 +59,7 @@ fn test_decryption_under_100ms() {
 
 /// Search 1000 contacts via search_contacts() in under 50ms.
 /// Traces to: features/performance.feature @resources
-// @scenario: performance :: Efficient database queries
-// @scenario: performance :: Search performance with many contacts
+// @internal
 #[test]
 #[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_query_under_50ms_with_1000_contacts() {
@@ -177,7 +176,7 @@ fn test_storage_open_under_500ms() {
 
 /// List 1000 contacts from storage in under 500ms.
 /// Traces to: features/performance.feature @contacts @scale
-// @scenario: performance :: Handle 1000 contacts
+// @internal
 #[test]
 #[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_list_1000_contacts_under_500ms() {

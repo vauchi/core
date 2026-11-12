@@ -1365,7 +1365,9 @@ fn go_exchange_from_my_info_navigates_to_exchange() {
 
 // ── Screen-presentation lifecycle hooks (Phase 2b) ────────────────────
 
-// @scenario: exchange.feature :: Multi-stage exchange dims screen, disables idle timer, and locks portrait on entry
+// @scenario: contact_exchange :: Glance shows its QR at a camera-readable brightness
+// @internal
+// Multi-stage exchange dims screen, disables idle timer, and locks portrait on entry
 #[test]
 fn navigate_to_multi_stage_exchange_drains_brightness_idle_timer_and_orientation_commands() {
     use vauchi_core::{Command, Orientation};
@@ -1416,7 +1418,9 @@ fn navigate_to_multi_stage_exchange_drains_brightness_idle_timer_and_orientation
     );
 }
 
-// @scenario: exchange.feature :: Multi-stage exchange restores defaults on exit
+// @scenario: contact_exchange :: Glance shows its QR at a camera-readable brightness
+// @internal
+// Multi-stage exchange restores defaults on exit
 #[test]
 fn navigate_back_from_multi_stage_exchange_drains_restore_commands() {
     use vauchi_core::Command;

@@ -4,7 +4,7 @@
 use super::*;
 use vauchi_core::exchange::X3DHKeyPair;
 
-// @scenario: multi_device_sync :: Card update propagation across devices
+// @scenario: visibility_control :: Granting visibility sends update to contact
 // @internal
 #[test]
 fn waiting_for_one_peer_does_not_repeat_updates_to_a_ready_peer() {
@@ -64,7 +64,7 @@ fn allow_marker_write(world: &PendingActivation) {
         .unwrap();
 }
 
-// @scenario: multi_device_sync :: Siblings adopt relayed activation state
+// @scenario: visibility_control :: Granting visibility sends update to contact
 // @internal
 #[test]
 fn failed_sibling_marker_write_rolls_back_activation_and_can_be_replayed() {
@@ -98,7 +98,7 @@ fn failed_sibling_marker_write_rolls_back_activation_and_can_be_replayed() {
     assert_owed_field_delivered(&world);
 }
 
-// @scenario: multi_device_sync :: A joining device inherits activation state via full sync
+// @scenario: visibility_control :: Granting visibility sends update to contact
 // @internal
 #[test]
 fn failed_full_sync_marker_write_rolls_back_activation_and_can_be_replayed() {

@@ -163,7 +163,7 @@ fn visibility_grant_awaiting_activation_is_accepted_and_remembered() {
     );
 }
 
-// @scenario: multi_device_sync :: Registry presence alone never switches sends off the legacy session
+// @scenario: visibility_control :: Granting visibility sends update to contact
 // @internal
 #[test]
 fn deferred_passes_neither_spend_retries_nor_emit_ciphertext_or_advance_versions() {
@@ -198,7 +198,7 @@ fn deferred_passes_neither_spend_retries_nor_emit_ciphertext_or_advance_versions
     );
 }
 
-// @scenario: multi_device_sync :: Siblings adopt relayed activation state
+// @scenario: visibility_control :: Granting visibility sends update to contact
 // @internal
 #[test]
 fn sibling_activation_delivers_the_owed_field_after_deferred_passes() {
@@ -213,7 +213,7 @@ fn sibling_activation_delivers_the_owed_field_after_deferred_passes() {
     assert_owed_field_delivered(&world);
 }
 
-// @scenario: multi_device_sync :: A joining device inherits activation state via full sync
+// @scenario: visibility_control :: Granting visibility sends update to contact
 // @internal
 #[test]
 fn full_sync_activation_delivers_the_owed_field_after_deferred_passes() {

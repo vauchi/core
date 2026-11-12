@@ -216,3 +216,20 @@ pub(crate) fn assert_restore_registered_a_fresh_device(vauchi: &Vauchi, backed_u
     assert!(registry.find_device(backed_up_device.device_id()).is_none());
     assert!(registry.verify(&identity.signing_keypair().public_key()));
 }
+
+// @scenario: backup_format_versioning :: Restored contacts continue exchanging updates
+// @internal
+#[cfg(not(feature = "test-kdf"))]
+#[test]
+fn newly_generated_backup_v7_vector_imports_as_a_fresh_device() {
+    let v = compute_backup_v7();
+    let mut vauchi = Vauchi::in_memory().expect("in-memory vauchi");
+    vauchi
+        .import_full_backup(&v.backup, &v.password)
+        .expect("fresh v7 import");
+
+    let identity = vauchi.identity().expect("restored identity");
+    assert_eq!(hex::encode(identity.master_seed()), v.master_seed);
+    assert_eq!(identity.display_name(), v.display_name);
+    assert_restore_registered_a_fresh_device(&vauchi, v.device_index);
+}

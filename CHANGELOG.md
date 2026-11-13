@@ -10,6 +10,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- Embedded languages (vauchi/private#1246): Core ships German, French,
+  Spanish and Italian beside English, so a phone opens in its language
+  with no shell file or content-update cycle. The avatar's edit action
+  speaks the screen's language too (vauchi/private#1237).
+- The native status item (vauchi/private#1029): Core shows a status item
+  to a shell that has a system tray, and `vauchi_core` re-exports
+  `StatusItemSpec`. The contract moves to v0.98.0, which carries the
+  native status item and its availability.
 - The duress lock policy (ADR-032 amendment 2026-11-10,
   vauchi/private#1117): `setup_duress_pin_with_biometric_unlock` sets a
   6-digit duress PIN behind biometric unlock;
@@ -27,6 +35,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
+- Core 0.106.0 also carries contract v0.98.0 (vauchi/private#1029).
+  Its native status item changes the Command/Event surface. Consumers
+  must move their display and hardware pins to the same contract version
+  to avoid compiling against two incompatible copies of the crate.
 - The authenticated multi-stage exchange API requires Core 0.106.0
   (vauchi/private#1217). `StageQr` carries a reveal-only frame and keyed
   terminal frames; `format_both_qr` requires the reveal key and DONE tag.

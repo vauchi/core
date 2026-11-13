@@ -34,10 +34,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   removed. Peers must both use the authenticated wire protocol.
 - Exchange selection offers Hover, Glance and Link. The other modes are
   deferred; saved preferences and capability fallback follow this scope.
-- The next stable Core release is 0.104.0 because 0.103.0's public
+- Core 0.104.0 was selected because 0.103.0's public
   `vauchi_core::sync::MerkleTree` and `DeltaError::CompressionError` are
   gone (vauchi/private#880). No consumer used them.
-- The next stable Core release is 0.103.0 because the migration/reset/shred
+- Core 0.103.0 was selected because the migration/reset/shred
   safety changes intentionally break Rust source compatibility
   (vauchi/private#1178). `ShredReport` literals must supply
   `key_files_complete`; callers must include that result when deciding

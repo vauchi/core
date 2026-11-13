@@ -27,6 +27,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
+- The authenticated multi-stage exchange API requires Core 0.106.0
+  (vauchi/private#1217). `StageQr` carries a reveal-only frame and keyed
+  terminal frames; `format_both_qr` requires the reveal key and DONE tag.
+  The legacy IN3D codec and preassembled reassembly-buffer constructor are
+  removed. Peers must both use the authenticated wire protocol.
+- Exchange selection offers Hover, Glance and Link. The other modes are
+  deferred; saved preferences and capability fallback follow this scope.
 - The next stable Core release is 0.104.0 because 0.103.0's public
   `vauchi_core::sync::MerkleTree` and `DeltaError::CompressionError` are
   gone (vauchi/private#880). No consumer used them.
@@ -50,6 +57,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Security
 
+- Multi-stage payloads prove ownership of the claimed identity, and
+  confirmation and peer-save frames bind the authenticated transcript.
+  Contact, recovery and ratchet writes commit together. Hover starts
+  proximity capture on discovery through the presentation route and
+  validates recorded audio before resampling (vauchi/private#1217).
 - `Vauchi::new` refuses a plaintext relay or OHTTP relay URL from
   `VauchiConfig`, as `set_relay` already did: https, `wss`, or plain
   http or `ws` to a loopback host only (ADR-037 addendum,

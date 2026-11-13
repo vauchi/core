@@ -4131,7 +4131,7 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vauchi-app"
-version = "0.104.0"
+version = "0.106.0"
 dependencies = [
  "base64",
  "cucumber",
@@ -4157,7 +4157,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-cabi"
-version = "0.104.0"
+version = "0.106.0"
 dependencies = [
  "cbindgen",
  "serde_json",
@@ -4183,7 +4183,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core"
-version = "0.104.0"
+version = "0.106.0"
 dependencies = [
  "argon2",
  "base64",
@@ -4240,7 +4240,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core-testkit"
-version = "0.104.0"
+version = "0.106.0"
 dependencies = [
  "base64",
  "ed25519-dalek",
@@ -4256,7 +4256,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-platform"
-version = "0.104.0"
+version = "0.106.0"
 dependencies = [
  "base64",
  "crc32fast",
@@ -4279,7 +4279,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-protocol"
-version = "0.104.0"
+version = "0.106.0"
 dependencies = [
  "proptest",
  "schemars 0.8.22",

@@ -829,30 +829,6 @@
                         }
                       },
                       {
-                        "title": "Tap hover shake",
-                        "subtitle": "Scan each other's screens, then shake",
-                        "detail": null,
-                        "icon_token": "pictogram.exchange.tap_hover_shake",
-                        "image_data": null,
-                        "fallback_text": null,
-                        "selected": false,
-                        "enabled": true,
-                        "activation": {
-                          "interaction_id": "surface.2.interaction.2",
-                          "label": "Tap hover shake",
-                          "accessibility_label": "Tap hover shake",
-                          "icon_token": null,
-                          "enabled": true,
-                          "shortcut": null
-                        },
-                        "secondary_actions": [],
-                        "controls": [],
-                        "accessibility": {
-                          "label": "Tap hover shake",
-                          "description": null
-                        }
-                      },
-                      {
                         "title": "Link",
                         "subtitle": "Send a link to connect remotely",
                         "detail": null,
@@ -862,7 +838,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.2.interaction.3",
+                          "interaction_id": "surface.2.interaction.2",
                           "label": "Link",
                           "accessibility_label": "Link",
                           "icon_token": null,
@@ -873,54 +849,6 @@
                         "controls": [],
                         "accessibility": {
                           "label": "Link",
-                          "description": null
-                        }
-                      },
-                      {
-                        "title": "Cable",
-                        "subtitle": "Requires USB port",
-                        "detail": null,
-                        "icon_token": "pictogram.exchange.cable",
-                        "image_data": null,
-                        "fallback_text": null,
-                        "selected": false,
-                        "enabled": true,
-                        "activation": {
-                          "interaction_id": "surface.2.interaction.4",
-                          "label": "Cable",
-                          "accessibility_label": "Cable",
-                          "icon_token": null,
-                          "enabled": true,
-                          "shortcut": null
-                        },
-                        "secondary_actions": [],
-                        "controls": [],
-                        "accessibility": {
-                          "label": "Cable",
-                          "description": null
-                        }
-                      },
-                      {
-                        "title": "Tap tap",
-                        "subtitle": "Tap the phones together twice",
-                        "detail": null,
-                        "icon_token": "pictogram.exchange.tap_tap",
-                        "image_data": null,
-                        "fallback_text": null,
-                        "selected": false,
-                        "enabled": true,
-                        "activation": {
-                          "interaction_id": "surface.2.interaction.5",
-                          "label": "Tap tap",
-                          "accessibility_label": "Tap tap",
-                          "icon_token": null,
-                          "enabled": true,
-                          "shortcut": null
-                        },
-                        "secondary_actions": [],
-                        "controls": [],
-                        "accessibility": {
-                          "label": "Tap tap",
                           "description": null
                         }
                       }

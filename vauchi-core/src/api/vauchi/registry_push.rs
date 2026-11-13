@@ -228,17 +228,11 @@ impl ProfileEngine {
         let ack = RegistryAckPayload::new(reply.push_nonce, reply.acked_version, echo)
             .map_err(|error| VauchiError::Serialization(error.to_string()))?;
         let payload = VersionedPayload::encode_registry_ack(&ack);
-        // Pre-activation acks ride the stateless genesis envelope like
-        // pushes: the peer may be a session-less orphaned sibling that can
-        // only open genesis, while a live sessioned peer opens it via the
-        // decrypt-failure fallback. Once Active, the ordinary path applies
-        // (per-device, resolvable — Active implies the peer holds our
-        // registry) — EXCEPT when a fresh device-pair session puts us on
-        // the responder side, which cannot send first: without the genesis
-        // fallback the handshake livelocks, because our scanner skips
-        // Active contacts and the peer only activates through this very
-        // ack (caught by the ordering-flipped un-orphaning test).
-        let genesis_sealed = |this: &Self| -> VauchiResult<_> {
+        // Active describes the identity relationship, not this requester's
+        // retained state: a restored device may lack our registry (private#1247).
+        // Like pushes, ACK control traffic uses the ADR-068 genesis
+        // forward-secrecy exception; card traffic keeps its device ratchets.
+        let prepared = {
             let ex = contact
                 .kind()
                 .exchanged_data()
@@ -247,22 +241,11 @@ impl ProfileEngine {
             // so a sibling cannot drain it from a shared identity mailbox; the
             // truly-unknown-origin case ([0;32]) keeps the identity-scoped copy.
             let sealed = if reply.sender_device_id == [0u8; 32] {
-                this.genesis_seal_for_cold_start(identity, ex, &payload)?
+                self.genesis_seal_for_cold_start(identity, ex, &payload)?
             } else {
-                this.genesis_seal_for_device(identity, ex, reply.sender_device_id, &payload)?
+                self.genesis_seal_for_device(identity, ex, reply.sender_device_id, &payload)?
             };
-            Ok(vec![sealed])
-        };
-        let prepared = if tracker.state() == ActivationState::Active {
-            match self.encrypt_payload_for_contact_devices(identity, &contact, &payload) {
-                Ok(prepared) => prepared,
-                Err(VauchiError::InvalidState(_))
-                | Err(VauchiError::SendDeferred)
-                | Err(VauchiError::NotFound(_)) => genesis_sealed(self)?,
-                Err(error) => return Err(error),
-            }
-        } else {
-            genesis_sealed(self)?
+            vec![sealed]
         };
 
         let now = self.clock.unix_seconds();

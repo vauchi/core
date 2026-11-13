@@ -27,8 +27,7 @@
 //! new ─(no I/O)→ Preparing
 //! Preparing ─advance: emit first INIT QR (Idle→Advertising)─▶ Advertising
 //! Advertising ─advance per display_duration_ms tick─▶ Advertising (next QR)
-//! Advertising ─QrScanned: peer INIT parsed─▶ Discovered
-//! Discovered ─advance/QrScanned: chunk transfer─▶ Transferring{…}
+//! Advertising ─QrScanned: peer INIT starts transfer─▶ Transferring{…}
 //! Transferring ─advance/QrScanned: protocol verify─▶ Verifying
 //! Verifying ─advance/QrScanned: peer ack─▶ Confirming
 //! Confirming ─advance/QrScanned: finalize─▶ Finalized {peer_name}
@@ -43,24 +42,6 @@
 //! hardware) via the returned [`MultiStageEvent`]. Tests drive expiry
 //! and per-frame timing by passing `now` values — no real wait
 //! (CC-06).
-//!
-//! # T1.2 status (GREEN — minimum viable)
-//!
-//! `advance` + the `QrScanned` branch of `handle_hardware_event` are
-//! wired against [`MultiStageSession::get_display_qr`] /
-//! [`MultiStageSession::process_scanned_qr`]. The T1.1 proptest
-//! invariants pass — the per-frame display-duration window is honoured
-//! via `now: u64`, `Finalized → Completed` is reachable through the
-//! existing `ProtocolState` graph, and the terminal-absorption /
-//! no-QR-after-terminal invariants are preserved.
-//!
-//! AppEngine integration (`sync_/ensure_/advance_/dispatch_/apply_`
-//! five-method on `ui/app_engine/multi_stage_exchange.rs`) and the
-//! Hover audio-handshake command emission are T1.2b follow-ups. Until
-//! they land, the existing cycle-thread bridge in
-//! `vauchi-platform/src/multistage_exchange.rs` continues to drive the
-//! engine — the new machine coexists with the old surface, which T1.3
-//! retires when the bridge is no longer the only path.
 
 use vauchi_core::Command;
 use vauchi_core::Event;

@@ -394,14 +394,10 @@ fn picker_rows(entry: &ScreenCatalogEntry) -> Vec<&PresentationRow> {
         .collect()
 }
 
-// The catalog is what shells and the design canvas are compared against,
-// so the picker must be recorded from a phone's capability set: Glance
-// (QR) leads as the recommended hero and the NFC- and BLE-gated modes are
-// offered as runnable, not "Requires camera, BLE" the way a camera-less
-// engine renders them.
+// Record phone capabilities so the offered modes have their runnable copy.
 // @scenario: exchange :: picker offers only the alpha-reliable modes
 #[test]
-fn screen_catalog_exchange_picker_offers_qr_nfc_and_bluetooth_from_a_phone_capability_set() {
+fn screen_catalog_exchange_picker_offers_only_glance_hover_and_link_on_a_phone() {
     let catalog = checked_in_catalog();
     let entry = catalog
         .screens
@@ -428,22 +424,16 @@ fn screen_catalog_exchange_picker_offers_qr_nfc_and_bluetooth_from_a_phone_capab
         .iter()
         .filter_map(|row| row.icon_token.as_deref())
         .collect();
-    for offered in [
-        "pictogram.exchange.glance",
-        "pictogram.exchange.hover",
-        "pictogram.exchange.tap_hover_shake",
-    ] {
-        assert!(
-            icons.contains(offered),
-            "picker offers {offered}, got {icons:?}"
-        );
-    }
-    // A phone has a camera, BLE, NFC, audio and an accelerometer; only the
-    // USB-gated Cable row may still read as unavailable.
-    for row in rows
-        .iter()
-        .filter(|row| row.icon_token.as_deref() != Some("pictogram.exchange.cable"))
-    {
+    assert_eq!(rows.len(), 3);
+    assert_eq!(
+        icons,
+        BTreeSet::from([
+            "pictogram.exchange.glance",
+            "pictogram.exchange.hover",
+            "pictogram.exchange.link",
+        ])
+    );
+    for row in rows {
         assert!(
             !row.subtitle
                 .as_deref()

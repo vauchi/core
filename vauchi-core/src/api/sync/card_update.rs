@@ -388,12 +388,25 @@ fn process_single_card_update_for_device_with_budget(
     let (mut ratchet, is_initiator) = match existing {
         Some(session) => session,
         None if *peer_device_id != [0; 32] => {
-            let peer_device = storage
+            let Some(peer_device) = storage
                 .device()
                 .load_contact_active_devices(sender_id)?
                 .into_iter()
                 .find(|device| &device.device_id == peer_device_id)
-                .ok_or(CardUpdateError::NoRatchetState)?;
+            else {
+                // A restored install has no peer registry yet; the genesis
+                // handshake reply carries it (vauchi/private#1247).
+                return try_receive_genesis_alert(
+                    identity,
+                    storage,
+                    sender_id,
+                    &contact,
+                    ciphertext,
+                    None,
+                    CardUpdateError::NoRatchetState,
+                    device_route_budget,
+                );
+            };
             let relationship_key = contact
                 .shared_key()
                 .ok_or(CardUpdateError::NoRatchetState)?;

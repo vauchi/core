@@ -102,16 +102,22 @@ fn received(owner: &Vauchi, contact_id: &str, label: &str) -> Option<String> {
         .map(|field| field.value().to_string())
 }
 
-// @scenario: backup_format_versioning :: Restored contacts continue exchanging updates
-#[test]
-fn restored_install_resumes_both_card_directions_through_its_own_queues() {
+fn run_restore(alice_initiates: bool) -> (Option<String>, Option<String>) {
     let clock = Arc::new(FakeClock::new(
         SystemTime::UNIX_EPOCH + Duration::from_secs(1_800_000_000),
     ));
-    let mut alice = Vauchi::in_memory_with_clock(clock.clone()).unwrap();
-    alice.create_identity("Alice").unwrap();
     let mut bob = Vauchi::in_memory_with_clock(clock.clone()).unwrap();
     bob.create_identity("Bob").unwrap();
+    let alice = loop {
+        let mut candidate = Vauchi::in_memory_with_clock(clock.clone()).unwrap();
+        candidate.create_identity("Alice").unwrap();
+        if (candidate.identity().unwrap().signing_public_key()
+            < bob.identity().unwrap().signing_public_key())
+            == alice_initiates
+        {
+            break candidate;
+        }
+    };
     let (alice_at_bob, bob_at_alice) = meet(&bob, &alice, false);
     for (receiver, peer, contact_id) in
         [(&alice, &bob, &bob_at_alice), (&bob, &alice, &alice_at_bob)]
@@ -151,12 +157,32 @@ fn restored_install_resumes_both_card_directions_through_its_own_queues() {
     for _ in 0..6 {
         sync_pair(&restored, &bob, &bob_at_alice, &alice_at_bob);
     }
+    (
+        received(&bob, &alice_at_bob, "AliceEmail"),
+        received(&restored, &bob_at_alice, "BobEmail"),
+    )
+}
+
+// @scenario: backup_format_versioning :: Restored contacts continue exchanging updates
+#[test]
+fn restored_install_resumes_both_card_directions_through_its_own_queues() {
     assert_eq!(
-        received(&bob, &alice_at_bob, "AliceEmail").as_deref(),
-        Some("new-alice@example.test")
+        run_restore(true),
+        (
+            Some("new-alice@example.test".into()),
+            Some("new-bob@example.test".into())
+        ),
     );
+}
+
+// @scenario: backup_format_versioning :: Restored contacts continue exchanging updates
+#[test]
+fn restored_responder_resumes_both_card_directions_through_its_own_queues() {
     assert_eq!(
-        received(&restored, &bob_at_alice, "BobEmail").as_deref(),
-        Some("new-bob@example.test")
+        run_restore(false),
+        (
+            Some("new-alice@example.test".into()),
+            Some("new-bob@example.test".into())
+        ),
     );
 }

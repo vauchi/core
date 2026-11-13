@@ -530,6 +530,7 @@ mod request_pacer_tests;
 mod responder_deferred_send_tests;
 mod restored_card_resumption_tests;
 mod restored_install_card_delta_tests;
+mod restored_registry_bootstrap_tests;
 mod resync_request_tests;
 mod retry_queue_tests;
 mod revocation_protocol_tests;

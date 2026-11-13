@@ -2277,7 +2277,7 @@ mod tests {
     fn denied_nfc_routes_taptap_to_failed_not_nfc_wait() {
         let mut led = TransportReadiness::new();
         led.note_denied(DeviceRequirement::Nfc);
-        let (engine, result) = pick_mode(led, "mode:tap_tap");
+        let (engine, result) = start_unoffered_mode(led, ExchangeMode::TapTap);
         assert!(
             !matches!(result, ActionResult::StartNfcExchange),
             "denied NFC must NOT enter the NFC wait"
@@ -2318,7 +2318,7 @@ mod tests {
     fn granted_nfc_lets_taptap_enter_nfc_wait() {
         let mut led = TransportReadiness::new();
         led.note_granted(DeviceRequirement::Nfc);
-        let (_engine, result) = pick_mode(led, "mode:tap_tap");
+        let (_engine, result) = start_unoffered_mode(led, ExchangeMode::TapTap);
         assert!(
             matches!(result, ActionResult::StartNfcExchange),
             "granted NFC must enter the wait, got {result:?}"
@@ -2335,7 +2335,7 @@ mod tests {
         led.note_denied(DeviceRequirement::Camera);
         led.note_denied(DeviceRequirement::Nfc);
         led.note_denied(DeviceRequirement::Microphone);
-        let (engine, result) = pick_mode(led, "mode:cable");
+        let (engine, result) = start_unoffered_mode(led, ExchangeMode::Cable);
         assert!(
             matches!(result, ActionResult::StartDirectTransport),
             "Cable (UsbPort presence-only) must never fail-fast, got {result:?}"
@@ -2573,10 +2573,7 @@ mod tests {
             vauchi_core::clock::SystemClock::shared(),
         );
 
-        let result = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "category:fun".into(),
-            item_id: "mode:tap_hover_shake".into(),
-        });
+        let result = engine.select_mode_for_testing(ExchangeMode::TapHoverShake);
         assert_eq!(engine.config.mode, Some(ExchangeMode::TapHoverShake));
         assert_eq!(engine.step, ExchangeStep::ModeSelection);
         assert!(

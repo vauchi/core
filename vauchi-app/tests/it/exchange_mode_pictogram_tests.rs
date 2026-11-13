@@ -32,6 +32,9 @@ fn unoffered(mode: &str) -> Option<ExchangeMode> {
         "bump" => Some(ExchangeMode::Bump),
         "shake" => Some(ExchangeMode::Shake),
         "magic" => Some(ExchangeMode::Magic),
+        "tap_tap" => Some(ExchangeMode::TapTap),
+        "tap_hover_shake" => Some(ExchangeMode::TapHoverShake),
+        "cable" => Some(ExchangeMode::Cable),
         _ => None,
     }
 }
@@ -142,8 +145,7 @@ fn a_permission_row_keeps_its_modes_pictogram() {
 fn every_mode_screen_opens_with_its_pictogram_and_name() {
     for mode in MODES {
         let mut engine = engine_on_picker(full_caps());
-        // The picker no longer starts the three it does not offer
-        // (vauchi/private#271); their screens still exist until #506.
+        // Deferred modes retain their engine-level presentation coverage.
         let _ = match unoffered(mode) {
             Some(unoffered) => engine.select_exchange_mode_for_testing(unoffered),
             None => engine.handle_action(UserAction::ListItemSelected {

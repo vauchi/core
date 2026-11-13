@@ -77,7 +77,7 @@ fn preview_field_visibilities(
     // Pick a grouped mode that routes through the field preview.
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "category:fun".into(),
-        item_id: "mode:tap_hover_shake".into(),
+        item_id: "mode:hover".into(),
     });
 
     let screen = engine.current_screen();

@@ -102,7 +102,7 @@ fn glance_full_flow_mode_to_ble_handoff() {
 
 // @internal
 #[test]
-fn tap_hover_shake_mode_pick_hands_off_to_multi_stage() {
+fn hover_mode_pick_hands_off_to_multi_stage() {
     // TapHoverShake graduated to the multi-stage engine (P2.D of the
     // TapHoverShake graduation plan): picking it then skipping groups hands
     // off via ActionResult::StartMultiStageExchange instead of the retired
@@ -119,19 +119,19 @@ fn tap_hover_shake_mode_pick_hands_off_to_multi_stage() {
         action_id: "skip".to_string(),
     });
 
-    // Select TapHoverShake → multi-stage handoff (no groups → no preview).
+    // Select the retained Hover mode (no groups → no preview).
     let result = engine.handle_action(UserAction::ListItemSelected {
         component_id: "category:fun".to_string(),
-        item_id: "mode:tap_hover_shake".to_string(),
+        item_id: "mode:hover".to_string(),
     });
     assert!(
         matches!(
             result,
             ActionResult::StartMultiStageExchange {
-                mode: vauchi_core::exchange::mode::ExchangeMode::TapHoverShake,
+                mode: vauchi_core::exchange::mode::ExchangeMode::Hover,
             },
         ),
-        "TapHoverShake must hand off to multi-stage; got {result:?}",
+        "Hover must hand off to multi-stage; got {result:?}",
     );
 }
 

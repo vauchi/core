@@ -18,8 +18,8 @@
 
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use vauchi_app::orchestrator::multi_stage_machine::MultiStagePhase;
-use vauchi_app::ui::{AppEngine, AppScreen, UserAction, WorkflowEngine};
+use vauchi_app::orchestrator::multi_stage_machine::{MultiStageEvent, MultiStagePhase};
+use vauchi_app::ui::{AppEngine, AppScreen, Component, UserAction, WorkflowEngine};
 use vauchi_core::clock::{Clock, FakeClock};
 use vauchi_core::platform::{
     BindingId, Command, InputValue, PresentationNode, PresentationQrPurpose, SurfaceId, SurfaceSpec,
@@ -108,6 +108,156 @@ fn report_decode(
 
 fn is_celebrate(cmd: &Command) -> bool {
     matches!(cmd, Command::Celebrate { .. })
+}
+
+fn audio_commands(commands: &[Command]) -> Vec<&'static str> {
+    commands
+        .iter()
+        .filter_map(|command| match command {
+            Command::AudioEmitChallenge { .. } => Some("emit"),
+            Command::AudioListenForResponse { .. } => Some("listen"),
+            _ => None,
+        })
+        .collect()
+}
+
+// @internal — real capture-event discovery must start Hover's hardware path.
+#[test]
+fn real_hover_init_starts_audio_once_through_the_presentation_route() {
+    let clock = Arc::new(FakeClock::new(
+        SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
+    ));
+    let mut alice = engine_on_hover("Alice", clock.clone());
+    let mut bob = engine_on_hover("Bob", clock);
+    alice.poll_notifications();
+    bob.poll_notifications();
+    let initial = alice.initial_commands().expect("Alice renders");
+    assert_eq!(audio_commands(&initial), Vec::<&str>::new());
+    let a_surface = latest_surface(&initial).expect("Alice surface");
+    let b_surface =
+        latest_surface(&bob.initial_commands().expect("Bob renders")).expect("Bob surface");
+    let qr = displayed_qr(&b_surface).expect("Bob INIT");
+    let binding = capture_binding(&a_surface).expect("capture binding");
+    let commands = report_decode(&mut alice, &a_surface.surface_id, &binding, qr.clone());
+    assert_eq!(audio_commands(&commands), vec!["emit", "listen"]);
+
+    let current = latest_surface(&commands).expect("updated capture surface");
+    let binding = capture_binding(&current).expect("current capture binding");
+    let repeated = report_decode(&mut alice, &current.surface_id, &binding, qr);
+    assert_eq!(audio_commands(&repeated), Vec::<&str>::new());
+}
+
+// @internal — native recorded audio must reach the held protocol machine.
+#[test]
+fn recorded_hover_audio_reaches_the_machine_through_public_dispatch() {
+    for (samples, sample_rate) in [
+        (vec![0.0; 32], 44_100),
+        (vec![0.0; 1], 0),
+        (vec![0.0; 32], 1),
+        (vec![0.0; 32], u32::MAX),
+        (vec![f32::NAN; 32], 44_100),
+        (vec![f32::INFINITY; 32], 48_000),
+        (vec![0.0; 264_601], 44_100),
+    ] {
+        let clock = Arc::new(FakeClock::new(
+            SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
+        ));
+        let mut alice = engine_on_hover("Alice", clock.clone());
+        let mut bob = engine_on_hover("Bob", clock);
+        alice.poll_notifications();
+        bob.poll_notifications();
+        let a_surface = latest_surface(&alice.initial_commands().expect("Alice renders"))
+            .expect("Alice surface");
+        let b_surface =
+            latest_surface(&bob.initial_commands().expect("Bob renders")).expect("Bob surface");
+        let binding = capture_binding(&a_surface).expect("capture binding");
+        let mut commands = report_decode(
+            &mut alice,
+            &a_surface.surface_id,
+            &binding,
+            displayed_qr(&b_surface).expect("Bob INIT"),
+        );
+        alice.apply_multi_stage_event(MultiStageEvent::PeerDiscovered);
+        commands.extend(alice.drain_pending_commands());
+        assert_eq!(audio_commands(&commands), vec!["emit", "listen"]);
+
+        let rendered = alice
+            .dispatch(Event::AudioSamplesRecorded {
+                samples,
+                sample_rate,
+            })
+            .expect("hardware dispatch succeeds");
+        let title =
+            alice
+                .current_screen()
+                .components
+                .iter()
+                .find_map(|component| match component {
+                    Component::StatusIndicator { title, .. } => Some(title.clone()),
+                    _ => None,
+                });
+        assert_eq!(
+            title,
+            Some("Couldn't confirm devices are close".to_string())
+        );
+        assert_eq!(
+            rendered
+                .iter()
+                .filter(|command| matches!(command, Command::ReplaceSurface { .. }))
+                .count(),
+            1
+        );
+    }
+}
+
+// @internal — valid native rates confirm audio and reject later stale samples.
+#[test]
+fn valid_hover_audio_survives_native_sample_rates_and_late_noise() {
+    use vauchi_core::exchange::audio_modem::{AudioConfig, generate_fsk_samples};
+    use vauchi_core::exchange::multistage::qr_codec::{StageQr, parse_qr};
+
+    for sample_rate in [44_100, 48_000] {
+        let clock = Arc::new(FakeClock::new(
+            SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
+        ));
+        let mut alice = engine_on_hover("Alice", clock.clone());
+        let mut bob = engine_on_hover("Bob", clock);
+        alice.poll_notifications();
+        bob.poll_notifications();
+        let a = latest_surface(&alice.initial_commands().expect("Alice renders"))
+            .expect("Alice surface");
+        let b = latest_surface(&bob.initial_commands().expect("Bob renders")).expect("Bob surface");
+        let qr = displayed_qr(&b).expect("Bob INIT");
+        let sid = match parse_qr(&qr).expect("valid INIT") {
+            StageQr::Init { session_id, .. } => session_id,
+            other => panic!("expected Bob INIT, got {other:?}"),
+        };
+        let commands = report_decode(
+            &mut alice,
+            &a.surface_id,
+            &capture_binding(&a).expect("capture"),
+            qr,
+        );
+        assert_eq!(audio_commands(&commands), vec!["emit", "listen"]);
+        let config = AudioConfig {
+            sample_rate,
+            ..AudioConfig::default()
+        };
+        alice
+            .dispatch(Event::AudioSamplesRecorded {
+                samples: generate_fsk_samples(&sid, &config),
+                sample_rate,
+            })
+            .expect("valid audio dispatch");
+        assert_eq!(alice.current_screen().screen_id, "multi_stage_exchange");
+        alice
+            .dispatch(Event::AudioSamplesRecorded {
+                samples: vec![0.0; 32],
+                sample_rate,
+            })
+            .expect("late audio dispatch");
+        assert_eq!(alice.current_screen().screen_id, "multi_stage_exchange");
+    }
 }
 
 /// A decode reported on the capture binding must move the protocol off

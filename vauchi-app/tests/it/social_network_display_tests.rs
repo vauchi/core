@@ -121,7 +121,7 @@ fn exchange_preview_shows_the_networks_current_name() {
     });
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "category:fun".into(),
-        item_id: "mode:tap_hover_shake".into(),
+        item_id: "mode:hover".into(),
     });
     assert_eq!(engine.current_screen().screen_id, "exchange_field_preview");
 

@@ -210,15 +210,13 @@ impl AppEngine {
     /// produced by `forward_multi_stage_hardware_event` in the
     /// QrScanned + peer-scan routes.
     pub fn apply_multi_stage_event(&mut self, event: MultiStageEvent) -> bool {
-        // Hover-only side effect: when the protocol reports
-        // `PeerDiscovered` the orchestrator fires the audio
-        // handshake. Mirrors the cycle-thread's
-        // `try_autonomous_audio_trigger` (Phase 1.C.3e-vi). Glance
-        // sessions return `None` from `try_audio_handshake_start`
-        // because they don't enter the `Listening` state.
-        if matches!(event, MultiStageEvent::PeerDiscovered)
-            && let Some(holder) = self.multi_stage_session.as_mut()
-        {
+        // A real INIT can enter transfer immediately, without resting in
+        // Discovered. Both observations start proximity hardware idempotently.
+        let peer_seen = matches!(
+            event,
+            MultiStageEvent::PeerDiscovered | MultiStageEvent::TransferProgress { .. }
+        );
+        if peer_seen && let Some(holder) = self.multi_stage_session.as_mut() {
             let cmds = holder.machine.try_audio_handshake_start();
             if !cmds.is_empty() {
                 self.extend_pending_commands(cmds);
@@ -229,9 +227,7 @@ impl AppEngine {
         // accelerometer shake capture. `try_accel_capture_start` is mode-gated
         // (Glance/Hover return `[]`) and idempotent, so this is a no-op for
         // every other mode and on repeat discovery events.
-        if matches!(event, MultiStageEvent::PeerDiscovered)
-            && let Some(holder) = self.multi_stage_session.as_mut()
-        {
+        if peer_seen && let Some(holder) = self.multi_stage_session.as_mut() {
             let accel_cmds = holder.machine.try_accel_capture_start();
             if !accel_cmds.is_empty() {
                 self.extend_pending_commands(accel_cmds);

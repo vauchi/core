@@ -42,7 +42,7 @@ fn back_from_exchange_subflow_rewinds_to_mode_selection() {
     // records ModeSelection on the engine's step history.
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "category:fun".into(),
-        item_id: "mode:tap_hover_shake".into(),
+        item_id: "mode:hover".into(),
     });
     assert!(
         engine.can_go_back(),

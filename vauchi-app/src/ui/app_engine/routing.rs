@@ -8,9 +8,9 @@
 use super::AppEngine;
 use super::AppScreen;
 use super::credential_gate::CredentialChange;
-use crate::ui::ScreenModel;
 use crate::ui::action::{ActionResult, ContactActionKind};
 use crate::ui::form_dialog::FormDialogType;
+use crate::ui::{ScreenModel, WorkflowEngine};
 use vauchi_core::Event;
 
 /// Capability tokens Core has user-facing copy for.
@@ -340,7 +340,15 @@ impl AppEngine {
 
         // Delegate to the engine via the WorkflowEngine trait (ADR-031).
         // ExchangeEngine handles session-aware events; other engines return None.
-        let engine_result = self.engine.handle_hardware_event(event);
+        let engine_result = if matches!(&event, Event::AudioSamplesRecorded { .. })
+            && self.multi_stage_session.is_some()
+        {
+            let observed = self.forward_multi_stage_hardware_event(&event);
+            self.apply_multi_stage_event(observed)
+                .then(|| ActionResult::UpdateScreen(self.current_screen()))
+        } else {
+            self.engine.handle_hardware_event(event)
+        };
 
         // Persist-at-Complete (legacy QR): the moment the session reaches
         // Complete — which the event just processed may have triggered — save

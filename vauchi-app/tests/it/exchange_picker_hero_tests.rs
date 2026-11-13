@@ -125,19 +125,12 @@ fn disclosure_lists_all_other_modes_in_order() {
     expand(&mut engine);
     assert_eq!(
         list_ids(&engine, "other_modes").expect("expanded list present"),
-        vec![
-            "mode:glance".to_string(),
-            "mode:tap_hover_shake".to_string(),
-            "mode:link".to_string(),
-            "mode:cable".to_string(),
-            "mode:tap_tap".to_string(),
-        ],
+        vec!["mode:glance".to_string(), "mode:link".to_string(),],
         "approved order, hero (Hover) excluded, every offered mode reachable"
     );
 }
 
-// Bump/Shake/Magic are not offered for the alpha — even on a device that
-// could run all three, and even when fully expanded.
+// Deferred modes stay hidden even when hardware could run them.
 // @scenario: exchange :: picker offers only the alpha-reliable modes
 // @internal
 #[test]
@@ -146,13 +139,20 @@ fn unoffered_ble_modes_are_absent_from_the_expanded_picker() {
     expand(&mut engine);
     let mut ids = list_ids(&engine, "hero").expect("hero list present");
     ids.extend(list_ids(&engine, "other_modes").expect("expanded list present"));
-    for mode in ["mode:bump", "mode:shake", "mode:magic"] {
+    for mode in [
+        "mode:bump",
+        "mode:shake",
+        "mode:magic",
+        "mode:tap_hover_shake",
+        "mode:tap_tap",
+        "mode:cable",
+    ] {
         assert!(
             !ids.contains(&mode.to_string()),
             "{mode} must not be offered, picker lists {ids:?}"
         );
     }
-    assert_eq!(ids.len(), 6, "hero + five others, got {ids:?}");
+    assert_eq!(ids.len(), 3, "hero + two others, got {ids:?}");
 }
 
 // A pre-alpha install may still store Magic as its last-used mode; the

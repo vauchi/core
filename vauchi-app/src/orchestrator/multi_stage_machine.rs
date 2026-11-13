@@ -79,6 +79,10 @@ mod save;
 /// to this module — the platform binding never reads it directly.
 const AUDIO_LISTEN_TIMEOUT_MS: u64 = 5000;
 
+// Bound native input before resampling; allow a buffer beyond the requested capture.
+const AUDIO_CAPTURE_MAX_RATE: u32 = 192_000;
+const AUDIO_CAPTURE_MAX_SECONDS: u64 = AUDIO_LISTEN_TIMEOUT_MS / 1000 + 1;
+
 /// Maximum a single non-terminal, peer-engaged exchange phase may persist
 /// with no forward progress before the machine fails to a retry/cancel
 /// screen. The deadline resets on every phase transition, so a healthy
@@ -786,13 +790,25 @@ impl MultiStageMachine {
             return MultiStageEvent::None;
         }
         let config = AudioConfig::default();
-        let decoded = audio_modem::decode_fsk_samples(samples, sample_rate, &config);
+        let maximum_samples = u64::from(sample_rate)
+            .checked_mul(AUDIO_CAPTURE_MAX_SECONDS)
+            .and_then(|count| usize::try_from(count).ok());
+        let valid_capture = sample_rate > 2 * (config.carrier_frequency + config.frequency_shift)
+            && sample_rate <= AUDIO_CAPTURE_MAX_RATE
+            && !samples.is_empty()
+            && maximum_samples.is_some_and(|limit| samples.len() <= limit)
+            && samples.iter().all(|sample| sample.is_finite());
+        let decoded = if valid_capture {
+            audio_modem::decode_fsk_samples(samples, sample_rate, &config).ok()
+        } else {
+            None
+        };
         let next = match decoded {
-            Ok(bytes) => match self.inner.verify_audio_response(&bytes) {
+            Some(bytes) => match self.inner.verify_audio_response(&bytes) {
                 Some(true) => AudioProximityState::Confirmed,
                 _ => AudioProximityState::Failed,
             },
-            Err(_) => AudioProximityState::Failed,
+            None => AudioProximityState::Failed,
         };
         if self.inner.set_audio_proximity(next).is_err() {
             return MultiStageEvent::None;

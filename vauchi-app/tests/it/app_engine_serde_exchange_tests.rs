@@ -239,14 +239,10 @@ fn exchange_screen_with_identity_has_session() {
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange");
 
-    // Pick TapHoverShake — graduated to the multi-stage engine (P2.D of the
-    // TapHoverShake plan). It now hands off via StartMultiStageExchange and
-    // the AppEngine navigates to the multi-stage screen, which owns the
-    // ADR-031 session wiring (the legacy ShowQr screen is unreachable; the
-    // ephemeral-QR-from-session check now lives on the multi-stage path).
+    // The retained Hover mode owns the same multi-stage session wiring.
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "category:fun".into(),
-        item_id: "mode:tap_hover_shake".into(),
+        item_id: "mode:hover".into(),
     });
 
     // The handoff navigates to the multi-stage exchange screen and the

@@ -5,11 +5,8 @@
 //! AppEngine-level integration tests for the graduated Cable (DirectTransport)
 //! exchange engine.
 //!
-//! Cable graduation slice 4 (R5). Pins the routing seam from slices 2-3: picking
-//! Cable on the mode picker emits `ActionResult::StartDirectTransport`, the
-//! AppEngine navigates to `AppScreen::DirectTransport`, and the live
-//! `DirectTransportEngine` drives the USB ceremony through the uniform AppEngine
-//! surface. Mirrors `nfc_exchange_app_engine_tests.rs`.
+//! The deferred engine remains covered through internal navigation. Product
+//! picker restrictions are exercised separately.
 
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
 use vauchi_core::Event;
@@ -23,27 +20,23 @@ fn engine_with_identity() -> AppEngine {
     AppEngine::new(vauchi)
 }
 
-/// Enter the exchange flow and pick Cable. With no groups the picker hands off
-/// directly to the dedicated DirectTransport screen.
+/// Preserve the deferred transport's routing and back-stack contracts.
 fn enter_cable() -> AppEngine {
     let mut engine = engine_with_identity();
     let entry = engine.navigate_to(AppScreen::Exchange);
     // Canonical tab-root id (see canonical_screen_id_tests).
     assert_eq!(entry.screen_id, "exchange");
-    let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "category:remote".into(),
-        item_id: "mode:cable".into(),
-    });
+    engine.navigate_to(AppScreen::DirectTransport);
     engine
 }
 
 // @internal
 #[test]
-fn selecting_cable_routes_to_direct_transport_and_renders_waiting() {
+fn deferred_cable_engine_renders_waiting() {
     let engine = enter_cable();
     assert!(
         matches!(engine.current_app_screen(), AppScreen::DirectTransport),
-        "picking Cable should navigate to DirectTransport, got {:?}",
+        "internal Cable navigation should reach DirectTransport, got {:?}",
         engine.current_app_screen()
     );
     assert_eq!(

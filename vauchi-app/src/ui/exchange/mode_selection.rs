@@ -2,8 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Mode selection engine — shows all exchange modes grouped by
-//! category with availability and recommendation.
+//! Presents the offered exchange choices with availability and recommendation.
 //!
 //! Wired into `ExchangeEngine` in Phase 1.2.
 
@@ -19,7 +18,7 @@ use vauchi_core::exchange::mode_availability::{
 /// Engine that displays exchange mode selection.
 ///
 /// One hero action (the last-used mode when it is offered and can run
-/// here, else Glance, else the capability recommendation) with every other
+/// here, else an offered runnable mode) with every other
 /// offered mode behind a single "Other ways to connect" disclosure (M2 S3,
 /// D2.3, user decision 2026-07-04). When the user picks a mode, returns
 /// `ModeSelectionResult::Selected`.
@@ -39,21 +38,12 @@ pub enum ModeSelectionResult {
     Screen(Box<ScreenModel>),
 }
 
-/// The modes offered to the user, in disclosure order (design D2.3):
-/// Glance first-class, then the remaining authenticated modes, NFC last
-/// (hardware-gated). The hero is filtered out so it is never listed twice.
-///
-/// Bump, Shake and Magic are deliberately absent: they are unreliable
-/// (2026-07-20 exchange-modes plan) and the owner removed them from the
-/// alpha offer (2026-09-08, RG-9), superseding D2.3's "annotate, don't
-/// hide". Their engines and enum variants stay.
+/// Keep the picker within the current product scope. Other engine variants
+/// remain available for later development.
 const DISCLOSURE_ORDER: &[ExchangeMode] = &[
     ExchangeMode::Glance,
     ExchangeMode::Hover,
-    ExchangeMode::TapHoverShake,
     ExchangeMode::Link,
-    ExchangeMode::Cable,
-    ExchangeMode::TapTap,
 ];
 
 fn is_offered(mode: ExchangeMode) -> bool {
@@ -72,8 +62,7 @@ fn runnable(
     )
 }
 
-/// Hero pick (D2.3): last-used when offered and runnable, else Glance
-/// (implemented + peer-authenticated), else the capability recommendation.
+/// A saved preference or capability fallback must not resurrect a deferred mode.
 fn pick_hero(
     last_used: Option<ExchangeMode>,
     capabilities: &DeviceCapabilities,
@@ -88,7 +77,15 @@ fn pick_hero(
     if runnable(ExchangeMode::Glance, capabilities, readiness) {
         return ExchangeMode::Glance;
     }
-    recommend_mode(capabilities)
+    let recommended = recommend_mode(capabilities);
+    if is_offered(recommended) {
+        return recommended;
+    }
+    DISCLOSURE_ORDER
+        .iter()
+        .copied()
+        .find(|mode| runnable(*mode, capabilities, readiness))
+        .unwrap_or(ExchangeMode::Link)
 }
 
 impl ModeSelectionEngine {
@@ -186,9 +183,7 @@ impl ModeSelectionEngine {
         }
         // When the mode can't run, the availability reason is the most useful
         // subtitle; otherwise show the short "what to do" instruction. The
-        // recommended mode (always available, since `recommend_mode` only picks
-        // runnable modes) gets a leading marker so the suggestion survives
-        // without a dedicated badge field on the wire item.
+        // hero gets a leading marker even when all offered choices are unavailable.
         let detail = match &availability {
             // Availability reasons are core-computed English today —
             // keying them means a reason enum on the availability type
@@ -416,21 +411,18 @@ mod tests {
         // Hero + expanded disclosure together list every offered mode once.
         let mut ids = mode_ids(&screen);
         ids.sort();
-        assert_eq!(
-            ids,
-            [
-                "mode:cable",
-                "mode:glance",
-                "mode:hover",
-                "mode:link",
-                "mode:tap_hover_shake",
-                "mode:tap_tap",
-            ]
-        );
-        for unoffered in ["mode:bump", "mode:shake", "mode:magic"] {
+        assert_eq!(ids, ["mode:glance", "mode:hover", "mode:link",]);
+        for unoffered in [
+            "mode:bump",
+            "mode:shake",
+            "mode:magic",
+            "mode:tap_hover_shake",
+            "mode:tap_tap",
+            "mode:cable",
+        ] {
             assert!(
                 !ids.iter().any(|id| id == unoffered),
-                "{unoffered} is unreliable (2026-07-20 plan) and must not be offered"
+                "{unoffered} is outside the current exchange offer"
             );
         }
     }
@@ -467,25 +459,48 @@ mod tests {
 
     #[test]
     fn last_used_unoffered_mode_does_not_become_the_hero() {
-        // A pre-alpha install may have Magic stored as its last-used mode;
-        // the hero must fall through to Glance rather than resurrect it.
-        let engine = ModeSelectionEngine::new(
-            full_caps(),
-            TransportReadiness::default(),
-            Some(ExchangeMode::Magic),
-            Locale::ENGLISH,
-        );
-        let screen = engine.screen();
-        let hero_first = screen
-            .components
-            .iter()
-            .find_map(|c| match c {
-                Component::ActionList { id, items } if id == "hero" => items.first(),
-                _ => None,
-            })
-            .map(|item| item.id.as_str());
-        assert_eq!(hero_first, Some("mode:glance"));
-        assert!(mode_ids(&screen).iter().all(|id| id != "mode:magic"));
+        for mode in [
+            ExchangeMode::Magic,
+            ExchangeMode::Bump,
+            ExchangeMode::Shake,
+            ExchangeMode::TapHoverShake,
+            ExchangeMode::TapTap,
+            ExchangeMode::Cable,
+        ] {
+            let engine = ModeSelectionEngine::new(
+                full_caps(),
+                TransportReadiness::default(),
+                Some(mode),
+                Locale::ENGLISH,
+            );
+            let screen = engine.screen();
+            let hero_first = screen
+                .components
+                .iter()
+                .find_map(|c| match c {
+                    Component::ActionList { id, items } if id == "hero" => items.first(),
+                    _ => None,
+                })
+                .map(|item| item.id.as_str());
+            assert_eq!(hero_first, Some("mode:glance"));
+            assert_eq!(mode_ids(&screen), vec!["mode:glance"]);
+        }
+    }
+
+    #[test]
+    fn capability_fallback_does_not_offer_deferred_transport() {
+        let caps = DeviceCapabilities {
+            has_camera: false,
+            has_ble: false,
+            has_nfc: true,
+            has_usb_port: true,
+            has_internet: false,
+            audio: vauchi_core::types::AudioCapability::None,
+            ..Default::default()
+        };
+        let engine =
+            ModeSelectionEngine::new(caps, TransportReadiness::default(), None, Locale::ENGLISH);
+        assert_eq!(mode_ids(&engine.screen()), vec!["mode:link"]);
     }
 
     #[test]
@@ -689,18 +704,16 @@ mod tests {
     #[test]
     fn selecting_unavailable_mode_still_returns_selected() {
         // Availability enforcement is the engine's job, not mode selection's
-        let mut engine = ModeSelectionEngine::new(
-            minimal_caps(),
-            TransportReadiness::default(),
-            None,
-            Locale::ENGLISH,
-        );
+        let mut caps = minimal_caps();
+        caps.has_internet = false;
+        let mut engine =
+            ModeSelectionEngine::new(caps, TransportReadiness::default(), None, Locale::ENGLISH);
         let result = engine.handle_action(&UserAction::ListItemSelected {
             component_id: "category:fun".into(),
-            item_id: "mode:tap_tap".into(),
+            item_id: "mode:link".into(),
         });
         assert!(
-            matches!(result, ModeSelectionResult::Selected(ExchangeMode::TapTap)),
+            matches!(result, ModeSelectionResult::Selected(ExchangeMode::Link)),
             "Should return Selected even for unavailable mode"
         );
     }
@@ -717,7 +730,14 @@ mod tests {
             None,
             Locale::ENGLISH,
         );
-        for unoffered in ["mode:bump", "mode:shake", "mode:magic"] {
+        for unoffered in [
+            "mode:bump",
+            "mode:shake",
+            "mode:magic",
+            "mode:tap_hover_shake",
+            "mode:tap_tap",
+            "mode:cable",
+        ] {
             let result = engine.handle_action(&UserAction::ListItemSelected {
                 component_id: "category:standard".into(),
                 item_id: unoffered.into(),

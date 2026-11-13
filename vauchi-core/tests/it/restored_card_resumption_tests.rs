@@ -51,7 +51,31 @@ fn deliver(from: &Vauchi, to: &Vauchi, to_id: &str, from_id: &str) {
             | ReceiveOutcome::RegistryAckReceived {
                 reply: Some(reply), ..
             } => {
+                let before = to
+                    .storage()
+                    .pending()
+                    .get_pending_updates(&reply.sender_id)
+                    .unwrap();
                 to.queue_registry_ack(&reply).unwrap();
+                let after = to
+                    .storage()
+                    .pending()
+                    .get_pending_updates(&reply.sender_id)
+                    .unwrap();
+                let replies: Vec<_> = after
+                    .iter()
+                    .filter(|update| !before.iter().any(|old| old.id == update.id))
+                    .collect();
+                assert_eq!(
+                    replies.len(),
+                    1,
+                    "one ACK must answer the requesting device"
+                );
+                assert_eq!(
+                    replies[0].target_device_id,
+                    Some(reply.sender_device_id),
+                    "other devices must not drain the requester's ACK"
+                );
             }
             ReceiveOutcome::CardDelta | ReceiveOutcome::RegistryAckReceived { reply: None, .. } => {
             }

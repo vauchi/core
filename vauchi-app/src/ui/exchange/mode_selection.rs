@@ -487,6 +487,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn capability_fallback_does_not_offer_deferred_transport() {
         let caps = DeviceCapabilities {

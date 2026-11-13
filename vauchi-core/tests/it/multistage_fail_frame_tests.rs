@@ -42,8 +42,14 @@ fn run(
         if let Some(q) = a.get_display_qr() {
             b.process_scanned_qr(&q.data);
         }
+        if stop(a, b) {
+            return;
+        }
         if let Some(q) = b.get_display_qr() {
             a.process_scanned_qr(&q.data);
+        }
+        if stop(a, b) {
+            return;
         }
         clock.advance(TICK);
     }
@@ -54,8 +60,7 @@ fn is_fail(frame: &str) -> bool {
     matches!(parse_qr(frame), Ok(StageQr::Fail { .. }))
 }
 
-/// Two devices of one identity: each rejects the other's payload.
-fn twins() -> (
+fn rejecting_phone_and_twin() -> (
     MultiStageSession,
     MultiStageSession,
     Arc<FakeMonotonicClock>,
@@ -64,16 +69,24 @@ fn twins() -> (
     let alice = Identity::create("Alice", 0);
     let mut a = signed(&alice, &clock);
     let mut twin = signed(&alice, &clock);
-    run(&mut a, &mut twin, &clock, |a, _| {
+    run(&mut a, &mut twin, &clock, |a, twin| {
         matches!(a.get_state(), ProtocolState::Failed(_))
+            || matches!(twin.get_state(), ProtocolState::Failed(_))
     });
+    if !a.shows_fail_frame() {
+        std::mem::swap(&mut a, &mut twin);
+    }
     (a, twin, clock)
 }
 
 // @internal
 #[test]
 fn a_phone_that_rejects_its_peer_shows_fail_for_the_linger_and_then_nothing() {
-    let (mut a, _twin, clock) = twins();
+    let (mut a, _twin, clock) = rejecting_phone_and_twin();
+    assert_eq!(
+        a.get_state(),
+        ProtocolState::Failed("peer payload did not verify".into())
+    );
 
     let frame = a
         .get_display_qr()
@@ -145,10 +158,16 @@ fn a_phone_whose_app_could_not_save_shows_fail_and_its_peer_learns_it() {
         if a.get_state() == ProtocolState::Finalized {
             break;
         }
-        if let Some(q) = a.get_display_qr()
-            && !q.data.starts_with("CNF4")
-        {
-            b.process_scanned_qr(&q.data);
+        if let Some(q) = a.get_display_qr() {
+            let data = match parse_qr(&q.data).unwrap() {
+                StageQr::Final {
+                    session_id,
+                    reveal_key,
+                    ..
+                } => qr_codec::format_reveal_qr(&session_id, &reveal_key),
+                _ => q.data,
+            };
+            b.process_scanned_qr(&data);
         }
         if let Some(q) = b.get_display_qr() {
             a.process_scanned_qr(&q.data);

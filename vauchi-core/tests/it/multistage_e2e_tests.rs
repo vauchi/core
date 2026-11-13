@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 use std::time::Duration;
+use vauchi_core::exchange::multistage::qr_codec::{self, StageQr};
 use vauchi_core::exchange::multistage::session::MultiStageSession;
 use vauchi_core::exchange::multistage::types::ProtocolState;
 use vauchi_core::monotonic::{FakeMonotonicClock, MonotonicClock, SystemMonotonicClock};
@@ -512,6 +513,28 @@ fn test_atomicity_ready_exchange_reaches_finalized() {
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
 
+/// Preserve the reveal when testing loss of only the acceptance tag.
+fn without_acceptance(qr: &str) -> (String, bool) {
+    match qr_codec::parse_qr(qr).expect("session emits a valid frame") {
+        StageQr::Final {
+            session_id,
+            reveal_key,
+            ..
+        }
+        | StageQr::Done {
+            session_id,
+            reveal_key,
+            ..
+        }
+        | StageQr::Both {
+            session_id,
+            reveal_key,
+            ..
+        } => (qr_codec::format_reveal_qr(&session_id, &reveal_key), true),
+        _ => (qr.to_owned(), false),
+    }
+}
+
 /// Feature: contact_exchange.feature @atomicity
 /// A side that never scans its peer's finalization frame must not finalize.
 // @internal
@@ -525,15 +548,14 @@ fn test_atomicity_without_peer_finalization_frame_no_finalize() {
     alice.process_scanned_qr(&bi.data);
     bob.process_scanned_qr(&ai.data);
 
-    // Bob reads everything Alice shows except her confirm.
+    // CNF4 can carry Alice's first reveal, so keep its key while withholding
+    // the acceptance tag. Dropping the whole frame can strand both peers.
     let mut withheld = 0;
     for _ in 0..500 {
         if let Some(aq) = alice.get_display_qr() {
-            if aq.data.starts_with("CNF4") || aq.data.starts_with("DON4") {
-                withheld += 1;
-            } else {
-                bob.process_scanned_qr(&aq.data);
-            }
+            let (frame, acceptance_withheld) = without_acceptance(&aq.data);
+            withheld += usize::from(acceptance_withheld);
+            bob.process_scanned_qr(&frame);
         }
         if let Some(bq) = bob.get_display_qr() {
             alice.process_scanned_qr(&bq.data);
@@ -580,11 +602,9 @@ fn test_asymmetric_finalization_both_reach_finalized() {
     for _ in 0..500 {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
-        if let Some(aq) = &aq
-            && !aq.data.starts_with("CNF4")
-            && !aq.data.starts_with("DON4")
-        {
-            bob.process_scanned_qr(&aq.data);
+        if let Some(aq) = &aq {
+            let (reveal_without_acceptance, _) = without_acceptance(&aq.data);
+            bob.process_scanned_qr(&reveal_without_acceptance);
         }
         if let Some(bq) = &bq {
             alice.process_scanned_qr(&bq.data);

@@ -117,7 +117,10 @@ pub(crate) fn receive_genesis_registry_push(
     })();
     match txn {
         Ok(held) => {
-            storage.commit()?;
+            if let Err(error) = storage.commit() {
+                storage.rollback();
+                return Err(error.into());
+            }
             journal_handshake_state_for_siblings(identity, storage, sender_id);
             Ok(ReceiveOutcome::RegistryPushReceived(RegistryReplyNeeded {
                 sender_id: sender_id.to_string(),
@@ -186,7 +189,10 @@ pub(crate) fn receive_genesis_registry_ack(
     })();
     match txn {
         Ok(reply) => {
-            storage.commit()?;
+            if let Err(error) = storage.commit() {
+                storage.rollback();
+                return Err(error.into());
+            }
             journal_handshake_state_for_siblings(identity, storage, sender_id);
             Ok(ReceiveOutcome::RegistryAckReceived {
                 sender_id: sender_id.to_string(),

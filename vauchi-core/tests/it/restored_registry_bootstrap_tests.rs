@@ -15,7 +15,9 @@ use vauchi_core::api::{
     process_single_card_update_for_device,
 };
 use vauchi_core::clock::FakeClock;
+use vauchi_core::crypto::SigningKeyPair;
 use vauchi_core::crypto::ratchet::RatchetMessage;
+use vauchi_core::identity::{DeviceInfo, DeviceRegistry, MAX_DEVICES};
 use vauchi_core::network::mailbox_token::{
     compute_device_mailbox_token, current_day_epoch, token_hex,
 };
@@ -317,5 +319,61 @@ fn genesis_push_commit_failure_rolls_back_and_retry_succeeds() {
                 .unwrap()
                 .version()
         )
+    );
+}
+
+// @scenario: backup_format_versioning :: Restored contacts continue exchanging updates
+#[test]
+fn supported_maximum_fleet_can_bootstrap_its_registry_ack() {
+    let p = pair();
+    let identity = p.bob.identity().unwrap();
+    let device_key = p
+        .bob
+        .storage()
+        .device()
+        .load_or_create_device_signing_key()
+        .unwrap();
+    let entry = identity
+        .device_info()
+        .to_registered(identity.master_seed())
+        .with_signing_key(*device_key.public_key().as_bytes());
+    let mut registry = DeviceRegistry::new(entry, identity.signing_keypair());
+    for index in 1..MAX_DEVICES {
+        let device = DeviceInfo::derive(
+            identity.master_seed(),
+            index.try_into().unwrap(),
+            format!("Device {index}"),
+            p.bob.clock().unix_seconds(),
+        );
+        let signing_key = SigningKeyPair::generate();
+        registry
+            .add_device(
+                device
+                    .to_registered(identity.master_seed())
+                    .with_signing_key(*signing_key.public_key().as_bytes()),
+                identity.signing_keypair(),
+            )
+            .unwrap();
+    }
+    assert_eq!(registry.active_count(), MAX_DEVICES);
+    p.bob
+        .storage()
+        .device()
+        .save_device_registry(&registry)
+        .unwrap();
+    let payload = ack(&p);
+    let outcome = receive_ack(&p, &payload).expect("the supported fleet must bootstrap");
+    assert!(
+        matches!(outcome, ReceiveOutcome::RegistryAckReceived { .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(
+        p.alice
+            .storage()
+            .device()
+            .load_contact_active_devices(&p.bob_at_alice)
+            .unwrap()
+            .len(),
+        MAX_DEVICES
     );
 }

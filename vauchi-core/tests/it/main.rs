@@ -511,6 +511,7 @@ mod registry_activation_send_gate_tests;
 mod registry_activation_sibling_sync_tests;
 mod registry_activation_state_tests;
 mod registry_activation_store_tests;
+mod registry_broadcast_bounds_tests;
 mod registry_broadcast_signature_tests;
 mod registry_push_per_device_tests;
 mod registry_push_retry_tests;

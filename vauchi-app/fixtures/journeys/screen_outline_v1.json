@@ -10742,37 +10742,13 @@
                   {
                     "accessibility": {
                       "description": null,
-                      "label": "len:15"
-                    },
-                    "activation": {
-                      "accessibility_label": "len:15",
-                      "enabled": true,
-                      "icon_token": null,
-                      "interaction_id": "surface.2.interaction.2",
-                      "label": "len:15",
-                      "shortcut": null
-                    },
-                    "controls": [],
-                    "detail": null,
-                    "enabled": true,
-                    "fallback_text": null,
-                    "icon_token": "pictogram.exchange.tap_hover_shake",
-                    "image_data": "bytes:0",
-                    "secondary_actions": [],
-                    "selected": false,
-                    "subtitle": "len:37",
-                    "title": "len:15"
-                  },
-                  {
-                    "accessibility": {
-                      "description": null,
                       "label": "len:4"
                     },
                     "activation": {
                       "accessibility_label": "len:4",
                       "enabled": true,
                       "icon_token": null,
-                      "interaction_id": "surface.2.interaction.3",
+                      "interaction_id": "surface.2.interaction.2",
                       "label": "len:4",
                       "shortcut": null
                     },
@@ -10786,54 +10762,6 @@
                     "selected": false,
                     "subtitle": "len:31",
                     "title": "len:4"
-                  },
-                  {
-                    "accessibility": {
-                      "description": null,
-                      "label": "len:5"
-                    },
-                    "activation": {
-                      "accessibility_label": "len:5",
-                      "enabled": true,
-                      "icon_token": null,
-                      "interaction_id": "surface.2.interaction.4",
-                      "label": "len:5",
-                      "shortcut": null
-                    },
-                    "controls": [],
-                    "detail": null,
-                    "enabled": true,
-                    "fallback_text": null,
-                    "icon_token": "pictogram.exchange.cable",
-                    "image_data": "bytes:0",
-                    "secondary_actions": [],
-                    "selected": false,
-                    "subtitle": "len:17",
-                    "title": "len:5"
-                  },
-                  {
-                    "accessibility": {
-                      "description": null,
-                      "label": "len:7"
-                    },
-                    "activation": {
-                      "accessibility_label": "len:7",
-                      "enabled": true,
-                      "icon_token": null,
-                      "interaction_id": "surface.2.interaction.5",
-                      "label": "len:7",
-                      "shortcut": null
-                    },
-                    "controls": [],
-                    "detail": null,
-                    "enabled": true,
-                    "fallback_text": null,
-                    "icon_token": "pictogram.exchange.tap_tap",
-                    "image_data": "bytes:0",
-                    "secondary_actions": [],
-                    "selected": false,
-                    "subtitle": "len:29",
-                    "title": "len:7"
                   }
                 ],
                 "searchable": false

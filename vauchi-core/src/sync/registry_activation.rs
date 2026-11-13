@@ -33,9 +33,10 @@ use crate::capacity::capacity;
 use crate::identity::RegistryBroadcast;
 use crate::sync::delta::DeltaError;
 
-/// Ceiling for a carried broadcast, aligned with the genesis envelope's
-/// registry ceiling so a broadcast that fits one path fits the other.
-pub const MAX_BROADCAST_JSON_BYTES: usize = 4096;
+/// Raw carried-registry ceiling, including the supported ten-device fleet.
+/// Genesis control envelopes retain their independent padded wire ceiling.
+pub const MAX_BROADCAST_JSON_BYTES: usize =
+    crate::identity::device::MAX_REGISTRY_BROADCAST_JSON_BYTES;
 
 /// Push nonce length on the wire.
 const NONCE_LEN: usize = 32;

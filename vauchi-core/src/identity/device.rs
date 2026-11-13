@@ -68,6 +68,10 @@ const DEVICE_EXCHANGE_INFO: &[u8] = b"Vauchi_Device_Exchange_v2";
 /// Maximum number of linked devices per identity.
 pub const MAX_DEVICES: usize = 10;
 
+// Ten canonical entries need at most 5123 JSON bytes; retain bounded
+// whitespace headroom without permitting unsupported fleets (private#1247).
+pub(crate) const MAX_REGISTRY_BROADCAST_JSON_BYTES: usize = 8192;
+
 /// Device-related errors.
 #[derive(Error, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -885,9 +889,24 @@ impl RegistryBroadcast {
         serde_json::to_string(self).expect("Broadcast serialization should not fail")
     }
 
-    /// Deserializes from JSON.
+    /// Deserializes a bounded broadcast with supported device and key widths.
     pub fn from_json(json: &str) -> Result<Self, DeviceError> {
-        serde_json::from_str(json).map_err(|_| DeviceError::InvalidRegistrySignature)
+        if json.len() > MAX_REGISTRY_BROADCAST_JSON_BYTES {
+            return Err(DeviceError::InvalidRegistrySignature);
+        }
+        let broadcast: Self =
+            serde_json::from_str(json).map_err(|_| DeviceError::InvalidRegistrySignature)?;
+        if broadcast.active_devices.len() > MAX_DEVICES {
+            return Err(DeviceError::MaxDevicesReached);
+        }
+        if broadcast
+            .device_signature
+            .as_ref()
+            .is_some_and(|signature| signature.len() != 64)
+        {
+            return Err(DeviceError::InvalidDeviceSignature);
+        }
+        Ok(broadcast)
     }
 }
 

@@ -28,11 +28,10 @@
 //!   `shared_key` + the message header on each attempt and never persists a
 //!   transient row; a bounded chain index caps key-derivation work.
 //!
-//! MR B keeps the receiver's post-accept session under the shared `[0;32]`
-//! ratchet id (today's production HTTP receive path routes everything there);
-//! canonical per-device sessions and the msg#2 acknowledgement belong to the
-//! later routing program. See
-//! `planning/todo/2026-07-21-genesis-envelope-plan.md` §REVISION.
+//! Receive handlers preserve established ratchets (ADR-068). Private genesis
+//! payloads may initialize a missing legacy `[0;32]` receive channel;
+//! registry handshakes persist activation state without installing a genesis
+//! session. Active card traffic uses independent device-pair ratchets.
 
 use crate::crypto::x3dh::X3DHKeyPair;
 use crate::crypto::{DoubleRatchetState, HKDF, RatchetMessage, SymmetricKey};
@@ -45,9 +44,8 @@ mod control_codec;
 #[path = "../../tests/unit/genesis_control_envelope_tests.rs"]
 mod control_envelope_tests;
 
-/// Version byte of the genesis envelope inner payload. Distinct from the
-/// [`crate::sync::delta::VersionedPayload`] tags (`0x02`–`0x04`) — a genesis
-/// envelope wraps one of those as its inner payload.
+/// Version byte of the uncompressed genesis plaintext. Its inner payload's
+/// version tags belong to a separate framing layer.
 pub const PAYLOAD_VERSION_GENESIS: u8 = 0x05;
 
 /// Domain separator for the envelope identity signature.

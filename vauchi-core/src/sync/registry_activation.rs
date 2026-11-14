@@ -142,9 +142,9 @@ impl ActivationTracker {
         self
     }
 
-    /// Record the peer's ack. Accepted only when it answers the
-    /// outstanding push exactly (nonce and version); anything else is
-    /// rejected without a state change.
+    /// Record an ACK of the outstanding registry version.
+    /// Reject a different version or a missing outstanding push without
+    /// changing state; the nonce is correlation rather than authority.
     pub fn record_ack(
         &mut self,
         nonce: &[u8; NONCE_LEN],

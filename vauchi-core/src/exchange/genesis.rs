@@ -38,6 +38,8 @@ use crate::crypto::x3dh::X3DHKeyPair;
 use crate::crypto::{DoubleRatchetState, HKDF, RatchetMessage, SymmetricKey};
 use crate::identity::{Identity, RegistryBroadcast};
 
+mod control_codec;
+
 /// Version byte of the genesis envelope inner payload. Distinct from the
 /// [`crate::sync::delta::VersionedPayload`] tags (`0x02`–`0x04`) — a genesis
 /// envelope wraps one of those as its inner payload.
@@ -59,7 +61,7 @@ const GENESIS_RESPONDER_INFO: &[u8] = b"vauchi-genesis-responder-v1";
 /// a `shared_key` holder cannot force skipped-key inflation (F8/F7).
 pub const GENESIS_MAX_CHAIN_INDEX: u32 = 64;
 
-/// Maximum genesis envelope plaintext, kept below the top padding bucket
+/// Maximum genesis wire plaintext after control packing, below the top padding bucket
 /// (4096 − the 4-byte length prefix) so a registry-bearing genesis never
 /// pushes into an overflow bucket that would leak its size class (F10).
 pub const MAX_GENESIS_PLAINTEXT: usize = 4092;
@@ -127,8 +129,8 @@ impl GenesisEnvelope {
     /// Seal `inner_payload` (a `VersionedPayload`-encoded signed alert) into a
     /// wire-ordinary [`RatchetMessage`] rooted in `shared_key`.
     ///
-    /// Returns the message to queue and the advanced initiator ratchet to
-    /// persist under the `[0;32]` session id for this contact.
+    /// Returns the message and advanced initiator state. Stateless genesis
+    /// callers must not persist it as the relationship's ratchet.
     pub fn seal(
         shared_key: &SymmetricKey,
         sender: &Identity,
@@ -150,6 +152,11 @@ impl GenesisEnvelope {
         let sender_exchange_public_key = *sender.device_info().exchange_public_key();
         let broadcast_json = serde_json::to_vec(sender_broadcast)
             .map_err(|e| GenesisError::Crypto(format!("broadcast encode: {e}")))?;
+        if broadcast_json.len() > crate::identity::device::MAX_REGISTRY_BROADCAST_JSON_BYTES
+            || inner_payload.len() > control_codec::MAX_CONTROL_PAYLOAD
+        {
+            return Err(GenesisError::TooLarge);
+        }
 
         // Genesis msg#1 header is deterministic (`initialize_initiator` starts
         // at generation 0, index 0, previous-chain 0); the signature binds the
@@ -181,9 +188,7 @@ impl GenesisEnvelope {
             &broadcast_json,
             inner_payload,
         );
-        if plaintext.len() > MAX_GENESIS_PLAINTEXT {
-            return Err(GenesisError::TooLarge);
-        }
+        let plaintext = control_codec::pack(plaintext, is_registry_control(inner_payload))?;
 
         let message = session
             .encrypt(&plaintext)
@@ -372,7 +377,18 @@ struct DecodedEnvelope {
 /// buffer must be exactly consumed (no trailing bytes). Peer-supplied lengths
 /// never drive an allocation past the remaining input.
 fn decode_envelope(data: &[u8]) -> Result<DecodedEnvelope, GenesisError> {
-    if data.len() > MAX_GENESIS_PLAINTEXT {
+    let expanded = control_codec::unpack(data)?;
+    let decoded = decode_signed_envelope(&expanded)?;
+    if data.first() == Some(&control_codec::COMPRESSED_CONTROL_VERSION)
+        && !is_registry_control(&decoded.inner_payload)
+    {
+        return Err(GenesisError::InvalidFormat);
+    }
+    Ok(decoded)
+}
+
+fn decode_signed_envelope(data: &[u8]) -> Result<DecodedEnvelope, GenesisError> {
+    if data.len() > control_codec::MAX_EXPANDED_ENVELOPE {
         return Err(GenesisError::TooLarge);
     }
     let mut cursor = Reader::new(data);
@@ -384,9 +400,17 @@ fn decode_envelope(data: &[u8]) -> Result<DecodedEnvelope, GenesisError> {
     let sender_exchange_public_key = cursor.array32()?;
     let signature = cursor.array64()?;
     let broadcast_len = cursor.u32()? as usize;
-    let broadcast_json = cursor.take(broadcast_len)?.to_vec();
+    let broadcast_bytes = cursor.take(broadcast_len)?;
+    if broadcast_len > crate::identity::device::MAX_REGISTRY_BROADCAST_JSON_BYTES {
+        return Err(GenesisError::TooLarge);
+    }
+    let broadcast_json = broadcast_bytes.to_vec();
     let inner_len = cursor.u32()? as usize;
-    let inner_payload = cursor.take(inner_len)?.to_vec();
+    let inner_bytes = cursor.take(inner_len)?;
+    if inner_len > control_codec::MAX_CONTROL_PAYLOAD {
+        return Err(GenesisError::TooLarge);
+    }
+    let inner_payload = inner_bytes.to_vec();
     if !cursor.is_empty() {
         return Err(GenesisError::InvalidFormat);
     }
@@ -398,6 +422,14 @@ fn decode_envelope(data: &[u8]) -> Result<DecodedEnvelope, GenesisError> {
         broadcast_json,
         inner_payload,
     })
+}
+
+fn is_registry_control(payload: &[u8]) -> bool {
+    matches!(
+        crate::sync::delta::VersionedPayload::decode(payload),
+        Ok(crate::sync::delta::VersionedPayload::RegistryPush(_))
+            | Ok(crate::sync::delta::VersionedPayload::RegistryAck(_))
+    )
 }
 
 /// Minimal bounds-checked byte reader — every accessor fails closed on

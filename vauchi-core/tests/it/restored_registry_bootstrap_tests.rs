@@ -322,13 +322,9 @@ fn genesis_push_commit_failure_rolls_back_and_retry_succeeds() {
     );
 }
 
-// @scenario: backup_format_versioning :: Restored contacts continue exchanging updates
-#[test]
-fn supported_maximum_fleet_can_bootstrap_its_registry_ack() {
-    let p = pair();
-    let identity = p.bob.identity().unwrap();
-    let device_key = p
-        .bob
+fn maximum_fleet(owner: &Vauchi) {
+    let identity = owner.identity().unwrap();
+    let device_key = owner
         .storage()
         .device()
         .load_or_create_device_signing_key()
@@ -343,7 +339,7 @@ fn supported_maximum_fleet_can_bootstrap_its_registry_ack() {
             identity.master_seed(),
             index.try_into().unwrap(),
             format!("Device {index}"),
-            p.bob.clock().unix_seconds(),
+            owner.clock().unix_seconds(),
         );
         let signing_key = SigningKeyPair::generate();
         registry
@@ -356,15 +352,60 @@ fn supported_maximum_fleet_can_bootstrap_its_registry_ack() {
             .unwrap();
     }
     assert_eq!(registry.active_count(), MAX_DEVICES);
-    p.bob
+    owner
         .storage()
         .device()
         .save_device_registry(&registry)
         .unwrap();
+}
+
+// @scenario: backup_format_versioning :: Restored contacts continue exchanging updates
+#[test]
+fn supported_maximum_fleet_can_bootstrap_its_registry_ack() {
+    let p = pair();
+    maximum_fleet(&p.bob);
     let payload = ack(&p);
     let outcome = receive_ack(&p, &payload).expect("the supported fleet must bootstrap");
     assert!(
         matches!(outcome, ReceiveOutcome::RegistryAckReceived { .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(
+        p.alice
+            .storage()
+            .device()
+            .load_contact_active_devices(&p.bob_at_alice)
+            .unwrap()
+            .len(),
+        MAX_DEVICES
+    );
+}
+
+// @scenario: backup_format_versioning :: Restored contacts continue exchanging updates
+#[test]
+fn supported_maximum_fleet_can_bootstrap_its_registry_push() {
+    let p = pair();
+    maximum_fleet(&p.bob);
+    assert_eq!(p.bob.queue_registry_pushes().unwrap(), 1);
+    let payload = p
+        .bob
+        .storage()
+        .pending()
+        .get_pending_updates(&p.alice_at_bob)
+        .unwrap()
+        .into_iter()
+        .next()
+        .expect("maximum-fleet push queued")
+        .payload;
+    let outcome = process_single_card_update(
+        p.alice.identity().unwrap(),
+        p.alice.storage(),
+        &p.bob_at_alice,
+        &payload,
+    )
+    .expect("the supported fleet must bootstrap its push");
+    assert!(
+        matches!(outcome, ReceiveOutcome::RegistryPushReceived(_)),
         "{outcome:?}"
     );
     assert_eq!(

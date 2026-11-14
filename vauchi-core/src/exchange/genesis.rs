@@ -40,6 +40,10 @@ use crate::identity::{Identity, RegistryBroadcast};
 
 mod control_codec;
 
+#[cfg(test)]
+#[path = "../../tests/unit/genesis_control_envelope_tests.rs"]
+mod control_envelope_tests;
+
 /// Version byte of the genesis envelope inner payload. Distinct from the
 /// [`crate::sync::delta::VersionedPayload`] tags (`0x02`–`0x04`) — a genesis
 /// envelope wraps one of those as its inner payload.

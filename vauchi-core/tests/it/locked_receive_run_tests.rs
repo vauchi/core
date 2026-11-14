@@ -32,6 +32,7 @@ use vauchi_core::network::mailbox_token::current_day_epoch;
 use vauchi_core::rng::OsSecureRng;
 use vauchi_core::sleeper::FakeSleeper;
 use vauchi_core::storage::{LockedReceiveStorage, MemoryKeyStorage, SecureStorage};
+use vauchi_core::sync::registry_activation::ActivationState;
 use vauchi_protocol::ohttp_key::window_of;
 
 struct World {
@@ -409,6 +410,21 @@ fn an_update_kept_while_locked_is_acknowledged_at_the_unlock_when_its_ack_was_lo
     world.outer.drop_gateway_acks(true);
     let locked = world.locked_run(&world.relay());
     world.outer.drop_gateway_acks(false);
+    let kept = world.inbox();
+    assert_eq!(kept.len(), 1);
+    assert_eq!(kept[0].contact_id(), world.linked.peer_contact_id);
+    assert_eq!(kept[0].peer_device_id(), &[0; 32]);
+    assert_eq!(
+        world
+            .alice
+            .storage()
+            .device()
+            .load_contact_device_registry(&world.linked.peer_contact_id)
+            .unwrap()
+            .map(|registry| registry.version()),
+        None,
+        "the other blob must bootstrap Bob's registry"
+    );
 
     // The session has moved past the kept blob, so trying it again would
     // fail, and on a device session that failure deletes the session.
@@ -416,14 +432,63 @@ fn an_update_kept_while_locked_is_acknowledged_at_the_unlock_when_its_ack_was_lo
     let after = world.locked_run(&world.relay());
 
     assert_eq!(locked, LockedRunOutcome::Received { stored: 1, left: 1 });
-    // Bob's other blob has no session on this side at all, locked or not.
+    // Bob's other blob is an authenticated genesis registry ACK. The
+    // relationship key can open it after unlock, without retrying the kept card.
     assert!(
         matches!(
             &unlocked,
-            VauchiSyncOutcome::Ok { rejected: 1, reject_reasons, .. } if reject_reasons == "no_ratchet:1"
+            VauchiSyncOutcome::Ok {
+                received: 1,
+                fetched: 2,
+                rejected: 0,
+                unresolved: 0,
+                ..
+            }
         ),
         "the kept blob is not tried again: {unlocked:?}"
     );
+    assert_eq!(
+        world
+            .alice
+            .storage()
+            .registry_activation()
+            .load_activation(&world.linked.peer_contact_id)
+            .unwrap()
+            .unwrap()
+            .state(),
+        ActivationState::Active
+    );
+    let registry = world
+        .alice
+        .storage()
+        .device()
+        .load_contact_device_registry(&world.linked.peer_contact_id)
+        .unwrap()
+        .unwrap();
+    assert!(registry.contains_device(world.bob.identity().unwrap().device_id()));
+    let retained = world.inbox();
+    assert_eq!(retained.len(), 1);
+    assert_eq!(retained[0].contact_id(), kept[0].contact_id());
+    assert_eq!(retained[0].peer_device_id(), kept[0].peer_device_id());
+    assert_eq!(retained[0].plaintext(), kept[0].plaintext());
+    assert_eq!(retained[0].received_at(), kept[0].received_at());
+    let (mut sender, _) = world
+        .bob
+        .storage()
+        .ratchets()
+        .load_ratchet_state(&world.linked.host_contact_id)
+        .unwrap()
+        .unwrap();
+    let (mut receiver, _) = world
+        .alice
+        .storage()
+        .ratchets()
+        .load_ratchet_state(&world.linked.peer_contact_id)
+        .unwrap()
+        .unwrap();
+    let challenge = b"kept ACK continuity";
+    let next = sender.encrypt(challenge).unwrap();
+    assert_eq!(receiver.decrypt(&next).unwrap(), challenge);
     assert_eq!(
         after,
         LockedRunOutcome::Received { stored: 0, left: 0 },

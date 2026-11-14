@@ -61,10 +61,10 @@ pub const PAYLOAD_VERSION_RECIPROCITY: u8 = 0x03;
 pub const PAYLOAD_VERSION_ALERT: u8 = 0x04;
 
 /// Version byte for F4 registry-push payloads.
-pub const PAYLOAD_VERSION_REGISTRY_PUSH: u8 = 0x05;
+pub const PAYLOAD_VERSION_REGISTRY_PUSH: u8 = crate::sync_control::PUSH_VERSION;
 
 /// Version byte for F4 registry-ack payloads.
-pub const PAYLOAD_VERSION_REGISTRY_ACK: u8 = 0x06;
+pub const PAYLOAD_VERSION_REGISTRY_ACK: u8 = crate::sync_control::ACK_VERSION;
 
 /// Version byte for a reciprocity confirmation from a sender that already
 /// counts us as confirmed: an answer, never answered (private#663).

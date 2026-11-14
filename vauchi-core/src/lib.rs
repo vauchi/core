@@ -143,6 +143,8 @@ pub use network::{
     ConnectionState, EmergencyAlert, GeoLocation, MessageEnvelope, MockTransport, NetworkError,
     RelayClient, RelayClientConfig, Transport,
 };
+mod sync_control;
+
 #[cfg(feature = "storage")]
 pub mod sync;
 #[cfg(feature = "storage")]

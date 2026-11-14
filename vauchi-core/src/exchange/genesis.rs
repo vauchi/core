@@ -37,10 +37,11 @@
 use crate::crypto::x3dh::X3DHKeyPair;
 use crate::crypto::{DoubleRatchetState, HKDF, RatchetMessage, SymmetricKey};
 use crate::identity::{Identity, RegistryBroadcast};
+use crate::sync_control::is_registry_control;
 
 mod control_codec;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "storage"))]
 #[path = "../../tests/unit/genesis_control_envelope_tests.rs"]
 mod control_envelope_tests;
 
@@ -426,14 +427,6 @@ fn decode_signed_envelope(data: &[u8]) -> Result<DecodedEnvelope, GenesisError> 
         broadcast_json,
         inner_payload,
     })
-}
-
-fn is_registry_control(payload: &[u8]) -> bool {
-    matches!(
-        crate::sync::delta::VersionedPayload::decode(payload),
-        Ok(crate::sync::delta::VersionedPayload::RegistryPush(_))
-            | Ok(crate::sync::delta::VersionedPayload::RegistryAck(_))
-    )
 }
 
 /// Minimal bounds-checked byte reader — every accessor fails closed on

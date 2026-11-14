@@ -24,7 +24,8 @@ use crate::identity::device::MAX_REGISTRY_BROADCAST_JSON_BYTES;
 
 pub(super) const COMPRESSED_CONTROL_VERSION: u8 = 0x15;
 const WRAPPER_HEADER: usize = 1 + 4 + 4;
-pub(super) const MAX_CONTROL_PAYLOAD: usize = 1 + 32 + 8 + 1 + MAX_REGISTRY_BROADCAST_JSON_BYTES;
+pub(super) const MAX_CONTROL_PAYLOAD: usize =
+    1 + crate::sync_control::ACK_PREFIX_LEN + MAX_REGISTRY_BROADCAST_JSON_BYTES;
 pub(super) const MAX_EXPANDED_ENVELOPE: usize =
     1 + 8 + 32 + 32 + 64 + 4 + MAX_REGISTRY_BROADCAST_JSON_BYTES + 4 + MAX_CONTROL_PAYLOAD;
 

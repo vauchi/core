@@ -39,10 +39,10 @@ pub const MAX_BROADCAST_JSON_BYTES: usize =
     crate::identity::device::MAX_REGISTRY_BROADCAST_JSON_BYTES;
 
 /// Push nonce length on the wire.
-const NONCE_LEN: usize = 32;
+const NONCE_LEN: usize = crate::sync_control::NONCE_LEN;
 
 /// Ack prefix: `push_nonce(32) || acked_version(8) || echo_flag(1)`.
-const ACK_PREFIX_LEN: usize = NONCE_LEN + 8 + 1;
+const ACK_PREFIX_LEN: usize = crate::sync_control::ACK_PREFIX_LEN;
 
 fn validate_broadcast_json(bytes: &[u8]) -> Result<(), DeltaError> {
     if bytes.len() > MAX_BROADCAST_JSON_BYTES {

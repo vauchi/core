@@ -27,6 +27,7 @@ use vauchi_core::network::{HttpTransport, HttpTransportConfig};
 use vauchi_core::rng::OsSecureRng;
 use vauchi_core::sleeper::FakeSleeper;
 use vauchi_core::storage::ReceiveScope;
+use vauchi_core::sync::registry_activation::ActivationState;
 use vauchi_protocol::ohttp_key::window_of;
 
 const OFFLINE_DAYS: u64 = 100;
@@ -93,6 +94,26 @@ fn checkpoint(client: &Vauchi, application: &MockRelay) -> Option<u64> {
         .load_receive_checkpoint(&scope)
         .unwrap()
         .map(|checkpoint| checkpoint.day)
+}
+
+fn assert_active_peer_registry(receiver: &Vauchi, peer: &Vauchi, contact_id: &str) {
+    let registry = receiver
+        .storage()
+        .device()
+        .load_contact_device_registry(contact_id)
+        .unwrap()
+        .unwrap();
+    assert!(registry.contains_device(peer.identity().unwrap().device_id()));
+    assert_eq!(
+        receiver
+            .storage()
+            .registry_activation()
+            .load_activation(contact_id)
+            .unwrap()
+            .unwrap()
+            .state(),
+        ActivationState::Active
+    );
 }
 
 /// A reader that has never read these mailboxes. New identities now start
@@ -433,12 +454,24 @@ fn after_an_expiry_gap_the_senders_next_edit_converges_the_card() {
     clock.advance(Duration::from_secs(DAY));
     share(&mut bob, "third", "three");
     sync(&mut bob);
+    assert_eq!(
+        alice
+            .storage()
+            .device()
+            .load_contact_device_registry(&linked.peer_contact_id)
+            .unwrap()
+            .map(|registry| registry.version()),
+        None,
+        "Bob's initial registry expired with the missed updates"
+    );
     let collected = sync(&mut alice);
     assert!(
         matches!(
             &collected,
             VauchiSyncOutcome::Ok {
-                received: 1,
+                received: 2,
+                fetched: 2,
+                rejected: 0,
                 unresolved: 0,
                 ..
             }
@@ -446,6 +479,7 @@ fn after_an_expiry_gap_the_senders_next_edit_converges_the_card() {
         "{collected:?}"
     );
     assert_eq!(fields(&alice), vec!["one", "three", "two"]);
+    assert_active_peer_registry(&alice, &bob, &linked.peer_contact_id);
 }
 
 /// Bob never edits after the share Alice missed; when her catch-up that

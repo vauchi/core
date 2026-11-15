@@ -374,6 +374,30 @@ check:ignored-results:
         - .gitlab-ci.yml
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
+# Holds the empty cucumber `then` bodies at .empty-then-steps-baseline:
+# an empty then lets a scenario pass without checking its assertion, so a
+# new one fails, and an MR that implements some lowers the baseline with
+# them (vauchi/private#862).
+check:empty-then-steps:
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
+  tags: [docker]
+  needs: []
+  before_script:
+    - apk add --no-cache python3
+  script:
+    - sh ci/tests/empty-then-steps-ratchet.test.sh
+    - python3 scripts/check-empty-then-steps.py
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "vauchi-*/tests/steps/*.rs"
+        - .empty-then-steps-baseline
+        - scripts/check-empty-then-steps.py
+        - ci/tests/empty-then-steps-ratchet.test.sh
+        - .gitlab-ci.yml
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
 check:consumer-pins-bump:
   stage: lint
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21

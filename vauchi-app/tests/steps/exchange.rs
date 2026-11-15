@@ -338,9 +338,61 @@ fn bad_cards_rejected(world: &mut VauchiWorld) {
     }
 }
 
+/// The peer's contact id on one party's side, looked up by display name.
+fn peer_contact_id(owner: &Vauchi, peer: &str) -> String {
+    owner
+        .list_contacts()
+        .unwrap()
+        .iter()
+        .find(|c| c.display_name() == peer)
+        .unwrap_or_else(|| panic!("{peer} is not a contact of the party"))
+        .id()
+        .to_string()
+}
+
+/// One card-update round trip `from` → `to`: delta encryption on the
+/// sender, authenticated decryption on the recipient. Returns the
+/// ciphertext so callers can compare successive sends.
+fn card_update_round_trip(world: &mut VauchiWorld, from: &str, to: &str) -> Vec<u8> {
+    let id_at_sender = peer_contact_id(world.party(from), to);
+    let id_at_recipient = peer_contact_id(world.party(to), from);
+    let baseline = vauchi_core::ContactCard::new("");
+    let current = world.party(from).own_card().unwrap().unwrap();
+    let ciphertext = world
+        .party(from)
+        .prepare_card_update_for_contact(&id_at_sender, &baseline, &current)
+        .unwrap();
+    vauchi_core::api::process_single_card_update(
+        world.party(to).identity().unwrap(),
+        world.party(to).storage(),
+        &id_at_recipient,
+        &ciphertext,
+    )
+    .unwrap();
+    ciphertext
+}
+
+/// AEAD under mismatched shared secrets fails authentication, so a
+/// successful round trip in BOTH directions is the observable proof that
+/// Alice and Bob derived the same secret.
 #[then("these keys should be derived from the same shared secret")]
+fn keys_from_same_shared_secret(world: &mut VauchiWorld) {
+    card_update_round_trip(world, "Alice", "Bob");
+    card_update_round_trip(world, "Bob", "Alice");
+}
+
+/// Two identical plaintexts, two sends: the Double Ratchet advances its
+/// sending chain per message, so the ciphertexts must differ while both
+/// still decrypt in order — a fresh message key each time, never a reuse.
 #[then("forward secrecy should be established via ratcheting")]
-fn crypto_invariant_noop(_world: &mut VauchiWorld) {}
+fn forward_secrecy_via_ratcheting(world: &mut VauchiWorld) {
+    let first = card_update_round_trip(world, "Alice", "Bob");
+    let second = card_update_round_trip(world, "Alice", "Bob");
+    assert_ne!(
+        first, second,
+        "identical plaintext produced identical ciphertext: the sending chain did not ratchet"
+    );
+}
 
 // ── Session initiation ───────────────────────────────────────────
 

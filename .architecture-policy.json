@@ -83,6 +83,7 @@
     "vauchi-core/social": 1,
     "vauchi-core/storage": 4,
     "vauchi-core/sync": 3,
+    "vauchi-core/sync_control": 1,
     "vauchi-core/text": 0,
     "vauchi-core/types": 5,
     "vauchi-core/version": 0,

@@ -53,7 +53,6 @@ fn generate_qr_image(text: &str, module_px: u32) -> GrayImage {
 // RqrrRaw — direct rqrr decoding path
 // ============================================================
 
-// @scenario: qr_scanning :: rqrr decodes a clean QR
 // @internal
 #[test]
 fn rqrr_raw_decodes_clean_qr_in_default_features() {
@@ -110,7 +109,6 @@ fn rqrr_raw_dimension_mismatch_zero_pixels_does_not_panic() {
 // RqrrPreprocessed — multi-decoder pipeline
 // ============================================================
 
-// @scenario: qr_scanning :: preprocessed pipeline decodes a clean QR
 // @internal
 #[test]
 fn rqrr_preprocessed_decodes_clean_qr_via_fast_tier() {

@@ -38,10 +38,9 @@
 include:
   - project: 'vauchi/scripts'
     # Pin the commit: ci-templates tags are protected and cut by the
-    # maintainer; a SHA needs none (private#994).
-    # TEMP(private#1262): on the scripts branch until scripts!746 merges;
-    # bump to the new main SHA before this MR leaves Draft.
-    ref: issue/1262
+    # maintainer; a SHA needs none (private#994). This SHA carries the
+    # duplication/cppcheck templates (scripts!746, private#1262).
+    ref: 5cee77a4e2783af6d989ed2b38d6dd1714665455
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -196,7 +195,7 @@ variables:
   # keeps the SHA form because tags here are not protected), the lint:typos
   # linux tag (vauchi/scripts!552) and retired_boundary_vocabulary
   # (vauchi/scripts!502).
-  VAUCHI_SCRIPTS_REF: "05530a91e38a7ad2704c8cf0f3275c2cd89a122a"
+  VAUCHI_SCRIPTS_REF: "5cee77a4e2783af6d989ed2b38d6dd1714665455"
   # cargo audit runs with --deny warnings; every entry here is an
   # advisory with no fix available to us, not one we chose to skip.
   #   RUSTSEC-2026-0192  ttf-parser unmaintained, reached through

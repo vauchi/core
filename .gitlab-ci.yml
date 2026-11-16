@@ -1706,8 +1706,9 @@ trial:unused-deps:
 
 # Conformance-suite drift guard (private#1265): the QR scanner, camera
 # corpus and executor suites run against two implementations each, with
-# the canonical file vendored into the other repo. Both files are read at
-# CI_COMMIT_SHA: the vendored copy must match the canonical in this tree.
+# the canonical file vendored into the other repo. Both files are read on
+# the MR's source branch (same name in both repos): the vendored copy
+# must match the canonical file there.
 check:conformance-sync:
   stage: lint
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
@@ -1730,7 +1731,10 @@ check:conformance-sync:
       open("/tmp/check-conformance-sync.py", "wb").write(body)
       FETCH
   script:
-    - CONFORMANCE_OWN_REF=$CI_COMMIT_SHA python3 /tmp/check-conformance-sync.py --api
+    # Both repos carry the same branch name (issue/<N> convention), so the
+    # vendored copy is compared with the canonical file on that branch;
+    # on main it is simply main.
+    - CONFORMANCE_OWN_REF=${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_DEFAULT_BRANCH} python3 /tmp/check-conformance-sync.py --api
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:

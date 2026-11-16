@@ -1703,3 +1703,41 @@ trial:unused-deps:
     expire_in: 1 week
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
+
+# Conformance-suite drift guard (private#1265): the QR scanner, camera
+# corpus and executor suites run against two implementations each, with
+# the text copy-pasted between repos. Only adapter lines may differ;
+# anything else fails. Own file at CI_COMMIT_SHA, counterparts at main.
+check:conformance-sync:
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
+  tags: [docker]
+  needs: []
+  variables:
+    # TEMP(private#1267): on the scripts branch until scripts!752 merges;
+    # then main (or the new main SHA).
+    CONFORMANCE_SCRIPTS_REF: "issue/1267"
+  before_script:
+    - apk add --no-cache python3
+    - |
+      python3 - <<'FETCH'
+      import os, urllib.request
+      ref = os.environ["CONFORMANCE_SCRIPTS_REF"]
+      url = f"{os.environ['CI_API_V4_URL']}/projects/77957857/repository/files/scripts%2Fcheck-conformance-sync.py/raw?ref={ref}"
+      request = urllib.request.Request(url, headers={"JOB-TOKEN": os.environ["CI_JOB_TOKEN"]})
+      with urllib.request.urlopen(request, timeout=30) as response:
+          body = response.read()
+      if not body.strip():
+          raise SystemExit("ERROR: check-conformance-sync.py came back empty")
+      open("/tmp/check-conformance-sync.py", "wb").write(body)
+      FETCH
+  script:
+    - CONFORMANCE_OWN_REF=$CI_COMMIT_SHA python3 /tmp/check-conformance-sync.py --api
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "vauchi-core/tests/it/qr_scanner_pipeline_tests.rs"
+        - "vauchi-core/tests/it/qr_decode_camera_corpus_tests.rs"
+        - "vauchi-core/tests/platform_executor_contract_tests.rs"
+        - .gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "schedule"

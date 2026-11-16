@@ -1736,8 +1736,8 @@ check:conformance-sync:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
-        - "vauchi-core/tests/it/qr_scanner_pipeline_tests.rs"
-        - "vauchi-core/tests/it/qr_decode_camera_corpus_tests.rs"
-        - "vauchi-core/tests/platform_executor_contract_tests.rs"
+        - "vauchi-core/tests/shared/qr_scanner_pipeline.rs"
+        - "vauchi-core/tests/shared/qr_decode_camera_corpus.rs"
+        - "vauchi-core/tests/shared/executor_conformance.rs"
         - .gitlab-ci.yml
     - if: $CI_PIPELINE_SOURCE == "schedule"

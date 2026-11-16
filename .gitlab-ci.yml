@@ -39,7 +39,9 @@ include:
   - project: 'vauchi/scripts'
     # Pin the commit: ci-templates tags are protected and cut by the
     # maintainer; a SHA needs none (private#994).
-    ref: 05530a91e38a7ad2704c8cf0f3275c2cd89a122a
+    # TEMP(private#1262): on the scripts branch until scripts!746 merges;
+    # bump to the new main SHA before this MR leaves Draft.
+    ref: issue/1262
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -63,6 +65,7 @@ include:
       - '/ci-templates/verified-fetch.yml'
       - '/ci-templates/tool-install.yml'
       - '/ci-templates/cross-cutting-lint.yml'
+      - '/ci-templates/duplication.yml'
   # Local include — nightly-only mutation + fuzz + slow tests extracted
   # 2026-04-22 under T2.3 split (2026-04-22-ci-pipeline-health-audit
   # Phase 2). Pure Phase 0 tidy — no behaviour change.
@@ -1668,3 +1671,36 @@ github-mirror:
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+
+# Advisory jscpd duplication scan (private#1262): source, CI YAML, shell
+# and Dockerfiles, generated/vendored paths ignored. Findings never block.
+quality:jscpd:
+  extends: .duplication-jscpd-job
+
+# Scheduled trial (private#1262): cargo-udeps vs cargo-machete on the Core
+# workspace. Both reports are artifacts for the false-positive comparison;
+# neither finding fails anything, and no MR runs this. Adopt at most one
+# after the trial, as a scheduled advisory — not an MR gate.
+trial:unused-deps:
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/rust:1.93-trixie
+  tags: [docker]
+  needs: []
+  allow_failure: true
+  before_script:
+    - rustup toolchain install nightly --profile minimal
+    - cargo install cargo-udeps --version 0.1.61 --locked --quiet
+    - cargo install cargo-machete --version 0.9.2 --locked --quiet
+  script:
+    - echo "=== cargo-udeps 0.1.61 (nightly) ==="
+    - cargo +nightly udeps -p vauchi-core --all-targets 2>&1 | tee udeps-report.txt || true
+    - echo "=== cargo-machete 0.9.2 ==="
+    - cargo machete --with-metadata 2>&1 | tee machete-report.txt || true
+  artifacts:
+    when: always
+    paths:
+      - udeps-report.txt
+      - machete-report.txt
+    expire_in: 1 week
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"

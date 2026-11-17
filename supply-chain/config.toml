@@ -236,10 +236,6 @@ criteria = "safe-to-deploy"
 version = "0.3.32"
 criteria = "safe-to-run"
 
-[[exemptions.futures-io]]
-version = "0.3.34"
-criteria = "safe-to-deploy"
-
 [[exemptions.futures-task]]
 version = "0.3.32"
 criteria = "safe-to-deploy"
@@ -676,10 +672,6 @@ criteria = "safe-to-deploy"
 version = "1.2.1"
 criteria = "safe-to-deploy"
 
-[[exemptions.syn]]
-version = "3.0.10"
-criteria = "safe-to-deploy"
-
 [[exemptions.synthez]]
 version = "0.3.1"
 criteria = "safe-to-run"
@@ -698,14 +690,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.terminal_size]]
 version = "0.4.4"
-criteria = "safe-to-deploy"
-
-[[exemptions.thiserror]]
-version = "2.0.21"
-criteria = "safe-to-deploy"
-
-[[exemptions.thiserror-impl]]
-version = "2.0.21"
 criteria = "safe-to-deploy"
 
 [[exemptions.thread_local]]

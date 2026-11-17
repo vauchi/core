@@ -28,6 +28,19 @@ ignore = [
     # askama_derive 0.16.1 (latest) still uses it. Remove once uniffi's
     # askama moves to `toml` (private#718).
     "RUSTSEC-2026-0374",
+    # chrono and chrono-tz are unmaintained (advisories, not vulnerabilities)
+    # — reached only through rxing, the QR decoder in qr_decode.rs, which
+    # needs them for calendar-result parsing and Aztec, neither of which our
+    # QR-only decode path calls. rxing 0.9.4 still requires chrono. Remove
+    # once rxing drops chrono, a vauchi fork does, or rqrr alone meets the
+    # decode-rate floor (private#1274).
+    "RUSTSEC-2026-0543",
+    "RUSTSEC-2026-0555",
+    # humantime is unmaintained (advisory, not a vulnerability) — a
+    # dev-dependency only, through cucumber (vauchi-app's scenario runner);
+    # no shipped binary contains it. cucumber 0.23.0 (latest) still requires
+    # it. Remove once cucumber moves off humantime (private#1274).
+    "RUSTSEC-2026-0542",
 ]
 
 [licenses]

@@ -9,8 +9,8 @@
 
 use vauchi_app::ui::{ActionResult, AppEngine, UserAction, WorkflowEngine};
 use vauchi_core::Vauchi;
-use vauchi_core::identity::DeviceInfo;
 use vauchi_core::types::{BackupReminderState, ReminderFrequency};
+use vauchi_core_testkit::device_sync::link_tablet;
 use vauchi_core_testkit::helpers::create_vauchi_with_identity;
 use vauchi_core_testkit::two_recipient::add_recipient;
 
@@ -30,20 +30,6 @@ fn alice_due(frequency: ReminderFrequency, backed_up_days_ago: Option<u64>) -> V
     state.last_backup_timestamp = Some(backed_up_days_ago.map_or(1, |days| now - days * DAY));
     vauchi.save_backup_reminder_state(&state).unwrap();
     vauchi
-}
-
-fn link_a_device(vauchi: &Vauchi) {
-    let mut registry = vauchi.identity().unwrap().initial_device_registry();
-    registry
-        .add_device_unsigned(
-            DeviceInfo::derive(&LAPTOP_SEED, 1, "Laptop".into(), 0).to_registered(&LAPTOP_SEED),
-        )
-        .unwrap();
-    vauchi
-        .storage()
-        .device()
-        .save_device_registry(&registry)
-        .unwrap();
 }
 
 fn designate_a_guardian(vauchi: &Vauchi) {
@@ -90,7 +76,7 @@ fn with_no_safeguard_the_reminder_slot_offers_all_three_and_opens_settings() {
 #[test]
 fn a_linked_device_brings_back_the_backup_reminder() {
     let vauchi = alice_due(ReminderFrequency::Weekly, None);
-    link_a_device(&vauchi);
+    link_tablet(&vauchi, LAPTOP_SEED);
 
     let action = toast_action(AppEngine::new(vauchi).drain_backup_reminder());
 

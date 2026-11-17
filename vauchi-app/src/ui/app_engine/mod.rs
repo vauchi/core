@@ -85,7 +85,7 @@ mod startup;
 pub use app_screen::AppScreen;
 use overlays::{
     ACTION_DISMISS_DEMO_CONTACT, ACTION_GO_BACK, ACTION_OPEN_SETTINGS, ACTION_OPEN_UPDATE_LINK,
-    ACTION_SYNC_NOW, UPDATE_LINK_URL,
+    ACTION_PROTECT_NOW, ACTION_SYNC_NOW, UPDATE_LINK_URL,
 };
 pub use {
     navigation::TabLayout, overlays::SyncChromeStatus, presentation_protocol::AppPresentationError,
@@ -640,6 +640,10 @@ impl AppEngine {
     /// Returns `Some(ShowToast { .. })` if a backup reminder is due, `None` otherwise.
     /// Frontends should call this after initialization or after unlocking.
     /// The toast action id is `"backup_now"` — pressing it navigates to Backup.
+    /// A user with no safeguard against losing the contact list gets the
+    /// safeguard prompt in its place, with `"protect_now"` opening Settings
+    /// (vauchi/private#796, D8b); an unreadable safeguard state keeps the
+    /// ordinary reminder.
     pub fn drain_backup_reminder(&mut self) -> Option<ActionResult> {
         if self.pending_backup_reminder {
             self.pending_backup_reminder = false;
@@ -651,10 +655,27 @@ impl AppEngine {
                 #[allow(clippy::let_underscore_must_use)]
                 let _ = self.vauchi.save_backup_reminder_state(&state);
             }
+            let unprotected = self
+                .vauchi
+                .loss_safeguards()
+                .is_ok_and(|safeguards| !safeguards.any());
+            let (message, action_id, label) = if unprotected {
+                (
+                    "backup.safeguard_prompt",
+                    ACTION_PROTECT_NOW,
+                    "backup.safeguard_action",
+                )
+            } else {
+                (
+                    "backup.reminder_toast",
+                    "backup_now",
+                    "backup.wizard.create",
+                )
+            };
             Some(ActionResult::ShowToast {
-                message: self.t("backup.reminder_toast"),
-                undo_action_id: Some("backup_now".into()),
-                undo_label: Some(self.t("backup.wizard.create")),
+                message: self.t(message),
+                undo_action_id: Some(action_id.into()),
+                undo_label: Some(self.t(label)),
             })
         } else {
             None

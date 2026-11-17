@@ -7,6 +7,7 @@
 use vauchi_app::ui::{ActionResult, AppEngine, UserAction, WorkflowEngine};
 use vauchi_core::Vauchi;
 use vauchi_core::types::{BackupReminderState, ReminderFrequency};
+use vauchi_core_testkit::device_sync::link_tablet;
 
 fn due_engine() -> AppEngine {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -16,6 +17,9 @@ fn due_engine() -> AppEngine {
     state.frequency = ReminderFrequency::Weekly;
     state.last_backup_timestamp = Some(1);
     vauchi.save_backup_reminder_state(&state).unwrap();
+    // A linked device is a safeguard, so the ordinary reminder shows rather
+    // than the safeguard prompt (vauchi/private#796, D8b).
+    link_tablet(&vauchi, [9u8; 32]);
 
     AppEngine::new(vauchi)
 }

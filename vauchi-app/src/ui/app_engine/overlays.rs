@@ -25,6 +25,10 @@ pub(super) const UPDATE_LINK_URL: &str = "https://vauchi.app/";
 /// to `NavigateTo(Settings)` before per-screen dispatch (CoreScreenIdMap
 /// rework Tier-0; ADR-043 Amendment 4 — forward nav is core-resolved).
 pub(super) const ACTION_OPEN_SETTINGS: &str = "open_settings";
+
+/// The safeguard prompt's toast action, which opens Settings where linked
+/// devices, backup and recovery are set up (vauchi/private#796, D8).
+pub(super) const ACTION_PROTECT_NOW: &str = "protect_now";
 /// Reserved global-chrome action id: the visible Back affordance. Stamped
 /// as a `nav_actions` item wherever `can_go_back()` holds, so frontends
 /// render Back from data instead of the `can_go_back` bool (ADR-044 Am2a,

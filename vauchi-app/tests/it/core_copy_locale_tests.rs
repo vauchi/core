@@ -17,6 +17,7 @@ use vauchi_app::ui::{
 };
 use vauchi_core::Vauchi;
 use vauchi_core::types::{BackupReminderState, ReminderFrequency};
+use vauchi_core_testkit::device_sync::link_tablet;
 
 fn engine_in(locale: Option<&str>, vauchi: Vauchi) -> AppEngine {
     let mut engine = AppEngine::new(vauchi);
@@ -82,6 +83,7 @@ fn reminder_message(locale: Option<&str>) -> String {
     state.frequency = ReminderFrequency::Weekly;
     state.last_backup_timestamp = Some(1);
     vauchi.save_backup_reminder_state(&state).unwrap();
+    link_tablet(&vauchi, [9u8; 32]);
     match engine_in(locale, vauchi).drain_backup_reminder() {
         Some(ActionResult::ShowToast { message, .. }) => message,
         other => panic!("a due reminder shows a toast, got {other:?}"),

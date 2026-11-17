@@ -34,6 +34,8 @@ mod identity;
 mod import;
 #[cfg(feature = "network-http")]
 mod link_exchange;
+mod loss_safeguards;
+pub use loss_safeguards::{LossSafeguards, RECENT_BACKUP_SECS};
 mod mask_foreground;
 mod merge;
 mod ohttp_key_error;

@@ -16,7 +16,7 @@ use super::SyncChromeStatus;
 use super::credential_gate::CredentialChange;
 use super::{
     ACTION_DISMISS_DEMO_CONTACT, ACTION_GO_BACK, ACTION_OPEN_SETTINGS, ACTION_OPEN_UPDATE_LINK,
-    ACTION_SYNC_NOW, AppEngine, AppScreen, UPDATE_LINK_URL,
+    ACTION_PROTECT_NOW, ACTION_SYNC_NOW, AppEngine, AppScreen, UPDATE_LINK_URL,
 };
 use crate::ui::action::{ActionResult, UserAction};
 use crate::ui::engine::WorkflowEngine;
@@ -142,6 +142,12 @@ impl AppEngine {
         {
             return Some(ActionResult::NavigateTo(
                 self.navigate_to(AppScreen::Backup),
+            ));
+        }
+        if matches!(action, UserAction::ActionPressed { action_id } | UserAction::UndoPressed { action_id } if action_id == ACTION_PROTECT_NOW)
+        {
+            return Some(ActionResult::NavigateTo(
+                self.navigate_to(AppScreen::Settings),
             ));
         }
 

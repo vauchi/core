@@ -39,9 +39,10 @@ include:
   - project: 'vauchi/scripts'
     # Pin the commit: ci-templates tags are protected and cut by the
     # maintainer; a SHA needs none (private#994). This SHA carries the
-    # jscpd ratchet (private#1262) and lint:reuse checking out the train
-    # car on a merge train (private#1214).
-    ref: 4efc86419219174c60c18819af8cc2432275138e
+    # jscpd ratchet (private#1262) with git on its image (scripts!761),
+    # and lint:reuse checking out the train car on a merge train
+    # (private#1214).
+    ref: 2f31fc325c3bb8f20b9a60ba6277d4c383f016c4
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/allow-direct-guard.yml'
@@ -200,7 +201,7 @@ variables:
   # keeps the SHA form because tags here are not protected), the lint:typos
   # linux tag (vauchi/scripts!552) and retired_boundary_vocabulary
   # (vauchi/scripts!502).
-  VAUCHI_SCRIPTS_REF: "4efc86419219174c60c18819af8cc2432275138e"
+  VAUCHI_SCRIPTS_REF: "2f31fc325c3bb8f20b9a60ba6277d4c383f016c4"
   # cargo audit runs with --deny warnings; every entry here is an
   # advisory with no fix available to us, not one we chose to skip.
   #   RUSTSEC-2026-0192  ttf-parser unmaintained, reached through

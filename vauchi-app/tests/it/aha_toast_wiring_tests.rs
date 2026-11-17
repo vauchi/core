@@ -111,6 +111,7 @@ fn run_ble_exchange(alice: &mut AppEngine, bob: &mut AppEngine) -> (Vec<Command>
 }
 
 // @scenario: onboarding :: Exchange success celebration
+// @scenario: contact_exchange :: First contact milestone after an exchange
 // @internal
 #[test]
 fn a_first_exchange_toasts_the_milestone_once_per_side_after_the_ceremony() {
@@ -137,6 +138,7 @@ fn a_first_exchange_toasts_the_milestone_once_per_side_after_the_ceremony() {
 }
 
 // @scenario: onboarding :: Exchange success celebration
+// @scenario: contact_exchange :: First contact milestone after an exchange
 // @internal
 #[test]
 fn a_later_contact_toasts_nothing() {

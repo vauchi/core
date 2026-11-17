@@ -254,6 +254,7 @@ mod lock_screen_biometric_first_tests;
 mod lock_screen_biometric_unlock_tests;
 mod lock_screen_feedback_tests;
 mod lock_session_tests;
+mod loss_safeguard_prompt_tests;
 mod multi_stage_back_tests;
 mod multi_stage_deadline_tests;
 mod multi_stage_exchange_i18n_tests;

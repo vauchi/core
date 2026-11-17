@@ -222,6 +222,8 @@
   "backup.reminder_toast": "Vous n’avez pas fait de sauvegarde depuis un moment. Sauvegardez maintenant pour protéger votre identité.",
   "backup.restore_error_title": "Échec de la restauration",
   "backup.restore_identity": "Restaurer l'identité",
+  "backup.safeguard_action": "Configurer",
+  "backup.safeguard_prompt": "Si vous perdez ce téléphone, votre liste de contacts disparaît avec lui. Liez un deuxième appareil, choisissez des garants ou faites une sauvegarde pour la conserver.",
   "backup.save_title": "Enregistrer la sauvegarde",
   "backup.select_file_instruction": "Sélectionnez un fichier de sauvegarde pour restaurer votre identité",
   "backup.share_chooser_title": "Enregistrer la sauvegarde Vauchi",

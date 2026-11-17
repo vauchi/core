@@ -222,6 +222,8 @@
   "backup.reminder_toast": "You haven't backed up in a while. Back up now to protect your identity.",
   "backup.restore_error_title": "Restore failed",
   "backup.restore_identity": "Restore Identity",
+  "backup.safeguard_action": "Set up",
+  "backup.safeguard_prompt": "If you lose this phone, your contact list goes with it. Link a second device, choose guardians or make a backup to keep it.",
   "backup.save_title": "Save Backup",
   "backup.select_file_instruction": "Select a backup file to restore your identity",
   "backup.share_chooser_title": "Save Vauchi backup",

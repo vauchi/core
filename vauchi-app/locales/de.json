@@ -222,6 +222,8 @@
   "backup.reminder_toast": "Du hast länger keine Sicherung erstellt. Sichere jetzt, um deine Identität zu schützen.",
   "backup.restore_error_title": "Wiederherstellung fehlgeschlagen",
   "backup.restore_identity": "Identität wiederherstellen",
+  "backup.safeguard_action": "Einrichten",
+  "backup.safeguard_prompt": "Wenn du dieses Telefon verlierst, ist deine Kontaktliste weg. Verknüpfe ein zweites Gerät, wähle Vertrauenspersonen oder erstelle eine Sicherung, um sie zu behalten.",
   "backup.save_title": "Backup speichern",
   "backup.select_file_instruction": "Wähle eine Sicherungsdatei, um deine Identität wiederherzustellen",
   "backup.share_chooser_title": "Vauchi-Backup speichern",

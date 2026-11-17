@@ -56,6 +56,14 @@
  * them to the mailbox under the shared key: every trace that reaches the
  * rekey went through the theft, which leaks that key, so it protects
  * nothing the model could check (and it multiplied the search past 8 GB).
+ *
+ * Not what Core accepts today: Core drops every rekey offer until a
+ * policy-guardian decision certificate authorizes it (P15, P18;
+ * `authorize_recovery` in api/vauchi/recovery_rekey_inbound.rs), because
+ * vouchers cannot keep two legitimate attempts from both being accepted
+ * and the old key's signatures are the thief's too. This model keeps the
+ * offer and answer, which the certified rekey reuses; the voucher
+ * acceptance it proves is retired (vauchi/private#796 plan step 7).
  */
 
 theory VauchiSocialRecovery

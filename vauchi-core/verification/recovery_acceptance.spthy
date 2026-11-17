@@ -32,6 +32,14 @@
  *   be falsified: the stolen device and one corrupted helper suffice.
  * Helpers vouch only for a contact (#708); the variant without that check
  *   exhausts 8 GB, so #708 rests on its tests.
+ *
+ * Not what Core accepts today: Core drops every rekey offer until a
+ * policy-guardian decision certificate authorizes it (P15, P18;
+ * `authorize_recovery` in api/vauchi/recovery_rekey_inbound.rs), because
+ * vouchers cannot keep two legitimate attempts from both being accepted
+ * and the old key's signatures are the thief's too. This model keeps the
+ * offer and answer, which the certified rekey reuses; the voucher
+ * acceptance it proves is retired (vauchi/private#796 plan step 7).
  */
 
 theory VauchiRecoveryAcceptance

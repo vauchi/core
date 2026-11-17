@@ -2500,6 +2500,8 @@
   "settings.new_name": "Nouveau nom d'affichage",
   "settings.new_relay": "Nouvelle URL du relais",
   "settings.notifications_group": "Notifications",
+  "settings.offline": "Mode hors ligne",
+  "settings.offline_hint": "Échanges et mises à jour en personne uniquement ; aucun trafic relais ou OHTTP.",
   "settings.options": "Options",
   "settings.pending_updates_hint": "Nombre de mises à jour de contact en attente d'envoi",
   "settings.privacy": "Confidentialité",

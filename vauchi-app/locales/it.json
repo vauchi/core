@@ -2500,6 +2500,8 @@
   "settings.new_name": "Nuovo nome visualizzato",
   "settings.new_relay": "Nuovo URL relay",
   "settings.notifications_group": "Notifiche",
+  "settings.offline": "Modalità offline",
+  "settings.offline_hint": "Solo scambi e aggiornamenti di persona; nessun traffico relay o OHTTP.",
   "settings.options": "Opzioni",
   "settings.pending_updates_hint": "Numero di aggiornamenti dei contatti in attesa di invio",
   "settings.privacy": "Privacy",

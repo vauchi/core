@@ -2500,6 +2500,8 @@
   "settings.new_name": "New Display Name",
   "settings.new_relay": "New Relay URL",
   "settings.notifications_group": "Notifications",
+  "settings.offline": "Offline mode",
+  "settings.offline_hint": "Only in-person exchanges and updates; no relay or OHTTP traffic.",
   "settings.options": "Options",
   "settings.pending_updates_hint": "Number of contact updates waiting to be sent",
   "settings.privacy": "Privacy",

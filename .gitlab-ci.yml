@@ -204,7 +204,11 @@ variables:
   #   RUSTSEC-2026-0374  basic-toml unmaintained, build-time only via
   #                      uniffi -> askama; mirrors deny.toml. Clears
   #                      with private#718.
-  AUDIT_IGNORES: "--ignore RUSTSEC-2026-0192 --ignore RUSTSEC-2026-0374"
+  #   RUSTSEC-2026-0543  chrono and RUSTSEC-2026-0555 chrono-tz,
+  #                      unmaintained via rxing; RUSTSEC-2026-0542
+  #                      humantime, dev-only via cucumber. Mirrors deny.toml;
+  #                      clears with private#1274.
+  AUDIT_IGNORES: "--ignore RUSTSEC-2026-0192 --ignore RUSTSEC-2026-0374 --ignore RUSTSEC-2026-0543 --ignore RUSTSEC-2026-0555 --ignore RUSTSEC-2026-0542"
 
 # vauchi/scripts is public, but its job-token allowlist rejects core's token.
 # Fetch these scripts without authentication, as check:binding-abi does.

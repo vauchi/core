@@ -574,6 +574,7 @@ impl ProfileEngine {
         // leave the caller-provided config untouched.
         if let Ok(Some(flags)) = storage.ux().load_settings_flags() {
             config.suppress_presence = flags.suppress_presence;
+            config.offline = flags.offline;
             config.contact_added_notifications = flags.contact_added_notifications;
             config.card_update_notifications = flags.card_update_notifications;
             config.reduce_motion = flags.reduce_motion;

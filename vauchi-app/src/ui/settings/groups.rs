@@ -448,6 +448,17 @@ impl SettingsEngine {
             // 2026-06-10, `2026-06-10-mobile-relay-url-editor-noop`).
             items: vec![
                 self.link_row(
+                    "offline",
+                    self.t("settings.offline"),
+                    Some(self.t("settings.offline_hint")),
+                    None,
+                    Some(self.t(if self.config.offline {
+                        "contacts.facet_state_on"
+                    } else {
+                        "contacts.facet_state_off"
+                    })),
+                ),
+                self.link_row(
                     "relay_url",
                     self.t("settings.relay_url"),
                     Some(self.t("settings.relay_url_hint")),

@@ -70,6 +70,9 @@ pub struct SettingsFlags {
     /// Suppress presence announcements to the relay. Defaults to false.
     #[serde(default)]
     pub suppress_presence: bool,
+    /// Permit only in-person operation and block every relay request.
+    #[serde(default)]
+    pub offline: bool,
     /// Notify when a new contact is added. Defaults to false.
     #[serde(default)]
     pub contact_added_notifications: bool,
@@ -134,6 +137,7 @@ impl Default for SettingsFlags {
     fn default() -> Self {
         Self {
             suppress_presence: false,
+            offline: false,
             contact_added_notifications: false,
             card_update_notifications: true,
             reduce_motion: false,

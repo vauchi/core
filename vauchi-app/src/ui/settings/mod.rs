@@ -113,6 +113,8 @@ pub struct SettingsConfig {
     pub content_updates_in_background: bool,
     #[serde(default)]
     pub delayed_fetching: DelayedFetching,
+    #[serde(default)]
+    pub offline: bool,
 }
 
 fn default_true() -> bool {
@@ -253,6 +255,7 @@ impl SettingsEngine {
             ("privacy", "card_update") => {
                 config.card_update_notifications = !config.card_update_notifications;
             }
+            ("network", "offline") => config.offline = !config.offline,
             ("accessibility", "reduce_motion") => config.reduce_motion = !config.reduce_motion,
             ("accessibility", "large_touch") => config.large_touch = !config.large_touch,
             ("appearance", "show_help_icons") => config.show_help_icons = !config.show_help_icons,
@@ -305,6 +308,13 @@ impl WorkflowEngine for SettingsEngine {
             // the pick on the very next render; the fresh config built
             // on re-entry re-derives the id from the engine's
             // RenderContext (ADR-047).
+            UserAction::ListItemSelected {
+                ref component_id,
+                ref item_id,
+            } if component_id == "network" && item_id == "offline" => {
+                self.config.offline = !self.config.offline;
+                ActionResult::UpdateScreen(self.current_screen())
+            }
             UserAction::ListItemSelected {
                 ref component_id,
                 ref item_id,

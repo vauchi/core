@@ -62,7 +62,7 @@ impl AppEngine {
         } = action
             && matches!(
                 component_id.as_str(),
-                "privacy" | "accessibility" | "appearance" | "content"
+                "privacy" | "accessibility" | "appearance" | "content" | "network"
             )
         {
             let config = self.vauchi.config_mut();
@@ -75,6 +75,9 @@ impl AppEngine {
                 }
                 "card_update" => {
                     config.card_update_notifications = !config.card_update_notifications;
+                }
+                "offline" => {
+                    config.offline = !config.offline;
                 }
                 // Category-2 accessibility flags (ADR-047 Addendum
                 // 2026-07-05) — core-owned so they follow the user.
@@ -200,6 +203,18 @@ impl AppEngine {
         }
         if let UserAction::ListItemSelected { item_id, .. } = action {
             match item_id.as_str() {
+                "offline" => {
+                    {
+                        let config = self.vauchi.config_mut();
+                        config.offline = !config.offline;
+                    }
+                    let mut flags = self.vauchi.load_settings_flags().unwrap_or_default();
+                    flags.merge_config_toggles(self.vauchi.config());
+                    if let Err(err) = self.vauchi.save_settings_flags(&flags) {
+                        tracing::warn!(?err, "offline setting persist failed");
+                    }
+                    return Some(self.engine.handle_action(action.clone()));
+                }
                 "display_name" => {
                     let current_name = self
                         .vauchi

@@ -6716,6 +6716,30 @@
                     "label": "Network",
                     "rows": [
                       {
+                        "title": "Offline mode",
+                        "subtitle": null,
+                        "detail": "off",
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.8",
+                          "label": "Offline mode",
+                          "accessibility_label": "Offline mode",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Offline mode",
+                          "description": "Only in-person exchanges and updates; no relay or OHTTP traffic."
+                        }
+                      },
+                      {
                         "title": "Relay URL",
                         "subtitle": null,
                         "detail": "https://relay.vauchi.app",
@@ -6725,7 +6749,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.8",
+                          "interaction_id": "surface.1.interaction.9",
                           "label": "Relay URL",
                           "accessibility_label": "Relay URL",
                           "icon_token": null,
@@ -6749,7 +6773,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.9",
+                          "interaction_id": "surface.1.interaction.10",
                           "label": "Delayed fetching",
                           "accessibility_label": "Delayed fetching",
                           "icon_token": null,
@@ -6857,7 +6881,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.10",
+                          "interaction_id": "surface.1.interaction.11",
                           "label": "Pending Updates",
                           "accessibility_label": "Pending Updates",
                           "icon_token": null,
@@ -6881,7 +6905,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.11",
+                          "interaction_id": "surface.1.interaction.12",
                           "label": "Failed Deliveries",
                           "accessibility_label": "Failed Deliveries",
                           "icon_token": null,
@@ -6919,7 +6943,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.12",
+                          "interaction_id": "surface.1.interaction.13",
                           "label": "What is Vauchi?",
                           "accessibility_label": "What is Vauchi?",
                           "icon_token": null,
@@ -6943,7 +6967,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.13",
+                          "interaction_id": "surface.1.interaction.14",
                           "label": "Support Development",
                           "accessibility_label": "Support Development",
                           "icon_token": null,
@@ -6967,7 +6991,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.14",
+                          "interaction_id": "surface.1.interaction.15",
                           "label": "Support",
                           "accessibility_label": "Support",
                           "icon_token": null,
@@ -6991,7 +7015,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.15",
+                          "interaction_id": "surface.1.interaction.16",
                           "label": "Version",
                           "accessibility_label": "Version",
                           "icon_token": null,
@@ -7059,7 +7083,7 @@
                         "selected": false,
                         "enabled": true,
                         "activation": {
-                          "interaction_id": "surface.1.interaction.16",
+                          "interaction_id": "surface.1.interaction.17",
                           "label": "Emergency Wipe",
                           "accessibility_label": "Emergency Wipe",
                           "icon_token": null,

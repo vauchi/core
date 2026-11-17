@@ -31,6 +31,33 @@ fn sample_config() -> SettingsConfig {
         backup_reminder_frequency: "Weekly".into(),
         last_backup_display: None,
         delayed_fetching: Default::default(),
+        offline: false,
+    }
+}
+
+// @scenario: sync_updates :: Offline mode blocks every relay path
+#[test]
+fn offline_mode_toggle_flips_the_network_setting() {
+    let mut engine = SettingsEngine::new_advanced(sample_config());
+    let screen = engine.current_screen();
+    assert_eq!(
+        find_link_detail(&screen, "network", "offline").as_deref(),
+        Some("off")
+    );
+
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "network".into(),
+        item_id: "offline".into(),
+    });
+
+    match result {
+        ActionResult::UpdateScreen(screen) => {
+            assert_eq!(
+                find_link_detail(&screen, "network", "offline").as_deref(),
+                Some("on")
+            );
+        }
+        other => panic!("Expected UpdateScreen, got {other:?}"),
     }
 }
 

@@ -67,6 +67,12 @@ impl ProfileEngine {
     /// 4. Return combined outcome.
     #[tracing::instrument(level = "info", skip_all, name = "vauchi.sync")]
     pub fn sync(&mut self) -> VauchiResult<VauchiSyncOutcome> {
+        if self.identity.is_none() {
+            return Ok(VauchiSyncOutcome::NoIdentity);
+        }
+        if self.config.offline {
+            return Ok(VauchiSyncOutcome::NotConnected);
+        }
         // Queued first, so a due guardian backup refresh leaves with this
         // sync (vauchi/private#796, D11).
         self.refresh_guardian_backup_if_stale()?;
@@ -379,6 +385,13 @@ impl ProfileEngine {
         // 1. Identity gate
         if self.identity.is_none() {
             return Err(VauchiError::IdentityNotInitialized);
+        }
+        if self.config.offline {
+            return Err(VauchiError::Network(
+                crate::network::NetworkError::ConnectionFailed(
+                    "offline mode blocks relay requests".into(),
+                ),
+            ));
         }
 
         // 2. Obtain OHTTP key bytes (cached → fetch)
@@ -1142,7 +1155,8 @@ impl ProfileEngine {
         application_relay_url: &str,
         timeout_ms: u64,
     ) -> HttpTransport {
-        if let Some(anchor) = self.config.relay.ohttp_trust_anchor()
+        if !self.config.offline
+            && let Some(anchor) = self.config.relay.ohttp_trust_anchor()
             && self.usable_held_ohttp_key().is_none()
         {
             // A failed fetch leaves the transport without a key, and the
@@ -1168,6 +1182,19 @@ impl ProfileEngine {
         application_relay_url: &str,
         timeout_ms: u64,
     ) -> HttpTransport {
+        use crate::api::relay_transport::{TransportOhttpKey, relay_transport};
+
+        if self.config.offline {
+            return relay_transport(
+                &self.config.relay,
+                application_relay_url,
+                timeout_ms,
+                self.ohttp_pacer(),
+                TransportOhttpKey::None,
+                self.clock.clone(),
+            );
+        }
+
         #[cfg(feature = "testing")]
         if self.config.ohttp.allow_direct {
             return HttpTransport::new(HttpTransportConfig::for_testing(
@@ -1177,7 +1204,6 @@ impl ProfileEngine {
             .with_pacer(self.ohttp_pacer());
         }
 
-        use crate::api::relay_transport::{TransportOhttpKey, relay_transport};
         let key = match self.config.relay.ohttp_trust_anchor() {
             Some(_) => self
                 .usable_held_ohttp_key()

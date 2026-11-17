@@ -12,7 +12,9 @@
 //! frontend `isOnline` mirror flag, no frontend `OfflineBanner()`
 //! switch — the renderer just walks the components.
 
-use vauchi_app::ui::{AppEngine, AppScreen, Component, WorkflowEngine};
+use vauchi_app::ui::{
+    ActionResult, AppEngine, AppScreen, Component, SettingsItemKind, UserAction, WorkflowEngine,
+};
 use vauchi_core::api::Vauchi;
 
 const OFFLINE_ACTION_ID: &str = "offline_banner";
@@ -126,4 +128,40 @@ fn is_network_online_reflects_setter_state() {
 
     engine.set_network_online(true);
     assert!(engine.is_network_online());
+}
+
+// @scenario: sync_updates :: Offline mode blocks every relay path
+#[test]
+fn offline_toggle_persists_to_config_and_flags() {
+    let mut engine = unlocked_engine();
+    engine.navigate_to(AppScreen::SettingsAdvanced);
+
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "network".into(),
+        item_id: "offline".into(),
+    });
+
+    assert!(engine.vauchi().config().offline);
+    assert!(engine.vauchi().load_settings_flags().unwrap().offline);
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("Offline row must refresh the visible settings screen");
+    };
+    let detail = screen.components.iter().find_map(|component| {
+        let Component::SettingsGroup { id, items, .. } = component else {
+            return None;
+        };
+        if id != "network" {
+            return None;
+        }
+        items.iter().find_map(|item| {
+            if item.id != "offline" {
+                return None;
+            }
+            match &item.kind {
+                SettingsItemKind::Link { detail } => detail.clone(),
+                _ => None,
+            }
+        })
+    });
+    assert_eq!(detail.as_deref(), Some("on"));
 }

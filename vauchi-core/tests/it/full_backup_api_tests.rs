@@ -13,9 +13,11 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::{
-    BackupKeyShard, ContactField, FieldType, ImportSource, Vauchi, VauchiConfig,
+    BackupKeyShard, ContactField, FieldType, ImportSource, Vauchi, VauchiConfig, VauchiSyncOutcome,
     open_share_for_guardian, seal_share_for_guardian,
 };
+
+use crate::common::mock_relay::MockRelay;
 
 const BACKUP_PASSWORD: &str = "correct-horse-battery-staple";
 
@@ -93,6 +95,36 @@ fn full_backup_api_roundtrip() {
     let imported_count = contacts.iter().filter(|c| c.is_imported()).count();
     assert_eq!(exchanged_count, 2);
     assert_eq!(imported_count, 1);
+}
+
+// @scenario: backup_recovery :: Full backup and restore work while Offline mode is enabled
+#[test]
+fn full_backup_and_restore_work_offline_without_relay_requests() {
+    let application = MockRelay::start();
+    let outer = MockRelay::start();
+    let mut v = setup_vauchi_with_data();
+    v.config_mut().relay.server_url = application.url();
+    v.config_mut().relay.ohttp_relay_url = Some(outer.url());
+    v.config_mut().offline = true;
+
+    let backup_hex = v.export_full_backup(BACKUP_PASSWORD).unwrap();
+    let mut restored = Vauchi::in_memory().unwrap();
+    restored.config_mut().relay.server_url = application.url();
+    restored.config_mut().relay.ohttp_relay_url = Some(outer.url());
+    restored.config_mut().offline = true;
+    restored
+        .import_full_backup(&backup_hex, BACKUP_PASSWORD)
+        .unwrap();
+
+    assert_eq!(restored.public_id().unwrap(), v.public_id().unwrap());
+    assert_eq!(restored.own_card().unwrap().unwrap().fields().len(), 2);
+    assert_eq!(restored.list_contacts().unwrap().len(), 3);
+    assert!(matches!(
+        restored.sync().unwrap(),
+        VauchiSyncOutcome::NotConnected
+    ));
+    assert!(application.received().is_empty());
+    assert!(outer.received().is_empty());
 }
 
 /// The identity persisted by a v3 full-backup import must be loadable

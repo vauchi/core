@@ -51,6 +51,9 @@ pub struct VauchiConfig {
     /// When true, the relay will not notify contacts of this client's online status.
     pub suppress_presence: bool,
 
+    /// Permit only in-person operation and block every relay request.
+    pub offline: bool,
+
     /// Recovery configuration for social key recovery.
     pub recovery: RecoveryConfig,
 
@@ -107,6 +110,7 @@ impl Default for VauchiConfig {
             auto_save: true,
             storage_key: None,
             suppress_presence: false,
+            offline: false,
             recovery: RecoveryConfig::default(),
             relay_list: None,
             ohttp: OhttpConfig::default(),
@@ -131,6 +135,7 @@ impl crate::settings::SettingsFlags {
     /// humble `persist_settings_toggle`) load-merge-save through this.
     pub fn merge_config_toggles(&mut self, config: &VauchiConfig) {
         self.suppress_presence = config.suppress_presence;
+        self.offline = config.offline;
         self.contact_added_notifications = config.contact_added_notifications;
         self.card_update_notifications = config.card_update_notifications;
         self.reduce_motion = config.reduce_motion;

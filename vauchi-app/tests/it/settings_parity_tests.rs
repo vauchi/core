@@ -70,6 +70,7 @@ fn sample_settings_config() -> SettingsConfig {
         backup_reminder_frequency: "Weekly".into(),
         last_backup_display: None,
         delayed_fetching: DelayedFetching::Off,
+        offline: false,
     }
 }
 

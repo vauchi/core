@@ -270,6 +270,7 @@ impl AppEngine {
                             .map(|t| crate::relative_time::format_relative_time(now, t, locale))
                     },
                     delayed_fetching: DelayedFetching::of(vauchi, render_context.resolved_locale()),
+                    offline: vauchi.config().offline,
                 };
                 let mode = match screen {
                     AppScreen::SettingsAdvanced => SettingsMode::Advanced,

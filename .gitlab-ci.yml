@@ -700,8 +700,11 @@ build:tests:
   # pipeline": twelve main pipelines in a row after the #1212 merge,
   # 2026-11-10/11, which .validation-rust's merge-request-only rule caused).
   # So its rule is the union of its dependents': .validation-rust's and
-  # .validation-platform's paths, lint:semver's two scripts, test:vectors'
-  # fixture corpus, and the default branch, where test:vectors runs.
+  # .validation-platform's paths, test:core's and lint:semver's crate
+  # trees (core!2370, two .spthy headers, failed this way), lint:semver's
+  # two scripts, test:vectors' fixture corpus, and the default branch,
+  # where test:vectors runs. ci/tests/build-tests-needs.test.sh holds the
+  # in-file dependents to it.
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
@@ -710,6 +713,11 @@ build:tests:
           - "**/*.rs"
           - "**/Cargo.toml"
           - "**/Cargo.lock"
+          - "vauchi-core/**/*"
+          - "vauchi-core-testkit/**/*"
+          - "vauchi-protocol/**/*"
+          - ".config/nextest.toml"
+          - ".cargo/config.toml"
           - ".gitlab-ci.yml"
           - "rust-toolchain.toml"
           - "vauchi-platform/**/*"

@@ -1687,6 +1687,7 @@ trial:unused-deps:
   needs: []
   allow_failure: true
   before_script:
+    - export RUSTC_WRAPPER=""
     - rustup toolchain install nightly --profile minimal
     - cargo install cargo-udeps --version 0.1.61 --locked --quiet
     - cargo install cargo-machete --version 0.9.2 --locked --quiet

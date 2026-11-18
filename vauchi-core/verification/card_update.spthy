@@ -26,16 +26,16 @@
  *   -DNO_RECIPIENT_BINDING  update_comes_from_the_sender_for_this_recipient
  *   -DNO_VERSION_FLOOR      no_rollback
  *   -DPLAINTEXT_UPDATES     changes_stay_secret
- *   -DSENDER_KEY_LEAKS      an_update_applies_once_whoever_holds_the_sender_key
  * no_rollback exists only in that control: with the floor, "versions only
  * rise" needs induction over the chain of receives that Tamarin does not
  * finish (no verdict in 7 minutes). Without the nonce check, neither
  * each_update_is_applied_once nor an exists-trace replay gets a verdict
- * within 6 GB, so that check has no control that removes it. The last
- * control stands in for one: it is each_update_is_applied_once without its
- * exception, and falsifying it shows that two applications of one update
- * are reachable in the model, so the lemma is not true for want of traces
- * (private#950).
+ * within 6 GB, so that check has no control that removes it. A witness
+ * stands in for one: -DSENDER_KEY_LEAKS must find a trace of
+ * a_leaked_sender_key_applies_one_update_twice, which shows that two
+ * applications of one update are reachable in the model, so the lemma is
+ * not true for want of traces (private#950). The lemma without its
+ * exception, proved as an all-traces statement, ran out of 8 GB.
  */
 
 theory VauchiCardUpdate
@@ -147,13 +147,26 @@ lemma each_update_is_applied_once:
       ==> #i = #j | (Ex #r. RevealIdentity(a) @ r)"
 
 #ifdef SENDER_KEY_LEAKS
+// Witness for each_update_is_applied_once: with the sender's identity key
+// and the channel key, the attacker signs one version and one set of
+// changes under two nonces, and both apply. The two restrictions only
+// remove traces (no honest send, at most two applications), so a trace
+// found here is a trace of the model above; without them the search ran
+// out of 8 GB (pipeline 3086164909).
+restriction Nobody_sends_honestly:
+  "All a b %v c #i. Sent(a, b, %v, c) @ i ==> F"
+
+restriction At_most_two_applications:
+  "All b1 a1 %v1 c1 b2 a2 %v2 c2 b3 a3 %v3 c3 #i #j #k.
+      Applied(b1, a1, %v1, c1) @ i & Applied(b2, a2, %v2, c2) @ j
+    & Applied(b3, a3, %v3, c3) @ k
+      ==> #i = #j | #i = #k | #j = #k"
+
 // @claim: S2
-// Control: the lemma above without its exception. With the sender's
-// identity key and the channel key, the attacker signs one version and
-// one set of changes under two nonces, and both apply.
-lemma an_update_applies_once_whoever_holds_the_sender_key:
-  "All b a %v c #i #j. Applied(b, a, %v, c) @ i & Applied(b, a, %v, c) @ j
-      ==> #i = #j"
+lemma a_leaked_sender_key_applies_one_update_twice:
+  exists-trace
+  "Ex b a %v c #i #j. Applied(b, a, %v, c) @ i & Applied(b, a, %v, c) @ j
+    & #i < #j"
 #endif
 
 #ifdef NO_VERSION_FLOOR

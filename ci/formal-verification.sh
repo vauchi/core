@@ -369,11 +369,12 @@ tamarin_expect "$models/card_update.spthy" falsified "-DNO_VERSION_FLOOR" \
     no_rollback
 # One lemma per run: the other lemmas are not what these flags are for.
 # The nonce check has no control that removes it (the model's header says
-# why); the second line shows a double application is reachable at all.
+# why); the second line is a witness that a double application is
+# reachable at all, an exists-trace lemma that must be verified.
 tamarin_lemma_expect "$models/card_update.spthy" changes_stay_secret \
     falsified "-DPLAINTEXT_UPDATES"
 tamarin_lemma_expect "$models/card_update.spthy" \
-    an_update_applies_once_whoever_holds_the_sender_key falsified "-DSENDER_KEY_LEAKS"
+    a_leaked_sender_key_applies_one_update_twice verified "-DSENDER_KEY_LEAKS"
 
 # Duress cover (#811, ADR-032): a coercer watching the wire cannot tell a
 # duress unlock that sends cover from a normal unlock that sends their

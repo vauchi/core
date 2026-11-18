@@ -82,7 +82,7 @@ fn unlocked_on_advanced_settings() -> AppEngine {
 
 // @internal
 #[test]
-fn back_while_locked_stays_on_the_lock_screen() {
+fn back_on_the_lock_screen_stays_on_the_lock_screen() {
     for pin in [PASSWORD, DURESS_PIN] {
         let mut engine = locked_after_backgrounding(pin);
         let (surface_id, _) = active_surface(&mut engine);

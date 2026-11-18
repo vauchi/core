@@ -6,6 +6,12 @@
 //! (SC-62, vauchi/private#970 plan step 6). Before, the restore kept the
 //! backed-up device index and took a new key, so a contact that pinned the
 //! backed-up device refused the restored install's registry for good.
+//!
+//! These tests show what a contact does with the restored install's
+//! registry once it arrives, delivered here over the original session. An
+//! identity backup restores no contacts and no sessions; whether the
+//! restored install can reach a contact it met before is a separate
+//! question (vauchi/private#1285).
 
 use crate::common::device_sync::device_signed_broadcast;
 use crate::common::per_device::{Party, two_parties};
@@ -47,7 +53,7 @@ fn alice_holds_as_active(p: &Party, device_id: &[u8; 32]) -> bool {
         .any(|device| &device.device_id == device_id)
 }
 
-// @scenario: backup_format_versioning :: Restored contacts continue exchanging updates
+// @scenario: backup_format_versioning :: Restore v2 backup with correct password
 // @internal
 #[test]
 fn an_identity_backup_restore_is_a_new_device_of_the_same_identity() {
@@ -63,7 +69,7 @@ fn an_identity_backup_restore_is_a_new_device_of_the_same_identity() {
     );
 }
 
-// @scenario: backup_format_versioning :: Restored contacts continue exchanging updates
+// @scenario: backup_format_versioning :: Restore v2 backup with correct password
 // @internal
 #[test]
 fn a_contact_that_pinned_the_backed_up_device_accepts_the_restored_registry() {

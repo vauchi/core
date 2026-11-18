@@ -223,6 +223,46 @@ fn test_forward_secrecy_compromised_state() {
     );
 }
 
+/// A state copied from a device keeps opening the peer's messages until
+/// the device has made a key after the theft and the peer has used it: the
+/// key the device replies with first was already in the stolen state.
+// @scenario: security :: Forward secrecy via Double Ratchet
+// @internal
+#[test]
+fn a_stolen_state_stops_opening_messages_after_the_device_uses_a_key_made_later() {
+    let (mut alice, mut bob) = create_test_pair();
+    let opener = alice.encrypt(b"before the theft").unwrap();
+    assert_eq!(bob.decrypt(&opener).unwrap(), b"before the theft");
+    let mut thief = DoubleRatchetState::deserialize(bob.serialize()).unwrap();
+
+    let first_reply = bob.encrypt(b"reply under a stolen key").unwrap();
+    assert_eq!(
+        alice.decrypt(&first_reply).unwrap(),
+        b"reply under a stolen key"
+    );
+    let still_exposed = alice.encrypt(b"still exposed").unwrap();
+    assert_eq!(bob.decrypt(&still_exposed).unwrap(), b"still exposed");
+    assert_eq!(
+        thief.decrypt(&still_exposed).unwrap(),
+        b"still exposed",
+        "the first reply's key was in the stolen state, so this still opens"
+    );
+
+    let second_reply = bob.encrypt(b"reply under a key made later").unwrap();
+    assert_eq!(
+        alice.decrypt(&second_reply).unwrap(),
+        b"reply under a key made later"
+    );
+    let after_healing = alice.encrypt(b"after healing").unwrap();
+
+    let stolen_view = thief.decrypt(&after_healing);
+    assert!(
+        matches!(stolen_view, Err(RatchetError::Encryption(_))),
+        "the stolen state must not open this, got {stolen_view:?}"
+    );
+    assert_eq!(bob.decrypt(&after_healing).unwrap(), b"after healing");
+}
+
 // @internal
 #[test]
 fn test_dr_out_of_order_messages() {

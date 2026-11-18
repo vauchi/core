@@ -220,23 +220,12 @@ impl ProfileEngine {
             crate::backup::decode_backup_hex_with_limit(backup_data, MAX_IDENTITY_BACKUP_BYTES)
                 .map_err(|e| VauchiError::Configuration(format!("Invalid backup data: {e}")))?;
         let backup = crate::identity::IdentityBackup::new(bytes);
-        let identity = Identity::import_backup(&backup, password, self.clock.unix_seconds())
+        let now = self.clock.unix_seconds();
+        let backed_up = Identity::import_backup(&backup, password, now)
             .map_err(|e| VauchiError::Configuration(format!("Import failed: {:?}", e)))?;
+        let identity = self.save_as_new_device(&backed_up, now)?;
 
         let name = identity.display_name().to_string();
-
-        // Persist in the same plaintext storage format as
-        // `create_identity` — the DB encrypts at rest (ADR-015).
-        // Persisting the password-encrypted backup bytes locked the
-        // user out on restart: no startup loader has the backup
-        // password (2026-06-11-restore-identity-unloadable-after-restart).
-        // One step, or the new identity could start signing with the device key
-        // of the identity it replaced (ADR-079): a backup carries no device key.
-        self.storage.with_savepoint(|| -> VauchiResult<()> {
-            self.storage.identity().save(&identity)?;
-            self.storage.device().clear_device_signing_key()?;
-            Ok(())
-        })?;
 
         // Create contact card if none exists
         if self.storage.contacts().load_own_card()?.is_none() {

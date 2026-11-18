@@ -195,6 +195,36 @@ impl ProfileEngine {
 }
 
 impl ProfileEngine {
+    /// Saves an identity-only backup's identity as a new device of it and
+    /// returns that identity. Signing as the backed-up device with a new key
+    /// would make every contact that pinned it refuse its deltas
+    /// (vauchi/private#970), so the install takes a new index, as a full
+    /// backup restore does (vauchi/private#1247).
+    pub(super) fn save_as_new_device(
+        &self,
+        backed_up: &Identity,
+        now: u64,
+    ) -> VauchiResult<Identity> {
+        let identity = Identity::from_device_link(
+            *backed_up.master_seed(),
+            backed_up.display_name().to_string(),
+            restored_device_index(backed_up.master_seed(), None),
+            backed_up.device_info().device_name().to_string(),
+            now,
+        );
+        // The storage encoding, not the password-encrypted backup bytes: no
+        // startup loader has the backup password
+        // (2026-06-11-restore-identity-unloadable-after-restart). One step,
+        // or the new identity could start signing with the device key of the
+        // identity it replaced (ADR-079): a backup carries no device key.
+        self.storage.with_savepoint(|| -> VauchiResult<()> {
+            self.storage.identity().save(&identity)?;
+            self.storage.device().clear_device_signing_key()?;
+            self.register_restored_device(&identity, None, backed_up.device_id(), now)
+        })?;
+        Ok(identity)
+    }
+
     /// Saves the registry the restored install signs: the backed-up one, or
     /// none for a backup that predates carrying it, with this install added
     /// as a new device. The next sync pushes it to every contact.

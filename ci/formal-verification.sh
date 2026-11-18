@@ -83,22 +83,49 @@ python3 ci/check-kani-result.py "$padding_report" \
     --require-cover "maximum modeled input length is reachable" \
     --require-cover "accepted nonempty plaintext is reachable" \
     --require-cover "rejected input is reachable"
-for harness in \
-    parse_exchange_payload_never_panics_and_reads_each_field_at_its_offset \
-    ble_advertisement_parse_never_panics_and_reads_each_field_at_its_offset \
-    recovery_claim_parse_never_panics_and_reads_each_field_at_its_offset \
-    recovery_time_bounds_are_exact_and_never_overflow; do
-    cargo kani -p vauchi-core --harness "$harness"
-done
+# kani_witnessed <harness path> "<kani flags>" <cover description>...: the
+# proof holds and every named cover is reached. A proof whose accepting or
+# refusing branch became unreachable would otherwise still pass, proving
+# nothing about that branch (private#950).
+kani_witnessed() {
+    k_harness=$1
+    k_flags=$2
+    shift 2
+    k_report=.formal-results/$(printf '%s' "$k_harness" | sed 's/.*:://').json
+    rm -f "$k_report"
+    k_status=0
+    # shellcheck disable=SC2086 # the flags are separate words
+    cargo kani -p vauchi-core $k_flags --harness "$k_harness" --exact \
+        -Z unstable-options --export-json "$k_report" || k_status=$?
+    for k_witness in "$@"; do
+        set -- "$@" --require-cover "$k_witness"
+        shift
+    done
+    python3 ci/check-kani-result.py "$k_report" \
+        --harness "$k_harness" --backend-exit "$k_status" \
+        --verifier-version "$KANI_VERSION" "$@"
+}
+kani_witnessed exchange::exchange_payload_proofs::parse_exchange_payload_never_panics_and_reads_each_field_at_its_offset "" \
+    "an accepted payload is reachable" "a refused payload is reachable"
+kani_witnessed exchange::ble::proofs::ble_advertisement_parse_never_panics_and_reads_each_field_at_its_offset "" \
+    "an accepted advertisement is reachable" "a refused advertisement is reachable"
+kani_witnessed recovery::proofs::recovery_claim_parse_never_panics_and_reads_each_field_at_its_offset "" \
+    "an accepted claim is reachable" "a refused claim is reachable"
+kani_witnessed recovery::proofs::recovery_time_bounds_are_exact_and_never_overflow "" \
+    "an expired claim is reachable" "a claim from the future is reachable" \
+    "an expired proof is reachable"
 # These stub format! or gf_mul, which CBMC cannot finish within the limits;
 # each harness says why its stub keeps the proof meaningful.
-for harness in \
-    cek_wrapped_payload_decode_never_panics_and_reads_each_field_at_its_offset \
-    interpolation_never_panics_and_refuses_a_zero_or_repeated_x \
-    recover_byte_never_panics \
-    reconstruct_refuses_more_shares_than_guardians; do
-    cargo kani -p vauchi-core -Z stubbing --harness "$harness"
-done
+kani_witnessed sync::delta_proofs::cek_wrapped_payload_decode_never_panics_and_reads_each_field_at_its_offset "-Z stubbing" \
+    "an accepted payload is reachable" "a refused payload is reachable"
+kani_witnessed crypto::shamir::proofs::interpolation_never_panics_and_refuses_a_zero_or_repeated_x "-Z stubbing" \
+    "an interpolated value is reachable" "a refused zero x is reachable" \
+    "a refused repeated x is reachable"
+kani_witnessed crypto::shamir::proofs::recover_byte_never_panics "-Z stubbing" \
+    "more shares than the buffer holds is reachable" "a recovered byte is reachable"
+kani_witnessed crypto::shamir::proofs::reconstruct_refuses_more_shares_than_guardians "-Z stubbing" \
+    "a tenth share refused for the count is reachable" \
+    "a threshold refused first is reachable"
 fi # wants code
 # Two recovery parser proofs run by hand, not here: the postcard token
 # parser over 140 symbolic bytes verified in 54 minutes on a 24-thread

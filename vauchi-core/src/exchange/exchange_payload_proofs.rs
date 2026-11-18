@@ -36,9 +36,11 @@ fn parse_exchange_payload_never_panics_and_reads_each_field_at_its_offset() {
             let timestamp = u64::from_be_bytes(input[102..110].try_into().expect("8 bytes"));
             assert_eq!(parsed.timestamp, timestamp);
             assert_eq!(parsed.signature, input[110..174]);
+            kani::cover!(true, "an accepted payload is reachable");
         }
         Err(_) => {
             assert!(len < EXCHANGE_PAYLOAD_SIZE || input[0..4] != magic || input[4] != 1);
+            kani::cover!(true, "a refused payload is reachable");
         }
     }
 }

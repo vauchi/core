@@ -61,8 +61,12 @@ fn recovery_claim_parse_never_panics_and_reads_each_field_at_its_offset() {
             assert_eq!(*claim.old_pk(), key_at(input, 1));
             assert_eq!(*claim.new_pk(), key_at(input, 33));
             assert_eq!(claim.timestamp(), u64_at(input, 65));
+            kani::cover!(true, "an accepted claim is reachable");
         }
-        Err(_) => assert!(len != CLAIM_LEN || input[0] != 1),
+        Err(_) => {
+            assert!(len != CLAIM_LEN || input[0] != 1);
+            kani::cover!(true, "a refused claim is reachable");
+        }
     }
 }
 
@@ -152,4 +156,11 @@ fn recovery_time_bounds_are_exact_and_never_overflow() {
         proof.is_expired(now),
         now > stamped.saturating_add(RecoveryProof::EXPIRY_SECS)
     );
+
+    kani::cover!(claim.is_expired(now), "an expired claim is reachable");
+    kani::cover!(
+        RecoveryClaim::is_from_the_future(stamped, now),
+        "a claim from the future is reachable"
+    );
+    kani::cover!(proof.is_expired(now), "an expired proof is reachable");
 }

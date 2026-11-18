@@ -26,7 +26,11 @@ fn ble_advertisement_parse_never_panics_and_reads_each_field_at_its_offset() {
             assert_eq!(advertisement.exchange_token, input[0..32]);
             assert_eq!(advertisement.public_key, input[32..64]);
             assert_eq!(advertisement.signature, input[64..128]);
+            kani::cover!(true, "an accepted advertisement is reachable");
         }
-        Err(_) => assert!(len < ADVERTISEMENT_LEN),
+        Err(_) => {
+            assert!(len < ADVERTISEMENT_LEN);
+            kani::cover!(true, "a refused advertisement is reachable");
+        }
     }
 }

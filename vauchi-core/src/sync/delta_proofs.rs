@@ -42,9 +42,11 @@ fn cek_wrapped_payload_decode_never_panics_and_reads_each_field_at_its_offset() 
                 payload.cek_ciphertext[..],
                 input[HEADER_LEN..HEADER_LEN + ct_len]
             );
+            kani::cover!(true, "an accepted payload is reachable");
         }
         Err(_) => {
-            assert!(len < HEADER_LEN || declared_ciphertext_len(input) > len - HEADER_LEN)
+            assert!(len < HEADER_LEN || declared_ciphertext_len(input) > len - HEADER_LEN);
+            kani::cover!(true, "a refused payload is reachable");
         }
     }
 }

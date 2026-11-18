@@ -72,9 +72,18 @@ fn interpolation_never_panics_and_refuses_a_zero_or_repeated_x() {
     let xs = &xs[..count];
 
     match lagrange_interpolate_at_zero(points) {
-        Ok(_) => assert!(xs_are_nonzero_and_distinct(xs)),
-        Err(ShamirError::InvalidShareIndex) => assert!(xs.contains(&0)),
-        Err(ShamirError::DuplicateIndices) => assert!(!xs_are_nonzero_and_distinct(xs)),
+        Ok(_) => {
+            assert!(xs_are_nonzero_and_distinct(xs));
+            kani::cover!(true, "an interpolated value is reachable");
+        }
+        Err(ShamirError::InvalidShareIndex) => {
+            assert!(xs.contains(&0));
+            kani::cover!(true, "a refused zero x is reachable");
+        }
+        Err(ShamirError::DuplicateIndices) => {
+            assert!(!xs_are_nonzero_and_distinct(xs));
+            kani::cover!(true, "a refused repeated x is reachable");
+        }
         // Reachable only because gf_mul is arbitrary here: with the real
         // field, distinct non-zero x values give a non-zero denominator.
         Err(ShamirError::DivisionByZero) => {}
@@ -102,7 +111,9 @@ fn recover_byte_never_panics() {
 
     if count > usize::from(MAX_COUNT) {
         assert_eq!(result, Err(ShamirError::CountTooHigh(MAX_COUNT)));
+        kani::cover!(true, "more shares than the buffer holds is reachable");
     }
+    kani::cover!(result.is_ok(), "a recovered byte is reachable");
 }
 
 /// A tenth share can only come from someone other than a guardian
@@ -129,4 +140,12 @@ fn reconstruct_refuses_more_shares_than_guardians() {
             | ShamirError::ThresholdTooHigh(_)
             | ShamirError::CountTooHigh(10)
     ));
+    kani::cover!(
+        matches!(error, ShamirError::CountTooHigh(10)),
+        "a tenth share refused for the count is reachable"
+    );
+    kani::cover!(
+        matches!(error, ShamirError::ThresholdTooLow(_)),
+        "a threshold refused first is reachable"
+    );
 }

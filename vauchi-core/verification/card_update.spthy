@@ -25,12 +25,17 @@
  * Controls, each of which must falsify its lemma:
  *   -DNO_RECIPIENT_BINDING  update_comes_from_the_sender_for_this_recipient
  *   -DNO_VERSION_FLOOR      no_rollback
+ *   -DPLAINTEXT_UPDATES     changes_stay_secret
+ *   -DSENDER_KEY_LEAKS      an_update_applies_once_whoever_holds_the_sender_key
  * no_rollback exists only in that control: with the floor, "versions only
  * rise" needs induction over the chain of receives that Tamarin does not
  * finish (no verdict in 7 minutes). Without the nonce check, neither
  * each_update_is_applied_once nor an exists-trace replay gets a verdict
- * within 6 GB, so that check has no control here; the lemma is not vacuous,
- * since it is falsified once a leaked identity key is allowed.
+ * within 6 GB, so that check has no control that removes it. The last
+ * control stands in for one: it is each_update_is_applied_once without its
+ * exception, and falsifying it shows that two applications of one update
+ * are reachable in the model, so the lemma is not true for want of traces
+ * (private#950).
  */
 
 theory VauchiCardUpdate
@@ -88,6 +93,16 @@ rule Reveal_channel:
   --[ RevealChannel(A, B) ]->
     [ Out(k) ]
 
+#ifdef PLAINTEXT_UPDATES
+// Control for changes_stay_secret: the update leaves unencrypted.
+rule Send_update:
+    let d = delta(%v, ~changes, ~nonce, pk(ska), pkb)
+    in
+    [ NextVersion(A, B, %v), !Ltk(A, ska), !Pk(B, pkb), !Channel(A, B, k),
+      Fr(~changes), Fr(~nonce) ]
+  --[ Sent(A, B, %v, ~changes) ]->
+    [ NextVersion(A, B, %v %+ %1), Out(<d, sign(d, ska)>) ]
+#else
 rule Send_update:
     let d = delta(%v, ~changes, ~nonce, pk(ska), pkb)
     in
@@ -95,6 +110,7 @@ rule Send_update:
       Fr(~changes), Fr(~nonce) ]
   --[ Sent(A, B, %v, ~changes) ]->
     [ NextVersion(A, B, %v %+ %1), Out(senc(<d, sign(d, ska)>, k)) ]
+#endif
 
 rule Receive_update:
     let d = delta(%v, changes, nonce, pka, pkb)
@@ -129,6 +145,16 @@ lemma update_comes_from_the_sender_for_this_recipient:
 lemma each_update_is_applied_once:
   "All b a %v c #i #j. Applied(b, a, %v, c) @ i & Applied(b, a, %v, c) @ j
       ==> #i = #j | (Ex #r. RevealIdentity(a) @ r)"
+
+#ifdef SENDER_KEY_LEAKS
+// @claim: S2
+// Control: the lemma above without its exception. With the sender's
+// identity key and the channel key, the attacker signs one version and
+// one set of changes under two nonces, and both apply.
+lemma an_update_applies_once_whoever_holds_the_sender_key:
+  "All b a %v c #i #j. Applied(b, a, %v, c) @ i & Applied(b, a, %v, c) @ j
+      ==> #i = #j"
+#endif
 
 #ifdef NO_VERSION_FLOOR
 // @claim: S2

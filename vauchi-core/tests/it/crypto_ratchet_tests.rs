@@ -226,6 +226,7 @@ fn test_forward_secrecy_compromised_state() {
 /// A state copied from a device keeps opening the peer's messages until
 /// the device has made a key after the theft and the peer has used it: the
 /// key the device replies with first was already in the stolen state.
+// @claim: S11
 // @scenario: security :: Forward secrecy via Double Ratchet
 // @internal
 #[test]

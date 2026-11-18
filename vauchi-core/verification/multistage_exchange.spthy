@@ -316,6 +316,7 @@ lemma executable:
 
 /* A saved card is a card the holder of that identity committed, unless
    that identity's key leaked before the save. */
+// @claim: S18
 lemma card_authentic:
   "All A B pka pkb sa sb card #i #r.
      Saved(A, pka, pkb, sa, sb, card) @ i & Identity(B, pkb) @ r
@@ -324,6 +325,7 @@ lemma card_authentic:
 
 /* No save on a failed check: a phone saves only after its peer, in the
    very session it saved from, accepted it. */
+// @claim: S18
 lemma peer_accepted_before_save:
   "All A B pka pkb sa sb card #i #r.
      Saved(A, pka, pkb, sa, sb, card) @ i & Identity(B, pkb) @ r
@@ -331,6 +333,7 @@ lemma peer_accepted_before_save:
          | (Ex #l. RevealIdentity(B) @ l & l < i)"
 
 /* A DONE that a phone takes as "the peer saved" is true. */
+// @claim: S18
 lemma peer_saved_is_true:
   "All A B pka pkb sa sb #i #r.
      PeerSaved(A, pka, pkb, sa, sb) @ i & Identity(B, pkb) @ r

@@ -10,7 +10,7 @@
 //! different keys and nothing either sends opens at the other.
 
 use vauchi_core::Vauchi;
-use vauchi_core::api::VauchiError;
+use vauchi_core::api::{CardUpdateError, VauchiError, process_single_card_update};
 
 use crate::common::device_sync::device_signed_broadcast;
 use crate::common::helpers::create_vauchi_with_identity;
@@ -324,5 +324,47 @@ fn a_yes_drops_the_sessions_the_contact_held_for_single_devices() {
             .unwrap(),
         vec![[0u8; 32]],
         "only the session shared by the whole identity is left"
+    );
+}
+
+/// The backed-up device still holds the connection the reconnect
+/// replaced. If it is lost or stolen, nothing it sends reaches the contact.
+// @internal
+#[test]
+fn after_a_yes_the_backed_up_device_can_no_longer_update_the_contact() {
+    let p = two_parties();
+    let restored = restore_identity_backup(&p);
+    alice_reconnects_with_the_restored_install(&p, &restored);
+    let mut card = p.bob.own_card().unwrap().unwrap();
+    card.set_display_name("Bob, old phone").unwrap();
+    p.bob.update_own_card(&card).unwrap();
+    p.bob.run_owed_repropagation().unwrap();
+    p.bob.queue_registry_pushes().unwrap();
+    let queued = p
+        .bob
+        .storage()
+        .pending()
+        .get_pending_updates(&p.alice_at_bob)
+        .unwrap();
+    assert!(
+        !queued.is_empty(),
+        "the old device must have sent something"
+    );
+
+    for update in &queued {
+        let outcome = process_single_card_update(
+            p.alice.identity().unwrap(),
+            p.alice.storage(),
+            &p.bob_at_alice,
+            &update.payload,
+        );
+        assert!(
+            matches!(outcome, Err(CardUpdateError::DecryptionFailed)),
+            "got {outcome:?}"
+        );
+    }
+    assert_eq!(
+        name_at(&p.alice, &p.bob_at_alice),
+        Some("Phone".to_string())
     );
 }

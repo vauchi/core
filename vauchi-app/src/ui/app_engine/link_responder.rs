@@ -28,11 +28,15 @@ impl AppEngine {
     /// Builds the rich success summary from the persisted contact, attaches
     /// it, and transitions the responder engine to
     /// `link_responder_completed`.
-    pub fn link_responder_completed(&mut self, contact_id: &str) -> Option<ScreenModel> {
+    pub fn link_responder_completed(
+        &mut self,
+        contact_id: &str,
+        already_held: bool,
+    ) -> Option<ScreenModel> {
         self.engine_cache.remove(&AppScreen::Contacts);
         // Build the summary first so the immutable `self.vauchi` borrow ends
         // before the `&mut self` engine borrow. Link mode assigns no group.
-        let summary = self.build_exchange_summary(contact_id, Vec::new());
+        let summary = self.build_link_summary(contact_id, already_held);
         // Ceremony (M2 S4): the sender's card was retrieved + persisted —
         // validated success, once per responder session.
         self.extend_pending_commands(vec![crate::ui::exchange::ceremony::exchange_celebrate()]);
@@ -199,8 +203,11 @@ impl AppEngine {
     ) -> bool {
         use vauchi_core::api::LinkExchangeProgress;
         match progress {
-            LinkExchangeProgress::Completed { contact_id } => {
-                self.link_responder_completed(&contact_id);
+            LinkExchangeProgress::Completed {
+                contact_id,
+                already_held,
+            } => {
+                self.link_responder_completed(&contact_id, already_held);
                 true
             }
             LinkExchangeProgress::Failed { reason } => {

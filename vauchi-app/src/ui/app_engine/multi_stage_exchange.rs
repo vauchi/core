@@ -699,6 +699,7 @@ impl AppEngine {
             my_visible_fields,
             group_names,
             is_reconnection: false,
+            already_held_unchanged: false,
         };
         self.apply_multi_stage_success_summary(summary);
     }
@@ -797,6 +798,23 @@ impl AppEngine {
             my_visible_fields,
             group_names,
             is_reconnection: self.exchange_was_reconnection,
+            already_held_unchanged: false,
+        }
+    }
+
+    /// The success summary of a Link exchange. Link assigns no group. A
+    /// contact already held was left as it is, so the summary says
+    /// "unchanged" and never "updated": the in-person paths' reconnection
+    /// flag is not Link's to read (vauchi/private#1285).
+    pub(crate) fn build_link_summary(
+        &self,
+        contact_id: &str,
+        already_held: bool,
+    ) -> crate::ui::exchange::success::ExchangeSuccessSummary {
+        crate::ui::exchange::success::ExchangeSuccessSummary {
+            is_reconnection: false,
+            already_held_unchanged: already_held,
+            ..self.build_exchange_summary(contact_id, Vec::new())
         }
     }
 

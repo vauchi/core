@@ -186,10 +186,12 @@ impl AppEngine {
         use crate::ui::{EngineUpdate, LinkExchangeUpdate};
         use vauchi_core::api::LinkExchangeProgress;
         match progress {
-            LinkExchangeProgress::Completed { contact_id } => {
+            LinkExchangeProgress::Completed {
+                contact_id,
+                already_held,
+            } => {
                 self.engine_cache.remove(&AppScreen::Contacts);
-                // Link mode assigns no group, so group_names is empty.
-                let summary = self.build_exchange_summary(&contact_id, Vec::new());
+                let summary = self.build_link_summary(&contact_id, already_held);
                 let _ = self.engine.apply_update(EngineUpdate::LinkExchange(
                     LinkExchangeUpdate::Succeeded(summary),
                 ));

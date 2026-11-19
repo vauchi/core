@@ -195,6 +195,20 @@ impl ProfileEngine {
         our_x3dh: &crate::exchange::X3DHKeyPair,
         binding: &crate::exchange::link_mode::LinkExchangeBinding,
     ) -> VauchiResult<String> {
+        self.complete_link_exchange_reporting(card_bytes, our_x3dh, binding)
+            .map(|(contact_id, _already_held)| contact_id)
+    }
+
+    /// [`Self::complete_link_exchange`], and whether the contact was
+    /// already held. A held contact is left exactly as it is, so the caller
+    /// must not tell its person that anything was added or updated
+    /// (vauchi/private#1285).
+    pub(crate) fn complete_link_exchange_reporting(
+        &self,
+        card_bytes: &[u8],
+        our_x3dh: &crate::exchange::X3DHKeyPair,
+        binding: &crate::exchange::link_mode::LinkExchangeBinding,
+    ) -> VauchiResult<(String, bool)> {
         use crate::exchange::ExchangeError;
         use crate::exchange::link_mode::{
             LinkCardPayload, derive_link_shared_key, parse_link_card_payload,
@@ -230,7 +244,7 @@ impl ProfileEngine {
         // Idempotent: keep the existing contact and its ratchet — re-keying
         // would desync an already-established channel.
         if self.storage.contacts().load_contact(&contact_id)?.is_some() {
-            return Ok(contact_id);
+            return Ok((contact_id, true));
         }
 
         // Enforce the per-identity contact limit (C3) — mirrors the import path.
@@ -278,6 +292,6 @@ impl ProfileEngine {
         // chain, so both sides owe a repropagation pass (see `finish_exchange`).
         self.mark_own_card_repropagate()?;
 
-        Ok(contact_id)
+        Ok((contact_id, false))
     }
 }

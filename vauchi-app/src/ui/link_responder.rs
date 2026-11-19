@@ -221,7 +221,7 @@ impl LinkResponderEngine {
         if let Some(summary) = &self.success_summary {
             return crate::ui::exchange::success::build_exchange_success_screen(
                 "link_responder_completed",
-                self.t(completion_title_key(summary.is_reconnection)),
+                self.t(completion_title_key(summary)),
                 ACTION_DONE,
                 summary,
                 self.locale,
@@ -427,6 +427,7 @@ mod success_summary_tests {
             my_visible_fields: vec!["Phone".into()],
             group_names: Vec::new(),
             is_reconnection: false,
+            already_held_unchanged: false,
         });
         engine.transition_to_completed();
         let screen = engine.build_screen();

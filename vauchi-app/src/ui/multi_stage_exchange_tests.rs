@@ -64,6 +64,7 @@ fn success_screen_renders_rich_summary_when_attached() {
         my_visible_fields: vec!["Phone".into()],
         group_names: Vec::new(),
         is_reconnection: false,
+        already_held_unchanged: false,
     });
     let screen = engine.build_screen();
     assert!(

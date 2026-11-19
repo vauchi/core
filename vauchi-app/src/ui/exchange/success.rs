@@ -36,6 +36,11 @@ pub struct ExchangeSuccessSummary {
     /// supported flow (it re-syncs and can raise trust), and the terminal
     /// screen must not claim a contact was added when none was.
     pub is_reconnection: bool,
+    /// Link only: the contact was already held and this exchange changed
+    /// nothing about it, not its card and not its key. The screen then
+    /// claims no update and says that reconnecting needs a meeting in
+    /// person (vauchi/private#1285).
+    pub already_held_unchanged: bool,
 }
 
 /// Locale key for an exchange's terminal title.
@@ -44,8 +49,10 @@ pub struct ExchangeSuccessSummary {
 /// flow — it re-syncs the cards and can raise trust — so the terminal
 /// screen has to say which of the two happened. Every engine shares this
 /// so the wording cannot drift between modes.
-pub(crate) fn completion_title_key(is_reconnection: bool) -> &'static str {
-    if is_reconnection {
+pub(crate) fn completion_title_key(summary: &ExchangeSuccessSummary) -> &'static str {
+    if summary.already_held_unchanged {
+        "link_exchange.contact_unchanged_title"
+    } else if summary.is_reconnection {
         "link_exchange.contact_updated_title"
     } else {
         "link_exchange.contact_added_title"
@@ -98,19 +105,33 @@ pub fn build_exchange_success_screen(
     // location-limited out-of-band channel, not a distance-bounding primitive,
     // and both are relayable in principle. Claiming "verified in person" here
     // would assert more than the protocol establishes.
-    components.push(Component::Text {
-        a11y: None,
-        id: "stays_updated".into(),
-        content: if summary.peer_name.is_empty() {
-            t("exchange.success.stays_updated_generic")
-        } else {
-            crate::i18n::get_string_with_args(
+    components.push(if summary.already_held_unchanged {
+        // Not the promise below: nothing here says the copy still updates.
+        Component::Text {
+            a11y: None,
+            id: "link_needs_meeting".into(),
+            content: crate::i18n::get_string_with_args(
                 locale,
-                "exchange.success.stays_updated",
+                "exchange.reconnect.link_needs_meeting",
                 &[("name", they.as_str())],
-            )
-        },
-        style: TextStyle::Body,
+            ),
+            style: TextStyle::Body,
+        }
+    } else {
+        Component::Text {
+            a11y: None,
+            id: "stays_updated".into(),
+            content: if summary.peer_name.is_empty() {
+                t("exchange.success.stays_updated_generic")
+            } else {
+                crate::i18n::get_string_with_args(
+                    locale,
+                    "exchange.success.stays_updated",
+                    &[("name", they.as_str())],
+                )
+            },
+            style: TextStyle::Body,
+        }
     });
 
     // What they shared with us — the received card fields, read-only.
@@ -240,6 +261,7 @@ mod tests {
             my_visible_fields: vec!["Phone".into(), "Website".into()],
             group_names: vec!["Friends".into()],
             is_reconnection: false,
+            already_held_unchanged: false,
         };
         let screen = build_exchange_success_screen(
             "exchange_success",

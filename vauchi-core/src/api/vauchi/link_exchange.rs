@@ -52,8 +52,14 @@ enum Role {
 pub enum LinkExchangeProgress {
     /// Still waiting for the other side or the relay.
     Waiting,
-    /// Both cards arrived; the contact exists.
-    Completed { contact_id: String },
+    /// Both cards arrived; the contact exists. `already_held` says it
+    /// existed before this exchange, which then changed nothing about it:
+    /// a Link exchange never refreshes or rekeys a held contact
+    /// (vauchi/private#1285).
+    Completed {
+        contact_id: String,
+        already_held: bool,
+    },
     /// The exchange ended without a contact (a stable failure id).
     Failed { reason: String },
 }
@@ -206,8 +212,15 @@ impl ProfileEngine {
             Outcome::Waiting => return LinkExchangeProgress::Waiting,
             Outcome::Finalized(card_bytes) => match binding(exchange) {
                 Some(binding) => {
-                    match self.complete_link_exchange(&card_bytes, &exchange.x3dh, &binding) {
-                        Ok(contact_id) => LinkExchangeProgress::Completed { contact_id },
+                    match self.complete_link_exchange_reporting(
+                        &card_bytes,
+                        &exchange.x3dh,
+                        &binding,
+                    ) {
+                        Ok((contact_id, already_held)) => LinkExchangeProgress::Completed {
+                            contact_id,
+                            already_held,
+                        },
                         Err(error) => LinkExchangeProgress::Failed {
                             reason: completion_failure(&error),
                         },

@@ -289,6 +289,7 @@ fn grace_screen_defers_rich_summary_until_session_ends() {
         my_visible_fields: vec!["Phone".into()],
         group_names: Vec::new(),
         is_reconnection: false,
+        already_held_unchanged: false,
     });
 
     let grace = engine.current_screen();
@@ -522,6 +523,7 @@ fn the_rich_final_screen_carries_the_confirmation_under_its_status() {
         my_visible_fields: vec!["Phone".into()],
         group_names: Vec::new(),
         is_reconnection: false,
+        already_held_unchanged: false,
     });
     engine.set_peer_confirmed(true);
     engine.set_session_ended();

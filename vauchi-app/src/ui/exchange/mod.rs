@@ -1311,6 +1311,7 @@ fn build_legacy_success_summary(
         my_visible_fields,
         group_names: Vec::new(),
         is_reconnection: false,
+        already_held_unchanged: false,
     }
 }
 
@@ -1432,6 +1433,7 @@ mod tests {
             my_visible_fields: vec!["Phone".into()],
             group_names: Vec::new(),
             is_reconnection: false,
+            already_held_unchanged: false,
         });
         engine.step = ExchangeStep::Success;
         let screen = engine.build_screen();

@@ -856,6 +856,12 @@ verify:reproducible:
       allow_failure: true
   variables:
     CARGO_INCREMENTAL: "0"
+    # Its own directory: the `cargo clean` below would otherwise empty the
+    # slot's target/, and the next build:tests there compiles everything
+    # again (13 minutes and more instead of 4 to 6; vauchi/private#1305).
+    # It sits inside target/ so the checkout cleanup and the disk pruning
+    # treat it as build output.
+    CARGO_TARGET_DIR: ${CI_PROJECT_DIR}/target/reproducible
   script:
     - export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
     - echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
@@ -869,15 +875,15 @@ verify:reproducible:
     # Build 1
     - echo "=== Build 1 ==="
     - cargo build --release -p vauchi-core --lib
-    - cp target/release/libvauchi_core.rlib "/tmp/build1-${CI_JOB_ID}.rlib" 2>/dev/null || true
-    - cp target/release/libvauchi_core.a "/tmp/build1-${CI_JOB_ID}.a" 2>/dev/null || true
-    - sha256sum target/release/libvauchi_core.* 2>/dev/null | tee "/tmp/build1-${CI_JOB_ID}-checksums.txt"
+    - cp "$CARGO_TARGET_DIR"/release/libvauchi_core.rlib "/tmp/build1-${CI_JOB_ID}.rlib" 2>/dev/null || true
+    - cp "$CARGO_TARGET_DIR"/release/libvauchi_core.a "/tmp/build1-${CI_JOB_ID}.a" 2>/dev/null || true
+    - sha256sum "$CARGO_TARGET_DIR"/release/libvauchi_core.* 2>/dev/null | tee "/tmp/build1-${CI_JOB_ID}-checksums.txt"
 
     # Clean and rebuild
     - cargo clean
     - echo "=== Build 2 ==="
     - cargo build --release -p vauchi-core --lib
-    - sha256sum target/release/libvauchi_core.* 2>/dev/null | tee "/tmp/build2-${CI_JOB_ID}-checksums.txt"
+    - sha256sum "$CARGO_TARGET_DIR"/release/libvauchi_core.* 2>/dev/null | tee "/tmp/build2-${CI_JOB_ID}-checksums.txt"
 
     # Compare
     - echo "=== Comparison ==="

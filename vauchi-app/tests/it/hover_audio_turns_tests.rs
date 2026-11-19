@@ -349,3 +349,18 @@ fn malformed_recordings_use_up_the_second_voices_six_windows_and_then_the_check_
         assert_eq!(results, expected);
     }
 }
+
+// @internal
+#[test]
+fn two_hover_phones_play_no_tone_and_never_listen() {
+    let mut room = Room::of(MultiStageMachine::new_hover, 0, 0, PEER_TONE_LEVEL);
+
+    for _ in 0..200 {
+        room.tick();
+    }
+
+    assert_eq!(room.tones.len(), 0);
+    assert_eq!(room.first.listen_commands, Vec::<u64>::new());
+    assert_eq!(room.second.listen_commands, Vec::<u64>::new());
+    assert_eq!((room.first.outcome, room.second.outcome), (None, None));
+}

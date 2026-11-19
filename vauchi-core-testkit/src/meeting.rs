@@ -17,18 +17,25 @@ pub fn signing_pk(wb: &Vauchi) -> [u8; 32] {
     *wb.identity().unwrap().signing_public_key()
 }
 
-/// An in-person exchange through the production seam,
-/// `save_exchanged_contact`, with `guardian_initiates` choosing the roles.
-/// Returns the phone's id at the guardian and the guardian's at the phone.
-pub fn meet(guardian: &Vauchi, phone: &Vauchi, guardian_initiates: bool) -> (String, String) {
+/// What one in-person exchange hands each side to save: the other as a
+/// contact under one new shared key, and that side's ratchet.
+pub struct Meeting {
+    pub phone_at_guardian: Contact,
+    pub guardian_ratchet: DoubleRatchetState,
+    pub guardian_at_phone: Contact,
+    pub phone_ratchet: DoubleRatchetState,
+}
+
+/// The two sides of an in-person exchange, not yet saved by either.
+pub fn exchange_material(guardian: &Vauchi, phone: &Vauchi, guardian_initiates: bool) -> Meeting {
     let shared = SymmetricKey::generate();
-    let phone_at_g = Contact::from_exchange(
+    let phone_at_guardian = Contact::from_exchange(
         signing_pk(phone),
         ContactCard::new("Phone"),
         shared.clone(),
         0,
     );
-    let g_at_phone = Contact::from_exchange(
+    let guardian_at_phone = Contact::from_exchange(
         signing_pk(guardian),
         ContactCard::new("G"),
         shared.clone(),
@@ -38,18 +45,42 @@ pub fn meet(guardian: &Vauchi, phone: &Vauchi, guardian_initiates: bool) -> (Str
     let initiator =
         DoubleRatchetState::initialize_initiator(&shared, *responder_dh.public_key()).unwrap();
     let responder = DoubleRatchetState::initialize_responder(&shared, responder_dh);
-    let (g_ratchet, phone_ratchet) = if guardian_initiates {
+    let (guardian_ratchet, phone_ratchet) = if guardian_initiates {
         (initiator, responder)
     } else {
         (responder, initiator)
     };
+    Meeting {
+        phone_at_guardian,
+        guardian_ratchet,
+        guardian_at_phone,
+        phone_ratchet,
+    }
+}
+
+/// An in-person exchange through the production seam,
+/// `save_exchanged_contact`, with `guardian_initiates` choosing the roles.
+/// Returns the phone's id at the guardian and the guardian's at the phone.
+pub fn meet(guardian: &Vauchi, phone: &Vauchi, guardian_initiates: bool) -> (String, String) {
+    let meeting = exchange_material(guardian, phone, guardian_initiates);
     phone
-        .save_exchanged_contact(&g_at_phone, &phone_ratchet, !guardian_initiates)
+        .save_exchanged_contact(
+            &meeting.guardian_at_phone,
+            &meeting.phone_ratchet,
+            !guardian_initiates,
+        )
         .unwrap();
     guardian
-        .save_exchanged_contact(&phone_at_g, &g_ratchet, guardian_initiates)
+        .save_exchanged_contact(
+            &meeting.phone_at_guardian,
+            &meeting.guardian_ratchet,
+            guardian_initiates,
+        )
         .unwrap();
-    (phone_at_g.id().to_string(), g_at_phone.id().to_string())
+    (
+        meeting.phone_at_guardian.id().to_string(),
+        meeting.guardian_at_phone.id().to_string(),
+    )
 }
 
 /// Delivers what `from` queued for `to_id` into `to` (from `from_id`) and

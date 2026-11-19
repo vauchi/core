@@ -235,6 +235,7 @@ mod i18n_support;
 mod native_application_menu_tests;
 mod native_status_item_tests;
 // A direct-HTTP relay stub needs the testing build (OHTTP otherwise).
+mod hover_engines;
 #[cfg(feature = "testing")]
 mod identity_deletion_purge_tests;
 mod inline_confirm_action_id_tests;

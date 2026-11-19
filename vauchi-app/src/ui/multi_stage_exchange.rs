@@ -278,26 +278,9 @@ impl MultiStageExchangeEngine {
     /// call this constructor in Phase 1.E (mode-dispatch step).
     pub fn new_hover() -> Self {
         Self {
-            state: ProtocolState::Idle,
-            current_qr_data: None,
-            current_qr_layout: 0,
-            current_qr_error_correction: None,
-            peer_name: None,
-            success_summary: None,
-            session_ended: false,
-            camera_gate: CameraGate::Available,
             use_front_camera: true,
-            scan_quality_tracker: ScanQualityTracker::new(),
-            cancelled: false,
-            audio_proximity: AudioProximityState::Pending,
-            accel_proximity: AccelerometerProximityState::Pending,
             is_hover_mode: true,
-            stalled: false,
-            link_feedback: LinkFeedback::default(),
-            peer_confirmed: false,
-            repeat: None,
-            reconnect_answer: None,
-            locale: Locale::ENGLISH,
+            ..Self::new_glance()
         }
     }
 
@@ -308,28 +291,7 @@ impl MultiStageExchangeEngine {
     /// accel cross-correlation chrome lands with the envelope-transport
     /// follow-up (P2.C).
     pub fn new_tap_hover_shake() -> Self {
-        Self {
-            state: ProtocolState::Idle,
-            current_qr_data: None,
-            current_qr_layout: 0,
-            current_qr_error_correction: None,
-            peer_name: None,
-            success_summary: None,
-            session_ended: false,
-            camera_gate: CameraGate::Available,
-            use_front_camera: true,
-            scan_quality_tracker: ScanQualityTracker::new(),
-            cancelled: false,
-            audio_proximity: AudioProximityState::Pending,
-            accel_proximity: AccelerometerProximityState::Pending,
-            is_hover_mode: true,
-            stalled: false,
-            link_feedback: LinkFeedback::default(),
-            peer_confirmed: false,
-            repeat: None,
-            reconnect_answer: None,
-            locale: Locale::ENGLISH,
-        }
+        Self::new_hover()
     }
 
     // ── Bridge setters (called by AppEngine from listener callbacks) ─

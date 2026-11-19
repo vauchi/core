@@ -4,7 +4,12 @@
 check:journey-fixtures:
   extends: [.linux-runner, .timeout-standard]
   stage: test
-  needs: []
+  # After build:tests where the pipeline has it, so its vauchi-app archive
+  # is on the host; ci/journey-fixture-tests.sh compiles where it is not.
+  needs:
+    - job: build:tests
+      optional: true
+      artifacts: false
   variables:
     PYTHONDONTWRITEBYTECODE: "1"
   rules:
@@ -18,12 +23,8 @@ check:journey-fixtures:
   script:
     - python3 -m unittest discover -s ci/tests -p journey_fixtures_test.py
     - cargo clippy -p vauchi-app --test screen_catalog_fixture_tests --features test-kdf,testing,network-http -- -D warnings
-    - cargo test -p vauchi-app --test presentation_contract_fixture_tests --test screen_catalog_fixture_tests --features test-kdf,testing,network-http
-    - cargo test -p vauchi-app --test presentation_contract_fixture_tests --features test-kdf,testing,network-http regenerate_shared_fixture -- --ignored
-    - git diff --exit-code -- vauchi-app/fixtures/journeys/presentation_contract_v1.json
-    - cargo test -p vauchi-core --features testing --test it recovery_ceremony_acceptance_tests::fixture
-    - cargo test -p vauchi-core --features testing --test it regenerate_ceremony_fixture -- --ignored
-    - git diff --exit-code -- vauchi-app/fixtures/journeys/recovery_ceremony_v1.json
+    - sh ci/journey-fixture-tests.sh
+    - git diff --exit-code -- vauchi-app/fixtures/journeys/presentation_contract_v1.json vauchi-app/fixtures/journeys/recovery_ceremony_v1.json
     - python3 ci/journey_fixtures.py build dist/journey-fixtures --core-revision "$CI_COMMIT_SHA"
   artifacts:
     paths: [dist/journey-fixtures/]

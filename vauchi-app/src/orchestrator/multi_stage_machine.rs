@@ -46,23 +46,16 @@
 use vauchi_core::Command;
 use vauchi_core::Event;
 use vauchi_core::exchange::{
-    AccelerometerProximityState, AudioConfig, AudioProximityState, LinkFeedback, MultiStageSession,
-    ProtocolState, QrPayload, audio_modem,
+    AccelerometerProximityState, AudioProximityState, LinkFeedback, MultiStageSession,
+    ProtocolState, QrPayload,
 };
 
+#[path = "multi_stage_machine_audio.rs"]
+mod audio;
 #[path = "multi_stage_machine_link_layout.rs"]
 mod link_layout;
 #[path = "multi_stage_machine_save.rs"]
 mod save;
-
-/// Audio-listen window default (ms). Mirrors the cycle-thread's
-/// `MobileMultiStageSession::AUDIO_LISTEN_TIMEOUT_MS`. Kept private
-/// to this module — the platform binding never reads it directly.
-const AUDIO_LISTEN_TIMEOUT_MS: u64 = 5000;
-
-// Bound native input before resampling; allow a buffer beyond the requested capture.
-const AUDIO_CAPTURE_MAX_RATE: u32 = 192_000;
-const AUDIO_CAPTURE_MAX_SECONDS: u64 = AUDIO_LISTEN_TIMEOUT_MS / 1000 + 1;
 
 /// Maximum a single non-terminal, peer-engaged exchange phase may persist
 /// with no forward progress before the machine fails to a retry/cancel
@@ -243,6 +236,10 @@ pub struct MultiStageMachine {
     /// Read by [`Self::is_frame_stalled`]; the AppEngine bridge pushes it
     /// onto the screen's Stalled presentation.
     frame_stalled: bool,
+    /// Rounds of the audio check this phone has begun (`audio` module).
+    audio_rounds: u8,
+    /// Audio commands made while handling an event, for the engine to take.
+    audio_commands: Vec<Command>,
 }
 
 impl MultiStageMachine {
@@ -284,6 +281,8 @@ impl MultiStageMachine {
             phase_entered_ms: now,
             last_peer_frame_ms: now,
             frame_stalled: false,
+            audio_rounds: 0,
+            audio_commands: Vec::new(),
         }
     }
 
@@ -661,58 +660,6 @@ impl MultiStageMachine {
             .ok()
     }
 
-    /// Hover-only side effect: fire the ultrasonic FSK
-    /// handshake when the protocol observes `Discovered`.
-    /// Mirrors the cycle-thread's `try_autonomous_audio_trigger`
-    /// (`vauchi-platform/src/multistage_exchange.rs::try_autonomous_audio_trigger`)
-    /// at the machine layer:
-    ///
-    /// - Mode gate: Glance returns `[]`; only Hover proceeds.
-    /// - State gate: returns `[]` unless `audio_proximity` is
-    ///   `Pending` (idempotent under repeated calls).
-    /// - Transition: drives the inner session
-    ///   `Pending -> Listening` via `set_audio_proximity`.
-    ///   On rejection (already started, terminal, etc.) returns `[]`.
-    /// - Emits the paired commands
-    ///   `Command::AudioEmitChallenge` (FSK-encoded `session_id` as
-    ///   the challenge — same temporary derivation the cycle
-    ///   thread used, Phase 1.C.3e-iii) +
-    ///   `Command::AudioListenForResponse` so the platform
-    ///   simultaneously plays the chirp and listens for the peer's
-    ///   reply within the listen-window budget.
-    pub fn try_audio_handshake_start(&mut self) -> Vec<Command> {
-        if !matches!(
-            self.mode,
-            MultiStageMode::Hover | MultiStageMode::TapHoverShake
-        ) {
-            return Vec::new();
-        }
-        if self.inner.audio_proximity() != AudioProximityState::Pending {
-            return Vec::new();
-        }
-        let challenge = self.inner.session_id();
-        let transitioned = self
-            .inner
-            .set_audio_proximity(AudioProximityState::Listening)
-            .is_ok();
-        if !transitioned {
-            return Vec::new();
-        }
-        let config = AudioConfig::default();
-        let samples = audio_modem::generate_fsk_samples(&challenge, &config);
-        let sample_rate = config.sample_rate;
-        vec![
-            Command::AudioEmitChallenge {
-                samples,
-                sample_rate,
-            },
-            Command::AudioListenForResponse {
-                timeout_ms: AUDIO_LISTEN_TIMEOUT_MS,
-                sample_rate,
-            },
-        ]
-    }
-
     /// TapHoverShake-only: start the accelerometer capture for the shake
     /// co-location signal. Mirrors [`Self::try_audio_handshake_start`] —
     /// mode gate (only TapHoverShake), state gate (only from `Pending`,
@@ -739,62 +686,6 @@ impl MultiStageMachine {
             return Vec::new();
         }
         vec![Command::AccelerometerStart]
-    }
-
-    /// Decode FSK samples from a frontend `AudioSamplesRecorded`
-    /// event, verify against the peer's session_id, and transition
-    /// the audio-proximity state. Mirrors the cycle-thread's
-    /// `process_audio_samples_recorded`
-    /// (`vauchi-platform/src/multistage_exchange.rs`) at the
-    /// machine layer:
-    ///
-    /// - Decode succeeds AND bytes match peer_session_id ->
-    ///   Listening -> Confirmed.
-    /// - Decode succeeds but mismatch -> Listening -> Failed.
-    /// - Decode fails (malformed samples, preamble not found) ->
-    ///   Listening -> Failed.
-    /// - peer_session_id is None (Stage 1 not yet complete) ->
-    ///   Listening -> Failed.
-    ///
-    /// Glance flows return `MultiStageEvent::None` immediately
-    /// (mode gate). Returning `None` from a non-`Listening` state
-    /// is also a no-op so a stray late sample after Confirmed /
-    /// Failed cannot bounce the state.
-    fn process_audio_samples(&mut self, samples: &[f32], sample_rate: u32) -> MultiStageEvent {
-        if !matches!(
-            self.mode,
-            MultiStageMode::Hover | MultiStageMode::TapHoverShake
-        ) {
-            return MultiStageEvent::None;
-        }
-        if self.inner.audio_proximity() != AudioProximityState::Listening {
-            return MultiStageEvent::None;
-        }
-        let config = AudioConfig::default();
-        let maximum_samples = u64::from(sample_rate)
-            .checked_mul(AUDIO_CAPTURE_MAX_SECONDS)
-            .and_then(|count| usize::try_from(count).ok());
-        let valid_capture = sample_rate > 2 * (config.carrier_frequency + config.frequency_shift)
-            && sample_rate <= AUDIO_CAPTURE_MAX_RATE
-            && !samples.is_empty()
-            && maximum_samples.is_some_and(|limit| samples.len() <= limit)
-            && samples.iter().all(|sample| sample.is_finite());
-        let decoded = if valid_capture {
-            audio_modem::decode_fsk_samples(samples, sample_rate, &config).ok()
-        } else {
-            None
-        };
-        let next = match decoded {
-            Some(bytes) => match self.inner.verify_audio_response(&bytes) {
-                Some(true) => AudioProximityState::Confirmed,
-                _ => AudioProximityState::Failed,
-            },
-            None => AudioProximityState::Failed,
-        };
-        if self.inner.set_audio_proximity(next).is_err() {
-            return MultiStageEvent::None;
-        }
-        MultiStageEvent::AudioProximityChanged(next)
     }
 
     /// Accumulate one `Event::AccelerometerData` sample into the local

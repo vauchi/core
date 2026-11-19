@@ -363,24 +363,18 @@ fn glance_machine_emits_no_audio_commands() {
     assert_eq!(machine.mode(), MultiStageMode::Glance);
 }
 
-/// **T1.2c-audio:** Hover machines emit the paired
-/// `AudioEmitChallenge` + `AudioListenForResponse` commands on
-/// `try_audio_handshake_start`, and decline a second call
-/// (idempotent — the inner state has moved past `Pending`).
+/// A machine that has read no peer starts no audio: whose turn it is
+/// depends on both session ids (vauchi/private#1300). The turns themselves
+/// are in `hover_audio_turns_tests.rs`.
 // @internal
 #[test]
-fn hover_machine_emits_paired_audio_commands_once() {
-    let mut machine = MultiStageMachine::new_hover(signed_session("Alice"), 0);
-    let cmds = machine.try_audio_handshake_start();
-    assert_eq!(cmds.len(), 2, "Hover must emit exactly 2 audio commands");
-    assert!(matches!(cmds[0], Command::AudioEmitChallenge { .. }));
-    assert!(matches!(cmds[1], Command::AudioListenForResponse { .. }));
-    // Second call is a no-op — audio_proximity moved to Listening.
-    let repeat = machine.try_audio_handshake_start();
-    assert!(
-        repeat.is_empty(),
-        "second handshake call must be a no-op: {repeat:?}",
-    );
+fn a_machine_that_has_read_no_peer_starts_no_audio() {
+    let mut hover = MultiStageMachine::new_hover(signed_session("Alice"), 0);
+    let mut shake = MultiStageMachine::new_tap_hover_shake(signed_session("Alice"), 0);
+
+    assert_eq!(hover.try_audio_handshake_start().len(), 0);
+    assert_eq!(shake.try_audio_handshake_start().len(), 0);
+    assert_eq!(hover.take_audio_commands().len(), 0);
 }
 
 /// **T1.2c-audio:** `Event::AudioSamplesRecorded` on a Glance
@@ -416,77 +410,6 @@ fn hover_machine_ignores_audio_samples_before_handshake_starts() {
         0,
     );
     assert!(matches!(event, MultiStageEvent::None));
-}
-
-/// **T1.2c-audio:** Malformed audio samples after the handshake
-/// has started transition Hover's audio proximity to `Failed`
-/// (Listening -> Failed). The matching `MultiStageEvent` carries
-/// that state.
-// @internal
-#[test]
-fn hover_machine_transitions_to_failed_on_malformed_audio() {
-    let mut machine = MultiStageMachine::new_hover(signed_session("Alice"), 0);
-    let _ = machine.try_audio_handshake_start();
-    // 32 zero samples decode to nothing — preamble not found.
-    let event = machine.handle_hardware_event(
-        &Event::AudioSamplesRecorded {
-            samples: vec![0.0; 32],
-            sample_rate: 44_100,
-        },
-        100,
-    );
-    match event {
-        MultiStageEvent::AudioProximityChanged(state) => {
-            assert_eq!(state, AudioProximityState::Failed);
-        }
-        other => panic!("expected AudioProximityChanged(Failed); got {other:?}"),
-    }
-}
-
-/// **P2.C:** TapHoverShake un-gates the audio handshake — it runs both
-/// audio (Hover's signal) and the accelerometer shake in parallel, so it
-/// must emit the paired audio commands exactly like Hover.
-// @internal
-#[test]
-fn tap_hover_shake_machine_emits_paired_audio_commands_once() {
-    let mut machine = MultiStageMachine::new_tap_hover_shake(signed_session("Alice"), 0);
-    assert_eq!(machine.mode(), MultiStageMode::TapHoverShake);
-    let cmds = machine.try_audio_handshake_start();
-    assert_eq!(
-        cmds.len(),
-        2,
-        "TapHoverShake must emit exactly 2 audio commands"
-    );
-    assert!(matches!(cmds[0], Command::AudioEmitChallenge { .. }));
-    assert!(matches!(cmds[1], Command::AudioListenForResponse { .. }));
-    let repeat = machine.try_audio_handshake_start();
-    assert!(
-        repeat.is_empty(),
-        "second handshake call must be a no-op: {repeat:?}",
-    );
-}
-
-/// **P2.C:** TapHoverShake processes audio samples like Hover — malformed
-/// samples after the handshake transition audio proximity to Failed via
-/// the un-gated `process_audio_samples` path.
-// @internal
-#[test]
-fn tap_hover_shake_machine_transitions_to_failed_on_malformed_audio() {
-    let mut machine = MultiStageMachine::new_tap_hover_shake(signed_session("Alice"), 0);
-    let _ = machine.try_audio_handshake_start();
-    let event = machine.handle_hardware_event(
-        &Event::AudioSamplesRecorded {
-            samples: vec![0.0; 32],
-            sample_rate: 44_100,
-        },
-        100,
-    );
-    match event {
-        MultiStageEvent::AudioProximityChanged(state) => {
-            assert_eq!(state, AudioProximityState::Failed);
-        }
-        other => panic!("expected AudioProximityChanged(Failed); got {other:?}"),
-    }
 }
 
 /// **T1.2c-audio:** `event_to_commands` for `AudioProximityChanged`

@@ -227,16 +227,22 @@ impl AppEngine {
     /// produced by `forward_multi_stage_hardware_event` in the
     /// QrScanned + peer-scan routes.
     pub fn apply_multi_stage_event(&mut self, event: MultiStageEvent) -> bool {
-        // A real INIT can enter transfer immediately, without resting in
-        // Discovered. Both observations start proximity hardware idempotently.
         let peer_seen = matches!(
             event,
             MultiStageEvent::PeerDiscovered | MultiStageEvent::TransferProgress { .. }
         );
-        if peer_seen && let Some(holder) = self.multi_stage_session.as_mut() {
-            let cmds = holder.machine.try_audio_handshake_start();
+        // The audio check starts when this phone's turn has come, which no
+        // single event marks (vauchi/private#1300): the machine is asked on
+        // every event and answers once. Later rounds and the second voice's
+        // answer come out of the events that carry a recording.
+        if let Some(holder) = self.multi_stage_session.as_mut() {
+            let mut cmds = holder.machine.try_audio_handshake_start();
+            let started = !cmds.is_empty();
+            cmds.extend(holder.machine.take_audio_commands());
             if !cmds.is_empty() {
                 self.extend_pending_commands(cmds);
+            }
+            if started {
                 let _ = self.apply_multi_stage_audio_proximity(AudioProximityState::Listening);
             }
         }

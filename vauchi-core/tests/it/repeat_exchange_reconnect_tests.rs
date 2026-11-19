@@ -12,6 +12,7 @@
 use vauchi_core::Vauchi;
 use vauchi_core::api::VauchiError;
 
+use crate::common::device_sync::device_signed_broadcast;
 use crate::common::helpers::create_vauchi_with_identity;
 use crate::common::meeting::{Meeting, deliver, exchange_material};
 use crate::common::per_device::{Party, two_parties};
@@ -266,4 +267,62 @@ fn a_reconnect_whose_ratchet_write_fails_leaves_the_old_key() {
     );
     assert_eq!(shared_key_of(&p.alice, &p.bob_at_alice), old_key);
     assert_eq!(name_at(&p.alice, &p.bob_at_alice), old_name);
+}
+
+fn devices_alice_accepts_for_bob(p: &Party) -> Vec<[u8; 32]> {
+    p.alice
+        .storage()
+        .device()
+        .load_contact_active_devices(&p.bob_at_alice)
+        .unwrap()
+        .iter()
+        .map(|device| device.device_id)
+        .collect()
+}
+
+/// The restored install's registry names only itself, and the contact's
+/// store replaces: the rule a full backup without a registry already
+/// follows (vauchi/private#1247; owner, 2026-11-19, for this path).
+// @internal
+#[test]
+fn after_a_yes_the_contact_accepts_the_restored_install_as_the_only_device() {
+    let p = two_parties();
+    p.push_to_alice(&device_signed_broadcast(&p.bob)).unwrap();
+    assert_eq!(devices_alice_accepts_for_bob(&p), vec![p.bob_device_id()]);
+    let restored = restore_identity_backup(&p);
+    let restored_device = *restored.identity().unwrap().device_id();
+    let (_, alice_at_restored) = alice_reconnects_with_the_restored_install(&p, &restored);
+
+    assert_eq!(restored.queue_registry_pushes().unwrap(), 1);
+    deliver(&restored, &alice_at_restored, &p.alice, &p.bob_at_alice);
+
+    assert_eq!(devices_alice_accepts_for_bob(&p), vec![restored_device]);
+}
+
+// @internal
+#[test]
+fn a_yes_drops_the_sessions_the_contact_held_for_single_devices() {
+    let p = two_parties();
+    let ratchets = p.alice.storage().ratchets();
+    let (old_session, _) = ratchets
+        .load_ratchet_state(&p.bob_at_alice)
+        .unwrap()
+        .unwrap();
+    ratchets
+        .save_ratchet_state_for_device(&p.bob_at_alice, &p.bob_device_id(), &old_session, false)
+        .unwrap();
+    assert_eq!(ratchets.peer_devices(&p.bob_at_alice).unwrap().len(), 2);
+    let restored = restore_identity_backup(&p);
+
+    alice_reconnects_with_the_restored_install(&p, &restored);
+
+    assert_eq!(
+        p.alice
+            .storage()
+            .ratchets()
+            .peer_devices(&p.bob_at_alice)
+            .unwrap(),
+        vec![[0u8; 32]],
+        "only the session shared by the whole identity is left"
+    );
 }

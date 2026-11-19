@@ -128,6 +128,26 @@ impl ProfileEngine {
         hex::encode(blob)
     }
 
+    /// Restores a password backup of either kind onto a fresh installation.
+    ///
+    /// The file's first byte says which kind it is: an identity-only backup
+    /// starts with `0x02`, a full backup with another version. The app's
+    /// restore screens do not ask, so they call this (vauchi/private#1301).
+    pub fn import_password_backup(
+        &mut self,
+        backup_data: &str,
+        password: &str,
+    ) -> VauchiResult<()> {
+        if self.identity.is_some() {
+            return Err(VauchiError::AlreadyInitialized);
+        }
+        if is_identity_only_backup(backup_data) {
+            self.import_backup(backup_data, password)
+        } else {
+            self.import_full_backup(backup_data, password)
+        }
+    }
+
     /// Atomically restores a password backup onto a fresh installation.
     ///
     /// Accepts v6 and legacy v3; missing legacy privacy state cannot be recovered.
@@ -278,6 +298,14 @@ fn restored_device_index(seed: &[u8; 32], registry: Option<&DeviceRegistry>) -> 
 
 fn device_id_at(seed: &[u8; 32], index: u32) -> [u8; 32] {
     *DeviceInfo::derive(seed, index, String::new(), 0).device_id()
+}
+
+/// Whether a hex-encoded backup file is an identity-only backup: its first
+/// byte is that format's version.
+fn is_identity_only_backup(hex_encoded: &str) -> bool {
+    hex_encoded
+        .trim_start()
+        .starts_with(&format!("{:02x}", crate::identity::BACKUP_VERSION_V2))
 }
 
 fn backup_error(error: crate::backup::BackupError) -> VauchiError {

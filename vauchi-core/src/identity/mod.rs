@@ -48,7 +48,7 @@ pub enum IdentityError {
 }
 
 /// Backup format version byte for Argon2id + XChaCha20.
-const BACKUP_VERSION_V2: u8 = 0x02;
+pub(crate) const BACKUP_VERSION_V2: u8 = 0x02;
 
 /// User identity containing cryptographic keys and metadata.
 pub struct Identity {

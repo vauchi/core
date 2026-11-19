@@ -611,7 +611,7 @@ impl AppEngine {
             }
         };
 
-        match self.vauchi.import_full_backup(&backup_hex, &password) {
+        match self.vauchi.import_password_backup(&backup_hex, &password) {
             Ok(()) => {
                 let target = AppScreen::MyInfo;
                 let screen = self.navigate_to_internal(target);
@@ -686,7 +686,7 @@ impl AppEngine {
                 self.engine.processing_failed();
                 return ActionResult::NavigateTo(self.engine.current_screen());
             }
-            return match self.vauchi.import_full_backup(&backup_hex, &password) {
+            return match self.vauchi.import_password_backup(&backup_hex, &password) {
                 Ok(()) => {
                     self.engine.processing_complete();
                     ActionResult::NavigateTo(self.engine.current_screen())

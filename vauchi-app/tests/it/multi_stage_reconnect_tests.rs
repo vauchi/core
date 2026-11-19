@@ -140,6 +140,7 @@ fn alice_asked_about_bob() -> World {
     w
 }
 
+// @scenario: contact_exchange :: Meeting again asks before starting a new connection
 // @internal
 #[test]
 fn the_phone_that_kept_the_contact_asks_and_the_other_waits_with_nothing_saved() {
@@ -157,6 +158,7 @@ fn the_phone_that_kept_the_contact_asks_and_the_other_waits_with_nothing_saved()
     assert_eq!(&shown_while_asking[..4], "CNF5");
 }
 
+// @scenario: contact_exchange :: Starting a new connection after meeting again
 // @internal
 #[test]
 fn a_yes_gives_both_phones_the_new_exchanges_key() {
@@ -173,6 +175,7 @@ fn a_yes_gives_both_phones_the_new_exchanges_key() {
     assert!(!shows(&w.bob, WAITING));
 }
 
+// @scenario: contact_exchange :: Leaving the old connection after meeting again
 // @internal
 #[test]
 fn a_no_leaves_the_key_as_it_was_and_the_other_phone_saves_nothing() {
@@ -188,6 +191,7 @@ fn a_no_leaves_the_key_as_it_was_and_the_other_phone_saves_nothing() {
     assert_eq!(w.bob.vauchi().list_contacts().unwrap().len(), 0);
 }
 
+// @scenario: contact_exchange :: Nobody answers the reconnect question
 // @internal
 #[test]
 fn no_answer_ends_as_a_no_at_two_minutes_and_not_before() {
@@ -220,6 +224,7 @@ fn a_second_tap_changes_nothing() {
     assert_eq!(w.bob.vauchi().list_contacts().unwrap().len(), 0);
 }
 
+// @scenario: contact_exchange :: Two phones that still have each other are not asked
 // @internal
 #[test]
 fn two_phones_that_still_hold_each_other_are_not_asked_and_keep_their_key() {

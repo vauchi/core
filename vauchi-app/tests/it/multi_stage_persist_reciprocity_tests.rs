@@ -15,7 +15,7 @@ use std::time::{Duration, SystemTime};
 
 use vauchi_app::ui::AppEngine;
 use vauchi_core::api::Vauchi;
-use vauchi_core::clock::{Clock, FakeClock};
+use vauchi_core::clock::FakeClock;
 use vauchi_core::exchange::reciprocity::Reciprocity;
 
 use crate::hover_engines::{engine_on_hover, engine_on_hover_with_profile, own_qr_data, scan_into};

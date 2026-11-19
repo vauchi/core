@@ -226,13 +226,17 @@ impl ProfileEngine {
     /// Whether this device holds `contact_id` as an exchanged contact, whose
     /// key a repeat exchange keeps. A blocked contact counts: it is never
     /// reconnected, and its peer is not told it is unknown here
-    /// (vauchi/private#1285).
+    /// (vauchi/private#1285). A contact restored from guardians and still
+    /// waiting for its rekey does not: the next in-person exchange gives it
+    /// its key without a question (vauchi/private#796, D20), so there is
+    /// no connection here to keep or to ask about.
     pub fn holds_exchanged_contact(&self, contact_id: &str) -> VauchiResult<bool> {
-        Ok(self
+        let keyed = self
             .storage
             .contacts()
             .load_contact(contact_id)?
-            .is_some_and(|stored| stored.shared_key().is_some()))
+            .is_some_and(|stored| stored.shared_key().is_some());
+        Ok(keyed && !self.restored_waiting_for_rekey(contact_id)?)
     }
 
     /// Persist a repeat exchange whose peer no longer holds this device,

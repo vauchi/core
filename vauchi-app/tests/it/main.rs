@@ -272,6 +272,7 @@ mod settings_content_updates_tests;
 mod settings_engine_tests;
 mod signed_session;
 mod support_engine_tests;
+mod sync_reaches_relay_tests;
 mod tag_promotion_tests;
 mod tags_engine_tests;
 mod tags_intercepts_tests;

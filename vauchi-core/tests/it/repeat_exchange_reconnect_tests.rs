@@ -246,6 +246,29 @@ fn a_phone_that_holds_nothing_cannot_reconnect() {
 
 // @internal
 #[test]
+fn a_contact_restored_from_guardians_is_not_held_until_it_was_met_again() {
+    let p = two_parties();
+    let recovery = p.alice.storage().recovery();
+    let held_before_any_recovery = p.alice.holds_exchanged_contact(&p.bob_at_alice).unwrap();
+
+    recovery.mark_rekey_pending(&p.bob_at_alice).unwrap();
+    let held_while_waiting_for_its_rekey =
+        p.alice.holds_exchanged_contact(&p.bob_at_alice).unwrap();
+    recovery.mark_rekey_met_again(&p.bob_at_alice).unwrap();
+    let held_once_met_again = p.alice.holds_exchanged_contact(&p.bob_at_alice).unwrap();
+
+    assert_eq!(
+        (
+            held_before_any_recovery,
+            held_while_waiting_for_its_rekey,
+            held_once_met_again
+        ),
+        (true, false, true)
+    );
+}
+
+// @internal
+#[test]
 fn a_no_refreshes_the_card_and_leaves_the_key() {
     let p = two_parties();
     let old_key = shared_key_of(&p.alice, &p.bob_at_alice);

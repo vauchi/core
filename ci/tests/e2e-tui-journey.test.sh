@@ -65,7 +65,16 @@ cat > "$fake/e2e/ci/tui-journey.sh" <<'FAKE'
 [ -n "${E2E_CORE_DIR:-}" ] || { echo "no E2E_CORE_DIR"; exit 9; }
 [ "${2:-}" = -E ] && [ -n "${3:-}" ] || { echo "no filter"; exit 9; }
 echo "journeys on $E2E_CORE_DIR"
-[ ! -f "$E2E_CORE_DIR/BROKEN" ]
+[ ! -f "$E2E_CORE_DIR/BROKEN" ] || exit 1
+[ -n "${E2E_BIN_DIR:-}" ] || { echo "no E2E_BIN_DIR"; exit 9; }
+if [ -f "$E2E_BIN_DIR/relay.sha" ]; then
+    echo "relay reused"
+else
+    echo "relay built"
+    echo "${FAKE_RELAY_SHA:-aaaa}" > "$E2E_BIN_DIR/relay.sha"
+    echo profile > "$E2E_BIN_DIR/relay.build-profile"
+    : > "$E2E_BIN_DIR/vauchi-relay"
+fi
 FAKE
 attribution() { # mr-broken target-broken expected
     rm -f "$fake/mr/BROKEN" "$fake/target/BROKEN"
@@ -82,6 +91,31 @@ attribution() { # mr-broken target-broken expected
 attribution no no 0
 attribution yes no 1
 attribution yes yes 3
+
+# The relay binaries are kept between jobs: the first run builds and saves
+# them, the next one reuses them, and a job never works in the kept
+# directory itself. Without the variable nothing is kept.
+cached_run() { # expected-line
+    rc=0
+    E2E_PINNED_BIN_CACHE="$fake/kept" sh ci/e2e-tui-journey.sh "$fake/e2e" "$fake/mr" "$fake/target" > "$fake/out" 2>&1 || rc=$?
+    if [ "$rc" = 0 ] && grep -qF "$1" "$fake/out"; then
+        echo "PASS: with a kept directory: $1"
+    else
+        fail "expected '$1', got rc=$rc: $(tail -3 "$fake/out")"
+    fi
+}
+rm -f "$fake/mr/BROKEN" "$fake/target/BROKEN"
+rm -rf "$fake/kept"
+cached_run "relay built"
+[ -f "$fake/kept/relay.sha" ] && [ -f "$fake/kept/vauchi-relay" ] ||
+    fail "the first run must save the binaries and their markers"
+cached_run "relay reused"
+sh ci/e2e-tui-journey.sh "$fake/e2e" "$fake/mr" "$fake/target" > "$fake/out" 2>&1 || true
+if grep -qF "relay built" "$fake/out"; then
+    echo "PASS: without E2E_PINNED_BIN_CACHE nothing is reused"
+else
+    fail "a run without E2E_PINNED_BIN_CACHE must not read the kept directory"
+fi
 
 if [ "$failures" -gt 0 ]; then
     echo "$failures failure(s)" >&2

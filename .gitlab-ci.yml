@@ -1337,6 +1337,7 @@ test:e2e-tui-journey:
     exit_codes: [3]
   variables:
     E2E_DIR: ${CI_PROJECT_DIR}/../e2e-tui-for-core-${CI_JOB_ID}
+    E2E_PINNED_BIN_CACHE: ${HOME}/.cache/vauchi-ci/e2e-pinned-bin
     TARGET_CORE_DIR: ${CI_PROJECT_DIR}/../core-tui-target-${CI_JOB_ID}
   script:
     - git clone --depth=1 "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/e2e.git" "$E2E_DIR"

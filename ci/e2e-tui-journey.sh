@@ -16,7 +16,14 @@
 # When the target fails too, tui or e2e is behind Core, not this MR's
 # doing: exit 3, which the job allows as a warning.
 #
+# The relays the journeys run against stay at e2e's pins and do not depend
+# on this Core, so E2E_PINNED_BIN_CACHE keeps them between jobs: building
+# them cold was most of this job's first ten minutes. Each job works on its
+# own copy; e2e's build script reuses a binary only at the commit and build
+# profile its markers name, and the cache is replaced whole when one moved.
+#
 # Usage: ci/e2e-tui-journey.sh <e2e-checkout> <mr-core-dir> <target-core-dir>
+# Env:   E2E_PINNED_BIN_CACHE  a directory on the runner kept between jobs
 # Exit:  0 the MR passes; 1 only the MR fails; 3 the target fails too.
 
 set -eu
@@ -29,11 +36,38 @@ trap 'rm -rf "$work"' EXIT
 
 journeys='test(/cross_platform::test_tui_create_identity/) + test(/cross_platform::test_tui_list_contacts_when_contacts_are_already_visible/) + test(/cross_platform::integration_tui_to_tui_link_exchange/) + test(/cross_platform::integration_tui_to_tui_device_link/)'
 
+cache=${E2E_PINNED_BIN_CACHE:-}
+bin="$work/bin"
+mkdir -p "$bin"
+# A copy that fails half way (another job replacing the cache) is dropped:
+# a marker beside a truncated binary would pass the build script's check.
+if [ -n "$cache" ] && [ -d "$cache" ] && ! cp -R "$cache/." "$bin/"; then
+    rm -rf "$bin"
+    mkdir -p "$bin"
+fi
+markers() { cat "$1"/*.sha "$1"/*.build-profile 2>/dev/null || true; }
+restored=$(markers "$bin")
+
+save_cache() {
+    [ -n "$cache" ] || return 0
+    [ -n "$(markers "$bin")" ] && [ "$(markers "$bin")" != "$restored" ] || return 0
+    mkdir -p "$(dirname "$cache")"
+    rm -rf "$cache.new.$$"
+    cp -R "$bin" "$cache.new.$$"
+    rm -rf "$cache"
+    mv "$cache.new.$$" "$cache"
+    restored=$(markers "$bin")
+}
+
 journeys_against() { # core-dir name
     copy="$work/$2"
     cp -R "$e2e" "$copy"
+    rc=0
     sh "$copy/ci/point-core-at.sh" "$1" "$copy/Cargo.toml" &&
-        (cd "$copy" && E2E_CORE_DIR="$1" sh ci/tui-journey.sh "$work/$2-job" -E "$journeys")
+        (cd "$copy" && E2E_CORE_DIR="$1" E2E_BIN_DIR="$bin" sh ci/tui-journey.sh "$work/$2-job" -E "$journeys") ||
+        rc=$?
+    save_cache
+    return "$rc"
 }
 
 if journeys_against "$mr_core" mr; then

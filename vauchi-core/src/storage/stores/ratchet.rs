@@ -370,6 +370,19 @@ impl RatchetStore<'_> {
         )?)
     }
 
+    /// Deletes the ratchet states of `contact_id`'s single devices and
+    /// keeps the one shared by the whole identity.
+    pub fn delete_single_device_ratchet_states(
+        &self,
+        contact_id: &str,
+    ) -> Result<usize, StorageError> {
+        Ok(self.conn.execute(
+            "DELETE FROM contact_ratchets
+             WHERE contact_id = ?1 AND peer_device_id != ?2",
+            params![contact_id, SHARED_PEER_DEVICE_ID],
+        )?)
+    }
+
     pub fn delete_ratchet_state_for_device(
         &self,
         contact_id: &str,

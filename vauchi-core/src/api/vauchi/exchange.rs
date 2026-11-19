@@ -243,6 +243,7 @@ impl ProfileEngine {
             stored.update_card(contact.card().clone(), self.clock.unix_seconds());
             self.adopt_exchange_key(&mut stored, contact)?;
             contact_event = self.persist_exchanged_card(&stored)?;
+            self.drop_single_device_sessions(contact.id())?;
             self.save_exchange_ratchet(contact.id(), ratchet, is_initiator)?;
             self.mark_own_card_repropagate()?;
             self.hand_back_owed()?;
@@ -251,6 +252,16 @@ impl ProfileEngine {
         if let Some(event) = contact_event {
             self.events.dispatch(event);
         }
+        Ok(())
+    }
+
+    /// The sessions held for single devices of the contact were keyed under
+    /// the connection a reconnect replaces; the devices come back through
+    /// the registry the new session carries (vauchi/private#1285, #1247).
+    fn drop_single_device_sessions(&self, contact_id: &str) -> VauchiResult<()> {
+        self.storage
+            .ratchets()
+            .delete_single_device_ratchet_states(contact_id)?;
         Ok(())
     }
 

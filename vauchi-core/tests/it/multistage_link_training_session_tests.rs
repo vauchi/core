@@ -526,7 +526,7 @@ fn every_frame_a_session_shows_fits_the_module_count_the_design_names() {
 
     assert_eq!(
         seen.into_iter().collect::<Vec<_>>(),
-        ["BTH4", "CNF4", "DAT4", "DON4", "INI3", "RVL4"],
+        ["BTH5", "CNF5", "DAT4", "DON5", "INI3", "RVL4"],
         "the run showed every frame type"
     );
 }

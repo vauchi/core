@@ -352,7 +352,7 @@ fn test_e2e_grace_period_keeps_showing_the_final_frame() {
     let ending_frames = (0..50)
         .filter_map(|_| alice.get_display_qr())
         .filter(|qr| {
-            ["CNF4", "DON4", "BTH4"]
+            ["CNF5", "DON5", "BTH5"]
                 .iter()
                 .any(|p| qr.data.starts_with(p))
         })
@@ -548,7 +548,7 @@ fn test_atomicity_without_peer_finalization_frame_no_finalize() {
     alice.process_scanned_qr(&bi.data);
     bob.process_scanned_qr(&ai.data);
 
-    // CNF4 can carry Alice's first reveal, so keep its key while withholding
+    // CNF5 can carry Alice's first reveal, so keep its key while withholding
     // the acceptance tag. Dropping the whole frame can strand both peers.
     let mut withheld = 0;
     for _ in 0..500 {

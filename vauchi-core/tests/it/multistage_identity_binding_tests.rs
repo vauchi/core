@@ -13,6 +13,7 @@
 //! Mallory, holding only Bob's public key, replaced the card Alice keeps for
 //! Bob (reproduced on core 03c434e74).
 
+use vauchi_core::exchange::multistage::confirmation::Holding;
 use vauchi_core::exchange::multistage::qr_codec;
 use vauchi_core::exchange::multistage::session::MultiStageSession;
 use vauchi_core::exchange::multistage::types::ProtocolState;
@@ -25,12 +26,22 @@ fn card(name: &str, email: &str) -> ContactCard {
     card
 }
 
+/// The app's answer for a peer met for the first time: it holds nothing,
+/// said as soon as the session asks (vauchi/private#1285).
+fn holds_nothing_once_asked(session: &mut MultiStageSession) {
+    if session.peer_awaiting_statement().is_some() {
+        session.state_holding(Holding::Nothing);
+    }
+}
+
 fn exchange(a: &mut MultiStageSession, b: &mut MultiStageSession) {
     let a_init = a.get_display_qr().unwrap();
     let b_init = b.get_display_qr().unwrap();
     a.process_scanned_qr(&b_init.data);
     b.process_scanned_qr(&a_init.data);
     for _ in 0..200 {
+        holds_nothing_once_asked(a);
+        holds_nothing_once_asked(b);
         let aq = a.get_display_qr();
         let bq = b.get_display_qr();
         if let Some(q) = &aq {
@@ -184,6 +195,8 @@ fn bobs_frames_recorded_in_an_exchange_with_mallory_and_replayed_to_alice_never_
     m.process_scanned_qr(&recorded[0]);
     b.process_scanned_qr(&m.get_display_qr().unwrap().data);
     for _ in 0..200 {
+        holds_nothing_once_asked(&mut b);
+        holds_nothing_once_asked(&mut m);
         if let Some(q) = b.get_display_qr() {
             m.process_scanned_qr(&q.data);
             recorded.push(q.data);
@@ -202,18 +215,18 @@ fn bobs_frames_recorded_in_an_exchange_with_mallory_and_replayed_to_alice_never_
     m.mark_saved();
     let bob_done = (0..50)
         .filter_map(|_| b.get_display_qr())
-        .find(|q| q.data.starts_with("DON4"))
+        .find(|q| q.data.starts_with("DON5"))
         .expect("saved Bob emits a genuine DONE");
     recorded.push(bob_done.data);
     let mallory_done = (0..50)
         .filter_map(|_| m.get_display_qr())
-        .find(|q| q.data.starts_with("DON4"))
+        .find(|q| q.data.starts_with("DON5"))
         .expect("saved Mallory emits a genuine DONE");
     b.process_scanned_qr(&mallory_done.data);
     let bob_both = b
         .get_display_qr()
         .expect("Bob lingers after verifying Mallory's save");
-    assert!(bob_both.data.starts_with("BTH4"));
+    assert!(bob_both.data.starts_with("BTH5"));
     recorded.push(bob_both.data);
     let alice = Identity::create("Alice", 0);
     let mut a = MultiStageSession::for_identity(&alice, &card("Alice", "a@a.example"), None);

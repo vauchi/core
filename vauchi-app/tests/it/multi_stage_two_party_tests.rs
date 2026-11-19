@@ -30,12 +30,23 @@ use vauchi_app::orchestrator::multi_stage_machine::{
     MultiStageEvent, MultiStageMachine, MultiStagePhase,
 };
 use vauchi_core::Event;
+use vauchi_core::exchange::Holding;
 
 use crate::signed_session::signed_session;
 
-/// What the AppEngine does on `Finalized`: save, then tell the machine.
+/// What the AppEngine does once the peer's payload verified, for a peer met
+/// for the first time: say it holds nothing (vauchi/private#1285).
+fn say_what_is_held(machine: &mut MultiStageMachine) {
+    if machine.peer_awaiting_statement().is_some() {
+        machine.state_holding(Holding::Nothing);
+    }
+}
+
+/// What the AppEngine does around the exchange: answer what it holds, and
+/// on `Finalized` save, then tell the machine.
 fn save_when_finalized(machines: [&mut MultiStageMachine; 2]) {
     for machine in machines {
+        say_what_is_held(machine);
         if matches!(machine.phase(), MultiStagePhase::Finalized { .. }) {
             machine.mark_saved();
         }
@@ -279,7 +290,7 @@ fn finalized_machine_exposes_combo_for_broadcast_seed() {
     );
     let seed = alice.finalization_qr();
     assert!(
-        seed.data.starts_with("DON4"),
+        seed.data.starts_with("DON5"),
         "the broadcast seed must be the final frame, got prefix {:?}",
         &seed.data[..seed.data.len().min(4)],
     );
@@ -288,7 +299,7 @@ fn finalized_machine_exposes_combo_for_broadcast_seed() {
         MultiStagePhase::Finalized { .. } | MultiStagePhase::Completed
     ) {
         assert!(
-            bob.finalization_qr().data.starts_with("DON4"),
+            bob.finalization_qr().data.starts_with("DON5"),
             "the slow peer's broadcast seed must also be the final frame",
         );
     }
@@ -382,6 +393,8 @@ fn a_machine_whose_save_failed_shows_fail_then_reports_the_failure() {
     let mut bob_frame: Option<String> = None;
     for _ in 0..4000 {
         now += 500;
+        say_what_is_held(&mut alice);
+        say_what_is_held(&mut bob);
         if let MultiStageEvent::QrFrameReady(p) = alice.advance(now) {
             alice_frame = Some(p.data);
         }

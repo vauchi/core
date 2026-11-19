@@ -8,7 +8,7 @@
 //! finalization state it is in (design D5); a phone shows it only once its
 //! own checks of the peer passed (vauchi/private#1217).
 
-use vauchi_core::exchange::multistage::confirmation::{self, Side, TagLabel};
+use vauchi_core::exchange::multistage::confirmation::{self, Ending, Holding, Side, TagLabel};
 use vauchi_core::exchange::multistage::qr_codec::{self, StageQr, parse_qr};
 use vauchi_core::exchange::multistage::session::MultiStageSession;
 use vauchi_core::exchange::multistage::types::{AccelerometerProximityState, ProtocolState};
@@ -25,7 +25,7 @@ struct Staged {
 }
 
 fn is_confirm(frame: &str) -> bool {
-    frame.starts_with("CNF4")
+    frame.starts_with("CNF5")
 }
 
 fn is_reveal_or_confirm(frame: &str) -> bool {
@@ -171,7 +171,12 @@ fn the_final_frame_confirms_the_card_and_both_session_ids() {
     assert_eq!(session_id, alice.session_id());
     assert_eq!(
         tag,
-        alice_tag(&staged, TagLabel::Confirm, ALICE_CARD, bob.session_id())
+        alice_tag(
+            &staged,
+            TagLabel::Confirm(Holding::Nothing),
+            ALICE_CARD,
+            bob.session_id()
+        )
     );
 }
 
@@ -184,7 +189,7 @@ fn a_confirm_whose_tag_covers_another_card_is_ignored() {
         &reveal_key_of(&staged.alice_final),
         &alice_tag(
             &staged,
-            TagLabel::Confirm,
+            TagLabel::Confirm(Holding::Nothing),
             b"not Alice's card",
             staged.bob.session_id(),
         ),
@@ -214,7 +219,12 @@ fn a_confirm_whose_tag_covers_other_session_ids_is_ignored() {
     let forged = qr_codec::format_final_qr(
         &staged.alice.session_id(),
         &reveal_key_of(&staged.alice_final),
-        &alice_tag(&staged, TagLabel::Confirm, ALICE_CARD, [9u8; 16]),
+        &alice_tag(
+            &staged,
+            TagLabel::Confirm(Holding::Nothing),
+            ALICE_CARD,
+            [9u8; 16],
+        ),
     );
     let alice_final = staged.alice_final.clone();
     let mut bob = staged.bob;
@@ -243,7 +253,7 @@ fn a_final_frame_with_a_wrong_reveal_key_fails_closed() {
         &[0x5Au8; 32],
         &alice_tag(
             &staged,
-            TagLabel::Confirm,
+            TagLabel::Confirm(Holding::Nothing),
             ALICE_CARD,
             staged.bob.session_id(),
         ),
@@ -391,7 +401,7 @@ fn a_single_genuine_early_confirm_is_applied_after_local_checks_without_another_
         alice.process_scanned_qr(&bob.finalization_qr().data);
         let confirm = (0..50)
             .filter_map(|_| alice.get_display_qr())
-            .find(|frame| frame.data.starts_with("CNF4"))
+            .find(|frame| frame.data.starts_with("CNF5"))
             .expect("Alice checked Bob's payload and shows its genuine confirm");
         assert_eq!(alice.get_state(), ProtocolState::Confirming);
         assert!(matches!(
@@ -465,7 +475,12 @@ fn a_done_tag_shown_as_a_confirm_is_ignored() {
     let relabelled = qr_codec::format_final_qr(
         &staged.alice.session_id(),
         &reveal_key_of(&staged.alice_final),
-        &alice_tag(&staged, TagLabel::Done, ALICE_CARD, staged.bob.session_id()),
+        &alice_tag(
+            &staged,
+            TagLabel::Done(Ending::Saved(Holding::Nothing)),
+            ALICE_CARD,
+            staged.bob.session_id(),
+        ),
     );
     let alice_final = staged.alice_final.clone();
     let mut bob = staged.bob;
@@ -545,10 +560,10 @@ fn a_session_shows_its_confirm_only_after_its_checks_and_done_only_once_saved() 
             .all(|p| ["RVL4", "DAT4", "SHK3"].contains(&p.as_str())),
         "no confirm before the checks: {verifying:?}"
     );
-    assert!(finalized.contains("CNF4"), "{finalized:?}");
+    assert!(finalized.contains("CNF5"), "{finalized:?}");
     assert!(
-        !finalized.contains("DON4"),
+        !finalized.contains("DON5"),
         "no done before saving: {finalized:?}"
     );
-    assert!(saved.contains("DON4"), "{saved:?}");
+    assert!(saved.contains("DON5"), "{saved:?}");
 }

@@ -10,6 +10,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use vauchi_core::exchange::multistage::confirmation::Holding;
 use vauchi_core::exchange::multistage::qr_codec::{
     self, StageQr, format_both_qr, format_done_qr, parse_qr,
 };
@@ -51,9 +52,17 @@ fn reads_everything(frame: &str) -> Option<String> {
 fn reads_no_ending(frame: &str) -> Option<String> {
     const REVEAL_END: usize = 4 + 8 + 24 + 48;
     match frame.get(..4) {
-        Some("CNF4" | "DON4") => frame.get(4..REVEAL_END).map(|rest| format!("RVL4{rest}")),
-        Some("BTH4") => None,
+        Some("CNF5" | "DON5") => frame.get(4..REVEAL_END).map(|rest| format!("RVL4{rest}")),
+        Some("BTH5") => None,
         _ => Some(frame.to_owned()),
+    }
+}
+
+/// The app's answer for a peer met for the first time: it holds nothing,
+/// said as soon as the session asks (vauchi/private#1285).
+fn holds_nothing_once_asked(session: &mut MultiStageSession) {
+    if session.peer_awaiting_statement().is_some() {
+        session.state_holding(Holding::Nothing);
     }
 }
 
@@ -61,6 +70,8 @@ fn reads_no_ending(frame: &str) -> Option<String> {
 /// its reader, until `done` holds or the ticks run out.
 fn run(p: &mut Pair, alice_reads: Reader, bob_reads: Reader, done: impl Fn(&Pair) -> bool) {
     for _ in 0..2000 {
+        holds_nothing_once_asked(&mut p.alice);
+        holds_nothing_once_asked(&mut p.bob);
         let aq = p.alice.get_display_qr();
         let bq = p.bob.get_display_qr();
         if let Some(seen) = aq.and_then(|q| bob_reads(&q.data)) {
@@ -136,7 +147,7 @@ fn a_done_frame_carries_the_final_frame_under_its_own_prefix() {
     let tag = [3u8; 32];
     let frame = format_done_qr(&sid, &reveal_key, &tag);
 
-    assert!(frame.starts_with("DON4"));
+    assert!(frame.starts_with("DON5"));
     assert_eq!(
         frame.len(),
         qr_codec::format_final_qr(&sid, &reveal_key, &tag).len()
@@ -159,7 +170,7 @@ fn a_both_frame_carries_the_done_tag_under_its_own_prefix() {
     let tag = [3u8; 32];
     let frame = format_both_qr(&sid, &reveal_key, &tag);
 
-    assert!(frame.starts_with("BTH4"));
+    assert!(frame.starts_with("BTH5"));
     assert_eq!(frame.len(), format_done_qr(&sid, &reveal_key, &tag).len());
     assert_eq!(
         parse_qr(&frame).expect("a both frame parses"),
@@ -178,7 +189,7 @@ fn a_saved_session_shows_done_in_place_of_the_final_frame() {
     for _ in 0..20 {
         let frame = next_ending_frame(&mut p.alice);
         assert!(
-            frame.starts_with("DON4"),
+            frame.starts_with("DON5"),
             "saved Alice showed {}",
             &frame[..4]
         );
@@ -205,7 +216,7 @@ fn a_saved_session_that_reads_the_peers_done_shows_both() {
     p.bob.process_scanned_qr(&alice_done);
 
     let frame = next_ending_frame(&mut p.bob);
-    assert!(frame.starts_with("BTH4"), "Bob showed {}", &frame[..4]);
+    assert!(frame.starts_with("BTH5"), "Bob showed {}", &frame[..4]);
 }
 
 // @internal
@@ -327,7 +338,7 @@ fn done_and_both_from_another_session_change_nothing() {
 
     let frame = next_ending_frame(&mut p.alice);
     assert!(
-        frame.starts_with("DON4"),
+        frame.starts_with("DON5"),
         "a stranger's DONE moved Alice to {}",
         &frame[..4]
     );
@@ -361,13 +372,13 @@ fn a_finalized_session_shows_its_confirm_until_its_app_saved() {
     for _ in 0..20 {
         let frame = next_ending_frame(&mut p.alice);
         assert!(
-            frame.starts_with("CNF4"),
+            frame.starts_with("CNF5"),
             "unsaved Alice showed {}",
             &frame[..4]
         );
     }
     p.alice.mark_saved();
-    assert!(next_ending_frame(&mut p.alice).starts_with("DON4"));
+    assert!(next_ending_frame(&mut p.alice).starts_with("DON5"));
 }
 
 // @internal
@@ -412,7 +423,7 @@ fn a_finalized_session_that_has_not_saved_neither_shows_nor_obeys_both() {
 
     let frame = next_ending_frame(&mut p.bob);
     assert!(
-        frame.starts_with("CNF4"),
+        frame.starts_with("CNF5"),
         "unsaved Bob showed {}",
         &frame[..4]
     );
@@ -421,7 +432,7 @@ fn a_finalized_session_that_has_not_saved_neither_shows_nor_obeys_both() {
     assert!(
         p.bob
             .get_display_qr()
-            .is_some_and(|q| q.data.starts_with("BTH4")),
+            .is_some_and(|q| q.data.starts_with("BTH5")),
         "the authenticated BOTH received before saving must not stop Bob after saving"
     );
 }

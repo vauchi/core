@@ -50,8 +50,8 @@ fn a_truncated_reveal_qr_is_an_error() {
 // @internal
 #[test]
 fn confirm_and_done_carry_their_own_prefixes() {
-    assert_eq!(&format_final_qr(&SID, &REVEAL_KEY, &TAG)[..4], "CNF4");
-    assert_eq!(&format_done_qr(&SID, &REVEAL_KEY, &TAG)[..4], "DON4");
+    assert_eq!(&format_final_qr(&SID, &REVEAL_KEY, &TAG)[..4], "CNF5");
+    assert_eq!(&format_done_qr(&SID, &REVEAL_KEY, &TAG)[..4], "DON5");
 }
 
 // ============================================================

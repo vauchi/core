@@ -7,6 +7,7 @@
 //! `multi_stage_machine.rs` is at the file-size limit (VRS04); loaded via
 //! `#[path]` from the parent.
 
+use vauchi_core::exchange::Holding;
 use vauchi_core::exchange::PeerPayload;
 
 use super::MultiStageMachine;
@@ -16,6 +17,18 @@ impl MultiStageMachine {
     /// what the AppEngine saves as the exchanged contact.
     pub fn received_peer(&self) -> Option<&PeerPayload> {
         self.inner.received_peer()
+    }
+
+    /// The identity key of a peer whose payload verified and for which
+    /// this phone has not yet said whether it holds a contact.
+    pub fn peer_awaiting_statement(&self) -> Option<[u8; 32]> {
+        self.inner.peer_awaiting_statement()
+    }
+
+    /// Whether this phone holds the verified peer as a contact: the
+    /// statement its confirm carries (vauchi/private#1285).
+    pub fn state_holding(&mut self, holding: Holding) {
+        self.inner.state_holding(holding);
     }
 
     /// The contact is saved: from now on this phone shows DONE.

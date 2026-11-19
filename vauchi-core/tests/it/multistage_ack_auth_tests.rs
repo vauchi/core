@@ -8,6 +8,7 @@
 //! to stall the exchange, and it was applied even when the frame's chunk
 //! failed to decrypt.
 
+use vauchi_core::exchange::multistage::confirmation::Holding;
 use vauchi_core::exchange::multistage::qr_codec::{
     QrCodecError, StageQr, format_data_qr, parse_qr,
 };
@@ -135,6 +136,11 @@ fn an_unauthenticated_first_data_frame_cannot_poison_a_signed_exchange() {
 
         ours.process_scanned_qr(&forged);
         for _ in 0..1000 {
+            for session in [&mut ours, &mut peer] {
+                if session.peer_awaiting_statement().is_some() {
+                    session.state_holding(Holding::Nothing);
+                }
+            }
             if let Some(qr) = ours.get_display_qr() {
                 peer.process_scanned_qr(&qr.data);
             }

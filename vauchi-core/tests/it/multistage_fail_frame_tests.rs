@@ -11,6 +11,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use vauchi_core::exchange::multistage::confirmation::Holding;
 use vauchi_core::exchange::multistage::qr_codec::{self, StageQr, parse_qr};
 use vauchi_core::exchange::multistage::session::{FAIL_LINGER, MultiStageSession};
 use vauchi_core::exchange::multistage::types::ProtocolState;
@@ -22,6 +23,14 @@ const TICK: Duration = Duration::from_millis(100);
 fn signed(identity: &Identity, clock: &Arc<FakeMonotonicClock>) -> MultiStageSession {
     MultiStageSession::for_identity(identity, &ContactCard::new("Someone"), None)
         .with_monotonic(clock.clone())
+}
+
+/// The app's answer for a peer met for the first time: it holds nothing,
+/// said as soon as the session asks (vauchi/private#1285).
+fn holds_nothing_once_asked(session: &mut MultiStageSession) {
+    if session.peer_awaiting_statement().is_some() {
+        session.state_holding(Holding::Nothing);
+    }
 }
 
 /// Each phone reads the other's frames until `stop` holds.
@@ -39,6 +48,8 @@ fn run(
         if stop(a, b) {
             return;
         }
+        holds_nothing_once_asked(a);
+        holds_nothing_once_asked(b);
         if let Some(q) = a.get_display_qr() {
             b.process_scanned_qr(&q.data);
         }
@@ -158,6 +169,8 @@ fn a_phone_whose_app_could_not_save_shows_fail_and_its_peer_learns_it() {
         if a.get_state() == ProtocolState::Finalized {
             break;
         }
+        holds_nothing_once_asked(&mut a);
+        holds_nothing_once_asked(&mut b);
         if let Some(q) = a.get_display_qr() {
             let data = match parse_qr(&q.data).unwrap() {
                 StageQr::Final {

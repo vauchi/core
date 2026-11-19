@@ -227,7 +227,7 @@ fn session_stranded_in_verifying() -> (MultiStageSession, MultiStageSession, Str
         // Verifying; they are the frames that never arrive from a peer that
         // went away.
         if let Some(bq) = &bq
-            && !["RVL4", "CNF4", "DON4"]
+            && !["RVL4", "CNF5", "DON5"]
                 .iter()
                 .any(|p| bq.data.starts_with(p))
         {

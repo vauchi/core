@@ -13,9 +13,9 @@
 //! - `INIT<sid:24><pk:48><eph:48><ch:48><display_name>`
 //! - `DATA<sid:24><idx:3>/<total:3><ack_len:2><ack:variable><crc:3><payload>`
 //! - `RVL4<header:8><sid:24><rk:48>`
-//! - `CNF4<header:8><sid:24><rk:48><tag:48>`
-//! - `DON4<header:8><sid:24><rk:48><tag:48>`, the confirm once saved
-//! - `BTH4<header:8><sid:24><rk:48><tag:48>`, DONE's tag once the peer's
+//! - `CNF5<header:8><sid:24><rk:48><tag:48>`
+//! - `DON5<header:8><sid:24><rk:48><tag:48>`, the confirm once saved
+//! - `BTH5<header:8><sid:24><rk:48><tag:48>`, DONE's tag once the peer's
 //!   DONE was read
 //!
 //! All binary fields are base45-encoded (fixed-width for known-size inputs).
@@ -163,7 +163,7 @@ const FLAG_HAS_RELAY_URL: u8 = 0x01;
 /// Stage prefixes (4 chars each).
 const PREFIX_LEN: usize = 4;
 const PREFIXES: [&str; 8] = [
-    "INI3", "RVL4", "DAT4", "CNF4", "DON4", "BTH4", "FAI3", "SHK3",
+    "INI3", "RVL4", "DAT4", "CNF5", "DON5", "BTH5", "FAI3", "SHK3",
 ];
 
 fn decode_fixed<const N: usize>(encoded: &str) -> Result<[u8; N], QrCodecError> {
@@ -205,7 +205,7 @@ fn frame(prefix: &str, body: &str) -> String {
 }
 
 /// Stage prefixes of the format used before every frame carried a header.
-const OLD_FORMAT_PREFIXES: [&str; 14] = [
+const OLD_FORMAT_PREFIXES: [&str; 17] = [
     "INI2", "IN2D", "DATA", "VRFY", "CONF", "RDYY", "FAIL", "SHAK", "CMBO",
     // DAT3 chunks did not authenticate the ACK they carried (#676).
     "DAT3",
@@ -215,6 +215,9 @@ const OLD_FORMAT_PREFIXES: [&str; 14] = [
     "IN3D", "FIN3", "DON3",
     // BTH3 carried no tag, so it could not prove the peer saved (#1217).
     "BTH3",
+    // The version 4 tags said "accepted" and "saved" only, not whether the
+    // sender already held the reader as a contact (#1285).
+    "CNF4", "DON4", "BTH4",
 ];
 
 /// Split a frame into its stage prefix, training header and body.
@@ -348,21 +351,21 @@ pub fn format_reveal_qr(session_id: &[u8; 16], reveal_key: &[u8; 32]) -> String 
     )
 }
 
-/// Format a CONFIRM frame: `CNF4<header:8><sid:24><rk:48><tag:48>`, 132
+/// Format a CONFIRM frame: `CNF5<header:8><sid:24><rk:48><tag:48>`, 132
 /// characters, the density of the opening frame. The tag is keyed (#1217).
 pub fn format_final_qr(session_id: &[u8; 16], reveal_key: &[u8; 32], tag: &[u8; 32]) -> String {
-    frame("CNF4", &final_body(session_id, reveal_key, tag))
+    frame("CNF5", &final_body(session_id, reveal_key, tag))
 }
 
-/// Format a DONE frame: the confirm's layout under `DON4`, with its own
+/// Format a DONE frame: the confirm's layout under `DON5`, with its own
 /// keyed tag, shown once the sender has saved.
 pub fn format_done_qr(session_id: &[u8; 16], reveal_key: &[u8; 32], tag: &[u8; 32]) -> String {
-    frame("DON4", &final_body(session_id, reveal_key, tag))
+    frame("DON5", &final_body(session_id, reveal_key, tag))
 }
 
-/// Format a BOTH frame: DONE's layout and tag under `BTH4`.
+/// Format a BOTH frame: DONE's layout and tag under `BTH5`.
 pub fn format_both_qr(session_id: &[u8; 16], reveal_key: &[u8; 32], tag: &[u8; 32]) -> String {
-    frame("BTH4", &final_body(session_id, reveal_key, tag))
+    frame("BTH5", &final_body(session_id, reveal_key, tag))
 }
 
 fn final_body(session_id: &[u8; 16], reveal_key: &[u8; 32], tag: &[u8; 32]) -> String {
@@ -415,17 +418,17 @@ pub fn parse_frame(raw: &str) -> Result<Frame, QrCodecError> {
         "INI3" => parse_ini2(body),
         "RVL4" => parse_reveal(body),
         "DAT4" => parse_data(body),
-        "CNF4" => parse_final_body(body).map(|(session_id, reveal_key, tag)| StageQr::Final {
+        "CNF5" => parse_final_body(body).map(|(session_id, reveal_key, tag)| StageQr::Final {
             session_id,
             reveal_key,
             tag,
         }),
-        "DON4" => parse_final_body(body).map(|(session_id, reveal_key, tag)| StageQr::Done {
+        "DON5" => parse_final_body(body).map(|(session_id, reveal_key, tag)| StageQr::Done {
             session_id,
             reveal_key,
             tag,
         }),
-        "BTH4" => parse_final_body(body).map(|(session_id, reveal_key, tag)| StageQr::Both {
+        "BTH5" => parse_final_body(body).map(|(session_id, reveal_key, tag)| StageQr::Both {
             session_id,
             reveal_key,
             tag,

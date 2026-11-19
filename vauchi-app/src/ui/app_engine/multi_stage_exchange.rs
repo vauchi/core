@@ -43,6 +43,7 @@ use vauchi_core::Command;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::AccelerometerProximityState;
 use vauchi_core::exchange::AudioProximityState;
+use vauchi_core::exchange::Holding;
 use vauchi_core::exchange::LinkFeedback;
 use vauchi_core::exchange::MultiStageSession;
 use vauchi_core::exchange::mode::ExchangeMode;
@@ -153,6 +154,7 @@ impl AppEngine {
         // for ~1000× its window and deadlocked the exchange
         // (2026-06-03-multistage-qr-exchange-stalls-init-on-device).
         let now = self.vauchi.clock().unix_millis();
+        self.state_what_this_phone_holds_for_the_peer();
         let (event, stalled, link) = match self.multi_stage_session.as_mut() {
             Some(holder) => {
                 let event = holder.machine.advance(now);
@@ -365,6 +367,7 @@ impl AppEngine {
         let event = self.forward_multi_stage_hardware_event(&vauchi_core::Event::QrScanned {
             data: qr.to_string(),
         });
+        self.state_what_this_phone_holds_for_the_peer();
         let (stalled, link) = self
             .multi_stage_session
             .as_ref()
@@ -395,6 +398,35 @@ impl AppEngine {
     /// Returns `None` when no identity exists (the screen falls back
     /// to the engine's default chrome — the user must complete
     /// onboarding before reaching this screen anyway).
+    /// Answers the session once the peer's signed payload verified: does
+    /// this phone already hold that identity as an exchanged contact? The
+    /// session shows no confirm before the answer (vauchi/private#1285). A
+    /// failed lookup states nothing, and the step timeout ends the exchange.
+    fn state_what_this_phone_holds_for_the_peer(&mut self) {
+        let Some(peer_identity) = self
+            .multi_stage_session
+            .as_ref()
+            .and_then(|holder| holder.machine.peer_awaiting_statement())
+        else {
+            return;
+        };
+        let Ok(held) = self
+            .vauchi
+            .holds_exchanged_contact(&hex::encode(peer_identity))
+        else {
+            tracing::error!("[MSX] Failed: contact lookup for the verified peer");
+            return;
+        };
+        let holding = if held {
+            Holding::Peer
+        } else {
+            Holding::Nothing
+        };
+        if let Some(holder) = self.multi_stage_session.as_mut() {
+            holder.machine.state_holding(holding);
+        }
+    }
+
     fn build_multi_stage_session(&self) -> Option<MultiStageSession> {
         let identity = self.vauchi.identity()?;
         let card = self

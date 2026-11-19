@@ -183,7 +183,7 @@ fn a_restored_contact_retries_ratchet_adoption_after_an_authenticated_peer_save(
         let a_qr = own_qr_data(&alice);
         let b_qr = own_qr_data(&bob);
         if let Some(frame) = b_qr {
-            authenticated_ending = frame.starts_with("DON4") || frame.starts_with("BTH4");
+            authenticated_ending = frame.starts_with("DON5") || frame.starts_with("BTH5");
             scan_into(&mut alice, frame);
         }
         if let Some(frame) = a_qr {

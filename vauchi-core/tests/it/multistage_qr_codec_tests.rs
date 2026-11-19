@@ -65,7 +65,7 @@ fn test_parse_final_qr() {
     let reveal_key = [7u8; 32];
     let tag = [9u8; 32];
     let qr = format_final_qr(&session_id, &reveal_key, &tag);
-    assert!(qr.starts_with("CNF4"));
+    assert!(qr.starts_with("CNF5"));
     let parsed = parse_qr(&qr).unwrap();
     match parsed {
         StageQr::Final {

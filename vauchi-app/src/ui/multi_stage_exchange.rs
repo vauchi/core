@@ -778,61 +778,6 @@ impl MultiStageExchangeEngine {
             }
         }
     }
-
-    fn build_success_screen(&self, title: String) -> ScreenModel {
-        // Rich, core-driven success screen (received card + group +
-        // visibility) when the AppEngine attached a summary; otherwise
-        // the minimal completion chrome below.
-        if let Some(summary) = &self.success_summary {
-            return crate::ui::exchange::success::build_exchange_success_screen(
-                SCREEN_ID,
-                title,
-                DONE_ACTION_ID,
-                summary,
-                self.locale,
-            );
-        }
-        let detail = self
-            .peer_name
-            .as_ref()
-            .map(|name| {
-                get_string_with_args(
-                    self.locale,
-                    "multi_stage.exchanged_with_detail",
-                    &[("name", name)],
-                )
-            })
-            .unwrap_or_else(|| self.t("multi_stage.exchange_complete_detail"));
-
-        ScreenModel::new(
-            SCREEN_ID,
-            title,
-            vec![
-                Component::StatusIndicator {
-                    id: COMPONENT_ID_STATUS.into(),
-                    icon: Some("checkmark.circle".into()),
-                    title: self.t("exchange.terminal.complete"),
-                    detail: None,
-                    status: Status::Success,
-                    status_label: self.t(Status::Success.label_key()),
-                    a11y: None,
-                },
-                Component::Text {
-                    a11y: None,
-                    id: COMPONENT_ID_PEER_NAME.into(),
-                    content: detail,
-                    style: TextStyle::Body,
-                },
-            ],
-            vec![ScreenAction {
-                id: DONE_ACTION_ID.into(),
-                label: self.t("action.done"),
-                style: ActionStyle::Primary,
-                enabled: true,
-                a11y: Some(A11y::labeled(self.t("action.done"))),
-            }],
-        )
-    }
 }
 
 impl WorkflowEngine for MultiStageExchangeEngine {

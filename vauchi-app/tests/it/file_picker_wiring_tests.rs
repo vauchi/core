@@ -336,6 +336,42 @@ fn submit_valid_password_imports_backup_and_navigates_to_main() {
     );
 }
 
+// @internal
+#[test]
+fn an_identity_only_backup_restores_the_identity_and_no_contacts() {
+    let password = "correct horse battery staple";
+    let mut donor = Vauchi::in_memory().unwrap();
+    donor.create_identity("Bob").unwrap();
+    let donor_key = *donor.identity().unwrap().signing_public_key();
+    let identity_only = donor.export_backup(password).unwrap().into_bytes();
+    let mut engine = fresh_engine();
+    let _ = engine.navigate_to(AppScreen::Onboarding);
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "load_backup".into(),
+    });
+    let _ = engine.handle_hardware_event(Event::FilePickedFromUser {
+        bytes: identity_only,
+        filename: "vauchi-backup.vauchi".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "backup_password".into(),
+        value: password.into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit_backup_password".into(),
+    });
+
+    match result {
+        ActionResult::NavigateTo(screen) => assert_eq!(screen.screen_id, "my_info"),
+        other => panic!("expected NavigateTo(my_info), got {other:?}"),
+    }
+    let restored = engine.vauchi().identity().expect("an identity is restored");
+    assert_eq!(*restored.signing_public_key(), donor_key);
+    assert_eq!(restored.display_name(), "Bob");
+    assert_eq!(engine.vauchi().list_contacts().unwrap().len(), 0);
+}
+
 // @scenario: core_file_picker :: wrong password surfaces alert
 #[test]
 fn submit_wrong_password_returns_alert_and_clears_state() {

@@ -188,6 +188,139 @@ pub fn find_preamble(samples: &[f32], sample_rate: f32) -> Result<usize, Proximi
     Err(ProximityError::NoResponse)
 }
 
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+/// How far above the recording's own floor the preamble tone must stand.
+/// A phone's own tone measures about 0.1 and a quiet room about 0.000001
+/// (Pixel 3a recordings, vauchi/private#1300), so a level fixed in advance
+/// fits neither a peer 14 cm away nor a noisy room.
+const PREAMBLE_OVER_FLOOR: f32 = 30.0;
+const PREAMBLE_LEVEL_MIN: f32 = 1e-6;
+const PREAMBLE_HOPS: usize = 4;
+/// Mean per-bit margin `|p1 - p0| / max(p0, p1)` a reading must reach.
+/// The Pixel's own tone reads 0.95 at the right timing and noise about 0.3.
+const MESSAGE_MARGIN_MIN: f32 = 0.6;
+/// Candidate preambles read per recording, so a long interfering tone
+/// cannot make a recording expensive to decode.
+const MESSAGE_CANDIDATES_MAX: usize = 24;
+
+/// Every message of `message_len` bytes in a recording, in the order heard.
+///
+/// A recording holds the phone's own tone as well as the peer's, so the
+/// caller picks the one it waits for. Levels are measured against the
+/// recording's own floor, the length is fixed, and the bit timing is
+/// searched over one bit either side of where the preamble was first seen:
+/// the first window that carries the preamble is up to half a window early.
+pub fn decode_fsk_messages(
+    samples: &[f32],
+    recorded_sample_rate: u32,
+    config: &AudioConfig,
+    message_len: usize,
+) -> Vec<Vec<u8>> {
+    let resampled;
+    let samples = if recorded_sample_rate == config.sample_rate {
+        samples
+    } else {
+        resampled = resample(samples, recorded_sample_rate, config.sample_rate);
+        &resampled
+    };
+    let sample_rate = config.sample_rate as f32;
+    let bit = (sample_rate * 0.01) as usize;
+    let hop = bit / 2;
+    let message_bits = message_len * 8;
+    if bit == 0 || hop == 0 || message_bits == 0 || samples.len() <= bit {
+        return Vec::new();
+    }
+    let lead_in = (sample_rate * 0.055) as usize;
+    let message_samples = lead_in + message_bits * bit;
+
+    let preamble_levels: Vec<f32> = (0..samples.len() - bit)
+        .step_by(hop)
+        .map(|start| goertzel(&samples[start..start + bit], 19_000.0, sample_rate))
+        .collect();
+    let mut sorted = preamble_levels.clone();
+    sorted.sort_by(f32::total_cmp);
+    let floor = sorted[sorted.len() / 4];
+    let preamble_level = (floor * PREAMBLE_OVER_FLOOR).max(PREAMBLE_LEVEL_MIN);
+
+    let mut messages = Vec::new();
+    let mut candidates = 0;
+    let mut index = 0;
+    while index + PREAMBLE_HOPS <= preamble_levels.len() && candidates < MESSAGE_CANDIDATES_MAX {
+        let preamble_here = preamble_levels[index..index + PREAMBLE_HOPS]
+            .iter()
+            .all(|level| *level > preamble_level);
+        if !preamble_here {
+            index += 1;
+            continue;
+        }
+        candidates += 1;
+        let nominal = index * hop + lead_in;
+        match best_timed_reading(samples, nominal, bit, message_bits, config) {
+            Some(message) => {
+                messages.push(message);
+                index += message_samples / hop;
+            }
+            None => index += PREAMBLE_HOPS,
+        }
+    }
+    messages
+}
+
+/// The reading with the clearest bits among starts one bit either side of
+/// `nominal`, or `None` when none is clear enough to be a message.
+fn best_timed_reading(
+    samples: &[f32],
+    nominal: usize,
+    bit: usize,
+    message_bits: usize,
+    config: &AudioConfig,
+) -> Option<Vec<u8>> {
+    let step = (bit / 10).max(1);
+    let earliest = nominal.saturating_sub(bit);
+    (earliest..=nominal + bit)
+        .step_by(step)
+        .filter_map(|start| read_message(samples, start, bit, message_bits, config))
+        .max_by(|a, b| a.1.total_cmp(&b.1))
+        .filter(|(_, margin)| *margin >= MESSAGE_MARGIN_MIN)
+        .map(|(message, _)| message)
+}
+
+/// `message_bits` bits read from `start`, with their mean margin.
+fn read_message(
+    samples: &[f32],
+    start: usize,
+    bit: usize,
+    message_bits: usize,
+    config: &AudioConfig,
+) -> Option<(Vec<u8>, f32)> {
+    let end = start.checked_add(message_bits.checked_mul(bit)?)?;
+    if end > samples.len() {
+        return None;
+    }
+    let sample_rate = config.sample_rate as f32;
+    let zero = config.carrier_frequency as f32;
+    let one = (config.carrier_frequency + config.frequency_shift) as f32;
+    let mut message = Vec::with_capacity(message_bits / 8);
+    let mut byte = 0u8;
+    let mut margin_sum = 0.0f32;
+    for index in 0..message_bits {
+        let chunk = &samples[start + index * bit..start + (index + 1) * bit];
+        let level_zero = goertzel(chunk, zero, sample_rate);
+        let level_one = goertzel(chunk, one, sample_rate);
+        byte = (byte << 1) | u8::from(level_one > level_zero);
+        margin_sum +=
+            (level_one - level_zero).abs() / level_zero.max(level_one).max(f32::MIN_POSITIVE);
+        if index % 8 == 7 {
+            message.push(byte);
+            byte = 0;
+        }
+    }
+    Some((message, margin_sum / message_bits as f32))
+}
+
 /// Linearly resamples `samples` from `from_rate` to `to_rate`.
 ///
 /// Returns a new `Vec<f32>` of length approximately
@@ -408,6 +541,124 @@ mod tests {
             (mean - 0.7).abs() < 0.01,
             "DC mean should be ~0.7, got {mean}"
         );
+    }
+
+    /// A recording of `seconds`, silent but for `tones`: each is samples,
+    /// the second it starts at, and its gain.
+    fn recording(seconds: f32, tones: &[(&[f32], f32, f32)]) -> Vec<f32> {
+        let rate = AudioConfig::default().sample_rate as f32;
+        let mut out = vec![0.0f32; (seconds * rate) as usize];
+        for (tone, at, gain) in tones {
+            let start = (at * rate) as usize;
+            for (offset, sample) in tone.iter().enumerate() {
+                if let Some(slot) = out.get_mut(start + offset) {
+                    *slot += sample * gain;
+                }
+            }
+        }
+        out
+    }
+
+    const OWN_ID: [u8; 16] = [0x11; 16];
+    const PEER_ID: [u8; 16] = [
+        0xa5, 0xbc, 0x81, 0x92, 0x4c, 0x8f, 0x74, 0xaa, 0x0a, 0xa6, 0x58, 0xc0, 0x0e, 0xf8, 0x50,
+        0xf3,
+    ];
+
+    fn messages_in(recording: &[f32]) -> Vec<Vec<u8>> {
+        let config = AudioConfig::default();
+        decode_fsk_messages(recording, config.sample_rate, &config, 16)
+    }
+
+    // @internal
+    #[test]
+    fn a_recording_of_two_tones_yields_both_messages_in_the_order_heard() {
+        let config = AudioConfig::default();
+        let own = generate_fsk_samples(&OWN_ID, &config);
+        let peer = generate_fsk_samples(&PEER_ID, &config);
+
+        let heard = messages_in(&recording(5.0, &[(&own, 0.13, 0.14), (&peer, 1.9, 0.14)]));
+
+        assert_eq!(heard, vec![OWN_ID.to_vec(), PEER_ID.to_vec()]);
+    }
+
+    // @internal
+    #[test]
+    fn a_tone_a_thousand_times_quieter_than_the_first_is_still_read() {
+        let config = AudioConfig::default();
+        let own = generate_fsk_samples(&OWN_ID, &config);
+        let peer = generate_fsk_samples(&PEER_ID, &config);
+
+        let heard = messages_in(&recording(
+            5.0,
+            &[(&own, 0.13, 0.14), (&peer, 1.6, 0.00014)],
+        ));
+
+        assert_eq!(heard, vec![OWN_ID.to_vec(), PEER_ID.to_vec()]);
+    }
+
+    // @internal
+    #[test]
+    fn a_tone_that_starts_between_two_bit_boundaries_is_read() {
+        let config = AudioConfig::default();
+        let peer = generate_fsk_samples(&PEER_ID, &config);
+        let one_ms = 0.001;
+
+        for tenths_of_a_bit in 0..10 {
+            let at = 0.5 + tenths_of_a_bit as f32 * one_ms;
+            let heard = messages_in(&recording(3.0, &[(&peer, at, 0.05)]));
+            assert_eq!(heard, vec![PEER_ID.to_vec()], "tone at {at} s");
+        }
+    }
+
+    // @internal
+    #[test]
+    fn a_tone_cut_off_by_the_end_of_the_recording_is_not_a_message() {
+        let config = AudioConfig::default();
+        let peer = generate_fsk_samples(&PEER_ID, &config);
+
+        let heard = messages_in(&recording(2.0, &[(&peer, 1.2, 0.1)]));
+
+        assert_eq!(heard, Vec::<Vec<u8>>::new());
+    }
+
+    // @internal
+    #[test]
+    fn silence_and_a_bare_whistle_hold_no_message() {
+        let config = AudioConfig::default();
+        let rate = config.sample_rate as f32;
+        let whistle: Vec<f32> = (0..(rate * 4.0) as usize)
+            .map(|i| (2.0 * std::f32::consts::PI * 19_000.0 * i as f32 / rate).sin() * 0.2)
+            .collect();
+
+        assert_eq!(messages_in(&vec![0.0; 44_100 * 3]), Vec::<Vec<u8>>::new());
+        assert_eq!(messages_in(&whistle), Vec::<Vec<u8>>::new());
+        assert_eq!(messages_in(&[]), Vec::<Vec<u8>>::new());
+    }
+
+    // @internal
+    #[test]
+    fn a_burst_at_the_preamble_pitch_with_no_data_after_it_is_not_a_message() {
+        let rate = AudioConfig::default().sample_rate as f32;
+        let burst: Vec<f32> = (0..(rate * 0.06) as usize)
+            .map(|i| (2.0 * std::f32::consts::PI * 19_000.0 * i as f32 / rate).sin() * 0.3)
+            .collect();
+
+        let heard = messages_in(&recording(4.0, &[(&burst, 0.5, 1.0)]));
+
+        assert_eq!(heard, Vec::<Vec<u8>>::new());
+    }
+
+    // @internal
+    #[test]
+    fn two_tones_on_top_of_each_other_do_not_read_as_the_quieter_one() {
+        let config = AudioConfig::default();
+        let own = generate_fsk_samples(&OWN_ID, &config);
+        let peer = generate_fsk_samples(&PEER_ID, &config);
+
+        let heard = messages_in(&recording(5.0, &[(&own, 0.13, 0.14), (&peer, 0.4, 0.01)]));
+
+        assert!(!heard.contains(&PEER_ID.to_vec()));
     }
 
     proptest::proptest! {

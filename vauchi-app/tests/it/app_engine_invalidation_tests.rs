@@ -172,9 +172,54 @@ fn link_responder_success_refreshes_previously_visited_contacts() {
     engine.navigate_to(AppScreen::DeepLinkResponder { payload });
     add_contact_named(&engine, "Bob");
     let completed = engine
-        .link_responder_completed("contact-Bob")
+        .link_responder_completed("contact-Bob", false)
         .expect("completion screen");
     assert_eq!(completed.screen_id, "link_responder_completed");
     engine.navigate_to(AppScreen::Contacts);
     assert_eq!(contact_names(&engine), vec!["Bob".to_string()]);
+}
+
+/// The Link responder's completion screen for Bob, held before or not.
+fn link_completion_for_bob(already_held: bool) -> vauchi_app::ui::ScreenModel {
+    let mut engine = engine_with_identity();
+    let (initiation, _) = vauchi_core::exchange::link_mode::initiator_generate();
+    let payload = vauchi_core::exchange::link_mode::parse_exchange_deep_link(&initiation.url)
+        .expect("valid peer link");
+    engine.navigate_to(AppScreen::DeepLinkResponder { payload });
+    add_contact_named(&engine, "Bob");
+    engine
+        .link_responder_completed("contact-Bob", already_held)
+        .expect("completion screen")
+}
+
+fn english(key: &str) -> String {
+    vauchi_app::i18n::get_string(vauchi_app::i18n::Locale::ENGLISH, key)
+}
+
+// Over Link a repeat exchange changes nothing the phone holds, so its
+// screen may claim neither "added" nor "updated", nor that the copy
+// stays current (owner, 2026-11-19, vauchi/private#1285).
+// @internal
+#[test]
+fn a_link_completion_for_a_contact_already_held_says_nothing_changed_and_to_meet() {
+    let screen = link_completion_for_bob(true);
+    let json = serde_json::to_string(&screen).unwrap();
+
+    assert_eq!(
+        screen.title,
+        english("link_exchange.contact_unchanged_title")
+    );
+    assert!(json.contains("\"link_needs_meeting\""));
+    assert!(!json.contains("\"stays_updated\""));
+}
+
+// @internal
+#[test]
+fn a_first_link_completion_says_added_and_keeps_the_stays_updated_line() {
+    let screen = link_completion_for_bob(false);
+    let json = serde_json::to_string(&screen).unwrap();
+
+    assert_eq!(screen.title, english("link_exchange.contact_added_title"));
+    assert!(json.contains("\"stays_updated\""));
+    assert!(!json.contains("\"link_needs_meeting\""));
 }

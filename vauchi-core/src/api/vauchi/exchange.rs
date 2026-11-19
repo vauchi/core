@@ -99,6 +99,23 @@ impl ProfileEngine {
         Ok(())
     }
 
+    /// Refreshes the card of a contact this phone already holds from an
+    /// exchange whose key it does not take: its person was asked to
+    /// reconnect and declined, or did not answer (vauchi/private#1285).
+    /// The key, the ratchet and everything the person recorded stay, also
+    /// for a contact restored from guardians, which
+    /// [`Self::save_exchanged_contact`] would rekey. A contact not held is
+    /// refused, and a blocked one as in [`Self::save_exchanged_card`].
+    pub fn refresh_exchanged_card(&self, exchanged: &Contact) -> VauchiResult<()> {
+        let mut stored = self
+            .storage
+            .contacts()
+            .load_contact(exchanged.id())?
+            .ok_or_else(|| VauchiError::ContactNotFound(exchanged.id().to_string()))?;
+        stored.update_card(exchanged.card().clone(), self.clock.unix_seconds());
+        self.save_exchanged_card(&stored)
+    }
+
     fn persist_exchanged_card(&self, contact: &Contact) -> VauchiResult<Option<VauchiEvent>> {
         let blocked = self
             .storage

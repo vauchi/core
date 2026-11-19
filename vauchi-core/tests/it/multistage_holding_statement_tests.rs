@@ -11,6 +11,9 @@
 //! makes it only after the peer's signed payload verified: a stranger who
 //! names an identity it cannot sign for learns nothing about who holds it.
 
+use std::sync::Arc;
+use std::time::Duration;
+
 use proptest::prelude::*;
 use vauchi_core::exchange::multistage::confirmation::{
     self, Ending, Holding, Side, TagKind, TagLabel,
@@ -20,6 +23,7 @@ use vauchi_core::exchange::multistage::qr_codec::{
 };
 use vauchi_core::exchange::multistage::session::MultiStageSession;
 use vauchi_core::exchange::multistage::types::ProtocolState;
+use vauchi_core::monotonic::FakeMonotonicClock;
 use vauchi_core::{ContactCard, Identity};
 
 const KEY: [u8; 32] = [7u8; 32];
@@ -204,15 +208,20 @@ struct Pair {
     alice: MultiStageSession,
     bob: MultiStageSession,
     bob_identity: Identity,
+    clock: Arc<FakeMonotonicClock>,
 }
 
 fn pair() -> Pair {
     let alice_identity = Identity::create("Alice", 0);
     let bob_identity = Identity::create("Bob", 0);
+    let clock = Arc::new(FakeMonotonicClock::new());
     Pair {
-        alice: MultiStageSession::for_identity(&alice_identity, &ContactCard::new("Alice"), None),
-        bob: MultiStageSession::for_identity(&bob_identity, &ContactCard::new("Bob"), None),
+        alice: MultiStageSession::for_identity(&alice_identity, &ContactCard::new("Alice"), None)
+            .with_monotonic(clock.clone()),
+        bob: MultiStageSession::for_identity(&bob_identity, &ContactCard::new("Bob"), None)
+            .with_monotonic(clock.clone()),
         bob_identity,
+        clock,
     }
 }
 
@@ -341,6 +350,7 @@ fn a_peer_that_cannot_sign_for_the_identity_it_names_gets_no_statement() {
         alice: MultiStageSession::for_identity(&alice_identity, &ContactCard::new("Alice"), None),
         bob: MultiStageSession::new(forged),
         bob_identity,
+        clock: Arc::new(FakeMonotonicClock::new()),
     };
     let mut shown_by_alice = Vec::new();
 
@@ -516,6 +526,72 @@ fn a_phone_that_ended_with_kept_stops_on_its_peers_both_as_a_saved_one_does() {
     assert!(shown_by_bob.iter().all(|frame| frame.starts_with("BTH5")));
     assert_eq!(p.alice.peer_ending(), Some(Ending::Kept(Holding::Nothing)));
     assert_eq!(p.alice.get_display_qr().map(|frame| frame.data), None);
+}
+
+// @internal
+#[test]
+fn a_phone_whose_person_is_asked_keeps_its_confirm_up_past_the_usual_grace() {
+    let mut p = pair();
+    run(
+        &mut p,
+        Some(Holding::Peer),
+        Some(Holding::Nothing),
+        both_finalized,
+    );
+
+    p.clock.advance(Duration::from_secs(120));
+    let shown_at_two_minutes = frames_shown(&mut p.alice, 8);
+    p.clock.advance(Duration::from_secs(31));
+    let shown_past_the_ceiling = p.alice.get_display_qr().map(|frame| frame.data);
+
+    assert!(
+        shown_at_two_minutes
+            .iter()
+            .any(|frame| frame.starts_with("CNF5"))
+    );
+    assert_eq!(shown_past_the_ceiling, None);
+}
+
+// @internal
+#[test]
+fn two_phones_that_agree_on_what_they_hold_stop_at_the_usual_grace() {
+    let mut p = pair();
+    run(
+        &mut p,
+        Some(Holding::Peer),
+        Some(Holding::Peer),
+        both_finalized,
+    );
+
+    p.clock.advance(Duration::from_secs(61));
+
+    assert_eq!(p.alice.get_display_qr().map(|frame| frame.data), None);
+}
+
+// @internal
+#[test]
+fn a_late_answer_gives_the_peer_a_full_grace_to_read_it() {
+    let mut p = pair();
+    run(
+        &mut p,
+        Some(Holding::Peer),
+        Some(Holding::Nothing),
+        both_finalized,
+    );
+    p.clock.advance(Duration::from_secs(100));
+
+    assert!(p.alice.mark_reconnected());
+    p.clock.advance(Duration::from_secs(59));
+    let shown_within_the_grace = frames_shown(&mut p.alice, 8);
+    p.clock.advance(Duration::from_secs(2));
+    let shown_after_it = p.alice.get_display_qr().map(|frame| frame.data);
+
+    assert!(
+        shown_within_the_grace
+            .iter()
+            .any(|frame| frame.starts_with("DON5"))
+    );
+    assert_eq!(shown_after_it, None);
 }
 
 proptest! {

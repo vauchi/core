@@ -146,12 +146,7 @@ impl ProfileEngine {
                     contact_event = self.persist_exchanged_card(&stored)?;
                     return Ok(());
                 }
-                let shared = contact.shared_key().ok_or_else(|| {
-                    VauchiError::InvalidState("An exchanged contact has a shared key".into())
-                })?;
-                stored
-                    .adopt_exchange_shared_key(shared.clone(), self.clock.unix_seconds())
-                    .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+                self.adopt_exchange_key(&mut stored, contact)?;
                 contact_event = self.persist_exchanged_card(&stored)?;
                 self.storage.recovery().mark_rekey_met_again(contact.id())?;
             } else {
@@ -209,6 +204,63 @@ impl ProfileEngine {
         }
         self.save_exchanged_contact(contact, ratchet, is_initiator)?;
         Ok(false)
+    }
+
+    /// Whether this device holds `contact_id` as an exchanged contact, whose
+    /// key a repeat exchange keeps. A blocked contact counts: it is never
+    /// reconnected, and its peer is not told it is unknown here
+    /// (vauchi/private#1285).
+    pub fn holds_exchanged_contact(&self, contact_id: &str) -> VauchiResult<bool> {
+        Ok(self
+            .storage
+            .contacts()
+            .load_contact(contact_id)?
+            .is_some_and(|stored| stored.shared_key().is_some()))
+    }
+
+    /// Persist a repeat exchange whose peer no longer holds this device,
+    /// after this device's person agreed to start a new connection: the
+    /// stored contact takes the exchange's shared key and ratchet and keeps
+    /// everything else. [`Self::save_exchanged_contact`] stays the path that
+    /// never rekeys (vauchi/private#941); call this one only for a peer the
+    /// exchange proved to hold the contact's identity key, and only after
+    /// the yes (vauchi/private#1285).
+    /// Contact, ratchet and queued bootstrap writes commit together, so a
+    /// failed write leaves the old key in place.
+    pub fn reconnect_exchanged_contact(
+        &self,
+        contact: &Contact,
+        ratchet: &DoubleRatchetState,
+        is_initiator: bool,
+    ) -> VauchiResult<()> {
+        let mut contact_event = None;
+        self.storage.with_transaction(|| -> VauchiResult<()> {
+            let mut stored = self
+                .storage
+                .contacts()
+                .load_contact(contact.id())?
+                .ok_or_else(|| VauchiError::ContactNotFound(contact.id().to_string()))?;
+            stored.update_card(contact.card().clone(), self.clock.unix_seconds());
+            self.adopt_exchange_key(&mut stored, contact)?;
+            contact_event = self.persist_exchanged_card(&stored)?;
+            self.save_exchange_ratchet(contact.id(), ratchet, is_initiator)?;
+            self.mark_own_card_repropagate()?;
+            self.hand_back_owed()?;
+            Ok(())
+        })?;
+        if let Some(event) = contact_event {
+            self.events.dispatch(event);
+        }
+        Ok(())
+    }
+
+    fn adopt_exchange_key(&self, stored: &mut Contact, exchanged: &Contact) -> VauchiResult<()> {
+        let shared = exchanged.shared_key().ok_or_else(|| {
+            VauchiError::InvalidState("An exchanged contact has a shared key".into())
+        })?;
+        stored
+            .adopt_exchange_shared_key(shared.clone(), self.clock.unix_seconds())
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))
     }
 
     fn restored_waiting_for_rekey(&self, contact_id: &str) -> VauchiResult<bool> {

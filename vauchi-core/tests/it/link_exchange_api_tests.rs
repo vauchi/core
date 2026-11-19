@@ -80,15 +80,70 @@ fn a_shared_link_accepted_by_the_peer_completes_on_both_sides() {
         progress,
         [
             LinkExchangeProgress::Completed {
-                contact_id: contact_id(&bob)
+                contact_id: contact_id(&bob),
+                already_held: false,
             },
             LinkExchangeProgress::Completed {
-                contact_id: contact_id(&alice)
+                contact_id: contact_id(&alice),
+                already_held: false,
             },
         ]
     );
     assert!(alice.get_contact(&contact_id(&bob)).unwrap().is_some());
     assert!(bob.get_contact(&contact_id(&alice)).unwrap().is_some());
+}
+
+fn exchange_over_a_link(
+    sharer: &vauchi_core::Vauchi,
+    accepter: &vauchi_core::Vauchi,
+) -> [LinkExchangeProgress; 2] {
+    let (link, mut shared) = sharer.start_link_exchange().expect("share");
+    let code = shown_code(&shared);
+    let mut accepted = accepter
+        .accept_link_exchange_with_code(&link, &code)
+        .expect("accept");
+    advance_until_done([(sharer, &mut shared), (accepter, &mut accepted)])
+}
+
+fn key_held(holder: &vauchi_core::Vauchi, of: &vauchi_core::Vauchi) -> Option<[u8; 32]> {
+    holder
+        .get_contact(&contact_id(of))
+        .unwrap()
+        .and_then(|contact| contact.shared_key().map(|key| *key.as_bytes()))
+}
+
+// Over Link only the phone that still holds the contact is told
+// (owner, 2026-11-19, vauchi/private#1285). The phone that lost it saves
+// a contact under a key the holder does not take: the known limit.
+// @internal
+#[test]
+fn a_repeat_link_exchange_tells_the_holder_and_leaves_what_it_holds() {
+    let mock = MockRelay::start();
+    mock.enable_escrow_store();
+    let (alice, _a) = user_at(&mock, "Alice");
+    let (bob, _b) = user_at(&mock, "Bob");
+    exchange_over_a_link(&alice, &bob);
+    let first_key = key_held(&alice, &bob);
+    assert!(bob.remove_contact(&contact_id(&alice)).unwrap());
+
+    let progress = exchange_over_a_link(&alice, &bob);
+
+    assert_eq!(
+        progress,
+        [
+            LinkExchangeProgress::Completed {
+                contact_id: contact_id(&bob),
+                already_held: true,
+            },
+            LinkExchangeProgress::Completed {
+                contact_id: contact_id(&alice),
+                already_held: false,
+            },
+        ]
+    );
+    assert_eq!(key_held(&alice, &bob), first_key);
+    assert_ne!(key_held(&bob, &alice), first_key);
+    assert!(key_held(&bob, &alice).is_some());
 }
 
 // Whoever holds only the link gets no contact and no card, on either side, and

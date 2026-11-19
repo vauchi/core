@@ -20,10 +20,19 @@
  *   - only then CONFIRM: a tag keyed from the transport key over a label,
  *     the transcript (sender then receiver: session ids, ephemerals,
  *     commitment hashes) and both payloads; a side saves on the peer's
- *     CONFIRM and shows DONE, a tag with its own label.
+ *     CONFIRM and shows DONE, a tag with its own label;
+ *   - since vauchi/private#1285 the CONFIRM label also states whether its
+ *     sender already holds the receiver as a contact, and the DONE label
+ *     how the exchange ended there. When one phone holds the other and
+ *     the other says it holds nothing, the holder asks its person; only a
+ *     yes gives the contact this exchange's key, and the phone that lost
+ *     the contact saves it only on the holder's "reconnected" DONE.
  *
  * The attacker controls every channel (the QR is shown on a screen anyone
- * may film). Card validity, self-exchange by a linked device, the rekey
+ * may film). The person at a phone is assumed to say yes only for the
+ * contact who is with them (rule Meet); the model does not prove that
+ * about people. Whether a phone's own statement is true is not modelled
+ * either: a phone may state either holding. Card validity, self-exchange by a linked device, the rekey
  * deferral and reciprocity are outside this model (reciprocity.spthy);
  * the lost last frame is liveness, not safety: a phone may save while its
  * peer never does, and no lemma here claims otherwise.
@@ -37,6 +46,15 @@
  *                            a side save while its peer rejected it
  *   -DNO_LABEL               peer_saved_is_true: CONFIRM and DONE share
  *                            one tag shape, so a CONFIRM reads as DONE
+ *   -DREKEY_WITHOUT_ASKING   a_key_changes_only_after_a_yes: the holder
+ *                            takes the new key on the peer's statement
+ *   -DSTATEMENT_IN_CLEAR     the_question_follows_the_peers_own_statement:
+ *                            the holding travels beside the tag, not under
+ *                            it, so anyone can change it
+ *   -DDONE_LABELS_SHARED     a_waiting_phone_saves_only_after_the_holders_yes:
+ *                            every ending has one done label, so a "kept"
+ *                            reads as "reconnected"
+ *   -DNO_PAYLOAD_SIG         also a_rekey_is_with_the_contacts_own_session
  * ADR-071 rebind (-DREBIND): the safety lemmas must stay verified with up
  *   to two bindings of one advertisement (executable is not run there).
  * Defence in depth (must stay verified):
@@ -50,6 +68,19 @@ begin
 builtins: diffie-hellman, signing, hashing, symmetric-encryption, multiset
 
 functions: mac/2
+
+/* The labels under the tags. Two controls take the statement out of one:
+   -DSTATEMENT_IN_CLEAR leaves the holding beside the confirm tag, and
+   -DDONE_LABELS_SHARED gives every ending the same done label. */
+#ifdef STATEMENT_IN_CLEAR
+macros: cnflab(x) = 'CNF', donlab(x) = <'DON', x>
+#endif
+#ifdef DONE_LABELS_SHARED
+macros: cnflab(x) = <'CNF', x>, donlab(x) = 'DON'
+#endif
+#ifdef not STATEMENT_IN_CLEAR & not DONE_LABELS_SHARED
+macros: cnflab(x) = <'CNF', x>, donlab(x) = <'DON', x>
+#endif
 
 restriction Equality:
   "All x y #i. Eq(x, y) @ i ==> x = y"
@@ -178,14 +209,15 @@ rule Verify_and_confirm:
   in
   [ St_reveal($A, ltk, sid, e, rk, pl, c, ch, relay,
               sid_b, epk_b, ch_b, relay_b, tk, c_b)
-  , In(<'REVEAL', sid_b, rk_b>) ]
+  , In(<'REVEAL', sid_b, rk_b>), In(hold) ]
   --[ Eq(ch_b, h(<c_b, relay_b>))
     , Neq(pk_b, pk(ltk))
     , Accepted($A, pk(ltk), pk_b, sid, sid_b, card_b)
+    , Stated($A, pk(ltk), pk_b, sid, sid_b, hold)
     ]->
   [ St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
-                 pk_b, card_b, pl_b, k)
-  , Out(<'CONFIRM', sid, mac(k, <'CNF', tr_out, h(pl), h(pl_b)>)>) ]
+                 pk_b, card_b, pl_b, k, hold)
+  , Out(<'CONFIRM', sid, hold, mac(k, <cnflab(hold), tr_out, h(pl), h(pl_b)>)>) ]
 #endif
 #ifdef CONFIRM_BEFORE_VERIFY
 rule Verify_and_confirm:
@@ -217,28 +249,29 @@ rule Verify_and_confirm:
   in
   [ St_reveal($A, ltk, sid, e, rk, pl, c, ch, relay,
               sid_b, epk_b, ch_b, relay_b, tk, c_b)
-  , In(<'REVEAL', sid_b, rk_b>) ]
+  , In(<'REVEAL', sid_b, rk_b>), In(hold) ]
   --[ Eq(ch_b, h(<c_b, relay_b>))
     , Eq(verify(sig_b, signed_b, pk_b), true)
     , Neq(pk_b, pk(ltk))
     , Accepted($A, pk(ltk), pk_b, sid, sid_b, card_b)
+    , Stated($A, pk(ltk), pk_b, sid, sid_b, hold)
     ]->
   [ St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
-                 pk_b, card_b, pl_b, k)
-  , Out(<'CONFIRM', sid, mac(k, <'CNF', tr_out, h(pl), h(pl_b)>)>) ]
+                 pk_b, card_b, pl_b, k, hold)
+  , Out(<'CONFIRM', sid, hold, mac(k, <cnflab(hold), tr_out, h(pl), h(pl_b)>)>) ]
 #endif
 
 /* The tag a peer sends us: sender first in the transcript. */
 #ifdef LEGACY_TAG
 rule Save_on_confirm:
   [ St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
-                 pk_b, card_b, pl_b, k)
-  , In(<'CONFIRM', sid_b, t>) ]
+                 pk_b, card_b, pl_b, k, hold)
+  , In(<'CONFIRM', sid_b, hold_b, t>) ]
   --[ Eq(t, h(<h(pl_b), sid + sid_b>))
     , Saved($A, pk(ltk), pk_b, sid, sid_b, card_b)
     ]->
   [ St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
-  , Out(<'DONE', sid, h(<h(pl), sid + sid_b>)>) ]
+  , Out(<'DONE', sid, 'sv_n', h(<h(pl), sid + sid_b>)>) ]
 #endif
 #ifdef NO_LABEL
 rule Save_on_confirm:
@@ -246,13 +279,13 @@ rule Save_on_confirm:
       tr_out = <sid, sid_b, epk, epk_b, ch, ch_b>
   in
   [ St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
-                 pk_b, card_b, pl_b, k)
-  , In(<'CONFIRM', sid_b, t>) ]
-  --[ Eq(t, mac(k, <'CNF', tr_in, h(pl_b), h(pl)>))
+                 pk_b, card_b, pl_b, k, hold)
+  , In(<'CONFIRM', sid_b, hold_b, t>) ]
+  --[ Eq(t, mac(k, <<'CNF', hold_b>, tr_in, h(pl_b), h(pl)>))
     , Saved($A, pk(ltk), pk_b, sid, sid_b, card_b)
     ]->
   [ St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
-  , Out(<'DONE', sid, mac(k, <'CNF', tr_out, h(pl), h(pl_b)>)>) ]
+  , Out(<'DONE', sid, 'sv_n', mac(k, <<'CNF', hold>, tr_out, h(pl), h(pl_b)>)>) ]
 #endif
 #ifdef CONFIRM_BEFORE_VERIFY
 /* v2: the peer's tag covers only its own payload. */
@@ -270,28 +303,145 @@ rule Save_on_confirm:
   , Out(<'DONE', sid, mac(k, <'DON', tr_out, h(pl), h(pl_b)>)>) ]
 #endif
 #ifdef not LEGACY_TAG & not NO_LABEL & not CONFIRM_BEFORE_VERIFY
-rule Save_on_confirm:
+/* A confirm states whether its sender already holds the receiver
+   (vauchi/private#1285). In the protocol the statement is the tag's label
+   and the frame does not carry it: the reader tries both labels. Here it
+   travels beside the tag so the rules can match on it; what is modelled
+   is that the tag covers it. Four cases follow from the two statements. */
+
+/* Neither holds the other: a first meeting. */
+rule Save_first_meeting:
   let tr_in = <sid_b, sid, epk_b, epk, ch_b, ch>
       tr_out = <sid, sid_b, epk, epk_b, ch, ch_b>
   in
   [ St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
-                 pk_b, card_b, pl_b, k)
-  , In(<'CONFIRM', sid_b, t>) ]
-  --[ Eq(t, mac(k, <'CNF', tr_in, h(pl_b), h(pl)>))
+                 pk_b, card_b, pl_b, k, 'none')
+  , In(<'CONFIRM', sid_b, 'none', t>) ]
+  --[ Eq(t, mac(k, <cnflab('none'), tr_in, h(pl_b), h(pl)>))
     , Saved($A, pk(ltk), pk_b, sid, sid_b, card_b)
     ]->
   [ St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
-  , Out(<'DONE', sid, mac(k, <'DON', tr_out, h(pl), h(pl_b)>)>) ]
+  , Out(<'DONE', sid, 'sv_n', mac(k, <donlab('sv_n'), tr_out, h(pl), h(pl_b)>)>) ]
+
+/* Both hold each other: the card is refreshed and no key changes. */
+rule Refresh_when_both_hold:
+  let tr_in = <sid_b, sid, epk_b, epk, ch_b, ch>
+      tr_out = <sid, sid_b, epk, epk_b, ch, ch_b>
+  in
+  [ St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
+                 pk_b, card_b, pl_b, k, 'held')
+  , In(<'CONFIRM', sid_b, 'held', t>) ]
+  --[ Eq(t, mac(k, <cnflab('held'), tr_in, h(pl_b), h(pl)>))
+    , Refreshed($A, pk(ltk), pk_b, sid, sid_b)
+    ]->
+  [ St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  , Out(<'DONE', sid, 'sv_h', mac(k, <donlab('sv_h'), tr_out, h(pl), h(pl_b)>)>) ]
+
+/* This phone holds the peer and the peer says it holds nothing: the
+   phone asks its person. */
+rule Ask_the_person:
+  let tr_in = <sid_b, sid, epk_b, epk, ch_b, ch>
+      tr_out = <sid, sid_b, epk, epk_b, ch, ch_b>
+  in
+  [ St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
+                 pk_b, card_b, pl_b, k, 'held')
+  , In(<'CONFIRM', sid_b, 'none', t>) ]
+  --[ Eq(t, mac(k, <cnflab('none'), tr_in, h(pl_b), h(pl)>))
+    , Asked($A, pk(ltk), pk_b, sid, sid_b)
+    ]->
+  [ St_asking($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, card_b, pl_b, k) ]
+
+/* The person at a phone is with somebody, and says yes only for the
+   contact who is with them. */
+rule Meet:
+  [ !Pk($B, pk_b) ]
+  --[ Together($A, $B) ]->
+  [ !With($A, pk_b) ]
+
+rule Person_says_yes:
+  [ St_asking($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, card_b, pl_b, k), !With($A, pk_b) ]
+  --[ SaidYes($A, pk(ltk), pk_b, sid) ]->
+  [ St_yes($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, card_b, pl_b, k) ]
+
+rule Rekey_after_the_yes:
+  let tr_in = <sid_b, sid, epk_b, epk, ch_b, ch>
+      tr_out = <sid, sid_b, epk, epk_b, ch, ch_b>
+  in
+  [ St_yes($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, card_b, pl_b, k) ]
+  --[ Rekeyed($A, pk(ltk), pk_b, sid, sid_b, card_b) ]->
+  [ St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  , Out(<'DONE', sid, 'reco', mac(k, <donlab('reco'), tr_out, h(pl), h(pl_b)>)>) ]
+
+rule Person_says_no:
+  let tr_in = <sid_b, sid, epk_b, epk, ch_b, ch>
+      tr_out = <sid, sid_b, epk, epk_b, ch, ch_b>
+  in
+  [ St_asking($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, card_b, pl_b, k) ]
+  --[ Kept($A, pk(ltk), pk_b, sid, sid_b) ]->
+  [ St_kept($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  , Out(<'DONE', sid, 'kp_h', mac(k, <donlab('kp_h'), tr_out, h(pl), h(pl_b)>)>) ]
+
+/* This phone holds nothing and the peer says it holds this phone: it
+   saves nothing and waits for the peer's done. */
+rule Wait_for_the_holder:
+  let tr_in = <sid_b, sid, epk_b, epk, ch_b, ch>
+      tr_out = <sid, sid_b, epk, epk_b, ch, ch_b>
+  in
+  [ St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
+                 pk_b, card_b, pl_b, k, 'none')
+  , In(<'CONFIRM', sid_b, 'held', t>) ]
+  --[ Eq(t, mac(k, <cnflab('held'), tr_in, h(pl_b), h(pl)>))
+    , Waiting($A, pk(ltk), pk_b, sid, sid_b)
+    ]->
+  [ St_waiting($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, card_b, pl_b, k) ]
+
+rule Save_after_the_holders_yes:
+  let tr_in = <sid_b, sid, epk_b, epk, ch_b, ch>
+      tr_out = <sid, sid_b, epk, epk_b, ch, ch_b>
+  in
+  [ St_waiting($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, card_b, pl_b, k)
+  , In(<'DONE', sid_b, 'reco', t>) ]
+  --[ Eq(t, mac(k, <donlab('reco'), tr_in, h(pl_b), h(pl)>))
+    , Saved($A, pk(ltk), pk_b, sid, sid_b, card_b)
+    , SavedAfterYes($A, pk(ltk), pk_b, sid, sid_b)
+    ]->
+  [ St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  , Out(<'DONE', sid, 'sv_n', mac(k, <donlab('sv_n'), tr_out, h(pl), h(pl_b)>)>) ]
+
+rule Save_nothing_after_the_holders_no:
+  let tr_in = <sid_b, sid, epk_b, epk, ch_b, ch>
+      tr_out = <sid, sid_b, epk, epk_b, ch, ch_b>
+  in
+  [ St_waiting($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, card_b, pl_b, k)
+  , In(<'DONE', sid_b, 'kp_h', t>) ]
+  --[ Eq(t, mac(k, <donlab('kp_h'), tr_in, h(pl_b), h(pl)>))
+    , Kept($A, pk(ltk), pk_b, sid, sid_b)
+    ]->
+  [ St_kept($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  , Out(<'DONE', sid, 'kp_n', mac(k, <donlab('kp_n'), tr_out, h(pl), h(pl_b)>)>) ]
 #endif
 
-/* A saved phone reads the peer's DONE: the peer has saved too. */
+#ifdef REKEY_WITHOUT_ASKING
+/* Control: the holder takes the new key on the peer's statement alone. */
+rule Rekey_on_the_statement:
+  let tr_in = <sid_b, sid, epk_b, epk, ch_b, ch>
+      tr_out = <sid, sid_b, epk, epk_b, ch, ch_b>
+  in
+  [ St_asking($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, card_b, pl_b, k) ]
+  --[ Rekeyed($A, pk(ltk), pk_b, sid, sid_b, card_b) ]->
+  [ St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  , Out(<'DONE', sid, 'reco', mac(k, <donlab('reco'), tr_out, h(pl), h(pl_b)>)>) ]
+#endif
+
+/* A phone that holds its peer reads the peer's DONE: under three of the
+   labels the peer holds this phone too. */
 #ifdef NO_LABEL
 rule Read_done:
   let tr_in = <sid_b, sid, epk_b, epk, ch_b, ch>
   in
   [ St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
-  , In(<'DONE', sid_b, t>) ]
-  --[ Eq(t, mac(k, <'CNF', tr_in, h(pl_b), h(pl)>))
+  , In(<'DONE', sid_b, lab, t>), In(x) ]
+  --[ Eq(t, mac(k, <<'CNF', x>, tr_in, h(pl_b), h(pl)>))
     , PeerSaved($A, pk(ltk), pk_b, sid, sid_b)
     ]->
   [ ]
@@ -300,12 +450,20 @@ rule Read_done:
   let tr_in = <sid_b, sid, epk_b, epk, ch_b, ch>
   in
   [ St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
-  , In(<'DONE', sid_b, t>) ]
-  --[ Eq(t, mac(k, <'DON', tr_in, h(pl_b), h(pl)>))
+  , In(<'DONE', sid_b, lab, t>) ]
+  --[ Eq(t, mac(k, <donlab(lab), tr_in, h(pl_b), h(pl)>))
+    , HoldsLabel(lab)
     , PeerSaved($A, pk(ltk), pk_b, sid, sid_b)
     ]->
   [ ]
 #endif
+
+restriction A_holding_is_held_or_none:
+  "All A pka pkb sa sb x #i. Stated(A, pka, pkb, sa, sb, x) @ i
+     ==> x = 'held' | x = 'none'"
+
+restriction Labels_that_mean_the_peer_holds_us:
+  "All l #i. HoldsLabel(l) @ i ==> l = 'sv_n' | l = 'sv_h' | l = 'reco'"
 
 /* Two honest phones can both save each other. */
 lemma executable:
@@ -338,6 +496,51 @@ lemma peer_saved_is_true:
   "All A B pka pkb sa sb #i #r.
      PeerSaved(A, pka, pkb, sa, sb) @ i & Identity(B, pkb) @ r
      ==> (Ex ca #j. Saved(B, pkb, pka, sb, sa, ca) @ j & j < i)
+         | (Ex #j. Refreshed(B, pkb, pka, sb, sa) @ j & j < i)
+         | (Ex ca #j. Rekeyed(B, pkb, pka, sb, sa, ca) @ j & j < i)
+         | (Ex #l. RevealIdentity(B) @ l & l < i)"
+
+/* A holder and a phone that lost it can reconnect: the holder's person
+   says yes, the holder takes the new key and the other phone saves. */
+lemma a_reconnect_is_possible:
+  exists-trace
+  "Ex A B pka pkb sa sb cb #i #j.
+     Rekeyed(A, pka, pkb, sa, sb, cb) @ i & SavedAfterYes(B, pkb, pka, sb, sa) @ j
+     & not (Ex P #r. RevealIdentity(P) @ r)"
+
+/* A contact's key changes only after its person said yes, to a peer
+   whose payload this phone accepted for that identity. */
+// @claim: S19
+lemma a_key_changes_only_after_a_yes:
+  "All A pka pkb sa sb card #i.
+     Rekeyed(A, pka, pkb, sa, sb, card) @ i
+     ==> (Ex #j. SaidYes(A, pka, pkb, sa) @ j & j < i)
+         & (Ex #k. Accepted(A, pka, pkb, sa, sb, card) @ k & k < i)"
+
+/* The new key is that of a session the contact's own identity opened. */
+// @claim: S19
+lemma a_rekey_is_with_the_contacts_own_session:
+  "All A B pka pkb sa sb card #i #r.
+     Rekeyed(A, pka, pkb, sa, sb, card) @ i & Identity(B, pkb) @ r
+     ==> (Ex #j. Started(B, pkb, sb, card) @ j)
+         | (Ex #l. RevealIdentity(B) @ l & l < i)"
+
+/* A phone asks its person only when the peer itself said it holds
+   nothing: nobody else can make the question appear. */
+// @claim: S19
+lemma the_question_follows_the_peers_own_statement:
+  "All A B pka pkb sa sb #i #r.
+     Asked(A, pka, pkb, sa, sb) @ i & Identity(B, pkb) @ r
+     ==> (Ex #j. Stated(B, pkb, pka, sb, sa, 'none') @ j & j < i)
+         | (Ex #l. RevealIdentity(B) @ l & l < i)"
+
+/* The phone that lost the contact saves only after the holder's person
+   said yes. */
+// @claim: S19
+lemma a_waiting_phone_saves_only_after_the_holders_yes:
+  "All A B pka pkb sa sb #i #r.
+     SavedAfterYes(A, pka, pkb, sa, sb) @ i & Identity(B, pkb) @ r
+     ==> (Ex #j. SaidYes(B, pkb, pka, sb) @ j & j < i)
          | (Ex #l. RevealIdentity(B) @ l & l < i)"
 
 end

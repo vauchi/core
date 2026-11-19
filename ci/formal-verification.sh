@@ -247,7 +247,11 @@ tamarin_expect "$models/qr_exchange.spthy" falsified "-DNO_IDENTITY_BINDING" \
 # peer's DONE means it saved. Each control removes one mechanism; the
 # controls and the ADR-071 rebind run one lemma per prover run.
 tamarin_expect "$models/multistage_exchange.spthy" verified "" \
-    executable card_authentic peer_accepted_before_save peer_saved_is_true
+    executable card_authentic peer_accepted_before_save peer_saved_is_true \
+    a_reconnect_is_possible a_key_changes_only_after_a_yes \
+    a_rekey_is_with_the_contacts_own_session \
+    the_question_follows_the_peers_own_statement \
+    a_waiting_phone_saves_only_after_the_holders_yes
 tamarin_lemma_expect "$models/multistage_exchange.spthy" card_authentic \
     falsified "-DNO_PAYLOAD_SIG"
 tamarin_lemma_expect "$models/multistage_exchange.spthy" peer_accepted_before_save \
@@ -259,7 +263,21 @@ tamarin_lemma_expect "$models/multistage_exchange.spthy" peer_saved_is_true \
 # Accepting IN3D again does not break the keyed confirm (defence in depth).
 tamarin_lemma_expect "$models/multistage_exchange.spthy" peer_accepted_before_save \
     verified "-DACCEPT_IN3D"
-for l in card_authentic peer_accepted_before_save peer_saved_is_true; do
+# A repeat exchange (#1285): a contact's key changes only after its person
+# said yes, the question follows the peer's own statement, and the phone
+# that lost the contact saves only after that yes. One control each.
+tamarin_lemma_expect "$models/multistage_exchange.spthy" a_key_changes_only_after_a_yes \
+    falsified "-DREKEY_WITHOUT_ASKING"
+tamarin_lemma_expect "$models/multistage_exchange.spthy" the_question_follows_the_peers_own_statement \
+    falsified "-DSTATEMENT_IN_CLEAR"
+tamarin_lemma_expect "$models/multistage_exchange.spthy" a_waiting_phone_saves_only_after_the_holders_yes \
+    falsified "-DDONE_LABELS_SHARED"
+tamarin_lemma_expect "$models/multistage_exchange.spthy" a_rekey_is_with_the_contacts_own_session \
+    falsified "-DNO_PAYLOAD_SIG"
+for l in card_authentic peer_accepted_before_save peer_saved_is_true \
+    a_key_changes_only_after_a_yes a_rekey_is_with_the_contacts_own_session \
+    the_question_follows_the_peers_own_statement \
+    a_waiting_phone_saves_only_after_the_holders_yes; do
     tamarin_lemma_expect "$models/multistage_exchange.spthy" "$l" verified "-DREBIND"
 done
 tamarin_expect "$models/device_link.spthy" verified "" \

@@ -1327,6 +1327,37 @@ test:e2e-smoke:
           - vauchi-protocol/**/*
           - Cargo.lock
 
+# The same clone-and-attribute shape as test:e2e-smoke, for the journeys
+# that drive a binary running the app engine (ci/e2e-tui-journey.sh).
+test:e2e-tui-journey:
+  extends: [.linux-runner, .timeout-cold-rebuild]
+  stage: test
+  needs: []
+  allow_failure:
+    exit_codes: [3]
+  variables:
+    E2E_DIR: ${CI_PROJECT_DIR}/../e2e-tui-for-core-${CI_JOB_ID}
+    TARGET_CORE_DIR: ${CI_PROJECT_DIR}/../core-tui-target-${CI_JOB_ID}
+  script:
+    - git clone --depth=1 "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/e2e.git" "$E2E_DIR"
+    - git clone --depth=1 --branch "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/core.git" "$TARGET_CORE_DIR"
+    - sh ci/e2e-tui-journey.sh "$E2E_DIR" "$CI_PROJECT_DIR" "$TARGET_CORE_DIR"
+  after_script:
+    - rm -rf "${CI_PROJECT_DIR}/../e2e-tui-for-core-${CI_JOB_ID}" "${CI_PROJECT_DIR}/../core-tui-target-${CI_JOB_ID}"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - vauchi-app/src/**/*
+          - vauchi-core/src/api/**/*
+          - vauchi-core/src/exchange/**/*
+          - vauchi-core/src/network/**/*
+          - vauchi-core/src/sync/**/*
+          - vauchi-protocol/**/*
+          - ci/e2e-tui-journey.sh
+          - Cargo.lock
+
 test:cucumber:
   extends: [.run-archive, .validation-rust]
   allow_failure: false

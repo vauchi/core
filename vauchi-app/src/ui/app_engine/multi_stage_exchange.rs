@@ -48,6 +48,13 @@ use vauchi_core::exchange::LinkFeedback;
 use vauchi_core::exchange::MultiStageSession;
 use vauchi_core::exchange::mode::ExchangeMode;
 
+/// What a finalized exchange gives this phone to save.
+struct ExchangeMaterial {
+    contact: vauchi_core::Contact,
+    ratchet: Option<(vauchi_core::crypto::DoubleRatchetState, bool)>,
+    saved: SavedExchange,
+}
+
 /// What the success screen needs from a contact just saved.
 struct SavedExchange {
     contact_id: String,
@@ -450,6 +457,18 @@ impl AppEngine {
     /// (vauchi/private#1217). The identity saved is the one the peer's
     /// payload signature verified for, never a self-asserted one.
     fn persist_exchanged_contact(&mut self) -> Option<SavedExchange> {
+        let ExchangeMaterial {
+            contact,
+            ratchet,
+            saved,
+        } = self.finalized_exchange_material()?;
+        self.save_exchange_material(&contact, ratchet)?;
+        Some(saved)
+    }
+
+    /// The contact, ratchet and success-screen content a finalized
+    /// exchange gives this phone, before anything is saved.
+    fn finalized_exchange_material(&self) -> Option<ExchangeMaterial> {
         // Copy the peer off under a short borrow so the `self.vauchi`
         // persistence calls below don't fight the borrow.
         let Some((peer, transport_key)) = self.multi_stage_session.as_ref().and_then(|h| {
@@ -517,6 +536,25 @@ impl AppEngine {
                 built
             }
         };
+        Some(ExchangeMaterial {
+            contact,
+            ratchet,
+            saved: SavedExchange {
+                contact_id,
+                peer_name,
+                received_fields,
+            },
+        })
+    }
+
+    /// Saves a finalized exchange's contact by the rule for a phone that
+    /// was not asked anything: a new contact is stored with its key, an
+    /// existing one keeps its key. `None` when nothing was saved.
+    fn save_exchange_material(
+        &mut self,
+        contact: &vauchi_core::Contact,
+        ratchet: Option<(vauchi_core::crypto::DoubleRatchetState, bool)>,
+    ) -> Option<()> {
         // Upsert + rekey via the unified core routine so a REPEAT multi-stage
         // exchange updates the peer's card and rekeys, instead of silently
         // dropping it: the old `add_contact` rejected the duplicate id and
@@ -530,11 +568,11 @@ impl AppEngine {
         let persisted = match ratchet {
             Some((ratchet, is_initiator)) if peer_saved => {
                 self.vauchi
-                    .save_exchanged_contact(&contact, &ratchet, is_initiator)
+                    .save_exchanged_contact(contact, &ratchet, is_initiator)
             }
             Some((ratchet, is_initiator)) => self
                 .vauchi
-                .save_exchanged_contact_before_peer_saved(&contact, &ratchet, is_initiator)
+                .save_exchanged_contact_before_peer_saved(contact, &ratchet, is_initiator)
                 .map(|awaiting| {
                     if awaiting && let Some(holder) = self.multi_stage_session.as_mut() {
                         holder.rekey_awaiting_peer = Some(contact.clone());
@@ -542,7 +580,7 @@ impl AppEngine {
                 }),
             // No session ratchet at completion — upsert the card alone; the
             // channel can't be (re)keyed without the session.
-            None => self.vauchi.save_exchanged_card(&contact),
+            None => self.vauchi.save_exchanged_card(contact),
         };
         if let Err(e) = persisted {
             tracing::warn!("multi-stage: failed to persist exchanged contact: {e}");
@@ -552,11 +590,7 @@ impl AppEngine {
         // SKIP logs above so a device run shows definitively whether each side
         // saved the exchanged contact (2026-07-25 Samsung half-exchange).
         tracing::info!("[MSX] persist OK: exchanged contact saved");
-        Some(SavedExchange {
-            contact_id,
-            peer_name,
-            received_fields,
-        })
+        Some(())
     }
 
     /// A restored contact saved before the peer's DONE adopts the

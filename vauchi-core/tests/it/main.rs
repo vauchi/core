@@ -526,6 +526,7 @@ mod relay_proptests;
 mod relay_purge_tests;
 mod relay_simulation_tests;
 mod relay_url_validator_tests;
+mod repeat_exchange_reconnect_tests;
 mod repeat_exchange_rekey_tests;
 mod replay_detection_api_tests;
 mod replay_detection_tests;

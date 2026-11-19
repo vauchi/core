@@ -74,6 +74,10 @@ const DATA_FRAME_AD_DOMAIN: &[u8] = b"vauchi-multistage-data-v4";
 /// immediately (save on Finalized) while the code stays up in the
 /// background.
 const FINALIZED_GRACE_DURATION: Duration = Duration::from_secs(60);
+/// How long a finalized phone keeps showing its confirm while a person is
+/// asked whether to reconnect (vauchi/private#1285). The app ends the
+/// question at 120 s; this is the session's own stop if the app never does.
+const DECISION_CEILING: Duration = Duration::from_secs(150);
 
 /// How long a saved phone shows BOTH, so its peer can read it and stop too
 /// (design D6, maintainer 2026-10-01).
@@ -533,16 +537,33 @@ impl MultiStageSession {
         self.peer_ending
     }
 
-    fn stated_holding(&self) -> Option<Holding> {
+    /// What this phone stated it holds for the peer, once it did.
+    pub fn own_holding(&self) -> Option<Holding> {
         self.own_holding
             .or_else(|| self.own_identity.is_none().then_some(Holding::Nothing))
+    }
+
+    /// One phone holds the other and the other holds nothing: a person is
+    /// asked before either saves, so the ending takes longer than a save.
+    fn awaits_a_decision(&self) -> bool {
+        self.ending.is_none()
+            && matches!(
+                (self.own_holding(), self.peer_holding),
+                (Some(own), Some(peer)) if own != peer
+            )
     }
 
     fn end_with(&mut self, ending: impl FnOnce(Holding) -> Option<Ending>) -> bool {
         if !matches!(self.state, ProtocolState::Finalized) || self.ending.is_some() {
             return false;
         }
-        self.ending = self.stated_holding().and_then(ending);
+        let decided_late = self.awaits_a_decision();
+        self.ending = self.own_holding().and_then(ending);
+        if self.ending.is_some() && decided_late {
+            // The peer has waited for a person, not for a save: it gets the
+            // full grace to read the DONE from now, not from Finalized.
+            self.phase_entered_at = Some(self.monotonic.now());
+        }
         self.ending.is_some()
     }
 
@@ -1424,7 +1445,12 @@ impl MultiStageSession {
                 // ceiling for a peer that never answers.
                 let now = self.monotonic.now();
                 let entered = *self.phase_entered_at.get_or_insert(now);
-                if self.peer_showed_both || now.duration_since(entered) > FINALIZED_GRACE_DURATION {
+                let ceiling = if self.awaits_a_decision() {
+                    DECISION_CEILING
+                } else {
+                    FINALIZED_GRACE_DURATION
+                };
+                if self.peer_showed_both || now.duration_since(entered) > ceiling {
                     return None;
                 }
                 if self.peer_ending.is_some() && self.ending.is_some() {
@@ -1863,7 +1889,7 @@ impl MultiStageSession {
         // phone has stated it, so the app can act on both statements.
         if !matches!(self.state, ProtocolState::Confirming)
             || self.accel_proximity == AccelerometerProximityState::Listening
-            || self.stated_holding().is_none()
+            || self.own_holding().is_none()
         {
             return;
         }
@@ -2264,7 +2290,7 @@ impl MultiStageSession {
             self.own_tag(TagLabel::Done(ending))
                 .map(|tag| qr_codec::format_done_qr(&self.session_id, reveal_key, &tag))
         } else {
-            self.stated_holding()
+            self.own_holding()
                 .and_then(|holding| self.own_tag(TagLabel::Confirm(holding)))
                 .map(|tag| qr_codec::format_final_qr(&self.session_id, reveal_key, &tag))
         }

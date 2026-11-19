@@ -55,8 +55,13 @@ use crate::ui::*;
 mod camera_gate;
 use camera_gate::CameraGate;
 
+#[path = "multi_stage_exchange_reconnect.rs"]
+mod reconnect;
 #[path = "multi_stage_exchange_terminal_screens.rs"]
 mod terminal_screens;
+pub use reconnect::{
+    RECONNECT_ACCEPT_ACTION_ID, RECONNECT_DECLINE_ACTION_ID, RepeatEnding, RepeatExchange,
+};
 
 pub(crate) use crate::ui::multi_stage_status::own_qr_label;
 use crate::ui::multi_stage_status::{saved_label, with_confirmation};
@@ -209,6 +214,12 @@ pub struct MultiStageExchangeEngine {
     /// The other phone said it saved too (DONE or BOTH read); pushed with
     /// `link_feedback` (plan 5.3).
     peer_confirmed: bool,
+    /// A repeat exchange whose two phones hold different things for each
+    /// other: the question, the wait or an ending without a new
+    /// connection (vauchi/private#1285). `None` for every other exchange.
+    repeat: Option<RepeatExchange>,
+    /// The person's answer to the reconnect question, latched.
+    reconnect_answer: Option<bool>,
     locale: Locale,
 }
 
@@ -237,6 +248,8 @@ impl MultiStageExchangeEngine {
             stalled: false,
             link_feedback: LinkFeedback::default(),
             peer_confirmed: false,
+            repeat: None,
+            reconnect_answer: None,
             locale: Locale::ENGLISH,
         }
     }
@@ -282,6 +295,8 @@ impl MultiStageExchangeEngine {
             stalled: false,
             link_feedback: LinkFeedback::default(),
             peer_confirmed: false,
+            repeat: None,
+            reconnect_answer: None,
             locale: Locale::ENGLISH,
         }
     }
@@ -311,6 +326,8 @@ impl MultiStageExchangeEngine {
             stalled: false,
             link_feedback: LinkFeedback::default(),
             peer_confirmed: false,
+            repeat: None,
+            reconnect_answer: None,
             locale: Locale::ENGLISH,
         }
     }
@@ -548,6 +565,14 @@ impl MultiStageExchangeEngine {
         // and success-pending phase, so this cannot shadow those screens.
         if self.stalled {
             return self.build_stalled_screen(title);
+        }
+        if let Some(repeat) = self.repeat
+            && matches!(
+                self.state,
+                ProtocolState::Finalized | ProtocolState::Complete | ProtocolState::RetryReady
+            )
+        {
+            return self.build_repeat_screen(title, repeat);
         }
         match &self.state {
             ProtocolState::Failed(reason) => self.build_failed_screen(title, reason),
@@ -823,6 +848,7 @@ impl WorkflowEngine for MultiStageExchangeEngine {
     fn engine_output(&self) -> Option<EngineOutput> {
         Some(EngineOutput::MultiStageExchange {
             hover_mode: self.is_hover_mode(),
+            reconnect_answer: self.reconnect_answer(),
         })
     }
 
@@ -841,6 +867,7 @@ impl WorkflowEngine for MultiStageExchangeEngine {
             MultiStageUpdate::Stalled(stalled) => self.set_stalled(stalled),
             MultiStageUpdate::LinkFeedback(feedback) => self.set_link_feedback(feedback),
             MultiStageUpdate::PeerConfirmed(confirmed) => self.set_peer_confirmed(confirmed),
+            MultiStageUpdate::Repeat(repeat) => self.set_repeat(repeat),
         }
         true
     }
@@ -872,6 +899,8 @@ impl WorkflowEngine for MultiStageExchangeEngine {
                 ActionResult::Complete
             }
             DONE_ACTION_ID => ActionResult::Complete,
+            RECONNECT_ACCEPT_ACTION_ID => self.answer_reconnect(true),
+            RECONNECT_DECLINE_ACTION_ID => self.answer_reconnect(false),
             RETRY_ACTION_ID => {
                 // Retry returns to the exchange mode-selection picker
                 // (AppScreen::Exchange) so the user can re-choose how to

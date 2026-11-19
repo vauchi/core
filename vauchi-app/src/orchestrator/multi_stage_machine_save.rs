@@ -7,8 +7,8 @@
 //! `multi_stage_machine.rs` is at the file-size limit (VRS04); loaded via
 //! `#[path]` from the parent.
 
-use vauchi_core::exchange::Holding;
 use vauchi_core::exchange::PeerPayload;
+use vauchi_core::exchange::{Ending, Holding};
 
 use super::MultiStageMachine;
 
@@ -31,9 +31,36 @@ impl MultiStageMachine {
         self.inner.state_holding(holding);
     }
 
+    /// What this phone stated it holds for the peer, once it did.
+    pub fn own_holding(&self) -> Option<Holding> {
+        self.inner.own_holding()
+    }
+
+    /// What the peer's verified confirm or done said it holds for us.
+    pub fn peer_holding(&self) -> Option<Holding> {
+        self.inner.peer_holding()
+    }
+
+    /// How the exchange ended on the peer's phone, from its verified DONE.
+    pub fn peer_ending(&self) -> Option<Ending> {
+        self.inner.peer_ending()
+    }
+
     /// The contact is saved: from now on this phone shows DONE.
     pub fn mark_saved(&mut self) {
         self.inner.mark_saved();
+    }
+
+    /// The contact this phone held took the exchange's key after its
+    /// person agreed: DONE says "reconnected".
+    pub fn mark_reconnected(&mut self) {
+        self.inner.mark_reconnected();
+    }
+
+    /// Nothing new was saved and the old connection stays: DONE says
+    /// "kept".
+    pub fn mark_kept(&mut self) {
+        self.inner.mark_kept();
     }
 
     /// The contact could not be saved: the exchange fails here, and no

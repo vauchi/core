@@ -27,7 +27,10 @@
 //! reachable from at least one BFS root.
 
 use vauchi_app::ui::testing::{assert_reachability_across_screens, check_reachability};
-use vauchi_app::ui::{MultiStageExchangeEngine, WorkflowEngine};
+use vauchi_app::ui::{
+    EngineOutput, MultiStageExchangeEngine, RepeatEnding, RepeatExchange, UserAction,
+    WorkflowEngine,
+};
 use vauchi_core::Event;
 use vauchi_core::exchange::ProtocolState;
 
@@ -134,4 +137,96 @@ fn no_orphan_handlers_or_affordances_on_permission_screen() {
         report.is_reachable(),
         "permission: unexpected orphans: {report:?}",
     );
+}
+
+/// A finalized repeat exchange in `repeat` (vauchi/private#1285).
+fn repeat_factory(repeat: RepeatExchange, session_ended: bool) -> MultiStageExchangeEngine {
+    let mut e = MultiStageExchangeEngine::new_hover();
+    e.set_state(ProtocolState::Finalized);
+    e.set_finalized("Alice".into());
+    e.set_repeat(Some(repeat));
+    if session_ended {
+        e.set_session_ended();
+    }
+    e
+}
+
+fn reconnect_answer(engine: &MultiStageExchangeEngine) -> Option<bool> {
+    match engine.engine_output() {
+        Some(EngineOutput::MultiStageExchange {
+            reconnect_answer, ..
+        }) => reconnect_answer,
+        other => panic!("not the multi-stage output: {other:?}"),
+    }
+}
+
+fn press(engine: &mut MultiStageExchangeEngine, item: &str) {
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "exchange_actions".into(),
+        item_id: item.into(),
+    });
+}
+
+fn shows(engine: &MultiStageExchangeEngine, id: &str) -> bool {
+    serde_json::to_string(&engine.current_screen())
+        .unwrap()
+        .contains(&format!("\"{id}\""))
+}
+
+// @internal
+#[test]
+fn the_question_and_the_wait_keep_the_exchange_layout_and_add_no_screen_action() {
+    for repeat in [RepeatExchange::Asking, RepeatExchange::Waiting] {
+        assert_reachability_across_screens(move || repeat_factory(repeat, false), ACTIVE_HANDLED);
+        assert!(shows(&repeat_factory(repeat, false), "peer_scan"));
+    }
+}
+
+// @internal
+#[test]
+fn an_ended_repeat_exchange_is_reachable_with_done_once_the_session_ended() {
+    for ending in [
+        RepeatEnding::KeptByYou,
+        RepeatEnding::KeptByThem,
+        RepeatEnding::TimedOut,
+    ] {
+        assert_reachability_across_screens(
+            move || repeat_factory(RepeatExchange::Ended(ending), true),
+            SUCCESS_HANDLED,
+        );
+    }
+}
+
+// @internal
+#[test]
+fn each_answer_the_question_offers_is_taken_in_that_state() {
+    for (item, answer) in [("reconnect_accept", true), ("reconnect_decline", false)] {
+        let mut engine = repeat_factory(RepeatExchange::Asking, false);
+        assert!(shows(&engine, item), "{item} is not offered");
+
+        press(&mut engine, item);
+
+        assert_eq!(reconnect_answer(&engine), Some(answer));
+        assert!(!shows(&engine, "reconnect_accept"));
+        assert!(!shows(&engine, "reconnect_decline"));
+    }
+}
+
+// @internal
+#[test]
+fn an_answer_is_taken_once_and_only_where_the_question_is_shown() {
+    let mut answered = repeat_factory(RepeatExchange::Asking, false);
+    press(&mut answered, "reconnect_decline");
+    press(&mut answered, "reconnect_accept");
+    assert_eq!(reconnect_answer(&answered), Some(false));
+
+    for mut engine in [
+        repeat_factory(RepeatExchange::Waiting, false),
+        repeat_factory(RepeatExchange::Ended(RepeatEnding::KeptByThem), false),
+        success_factory(),
+        idle_factory(),
+    ] {
+        press(&mut engine, "reconnect_accept");
+        assert_eq!(reconnect_answer(&engine), None);
+    }
 }

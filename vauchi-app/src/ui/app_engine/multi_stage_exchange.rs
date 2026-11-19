@@ -74,7 +74,13 @@ pub(crate) struct MultiStageHolder {
     /// A restored contact saved before the peer's DONE was read, still
     /// waiting for its rekey: it adopts the exchange's key once DONE is.
     rekey_awaiting_peer: Option<vauchi_core::Contact>,
+    /// A finalized repeat exchange that waits for a person before either
+    /// phone saves (vauchi/private#1285).
+    repeat: Option<reconnect::RepeatWait>,
 }
+
+#[path = "multi_stage_reconnect.rs"]
+mod reconnect;
 
 impl AppEngine {
     /// Build / cancel the multi-stage machine on entry / exit of the
@@ -132,6 +138,7 @@ impl AppEngine {
             machine,
             last_frame_ms: None,
             rekey_awaiting_peer: None,
+            repeat: None,
         });
         // Build our QR now rather than on the next heartbeat. Until it exists
         // the machine is still `Idle`, and `handle_init` accepts a peer INIT
@@ -180,7 +187,8 @@ impl AppEngine {
         let link_changed =
             self.apply_multi_stage_link_feedback(link) | self.apply_multi_stage_peer_confirmed();
         let event_changed = self.apply_multi_stage_event(event);
-        stalled_changed || link_changed || event_changed
+        let repeat_changed = self.resolve_repeat_exchange();
+        stalled_changed || link_changed || event_changed || repeat_changed
     }
 
     /// Translate a frontend-emitted [`vauchi_core::Event`] into a
@@ -279,6 +287,9 @@ impl AppEngine {
                 self.apply_multi_stage_state(vauchi_core::exchange::ProtocolState::Confirming)
             }
             MultiStageEvent::Finalized { peer_name } => {
+                if let Some(wait) = self.repeat_exchange_wait() {
+                    return self.begin_repeat_exchange(wait, peer_name);
+                }
                 // Save first: DONE tells the peer we saved it, so it may be
                 // shown only after a save that succeeded (vauchi/private#1217).
                 // A failed save shows FAIL to the peer for its linger; the
@@ -384,7 +395,8 @@ impl AppEngine {
         let link_changed =
             self.apply_multi_stage_link_feedback(link) | self.apply_multi_stage_peer_confirmed();
         let event_changed = self.apply_multi_stage_event(event);
-        stalled_changed || link_changed || event_changed
+        let repeat_changed = self.resolve_repeat_exchange();
+        stalled_changed || link_changed || event_changed || repeat_changed
     }
 
     /// Drain any commands the machine emitted that aren't routed
@@ -899,7 +911,10 @@ impl AppEngine {
     pub fn is_active_engine_multi_stage_hover(&self) -> bool {
         matches!(
             self.engine.engine_output(),
-            Some(crate::ui::EngineOutput::MultiStageExchange { hover_mode: true })
+            Some(crate::ui::EngineOutput::MultiStageExchange {
+                hover_mode: true,
+                ..
+            })
         )
     }
 }

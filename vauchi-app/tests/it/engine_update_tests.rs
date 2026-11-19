@@ -42,11 +42,17 @@ fn multi_stage_rejects_foreign_update() {
 fn multi_stage_hover_mode_exposed_via_output() {
     assert_eq!(
         MultiStageExchangeEngine::new_hover().engine_output(),
-        Some(EngineOutput::MultiStageExchange { hover_mode: true })
+        Some(EngineOutput::MultiStageExchange {
+            hover_mode: true,
+            reconnect_answer: None,
+        })
     );
     assert_eq!(
         MultiStageExchangeEngine::new_glance().engine_output(),
-        Some(EngineOutput::MultiStageExchange { hover_mode: false })
+        Some(EngineOutput::MultiStageExchange {
+            hover_mode: false,
+            reconnect_answer: None,
+        })
     );
 }
 

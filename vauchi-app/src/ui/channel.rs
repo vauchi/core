@@ -99,7 +99,12 @@ pub enum EngineOutput {
     /// Whether the user granted the deep-link consent gate.
     DeepLinkConsent { granted: bool },
     /// Whether the active multi-stage exchange engine runs Hover mode.
-    MultiStageExchange { hover_mode: bool },
+    MultiStageExchange {
+        hover_mode: bool,
+        /// The person's answer to the reconnect question of a repeat
+        /// exchange, once given (vauchi/private#1285).
+        reconnect_answer: Option<bool>,
+    },
     /// The Recovery screen's inputs: the old key, and the pasted voucher
     /// while vouchers are being collected (`None` at every other step).
     Recovery {
@@ -243,6 +248,9 @@ pub enum MultiStageUpdate {
     /// The other phone said it saved too; from
     /// `MultiStageMachine::peer_confirmed` on the same ticks (plan 5.3).
     PeerConfirmed(bool),
+    /// A repeat exchange asks, waits or ended without a new connection;
+    /// `None` once it ended in a save (vauchi/private#1285).
+    Repeat(Option<crate::ui::RepeatExchange>),
 }
 
 /// The AppEngine's verdict on the PIN typed to confirm a data export.
@@ -468,6 +476,7 @@ impl EngineUpdate {
                 MultiStageUpdate::Stalled(_) => "MultiStage::Stalled",
                 MultiStageUpdate::LinkFeedback(_) => "MultiStage::LinkFeedback",
                 MultiStageUpdate::PeerConfirmed(_) => "MultiStage::PeerConfirmed",
+                MultiStageUpdate::Repeat(_) => "MultiStage::Repeat",
             },
             Self::DeviceLink(u) => match u {
                 DeviceLinkUpdate::QrPending => "DeviceLink::QrPending",
@@ -790,9 +799,13 @@ impl std::fmt::Debug for EngineOutput {
                 .debug_struct("DeepLinkConsent")
                 .field("granted", granted)
                 .finish(),
-            Self::MultiStageExchange { hover_mode } => f
+            Self::MultiStageExchange {
+                hover_mode,
+                reconnect_answer,
+            } => f
                 .debug_struct("MultiStageExchange")
                 .field("hover_mode", hover_mode)
+                .field("reconnect_answer", reconnect_answer)
                 .finish(),
             Self::Recovery {
                 old_key_input,

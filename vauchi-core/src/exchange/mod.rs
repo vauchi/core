@@ -165,7 +165,7 @@ pub use session::{
 pub use trust_metrics::{TransportProximity, TrustMetrics};
 pub use x3dh::{X3DH, X3DHKeyPair};
 
-pub use multistage::confirmation::Holding;
+pub use multistage::confirmation::{Ending, Holding};
 pub use multistage::payload::PeerPayload;
 pub use multistage::session::{AccelStateError, AudioStateError, MultiStageSession};
 pub use multistage::types::{

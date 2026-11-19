@@ -254,3 +254,20 @@ fn two_phones_that_never_met_are_not_asked_and_both_save() {
     assert!(!asked);
     assert_eq!(key_of(&w.alice, &w.bob_id), key_of(&w.bob, &w.alice_id));
 }
+
+// @internal
+#[test]
+fn a_blocked_contact_is_not_asked_about_and_nothing_is_saved_or_rekeyed() {
+    let mut w = world(true, Lost::BobLostAlice);
+    w.alice.vauchi().block_contact(&w.bob_id).unwrap();
+    let mut asked = false;
+
+    drive(&mut w, 300, |w| {
+        asked |= shows(&w.alice, ACCEPT);
+        false
+    });
+
+    assert!(!asked);
+    assert_eq!(key_of(&w.alice, &w.bob_id), w.old_key);
+    assert_eq!(w.bob.vauchi().list_contacts().unwrap().len(), 0);
+}

@@ -246,6 +246,68 @@ fn a_phone_that_holds_nothing_cannot_reconnect() {
 
 // @internal
 #[test]
+fn a_no_refreshes_the_card_and_leaves_the_key() {
+    let p = two_parties();
+    let old_key = shared_key_of(&p.alice, &p.bob_at_alice);
+    let restored = restore_identity_backup(&p);
+    let meeting = exchange_material(&p.alice, &restored, false);
+    let mut met_again = meeting.phone_at_guardian.clone();
+    met_again.update_card(vauchi_core::ContactCard::new("Bob, back again"), 0);
+
+    p.alice.refresh_exchanged_card(&met_again).unwrap();
+
+    assert_eq!(
+        name_at(&p.alice, &p.bob_at_alice).as_deref(),
+        Some("Bob, back again")
+    );
+    assert_eq!(shared_key_of(&p.alice, &p.bob_at_alice), old_key);
+    assert_ne!(exchange_key(&meeting), old_key);
+}
+
+// @internal
+#[test]
+fn a_no_does_not_rekey_a_contact_restored_from_guardians() {
+    let p = two_parties();
+    let old_key = shared_key_of(&p.alice, &p.bob_at_alice);
+    p.alice
+        .storage()
+        .recovery()
+        .mark_rekey_pending(&p.bob_at_alice)
+        .unwrap();
+    let restored = restore_identity_backup(&p);
+    let meeting = exchange_material(&p.alice, &restored, false);
+
+    p.alice
+        .refresh_exchanged_card(&meeting.phone_at_guardian)
+        .unwrap();
+
+    assert_eq!(shared_key_of(&p.alice, &p.bob_at_alice), old_key);
+}
+
+// @internal
+#[test]
+fn a_card_refresh_for_a_contact_not_held_or_blocked_is_refused() {
+    let p = two_parties();
+    let restored = restore_identity_backup(&p);
+    let meeting = exchange_material(&p.alice, &restored, false);
+
+    let not_held = restored.refresh_exchanged_card(&meeting.guardian_at_phone);
+    p.alice.block_contact(&p.bob_at_alice).unwrap();
+    let blocked = p.alice.refresh_exchanged_card(&meeting.phone_at_guardian);
+
+    assert!(
+        matches!(not_held, Err(VauchiError::ContactNotFound(ref id)) if id == meeting.guardian_at_phone.id()),
+        "got {not_held:?}"
+    );
+    assert_eq!(restored.list_contacts().unwrap().len(), 0);
+    assert!(
+        matches!(blocked, Err(VauchiError::ContactBlocked(ref id)) if id == &p.bob_at_alice),
+        "got {blocked:?}"
+    );
+}
+
+// @internal
+#[test]
 fn a_reconnect_whose_ratchet_write_fails_leaves_the_old_key() {
     let p = two_parties();
     let old_key = shared_key_of(&p.alice, &p.bob_at_alice);

@@ -190,7 +190,7 @@ fn read_the_peers_opening_frame(voice: &mut Voice) -> Vec<Command> {
 // check for the phone whose turn it is, and only once.
 #[test]
 fn the_second_voice_starts_listening_once_and_the_first_waits_for_data() {
-    let (mut first, mut second) = the_two_voices(engine_on_hover);
+    let (mut first, mut second) = the_two_voices(engine_on_tap_hover_shake);
 
     let second_starts = read_the_peers_opening_frame(&mut second);
     let second_again = read_the_peers_opening_frame(&mut second);
@@ -198,6 +198,18 @@ fn the_second_voice_starts_listening_once_and_the_first_waits_for_data() {
 
     assert_eq!(audio_commands(&second_starts), vec!["listen"]);
     assert_eq!(audio_commands(&second_again), Vec::<&str>::new());
+    assert_eq!(audio_commands(&first_starts), Vec::<&str>::new());
+}
+
+// @internal — Hover runs no audio check: no tone, no microphone.
+#[test]
+fn hover_starts_no_audio_when_the_phones_read_each_other() {
+    let (mut first, mut second) = the_two_voices(engine_on_hover);
+
+    let second_starts = read_the_peers_opening_frame(&mut second);
+    let first_starts = read_the_peers_opening_frame(&mut first);
+
+    assert_eq!(audio_commands(&second_starts), Vec::<&str>::new());
     assert_eq!(audio_commands(&first_starts), Vec::<&str>::new());
 }
 
@@ -232,9 +244,10 @@ fn a_malformed_recording_ends_the_exchange_only_where_the_audio_check_decides() 
     assert_eq!(on_hover, vec![never_shown; 7]);
 }
 
-/// The second voice listens for six windows before its check fails. For
-/// each malformed recording, handed to it six times: whether the audio
-/// failure is on screen after the fifth, and after the sixth.
+/// Where the audio check runs, the second voice listens for six windows
+/// before it fails; Hover never listens. For each malformed recording,
+/// handed to the second voice six times: whether the audio failure is on
+/// screen after the fifth, and after the sixth.
 fn after_six_of_each_malformed_recording(
     on_exchange: fn(&str, Arc<dyn Clock>) -> AppEngine,
 ) -> Vec<(bool, bool)> {
@@ -254,8 +267,7 @@ fn after_six_of_each_malformed_recording(
         (vec![0.0; 352_801], 44_100),
     ] {
         let (_, mut second) = the_two_voices(on_exchange);
-        let commands = read_the_peers_opening_frame(&mut second);
-        assert_eq!(audio_commands(&commands), vec!["listen"]);
+        read_the_peers_opening_frame(&mut second);
 
         for _ in 0..5 {
             second
@@ -286,7 +298,7 @@ fn the_second_voice_hears_the_first_at_native_sample_rates_and_answers_once() {
     use vauchi_core::exchange::audio_modem::{AudioConfig, generate_fsk_samples};
 
     for sample_rate in [44_100, 48_000] {
-        let (_, mut second) = the_two_voices(engine_on_hover);
+        let (_, mut second) = the_two_voices(engine_on_tap_hover_shake);
         let commands = read_the_peers_opening_frame(&mut second);
         assert_eq!(audio_commands(&commands), vec!["listen"]);
         let config = AudioConfig {

@@ -2,7 +2,8 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! The audio closeness check taken in turns (vauchi/private#1300).
+//! The audio closeness check taken in turns (vauchi/private#1300). Only
+//! TapHoverShake runs it; Hover plays no tone and never listens.
 //!
 //! Two machines in a simulated room: each plays through a speaker and
 //! records its own tone, loud, and its peer's, quieter, as two phones did on
@@ -54,10 +55,10 @@ fn opening_session_id(machine: &mut MultiStageMachine) -> ([u8; 16], String) {
 }
 
 impl Room {
-    /// Two Hover phones; `first` is the one with the lower session id.
+    /// Two TapHoverShake phones; `first` is the one with the lower session id.
     fn new(first_reads_from_ms: u64, second_reads_from_ms: u64, peer_tone_level: f32) -> Room {
         Room::of(
-            MultiStageMachine::new_hover,
+            MultiStageMachine::new_tap_hover_shake,
             first_reads_from_ms,
             second_reads_from_ms,
             peer_tone_level,
@@ -313,11 +314,8 @@ fn whatever_the_delay_between_the_two_first_reads_both_phones_hear_each_other() 
 // @internal
 #[test]
 fn malformed_recordings_use_up_the_second_voices_six_windows_and_then_the_check_fails() {
-    for machine in [
-        MultiStageMachine::new_hover,
-        MultiStageMachine::new_tap_hover_shake,
-    ] {
-        let mut room = Room::of(machine, 0, 0, PEER_TONE_LEVEL);
+    {
+        let mut room = Room::new(0, 0, PEER_TONE_LEVEL);
         while room.second.listen_commands.is_empty() {
             room.tick();
         }

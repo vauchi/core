@@ -6,7 +6,8 @@
 //! module because `multi_stage_machine.rs` is at the file-size limit (VRS04);
 //! loaded via `#[path]` from the parent.
 //!
-//! Each phone plays its session id as a tone and wants to hear its peer's.
+//! Only TapHoverShake runs it. Each phone plays its session id as a tone
+//! and wants to hear its peer's.
 //! Two phones that each played once, the moment they first read the other,
 //! never heard each other on the rig (2026-11-19): the later reader was not
 //! listening yet when the earlier one played, and each recorded its own
@@ -61,7 +62,9 @@ impl MultiStageMachine {
     /// Start this phone's part of the audio check when its turn has come.
     /// Called on every machine event; returns commands once.
     ///
-    /// Glance returns nothing: its one-way scan has no audio check.
+    /// Glance and Hover return nothing. Hover's proof of closeness is the
+    /// two phones reading each other's codes at the same time; it plays no
+    /// tone and does not touch the microphone (owner, 2026-11-19).
     pub fn try_audio_handshake_start(&mut self) -> Vec<Command> {
         if !self.runs_the_audio_check()
             || self.inner.audio_proximity() != AudioProximityState::Pending
@@ -124,10 +127,7 @@ impl MultiStageMachine {
     }
 
     fn runs_the_audio_check(&self) -> bool {
-        matches!(
-            self.mode,
-            MultiStageMode::Hover | MultiStageMode::TapHoverShake
-        )
+        self.mode == MultiStageMode::TapHoverShake
     }
 
     /// Both phones know both session ids once each has read the other's

@@ -13,7 +13,8 @@ mod recovery_meeting;
 pub mod seed;
 
 use vauchi_app::ui::{
-    AppEngine, AppScreen, FormDialogType, RenderContext, ScreenCatalogEntry, ScreenCatalogFixture,
+    AppEngine, AppScreen, FormDialogType, RenderContext, RepeatExchange, ScreenCatalogEntry,
+    ScreenCatalogFixture,
 };
 use vauchi_core::exchange::QrPayload;
 use vauchi_core::exchange::capability::types::{BiometricType, DeviceCapabilities, Platform};
@@ -205,6 +206,28 @@ impl<'a> Recorder<'a> {
         self.record_current("multi_stage_exchange-hover-placed");
     }
 
+    /// A finalized repeat Hover exchange in `repeat`: the question or the
+    /// wait beside the code (vauchi/private#1285).
+    fn record_repeat_exchange(&mut self, repeat: RepeatExchange, code_id: &str) {
+        self.engine.navigate_to(AppScreen::MultiStageExchange {
+            mode: ExchangeMode::Hover,
+        });
+        let confirm_frame = QrPayload {
+            data: "CONFIRM-FRAME".into(),
+            error_correction: "L".into(),
+            display_duration_ms: 100,
+            layout: 0,
+        };
+        assert!(self.engine.apply_multi_stage_qr_payload(&confirm_frame));
+        assert!(
+            self.engine
+                .apply_multi_stage_state(vauchi_core::exchange::ProtocolState::Finalized)
+        );
+        assert!(self.engine.apply_multi_stage_finalized("Dana".into()));
+        assert!(self.engine.apply_multi_stage_repeat(Some(repeat)));
+        self.record_current(code_id);
+    }
+
     /// Activate the row carrying `icon_token` on `surface_id` the way a
     /// shell relays a tap: through the surface's minted interaction id.
     fn activate_row(&mut self, surface_id: &str, icon_token: &str) {
@@ -315,6 +338,16 @@ fn record_seeded(world: SeededWorld, locale: &'static str, screens: &mut Vec<Scr
         );
     }
     recorder.record_trained_exchange();
+    // Here, while the Hover screen is still up: entering it again emits a
+    // wake-up whose delay is jittered, which no two builds agree on.
+    recorder.record_repeat_exchange(
+        RepeatExchange::Asking,
+        "multi_stage_exchange-hover-reconnect-question",
+    );
+    recorder.record_repeat_exchange(
+        RepeatExchange::Waiting,
+        "multi_stage_exchange-hover-reconnect-wait",
+    );
     for (mode, variant) in [
         (ExchangeMode::Magic, "magic"),
         (ExchangeMode::Bump, "bump"),

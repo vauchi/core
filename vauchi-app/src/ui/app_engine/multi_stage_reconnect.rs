@@ -120,7 +120,10 @@ impl AppEngine {
         }
     }
 
-    fn apply_multi_stage_repeat(&mut self, repeat: Option<RepeatExchange>) -> bool {
+    /// Bridge: where a repeat exchange stands, onto the active engine's
+    /// screen. Public for the screen catalogue, which records the
+    /// question and the wait without a second phone.
+    pub fn apply_multi_stage_repeat(&mut self, repeat: Option<RepeatExchange>) -> bool {
         self.engine
             .apply_update(EngineUpdate::MultiStage(MultiStageUpdate::Repeat(repeat)))
     }

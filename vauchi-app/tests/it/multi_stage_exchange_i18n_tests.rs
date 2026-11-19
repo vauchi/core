@@ -10,8 +10,9 @@
 
 use super::i18n_support::{action_label, assert_translated, load_german};
 use vauchi_app::i18n::Locale;
-use vauchi_app::ui::{MultiStageExchangeEngine, WorkflowEngine};
+use vauchi_app::ui::{MultiStageExchangeEngine, RepeatEnding, RepeatExchange, WorkflowEngine};
 use vauchi_core::Event;
+use vauchi_core::exchange::ProtocolState;
 
 /// `(title, grant-permission action label)` after camera permission is denied.
 fn camera_denied_copy(locale: Locale) -> (String, String) {
@@ -53,4 +54,52 @@ fn multi_stage_camera_denied_screen_english_copy_unchanged() {
         action_label(&screen, "grant_camera_permission"),
         "Grant Permission"
     );
+}
+
+const EVERY_REPEAT_STATE: [RepeatExchange; 5] = [
+    RepeatExchange::Asking,
+    RepeatExchange::Waiting,
+    RepeatExchange::Ended(RepeatEnding::KeptByYou),
+    RepeatExchange::Ended(RepeatEnding::KeptByThem),
+    RepeatExchange::Ended(RepeatEnding::TimedOut),
+];
+
+/// The screen of a finalized repeat exchange with Dana, as JSON.
+fn repeat_screen(locale: Locale, repeat: RepeatExchange) -> String {
+    let mut engine = MultiStageExchangeEngine::new_hover().with_locale(locale);
+    engine.set_state(ProtocolState::Finalized);
+    engine.set_finalized("Dana".into());
+    engine.set_repeat(Some(repeat));
+    serde_json::to_string(&engine.current_screen()).unwrap()
+}
+
+// @internal
+#[test]
+fn the_reconnect_question_names_the_peer_and_offers_both_answers() {
+    let question = repeat_screen(Locale::ENGLISH, RepeatExchange::Asking);
+
+    for expected in [
+        "You already have Dana",
+        "Do this only if Dana is the person with you.",
+        "Start a new connection",
+        "Leave it",
+    ] {
+        assert!(question.contains(expected), "missing: {expected}");
+    }
+}
+
+// @internal
+#[test]
+fn every_repeat_exchange_screen_resolves_its_strings_in_both_languages() {
+    load_german();
+    for repeat in EVERY_REPEAT_STATE {
+        let (en, de) = (
+            repeat_screen(Locale::ENGLISH, repeat),
+            repeat_screen(Locale::GERMAN, repeat),
+        );
+
+        assert!(!en.contains("Missing:"), "{repeat:?}: {en}");
+        assert!(!de.contains("Missing:"), "{repeat:?}: {de}");
+        assert_ne!(en, de, "{repeat:?} is not translated");
+    }
 }

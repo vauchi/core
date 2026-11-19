@@ -49,6 +49,8 @@
     "multi_stage_exchange-glance",
     "multi_stage_exchange-hover",
     "multi_stage_exchange-hover-placed",
+    "multi_stage_exchange-hover-reconnect-question",
+    "multi_stage_exchange-hover-reconnect-wait",
     "ble_exchange-magic",
     "ble_exchange-bump",
     "ble_exchange-shake",

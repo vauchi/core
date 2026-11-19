@@ -384,6 +384,7 @@ mod multistage_e2e_tests;
 mod multistage_ending_tests;
 mod multistage_fail_frame_tests;
 mod multistage_final_frame_tests;
+mod multistage_holding_statement_tests;
 mod multistage_identity_binding_tests;
 mod multistage_layout_bound_link_tests;
 mod multistage_link_trainer_proptest;

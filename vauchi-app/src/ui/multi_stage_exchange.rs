@@ -186,6 +186,10 @@ pub struct MultiStageExchangeEngine {
     /// `Pending` for both Glance and Hover; Glance never transitions
     /// because it doesn't emit the audio commands.
     audio_proximity: AudioProximityState,
+    /// Whether a failed audio check ends the exchange. Not on Hover: both
+    /// phones reading each other's codes at the same time is the proof
+    /// that they are close there (vauchi/private#1300).
+    audio_check_decides: bool,
     /// TapHoverShake accelerometer-proximity mirror. Pending for Glance
     /// and Hover (never driven); TapHoverShake transitions it via
     /// [`Self::set_accel_proximity`]. See [`AccelerometerProximityState`].
@@ -243,6 +247,7 @@ impl MultiStageExchangeEngine {
             scan_quality_tracker: ScanQualityTracker::new(),
             cancelled: false,
             audio_proximity: AudioProximityState::Pending,
+            audio_check_decides: true,
             accel_proximity: AccelerometerProximityState::Pending,
             is_hover_mode: false,
             stalled: false,
@@ -280,6 +285,7 @@ impl MultiStageExchangeEngine {
         Self {
             use_front_camera: true,
             is_hover_mode: true,
+            audio_check_decides: false,
             ..Self::new_glance()
         }
     }
@@ -291,7 +297,10 @@ impl MultiStageExchangeEngine {
     /// accel cross-correlation chrome lands with the envelope-transport
     /// follow-up (P2.C).
     pub fn new_tap_hover_shake() -> Self {
-        Self::new_hover()
+        Self {
+            audio_check_decides: true,
+            ..Self::new_hover()
+        }
     }
 
     // ── Bridge setters (called by AppEngine from listener callbacks) ─
@@ -510,8 +519,9 @@ impl MultiStageExchangeEngine {
         // problem ("devices aren't actually close") that a generic
         // "Exchange Failed" panel would hide. G1.3 of the Hover
         // graduation problem record. Glance never reaches this branch
-        // because Glance's audio_proximity stays Pending forever.
-        if matches!(self.audio_proximity, AudioProximityState::Failed) {
+        // because Glance's audio_proximity stays Pending forever, and Hover
+        // does not take it: its exchange goes on without the audio check.
+        if self.audio_check_decides && matches!(self.audio_proximity, AudioProximityState::Failed) {
             return self.build_audio_failed_screen(title);
         }
         // Accel-proximity failure is the TapHoverShake mirror, checked

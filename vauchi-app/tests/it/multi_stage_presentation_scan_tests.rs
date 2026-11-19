@@ -147,9 +147,44 @@ fn real_hover_init_starts_audio_once_through_the_presentation_route() {
     assert_eq!(audio_commands(&repeated), Vec::<&str>::new());
 }
 
-// @internal — native recorded audio must reach the held protocol machine.
+/// A device on the exchange screen of a mode the picker does not offer.
+fn engine_on_tap_hover_shake(name: &str, clock: Arc<dyn Clock>) -> AppEngine {
+    let mut vauchi = Vauchi::in_memory_with_clock(clock).expect("in-memory Vauchi");
+    vauchi.create_identity(name).expect("identity");
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::MultiStageExchange {
+        mode: vauchi_core::exchange::mode::ExchangeMode::TapHoverShake,
+    });
+    engine
+}
+
+const AUDIO_FAILURE_TITLE: &str = "Couldn't confirm devices are close";
+
+// @internal — a malformed recording reaches the held machine through public
+// dispatch. It ends the exchange where the audio check decides, and changes
+// nothing on Hover (vauchi/private#1300).
 #[test]
-fn recorded_hover_audio_reaches_the_machine_through_public_dispatch() {
+fn a_malformed_recording_ends_the_exchange_only_where_the_audio_check_decides() {
+    let failure_shown_and_one_surface_drawn = (true, 1);
+    let nothing_changed_and_one_surface_drawn = (false, 1);
+
+    let where_audio_decides = after_each_malformed_recording(engine_on_tap_hover_shake);
+    let on_hover = after_each_malformed_recording(engine_on_hover);
+
+    assert_eq!(
+        where_audio_decides,
+        vec![failure_shown_and_one_surface_drawn; 7]
+    );
+    assert_eq!(on_hover, vec![nothing_changed_and_one_surface_drawn; 7]);
+}
+
+/// For each malformed recording handed to a phone that has just seen its
+/// peer: whether the audio failure is on screen, and how many surfaces the
+/// dispatch drew.
+fn after_each_malformed_recording(
+    on_exchange: fn(&str, Arc<dyn Clock>) -> AppEngine,
+) -> Vec<(bool, usize)> {
+    let mut seen = Vec::new();
     for (samples, sample_rate) in [
         (vec![0.0; 32], 44_100),
         (vec![0.0; 1], 0),
@@ -162,8 +197,8 @@ fn recorded_hover_audio_reaches_the_machine_through_public_dispatch() {
         let clock = Arc::new(FakeClock::new(
             SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
         ));
-        let mut alice = engine_on_hover("Alice", clock.clone());
-        let mut bob = engine_on_hover("Bob", clock);
+        let mut alice = on_exchange("Alice", clock.clone());
+        let mut bob = on_exchange("Bob", clock);
         alice.poll_notifications();
         bob.poll_notifications();
         let a_surface = latest_surface(&alice.initial_commands().expect("Alice renders"))
@@ -187,27 +222,16 @@ fn recorded_hover_audio_reaches_the_machine_through_public_dispatch() {
                 sample_rate,
             })
             .expect("hardware dispatch succeeds");
-        let title =
-            alice
-                .current_screen()
-                .components
-                .iter()
-                .find_map(|component| match component {
-                    Component::StatusIndicator { title, .. } => Some(title.clone()),
-                    _ => None,
-                });
-        assert_eq!(
-            title,
-            Some("Couldn't confirm devices are close".to_string())
-        );
-        assert_eq!(
-            rendered
-                .iter()
-                .filter(|command| matches!(command, Command::ReplaceSurface { .. }))
-                .count(),
-            1
-        );
+        let failure_shown = alice.current_screen().components.iter().any(|component| {
+            matches!(component, Component::StatusIndicator { title, .. } if title == AUDIO_FAILURE_TITLE)
+        });
+        let surfaces_drawn = rendered
+            .iter()
+            .filter(|command| matches!(command, Command::ReplaceSurface { .. }))
+            .count();
+        seen.push((failure_shown, surfaces_drawn));
     }
+    seen
 }
 
 // @internal — valid native rates confirm audio and reject later stale samples.

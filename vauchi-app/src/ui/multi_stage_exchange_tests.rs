@@ -387,7 +387,7 @@ fn set_audio_proximity_is_noop_when_cancelled() {
 // @internal
 #[test]
 fn audio_proximity_failed_renders_audio_failed_screen() {
-    let mut engine = MultiStageExchangeEngine::new_hover();
+    let mut engine = MultiStageExchangeEngine::new_tap_hover_shake();
     engine.set_audio_proximity(AudioProximityState::Failed);
     let screen = engine.current_screen();
     let status = first_status_indicator(&screen).expect("status indicator");
@@ -417,6 +417,20 @@ fn audio_proximity_failed_renders_audio_failed_screen() {
 
 // @internal
 #[test]
+fn a_failed_audio_check_changes_nothing_on_a_hover_screen() {
+    let mut engine = MultiStageExchangeEngine::new_hover();
+    engine.set_state(ProtocolState::Advertising);
+    let before = serde_json::to_string(&engine.current_screen()).unwrap();
+
+    engine.set_audio_proximity(AudioProximityState::Failed);
+
+    let after = serde_json::to_string(&engine.current_screen()).unwrap();
+    assert_eq!(after, before);
+    assert!(!after.contains("Couldn't confirm devices are close"));
+}
+
+// @internal
+#[test]
 fn audio_failed_takes_precedence_over_protocol_failed() {
     // Both failure modes co-exist on a single engine after a
     // failed handshake: protocol may have failed for an
@@ -424,7 +438,7 @@ fn audio_failed_takes_precedence_over_protocol_failed() {
     // The user-facing chrome should narrate the audio failure
     // (the actionable physical-setup hint) rather than a
     // generic "Exchange failed" panel.
-    let mut engine = MultiStageExchangeEngine::new_hover();
+    let mut engine = MultiStageExchangeEngine::new_tap_hover_shake();
     engine.set_state(ProtocolState::Failed("generic-reason".to_string()));
     engine.set_audio_proximity(AudioProximityState::Failed);
     let screen = engine.current_screen();
@@ -560,7 +574,7 @@ fn audio_failed_takes_precedence_over_accel_failed() {
     // single Failed screen — a deterministic, documented order
     // (audio branch is checked first in build_screen). The accel
     // failure is still recoverable via the shared Retry action.
-    let mut engine = MultiStageExchangeEngine::new_hover();
+    let mut engine = MultiStageExchangeEngine::new_tap_hover_shake();
     engine.set_audio_proximity(AudioProximityState::Failed);
     engine.set_accel_proximity(AccelerometerProximityState::Failed);
     let screen = engine.current_screen();

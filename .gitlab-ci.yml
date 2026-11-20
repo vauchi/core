@@ -803,6 +803,7 @@ build:tests:
       cp "$cucumber" "$ARCHIVE_DIR/cucumber_tests"
     - hostname > "$ARCHIVE_DIR/built-on"
     - ls -la "$ARCHIVE_DIR"
+    - sh ci/target-state.sh leave
 
 # SemVer compatibility check — catch breaking API changes before they cascade
 # to 10+ downstream consumers (cli, tui, e2e, relay, linux-gtk, mobile bindings).

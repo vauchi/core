@@ -1149,6 +1149,8 @@
   "exchange.reconnect.kept_by_you": "Nothing was changed. Updates between you and {name} stay stopped until you meet and connect again.",
   "exchange.reconnect.link_needs_meeting": "You already had {name}, and nothing was changed. If updates between you have stopped, meet in person to connect again.",
   "exchange.reconnect.question": "Start a new connection with {name}? Your notes and groups stay. Do this only if {name} is the person with you.",
+  "exchange.reconnect.question_text": "Start a new connection only if {name} is with you. Your notes and groups stay.",
+  "exchange.reconnect.question_title": "{name}'s phone no longer has you",
   "exchange.reconnect.reconnected": "You and {name} are connected again.",
   "exchange.reconnect.timed_out": "Nobody answered in time. Nothing was changed.",
   "exchange.reconnect.title": "You already have {name}",

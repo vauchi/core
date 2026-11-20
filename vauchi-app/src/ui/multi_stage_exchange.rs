@@ -59,6 +59,9 @@ use camera_gate::CameraGate;
 mod reconnect;
 #[path = "multi_stage_exchange_terminal_screens.rs"]
 mod terminal_screens;
+// Its callers are in `app_engine`, which this feature gates.
+#[cfg(feature = "network-rustls")]
+pub(crate) use reconnect::asks_to_reconnect;
 pub use reconnect::{
     RECONNECT_ACCEPT_ACTION_ID, RECONNECT_DECLINE_ACTION_ID, RepeatEnding, RepeatExchange,
 };
@@ -639,6 +642,27 @@ impl MultiStageExchangeEngine {
         status: Component,
         buttons: Vec<ActionListItem>,
     ) -> ScreenModel {
+        let beside_camera = vec![status, self.exchange_buttons(buttons)];
+        let mut screen = self.exchange_screen(title, Vec::new(), beside_camera);
+        screen.layout = ScreenLayout::Fixed;
+        screen
+    }
+
+    fn exchange_buttons(&self, items: Vec<ActionListItem>) -> Component {
+        Component::ButtonList {
+            id: EXCHANGE_ACTIONS_ID.into(),
+            items,
+        }
+    }
+
+    /// The own code, `under_code` at the screen's full width, then the
+    /// camera, beside a column of `beside_camera` when there is any.
+    fn exchange_screen(
+        &self,
+        title: String,
+        under_code: Vec<Component>,
+        beside_camera: Vec<Component>,
+    ) -> ScreenModel {
         let mut components: Vec<Component> = Vec::new();
 
         // Own QR — pinned at the TOP of a fixed (non-scrolling) layout.
@@ -684,26 +708,23 @@ impl MultiStageExchangeEngine {
             size: None,
             a11y: None,
         };
-        components.push(Component::Row {
-            id: EXCHANGE_PREVIEW_ROW_ID.into(),
-            items: vec![
-                scan,
-                Component::Column {
-                    id: EXCHANGE_SIDE_COLUMN_ID.into(),
-                    items: vec![
-                        status,
-                        Component::ButtonList {
-                            id: EXCHANGE_ACTIONS_ID.into(),
-                            items: buttons,
-                        },
-                    ],
-                },
-            ],
+        components.extend(under_code);
+        components.push(if beside_camera.is_empty() {
+            scan
+        } else {
+            Component::Row {
+                id: EXCHANGE_PREVIEW_ROW_ID.into(),
+                items: vec![
+                    scan,
+                    Component::Column {
+                        id: EXCHANGE_SIDE_COLUMN_ID.into(),
+                        items: beside_camera,
+                    },
+                ],
+            }
         });
 
-        let mut screen = ScreenModel::new(SCREEN_ID, title, components, Vec::new());
-        screen.layout = ScreenLayout::Fixed;
-        screen
+        ScreenModel::new(SCREEN_ID, title, components, Vec::new())
     }
 
     /// The status beside the preview ("Show this", then the live

@@ -1149,6 +1149,8 @@
   "exchange.reconnect.kept_by_you": "Non è stato modificato nulla. Gli aggiornamenti tra te e {name} restano fermi finché non vi incontrate e vi riconnettete.",
   "exchange.reconnect.link_needs_meeting": "Avevi già {name}, e non è stato modificato nulla. Se gli aggiornamenti tra voi si sono fermati, incontratevi di persona per riconnettervi.",
   "exchange.reconnect.question": "Avviare una nuova connessione con {name}? Le tue note e i tuoi gruppi restano. Fallo solo se {name} è la persona che è con te.",
+  "exchange.reconnect.question_text": "Avvia una nuova connessione solo se {name} è con te. Le tue note e i tuoi gruppi restano.",
+  "exchange.reconnect.question_title": "Il telefono di {name} non ti ha più",
   "exchange.reconnect.reconnected": "Tu e {name} siete di nuovo connessi.",
   "exchange.reconnect.timed_out": "Nessuno ha risposto in tempo. Non è stato modificato nulla.",
   "exchange.reconnect.title": "Hai già {name}",

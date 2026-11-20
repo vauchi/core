@@ -28,8 +28,9 @@ impl AppEngine {
             AppScreen::DirectTransport => ExchangeMode::Cable,
             _ => return screen,
         };
+        let asking = crate::ui::multi_stage_exchange::asks_to_reconnect(&screen);
         if self.presentation_coordinator.is_short()
-            && screen.layout == crate::ui::ScreenLayout::Fixed
+            && (screen.layout == crate::ui::ScreenLayout::Fixed || asking)
         {
             let glance = matches!(
                 self.screen,
@@ -68,7 +69,9 @@ impl AppEngine {
 /// its subtitle and asks for a compact code: its bootstrap code is small and
 /// read at arm's length. Hover keeps the standard square, because a Samsung
 /// S7's front camera at 8 cm could not read an iPhone SE's compact one
-/// (rig, #534).
+/// (rig, #534), nor a Pixel 3a's at 14 cm while the SE asked the reconnect
+/// question with one (rig, 2026-11-20, #1304). That question scrolls, and
+/// on a short window gives up the mode row all the same.
 fn compact_exchange_screen(
     mut screen: crate::ui::ScreenModel,
     glance: bool,

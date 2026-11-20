@@ -19955,7 +19955,7 @@
               "title": "Exchange",
               "subtitle": null,
               "accessibility_label": "Exchange",
-              "layout": "fixed",
+              "layout": "scroll",
               "tokens": {
                 "spacing_small": 8,
                 "spacing_medium": 16,
@@ -20029,119 +20029,104 @@
                   }
                 },
                 {
-                  "Group": {
-                    "id": "exchange_preview_row",
+                  "Text": {
+                    "id": "reconnect_title",
+                    "content": "Dana's phone no longer has you",
+                    "style": "body",
+                    "accessibility": {
+                      "label": "Dana's phone no longer has you",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "Text": {
+                    "id": "reconnect_question",
+                    "content": "Start a new connection only if Dana is with you. Your notes and groups stay.",
+                    "style": "body",
+                    "accessibility": {
+                      "label": "Start a new connection only if Dana is with you. Your notes and groups stay.",
+                      "description": null
+                    }
+                  }
+                },
+                {
+                  "List": {
+                    "id": "exchange_actions",
                     "label": null,
-                    "axis": "horizontal",
-                    "children": [
+                    "rows": [
                       {
-                        "Qr": {
-                          "id": "surface.capture.peer_scan",
-                          "payloads": [
-                            ""
-                          ],
-                          "purpose": "capture",
-                          "label": "Scan their code",
-                          "accessibility": {
-                            "label": "Scan their code",
-                            "description": null
-                          },
-                          "capture_placeholder": "Paste QR data here",
-                          "capture_submit_label": "Submit"
+                        "title": "Start a new connection",
+                        "subtitle": null,
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.0",
+                          "label": "Start a new connection",
+                          "accessibility_label": "Start a new connection",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Start a new connection",
+                          "description": null
                         }
                       },
                       {
-                        "Group": {
-                          "id": "exchange_side_column",
-                          "label": null,
-                          "axis": "vertical",
-                          "children": [
-                            {
-                              "Text": {
-                                "id": "reconnect_question",
-                                "content": "You already have Dana · Dana's phone no longer has you as a contact, so your updates do not reach each other. Start a new connection with Dana? Your notes and groups stay. Do this only if Dana is the person with you.",
-                                "style": "body",
-                                "accessibility": {
-                                  "label": "You already have Dana",
-                                  "description": null
-                                }
-                              }
-                            },
-                            {
-                              "List": {
-                                "id": "exchange_actions",
-                                "label": null,
-                                "rows": [
-                                  {
-                                    "title": "Start a new connection",
-                                    "subtitle": null,
-                                    "detail": null,
-                                    "icon_token": null,
-                                    "image_data": null,
-                                    "fallback_text": null,
-                                    "selected": false,
-                                    "enabled": true,
-                                    "activation": {
-                                      "interaction_id": "surface.1.interaction.0",
-                                      "label": "Start a new connection",
-                                      "accessibility_label": "Start a new connection",
-                                      "icon_token": null,
-                                      "enabled": true,
-                                      "shortcut": null
-                                    },
-                                    "secondary_actions": [],
-                                    "controls": [],
-                                    "accessibility": {
-                                      "label": "Start a new connection",
-                                      "description": null
-                                    }
-                                  },
-                                  {
-                                    "title": "Leave it",
-                                    "subtitle": null,
-                                    "detail": null,
-                                    "icon_token": null,
-                                    "image_data": null,
-                                    "fallback_text": null,
-                                    "selected": false,
-                                    "enabled": true,
-                                    "activation": {
-                                      "interaction_id": "surface.1.interaction.1",
-                                      "label": "Leave it",
-                                      "accessibility_label": "Leave it",
-                                      "icon_token": null,
-                                      "enabled": true,
-                                      "shortcut": null
-                                    },
-                                    "secondary_actions": [],
-                                    "controls": [],
-                                    "accessibility": {
-                                      "label": "Leave it",
-                                      "description": null
-                                    }
-                                  }
-                                ],
-                                "searchable": false,
-                                "paging": null,
-                                "accessibility": {
-                                  "label": "",
-                                  "description": null
-                                },
-                                "style": "buttons"
-                              }
-                            }
-                          ],
-                          "accessibility": {
-                            "label": "exchange_side_column",
-                            "description": null
-                          }
+                        "title": "Leave it",
+                        "subtitle": null,
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": {
+                          "interaction_id": "surface.1.interaction.1",
+                          "label": "Leave it",
+                          "accessibility_label": "Leave it",
+                          "icon_token": null,
+                          "enabled": true,
+                          "shortcut": null
+                        },
+                        "secondary_actions": [],
+                        "controls": [],
+                        "accessibility": {
+                          "label": "Leave it",
+                          "description": null
                         }
                       }
                     ],
+                    "searchable": false,
+                    "paging": null,
                     "accessibility": {
-                      "label": "exchange_preview_row",
+                      "label": "",
                       "description": null
-                    }
+                    },
+                    "style": "buttons"
+                  }
+                },
+                {
+                  "Qr": {
+                    "id": "surface.capture.peer_scan",
+                    "payloads": [
+                      ""
+                    ],
+                    "purpose": "capture",
+                    "label": "Scan their code",
+                    "accessibility": {
+                      "label": "Scan their code",
+                      "description": null
+                    },
+                    "capture_placeholder": "Paste QR data here",
+                    "capture_submit_label": "Submit"
                   }
                 }
               ]

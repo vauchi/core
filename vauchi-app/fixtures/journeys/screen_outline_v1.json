@@ -15667,7 +15667,7 @@
       "ReplaceSurface": {
         "surface": {
           "accessibility_label": "len:8",
-          "layout": "len:5",
+          "layout": "len:6",
           "nodes": [
             {
               "Group": {
@@ -15713,119 +15713,104 @@
               }
             },
             {
-              "Group": {
+              "Text": {
                 "accessibility": {
                   "description": null,
-                  "label": "len:20"
+                  "label": "len:30"
                 },
-                "axis": "len:10",
-                "children": [
+                "content": "len:30",
+                "id": "reconnect_title",
+                "style": "body"
+              }
+            },
+            {
+              "Text": {
+                "accessibility": {
+                  "description": null,
+                  "label": "len:76"
+                },
+                "content": "len:76",
+                "id": "reconnect_question",
+                "style": "body"
+              }
+            },
+            {
+              "List": {
+                "accessibility": {
+                  "description": null,
+                  "label": "len:0"
+                },
+                "id": "exchange_actions",
+                "label": null,
+                "paging": null,
+                "rows": [
                   {
-                    "Qr": {
-                      "accessibility": {
-                        "description": null,
-                        "label": "len:15"
-                      },
-                      "capture_placeholder": "len:18",
-                      "capture_submit_label": "len:6",
-                      "id": "surface.capture.peer_scan",
-                      "label": "len:15",
-                      "payloads": [
-                        "len:0"
-                      ],
-                      "purpose": "capture"
-                    }
+                    "accessibility": {
+                      "description": null,
+                      "label": "len:22"
+                    },
+                    "activation": {
+                      "accessibility_label": "len:22",
+                      "enabled": true,
+                      "icon_token": null,
+                      "interaction_id": "surface.1.interaction.0",
+                      "label": "len:22",
+                      "shortcut": null
+                    },
+                    "controls": [],
+                    "detail": null,
+                    "enabled": true,
+                    "fallback_text": null,
+                    "icon_token": null,
+                    "image_data": "bytes:0",
+                    "secondary_actions": [],
+                    "selected": false,
+                    "subtitle": null,
+                    "title": "len:22"
                   },
                   {
-                    "Group": {
-                      "accessibility": {
-                        "description": null,
-                        "label": "len:20"
-                      },
-                      "axis": "len:8",
-                      "children": [
-                        {
-                          "Text": {
-                            "accessibility": {
-                              "description": null,
-                              "label": "len:21"
-                            },
-                            "content": "len:216",
-                            "id": "reconnect_question",
-                            "style": "body"
-                          }
-                        },
-                        {
-                          "List": {
-                            "accessibility": {
-                              "description": null,
-                              "label": "len:0"
-                            },
-                            "id": "exchange_actions",
-                            "label": null,
-                            "paging": null,
-                            "rows": [
-                              {
-                                "accessibility": {
-                                  "description": null,
-                                  "label": "len:22"
-                                },
-                                "activation": {
-                                  "accessibility_label": "len:22",
-                                  "enabled": true,
-                                  "icon_token": null,
-                                  "interaction_id": "surface.1.interaction.0",
-                                  "label": "len:22",
-                                  "shortcut": null
-                                },
-                                "controls": [],
-                                "detail": null,
-                                "enabled": true,
-                                "fallback_text": null,
-                                "icon_token": null,
-                                "image_data": "bytes:0",
-                                "secondary_actions": [],
-                                "selected": false,
-                                "subtitle": null,
-                                "title": "len:22"
-                              },
-                              {
-                                "accessibility": {
-                                  "description": null,
-                                  "label": "len:8"
-                                },
-                                "activation": {
-                                  "accessibility_label": "len:8",
-                                  "enabled": true,
-                                  "icon_token": null,
-                                  "interaction_id": "surface.1.interaction.1",
-                                  "label": "len:8",
-                                  "shortcut": null
-                                },
-                                "controls": [],
-                                "detail": null,
-                                "enabled": true,
-                                "fallback_text": null,
-                                "icon_token": null,
-                                "image_data": "bytes:0",
-                                "secondary_actions": [],
-                                "selected": false,
-                                "subtitle": null,
-                                "title": "len:8"
-                              }
-                            ],
-                            "searchable": false,
-                            "style": "buttons"
-                          }
-                        }
-                      ],
-                      "id": "exchange_side_column",
-                      "label": null
-                    }
+                    "accessibility": {
+                      "description": null,
+                      "label": "len:8"
+                    },
+                    "activation": {
+                      "accessibility_label": "len:8",
+                      "enabled": true,
+                      "icon_token": null,
+                      "interaction_id": "surface.1.interaction.1",
+                      "label": "len:8",
+                      "shortcut": null
+                    },
+                    "controls": [],
+                    "detail": null,
+                    "enabled": true,
+                    "fallback_text": null,
+                    "icon_token": null,
+                    "image_data": "bytes:0",
+                    "secondary_actions": [],
+                    "selected": false,
+                    "subtitle": null,
+                    "title": "len:8"
                   }
                 ],
-                "id": "exchange_preview_row",
-                "label": null
+                "searchable": false,
+                "style": "buttons"
+              }
+            },
+            {
+              "Qr": {
+                "accessibility": {
+                  "description": null,
+                  "label": "len:15"
+                },
+                "capture_placeholder": "len:18",
+                "capture_submit_label": "len:6",
+                "id": "surface.capture.peer_scan",
+                "label": "len:15",
+                "payloads": [
+                  "len:0"
+                ],
+                "purpose": "capture"
               }
             }
           ],

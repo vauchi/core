@@ -1149,6 +1149,8 @@
   "exchange.reconnect.kept_by_you": "Es wurde nichts geändert. Aktualisierungen zwischen dir und {name} bleiben aus, bis ihr euch trefft und neu verbindet.",
   "exchange.reconnect.link_needs_meeting": "Du hattest {name} bereits, und es wurde nichts geändert. Falls zwischen euch keine Aktualisierungen mehr ankommen, trefft euch, um euch neu zu verbinden.",
   "exchange.reconnect.question": "Eine neue Verbindung mit {name} beginnen? Deine Notizen und Gruppen bleiben. Tu das nur, wenn {name} die Person bei dir ist.",
+  "exchange.reconnect.question_text": "Beginne eine neue Verbindung nur, wenn {name} bei dir ist. Deine Notizen und Gruppen bleiben.",
+  "exchange.reconnect.question_title": "Das Telefon von {name} hat dich nicht mehr",
   "exchange.reconnect.reconnected": "Du und {name} seid wieder verbunden.",
   "exchange.reconnect.timed_out": "Niemand hat rechtzeitig geantwortet. Es wurde nichts geändert.",
   "exchange.reconnect.title": "Du hast {name} bereits",

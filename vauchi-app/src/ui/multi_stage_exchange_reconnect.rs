@@ -8,8 +8,8 @@
 //! endings that save nothing new. A child module of
 //! `multi_stage_exchange.rs` for its size (VRS04); loaded via `#[path]`.
 //!
-//! The question and the wait keep the exchange layout: the code has to
-//! stay where the peer reads it while a person decides.
+//! The question and the wait keep the code on screen: it has to stay
+//! where the peer reads it while a person decides.
 
 use super::*;
 
@@ -19,8 +19,18 @@ pub const RECONNECT_ACCEPT_ACTION_ID: &str = "reconnect_accept";
 /// "Leave it": the contact keeps the connection it had.
 pub const RECONNECT_DECLINE_ACTION_ID: &str = "reconnect_decline";
 
+const COMPONENT_ID_QUESTION_TITLE: &str = "reconnect_title";
 const COMPONENT_ID_QUESTION: &str = "reconnect_question";
 const COMPONENT_ID_WAITING: &str = "reconnect_waiting";
+
+/// Whether `screen` asks the reconnect question: the one exchange screen
+/// that scrolls, for its text, while it shows a code the peer reads.
+#[cfg(feature = "network-rustls")]
+pub(crate) fn asks_to_reconnect(screen: &ScreenModel) -> bool {
+    screen.components.iter().any(
+        |component| matches!(component, Component::Text { id, .. } if id == COMPONENT_ID_QUESTION),
+    )
+}
 
 /// Where a repeat exchange stands when the two phones hold different
 /// things for each other.
@@ -110,15 +120,27 @@ impl MultiStageExchangeEngine {
     pub(super) fn build_repeat_screen(&self, title: String, repeat: RepeatExchange) -> ScreenModel {
         match repeat {
             RepeatExchange::Asking => {
-                let status = self.repeat_status(
-                    COMPONENT_ID_QUESTION,
-                    self.t_named("exchange.reconnect.title"),
-                    format!(
-                        "{} {}",
-                        self.t_named("exchange.reconnect.body"),
-                        self.t_named("exchange.reconnect.question")
+                // Body size for the title too: as a heading it took two
+                // lines on an iPhone SE and left the warning one line
+                // under the code (rig, 2026-11-20).
+                let paragraph = |id: &str, key| Component::Text {
+                    id: id.into(),
+                    content: self.t_named(key),
+                    style: TextStyle::Body,
+                    a11y: None,
+                };
+                // Under the code and not beside the camera, on a screen
+                // that scrolls: in that column an iPhone SE cut the
+                // question to one line (rig, vauchi/private#1304). The
+                // answers come before the camera, which on a scrolling
+                // screen is a screen's height of its own.
+                let mut question = vec![
+                    paragraph(
+                        COMPONENT_ID_QUESTION_TITLE,
+                        "exchange.reconnect.question_title",
                     ),
-                );
+                    paragraph(COMPONENT_ID_QUESTION, "exchange.reconnect.question_text"),
+                ];
                 // Answered: the buttons go, so a second tap has nothing
                 // to press while the AppEngine acts on the first.
                 let buttons = if self.reconnect_answer.is_some() {
@@ -135,7 +157,8 @@ impl MultiStageExchangeEngine {
                         ),
                     ]
                 };
-                self.build_exchange_layout(title, status, buttons)
+                question.push(self.exchange_buttons(buttons));
+                self.exchange_screen(title, question, Vec::new())
             }
             RepeatExchange::Waiting => {
                 let status = self.repeat_status(

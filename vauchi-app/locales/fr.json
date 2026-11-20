@@ -1149,6 +1149,8 @@
   "exchange.reconnect.kept_by_you": "Rien n'a été modifié. Les mises à jour entre vous et {name} restent interrompues jusqu'à ce que vous vous retrouviez pour vous reconnecter.",
   "exchange.reconnect.link_needs_meeting": "Vous aviez déjà {name}, et rien n'a été modifié. Si les mises à jour entre vous se sont arrêtées, retrouvez-vous en personne pour vous reconnecter.",
   "exchange.reconnect.question": "Démarrer une nouvelle connexion avec {name} ? Vos notes et vos groupes sont conservés. Ne le faites que si {name} est la personne à vos côtés.",
+  "exchange.reconnect.question_text": "Ne démarrez une nouvelle connexion que si {name} est à vos côtés. Vos notes et groupes restent.",
+  "exchange.reconnect.question_title": "Le téléphone de {name} ne vous a plus",
   "exchange.reconnect.reconnected": "Vous et {name} êtes de nouveau connectés.",
   "exchange.reconnect.timed_out": "Personne n'a répondu à temps. Rien n'a été modifié.",
   "exchange.reconnect.title": "Vous avez déjà {name}",

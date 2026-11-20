@@ -414,7 +414,11 @@ impl AppEngine {
         // the sync chrome's state changes would shift a live element —
         // the QR the peer is scanning — and break the camera lock.
         // Skip the overlay there (`2026-06-03-exchange-qr-scan-stability`).
-        if screen.layout == ScreenLayout::Fixed {
+        // The reconnect question scrolls for its text and shows such a
+        // code all the same (vauchi/private#1304).
+        if screen.layout == ScreenLayout::Fixed
+            || crate::ui::multi_stage_exchange::asks_to_reconnect(&screen)
+        {
             return screen;
         }
         if !self.network_online {

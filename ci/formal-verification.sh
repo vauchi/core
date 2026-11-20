@@ -246,6 +246,12 @@ tamarin_expect "$models/qr_exchange.spthy" falsified "-DNO_IDENTITY_BINDING" \
 # holder committed, a phone saves only after its peer accepted it, and a
 # peer's DONE means it saved. Each control removes one mechanism; the
 # controls and the ADR-071 rebind run one lemma per prover run.
+# The multi-stage runs take as long as all the other models together and
+# the job has one hour (private#1296, job 18202419158), so they run beside
+# the others. Their output is printed, and their verdict taken, after the
+# last Quint model of this set.
+multistage_log=$(mktemp)
+(
 tamarin_expect "$models/multistage_exchange.spthy" verified "" \
     executable card_authentic peer_accepted_before_save peer_saved_is_true \
     a_reconnect_is_possible a_key_changes_only_after_a_yes \
@@ -280,6 +286,8 @@ for l in card_authentic peer_accepted_before_save peer_saved_is_true \
     a_waiting_phone_saves_only_after_the_holders_yes; do
     tamarin_lemma_expect "$models/multistage_exchange.spthy" "$l" verified "-DREBIND"
 done
+) > "$multistage_log" 2>&1 &
+multistage_pid=$!
 tamarin_expect "$models/device_link.spthy" verified "" \
     executable seed_secrecy initiator_agreement joiner_agreement \
     qr_leak_exposes_seed qr_leak_lets_attacker_choose_joiner_identity
@@ -529,6 +537,14 @@ quint_expect device_link_machines.qnt reliable_relay ok verify joiner_seed_impli
 # joiner gave up; a lost response still does, which #808 leaves open.
 quint_expect device_link_machines.qnt before_808 violation run no_device_registered_for_a_failed_joiner
 quint_expect device_link_machines.qnt lossy_relay violation run no_device_registered_for_a_failed_joiner
+multistage_status=0
+wait "$multistage_pid" || multistage_status=$?
+cat "$multistage_log"
+rm -f "$multistage_log"
+[ "$multistage_status" = 0 ] || {
+    echo "FAIL: the multi-stage exchange runs above" >&2
+    exit 1
+}
 fi # wants models
 # Each Apalache verify runs for about 80 s on CI; the eight below are the
 # extended set (private#842).

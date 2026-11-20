@@ -357,6 +357,7 @@ mod shred_i18n_tests;
 mod social_active_registry_tests;
 mod social_network_display_tests;
 mod social_rule_from_network_list_tests;
+mod stale_action_event_tests;
 mod stale_binding_event_tests;
 mod status_indicator_label_tests;
 mod storage_lock_hardware_routing_tests;

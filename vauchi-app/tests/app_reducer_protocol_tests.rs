@@ -147,16 +147,19 @@ fn contextual_action_reduces_state_and_replaces_the_surface_at_the_next_revision
 
 // @scenario: generic_presentation_protocol.feature :: Invalid boundary input fails safely
 #[test]
-fn stale_body_interaction_is_rejected_after_replacement() {
+fn a_body_interaction_of_an_earlier_revision_changes_nothing() {
     let mut app = AppEngine::new(Vauchi::in_memory().expect("in-memory core"));
     let _ = app.initial_commands().expect("initial commands");
 
-    assert!(
-        app.dispatch(Event::ActionActivated {
-            surface_id: SurfaceId::new("onboarding").unwrap(),
-            interaction_id: vauchi_core::InteractionId::new("surface.0.interaction.0").unwrap(),
-        })
-        .is_err()
+    let out = app.dispatch(Event::ActionActivated {
+        surface_id: SurfaceId::new("onboarding").unwrap(),
+        interaction_id: vauchi_core::InteractionId::new("surface.0.interaction.0").unwrap(),
+    });
+
+    assert_eq!(
+        out,
+        Ok(Vec::new()),
+        "a tap overtaken by a re-render is dropped (stale_action_event_tests)"
     );
 }
 

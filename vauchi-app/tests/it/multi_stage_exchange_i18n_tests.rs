@@ -79,8 +79,8 @@ fn the_reconnect_question_names_the_peer_and_offers_both_answers() {
     let question = repeat_screen(Locale::ENGLISH, RepeatExchange::Asking);
 
     for expected in [
-        "You already have Dana",
-        "Do this only if Dana is the person with you.",
+        "Dana's phone no longer has you",
+        "Start a new connection only if Dana is with you.",
         "Start a new connection",
         "Leave it",
     ] {

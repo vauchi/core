@@ -158,6 +158,18 @@ fn the_phone_that_kept_the_contact_asks_and_the_other_waits_with_nothing_saved()
     assert_eq!(&shown_while_asking[..4], "CNF5");
 }
 
+// A screen that scrolls takes the sync chip, and a chip that changes moves
+// what is under it: here the code the other phone is reading
+// (`2026-06-03-exchange-qr-scan-stability`, vauchi/private#1304).
+// @internal
+#[test]
+fn the_question_screen_has_no_sync_chip_over_the_code() {
+    let w = alice_asked_about_bob();
+
+    assert!(shows(&w.alice, "reconnect_question"));
+    assert!(!shows(&w.alice, "sync"));
+}
+
 // @scenario: contact_exchange :: Starting a new connection after meeting again
 // @internal
 #[test]

@@ -13,9 +13,10 @@
 #
 # FORMAL_SET picks what runs. `code` checks Rust: the Kani harnesses and
 # the wipe tests, about 16 minutes. `models` checks the hand-written
-# models, which read no Rust: the Tamarin models that answer in minutes
-# and the device-link Quint verifies, about 20 minutes. CI runs each on
-# the merge requests that change what it checks (private#1032); `gate`
+# models, which read no Rust: the Tamarin models and the device-link
+# Quint verifies, about 38 minutes with the multi-stage runs beside the
+# others (job 18204836658). CI runs each on the merge requests that
+# change what it checks (private#1032); `gate`
 # is both, the merge-request set before the split. `extended` is
 # the rest: the Bluetooth handshake lemmas, one capped prover run each,
 # and the Apalache verifies of the Bluetooth and multi-stage machines,

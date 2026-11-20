@@ -157,6 +157,13 @@ grep -B1 'Scenario: In a mutual QR exchange' "$T/check-features/contact_exchange
     | grep -q '@planned' || fail "a scenario annotated only in a non-Rust file stays planned"
 grep -B1 'Scenario: A QR contact carries' "$T/check-features/other.feature" | grep -q '@planned' \
     || fail "the same scenario name in another feature file is left alone"
+# Feature files are public text: without this trailer the features
+# repository's lint:shipped-in rejects the commit and the merge request
+# the bot opened can never merge (vauchi/private#1315).
+[ "$(git -C "$T/check-features" log -1 --format='%(trailers:key=Shipped-in,valueonly)' | sed '/^$/d')" = "core@$AFTER" ] \
+    || fail "the features commit must carry the trailer Shipped-in: core@<the Core commit>"
+[ -z "$(git -C "$T/check-spec" log -1 --format='%(trailers:key=Shipped-in,valueonly)' | sed '/^$/d')" ] \
+    || fail "the spec commit changes no public text and carries no Shipped-in trailer"
 grep -q 'not planned in features: contact_exchange :: Not in features yet' "$T/out" \
     || fail "an annotation without a planned scenario must be reported, not invented"
 [ "$(grep -c '^POST .*/merge_requests' "$T/log")" -eq 2 ] || fail "exactly two MRs must be opened"

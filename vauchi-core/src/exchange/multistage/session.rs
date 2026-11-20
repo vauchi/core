@@ -2337,10 +2337,14 @@ impl MultiStageSession {
         } else {
             self.handle_tagged(TagKind::Done, sender, reveal_key, tag);
         }
-        if self.peer_ending.is_some() && !had_ended {
+        if !had_ended && let Some(ending) = self.peer_ending {
             // Dev instrumentation (dev-logging only; no PII): times the
             // DONE / BOTH ending on the rig (design D6).
-            tracing::info!("[MSX] ending: peer saved (DONE read)");
+            if ending.saved() {
+                tracing::info!("[MSX] ending: peer saved (DONE read)");
+            } else {
+                tracing::info!("[MSX] ending: peer kept its connection (DONE read)");
+            }
         }
         self.state.clone()
     }

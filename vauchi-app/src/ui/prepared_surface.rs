@@ -188,6 +188,15 @@ impl PreparedSurface {
             .is_some_and(|minted| minted < self.surface.revision)
     }
 
+    /// Whether `interaction` was minted for an earlier revision of this
+    /// surface: a tap on what the shell last rendered, overtaken by a newer
+    /// render (vauchi/private#1306). The same rule as a stale binding: an
+    /// id with no revision, or one at or past this surface's, is unknown.
+    pub fn is_stale_interaction(&self, interaction: &InteractionId) -> bool {
+        Projection::minted_revision(interaction.as_str())
+            .is_some_and(|minted| minted < self.surface.revision)
+    }
+
     /// Whether `binding` belongs to a camera this surface no longer shows:
     /// a decode still in flight when the capture node went away. With a
     /// camera on screen, an unknown capture binding is one Core never

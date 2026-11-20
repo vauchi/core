@@ -362,6 +362,16 @@ impl AppEngine {
         self.presentation_coordinator
             .ensure_active_surface(event_surface_id)?;
         let (event_screen, screen, prepared) = self.prepared_visible_surface(event_surface_id)?;
+        if let Event::ActionActivated { interaction_id, .. } = &event
+            && prepared.is_stale_interaction(interaction_id)
+        {
+            tracing::info!(
+                "[Presentation] dropped a tap for stale interaction {} (surface at revision {})",
+                interaction_id.as_str(),
+                self.surface_revision
+            );
+            return Ok(Vec::new());
+        }
         let native_action = self.native_menu_action(&event)?;
         let cause = match &event {
             Event::ActionActivated {

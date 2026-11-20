@@ -163,6 +163,7 @@ mod device_link_bridge_tests;
 mod device_link_join_guard_tests;
 mod device_link_live_device_tests;
 mod device_link_local_hosting_tests;
+mod device_link_paste_tests;
 mod device_link_pin_tests;
 mod device_link_two_machine_tests;
 mod device_linking_i18n_tests;

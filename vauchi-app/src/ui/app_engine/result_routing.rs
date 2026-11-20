@@ -32,6 +32,9 @@ impl AppEngine {
             ActionResult::RequestCamera => ActionResult::Commands {
                 commands: vec![vauchi_core::Command::QrRequestScan],
             },
+            ActionResult::DeviceLinkInvitationPasted { url } => {
+                self.open_device_link_invitation_or_say_why(&url)
+            }
             ActionResult::EditContact { contact_id } => {
                 ActionResult::NavigateTo(self.navigate_to(AppScreen::ContactEdit { contact_id }))
             }

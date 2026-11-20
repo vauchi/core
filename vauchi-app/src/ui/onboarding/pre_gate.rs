@@ -16,6 +16,9 @@ fn backup_mime_types() -> Vec<String> {
 
 const VAUCHI_MARK_PNG: &[u8] = include_bytes!("../../../assets/vauchi-mark.png");
 
+const PASTED_INVITATION_ID: &str = "device_link_invitation";
+const OPEN_PASTED_INVITATION_ID: &str = "open_pasted_invitation";
+
 impl OnboardingEngine {
     pub(super) fn build_identity_check(&self) -> ScreenModel {
         ScreenModel {
@@ -123,50 +126,80 @@ impl OnboardingEngine {
     /// deep-link path and the `Event::QrScanned` hardware-event path in
     /// `AppEngine`, both of which route to `AppScreen::DeviceLinkJoin`.
     pub(super) fn build_device_link_instructions(&self) -> ScreenModel {
+        let scan = ScreenAction {
+            id: "scan_qr".into(),
+            label: self.t("qr.scan_button"),
+            style: if self.has_camera {
+                ActionStyle::Primary
+            } else {
+                ActionStyle::Secondary
+            },
+            enabled: true,
+            a11y: Some(A11y::labeled(self.t("qr.scan_button"))),
+        };
+        let back = ScreenAction {
+            id: "back".into(),
+            label: self.t("action.back"),
+            style: ActionStyle::Secondary,
+            enabled: true,
+            a11y: Some(A11y::labeled(self.t("action.back"))),
+        };
+        let mut components = vec![self.device_link_instructions_info()];
+        let mut contextual_actions = Vec::new();
+        if !self.has_camera {
+            components.push(Component::TextInput {
+                id: PASTED_INVITATION_ID.into(),
+                label: self.t("platform.qr_no_camera_paste"),
+                value: self.pasted_invitation.clone(),
+                placeholder: Some(self.t("platform.qr_paste_placeholder")),
+                max_length: Some(vauchi_core::MAX_EVENT_INPUT_VALUE_BYTES),
+                validation_error: None,
+                input_type: InputType::Text,
+                a11y: Some(A11y::labeled(self.t("platform.qr_no_camera_paste"))),
+                info_key: None,
+            });
+            contextual_actions.push(ScreenAction {
+                id: OPEN_PASTED_INVITATION_ID.into(),
+                label: self.t("platform.qr_submit"),
+                style: ActionStyle::Primary,
+                enabled: !self.pasted_invitation.trim().is_empty(),
+                a11y: Some(A11y::labeled(self.t("platform.qr_submit"))),
+            });
+        }
+        contextual_actions.extend([scan, back]);
         ScreenModel {
             screen_id: "device_link_instructions".into(),
             title: self.t("onboarding.link_device_instructions_title"),
             subtitle: Some(self.t("onboarding.link_device_instructions_subtitle")),
-            components: vec![Component::InfoPanel {
-                id: "device_link_instructions_info".into(),
-                icon: Some("devices".into()),
-                title: "".into(),
-                items: vec![
-                    InfoItem {
-                        icon: Some("qr".into()),
-                        title: self.t("onboarding.link_device_instructions_scan"),
-                        detail: self.t("onboarding.link_device_instructions_scan_desc"),
-                    },
-                    InfoItem {
-                        icon: Some("link".into()),
-                        title: self.t("onboarding.link_device_instructions_link"),
-                        detail: self.t("onboarding.link_device_instructions_link_desc"),
-                    },
-                ],
-                a11y: Some(A11y {
-                    label: Some(self.t("onboarding.link_device_instructions_title")),
-                    hint: None,
-                    role: Some(AccessibilityRole::Heading),
-                }),
-            }],
-            contextual_actions: vec![
-                ScreenAction {
-                    id: "scan_qr".into(),
-                    label: self.t("qr.scan_button"),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("qr.scan_button"))),
-                },
-                ScreenAction {
-                    id: "back".into(),
-                    label: self.t("action.back"),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: Some(A11y::labeled(self.t("action.back"))),
-                },
-            ],
+            components,
+            contextual_actions,
             progress: None,
             ..Default::default()
+        }
+    }
+
+    fn device_link_instructions_info(&self) -> Component {
+        Component::InfoPanel {
+            id: "device_link_instructions_info".into(),
+            icon: Some("devices".into()),
+            title: "".into(),
+            items: vec![
+                InfoItem {
+                    icon: Some("qr".into()),
+                    title: self.t("onboarding.link_device_instructions_scan"),
+                    detail: self.t("onboarding.link_device_instructions_scan_desc"),
+                },
+                InfoItem {
+                    icon: Some("link".into()),
+                    title: self.t("onboarding.link_device_instructions_link"),
+                    detail: self.t("onboarding.link_device_instructions_link_desc"),
+                },
+            ],
+            a11y: Some(A11y {
+                label: Some(self.t("onboarding.link_device_instructions_title")),
+                hint: None,
+                role: Some(AccessibilityRole::Heading),
+            }),
         }
     }
 
@@ -258,7 +291,23 @@ impl OnboardingEngine {
                     commands: vec![Command::QrRequestScan],
                 }
             }
+            UserAction::TextChanged {
+                component_id,
+                value,
+            } if component_id == PASTED_INVITATION_ID => {
+                self.pasted_invitation = value.clone();
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::ActionPressed { action_id }
+                if action_id == OPEN_PASTED_INVITATION_ID
+                    && !self.pasted_invitation.trim().is_empty() =>
+            {
+                ActionResult::DeviceLinkInvitationPasted {
+                    url: self.pasted_invitation.trim().to_string(),
+                }
+            }
             UserAction::ActionPressed { action_id } if action_id == "back" => {
+                self.pasted_invitation.clear();
                 self.navigate_to(Step::IdentityCheck)
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),

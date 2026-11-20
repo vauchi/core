@@ -247,15 +247,7 @@ impl AppEngine {
             && !self.vauchi.has_identity()
             && data.starts_with("vauchi://device-link")
         {
-            match self.open_device_link_invitation(data) {
-                Ok(screen) => return Some(ActionResult::NavigateTo(screen)),
-                Err(message) => {
-                    return Some(ActionResult::ShowAlert {
-                        title: self.t("device_link.invalid_title"),
-                        message,
-                    });
-                }
-            }
+            return Some(self.open_device_link_invitation_or_say_why(data));
         }
 
         if let Some(result) = self.route_recovery_link_event(&event) {
@@ -833,6 +825,18 @@ impl AppEngine {
     /// Returns the rendered join screen, or an error if the URL is not a
     /// supported invitation or if this device already has an identity (join
     /// is only for fresh installs).
+    /// A scanned and a pasted invitation end the same way: the join screen,
+    /// or an alert with the reason.
+    pub(super) fn open_device_link_invitation_or_say_why(&mut self, url: &str) -> ActionResult {
+        match self.open_device_link_invitation(url) {
+            Ok(screen) => ActionResult::NavigateTo(screen),
+            Err(message) => ActionResult::ShowAlert {
+                title: self.t("device_link.invalid_title"),
+                message,
+            },
+        }
+    }
+
     pub fn open_device_link_invitation(&mut self, url: &str) -> Result<ScreenModel, String> {
         if self.vauchi.has_identity() {
             return Err("This device already has an identity.".into());

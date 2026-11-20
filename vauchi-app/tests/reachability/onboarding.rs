@@ -153,6 +153,27 @@ fn bfs_pins_remaining_orphans() {
     );
 }
 
+// @internal — without a camera the join screen adds the paste action (vauchi/private#1233).
+#[test]
+fn without_a_camera_the_paste_action_is_handled_and_nothing_else_drifts() {
+    let handled: Vec<&str> = ONBOARDING_ALL_HANDLED
+        .iter()
+        .copied()
+        .chain(["open_pasted_invitation"])
+        .collect();
+
+    let report = check_reachability(|| OnboardingEngine::new().with_camera(false), &handled);
+
+    assert_eq!(
+        report.orphan_handlers,
+        BTreeSet::from([
+            "submit_display_name".to_string(),
+            "submit_backup_password".to_string(),
+        ])
+    );
+    assert_eq!(report.orphan_affordances, BTreeSet::new());
+}
+
 /// Guards the BFS itself: the full flow should reach six distinct
 /// screens. If this drops, the BFS regressed or a screen
 /// disappeared silently.

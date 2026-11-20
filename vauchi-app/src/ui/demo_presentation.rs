@@ -282,6 +282,7 @@ fn action_result_name(result: &ActionResult) -> &'static str {
         ActionResult::EditContact { .. } => "EditContact",
         ActionResult::OpenEntryDetail { .. } => "OpenEntryDetail",
         ActionResult::DeviceLinkJoinStart { .. } => "DeviceLinkJoinStart",
+        ActionResult::DeviceLinkInvitationPasted { .. } => "DeviceLinkInvitationPasted",
         ActionResult::PreviewAs { .. } => "PreviewAs",
         ActionResult::ShowContactPicker => "ShowContactPicker",
         ActionResult::VerifyFingerprint { .. } => "VerifyFingerprint",

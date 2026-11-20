@@ -97,6 +97,9 @@ pub(super) fn append_result_commands(
         ActionResult::EditContact { .. } => return Err("EditContact"),
         ActionResult::OpenEntryDetail { .. } => return Err("OpenEntryDetail"),
         ActionResult::DeviceLinkJoinStart { .. } => return Err("DeviceLinkJoinStart"),
+        ActionResult::DeviceLinkInvitationPasted { .. } => {
+            return Err("DeviceLinkInvitationPasted");
+        }
         ActionResult::PreviewAs { .. } => return Err("PreviewAs"),
         ActionResult::ShowContactPicker => return Err("ShowContactPicker"),
         ActionResult::VerifyFingerprint { .. } => return Err("VerifyFingerprint"),

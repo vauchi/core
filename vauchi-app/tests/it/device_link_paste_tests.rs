@@ -15,6 +15,8 @@ use vauchi_core::{Identity, MAX_EVENT_INPUT_VALUE_BYTES, event_from_json};
 
 const PASTE_FIELD: &str = "device_link_invitation";
 const OPEN_PASTED: &str = "open_pasted_invitation";
+const WITHOUT_A_CAMERA: [(&str, bool); 3] =
+    [(OPEN_PASTED, false), ("scan_qr", true), ("back", true)];
 
 fn alices_invitation() -> String {
     let alice = Identity::create("Alice", 0);
@@ -92,7 +94,7 @@ fn without_a_camera_the_join_screen_takes_a_pasted_invitation() {
         paste_placeholder(&screen).as_deref(),
         Some("Paste QR data here")
     );
-    assert_eq!(actions(&screen), [(OPEN_PASTED, false), ("back", true)]);
+    assert_eq!(actions(&screen), WITHOUT_A_CAMERA);
 
     let invitation = alices_invitation();
     assert!(
@@ -103,7 +105,10 @@ fn without_a_camera_the_join_screen_takes_a_pasted_invitation() {
     let ActionResult::UpdateScreen(screen) = paste(&mut engine, &format!(" {invitation}\n")) else {
         panic!("typing into the field should redraw the screen");
     };
-    assert_eq!(actions(&screen), [(OPEN_PASTED, true), ("back", true)]);
+    assert_eq!(
+        actions(&screen),
+        [(OPEN_PASTED, true), ("scan_qr", true), ("back", true)]
+    );
 
     let ActionResult::NavigateTo(screen) = press(&mut engine, OPEN_PASTED) else {
         panic!("a pasted invitation should open the join screen");
@@ -133,32 +138,33 @@ fn pasted_text_that_is_no_invitation_is_refused_and_the_screen_stays() {
     );
 }
 
-// @internal — the scan button stays where a camera, or no report of one, exists.
+// @internal — with a camera the screen offers the scan alone.
 #[test]
-fn with_a_camera_or_no_hardware_report_the_join_screen_offers_the_scan() {
-    let mut with_camera = fresh_device();
-    report_hardware(&mut with_camera, true);
-    let mut unreported = fresh_device();
+fn with_a_camera_the_join_screen_offers_only_the_scan() {
+    let mut engine = fresh_device();
+    report_hardware(&mut engine, true);
 
-    for engine in [&mut with_camera, &mut unreported] {
-        let screen = link_this_device(engine);
-        assert_eq!(paste_placeholder(&screen), None);
-        assert_eq!(actions(&screen), [("scan_qr", true), ("back", true)]);
-    }
+    let screen = link_this_device(&mut engine);
+
+    assert_eq!(paste_placeholder(&screen), None);
+    assert_eq!(actions(&screen), [("scan_qr", true), ("back", true)]);
 }
 
-// @internal — a hardware shell may attach while the screen is already open.
+// @internal — a shell that reports no hardware still scans the old way, so
+// the scan stays beside the field until a camera is reported.
 #[test]
-fn a_report_of_no_camera_reaches_the_join_screen_already_open() {
+fn a_device_that_reported_nothing_is_offered_both_and_a_camera_report_drops_the_field() {
     let mut engine = fresh_device();
-    link_this_device(&mut engine);
-
-    report_hardware(&mut engine, false);
-
-    let screen = engine.current_screen();
+    let screen = link_this_device(&mut engine);
     assert_eq!(
         paste_placeholder(&screen).as_deref(),
         Some("Paste QR data here")
     );
-    assert_eq!(actions(&screen), [(OPEN_PASTED, false), ("back", true)]);
+    assert_eq!(actions(&screen), WITHOUT_A_CAMERA);
+
+    report_hardware(&mut engine, true);
+
+    let screen = engine.current_screen();
+    assert_eq!(paste_placeholder(&screen), None);
+    assert_eq!(actions(&screen), [("scan_qr", true), ("back", true)]);
 }

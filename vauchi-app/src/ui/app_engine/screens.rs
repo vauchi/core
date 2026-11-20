@@ -58,6 +58,7 @@ impl AppEngine {
         match screen {
             AppScreen::Onboarding => Box::new(
                 OnboardingEngine::new()
+                    .with_camera(device_capabilities.has_camera)
                     .with_help_icons(true)
                     .with_locale(render_context.resolved_locale()),
             ),

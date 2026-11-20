@@ -132,6 +132,10 @@ pub struct OnboardingEngine {
     /// Password the user typed on the BackupPasswordEntry screen.
     /// Used in concert with `pending_backup_bytes` at submit time.
     pending_backup_password: String,
+    /// Without a camera the invitation of the device to join cannot be
+    /// scanned, so its screen takes it pasted (vauchi/private#1233).
+    has_camera: bool,
+    pasted_invitation: String,
     locale: Locale,
 }
 
@@ -172,8 +176,16 @@ impl OnboardingEngine {
             show_help_icons: false,
             pending_backup_bytes: None,
             pending_backup_password: String::new(),
+            has_camera: true,
+            pasted_invitation: String::new(),
             locale: Locale::ENGLISH,
         }
+    }
+
+    /// Whether the device can scan a code (defaults to yes).
+    pub fn with_camera(mut self, has_camera: bool) -> Self {
+        self.has_camera = has_camera;
+        self
     }
 
     /// Sets the render locale (defaults to English). Threaded from the
@@ -813,8 +825,13 @@ impl WorkflowEngine for OnboardingEngine {
 
     fn apply_update(&mut self, update: crate::ui::EngineUpdate) -> bool {
         use crate::ui::OnboardingUpdate as U;
-        let crate::ui::EngineUpdate::Onboarding(update) = update else {
-            return false;
+        let update = match update {
+            crate::ui::EngineUpdate::Onboarding(update) => update,
+            crate::ui::EngineUpdate::DeviceCapabilities(capabilities) => {
+                self.has_camera = capabilities.has_camera;
+                return true;
+            }
+            _ => return false,
         };
         match update {
             U::PendingBackupBytes(bytes) => self.set_pending_backup_bytes(bytes),

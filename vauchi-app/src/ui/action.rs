@@ -295,6 +295,12 @@ pub enum ActionResult {
     DeviceLinkJoinStart {
         device_name: String,
     },
+    /// App layer should open the device-link invitation the person pasted
+    /// where no camera can scan it (vauchi/private#1233). It is checked like
+    /// a scanned one.
+    DeviceLinkInvitationPasted {
+        url: String,
+    },
     /// Frontend should perform hardware actions for the exchange protocol (ADR-031).
     /// Each command maps to a platform-specific operation (QR display, BLE scan, etc.).
     /// Unsupported commands should be answered with `Event::HardwareUnavailable`.

@@ -97,10 +97,13 @@ change_features() {
     python3 "$LOGIC" flip "$1" --scenarios-file "$WORK/scenarios"
 }
 
-# open_mr <repo> <branch> <title> <changer>: the changer edits the clone and
-# prints the summary that becomes the commit body and the MR description.
+# open_mr <repo> <branch> <title> <changer> [trailer]: the changer edits the
+# clone and prints the summary that becomes the commit body and the MR
+# description. The trailer is for a repository whose changed files are
+# public text: its lint:shipped-in rejects the commit without one (VGT15).
 open_mr() {
-    local repo=$1 branch=$2 title=$3 changer=$4 dir="$WORK/$1" project="vauchi%2F$1" status url body
+    local repo=$1 branch=$2 title=$3 changer=$4 trailer=${5:-} dir="$WORK/$1" project="vauchi%2F$1" status url body
+    local origin="Opened by Core's main pipeline (open:follow-ups) for Core $SHORT (vauchi/private#1010)."
     git clone -q --depth 1 "$GIT_BASE/$repo.git" "$dir"
     if git -C "$dir" ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
         status=$(api GET "$API/projects/$project/merge_requests?state=opened&source_branch=$branch")
@@ -121,8 +124,7 @@ open_mr() {
     fi
     git -C "$dir" checkout -q -b "$branch"
     git -C "$dir" -c user.name="$BOT_NAME" -c user.email="$BOT_EMAIL" commit -q -a \
-        -m "$title" -m "$(cat "$WORK/summary.$repo")" \
-        -m "Opened by Core's main pipeline (open:follow-ups) for Core $SHORT (vauchi/private#1010)."
+        -m "$title" -m "$(cat "$WORK/summary.$repo")" -m "$origin" ${trailer:+-m "$trailer"}
     # GitLab's internal pre-receive call can fail for one push and pass the
     # next; one blip left cli unbumped for Core 0.84.1 (#704).
     local attempt=1
@@ -166,7 +168,7 @@ fi
 if [ -s "$WORK/scenarios" ]; then
     open_mr features "chore/core-$SHORT-implemented" \
         "feat: the scenarios whose tests landed with Core $SHORT are implemented" \
-        change_features || FAILED="$FAILED features"
+        change_features "Shipped-in: core@$AFTER" || FAILED="$FAILED features"
 else
     echo "features: no scenario annotation added in the range, nothing to do"
 fi

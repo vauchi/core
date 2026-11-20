@@ -32,8 +32,13 @@
  * may film). The person at a phone is assumed to say yes only for the
  * contact who is with them (rule Meet); the model does not prove that
  * about people. Whether a phone's own statement is true is not modelled
- * either: a phone may state either holding. Card validity, self-exchange by a linked device, the rekey
- * deferral and reciprocity are outside this model (reciprocity.spthy);
+ * either: a phone states whatever term it is handed (In(hold) in
+ * Verify_and_confirm). Only 'held' and 'none' lead anywhere, because every
+ * later rule matches one of the two; a restriction that said so made the
+ * -DLEGACY_TAG control about three times slower (409 s against 145 s)
+ * and no lemma needs it. Card validity, self-exchange by a linked device,
+ * the rekey deferral and reciprocity are outside this model
+ * (reciprocity.spthy);
  * the lost last frame is liveness, not safety: a phone may save while its
  * peer never does, and no lemma here claims otherwise.
  *
@@ -215,7 +220,8 @@ rule Verify_and_confirm:
     , Accepted($A, pk(ltk), pk_b, sid, sid_b, card_b)
     , Stated($A, pk(ltk), pk_b, sid, sid_b, hold)
     ]->
-  [ St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
+  [ !Session($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  , St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
                  pk_b, card_b, pl_b, k, hold)
   , Out(<'CONFIRM', sid, hold, mac(k, <cnflab(hold), tr_out, h(pl), h(pl_b)>)>) ]
 #endif
@@ -235,7 +241,8 @@ rule Verify_and_confirm:
     , Neq(pk_b, pk(ltk))
     , Accepted($A, pk(ltk), pk_b, sid, sid_b, card_b)
     ]->
-  [ St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
+  [ !Session($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  , St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
                  pk_b, card_b, pl_b, k) ]
 #endif
 #ifdef not NO_PAYLOAD_SIG & not CONFIRM_BEFORE_VERIFY
@@ -256,7 +263,8 @@ rule Verify_and_confirm:
     , Accepted($A, pk(ltk), pk_b, sid, sid_b, card_b)
     , Stated($A, pk(ltk), pk_b, sid, sid_b, hold)
     ]->
-  [ St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
+  [ !Session($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  , St_confirmed($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b,
                  pk_b, card_b, pl_b, k, hold)
   , Out(<'CONFIRM', sid, hold, mac(k, <cnflab(hold), tr_out, h(pl), h(pl_b)>)>) ]
 #endif
@@ -434,12 +442,18 @@ rule Rekey_on_the_statement:
 #endif
 
 /* A phone that holds its peer reads the peer's DONE: under three of the
-   labels the peer holds this phone too. */
+   labels the peer holds this phone too. !Session repeats what St_saved
+   holds, and St_saved is solved last ([-]): the prover then reads the key
+   and transcript from the one rule that made them instead of retracing
+   each of the four ways to St_saved, which took peer_saved_is_true from
+   877 steps to 376. Every St_saved has its !Session, so no trace is
+   lost. */
 #ifdef NO_LABEL
 rule Read_done:
   let tr_in = <sid_b, sid, epk_b, epk, ch_b, ch>
   in
-  [ St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  [ !Session($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  , St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)[-]
   , In(<'DONE', sid_b, lab, t>), In(x) ]
   --[ Eq(t, mac(k, <<'CNF', x>, tr_in, h(pl_b), h(pl)>))
     , PeerSaved($A, pk(ltk), pk_b, sid, sid_b)
@@ -449,7 +463,8 @@ rule Read_done:
 rule Read_done:
   let tr_in = <sid_b, sid, epk_b, epk, ch_b, ch>
   in
-  [ St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  [ !Session($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)
+  , St_saved($A, ltk, sid, epk, pl, ch, sid_b, epk_b, ch_b, pk_b, pl_b, k)[-]
   , In(<'DONE', sid_b, lab, t>) ]
   --[ Eq(t, mac(k, <donlab(lab), tr_in, h(pl_b), h(pl)>))
     , HoldsLabel(lab)
@@ -457,10 +472,6 @@ rule Read_done:
     ]->
   [ ]
 #endif
-
-restriction A_holding_is_held_or_none:
-  "All A pka pkb sa sb x #i. Stated(A, pka, pkb, sa, sb, x) @ i
-     ==> x = 'held' | x = 'none'"
 
 restriction Labels_that_mean_the_peer_holds_us:
   "All l #i. HoldsLabel(l) @ i ==> l = 'sv_n' | l = 'sv_h' | l = 'reco'"

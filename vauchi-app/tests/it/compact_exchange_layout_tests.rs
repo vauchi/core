@@ -224,13 +224,13 @@ fn texts_in(nodes: &[PresentationNode]) -> Vec<String> {
 }
 
 // On an iPhone SE the question sat in the column beside the camera and was
-// cut to "Vous avez déjà Bob · Le téléph…": the person was asked to start a
-// new connection without the reason or the warning (rig, 2026-11-19,
-// vauchi/private#1304). Under the code it has the surface's full width, and
-// a screen that scrolls cuts nothing in any language or text size.
+// cut to "Vous avez déjà Bob · Le téléph…" (rig, 2026-11-19); under the
+// code, with the two answers pinned, it was off the screen (rig,
+// 2026-11-21, vauchi/private#1304). One line over the code is what an SE
+// has room for with the code whole and both answers in view.
 // @internal
 #[test]
-fn the_reconnect_question_is_whole_under_the_code_on_a_screen_that_scrolls() {
+fn the_reconnect_question_is_one_line_straight_over_the_code() {
     let surface = presented(&mut engine_asking_to_reconnect(TALL_WINDOW_HEIGHT));
 
     let code = surface
@@ -239,18 +239,10 @@ fn the_reconnect_question_is_whole_under_the_code_on_a_screen_that_scrolls() {
         .position(is_own_code)
         .expect("the own code");
     assert!(
-        surface.nodes[code + 1..code + 3]
-            .iter()
-            .all(|node| matches!(node, PresentationNode::Text { .. })),
-        "both paragraphs are the surface's own, straight under the code"
+        matches!(surface.nodes[code - 1], PresentationNode::Text { .. }),
+        "the question is the surface's own text, straight over the code"
     );
-    assert_eq!(
-        texts_in(&surface.nodes),
-        [
-            "Dana's phone no longer has you",
-            "Start a new connection only if Dana is with you. Your notes and groups stay.",
-        ]
-    );
+    assert_eq!(texts_in(&surface.nodes), ["Is Dana next to you?"]);
     assert_eq!(surface.layout, SurfaceLayout::Scroll);
 }
 
@@ -264,11 +256,12 @@ fn button_titles(node: &PresentationNode) -> Option<Vec<String>> {
 }
 
 // On a screen that scrolls the camera takes its full height, 240 pt on an
-// iPhone, so answers beside it would sit a screen below the code. Straight
-// under the question, the person reaches them with the code still in view.
+// iPhone, so answers beside it would sit a screen below the code. For a
+// shell that does not pin them they come straight under the code, where
+// the person reaches them with the code still in view.
 // @internal
 #[test]
-fn the_two_answers_follow_the_question_and_the_camera_comes_last() {
+fn the_two_answers_come_straight_under_the_code_and_the_camera_last() {
     let surface = presented(&mut engine_asking_to_reconnect(TALL_WINDOW_HEIGHT));
 
     let answers = surface
@@ -279,10 +272,11 @@ fn the_two_answers_follow_the_question_and_the_camera_comes_last() {
     assert_eq!(
         button_titles(&surface.nodes[answers]),
         Some(vec![
-            "Start a new connection".to_string(),
-            "Leave it".to_string()
+            "Yes, reconnect Dana".to_string(),
+            "No, stop the exchange".to_string()
         ])
     );
+    assert!(is_own_code(&surface.nodes[answers - 1]));
     let last = surface.nodes.len() - 1;
     assert_eq!(answers, last - 1);
     assert!(holds_the_camera(&surface.nodes[last]));

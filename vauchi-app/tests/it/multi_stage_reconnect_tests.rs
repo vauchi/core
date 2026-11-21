@@ -342,11 +342,10 @@ fn labels(bar: &ContextBar) -> Vec<&str> {
         .collect()
 }
 
-const YES: &str = "Start a new connection";
-const NO: &str = "Leave it";
+const YES: &str = "Yes, reconnect Bob";
+const NO: &str = "No, stop the exchange";
 
-/// Whether the surface's wire text has an element labelled exactly so. The
-/// question's own sentence begins with the words of the yes.
+/// Whether the surface's wire text has an element labelled exactly so.
 fn has_label(surface: &str, label: &str) -> bool {
     surface.contains(&format!("\"{label}\""))
 }

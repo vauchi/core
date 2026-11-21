@@ -79,10 +79,9 @@ fn the_reconnect_question_names_the_peer_and_offers_both_answers() {
     let question = repeat_screen(Locale::ENGLISH, RepeatExchange::Asking);
 
     for expected in [
-        "Dana's phone no longer has you",
-        "Start a new connection only if Dana is with you.",
-        "Start a new connection",
-        "Leave it",
+        "Is Dana next to you?",
+        "Yes, reconnect Dana",
+        "No, stop the exchange",
     ] {
         assert!(question.contains(expected), "missing: {expected}");
     }

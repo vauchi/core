@@ -403,6 +403,44 @@ fn submit_wrong_password_returns_alert_and_clears_state() {
     );
 }
 
+// @scenario: core_file_picker :: the restore password field keeps what was typed
+// A shell that draws Core's value emptied the field under the typing and
+// sent the rest as the whole password (vauchi/private#1327).
+#[test]
+fn the_restore_password_field_shows_what_was_typed() {
+    use vauchi_app::ui::Component;
+    let mut engine = fresh_engine();
+    let _ = engine.navigate_to(AppScreen::Onboarding);
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "load_backup".into(),
+    });
+    let _ = engine.handle_hardware_event(Event::FilePickedFromUser {
+        bytes: make_backup("correct horse battery staple", "Bob"),
+        filename: "bob-backup.txt".into(),
+    });
+
+    let result = engine.handle_action(UserAction::TextChanged {
+        component_id: "backup_password".into(),
+        value: "correct horse".into(),
+    });
+
+    let screen = match result {
+        ActionResult::UpdateScreen(s) | ActionResult::NavigateTo(s) => s,
+        other => panic!("expected the password screen again, got {other:?}"),
+    };
+    let shown = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::TextInput { id, value, .. } if id == "backup_password" => {
+                Some(value.clone())
+            }
+            _ => None,
+        })
+        .expect("backup_password TextInput missing from screen");
+    assert_eq!(shown, "correct horse");
+}
+
 // @scenario: core_file_picker :: empty password is rejected before import
 #[test]
 fn submit_empty_password_surfaces_validation_error_in_component() {

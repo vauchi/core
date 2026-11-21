@@ -8,7 +8,18 @@ pub(super) struct PendingFilePick {
     request_id: String,
     screen: AppScreen,
     contact_import: bool,
+    answer: PickAnswer,
 }
+
+/// The event a completed pick is reported as to the screen that asked.
+#[derive(Clone, Copy, PartialEq)]
+enum PickAnswer {
+    File,
+    Image,
+}
+
+const IMAGE_MIME_TYPES: [&str; 4] = ["image/png", "image/jpeg", "image/webp", "image/bmp"];
+const IMAGE_EXTENSIONS: [&str; 5] = ["png", "jpg", "jpeg", "webp", "bmp"];
 
 impl AppEngine {
     pub(super) fn cancel_file_pick(&mut self) {
@@ -33,46 +44,81 @@ impl AppEngine {
         if !self.correlated_file_picker {
             return commands;
         }
+        // A display that answers picks shows its own picker for the image
+        // file too; the library request beside it would open a second one.
+        let asks_for_an_image_file = commands.contains(&Command::ImagePickFromFile);
         let mut output = Vec::with_capacity(commands.len());
         for command in commands {
-            let Command::FilePickFromUser {
-                accepted_mime_types,
-                accepted_extensions,
-                max_bytes,
-                purpose,
-            } = command
-            else {
-                output.push(command);
-                continue;
-            };
-            if let Some(previous) = self.pending_file_pick.take() {
-                output.push(Command::CancelFilePick {
-                    request_id: previous.request_id,
-                });
+            match command {
+                Command::FilePickFromUser {
+                    accepted_mime_types,
+                    accepted_extensions,
+                    max_bytes,
+                    purpose,
+                } => {
+                    let title = match purpose {
+                        FilePickPurpose::ImportContacts => self.t("menu.import_contacts"),
+                        FilePickPurpose::ImportBackup => self.t("backup.import_title"),
+                        FilePickPurpose::Other { label_key } => self.t(&label_key),
+                    };
+                    self.ask_pick(
+                        &mut output,
+                        PickAnswer::File,
+                        title,
+                        accepted_mime_types,
+                        accepted_extensions,
+                        max_bytes,
+                    );
+                }
+                Command::ImagePickFromFile => {
+                    let title = self.t("avatar.choose_title");
+                    self.ask_pick(
+                        &mut output,
+                        PickAnswer::Image,
+                        title,
+                        IMAGE_MIME_TYPES.map(String::from).to_vec(),
+                        IMAGE_EXTENSIONS.map(String::from).to_vec(),
+                        None,
+                    );
+                }
+                Command::ImagePickFromLibrary if asks_for_an_image_file => {}
+                other => output.push(other),
             }
-            // Independent ids prevent a delayed callback surviving an engine restart (#764).
-            let request_id = hex::encode(vauchi_core::crypto::random_bytes::<16>());
-            let title = match purpose {
-                FilePickPurpose::ImportContacts => self.t("menu.import_contacts"),
-                FilePickPurpose::ImportBackup => self.t("backup.import_title"),
-                FilePickPurpose::Other { label_key } => self.t(&label_key),
-            };
-            self.pending_file_pick = Some(PendingFilePick {
-                request_id: request_id.clone(),
-                screen: self.screen.clone(),
-                contact_import: self.pending_contact_import,
-            });
-            output.push(Command::PickFile {
-                request_id,
-                title,
-                accepted_mime_types,
-                accepted_extensions,
-                max_bytes: max_bytes
-                    .unwrap_or(MAX_FILE_PICK_BYTES as u64)
-                    .min(MAX_FILE_PICK_BYTES as u64),
-            });
         }
         output
+    }
+
+    fn ask_pick(
+        &mut self,
+        output: &mut Vec<Command>,
+        answer: PickAnswer,
+        title: String,
+        accepted_mime_types: Vec<String>,
+        accepted_extensions: Vec<String>,
+        max_bytes: Option<u64>,
+    ) {
+        if let Some(previous) = self.pending_file_pick.take() {
+            output.push(Command::CancelFilePick {
+                request_id: previous.request_id,
+            });
+        }
+        // Independent ids prevent a delayed callback surviving an engine restart (#764).
+        let request_id = hex::encode(vauchi_core::crypto::random_bytes::<16>());
+        self.pending_file_pick = Some(PendingFilePick {
+            request_id: request_id.clone(),
+            screen: self.screen.clone(),
+            contact_import: answer == PickAnswer::File && self.pending_contact_import,
+            answer,
+        });
+        output.push(Command::PickFile {
+            request_id,
+            title,
+            accepted_mime_types,
+            accepted_extensions,
+            max_bytes: max_bytes
+                .unwrap_or(MAX_FILE_PICK_BYTES as u64)
+                .min(MAX_FILE_PICK_BYTES as u64),
+        });
     }
 
     pub(super) fn correlate_file_event(&mut self, event: Event) -> Option<Event> {
@@ -97,6 +143,7 @@ impl AppEngine {
                     self.cancel_file_pick();
                     return None;
                 }
+                let answer = pending.answer;
                 self.pending_file_pick = None;
                 match outcome {
                     FilePickOutcome::Selected { bytes, filename } => {
@@ -107,9 +154,15 @@ impl AppEngine {
                                 error: String::new(),
                             });
                         }
-                        Some(Event::FilePickedFromUser { bytes, filename })
+                        Some(match answer {
+                            PickAnswer::File => Event::FilePickedFromUser { bytes, filename },
+                            PickAnswer::Image => Event::ImageReceived { data: bytes },
+                        })
                     }
-                    FilePickOutcome::Cancelled => Some(Event::FilePickCancelledByUser),
+                    FilePickOutcome::Cancelled => Some(match answer {
+                        PickAnswer::File => Event::FilePickCancelledByUser,
+                        PickAnswer::Image => Event::ImagePickCancelled,
+                    }),
                     FilePickOutcome::Failed { .. } => Some(Event::HardwareError {
                         transport: "file_picker".into(),
                         error: String::new(),

@@ -15,6 +15,7 @@ use std::time::{Duration, SystemTime};
 use vauchi_app::ui::{AppEngine, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
 use vauchi_core::clock::FakeClock;
+use vauchi_core::platform::{Command, ContextBar, Event, InputMode, MotionPreference, SurfaceId};
 use vauchi_core_testkit::meeting;
 
 use crate::hover_engines::{engine_on_hover_with_profile, own_qr_data, scan_into};
@@ -287,4 +288,129 @@ fn a_blocked_contact_is_not_asked_about_and_nothing_is_saved_or_rekeyed() {
     assert!(!asked);
     assert_eq!(key_of(&w.alice, &w.bob_id), w.old_key);
     assert_eq!(w.bob.vauchi().list_contacts().unwrap().len(), 0);
+}
+
+/// The shell's environment report; `pins_actions` is whether it keeps
+/// pinned actions in view.
+fn report_environment(engine: &mut AppEngine, pins_actions: bool) {
+    engine
+        .dispatch(Event::PresentationEnvironmentChanged {
+            available_width: 375,
+            available_height: 760,
+            input_modes: vec![InputMode::Touch],
+            motion: MotionPreference::Full,
+            color_scheme: None,
+            pinned_actions: pins_actions,
+        })
+        .expect("environment accepted");
+}
+
+/// What the shell is handed for the screen the engine is on: the surface
+/// as its wire text, and the bar.
+fn presented_again(engine: &mut AppEngine) -> (String, SurfaceId, ContextBar) {
+    let commands = engine
+        .dispatch(Event::PresentationInvalidated)
+        .expect("surface presented again");
+    let surface = commands
+        .iter()
+        .find_map(|command| match command {
+            Command::ReplaceSurface { surface } => Some(serde_json::to_string(surface).unwrap()),
+            _ => None,
+        })
+        .expect("a surface");
+    let (surface_id, bar) = commands
+        .into_iter()
+        .find_map(|command| match command {
+            Command::SetContextBar {
+                surface_id, bar, ..
+            } => Some((surface_id, *bar)),
+            _ => None,
+        })
+        .expect("a context bar");
+    (surface, surface_id, bar)
+}
+
+fn presented(engine: &mut AppEngine, pins_actions: bool) -> (String, SurfaceId, ContextBar) {
+    report_environment(engine, pins_actions);
+    presented_again(engine)
+}
+
+fn labels(bar: &ContextBar) -> Vec<&str> {
+    bar.pinned
+        .iter()
+        .map(|action| action.label.as_str())
+        .collect()
+}
+
+const YES: &str = "Start a new connection";
+const NO: &str = "Leave it";
+
+/// Whether the surface's wire text has an element labelled exactly so. The
+/// question's own sentence begins with the words of the yes.
+fn has_label(surface: &str, label: &str) -> bool {
+    surface.contains(&format!("\"{label}\""))
+}
+
+// On an iPhone SE both answers were below the fold and the person at the
+// phone did not find the second one (rig, 2026-11-20, vauchi/private#1304).
+// @internal
+#[test]
+fn a_shell_that_pins_actions_gets_both_answers_in_the_bar_and_not_in_the_content() {
+    let mut w = alice_asked_about_bob();
+
+    let (surface, _, bar) = presented(&mut w.alice, true);
+
+    assert_eq!(labels(&bar), [YES, NO]);
+    assert!(!has_label(&surface, YES), "the yes is still in the content");
+    assert!(!has_label(&surface, NO), "the no is still in the content");
+    assert!(surface.contains("reconnect_question"));
+}
+
+// @internal
+#[test]
+fn a_shell_that_does_not_pin_actions_keeps_both_answers_in_the_content() {
+    let mut w = alice_asked_about_bob();
+
+    let (surface, _, bar) = presented(&mut w.alice, false);
+
+    assert_eq!(labels(&bar), [] as [&str; 0]);
+    assert!(has_label(&surface, YES));
+    assert!(has_label(&surface, NO));
+}
+
+// @internal
+#[test]
+fn the_pinned_no_leaves_the_key_as_it_was_and_takes_the_answers_away() {
+    let mut w = alice_asked_about_bob();
+    let (_, surface_id, bar) = presented(&mut w.alice, true);
+    let no = bar.pinned[1].interaction_id.clone();
+
+    w.alice
+        .dispatch(Event::ActionActivated {
+            surface_id,
+            interaction_id: no,
+        })
+        .expect("the pinned answer is accepted");
+    let bob_was_told = drive(&mut w, 200, |w| shows(&w.bob, KEPT_BY_THEM));
+
+    assert!(bob_was_told, "Bob's phone never said Alice declined");
+    assert!(shows(&w.alice, KEPT_BY_YOU));
+    assert_eq!(key_of(&w.alice, &w.bob_id), w.old_key);
+    let (_, _, bar) = presented(&mut w.alice, true);
+    assert_eq!(labels(&bar), [] as [&str; 0]);
+}
+
+// An engine that replaces another (after an unlock or a wipe) is not told
+// the environment again; the shell would lose its pinned answers.
+// @internal
+#[test]
+fn an_engine_that_takes_over_keeps_what_the_shell_said_about_pinning() {
+    let mut w = alice_asked_about_bob();
+    report_environment(&mut w.bob, true);
+    let window = w.bob.reported_window();
+
+    w.alice.inherit_reported_window(window);
+
+    let (_, _, bar) = presented_again(&mut w.alice);
+    assert_eq!(labels(&bar), [YES, NO]);
 }

@@ -19,7 +19,6 @@ pub const RECONNECT_ACCEPT_ACTION_ID: &str = "reconnect_accept";
 /// "Leave it": the contact keeps the connection it had.
 pub const RECONNECT_DECLINE_ACTION_ID: &str = "reconnect_decline";
 
-const COMPONENT_ID_QUESTION_TITLE: &str = "reconnect_title";
 const COMPONENT_ID_QUESTION: &str = "reconnect_question";
 const COMPONENT_ID_WAITING: &str = "reconnect_waiting";
 
@@ -120,27 +119,17 @@ impl MultiStageExchangeEngine {
     pub(super) fn build_repeat_screen(&self, title: String, repeat: RepeatExchange) -> ScreenModel {
         match repeat {
             RepeatExchange::Asking => {
-                // Body size for the title too: as a heading it took two
-                // lines on an iPhone SE and left the warning one line
-                // under the code (rig, 2026-11-20).
-                let paragraph = |id: &str, key| Component::Text {
-                    id: id.into(),
-                    content: self.t_named(key),
+                // One line, over the code: with the two answers kept in
+                // view under it, that is what an iPhone SE has room for
+                // with the code whole. Under the code the question was off
+                // the screen, and beside the camera it was cut to one line
+                // of three (rig, 2026-11-19 to 21, vauchi/private#1304).
+                let question = Component::Text {
+                    id: COMPONENT_ID_QUESTION.into(),
+                    content: self.t_named("exchange.reconnect.ask"),
                     style: TextStyle::Body,
                     a11y: None,
                 };
-                // Under the code and not beside the camera, on a screen
-                // that scrolls: in that column an iPhone SE cut the
-                // question to one line (rig, vauchi/private#1304). The
-                // answers come before the camera, which on a scrolling
-                // screen is a screen's height of its own.
-                let mut question = vec![
-                    paragraph(
-                        COMPONENT_ID_QUESTION_TITLE,
-                        "exchange.reconnect.question_title",
-                    ),
-                    paragraph(COMPONENT_ID_QUESTION, "exchange.reconnect.question_text"),
-                ];
                 // Answered: the buttons go, so a second tap has nothing
                 // to press while the AppEngine acts on the first.
                 let buttons = if self.reconnect_answer.is_some() {
@@ -149,17 +138,19 @@ impl MultiStageExchangeEngine {
                     vec![
                         self.list_button(
                             RECONNECT_ACCEPT_ACTION_ID,
-                            self.t("exchange.reconnect.accept"),
+                            self.t_named("exchange.reconnect.yes"),
                         ),
                         self.list_button(
                             RECONNECT_DECLINE_ACTION_ID,
-                            self.t("exchange.reconnect.decline"),
+                            self.t("exchange.reconnect.no"),
                         ),
                     ]
                 };
                 let answered = buttons.is_empty();
-                question.push(self.exchange_buttons(buttons));
-                let mut screen = self.exchange_screen(title, question, Vec::new());
+                // The answers come before the camera, which on a scrolling
+                // screen is a screen's height of its own.
+                let answers = vec![self.exchange_buttons(buttons)];
+                let mut screen = self.exchange_screen(title, vec![question], answers, Vec::new());
                 if !answered {
                     screen.pinned_list = Some(PinnedList {
                         component_id: EXCHANGE_ACTIONS_ID.into(),

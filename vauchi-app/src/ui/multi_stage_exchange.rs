@@ -643,7 +643,7 @@ impl MultiStageExchangeEngine {
         buttons: Vec<ActionListItem>,
     ) -> ScreenModel {
         let beside_camera = vec![status, self.exchange_buttons(buttons)];
-        let mut screen = self.exchange_screen(title, Vec::new(), beside_camera);
+        let mut screen = self.exchange_screen(title, Vec::new(), Vec::new(), beside_camera);
         screen.layout = ScreenLayout::Fixed;
         screen
     }
@@ -655,15 +655,17 @@ impl MultiStageExchangeEngine {
         }
     }
 
-    /// The own code, `under_code` at the screen's full width, then the
-    /// camera, beside a column of `beside_camera` when there is any.
+    /// `over_code`, the own code, `under_code` at the screen's full width,
+    /// then the camera, beside a column of `beside_camera` when there is
+    /// any.
     fn exchange_screen(
         &self,
         title: String,
+        over_code: Vec<Component>,
         under_code: Vec<Component>,
         beside_camera: Vec<Component>,
     ) -> ScreenModel {
-        let mut components: Vec<Component> = Vec::new();
+        let mut components = over_code;
 
         // Own QR — pinned at the TOP of a fixed (non-scrolling) layout.
         // It is what the peer scans, so it must never move; keeping it

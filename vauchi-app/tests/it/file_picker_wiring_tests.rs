@@ -403,7 +403,7 @@ fn submit_wrong_password_returns_alert_and_clears_state() {
     );
 }
 
-// @scenario: core_file_picker :: the restore password field keeps what was typed
+// @internal
 // A shell that draws Core's value emptied the field under the typing and
 // sent the rest as the whole password (vauchi/private#1327).
 #[test]

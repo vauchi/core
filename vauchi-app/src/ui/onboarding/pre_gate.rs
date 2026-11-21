@@ -216,7 +216,10 @@ impl OnboardingEngine {
             components: vec![Component::TextInput {
                 id: "backup_password".into(),
                 label: self.t("backup.password"),
-                value: String::new(),
+                // A shell that draws this value instead of holding its own
+                // buffer empties the field on a re-render when it is not
+                // echoed (vauchi/private#1327).
+                value: self.pending_backup_password.clone(),
                 placeholder: Some(self.t("onboarding.backup_password_placeholder")),
                 max_length: None,
                 validation_error: None,

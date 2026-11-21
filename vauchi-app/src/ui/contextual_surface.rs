@@ -18,6 +18,7 @@ const NAVIGATION_INTERACTION_ID: &str = "presentation.navigation";
 const SECONDARY_INTERACTION_ID: &str = "presentation.secondary";
 const INFO_INTERACTION_ID: &str = "presentation.info";
 const NAVIGATION_ITEM_PREFIX: &str = "presentation.navigation.";
+const PINNED_ITEM_PREFIX: &str = "presentation.pinned.";
 const LEGACY_BACK_ACTION_ID: &str = "go_back";
 
 #[derive(Clone, Debug, PartialEq)]
@@ -181,6 +182,36 @@ impl ContextualSurface {
             secondary_items.push(action_spec(interaction_id, action, tone_for(action), None)?);
         }
 
+        let mut pinned = Vec::new();
+        if let Some(list) = &screen.pinned_list {
+            for item in &list.lifted {
+                let interaction_id =
+                    scoped_interaction(revision, &format!("{PINNED_ITEM_PREFIX}{}", item.id))?;
+                // The same action the list sends from the content, so the
+                // screen's engine answers one way wherever the shell drew it.
+                routes.insert(
+                    interaction_id.clone(),
+                    UserAction::ListItemSelected {
+                        component_id: list.component_id.clone(),
+                        item_id: item.id.clone(),
+                    },
+                );
+                pinned.push(ActionSpec {
+                    interaction_id,
+                    label: item.label.clone(),
+                    accessibility_label: item
+                        .a11y
+                        .as_ref()
+                        .and_then(|a11y| a11y.label.clone())
+                        .unwrap_or_else(|| item.label.clone()),
+                    icon_token: None,
+                    enabled: true,
+                    tone: ActionTone::Standard,
+                    shortcut: None,
+                });
+            }
+        }
+
         let mut navigation_items = Vec::with_capacity(navigation.len());
         let mut navigation_spec_items = Vec::with_capacity(navigation.len());
         for item in navigation {
@@ -239,7 +270,7 @@ impl ContextualSurface {
                 primary,
                 secondary,
                 info: None,
-                pinned: Vec::new(),
+                pinned,
             },
             back_interaction_id,
             navigation_interaction_id,

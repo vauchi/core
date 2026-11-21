@@ -213,8 +213,8 @@ pub use recovery_help::{ParsedClaimSummary, RecoveryHelpEngine};
 pub use recovery_status::RecoveryEngine;
 pub use render_context::RenderContext;
 pub use screen::{
-    ActionStyle, CURRENT_SCHEMA_VERSION, NativeWrapperHint, Progress, ScreenAction, ScreenLayout,
-    ScreenModel, ScreenPresentationKind, TabInfo,
+    ActionStyle, CURRENT_SCHEMA_VERSION, MAX_PINNED_ACTIONS, NativeWrapperHint, PinnedList,
+    Progress, ScreenAction, ScreenLayout, ScreenModel, ScreenPresentationKind, TabInfo,
 };
 pub use screen_catalog_fixture::{
     ScreenCatalogEntry, ScreenCatalogFixture, screen_catalog_fixture_json,

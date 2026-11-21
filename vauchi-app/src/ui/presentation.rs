@@ -27,6 +27,7 @@ const LEFT_BEHIND_MEMORY: usize = 4;
 pub struct ReportedWindow {
     window_class: Option<WindowClass>,
     available_height: Option<u32>,
+    pins_actions: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -36,6 +37,7 @@ pub struct PresentationCoordinator {
     active_surface: SurfaceId,
     window_class: Option<WindowClass>,
     available_height: Option<u32>,
+    pins_actions: bool,
     left_behind: Vec<SurfaceId>,
 }
 
@@ -59,6 +61,7 @@ impl PresentationCoordinator {
             detail_surface: None,
             window_class: None,
             available_height: None,
+            pins_actions: false,
             left_behind: Vec::new(),
         }
     }
@@ -88,12 +91,14 @@ impl PresentationCoordinator {
         ReportedWindow {
             window_class: self.window_class,
             available_height: self.available_height,
+            pins_actions: self.pins_actions,
         }
     }
 
     pub fn inherit_reported_window(&mut self, window: ReportedWindow) {
         self.window_class = window.window_class;
         self.available_height = window.available_height;
+        self.pins_actions = window.pins_actions;
     }
 
     /// Takes surfaces another coordinator showed as left behind here, so an
@@ -187,10 +192,12 @@ impl PresentationCoordinator {
             Event::PresentationEnvironmentChanged {
                 available_width,
                 available_height,
+                pinned_actions,
                 ..
             } => {
                 self.window_class = Some(classify_width(self.window_class, available_width));
                 self.available_height = Some(available_height);
+                self.pins_actions = pinned_actions;
             }
             Event::SurfaceActivated { surface_id } => {
                 if !self.surface_is_visible(&surface_id)? {
@@ -212,6 +219,13 @@ impl PresentationCoordinator {
     pub(crate) fn is_short(&self) -> bool {
         self.available_height
             .is_some_and(|height| height < SHORT_WINDOW_HEIGHT)
+    }
+
+    /// Whether the shell keeps `ContextBar::pinned` in view. Not until it
+    /// says so in its environment report.
+    #[cfg(feature = "network-rustls")]
+    pub(crate) fn pins_actions(&self) -> bool {
+        self.pins_actions
     }
 
     fn profile(&self) -> Result<PresentationProfile, PresentationCoordinatorError> {

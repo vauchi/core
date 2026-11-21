@@ -64,6 +64,7 @@ mod notifications;
 mod onboarding_shortfall_tests;
 mod overlays;
 mod pending_commands;
+mod pinned_actions;
 mod presentation_invalidation;
 mod presentation_protocol;
 mod render_context;
@@ -745,6 +746,7 @@ impl WorkflowEngine for AppEngine {
         let screen = self.apply_sync_chrome_overlay(screen);
         let screen = self.apply_nav_chrome_overlay(screen);
         let screen = self.apply_demo_contact_overlay(screen);
+        let screen = self.apply_pinned_actions(screen);
         let screen = match &self.validation_error {
             Some((component_id, message)) => {
                 screen.with_validation_error(component_id, message.clone())

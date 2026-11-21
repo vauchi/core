@@ -95,6 +95,21 @@ impl NativeWrapperHint {
     }
 }
 
+/// The button list a screen's decision lives in. A shell that keeps
+/// actions in view under the content gets its items there instead of in
+/// the content, so the decision cannot scroll away (vauchi/private#1304).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PinnedList {
+    /// The `ButtonList` among the screen's components.
+    pub component_id: String,
+    /// Its items once the AppEngine took the list out of the content for
+    /// a shell that pins actions; empty while the list is still there.
+    pub lifted: Vec<super::ActionListItem>,
+}
+
+/// The most actions a shell is asked to keep in view at once.
+pub const MAX_PINNED_ACTIONS: usize = 3;
+
 /// Describes a full screen to render.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -158,6 +173,11 @@ pub struct ScreenModel {
     #[serde(skip)]
     #[cfg_attr(feature = "schema-gen", schemars(skip))]
     pub nav_actions: Vec<ScreenAction>,
+    /// Core-internal: which button list holds the screen's decision. See
+    /// [`PinnedList`].
+    #[serde(skip)]
+    #[cfg_attr(feature = "schema-gen", schemars(skip))]
+    pub pinned_list: Option<PinnedList>,
 }
 
 fn default_schema_version() -> u16 {
@@ -186,6 +206,7 @@ impl Default for ScreenModel {
             layout: ScreenLayout::Scroll,
             native_wrapper_hint: NativeWrapperHint::None,
             nav_actions: Vec::new(),
+            pinned_list: None,
         }
     }
 }
@@ -217,6 +238,7 @@ impl ScreenModel {
             layout: ScreenLayout::Scroll,
             native_wrapper_hint: NativeWrapperHint::None,
             nav_actions: Vec::new(),
+            pinned_list: None,
         }
     }
 

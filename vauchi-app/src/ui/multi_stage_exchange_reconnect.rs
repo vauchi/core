@@ -157,8 +157,16 @@ impl MultiStageExchangeEngine {
                         ),
                     ]
                 };
+                let answered = buttons.is_empty();
                 question.push(self.exchange_buttons(buttons));
-                self.exchange_screen(title, question, Vec::new())
+                let mut screen = self.exchange_screen(title, question, Vec::new());
+                if !answered {
+                    screen.pinned_list = Some(PinnedList {
+                        component_id: EXCHANGE_ACTIONS_ID.into(),
+                        lifted: Vec::new(),
+                    });
+                }
+                screen
             }
             RepeatExchange::Waiting => {
                 let status = self.repeat_status(

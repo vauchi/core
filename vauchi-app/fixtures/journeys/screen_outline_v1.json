@@ -15698,6 +15698,17 @@
               }
             },
             {
+              "Text": {
+                "accessibility": {
+                  "description": null,
+                  "label": "len:20"
+                },
+                "content": "len:20",
+                "id": "reconnect_question",
+                "style": "body"
+              }
+            },
+            {
               "Qr": {
                 "accessibility": {
                   "description": null,
@@ -15713,28 +15724,6 @@
               }
             },
             {
-              "Text": {
-                "accessibility": {
-                  "description": null,
-                  "label": "len:30"
-                },
-                "content": "len:30",
-                "id": "reconnect_title",
-                "style": "body"
-              }
-            },
-            {
-              "Text": {
-                "accessibility": {
-                  "description": null,
-                  "label": "len:76"
-                },
-                "content": "len:76",
-                "id": "reconnect_question",
-                "style": "body"
-              }
-            },
-            {
               "List": {
                 "accessibility": {
                   "description": null,
@@ -15747,14 +15736,14 @@
                   {
                     "accessibility": {
                       "description": null,
-                      "label": "len:22"
+                      "label": "len:19"
                     },
                     "activation": {
-                      "accessibility_label": "len:22",
+                      "accessibility_label": "len:19",
                       "enabled": true,
                       "icon_token": null,
                       "interaction_id": "surface.1.interaction.0",
-                      "label": "len:22",
+                      "label": "len:19",
                       "shortcut": null
                     },
                     "controls": [],
@@ -15766,19 +15755,19 @@
                     "secondary_actions": [],
                     "selected": false,
                     "subtitle": null,
-                    "title": "len:22"
+                    "title": "len:19"
                   },
                   {
                     "accessibility": {
                       "description": null,
-                      "label": "len:8"
+                      "label": "len:21"
                     },
                     "activation": {
-                      "accessibility_label": "len:8",
+                      "accessibility_label": "len:21",
                       "enabled": true,
                       "icon_token": null,
                       "interaction_id": "surface.1.interaction.1",
-                      "label": "len:8",
+                      "label": "len:21",
                       "shortcut": null
                     },
                     "controls": [],
@@ -15790,7 +15779,7 @@
                     "secondary_actions": [],
                     "selected": false,
                     "subtitle": null,
-                    "title": "len:8"
+                    "title": "len:21"
                   }
                 ],
                 "searchable": false,

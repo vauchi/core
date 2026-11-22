@@ -10,6 +10,7 @@
 mod app_screen;
 mod auth_mode_sessions;
 mod backup_presence;
+mod binding_revision;
 mod ble_handshake;
 mod completion;
 #[cfg(feature = "content-updates")]

@@ -274,12 +274,7 @@ impl AppEngine {
             // step just left would be refused, not dropped (private#1339).
             let before = self.projected_visible_surface();
             self.invalidate_all();
-            if !self.preserves_binding_meaning(before.as_ref()) {
-                self.surface_revision = self
-                    .surface_revision
-                    .checked_add(1)
-                    .ok_or(AppPresentationError::RevisionExhausted)?;
-            }
+            self.renew_revision_unless_bindings_kept(before.as_ref())?;
             return self.initial_commands();
         }
 
@@ -727,12 +722,7 @@ impl AppEngine {
                 | ActionResult::DeviceLinkDeny
                 | ActionResult::DeviceLinkRetry
         );
-        if !self.preserves_binding_meaning(before.as_ref()) {
-            self.surface_revision = self
-                .surface_revision
-                .checked_add(1)
-                .ok_or(AppPresentationError::RevisionExhausted)?;
-        }
+        self.renew_revision_unless_bindings_kept(before.as_ref())?;
         let screen = self.current_screen();
         let mut commands = self.surface_commands(&screen)?;
         commands.extend(self.offer_causal_undo(&result, cause.as_ref()));
@@ -777,35 +767,6 @@ impl AppEngine {
     fn finish_batch(&mut self, mut commands: Vec<Command>) -> Vec<Command> {
         commands.extend(self.drain_pending_commands());
         commands
-    }
-
-    fn projected_visible_surface(&self) -> Option<(SurfaceId, PreparedSurface)> {
-        let surface_id = SurfaceId::new(self.screen.screen_id()).ok()?;
-        let screen = self.current_screen();
-        let prepared = PreparedSurface::from_screen_in(
-            surface_id.clone(),
-            self.surface_revision,
-            &screen,
-            &self.render_context,
-        )
-        .ok()?;
-        Some((surface_id, prepared))
-    }
-
-    /// Whether the ids already handed to shells still mean what they meant.
-    ///
-    /// Shells key their composition state on these ids, so reminting them for
-    /// a content-only change rebuilds live widgets: on Android that drops
-    /// focus and closes the soft keyboard between keystrokes. The revision
-    /// therefore tracks binding topology, not content.
-    fn preserves_binding_meaning(&self, before: Option<&(SurfaceId, PreparedSurface)>) -> bool {
-        let Some((before_id, before_surface)) = before else {
-            return false;
-        };
-        let Some((after_id, after_surface)) = self.projected_visible_surface() else {
-            return false;
-        };
-        *before_id == after_id && before_surface.routes_match(&after_surface)
     }
 
     fn offer_causal_undo(

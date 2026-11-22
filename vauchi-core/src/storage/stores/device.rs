@@ -271,6 +271,14 @@ impl DeviceStore<'_> {
         let Some(mut saved) = self.load_device_registry()? else {
             return Ok(identity.initial_device_registry_naming(device_public_key));
         };
+        // Every registry this install saves is signed by its identity; one
+        // that is not was left by an identity this install held before, and
+        // naming this device in it would re-sign another identity's devices.
+        if !saved.verify(&identity.signing_keypair().public_key()) {
+            return Err(StorageError::InvalidData(
+                "the saved device registry belongs to another identity".into(),
+            ));
+        }
         // A registry saved before this device had a key (a link from an
         // older host, hand-back recovery) names it here, once. A registry
         // whose entry for this device names another key is a database

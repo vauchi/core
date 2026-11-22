@@ -207,15 +207,14 @@ fn opened(
         secret.as_ref(),
         &transcript(b"Vauchi_Notice_Root_v7|"),
     );
-    let proof = HKDF::derive_array::<KEY_BYTES>(
-        None,
-        agreed.ephemeral_with_receiver_device,
-        &info(
-            b"Vauchi_Notice_Proof_v7|",
-            &[label.as_bytes(), &number_bytes],
-        ),
-    );
     let root = key_at(okm.as_ref(), 0);
+    // Salted with the new root: a copy of the receiver's device key, with
+    // the openings it reads, must not give the proof key of later epochs.
+    let proof = HKDF::derive_array::<KEY_BYTES>(
+        Some(root.as_ref()),
+        agreed.ephemeral_with_receiver_device,
+        &transcript(b"Vauchi_Notice_Proof_v7|"),
+    );
     Opened {
         epoch: Epoch {
             number,

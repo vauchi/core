@@ -21,7 +21,7 @@ use vauchi_core::exchange::multistage::confirmation::{
 use vauchi_core::exchange::multistage::qr_codec::{
     self, QrCodecError, StageQr, format_both_qr, format_done_qr, format_final_qr, parse_qr,
 };
-use vauchi_core::exchange::multistage::session::MultiStageSession;
+use vauchi_core::exchange::multistage::session::{BOTH_LINGER, MultiStageSession};
 use vauchi_core::exchange::multistage::types::ProtocolState;
 use vauchi_core::monotonic::FakeMonotonicClock;
 use vauchi_core::{ContactCard, Identity};
@@ -628,4 +628,60 @@ proptest! {
         prop_assert_eq!(p.alice.peer_holding(), None);
         prop_assert_eq!(p.alice.peer_ending(), None);
     }
+}
+
+/// After a yes the phone whose person answered starts its camera again
+/// (the question's screen had none running on Android), and at 14 cm a
+/// Pixel 3a read nothing of the waiting iPhone for 3 s: the iPhone stopped
+/// showing BOTH, and the Pixel said only "Saved on this phone" (rig,
+/// 2026-11-22, run r9, vauchi/private#1330). After a question the waiting
+/// phone keeps BOTH up long enough for that camera; the owner chose 10 s
+/// the same day. It still stops at once when it reads the peer's BOTH.
+// @internal
+#[test]
+fn after_a_question_the_waiting_phone_shows_both_until_the_answering_phone_can_read_it() {
+    let mut p = pair();
+    run(
+        &mut p,
+        Some(Holding::Peer),
+        Some(Holding::Nothing),
+        both_finalized,
+    );
+    assert!(p.alice.mark_reconnected());
+    deliver(&mut p.alice, &mut p.bob);
+    assert!(p.bob.mark_saved());
+    assert!(frames_shown(&mut p.bob, 1)[0].starts_with("BTH5"));
+
+    p.clock.advance(Duration::from_secs(4));
+    let shown_four_seconds_on = frames_shown(&mut p.bob, 3);
+    for frame in &shown_four_seconds_on {
+        p.alice.process_scanned_qr(frame);
+    }
+
+    assert_eq!(shown_four_seconds_on.len(), 3, "Bob stopped showing BOTH");
+    assert!(p.alice.peer_saved(), "Alice never learned that Bob saved");
+    p.clock.advance(Duration::from_secs(7));
+    assert_eq!(p.bob.get_display_qr().map(|frame| frame.data), None);
+}
+
+/// Without a question nothing waited for a person, and BOTH keeps its
+/// short linger (design D6).
+// @internal
+#[test]
+fn without_a_question_both_keeps_its_short_linger() {
+    let mut p = pair();
+    run(
+        &mut p,
+        Some(Holding::Peer),
+        Some(Holding::Peer),
+        both_finalized,
+    );
+    assert!(p.alice.mark_saved());
+    deliver(&mut p.alice, &mut p.bob);
+    assert!(p.bob.mark_saved());
+    assert!(frames_shown(&mut p.bob, 1)[0].starts_with("BTH5"));
+
+    p.clock.advance(BOTH_LINGER);
+
+    assert_eq!(p.bob.get_display_qr().map(|frame| frame.data), None);
 }

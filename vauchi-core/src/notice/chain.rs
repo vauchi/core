@@ -23,6 +23,10 @@ pub const WINDOW: u32 = 512;
 pub const SKIPPED_KEPT: u32 = 256;
 /// How long a skipped position keeps its key.
 pub const SKIPPED_SECONDS: u64 = 3 * PERIOD_SECONDS;
+/// The chain's last position. Out of reach in honest use (at 128
+/// positions a period it takes over 600,000 years); the chain ends there
+/// rather than write a position twice.
+pub const LAST_POSITION: u32 = u32::MAX - 1;
 
 pub struct ChainWriter {
     position: u32,
@@ -31,20 +35,31 @@ pub struct ChainWriter {
 
 impl ChainWriter {
     pub fn new(chain_key: &[u8; 32]) -> Self {
+        Self::resume(chain_key, 0)
+    }
+
+    /// The writer of a chain whose next position is `position`, with
+    /// `chain_key` that position's key, as saved state holds it.
+    pub fn resume(chain_key: &[u8; 32], position: u32) -> Self {
         Self {
-            position: 0,
+            position,
             chain_key: Zeroizing::new(*chain_key),
         }
     }
 
-    /// The next position and where a record written there travels. The
-    /// chain steps at once, so no position is assigned twice.
-    pub fn assign(&mut self) -> (u32, Keyed) {
+    /// The next position and where a record written there travels, or
+    /// `None` once the chain has ended. The chain steps at once, so no
+    /// position is assigned twice.
+    pub fn assign(&mut self) -> Option<(u32, Keyed)> {
+        if self.position > LAST_POSITION {
+            return None;
+        }
         let step = chain_step(&self.chain_key);
         let position = self.position;
         self.chain_key = step.next;
+        // Past LAST_POSITION, u32::MAX means ended; it is never assigned.
         self.position = position.saturating_add(1);
-        (position, step.at)
+        Some((position, step.at))
     }
 }
 
@@ -64,8 +79,14 @@ pub struct ChainReader {
 
 impl ChainReader {
     pub fn new(chain_key: &[u8; 32]) -> Self {
+        Self::resume(chain_key, 0)
+    }
+
+    /// The reader of a chain whose lowest position not stepped past is
+    /// `position`, with `chain_key` that position's key.
+    pub fn resume(chain_key: &[u8; 32], position: u32) -> Self {
         let mut reader = Self {
-            position: 0,
+            position,
             chain_key: Zeroizing::new(*chain_key),
             window_tags: Vec::new(),
             skipped: BTreeMap::new(),
@@ -81,7 +102,10 @@ impl ChainReader {
     fn fill_window(&mut self) {
         self.window_tags.clear();
         let mut chain_key = self.chain_key.clone();
-        for _ in 0..WINDOW {
+        let left = LAST_POSITION
+            .checked_sub(self.position)
+            .map_or(0, |beyond| beyond.saturating_add(1));
+        for _ in 0..WINDOW.min(left) {
             let step = chain_step(&chain_key);
             self.window_tags.push(step.at.tag);
             chain_key = step.next;
@@ -127,7 +151,7 @@ impl ChainReader {
 
         let first_passed = self.position;
         for (offset, at) in passed.into_iter().enumerate() {
-            let position = first_passed.saturating_add(u32::try_from(offset).ok()?);
+            let position = first_passed.checked_add(u32::try_from(offset).ok()?)?;
             self.skipped.insert(
                 position,
                 Skipped {
@@ -139,7 +163,7 @@ impl ChainReader {
         while self.skipped.len() > SKIPPED_KEPT as usize {
             self.skipped.pop_first();
         }
-        let read_position = first_passed.saturating_add(u32::try_from(ahead).ok()?);
+        let read_position = first_passed.checked_add(u32::try_from(ahead).ok()?)?;
         self.position = read_position.saturating_add(1);
         self.chain_key = step.next;
         self.fill_window();

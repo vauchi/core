@@ -46,6 +46,7 @@ fn rejection_alert(locale: Locale, message: String) -> Vec<Command> {
 /// Dev instrumentation (no content): which event `dispatch` refused, what
 /// it targeted and why, against which screen and revision; `kind` alone
 /// did not say (vauchi/private#1339).
+#[cfg(feature = "network-rustls")]
 pub(crate) fn log_refused(
     event: &vauchi_core::Event,
     error: &crate::ui::AppPresentationError,
@@ -64,6 +65,7 @@ pub(crate) fn log_refused(
 /// An event's variant, never its fields: a value may be what the person
 /// typed (logging rules). For the log line of a refused event
 /// (vauchi/private#1339).
+#[cfg(feature = "network-rustls")]
 pub(crate) fn event_kind(event: &vauchi_core::Event) -> String {
     match serde_json::to_value(event) {
         Ok(serde_json::Value::String(unit)) => unit,
@@ -78,6 +80,7 @@ pub(crate) fn event_kind(event: &vauchi_core::Event) -> String {
 
 /// The binding or interaction id an event names. Core mints these ids;
 /// they carry no user input, unlike the event's value.
+#[cfg(feature = "network-rustls")]
 pub(crate) fn event_target(event: &vauchi_core::Event) -> String {
     use vauchi_core::Event;
     match event {
@@ -91,6 +94,7 @@ pub(crate) fn event_target(event: &vauchi_core::Event) -> String {
 
 /// Why `dispatch` refused, one level deeper than
 /// `AppPresentationError::kind` where the prepared surface said why.
+#[cfg(feature = "network-rustls")]
 pub(crate) fn rejection_detail(error: &crate::ui::AppPresentationError) -> String {
     use crate::ui::{AppPresentationError, PreparedSurfaceError};
     match error {
@@ -110,7 +114,8 @@ pub(crate) fn rejection_detail(error: &crate::ui::AppPresentationError) -> Strin
 }
 
 // INLINE_TEST_REQUIRED: tests exercise the crate-private diagnostics helpers
-#[cfg(test)]
+// The helpers name `AppPresentationError`, which exists with `network-rustls`.
+#[cfg(all(test, feature = "network-rustls"))]
 mod tests {
     use super::*;
     use crate::ui::AppPresentationError;

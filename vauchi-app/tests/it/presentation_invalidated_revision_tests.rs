@@ -100,3 +100,34 @@ fn a_late_focus_end_for_the_name_field_after_an_invalidation_is_dropped_not_refu
         Ok(Vec::new())
     );
 }
+
+// On the phone the rebuild came before the invalidation event: locale
+// content applied in the background is absorbed at the start of the next
+// dispatch, which rebuilt onboarding to Welcome first, so the event's own
+// check saw Welcome on both sides and kept revision 2 (Pixel 3a,
+// 2026-11-22 23:17, core cec092e62).
+// @internal
+#[test]
+fn a_late_focus_end_after_locales_reloaded_is_dropped_not_refused() {
+    let (mut engine, surface_id, name_revision, binding_id) = on_the_name_page();
+    engine.reload_locales();
+
+    let rebuilt = engine
+        .dispatch(Event::PresentationInvalidated)
+        .expect("invalidation");
+    let late = engine.dispatch(Event::InputFocusEnded {
+        surface_id,
+        binding_id,
+    });
+
+    let (_, rebuilt_revision, nodes) = shown_surface(&rebuilt);
+    assert_eq!(input_binding(&nodes), None, "onboarding is back at Welcome");
+    assert!(
+        rebuilt_revision > name_revision,
+        "Welcome came at revision {rebuilt_revision}, the name page's was {name_revision}"
+    );
+    assert_eq!(
+        late.map_err(|rejection| rejection.to_string()),
+        Ok(Vec::new())
+    );
+}

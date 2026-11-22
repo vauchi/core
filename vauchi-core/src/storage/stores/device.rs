@@ -268,17 +268,9 @@ impl DeviceStore<'_> {
     pub fn own_device_registry(&self, identity: &Identity) -> Result<DeviceRegistry, StorageError> {
         let device_key = self.load_or_create_device_signing_key(identity)?;
         let device_public_key = *device_key.public_key().as_bytes();
-        let Some(mut saved) = self.load_device_registry()? else {
+        let Some(mut saved) = self.load_own_device_registry(identity)? else {
             return Ok(identity.initial_device_registry_naming(device_public_key));
         };
-        // Every registry this install saves is signed by its identity; one
-        // that is not was left by an identity this install held before, and
-        // naming this device in it would re-sign another identity's devices.
-        if !saved.verify(&identity.signing_keypair().public_key()) {
-            return Err(StorageError::InvalidData(
-                "the saved device registry belongs to another identity".into(),
-            ));
-        }
         // A registry saved before this device had a key (a link from an
         // older host, hand-back recovery) names it here, once. A registry
         // whose entry for this device names another key is a database
@@ -324,6 +316,25 @@ impl DeviceStore<'_> {
     pub fn clear_device_signing_key(&self) -> Result<(), StorageError> {
         self.conn.execute("DELETE FROM device_signing_key", [])?;
         Ok(())
+    }
+
+    /// The saved registry, refused when `identity` did not sign it. Every
+    /// registry this install saves is signed by its identity; one that is
+    /// not was left by an identity this install held before, and changing
+    /// it would re-sign another identity's devices as this one's.
+    pub fn load_own_device_registry(
+        &self,
+        identity: &Identity,
+    ) -> Result<Option<DeviceRegistry>, StorageError> {
+        let Some(saved) = self.load_device_registry()? else {
+            return Ok(None);
+        };
+        if !saved.verify(&identity.signing_keypair().public_key()) {
+            return Err(StorageError::InvalidData(
+                "the saved device registry belongs to another identity".into(),
+            ));
+        }
+        Ok(Some(saved))
     }
 
     /// Forgets this install's device registry.

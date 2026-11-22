@@ -326,6 +326,12 @@ impl DeviceStore<'_> {
         Ok(())
     }
 
+    /// Forgets this install's device registry.
+    pub fn clear_device_registry(&self) -> Result<(), StorageError> {
+        self.conn.execute("DELETE FROM device_registry", [])?;
+        Ok(())
+    }
+
     /// Saves the device registry (encrypted).
     pub fn save_device_registry(&self, registry: &DeviceRegistry) -> Result<(), StorageError> {
         let registry_json = serde_json::to_string(registry)

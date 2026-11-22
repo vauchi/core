@@ -507,6 +507,27 @@ fn a_late_refresh_names_an_epoch_on_the_day_it_would_expire() {
     p.assert_no_alarm();
 }
 
+// Gate review, 2026-11-23 (Codex): a followed refresh with no update yet
+// left a current view due that stepped the chain in every session
+// without writing or counting, so the first real notice lay beyond the
+// receiver's window.
+// @internal
+#[test]
+fn a_view_with_no_update_yet_uses_no_chain_position() {
+    let mut p = pair();
+    let refresh = p.receiver_session(&[], START);
+    p.sender_session(&refresh, START + DAY);
+    for session in 0..520 {
+        p.sender_session(&[], START + DAY + 60 * (session + 1));
+    }
+    let (key, commitment) = update(8);
+    p.sender.queue_update(&key, &commitment);
+    let written = p.sender_session(&[], START + 2 * DAY);
+    let read = p.receiver.read(&written, START + 2 * DAY);
+    assert_eq!(read.len(), 1, "the first update lies inside the window");
+    assert_eq!(*read[0].update_key, key);
+}
+
 // Red team, pass 1: four unanswered openings stopped healing for good.
 // @internal
 #[test]

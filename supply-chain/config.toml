@@ -216,6 +216,10 @@ criteria = "safe-to-deploy"
 version = "0.1.9"
 criteria = "safe-to-deploy"
 
+[[exemptions.form_urlencoded]]
+version = "1.2.3"
+criteria = "safe-to-deploy"
+
 [[exemptions.fs-err]]
 version = "2.11.0"
 criteria = "safe-to-deploy"
@@ -754,6 +758,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.uriparse]]
 version = "0.6.4"
+criteria = "safe-to-deploy"
+
+[[exemptions.url]]
+version = "2.5.9"
 criteria = "safe-to-deploy"
 
 [[exemptions.urlencoding]]

@@ -8,6 +8,7 @@
 use crate::common::device_sync::device_signed_broadcast;
 use crate::common::helpers::create_vauchi_with_identity;
 use vauchi_core::Vauchi;
+use vauchi_core::identity::Identity;
 
 fn stored_device_key(wb: &Vauchi) -> [u8; 32] {
     *wb.storage()
@@ -99,5 +100,60 @@ fn a_saved_registry_naming_another_key_for_this_device_is_not_signed() {
     assert!(
         error.to_string().contains("another signing key"),
         "the refusal names the cause, got: {error}"
+    );
+}
+
+const ANOTHER_IDENTITYS_REGISTRY: &str = "the saved device registry belongs to another identity";
+
+// @scenario: device_management :: Device-specific keys
+// @internal
+#[test]
+fn a_registry_saved_by_a_previous_identity_is_not_signed() {
+    let wb = create_vauchi_with_identity("Alice");
+    let previous = Identity::create("Bob", 1_700_000_000);
+    let left_over = previous.initial_device_registry_naming([9u8; 32]);
+    wb.storage()
+        .device()
+        .save_device_registry(&left_over)
+        .unwrap();
+
+    let error = wb
+        .own_registry_broadcast(wb.identity().unwrap())
+        .expect_err("a registry another identity signed is not this identity's");
+
+    assert!(
+        error.to_string().contains(ANOTHER_IDENTITYS_REGISTRY),
+        "refused as another identity's registry, got: {error}"
+    );
+    let still_saved = wb
+        .storage()
+        .device()
+        .load_device_registry()
+        .unwrap()
+        .unwrap();
+    assert_eq!(still_saved.to_json(), left_over.to_json(), "left as it was");
+}
+
+// @scenario: device_management :: Device-specific keys
+// @internal
+#[test]
+fn a_registry_naming_this_device_under_another_identitys_signature_is_not_signed() {
+    let wb = create_vauchi_with_identity("Alice");
+    let identity = wb.identity().unwrap();
+    let mut resigned = identity.initial_device_registry_naming(stored_device_key(&wb));
+    let other = Identity::create("Bob", 1_700_000_000);
+    resigned.lift_version_to(resigned.version() + 1, other.signing_keypair());
+    wb.storage()
+        .device()
+        .save_device_registry(&resigned)
+        .unwrap();
+
+    let error = wb
+        .own_registry_broadcast(identity)
+        .expect_err("this identity does not broadcast a registry it did not sign");
+
+    assert!(
+        error.to_string().contains(ANOTHER_IDENTITYS_REGISTRY),
+        "refused as another identity's registry, got: {error}"
     );
 }

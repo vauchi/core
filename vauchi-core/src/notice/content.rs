@@ -151,14 +151,18 @@ impl Reader<'_> {
     }
 }
 
-/// Opens a record expected at `id`. `None` for a record that is not this
-/// update's at that ID, or whose index, count or length cannot be a
-/// body's.
+/// Opens a record expected as record `index` of the publication of
+/// `week`, on its `transmission`-th writing. `None` for a record that is
+/// not that, or whose count or length cannot be a body's.
 pub fn open_record(
     update_key: &[u8; 32],
-    id: &[u8; ID_BYTES],
+    week: u32,
+    index: u16,
+    transmission: u8,
     record: &[u8; RECORD_BYTES],
 ) -> Option<Chunk> {
+    let expected_id = record_id(update_key, week, index, transmission);
+    let id = &expected_id;
     let mut reader = Reader { rest: record };
     let carried_id = reader.take::<ID_BYTES>()?;
     if !bool::from(carried_id.ct_eq(id)) {
@@ -181,7 +185,10 @@ pub fn open_record(
     let mut fields = Reader {
         rest: plaintext.as_slice(),
     };
-    let index = u16::from_be_bytes(fields.take::<2>()?);
+    let carried_index = u16::from_be_bytes(fields.take::<2>()?);
+    if carried_index != index {
+        return None;
+    }
     let count = u16::from_be_bytes(fields.take::<2>()?);
     let length = u32::from_be_bytes(fields.take::<4>()?);
     let bytes = Zeroizing::new(fields.take::<CHUNK_BYTES>()?);

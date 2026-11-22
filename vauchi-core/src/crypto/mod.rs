@@ -22,9 +22,9 @@ pub mod shredding;
 pub mod signing;
 pub mod x25519;
 
+pub use self::hkdf::{HKDF, KDFError};
 pub use chain::{ChainError, ChainKey, MessageKey};
 pub use encryption::{SymmetricKey, decrypt, decrypt_with_ad, encrypt, encrypt_with_ad};
-pub use hkdf::{HKDF, KDFError};
 pub use password_kdf::{PasswordKdfError, derive_key_argon2id};
 pub use random::{random_bytes, random_fill};
 pub use ratchet::{DoubleRatchetState, RATCHET_STATE_VERSION, RatchetError, RatchetMessage};

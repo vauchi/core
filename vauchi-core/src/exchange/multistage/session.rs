@@ -83,6 +83,13 @@ const DECISION_CEILING: Duration = Duration::from_secs(150);
 /// (design D6, maintainer 2026-10-01).
 pub const BOTH_LINGER: Duration = Duration::from_secs(3);
 
+/// BOTH's linger when a person was asked whether to reconnect: the phone
+/// that answered starts its camera again on the answer, and at 14 cm a
+/// Pixel 3a read nothing within `BOTH_LINGER` (rig, 2026-11-22,
+/// vauchi/private#1330; owner's choice of 10 s the same day). A peer that
+/// reads it sooner shows BOTH, which stops this phone at once.
+pub const BOTH_LINGER_AFTER_A_QUESTION: Duration = Duration::from_secs(10);
+
 /// How long a phone that rejected its peer, or could not save it, shows
 /// FAIL, so the peer stops instead of waiting out its timeout
 /// (vauchi/private#1217).
@@ -321,7 +328,7 @@ pub struct MultiStageSession {
     peer_holding: Option<Holding>,
     /// The peer showed DONE: how the exchange ended there.
     peer_ending: Option<Ending>,
-    /// When this phone first showed BOTH; it stops `BOTH_LINGER` later.
+    /// When this phone first showed BOTH; it stops `both_linger()` later.
     both_shown_at: Option<Instant>,
     /// When this phone first showed FAIL; `None` until it does.
     fail_shown_at: Option<Instant>,
@@ -545,12 +552,25 @@ impl MultiStageSession {
 
     /// One phone holds the other and the other holds nothing: a person is
     /// asked before either saves, so the ending takes longer than a save.
+    /// The two phones held different things for each other, so one
+    /// person was asked whether to reconnect.
+    fn followed_a_question(&self) -> bool {
+        matches!(
+            (self.own_holding(), self.peer_holding),
+            (Some(own), Some(peer)) if own != peer
+        )
+    }
+
+    fn both_linger(&self) -> Duration {
+        if self.followed_a_question() {
+            BOTH_LINGER_AFTER_A_QUESTION
+        } else {
+            BOTH_LINGER
+        }
+    }
+
     fn awaits_a_decision(&self) -> bool {
-        self.ending.is_none()
-            && matches!(
-                (self.own_holding(), self.peer_holding),
-                (Some(own), Some(peer)) if own != peer
-            )
+        self.ending.is_none() && self.followed_a_question()
     }
 
     fn end_with(&mut self, ending: impl FnOnce(Holding) -> Option<Ending>) -> bool {
@@ -1455,7 +1475,7 @@ impl MultiStageSession {
                 }
                 if self.peer_ending.is_some() && self.ending.is_some() {
                     let shown_at = *self.both_shown_at.get_or_insert(now);
-                    if now.duration_since(shown_at) >= BOTH_LINGER {
+                    if now.duration_since(shown_at) >= self.both_linger() {
                         return None;
                     }
                     return Some(self.both_frame_qr());

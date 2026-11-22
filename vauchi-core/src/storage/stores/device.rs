@@ -131,61 +131,36 @@ impl DeviceStore<'_> {
         Ok(())
     }
 
-    /// This device's random signing key, generated on first use (ADR-079).
+    /// This device's random signing key for `identity`, generated on first
+    /// use (ADR-079).
     ///
     /// Contacts pin the public half and accept no other for this device, so a
-    /// stored key that does not open is an error and is never replaced.
-    pub fn load_or_create_device_signing_key(&self) -> Result<SigningKeyPair, StorageError> {
-        let stored = match self.stored_device_signing_key()? {
-            Some(stored) => stored,
-            None => {
-                let candidate = Zeroizing::new(crate::crypto::random_bytes::<32>());
-                let sealed = crate::crypto::encrypt(self.key, candidate.as_slice())
-                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
-                // IGNORE, then read back: the app and its background worker can
-                // both get here, and only one key may ever exist. The identity
-                // check is in the same statement because a worker that outlives
-                // an identity deletion would otherwise leave a key for the next
-                // identity to sign with (ADR-079, vauchi/private#970).
-                let holder = if self.identity_is_derived {
-                    "SELECT 1, ?1"
-                } else {
-                    "SELECT 1, ?1 WHERE EXISTS (SELECT 1 FROM identity WHERE id = 1)"
-                };
-                self.conn.execute(
-                    &format!(
-                        "INSERT OR IGNORE INTO device_signing_key (id, key_encrypted) {holder}"
-                    ),
-                    params![sealed],
-                )?;
-                self.stored_device_signing_key()?.ok_or_else(|| {
-                    StorageError::InvalidData(
-                        "a device signing key is created only while an identity is stored".into(),
-                    )
-                })?
-            }
-        };
-        let opened = Zeroizing::new(
-            crate::crypto::decrypt(self.key, &stored)
-                .map_err(|e| StorageError::Encryption(e.to_string()))?,
-        );
-        let seed: Zeroizing<[u8; 32]> =
-            Zeroizing::new(opened.as_slice().try_into().map_err(|_| {
-                StorageError::InvalidData("device signing key has invalid length".into())
-            })?);
-        Ok(SigningKeyPair::from_seed(&seed))
+    /// stored key that does not open is an error and is never replaced. The
+    /// row names the identity it belongs to: a key one identity signed with
+    /// must never sign for another, or the two identities are linked
+    /// (vauchi/private#970).
+    pub fn load_or_create_device_signing_key(
+        &self,
+        identity: &Identity,
+    ) -> Result<SigningKeyPair, StorageError> {
+        let owner = identity.signing_public_key();
+        if self.stored_device_signing_key()?.is_none() {
+            let seed = Zeroizing::new(crate::crypto::random_bytes::<32>());
+            self.insert_device_signing_key(owner, &seed)?;
+        }
+        self.open_device_signing_key(owner)
     }
 
     /// Keeps the key a joining device generated before it had storage. A
     /// different key already here is refused: contacts accept only one.
-    pub fn adopt_device_signing_key(&self, seed: &Zeroizing<[u8; 32]>) -> Result<(), StorageError> {
-        let sealed = crate::crypto::encrypt(self.key, seed.as_slice())
-            .map_err(|e| StorageError::Encryption(e.to_string()))?;
-        self.conn.execute(
-            "INSERT OR IGNORE INTO device_signing_key (id, key_encrypted) VALUES (1, ?1)",
-            params![sealed],
-        )?;
-        let kept = self.load_or_create_device_signing_key()?;
+    pub fn adopt_device_signing_key(
+        &self,
+        identity: &Identity,
+        seed: &Zeroizing<[u8; 32]>,
+    ) -> Result<(), StorageError> {
+        let owner = identity.signing_public_key();
+        self.insert_device_signing_key(owner, seed)?;
+        let kept = self.open_device_signing_key(owner)?;
         if kept.public_key().as_bytes() != SigningKeyPair::from_seed(seed).public_key().as_bytes() {
             return Err(StorageError::InvalidData(
                 "a different device signing key is already stored".into(),
@@ -194,10 +169,88 @@ impl DeviceStore<'_> {
         Ok(())
     }
 
+    /// Stores `seed` for `owner` unless a key is already stored. IGNORE,
+    /// then read back: the app and its background worker can both get here,
+    /// and only one key may ever exist. The identity check is in the same
+    /// statement so a worker that outlives an identity deletion leaves no
+    /// key behind (ADR-079, vauchi/private#970).
+    fn insert_device_signing_key(
+        &self,
+        owner: &[u8; 32],
+        seed: &Zeroizing<[u8; 32]>,
+    ) -> Result<(), StorageError> {
+        let sealed = self.seal_device_signing_key(owner, seed)?;
+        let holder = if self.identity_is_derived {
+            "SELECT 1, ?1"
+        } else {
+            "SELECT 1, ?1 WHERE EXISTS (SELECT 1 FROM identity WHERE id = 1)"
+        };
+        self.conn.execute(
+            &format!("INSERT OR IGNORE INTO device_signing_key (id, key_encrypted) {holder}"),
+            params![sealed],
+        )?;
+        Ok(())
+    }
+
+    fn seal_device_signing_key(
+        &self,
+        owner: &[u8; 32],
+        seed: &Zeroizing<[u8; 32]>,
+    ) -> Result<Vec<u8>, StorageError> {
+        let mut plaintext = Zeroizing::new(Vec::with_capacity(64));
+        plaintext.extend_from_slice(owner);
+        plaintext.extend_from_slice(seed.as_slice());
+        crate::crypto::encrypt(self.key, plaintext.as_slice())
+            .map_err(|e| StorageError::Encryption(e.to_string()))
+    }
+
+    /// The stored key, if it belongs to `owner`. A row from before keys
+    /// named their identity is the current identity's (its contacts pinned
+    /// it) and is rewritten to name it.
+    fn open_device_signing_key(&self, owner: &[u8; 32]) -> Result<SigningKeyPair, StorageError> {
+        let stored = self.stored_device_signing_key()?.ok_or_else(|| {
+            StorageError::InvalidData(
+                "a device signing key is created only while an identity is stored".into(),
+            )
+        })?;
+        let opened = Zeroizing::new(
+            crate::crypto::decrypt(self.key, &stored)
+                .map_err(|e| StorageError::Encryption(e.to_string()))?,
+        );
+        let (named_owner, seed_bytes) = match opened.len() {
+            64 => (Some(&opened[..32]), &opened[32..]),
+            32 => (None, &opened[..]),
+            _ => {
+                return Err(StorageError::InvalidData(
+                    "device signing key has invalid length".into(),
+                ));
+            }
+        };
+        let seed: Zeroizing<[u8; 32]> = Zeroizing::new(seed_bytes.try_into().map_err(|_| {
+            StorageError::InvalidData("device signing key has invalid length".into())
+        })?);
+        match named_owner {
+            Some(named) if named == owner.as_slice() => {}
+            Some(_) => {
+                return Err(StorageError::InvalidData(
+                    "the stored device signing key belongs to another identity".into(),
+                ));
+            }
+            None => {
+                let sealed = self.seal_device_signing_key(owner, &seed)?;
+                self.conn.execute(
+                    "UPDATE device_signing_key SET key_encrypted = ?1 WHERE id = 1 AND key_encrypted = ?2",
+                    params![sealed, stored],
+                )?;
+            }
+        }
+        Ok(SigningKeyPair::from_seed(&seed))
+    }
+
     /// The saved registry, or a new one naming this device and its key. Takes
     /// the identity so the key is only ever created while one is loaded.
     pub fn own_device_registry(&self, identity: &Identity) -> Result<DeviceRegistry, StorageError> {
-        let device_key = self.load_or_create_device_signing_key()?;
+        let device_key = self.load_or_create_device_signing_key(identity)?;
         let device_public_key = *device_key.public_key().as_bytes();
         let Some(mut saved) = self.load_device_registry()? else {
             return Ok(identity.initial_device_registry_naming(device_public_key));

@@ -47,7 +47,7 @@ fn install_linked_registry(wb: &Vauchi) -> (vauchi_core::identity::DeviceRegistr
     let device_key = wb
         .storage()
         .device()
-        .load_or_create_device_signing_key()
+        .load_or_create_device_signing_key(wb.identity().unwrap())
         .unwrap();
     let mut registry = identity.initial_device_registry_naming(*device_key.public_key().as_bytes());
     let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);

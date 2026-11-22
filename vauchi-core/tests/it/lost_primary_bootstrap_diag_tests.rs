@@ -68,7 +68,7 @@ fn stored_device_key(device: &Vauchi) -> SigningKeyPair {
     device
         .storage()
         .device()
-        .load_or_create_device_signing_key()
+        .load_or_create_device_signing_key(device.identity().unwrap())
         .unwrap()
 }
 

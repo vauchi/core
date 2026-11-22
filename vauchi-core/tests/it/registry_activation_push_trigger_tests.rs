@@ -180,7 +180,7 @@ fn a_pushed_registry_names_the_senders_device_signing_key() {
     let bob_key = bob_wb
         .storage()
         .device()
-        .load_or_create_device_signing_key()
+        .load_or_create_device_signing_key(bob_wb.identity().unwrap())
         .unwrap();
     assert_eq!(
         received.active_devices()[0].signing_public_key,

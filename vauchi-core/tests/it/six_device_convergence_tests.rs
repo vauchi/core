@@ -45,7 +45,7 @@ fn make_party(seed: [u8; 32], name: &str, email: &str) -> Party {
         device
             .storage()
             .device()
-            .load_or_create_device_signing_key()
+            .load_or_create_device_signing_key(device.identity().unwrap())
             .unwrap()
     };
     let first_identity = devices[0].identity().unwrap();

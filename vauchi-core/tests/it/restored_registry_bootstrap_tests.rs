@@ -327,7 +327,7 @@ fn maximum_fleet(owner: &Vauchi) {
     let device_key = owner
         .storage()
         .device()
-        .load_or_create_device_signing_key()
+        .load_or_create_device_signing_key(owner.identity().unwrap())
         .unwrap();
     let entry = identity
         .device_info()

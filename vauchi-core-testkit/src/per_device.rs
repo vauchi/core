@@ -65,7 +65,7 @@ impl Party {
         self.bob
             .storage()
             .device()
-            .load_or_create_device_signing_key()
+            .load_or_create_device_signing_key(self.bob.identity().unwrap())
             .unwrap()
     }
 

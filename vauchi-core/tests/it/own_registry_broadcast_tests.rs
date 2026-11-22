@@ -12,7 +12,7 @@ use vauchi_core::Vauchi;
 fn stored_device_key(wb: &Vauchi) -> [u8; 32] {
     *wb.storage()
         .device()
-        .load_or_create_device_signing_key()
+        .load_or_create_device_signing_key(wb.identity().unwrap())
         .unwrap()
         .public_key()
         .as_bytes()

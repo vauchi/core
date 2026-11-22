@@ -24,7 +24,7 @@ fn public_key_of_stored_key(vauchi: &Vauchi) -> [u8; 32] {
     *vauchi
         .storage()
         .device()
-        .load_or_create_device_signing_key()
+        .load_or_create_device_signing_key(vauchi.identity().unwrap())
         .unwrap()
         .public_key()
         .as_bytes()
@@ -306,19 +306,20 @@ fn adopting_a_response_with_no_device_key_leaves_no_identity() {
 // @internal
 #[test]
 fn adopting_a_key_keeps_it_and_repeats_harmlessly() {
-    let vauchi = Vauchi::in_memory().unwrap();
+    let vauchi = crate::common::helpers::create_vauchi_with_identity("Alice");
+    let identity = vauchi.identity().unwrap();
     let seed = zeroize::Zeroizing::new([0x0b; 32]);
     let expected = *SigningKeyPair::from_seed(&seed).public_key().as_bytes();
 
     vauchi
         .storage()
         .device()
-        .adopt_device_signing_key(&seed)
+        .adopt_device_signing_key(identity, &seed)
         .unwrap();
     vauchi
         .storage()
         .device()
-        .adopt_device_signing_key(&seed)
+        .adopt_device_signing_key(identity, &seed)
         .unwrap();
 
     assert_eq!(public_key_of_stored_key(&vauchi), expected);
@@ -330,10 +331,10 @@ fn adopting_a_second_key_is_refused_and_the_first_stays() {
     let vauchi = crate::common::helpers::create_vauchi_with_identity("Alice");
     let existing = public_key_of_stored_key(&vauchi);
 
-    let result = vauchi
-        .storage()
-        .device()
-        .adopt_device_signing_key(&zeroize::Zeroizing::new([0x0c; 32]));
+    let result = vauchi.storage().device().adopt_device_signing_key(
+        vauchi.identity().unwrap(),
+        &zeroize::Zeroizing::new([0x0c; 32]),
+    );
 
     assert!(result.is_err());
     assert_eq!(public_key_of_stored_key(&vauchi), existing);
@@ -366,10 +367,11 @@ fn a_first_device_names_its_stored_key_in_the_registry_it_offers() {
 fn a_saved_registry_is_returned_as_saved() {
     let host = host();
     let vauchi = Vauchi::in_memory().unwrap();
+    vauchi.storage().identity().save(&host.identity).unwrap();
     vauchi
         .storage()
         .device()
-        .adopt_device_signing_key(&zeroize::Zeroizing::new([0x07; 32]))
+        .adopt_device_signing_key(&host.identity, &zeroize::Zeroizing::new([0x07; 32]))
         .unwrap();
     let saved = host.registry.clone();
     vauchi

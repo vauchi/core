@@ -37,7 +37,7 @@ fn restored_device_key(restored: &Vauchi) -> [u8; 32] {
     *restored
         .storage()
         .device()
-        .load_or_create_device_signing_key()
+        .load_or_create_device_signing_key(restored.identity().unwrap())
         .unwrap()
         .public_key()
         .as_bytes()

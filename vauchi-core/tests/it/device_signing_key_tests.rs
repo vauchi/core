@@ -14,10 +14,19 @@ use vauchi_core::{Vauchi, VauchiConfig, crypto::SigningKeyPair};
 
 use crate::common::helpers::create_vauchi_with_identity;
 
+/// The identity stored in `storage`, or one it does not hold when it has
+/// none: what a caller that kept an identity in memory would pass.
+fn stored_identity(storage: &Storage) -> Identity {
+    match storage.identity().load_identity().unwrap() {
+        Some(bytes) => Identity::from_storage_bytes(&bytes, 1_700_000_000).unwrap(),
+        None => Identity::create("Nobody", 1_700_000_000),
+    }
+}
+
 fn public_key_of(storage: &Storage) -> [u8; 32] {
     *storage
         .device()
-        .load_or_create_device_signing_key()
+        .load_or_create_device_signing_key(&stored_identity(storage))
         .unwrap()
         .public_key()
         .as_bytes()
@@ -49,7 +58,10 @@ fn stored_key_rows(storage: &Storage) -> i64 {
 }
 
 fn creation_refusal(storage: &Storage) -> String {
-    match storage.device().load_or_create_device_signing_key() {
+    match storage
+        .device()
+        .load_or_create_device_signing_key(&stored_identity(storage))
+    {
         Ok(_) => "a key was created".to_string(),
         Err(error) => error.to_string(),
     }
@@ -179,7 +191,10 @@ fn adopting_a_key_without_a_stored_identity_is_refused() {
 
     let adopted = storage
         .device()
-        .adopt_device_signing_key(&zeroize::Zeroizing::new([0x0c; 32]))
+        .adopt_device_signing_key(
+            &stored_identity(&storage),
+            &zeroize::Zeroizing::new([0x0c; 32]),
+        )
         .map_err(|error| error.to_string());
 
     assert_eq!(adopted, Err(NO_IDENTITY.to_string()));
@@ -277,7 +292,7 @@ fn the_stored_key_signs_under_its_public_key() {
     let (_dir, _path, _key, storage) = open_storage();
     let device_key = storage
         .device()
-        .load_or_create_device_signing_key()
+        .load_or_create_device_signing_key(&stored_identity(&storage))
         .unwrap();
 
     let signature = device_key.sign(b"a registry broadcast");
@@ -373,8 +388,10 @@ fn a_row_that_does_not_open_is_refused_and_kept() {
             )
             .unwrap();
 
-        let opened: Option<SigningKeyPair> =
-            storage.device().load_or_create_device_signing_key().ok();
+        let opened: Option<SigningKeyPair> = storage
+            .device()
+            .load_or_create_device_signing_key(&stored_identity(&storage))
+            .ok();
 
         assert!(opened.is_none(), "{case} must be refused");
         assert_eq!(stored_row(&storage), row, "{case} must stay as it was");

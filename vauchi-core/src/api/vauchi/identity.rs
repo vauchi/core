@@ -80,8 +80,14 @@ impl ProfileEngine {
             storage_keys::attach_background_receive_key(&mut self.storage, ss.as_ref());
         }
 
-        // Persist identity to storage so it survives restart
-        self.storage.identity().save(&identity)?;
+        // Persist identity to storage so it survives restart. A key left by
+        // an identity this install held before must not sign for the new one
+        // (ADR-079, vauchi/private#970), so it goes in the same step.
+        self.storage.with_savepoint(|| -> VauchiResult<()> {
+            self.storage.device().clear_device_signing_key()?;
+            self.storage.identity().save(&identity)?;
+            Ok(())
+        })?;
         self.start_receiving_today(&identity)?;
 
         self.identity = Some(identity);
@@ -302,9 +308,10 @@ impl ProfileEngine {
             // Same plaintext storage format as `create_identity`; the DB
             // encrypts at rest (ADR-015).
             self.storage.identity().save(&identity)?;
+            self.storage.device().clear_device_signing_key()?;
             self.storage
                 .device()
-                .adopt_device_signing_key(device_signing_seed)?;
+                .adopt_device_signing_key(&identity, device_signing_seed)?;
 
             // Persist the registry from the linking device so sync can address
             // the peer devices.

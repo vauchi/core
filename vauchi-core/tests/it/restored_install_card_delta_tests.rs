@@ -62,7 +62,7 @@ fn delta_from(restored: &Vauchi, p: &Party) -> Vec<u8> {
     let key = restored
         .storage()
         .device()
-        .load_or_create_device_signing_key()
+        .load_or_create_device_signing_key(restored.identity().unwrap())
         .unwrap();
     delta.sign_by_device(*restored.identity().unwrap().device_id(), &key);
     seal_delta(&p.bob, &p.alice_at_bob, &delta)

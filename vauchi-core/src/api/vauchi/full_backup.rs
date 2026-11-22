@@ -196,6 +196,9 @@ impl ProfileEngine {
             if let Some(duress) = &snapshot.duress {
                 duress.restore(&self.storage)?;
             }
+            // A backup carries no device key; one left on this install
+            // belongs to an identity it held before (ADR-079).
+            self.storage.device().clear_device_signing_key()?;
             self.register_restored_device(
                 &identity,
                 snapshot.device_registry.clone(),
@@ -255,7 +258,10 @@ impl ProfileEngine {
         backed_up_device: &[u8; 32],
         now: u64,
     ) -> VauchiResult<()> {
-        let device_key = self.storage.device().load_or_create_device_signing_key()?;
+        let device_key = self
+            .storage
+            .device()
+            .load_or_create_device_signing_key(identity)?;
         let entry = identity
             .device_info()
             .to_registered(identity.master_seed())

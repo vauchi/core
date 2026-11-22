@@ -33,6 +33,7 @@ struct Exported {
     backup: String,
     real_key: [u8; 32],
     mask_key: [u8; 32],
+    mask_device_key: [u8; 32],
 }
 
 /// Alice sets a duress PIN and two decoys, notes the mask identity under
@@ -56,6 +57,13 @@ fn exported_from_the_real_profile() -> Exported {
         AuthMode::Duress
     );
     let mask_key = signing_key(&alice);
+    let mask_device_key = *alice
+        .storage()
+        .device()
+        .load_or_create_device_signing_key(alice.identity().unwrap())
+        .unwrap()
+        .public_key()
+        .as_bytes();
     assert_eq!(
         alice.authenticate(APP_PASSWORD).expect("unlock"),
         AuthMode::Normal
@@ -64,6 +72,7 @@ fn exported_from_the_real_profile() -> Exported {
         backup: alice.export_full_backup(BACKUP_PASSWORD).expect("export"),
         real_key: signing_key(&alice),
         mask_key,
+        mask_device_key,
     }
 }
 
@@ -104,6 +113,26 @@ fn a_restored_install_opens_the_old_decoys_under_the_old_mask_with_the_duress_pi
         decoy_names(&fresh),
         vec!["Decoy Dana".to_string(), "Decoy Eli".to_string()]
     );
+}
+
+// @internal
+#[test]
+fn a_restored_mask_signs_with_a_device_key_of_its_own() {
+    let exported = exported_from_the_real_profile();
+    let mut fresh = restored(&exported.backup);
+
+    assert_eq!(
+        fresh.authenticate(DURESS_PIN).expect("unlock"),
+        AuthMode::Duress
+    );
+    let restored_device_key = *fresh
+        .storage()
+        .device()
+        .load_or_create_device_signing_key(fresh.identity().unwrap())
+        .unwrap()
+        .public_key()
+        .as_bytes();
+    assert_ne!(restored_device_key, exported.mask_device_key);
 }
 
 // @scenario: duress_mode :: Backup includes duress profile

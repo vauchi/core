@@ -9,6 +9,7 @@
 //! `notice-core` feature so that no shipped build contains it.
 
 pub mod chain;
+pub mod direction;
 pub mod keys;
 pub mod record;
 pub mod seal;

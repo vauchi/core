@@ -319,8 +319,10 @@ fn withheld_acknowledgements_do_not_run_the_chain_past_the_window() {
     let (key, commitment) = update(4);
     p.sender.queue_update(&key, &commitment);
     let mut last = Vec::new();
-    for hour in 0..(3 * 7 * 24) {
-        let now = START + hour * 3_600;
+    // 1,008 sessions: without the cap of 128 positions a period the last
+    // notice would sit at position 1,007, beyond the window of 512.
+    for half_hour in 0..(3 * 7 * 48) {
+        let now = START + half_hour * 1_800;
         p.sender.read(&[], now);
         let written = p.sender.write(now);
         if !written.is_empty() {

@@ -201,3 +201,15 @@ fn an_event_outline_of_a_tap_keeps_its_interaction_id() {
         r#"{"ActionActivated":{"interaction_id":"surface.2.context.presentation.navigation.onboarding","surface_id":"onboarding"}}"#
     );
 }
+
+// An event with no fields serializes as its bare name, which is
+// structure, not content (vauchi/private#1339: `"len:23"` hid
+// `PresentationInvalidated` in the first log).
+// @internal
+#[test]
+fn an_event_outline_of_an_event_without_fields_is_its_name() {
+    assert_eq!(
+        vauchi_app::ui::event_outline_json(&vauchi_core::Event::PresentationInvalidated),
+        r#""PresentationInvalidated""#
+    );
+}

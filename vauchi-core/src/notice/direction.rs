@@ -37,6 +37,7 @@ const WEEKS_WATCHED_BACK: u32 = 18;
 const REFRESH_MEMORY_SECONDS: u64 = (WEEKS_WATCHED_BACK as u64 + 2) * PERIOD_SECONDS;
 const NUMBERS_WATCHED_AHEAD: u32 = 2;
 const REFRESH_KEYS_HELD: usize = 3;
+const REFRESH_KEYS_HELD_BY_RECEIVER: u32 = REFRESH_KEYS_HELD as u32;
 const NAMED_EPOCHS_KEPT: usize = 24;
 const UNNAMED_EPOCHS_KEPT: usize = 12;
 const ERASED_IDS_KEPT: usize = 64;
@@ -885,6 +886,7 @@ impl Sender {
 
         if !opened_before {
             self.open_on(refresh, read_in, now);
+            self.erase_unreachable(refresh.number);
         }
         self.refreshes.push(RefreshRead {
             number: refresh.number,
@@ -893,6 +895,28 @@ impl Sender {
             opened: true,
             read_at: now,
         });
+    }
+
+    /// When the receiver made refresh `number` it had either moved past
+    /// every epoch numbered three or more below, or held three newer
+    /// unused keys, which displaced the key such an epoch was opened on.
+    /// An epoch still unnamed that low can never become the receiver's.
+    fn erase_unreachable(&mut self, number: u32) {
+        let Some(below) = number.checked_sub(REFRESH_KEYS_HELD_BY_RECEIVER) else {
+            return;
+        };
+        let writes_in = self.writes_in;
+        let unreachable: Vec<EpochId> = self
+            .epochs
+            .iter()
+            .filter(|e| {
+                e.named_at.is_none() && e.keys.number() <= below && e.keys.id() != writes_in
+            })
+            .map(|e| e.keys.id())
+            .collect();
+        for id in unreachable {
+            self.erase(id);
+        }
     }
 
     fn open_on(&mut self, refresh: &RefreshFound, read_in: usize, now: u64) {
@@ -1043,7 +1067,11 @@ impl Sender {
             let lowest = self
                 .epochs
                 .iter()
-                .filter(|e| e.named_at.is_none() && e.keys.id() != writes_in)
+                .filter(|e| {
+                    e.named_at.is_none()
+                        && e.keys.id() != writes_in
+                        && e.keys.number() < highest_named
+                })
                 .map(|e| (e.keys.number(), e.keys.id()))
                 .min();
             match lowest {

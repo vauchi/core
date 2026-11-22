@@ -435,6 +435,35 @@ fn after_lost_openings_the_sender_keeps_only_the_three_newest_unnamed_epochs() {
     p.assert_no_alarm();
 }
 
+// The boundary of the rule above: the receiver holds the keys of its
+// three newest refreshes, so an epoch two below the newest is still one
+// it can move into, and the sender must keep it.
+// @internal
+#[test]
+fn the_sender_keeps_an_unnamed_epoch_two_below_the_newest_refresh() {
+    let mut p = pair();
+    let first = p.receiver_session(&[], START);
+    let delayed_opening = p.sender_session(&first, START + DAY);
+    for week in 1..3 {
+        let now = START + week * WEEK;
+        let refresh = p.receiver_session(&[], now);
+        let _lost = p.sender_session(&refresh, now + DAY);
+    }
+    assert_eq!(p.sender.kept_numbers(), vec![0, 1, 2, 3]);
+
+    p.receiver_session(&delayed_opening, START + 2 * WEEK + 2 * DAY);
+    let moved_into = p.receiver.current_epoch();
+    assert_ne!(
+        moved_into,
+        p.receiver.seed_epoch(),
+        "the key of refresh 1 was still held"
+    );
+    let naming = p.receiver_session(&[], START + 3 * WEEK);
+    p.sender_session(&naming, START + 3 * WEEK + DAY);
+    assert_eq!(p.sender.writes_in(), moved_into);
+    p.assert_no_alarm();
+}
+
 // Red team, pass 1: four unanswered openings stopped healing for good.
 // @internal
 #[test]

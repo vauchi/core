@@ -26,6 +26,7 @@ assert "gtk-display" not in cargo_consumers, "the GTK display depends on the con
 repos = {entry["repo"] for entry in consumers}
 assert "qt-display" in repos, "the Qt display's core-ref is bumped under its project name (ADR-078)"
 assert not repos & {"linux-gtk", "linux-qt"}, "GitLab's API does not find a project by its earlier path"
+assert "windows-app" in repos and "windows" not in repos, "the Windows app's CABI pin is bumped under its project name (ADR-078 step 4)"
 matrix = [line for line in Path(sys.argv[2]).read_text().splitlines() if "DOWNSTREAM:" in line]
 assert all("vauchi/gtk-display" not in line for line in matrix), "Core RC verification must not target the display"
 PY

@@ -39,6 +39,25 @@ fn save_an_identity(storage: &Storage) {
         .unwrap();
 }
 
+fn stored_key_rows(storage: &Storage) -> i64 {
+    storage
+        .connection()
+        .query_row("SELECT COUNT(*) FROM device_signing_key", [], |row| {
+            row.get(0)
+        })
+        .unwrap()
+}
+
+fn creation_refusal(storage: &Storage) -> String {
+    match storage.device().load_or_create_device_signing_key() {
+        Ok(_) => "a key was created".to_string(),
+        Err(error) => error.to_string(),
+    }
+}
+
+const NO_IDENTITY: &str =
+    "Invalid data: a device signing key is created only while an identity is stored";
+
 fn stored_row(storage: &Storage) -> Vec<u8> {
     storage
         .connection()
@@ -97,6 +116,18 @@ fn a_backup_imported_over_another_identity_takes_a_new_key() {
     wb.import_backup(&backup, "correct horse battery").unwrap();
 
     assert_ne!(public_key_of(wb.storage()), before);
+}
+
+/// A worker that outlives an identity deletion must not leave a new key
+/// behind for the next identity to sign with (ADR-079, vauchi/private#970).
+// @internal
+#[test]
+fn no_key_is_created_in_a_store_without_an_identity() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(dir.path().join("vauchi.db"), SymmetricKey::generate()).unwrap();
+
+    assert_eq!(creation_refusal(&storage), NO_IDENTITY);
+    assert_eq!(stored_key_rows(&storage), 0);
 }
 
 /// The app and its background worker open the same database.
@@ -214,11 +245,13 @@ fn wiping_device_data_forgets_the_key() {
 #[test]
 fn an_emergency_wipe_of_an_in_memory_store_forgets_the_key() {
     let mut wb = create_vauchi_with_identity("Alice");
-    let before = public_key_of(wb.storage());
+    public_key_of(wb.storage());
+    assert_eq!(stored_key_rows(wb.storage()), 1);
 
     wb.perform_emergency_wipe(true).unwrap();
 
-    assert_ne!(public_key_of(wb.storage()), before);
+    assert_eq!(creation_refusal(wb.storage()), NO_IDENTITY);
+    assert_eq!(stored_key_rows(wb.storage()), 0);
 }
 
 /// Contacts pin this key and never accept another for the device, so a row

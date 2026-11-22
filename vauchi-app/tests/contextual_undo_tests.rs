@@ -34,6 +34,7 @@ fn initial_bar() -> ContextBar {
         )),
         secondary: Some(action("more", "More actions", None)),
         info: None,
+        pinned: Vec::new(),
     }
 }
 

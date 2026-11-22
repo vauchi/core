@@ -118,6 +118,7 @@ fn a_new_entry_row_carries_its_default_audience_as_a_status_control_not_as_detai
             input_modes: vec![InputMode::Pointer, InputMode::Keyboard],
             motion: MotionPreference::Full,
             color_scheme: None,
+            pinned_actions: false,
         })
         .expect("presentation environment"),
     );

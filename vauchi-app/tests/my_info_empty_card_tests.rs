@@ -36,6 +36,7 @@ fn card(has_field: bool, width: u32) -> (AppEngine, Vec<Command>) {
             },
             motion: MotionPreference::Full,
             color_scheme: None,
+            pinned_actions: false,
         })
         .expect("presentation environment"),
     );

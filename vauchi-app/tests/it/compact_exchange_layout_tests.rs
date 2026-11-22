@@ -27,6 +27,7 @@ fn environment(available_height: u32) -> Event {
         input_modes: vec![InputMode::Touch],
         motion: MotionPreference::Full,
         color_scheme: None,
+        pinned_actions: false,
     }
 }
 

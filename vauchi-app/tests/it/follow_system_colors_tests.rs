@@ -64,6 +64,7 @@ fn environment(color_scheme: Option<ColorScheme>) -> Event {
         input_modes: vec![InputMode::Touch],
         motion: MotionPreference::Full,
         color_scheme,
+        pinned_actions: false,
     }
 }
 

@@ -59,6 +59,7 @@ fn the_presentation_profile_carries_the_window_title() {
             input_modes: vec![InputMode::Pointer, InputMode::Keyboard],
             motion: MotionPreference::Full,
             color_scheme: None,
+            pinned_actions: false,
         })
         .expect("environment event");
 

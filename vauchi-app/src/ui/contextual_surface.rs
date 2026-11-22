@@ -239,6 +239,7 @@ impl ContextualSurface {
                 primary,
                 secondary,
                 info: None,
+                pinned: Vec::new(),
             },
             back_interaction_id,
             navigation_interaction_id,

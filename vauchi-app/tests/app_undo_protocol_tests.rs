@@ -77,6 +77,7 @@ fn secondary_mutation_becomes_primary_undo_and_survives_resizing() {
                 input_modes: vec![InputMode::Touch],
                 motion: MotionPreference::Full,
                 color_scheme: None,
+                pinned_actions: false,
             })
             .expect("resize");
         assert!(

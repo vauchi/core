@@ -102,6 +102,7 @@ fn environment_event_reduces_to_core_owned_responsive_profile() {
             input_modes: vec![InputMode::Touch],
             motion: MotionPreference::Full,
             color_scheme: None,
+            pinned_actions: false,
         })
         .expect("environment event");
 
@@ -248,6 +249,7 @@ fn selecting_a_contact_emits_a_live_primary_and_detail_surface_transaction() {
         input_modes: vec![InputMode::Pointer, InputMode::Keyboard],
         motion: MotionPreference::Full,
         color_scheme: None,
+        pinned_actions: false,
     })
     .expect("expanded environment");
     app.dispatch(Event::SurfaceActivated {
@@ -328,6 +330,7 @@ fn changing_an_active_parent_pane_preserves_the_selected_detail_surface() {
         input_modes: vec![InputMode::Pointer, InputMode::Keyboard],
         motion: MotionPreference::Full,
         color_scheme: None,
+        pinned_actions: false,
     })
     .expect("expanded environment");
     let split = app
@@ -396,6 +399,7 @@ fn changing_a_value_keeps_binding_ids_stable() {
         input_modes: vec![InputMode::Pointer, InputMode::Keyboard],
         motion: MotionPreference::Full,
         color_scheme: None,
+        pinned_actions: false,
     })
     .expect("expanded environment");
 

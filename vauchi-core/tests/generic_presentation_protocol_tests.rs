@@ -52,6 +52,7 @@ fn test_context_bar_complete_roles_round_trip_without_domain_interpretation() {
             )),
             secondary: Some(action("more", "More actions", "action.more", None)),
             info: None,
+            pinned: Vec::new(),
         }),
     };
 
@@ -275,6 +276,7 @@ fn test_presentation_environment_event_carries_window_input_and_motion_facts() {
         input_modes: vec![InputMode::Touch, InputMode::Keyboard],
         motion: MotionPreference::Reduced,
         color_scheme: None,
+        pinned_actions: false,
     };
 
     assert_eq!(

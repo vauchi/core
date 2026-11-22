@@ -58,6 +58,19 @@ pub(crate) fn event_kind(event: &vauchi_core::Event) -> String {
     }
 }
 
+/// The binding or interaction id an event names. Core mints these ids;
+/// they carry no user input, unlike the event's value.
+pub(crate) fn event_target(event: &vauchi_core::Event) -> String {
+    use vauchi_core::Event;
+    match event {
+        Event::ValueChanged { binding_id, .. }
+        | Event::InputSubmitted { binding_id, .. }
+        | Event::InputFocusEnded { binding_id, .. } => binding_id.as_str().to_owned(),
+        Event::ActionActivated { interaction_id, .. } => interaction_id.as_str().to_owned(),
+        _ => "-".to_owned(),
+    }
+}
+
 /// Why `dispatch` refused, one level deeper than
 /// `AppPresentationError::kind` where the prepared surface said why.
 pub(crate) fn rejection_detail(error: &crate::ui::AppPresentationError) -> String {

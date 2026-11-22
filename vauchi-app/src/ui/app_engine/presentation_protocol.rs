@@ -187,7 +187,10 @@ impl AppEngine {
             // why, which `kind` alone did not say (vauchi/private#1339).
             tracing::warn!(
                 event = %rejection::event_kind(&event),
+                target = %rejection::event_target(&event),
                 reason = %rejection::rejection_detail(error),
+                screen = self.screen.screen_id(),
+                revision = self.surface_revision,
                 "event refused"
             );
         })?;

@@ -42,3 +42,52 @@ fn rejection_alert(locale: Locale, message: String) -> Vec<Command> {
         },
     }]
 }
+
+// INLINE_TEST_REQUIRED: tests exercise the crate-private diagnostics helpers
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ui::AppPresentationError;
+    use crate::ui::PreparedSurfaceError;
+    use vauchi_core::Event;
+    use vauchi_core::platform::{BindingId, SurfaceId};
+
+    /// A rejected event is logged by its variant only: the variant says
+    /// which event a shell sent too late or wrongly, its fields may hold
+    /// what the person typed (vauchi/private#1339).
+    // @internal
+    #[test]
+    fn a_rejected_event_is_named_by_its_variant_and_nothing_else() {
+        let typed = Event::ValueChanged {
+            surface_id: SurfaceId::new("onboarding").unwrap(),
+            binding_id: BindingId::new("display_name").unwrap(),
+            value: vauchi_core::platform::InputValue::Text("Carol".into()),
+        };
+        assert_eq!(event_kind(&typed), "ValueChanged");
+        assert_eq!(event_kind(&Event::AppBackgrounded), "AppBackgrounded");
+        assert!(!event_kind(&typed).contains("Carol"));
+    }
+
+    /// "prepared" alone did not say whether the binding was unknown, the
+    /// surface another one, or the value of the wrong type.
+    // @internal
+    #[test]
+    fn a_prepared_surface_rejection_names_its_reason() {
+        assert_eq!(
+            rejection_detail(&AppPresentationError::Prepared(
+                PreparedSurfaceError::UnknownBinding
+            )),
+            "prepared.unknown_binding"
+        );
+        assert_eq!(
+            rejection_detail(&AppPresentationError::Prepared(
+                PreparedSurfaceError::SurfaceMismatch
+            )),
+            "prepared.surface_mismatch"
+        );
+        assert_eq!(
+            rejection_detail(&AppPresentationError::InvalidBackgroundBudget),
+            "invalid_background_budget"
+        );
+    }
+}

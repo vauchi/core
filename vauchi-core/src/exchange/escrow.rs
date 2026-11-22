@@ -15,7 +15,7 @@ use sha2::{Digest, Sha256};
 use zeroize::Zeroizing;
 
 use crate::crypto::encryption::{self, EncryptionError, SymmetricKey};
-use crate::crypto::kdf::HKDF;
+use crate::crypto::hkdf::HKDF;
 
 // =========================================================================
 // Domain separation constants — MUST NOT collide with existing domains.

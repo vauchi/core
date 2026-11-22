@@ -34,7 +34,7 @@
 use chacha20poly1305::ChaCha20Poly1305;
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 
-use crate::crypto::kdf::HKDF;
+use crate::crypto::hkdf::HKDF;
 use crate::exchange::shake_protocol::{decode_envelope, encode_envelope};
 
 /// HKDF `info` for the accel-envelope sub-key (ADR-007 domain separation).

@@ -66,7 +66,7 @@ use super::ble_payload::BleCardPayload;
 use super::error::ExchangeError;
 use super::x3dh::X3DHKeyPair;
 use crate::crypto::encryption::{self, SymmetricKey};
-use crate::crypto::kdf::HKDF;
+use crate::crypto::hkdf::HKDF;
 use crate::identity::Identity;
 
 /// HKDF info prefix for BLE handshake key derivation. Bumped in

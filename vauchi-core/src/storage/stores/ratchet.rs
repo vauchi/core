@@ -19,7 +19,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use std::sync::Arc;
 
 use super::super::{Storage, StorageError};
-use crate::crypto::kdf::HKDF;
+use crate::crypto::hkdf::HKDF;
 use crate::crypto::ratchet::DoubleRatchetState;
 
 /// Device ID of the shared per-contact session: genesis cold-start sends,

@@ -16,7 +16,7 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::cek::ContentEncryptionKey;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::crypto::x3dh::X3DHKeyPair;
+use vauchi_core::crypto::x25519::X3DHKeyPair;
 use vauchi_core::exchange::genesis::GenesisEnvelope;
 use vauchi_core::identity::{Identity, RegistryBroadcast};
 use vauchi_core::network::mailbox_token::current_day_epoch;

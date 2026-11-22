@@ -24,7 +24,7 @@ use rusqlite::types::Value;
 use rusqlite::{Connection, params, params_from_iter};
 use serde::{Deserialize, Serialize};
 
-use crate::crypto::{SymmetricKey, decrypt, encrypt, kdf::HKDF};
+use crate::crypto::{SymmetricKey, decrypt, encrypt, hkdf::HKDF};
 
 use super::mask::SealedSlot;
 use super::{Storage, StorageError};

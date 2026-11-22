@@ -12,7 +12,7 @@
 use rusqlite::{Connection, OptionalExtension, params};
 use zeroize::Zeroizing;
 
-use crate::crypto::{SymmetricKey, decrypt, encrypt, kdf::HKDF};
+use crate::crypto::{SymmetricKey, decrypt, encrypt, hkdf::HKDF};
 
 use super::super::{Storage, StorageError};
 

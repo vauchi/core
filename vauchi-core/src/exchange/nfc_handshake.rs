@@ -22,7 +22,7 @@ use super::nfc_active::ExchangeNfc;
 use super::nfc_card_payload::NfcCardPayload;
 use super::x3dh::X3DHKeyPair;
 use crate::crypto::encryption::{self, SymmetricKey};
-use crate::crypto::kdf::HKDF;
+use crate::crypto::hkdf::HKDF;
 use crate::identity::Identity;
 
 /// HKDF info prefix for NFC handshake key derivation.

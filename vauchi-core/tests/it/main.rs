@@ -139,7 +139,7 @@ mod cross_kind_merge_adoption_tests;
 mod cross_platform_sync_tests;
 mod crypto_cek_tests;
 mod crypto_encryption_tests;
-mod crypto_kdf_tests;
+mod crypto_hkdf_tests;
 mod crypto_ratchet_tests;
 mod crypto_shredding_integration_tests;
 mod crypto_shredding_storage_tests;

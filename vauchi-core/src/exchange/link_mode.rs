@@ -22,9 +22,9 @@ use zeroize::Zeroizing;
 
 use crate::card::ContactCard;
 use crate::crypto::encryption::SymmetricKey;
-use crate::crypto::kdf::HKDF;
+use crate::crypto::hkdf::HKDF;
 use crate::crypto::signing::{Signature, SigningKeyPair, verify_signature};
-use crate::crypto::x3dh::X3DHKeyPair;
+use crate::crypto::x25519::X3DHKeyPair;
 use crate::exchange::escrow::{EscrowKeys, EscrowRole};
 use crate::exchange::link_pake::{LINK_PAKE_MESSAGE_LEN, LinkCode, LinkPake, LinkPakeError};
 use crate::platform::Command;

@@ -22,7 +22,7 @@
 //!   offer_key(32) || sig(64)`, the signature over
 //!   `ANSWER_DOMAIN || contact_pk || exchange_key || offer_key`.
 
-use crate::crypto::kdf::HKDF;
+use crate::crypto::hkdf::HKDF;
 use crate::crypto::{PublicKey, Signature, SymmetricKey};
 use crate::exchange::X3DHKeyPair;
 use crate::identity::Identity;

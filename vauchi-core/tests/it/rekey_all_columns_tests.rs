@@ -28,7 +28,7 @@ use hmac::{Hmac, Mac};
 use rusqlite::params;
 use sha2::Sha256;
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::crypto::kdf::HKDF;
+use vauchi_core::crypto::hkdf::HKDF;
 use vauchi_core::crypto::{decrypt, encrypt};
 use vauchi_core::storage::Storage;
 

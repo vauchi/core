@@ -22,7 +22,7 @@ pub fn fresh_attempt_token() -> [u8; 32] {
 /// token in its QR: the scanner computes the same value from the QR it
 /// scanned and connects only to the advertiser whose prefix matches.
 pub fn attempt_token_from_oob(qr_token: &[u8; 32]) -> [u8; 32] {
-    *crate::crypto::kdf::HKDF::derive_key(None, qr_token, ATTEMPT_TOKEN_INFO)
+    *crate::crypto::hkdf::HKDF::derive_key(None, qr_token, ATTEMPT_TOKEN_INFO)
 }
 
 /// Decode the two-byte carrier used by current peers and the legacy

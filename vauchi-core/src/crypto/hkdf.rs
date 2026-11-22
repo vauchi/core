@@ -5,8 +5,8 @@
 //! HKDF Key Derivation Function
 //!
 //! Implements HMAC-based Extract-and-Expand Key Derivation Function (HKDF)
-//! as specified in RFC 5869. Used for deriving cryptographic keys in the
-//! Double Ratchet protocol.
+//! as specified in RFC 5869. Every key derived from other key material
+//! in Core goes through it (the Double Ratchet, exchange, backup, storage).
 //!
 //! All intermediate key material (PRK, T(i) blocks) is zeroized after use
 //! to prevent key extraction from memory dumps (#234).

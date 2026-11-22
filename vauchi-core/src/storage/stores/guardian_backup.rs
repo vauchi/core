@@ -21,7 +21,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 
 use super::super::{Storage, StorageError};
 use crate::crypto::SymmetricKey;
-use crate::crypto::kdf::HKDF;
+use crate::crypto::hkdf::HKDF;
 use crate::sync::guardian_piece::{
     GuardianBackupPiece, GuardianDelivery, PieceAssembly, PieceError,
 };

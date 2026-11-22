@@ -31,7 +31,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 use super::X3DHKeyPair;
 use super::chain::{ChainError, ChainKey, MessageKey};
 use super::encryption::{EncryptionError, SymmetricKey, decrypt_with_ad, encrypt_with_ad};
-use super::kdf::HKDF;
+use super::hkdf::HKDF;
 use super::padding;
 
 /// Maximum number of skipped message keys to store.

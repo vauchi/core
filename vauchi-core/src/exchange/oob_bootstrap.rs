@@ -35,7 +35,7 @@ use super::exchange_payload::{
 };
 use super::qr_url::{decode_scanned_qr, encode_qr_url};
 use super::x3dh::X3DHKeyPair;
-use crate::crypto::kdf::HKDF;
+use crate::crypto::hkdf::HKDF;
 use crate::identity::Identity;
 
 /// Magic for the Glance one-sided QR OOB bootstrap carrier.

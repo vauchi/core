@@ -45,7 +45,7 @@ use super::types::{
 use crate::card::ContactCard;
 use crate::identity::Identity;
 
-use crate::crypto::x3dh::X3DHKeyPair;
+use crate::crypto::x25519::X3DHKeyPair;
 use crate::crypto::{DoubleRatchetState, SymmetricKey};
 use crate::exchange::ratchet_bootstrap;
 
@@ -2195,7 +2195,7 @@ impl MultiStageSession {
     }
 
     fn derive_transport_key(&self, shared_secret: &[u8]) -> [u8; 32] {
-        use crate::crypto::kdf::HKDF;
+        use crate::crypto::hkdf::HKDF;
         let prk = HKDF::extract(None, shared_secret);
         let okm = HKDF::expand(&prk, HKDF_INFO, 32).expect("HKDF expand failed");
         let mut key = [0u8; 32];

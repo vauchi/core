@@ -209,7 +209,7 @@ impl ProfileEngine {
         // key), include it in our response, then compute the X3DH shared
         // secret after learning the initiator's exchange key.
 
-        use crate::crypto::kdf::HKDF;
+        use crate::crypto::hkdf::HKDF;
         use rand_core::OsRng;
         use x25519_dalek::{EphemeralSecret, PublicKey};
         use zeroize::Zeroize;

@@ -19,7 +19,7 @@
 )]
 
 use super::encryption::SymmetricKey;
-use super::kdf::HKDF;
+use super::hkdf::HKDF;
 use thiserror::Error;
 use zeroize::Zeroize;
 

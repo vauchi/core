@@ -24,7 +24,7 @@ use rusqlite::{OptionalExtension, params};
 use sha2::Sha256;
 
 use crate::crypto::encryption::EncryptionError;
-use crate::crypto::{SymmetricKey, decrypt, encrypt, kdf::HKDF};
+use crate::crypto::{SymmetricKey, decrypt, encrypt, hkdf::HKDF};
 
 type HmacSha256 = Hmac<Sha256>;
 

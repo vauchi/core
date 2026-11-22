@@ -46,7 +46,7 @@ use super::BackupError;
 use super::contact_backup::ContactBackupEntry;
 use crate::card::ContactCard;
 use crate::contact::Contact;
-use crate::crypto::kdf::HKDF;
+use crate::crypto::hkdf::HKDF;
 use crate::crypto::{
     SymmetricKey, decrypt, decrypt_with_ad, derive_key_argon2id, encrypt, encrypt_with_ad,
     random_bytes,

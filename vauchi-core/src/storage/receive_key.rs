@@ -11,7 +11,7 @@
 use rusqlite::{OptionalExtension, params};
 use zeroize::Zeroizing;
 
-use crate::crypto::{SymmetricKey, decrypt, encrypt, kdf::HKDF};
+use crate::crypto::{SymmetricKey, decrypt, encrypt, hkdf::HKDF};
 
 use super::stores::ratchet::{ratchet_key_under_receive_key, ratchet_key_under_storage_key};
 use super::{Storage, StorageError};

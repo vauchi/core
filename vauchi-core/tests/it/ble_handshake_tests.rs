@@ -11,7 +11,7 @@
 use sha2::{Digest, Sha256};
 use vauchi_core::ExchangeError;
 use vauchi_core::crypto::encryption::{self, SymmetricKey};
-use vauchi_core::crypto::kdf::HKDF;
+use vauchi_core::crypto::hkdf::HKDF;
 use vauchi_core::exchange::{
     BLE_HANDSHAKE_VERSION, BleCardPayload, BleHandshakeSession, BleHandshakeState, X3DHKeyPair,
 };

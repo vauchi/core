@@ -19,7 +19,7 @@ use super::trust_metrics::TrustMetrics;
 use super::{ExchangeError, ExchangeQR, ProximityConfidence, ProximityVerifier, X3DHKeyPair};
 use crate::card::ContactCard;
 use crate::contact::Contact;
-use crate::crypto::kdf::HKDF;
+use crate::crypto::hkdf::HKDF;
 
 /// HKDF domain-separation label for the USB/direct-transport card-exchange key
 /// (ADR-007). Bumping `v1` is a wire break.

@@ -11,7 +11,7 @@
 
 use rusqlite::{Connection, OptionalExtension, params};
 
-use crate::crypto::{SymmetricKey, kdf::HKDF};
+use crate::crypto::{SymmetricKey, hkdf::HKDF};
 
 use super::super::{Storage, StorageError};
 

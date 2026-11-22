@@ -27,7 +27,7 @@ use chacha20poly1305::XChaCha20Poly1305;
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use sha2::{Digest, Sha256};
 
-use crate::crypto::kdf::HKDF;
+use crate::crypto::hkdf::HKDF;
 use crate::rng::SecureRng;
 
 /// Domain-separation label for both the HKDF key derivation and the AAD prefix.

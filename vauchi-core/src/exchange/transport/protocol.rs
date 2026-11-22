@@ -26,7 +26,7 @@
 //! shared    = HKDF-SHA256(salt, dh_secret, info)
 //! ```
 
-use crate::crypto::kdf::HKDF;
+use crate::crypto::hkdf::HKDF;
 use crate::exchange::error::ExchangeError;
 use chacha20poly1305::XChaCha20Poly1305;
 use chacha20poly1305::aead::{Aead, KeyInit};

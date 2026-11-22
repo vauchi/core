@@ -19,7 +19,7 @@ use sha2::Sha256;
 use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::Zeroizing;
 
-use crate::crypto::{SymmetricKey, X3DHKeyPair, decrypt, encrypt, kdf::HKDF};
+use crate::crypto::{SymmetricKey, X3DHKeyPair, decrypt, encrypt, hkdf::HKDF};
 use crate::recovery::sealed_box;
 
 use super::super::{Storage, StorageError};

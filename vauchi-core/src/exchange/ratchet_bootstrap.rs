@@ -12,7 +12,7 @@
 //! and the same role bug had to be fixed twice (2026-05-25).
 
 use super::key_order;
-use crate::crypto::x3dh::X3DHKeyPair;
+use crate::crypto::x25519::X3DHKeyPair;
 use crate::crypto::{DoubleRatchetState, HKDF, SymmetricKey};
 
 #[derive(Debug, PartialEq, Eq)]

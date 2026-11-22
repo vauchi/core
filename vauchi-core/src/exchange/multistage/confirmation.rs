@@ -22,7 +22,7 @@ use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
-use crate::crypto::kdf::HKDF;
+use crate::crypto::hkdf::HKDF;
 
 const KEY_INFO: &[u8] = b"vauchi-multistage-confirm-v4";
 

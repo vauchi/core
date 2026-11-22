@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Tests for crypto::kdf
+//! Tests for crypto::hkdf
 //! Extracted from kdf.rs
 
 use vauchi_core::crypto::*;

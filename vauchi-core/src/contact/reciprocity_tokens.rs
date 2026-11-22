@@ -3,7 +3,7 @@
 
 //! Contact reciprocity proof derivation.
 
-use crate::crypto::kdf::HKDF;
+use crate::crypto::hkdf::HKDF;
 use zeroize::Zeroizing;
 
 /// HKDF domain-separation label for reciprocity confirmation tokens (ADR-007).

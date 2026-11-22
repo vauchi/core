@@ -11,7 +11,7 @@
 use sha2::{Digest, Sha256};
 
 use super::escrow::EscrowRole;
-use crate::crypto::kdf::HKDF;
+use crate::crypto::hkdf::HKDF;
 
 const DOMAIN_CONFIRM_GATE: &[u8] = b"vauchi-confirm-escrow-gate-v1";
 const DOMAIN_CONFIRM_SLOT_INIT: &[u8] = b"vauchi-confirm-escrow-slot-init-v1";

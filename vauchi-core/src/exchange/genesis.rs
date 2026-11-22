@@ -33,7 +33,7 @@
 //! registry handshakes persist activation state without installing a genesis
 //! session. Active card traffic uses independent device-pair ratchets.
 
-use crate::crypto::x3dh::X3DHKeyPair;
+use crate::crypto::x25519::X3DHKeyPair;
 use crate::crypto::{DoubleRatchetState, HKDF, RatchetMessage, SymmetricKey};
 use crate::identity::{Identity, RegistryBroadcast};
 use crate::sync_control::is_registry_control;

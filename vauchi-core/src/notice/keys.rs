@@ -41,7 +41,7 @@ pub struct Epoch {
     number: u32,
     id: [u8; TAG_BYTES],
     root: Key,
-    notice_chain: Key,
+    notice_chain: Option<Key>,
     record: Key,
     control: Key,
     opening: Key,
@@ -62,9 +62,11 @@ impl Epoch {
         &self.root
     }
 
-    /// The notice chain's key at position 0.
-    pub fn notice_chain(&self) -> &[u8; KEY_BYTES] {
-        &self.notice_chain
+    /// The notice chain's key at position 0, once. Whoever takes it
+    /// steps it and erases what it stepped past; the epoch keeps no copy,
+    /// or a later copy of the device could read the whole chain again.
+    pub fn take_notice_chain(&mut self) -> Option<Zeroizing<[u8; KEY_BYTES]>> {
+        self.notice_chain.take()
     }
 
     pub fn record_key(&self) -> &[u8; KEY_BYTES] {
@@ -150,7 +152,7 @@ pub fn seed_epoch(handshake_secret: &[u8; 32], label: &Label) -> Epoch {
         number: 0,
         id: epoch_id(&root),
         root,
-        notice_chain: key_at(okm.as_ref(), 1),
+        notice_chain: Some(key_at(okm.as_ref(), 1)),
         record: key_at(okm.as_ref(), 2),
         control: key_at(okm.as_ref(), 3),
         opening: key_at(okm.as_ref(), 4),
@@ -158,39 +160,56 @@ pub fn seed_epoch(handshake_secret: &[u8; 32], label: &Label) -> Epoch {
     }
 }
 
+/// The three Diffie-Hellman results of an opening, as either side has them.
+struct Agreed<'a> {
+    ephemeral_with_refresh: &'a [u8; 32],
+    sender_device_with_refresh: &'a [u8; 32],
+    ephemeral_with_receiver_device: &'a [u8; 32],
+}
+
 fn opened(
     base: &Epoch,
     label: &Label,
     number: u32,
-    ephemeral_with_refresh: &[u8; 32],
-    sender_device_with_refresh: &[u8; 32],
-    ephemeral_with_receiver_device: &[u8; 32],
+    ephemeral_public: &[u8; 32],
+    refresh_public: &[u8; 32],
+    agreed: Agreed<'_>,
 ) -> Opened {
     let number_bytes = number.to_be_bytes();
+    let base_id = base.id();
+    // The opening's whole context goes into what it derives: X25519 gives
+    // one secret for several encodings of a public key, and the number
+    // alone does not say which keys or which base an epoch came from.
+    let transcript = |domain: &[u8]| {
+        info(
+            domain,
+            &[
+                label.as_bytes(),
+                &number_bytes,
+                ephemeral_public,
+                refresh_public,
+                &base_id,
+            ],
+        )
+    };
     let mut secret = Zeroizing::new([0u8; 64]);
     let (first, second) = secret.split_at_mut(KEY_BYTES);
-    first.copy_from_slice(ephemeral_with_refresh);
-    second.copy_from_slice(sender_device_with_refresh);
+    first.copy_from_slice(agreed.ephemeral_with_refresh);
+    second.copy_from_slice(agreed.sender_device_with_refresh);
 
     let confirmation = *HKDF::derive_array::<TAG_BYTES>(
         Some(base.root()),
         secret.as_ref(),
-        &info(
-            b"Vauchi_Notice_Confirm_v7|",
-            &[label.as_bytes(), &number_bytes],
-        ),
+        &transcript(b"Vauchi_Notice_Confirm_v7|"),
     );
     let okm = HKDF::derive_array::<160>(
         Some(base.root()),
         secret.as_ref(),
-        &info(
-            b"Vauchi_Notice_Root_v7|",
-            &[label.as_bytes(), &number_bytes],
-        ),
+        &transcript(b"Vauchi_Notice_Root_v7|"),
     );
     let proof = HKDF::derive_array::<KEY_BYTES>(
         None,
-        ephemeral_with_receiver_device,
+        agreed.ephemeral_with_receiver_device,
         &info(
             b"Vauchi_Notice_Proof_v7|",
             &[label.as_bytes(), &number_bytes],
@@ -202,7 +221,7 @@ fn opened(
             number,
             id: epoch_id(&root),
             root,
-            notice_chain: key_at(okm.as_ref(), 1),
+            notice_chain: Some(key_at(okm.as_ref(), 1)),
             record: key_at(okm.as_ref(), 2),
             control: key_at(okm.as_ref(), 3),
             opening: key_at(okm.as_ref(), 4),
@@ -227,9 +246,13 @@ pub fn open_as_sender(
         base,
         label,
         number,
-        &*ephemeral.diffie_hellman(refresh_public)?,
-        &*sender_device.diffie_hellman(refresh_public)?,
-        &*ephemeral.diffie_hellman(receiver_device_public)?,
+        ephemeral.public_key(),
+        refresh_public,
+        Agreed {
+            ephemeral_with_refresh: &*ephemeral.diffie_hellman(refresh_public)?,
+            sender_device_with_refresh: &*sender_device.diffie_hellman(refresh_public)?,
+            ephemeral_with_receiver_device: &*ephemeral.diffie_hellman(receiver_device_public)?,
+        },
     ))
 }
 
@@ -248,9 +271,13 @@ pub fn open_as_receiver(
         base,
         label,
         number,
-        &*refresh.diffie_hellman(ephemeral_public)?,
-        &*refresh.diffie_hellman(sender_device_public)?,
-        &*receiver_device.diffie_hellman(ephemeral_public)?,
+        ephemeral_public,
+        refresh.public_key(),
+        Agreed {
+            ephemeral_with_refresh: &*refresh.diffie_hellman(ephemeral_public)?,
+            sender_device_with_refresh: &*refresh.diffie_hellman(sender_device_public)?,
+            ephemeral_with_receiver_device: &*receiver_device.diffie_hellman(ephemeral_public)?,
+        },
     ))
 }
 

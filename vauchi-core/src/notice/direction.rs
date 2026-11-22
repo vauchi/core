@@ -32,7 +32,9 @@ const RETENTION_SECONDS: u64 = 3 * PERIOD_SECONDS;
 const REFRESH_EVERY_SECONDS: u64 = PERIOD_SECONDS;
 /// The relays keep records 120 days; eighteen weeks cover that.
 const WEEKS_WATCHED_BACK: u32 = 18;
-const REFRESH_MEMORY_SECONDS: u64 = 120 * 86_400;
+/// As long as a refresh's addresses are watched, so that a replay inside
+/// the watch is always known.
+const REFRESH_MEMORY_SECONDS: u64 = (WEEKS_WATCHED_BACK as u64 + 2) * PERIOD_SECONDS;
 const NUMBERS_WATCHED_AHEAD: u32 = 2;
 const REFRESH_KEYS_HELD: usize = 3;
 const NAMED_EPOCHS_KEPT: usize = 24;
@@ -76,32 +78,58 @@ enum Seen {
 
 /// What a device first read at each address: a replay is dropped, and a
 /// second, different record there can only come from a holder of the
-/// epoch's keys.
+/// epoch's keys. An entry is kept while its address is watched.
 #[derive(Default)]
-struct FirstRecords(BTreeMap<[u8; TAG_BYTES], ([u8; 8], u64)>);
+struct FirstRecords(BTreeMap<[u8; TAG_BYTES], FirstRecord>);
+
+struct FirstRecord {
+    hash: [u8; 8],
+    read_at: u64,
+    /// The week in a refresh address, which says when it stops being
+    /// watched; `None` for an opening address, watched by age.
+    address_week: Option<u32>,
+}
+
+fn short_hash(notice: &Notice) -> [u8; 8] {
+    let digest = Sha256::digest(notice);
+    let mut hash = [0u8; 8];
+    for (to, from) in hash.iter_mut().zip(digest.iter()) {
+        *to = *from;
+    }
+    hash
+}
 
 impl FirstRecords {
-    fn note(&mut self, tag: [u8; TAG_BYTES], notice: &Notice, now: u64) -> Seen {
-        let digest = Sha256::digest(notice);
-        let mut hash = [0u8; 8];
-        for (to, from) in hash.iter_mut().zip(digest.iter()) {
-            *to = *from;
-        }
-        match self.0.get(&tag) {
-            None => {
-                self.0.insert(tag, (hash, now));
-                Seen::First
-            }
-            Some((known, _)) if *known == hash => Seen::Again,
+    fn seen(&self, tag: &[u8; TAG_BYTES], notice: &Notice) -> Seen {
+        match self.0.get(tag) {
+            None => Seen::First,
+            Some(first) if first.hash == short_hash(notice) => Seen::Again,
             Some(_) => Seen::Different,
         }
     }
 
+    fn remember(
+        &mut self,
+        tag: [u8; TAG_BYTES],
+        notice: &Notice,
+        now: u64,
+        address_week: Option<u32>,
+    ) {
+        self.0.entry(tag).or_insert(FirstRecord {
+            hash: short_hash(notice),
+            read_at: now,
+            address_week,
+        });
+    }
+
     fn forget_unwatched(&mut self, now: u64) {
-        let watched =
-            u64::from(WEEKS_WATCHED_BACK.saturating_add(1)).saturating_mul(PERIOD_SECONDS);
-        self.0
-            .retain(|_, (_, read_at)| now.saturating_sub(*read_at) < watched);
+        let this_week = week(now);
+        self.0.retain(|_, first| match first.address_week {
+            Some(address_week) => this_week <= address_week.saturating_add(WEEKS_WATCHED_BACK),
+            // An opening's number is watched for three periods from its
+            // refresh, which was made before the opening was read.
+            None => age(now, &mut first.read_at) < RETENTION_SECONDS,
+        });
     }
 }
 
@@ -139,8 +167,10 @@ struct ReceiverEpoch {
 }
 
 impl ReceiverEpoch {
-    fn new(keys: Epoch) -> Self {
-        let reader = Some(ChainReader::new(keys.notice_chain()));
+    fn new(mut keys: Epoch) -> Self {
+        let reader = keys
+            .take_notice_chain()
+            .map(|chain_key| ChainReader::new(&chain_key));
         Self {
             keys,
             reader,
@@ -318,10 +348,10 @@ impl Receiver {
             let Some(plaintext) = open(at, notice) else {
                 continue;
             };
-            match self.first_records.note(tag, notice, now) {
+            match self.first_records.seen(&tag, notice) {
                 Seen::Again => continue,
                 Seen::Different => self.raise(Alarm::TwoRecordsAtOneAddress, base, now),
-                Seen::First => {}
+                Seen::First => self.first_records.remember(tag, notice, now, None),
             }
             let Ok(Record::Opening {
                 ephemeral_public,
@@ -508,10 +538,18 @@ impl Receiver {
     }
 
     fn expire(&mut self, now: u64) {
+        let alarm_is_old = self
+            .alarm_epoch
+            .as_mut()
+            .is_some_and(|(_, alarmed_at)| age(now, alarmed_at) >= RETENTION_SECONDS);
+        if alarm_is_old {
+            self.alarm_epoch = None;
+        }
+        let alarmed = self.alarm_epoch.map(|(id, _)| id);
         let current = self.epochs.len().saturating_sub(1);
         let mut index = 0usize;
         self.epochs.retain_mut(|epoch| {
-            let is_current = index == current;
+            let is_current = index == current || Some(epoch.keys.id()) == alarmed;
             index = index.saturating_add(1);
             if is_current {
                 if let Some(reader) = epoch.reader.as_mut() {
@@ -536,22 +574,34 @@ impl Receiver {
         self.issued.retain_mut(|issued| {
             issued.number == newest || age(now, &mut issued.made_at) < RETENTION_SECONDS
         });
-        let alarm_is_old = self
-            .alarm_epoch
-            .as_mut()
-            .is_some_and(|(_, alarmed_at)| age(now, alarmed_at) >= RETENTION_SECONDS);
-        if alarm_is_old {
-            self.alarm_epoch = None;
-        }
         self.first_records.forget_unwatched(now);
     }
 }
 
 struct SenderEpoch {
     keys: Epoch,
-    writer: ChainWriter,
+    /// `None` only if the epoch's chain key was already taken.
+    writer: Option<ChainWriter>,
     opened_at: u64,
     named_at: Option<u64>,
+    /// The next attempt of an opening under each number with this epoch
+    /// as its base: an address is written once, whoever asks.
+    opening_attempts: BTreeMap<u32, u8>,
+}
+
+impl SenderEpoch {
+    fn new(mut keys: Epoch, opened_at: u64, named_at: Option<u64>) -> Self {
+        let writer = keys
+            .take_notice_chain()
+            .map(|chain_key| ChainWriter::new(&chain_key));
+        Self {
+            keys,
+            writer,
+            opened_at,
+            named_at,
+            opening_attempts: BTreeMap::new(),
+        }
+    }
 }
 
 struct RefreshRead {
@@ -569,7 +619,8 @@ struct OpeningQueued {
     ephemeral_public: [u8; 32],
     key_id: [u8; 8],
     confirmation: [u8; 16],
-    attempts: u8,
+    /// No address is left for it under its number in its base.
+    spent: bool,
 }
 
 struct RefreshFound {
@@ -577,6 +628,9 @@ struct RefreshFound {
     public: [u8; 32],
     proof: [u8; 16],
     read_in: EpochId,
+    tag: [u8; TAG_BYTES],
+    notice: Notice,
+    address_week: u32,
 }
 
 pub struct Sender {
@@ -592,7 +646,10 @@ pub struct Sender {
     latest: Option<(Zeroizing<[u8; 32]>, [u8; 31])>,
     view_due: bool,
     update_queued: bool,
-    update_written: bool,
+    /// Counts edits, so that an acknowledgement clears only the edit the
+    /// acknowledged write carried.
+    edits: u64,
+    edits_written: Option<u64>,
     positions_assigned_at: VecDeque<u64>,
     first_records: FirstRecords,
     alarms: Vec<Alarm>,
@@ -607,17 +664,11 @@ impl Sender {
         now: u64,
     ) -> Self {
         let writes_in = seed.id();
-        let writer = ChainWriter::new(seed.notice_chain());
         Self {
             label,
             device,
             receiver_device_public,
-            epochs: vec![SenderEpoch {
-                keys: seed,
-                writer,
-                opened_at: now,
-                named_at: Some(now),
-            }],
+            epochs: vec![SenderEpoch::new(seed, now, Some(now))],
             writes_in,
             highest_named: 0,
             erased: VecDeque::new(),
@@ -626,7 +677,8 @@ impl Sender {
             latest: None,
             view_due: false,
             update_queued: false,
-            update_written: false,
+            edits: 0,
+            edits_written: None,
             positions_assigned_at: VecDeque::new(),
             first_records: FirstRecords::default(),
             alarms: Vec::new(),
@@ -651,29 +703,69 @@ impl Sender {
     pub fn queue_update(&mut self, update_key: &[u8; 32], commitment: &[u8; 31]) {
         self.latest = Some((Zeroizing::new(*update_key), *commitment));
         self.update_queued = true;
+        self.edits = self.edits.saturating_add(1);
     }
 
     /// Reads one session's notices: refreshes at the addresses of every
-    /// epoch it keeps, handled in rising order of number.
+    /// epoch it keeps. Those it already knows cost nothing; of the rest it
+    /// handles the eight with the highest numbers, in rising order, and
+    /// leaves the others unread so that a later delivery can still be
+    /// read.
     pub fn read(&mut self, notices: &[Notice], now: u64) {
         self.retain(now);
-        let mut found = self.find_refreshes(notices, now);
-        found.sort_by_key(|refresh| refresh.number);
-        for refresh in found.into_iter().take(REFRESHES_A_SESSION) {
+        let mut new = Vec::new();
+        for refresh in self.find_refreshes(notices, now) {
+            if self.knows(&refresh) {
+                self.first_records.remember(
+                    refresh.tag,
+                    &refresh.notice,
+                    now,
+                    Some(refresh.address_week),
+                );
+            } else {
+                new.push(refresh);
+            }
+        }
+        new.sort_by_key(|refresh| refresh.number);
+        let skip = new.len().saturating_sub(REFRESHES_A_SESSION);
+        for refresh in new.into_iter().skip(skip) {
+            self.first_records.remember(
+                refresh.tag,
+                &refresh.notice,
+                now,
+                Some(refresh.address_week),
+            );
             self.handle(&refresh, now);
         }
         self.retain(now);
     }
 
+    /// Whether this refresh, with this key and this name, was read before.
+    fn knows(&self, refresh: &RefreshFound) -> bool {
+        let Some(proof_key) = self
+            .epochs
+            .iter()
+            .find(|epoch| epoch.keys.id() == refresh.read_in)
+            .map(|epoch| Zeroizing::new(*epoch.keys.proof_key()))
+        else {
+            return false;
+        };
+        let named = self.named_by(refresh, &proof_key);
+        self.refreshes.iter().any(|read| {
+            read.number == refresh.number && read.public == refresh.public && read.named == named
+        })
+    }
+
     fn find_refreshes(&mut self, notices: &[Notice], now: u64) -> Vec<RefreshFound> {
+        let _ = now;
         let this_week = week(now);
-        let mut watched: BTreeMap<[u8; TAG_BYTES], (Keyed, EpochId)> = BTreeMap::new();
+        let mut watched: BTreeMap<[u8; TAG_BYTES], (Keyed, EpochId, u32)> = BTreeMap::new();
         for epoch in &self.epochs {
             let from = this_week.saturating_sub(WEEKS_WATCHED_BACK);
             for watched_week in from..=this_week.saturating_add(1) {
                 for attempt in 0..ATTEMPTS {
                     let at = refresh_address(epoch.keys.control_key(), watched_week, attempt);
-                    watched.insert(at.tag, (at, epoch.keys.id()));
+                    watched.insert(at.tag, (at, epoch.keys.id(), watched_week));
                 }
             }
         }
@@ -681,14 +773,14 @@ impl Sender {
         let mut found = Vec::new();
         for notice in notices {
             let tag = tag_of(notice);
-            let Some((at, read_in)) = watched.get(&tag) else {
+            let Some((at, read_in, address_week)) = watched.get(&tag) else {
                 continue;
             };
-            let read_in = *read_in;
+            let (read_in, address_week) = (*read_in, *address_week);
             let Some(plaintext) = open(at, notice) else {
                 continue;
             };
-            match self.first_records.note(tag, notice, now) {
+            match self.first_records.seen(&tag, notice) {
                 Seen::Again => continue,
                 Seen::Different => self.alarms.push(Alarm::TwoRecordsAtOneAddress),
                 Seen::First => {}
@@ -706,6 +798,9 @@ impl Sender {
                 public: refresh_public,
                 proof: proof_tag,
                 read_in,
+                tag,
+                notice: *notice,
+                address_week,
             });
         }
         found
@@ -731,7 +826,11 @@ impl Sender {
         else {
             return;
         };
-        let Some(proof_key) = self.epochs.get(read_in).map(|e| *e.keys.proof_key()) else {
+        let Some(proof_key) = self
+            .epochs
+            .get(read_in)
+            .map(|epoch| Zeroizing::new(*epoch.keys.proof_key()))
+        else {
             return;
         };
         let named = self.named_by(refresh, &proof_key);
@@ -806,15 +905,9 @@ impl Sender {
             ephemeral_public: *ephemeral.public_key(),
             key_id: key_id(&refresh.public),
             confirmation: opened.confirmation,
-            attempts: 0,
+            spent: false,
         });
-        let writer = ChainWriter::new(opened.epoch.notice_chain());
-        self.epochs.push(SenderEpoch {
-            keys: opened.epoch,
-            writer,
-            opened_at: now,
-            named_at: None,
-        });
+        self.epochs.push(SenderEpoch::new(opened.epoch, now, None));
     }
 
     /// Writes the openings not yet named, each at its next address until
@@ -822,14 +915,19 @@ impl Sender {
     /// or an edit is waiting.
     pub fn write(&mut self, now: u64) -> Vec<Notice> {
         self.retain(now);
-        self.update_written = false;
+        self.edits_written = None;
         let mut written = Vec::new();
         for opening in &mut self.openings {
-            let Some(base) = self.epochs.iter().find(|e| e.keys.id() == opening.base) else {
+            let Some(base) = self.epochs.iter_mut().find(|e| e.keys.id() == opening.base) else {
                 continue;
             };
-            let at = opening_address(base.keys.opening_key(), opening.number, opening.attempts);
-            opening.attempts = opening.attempts.saturating_add(1);
+            let attempt = base.opening_attempts.entry(opening.number).or_insert(0);
+            if *attempt >= ATTEMPTS {
+                opening.spent = true;
+                continue;
+            }
+            let at = opening_address(base.keys.opening_key(), opening.number, *attempt);
+            *attempt = attempt.saturating_add(1);
             let record = Record::Opening {
                 ephemeral_public: opening.ephemeral_public,
                 number: opening.number,
@@ -838,22 +936,23 @@ impl Sender {
             };
             written.push(seal(&at, &record.to_plaintext()));
         }
-        self.openings.retain(|opening| opening.attempts < ATTEMPTS);
+        self.openings.retain(|opening| !opening.spent);
 
         if (self.view_due || self.update_queued)
             && self.positions_assigned_at.len() < POSITIONS_A_PERIOD
         {
             let writes_in = self.writes_in;
             let epoch = self.epochs.iter_mut().find(|e| e.keys.id() == writes_in);
-            if let (Some(epoch), Some((update_key, commitment))) = (epoch, self.latest.as_ref()) {
-                let (_, at) = epoch.writer.assign();
+            let writer = epoch.and_then(|epoch| epoch.writer.as_mut());
+            if let (Some(writer), Some((update_key, commitment))) = (writer, self.latest.as_ref()) {
+                let (_, at) = writer.assign();
                 self.positions_assigned_at.push_back(now);
                 let record = Record::UpdateKey {
                     update_key: update_key.clone(),
                     commitment: *commitment,
                 };
                 written.push(seal(&at, &record.to_plaintext()));
-                self.update_written = true;
+                self.edits_written = Some(self.edits);
             }
         }
         written
@@ -861,9 +960,11 @@ impl Sender {
 
     /// The relay took the last write.
     pub fn acknowledge(&mut self) {
-        if self.update_written {
+        if let Some(edits_written) = self.edits_written.take() {
             self.view_due = false;
-            self.update_queued = false;
+            if edits_written == self.edits {
+                self.update_queued = false;
+            }
         }
     }
 
@@ -886,15 +987,16 @@ impl Sender {
             if id == writes_in {
                 continue;
             }
+            // The receiver only moves upwards and seals every refresh in
+            // its current epoch. Until a refresh names a higher epoch, an
+            // epoch may hold the receiver, named or not, whatever an older
+            // refresh delivered late made the sender write in meanwhile.
+            if epoch.keys.number() >= highest_named {
+                continue;
+            }
             let expired = match epoch.named_at.as_mut() {
                 Some(named_at) => age(now, named_at) >= RETENTION_SECONDS,
-                // The receiver only moves upwards and seals every refresh
-                // in its current epoch, so an epoch not yet named may hold
-                // the receiver until a higher one is named.
-                None => {
-                    age(now, &mut epoch.opened_at) >= RETENTION_SECONDS
-                        && highest_named > epoch.keys.number()
-                }
+                None => age(now, &mut epoch.opened_at) >= RETENTION_SECONDS,
             };
             if expired {
                 to_erase.push(id);
@@ -912,7 +1014,7 @@ impl Sender {
             let oldest = self
                 .epochs
                 .iter()
-                .filter(|e| e.keys.id() != writes_in)
+                .filter(|e| e.keys.id() != writes_in && e.keys.number() < highest_named)
                 .filter_map(|e| e.named_at.map(|at| (at, e.keys.id())))
                 .min();
             match oldest {
@@ -940,7 +1042,18 @@ impl Sender {
         self.refreshes
             .retain_mut(|read| age(now, &mut read.read_at) < REFRESH_MEMORY_SECONDS);
         while self.refreshes.len() > REFRESHES_REMEMBERED {
-            self.refreshes.remove(0);
+            let oldest = self
+                .refreshes
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, read)| read.read_at)
+                .map(|(index, _)| index);
+            match oldest {
+                Some(index) => {
+                    self.refreshes.remove(index);
+                }
+                None => break,
+            }
         }
         while let Some(assigned_at) = self.positions_assigned_at.front_mut() {
             if age(now, assigned_at) < PERIOD_SECONDS {

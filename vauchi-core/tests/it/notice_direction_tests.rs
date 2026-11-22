@@ -12,9 +12,12 @@
 use proptest::prelude::*;
 use vauchi_core::crypto::X25519KeyPair;
 use vauchi_core::notice::chain::PERIOD_SECONDS;
-use vauchi_core::notice::direction::{Alarm, Receiver, Sender};
-use vauchi_core::notice::keys::{Label, seed_epoch};
-use vauchi_core::notice::seal::NOTICE_BYTES;
+use vauchi_core::notice::direction::{Alarm, Receiver, Sender, week};
+use vauchi_core::notice::keys::{
+    Epoch, Label, key_id, opening_address, proof_tag, refresh_address, seed_epoch,
+};
+use vauchi_core::notice::record::Record;
+use vauchi_core::notice::seal::{NOTICE_BYTES, seal};
 
 const START: u64 = 1_800_000_000;
 const DAY: u64 = 86_400;
@@ -25,6 +28,8 @@ type Notice = [u8; NOTICE_BYTES];
 struct Pair {
     sender: Sender,
     receiver: Receiver,
+    /// The seed epoch's keys as a copy of either device holds them.
+    copied_seed: Epoch,
 }
 
 fn pair() -> Pair {
@@ -34,6 +39,7 @@ fn pair() -> Pair {
     let handshake = X25519KeyPair::generate()
         .diffie_hellman(X25519KeyPair::generate().public_key())
         .expect("contributory");
+    let copied_seed = seed_epoch(&handshake, &label);
     let sender_public = *sender_device.public_key();
     let receiver_public = *receiver_device.public_key();
     Pair {
@@ -51,7 +57,44 @@ fn pair() -> Pair {
             sender_public,
             START,
         ),
+        copied_seed,
     }
+}
+
+/// A refresh as a holder of the seed epoch's keys can seal it.
+fn forged_refresh(
+    seed: &Epoch,
+    now: u64,
+    attempt: u8,
+    number: u32,
+    public: [u8; 32],
+    names: [u8; 16],
+) -> Notice {
+    let at = refresh_address(seed.control_key(), week(now), attempt);
+    let record = Record::Refresh {
+        refresh_public: public,
+        number,
+        proof_tag: proof_tag(seed.proof_key(), number, &public, &names),
+    };
+    seal(&at, &record.to_plaintext())
+}
+
+/// An opening as a holder of the seed epoch's keys can seal it.
+fn forged_opening(
+    seed: &Epoch,
+    attempt: u8,
+    number: u32,
+    key_id: [u8; 8],
+    confirmation: [u8; 16],
+) -> Notice {
+    let at = opening_address(seed.opening_key(), number, attempt);
+    let record = Record::Opening {
+        ephemeral_public: *X25519KeyPair::generate().public_key(),
+        number,
+        key_id,
+        confirmation,
+    };
+    seal(&at, &record.to_plaintext())
 }
 
 impl Pair {
@@ -177,6 +220,136 @@ fn replayed_records_change_nothing() {
     assert_eq!(p.receiver.current_epoch(), epoch);
     assert_eq!(p.sender.writes_in(), writes_in);
     p.assert_no_alarm();
+}
+
+// Every "no alarm" above and below means something only if the alarms can
+// be raised. Each is, by a record only a holder of the keys can seal.
+// @internal
+#[test]
+fn the_sender_alarms_on_a_second_key_under_a_number_and_opens_it_at_its_own_address() {
+    let mut p = pair();
+    let honest = p.receiver_session(&[], START);
+    let first = p.sender_session(&honest, START + DAY);
+    p.assert_no_alarm();
+
+    let copy_key = *X25519KeyPair::generate().public_key();
+    let forged = forged_refresh(
+        &p.copied_seed,
+        START,
+        3,
+        1,
+        copy_key,
+        p.receiver.seed_epoch(),
+    );
+    let second = p.sender_session(&[forged], START + 2 * DAY);
+    assert_eq!(p.sender.alarms(), &[Alarm::RefreshConflict]);
+
+    let mut tags = std::collections::BTreeSet::new();
+    for notice in first.iter().chain(second.iter()) {
+        assert!(
+            tags.insert(notice[..16].to_vec()),
+            "two openings at one address"
+        );
+    }
+    assert!(
+        tags.len() >= 3,
+        "the first again and the second key's opening"
+    );
+}
+
+// @internal
+#[test]
+fn the_sender_alarms_on_a_name_it_never_opened() {
+    let mut p = pair();
+    let copy_key = *X25519KeyPair::generate().public_key();
+    let forged = forged_refresh(&p.copied_seed, START, 0, 1, copy_key, [0xee; 16]);
+    p.sender_session(&[forged], START + DAY);
+    assert_eq!(p.sender.alarms(), &[Alarm::ForeignName]);
+    assert_eq!(
+        p.sender.writes_in(),
+        p.receiver.seed_epoch(),
+        "writes where it was sealed"
+    );
+}
+
+// @internal
+#[test]
+fn the_sender_alarms_on_two_records_at_one_address() {
+    let mut p = pair();
+    let seed = p.receiver.seed_epoch();
+    let first = forged_refresh(&p.copied_seed, START, 0, 1, [1; 32], seed);
+    let second = forged_refresh(&p.copied_seed, START, 0, 2, [2; 32], seed);
+    p.sender_session(&[first], START + DAY);
+    assert_eq!(p.sender.alarms(), &[] as &[Alarm]);
+    p.sender_session(&[second], START + DAY);
+    assert_eq!(p.sender.alarms(), &[Alarm::TwoRecordsAtOneAddress]);
+}
+
+// @internal
+#[test]
+fn the_receiver_alarms_on_each_opening_only_a_copy_can_make() {
+    let cases: [(&str, Alarm); 3] = [
+        ("number not issued", Alarm::OpeningOnNumberNotIssued),
+        ("key id not issued", Alarm::OpeningKeyIdNotIssued),
+        ("confirmation", Alarm::OpeningConfirmationFailed),
+    ];
+    for (case, expected) in cases {
+        let mut p = pair();
+        let refresh = p.receiver_session(&[], START);
+        let honest = p.sender_session(&refresh, START + DAY);
+        let real_key_id = match Record::from_plaintext(
+            &vauchi_core::notice::seal::open(
+                &opening_address(p.copied_seed.opening_key(), 1, 0),
+                &honest[0],
+            )
+            .expect("the honest opening"),
+        ) {
+            Ok(Record::Opening { key_id, .. }) => key_id,
+            _ => panic!("not an opening"),
+        };
+        let forged = match expected {
+            Alarm::OpeningOnNumberNotIssued => {
+                forged_opening(&p.copied_seed, 0, 2, [0; 8], [0; 16])
+            }
+            Alarm::OpeningKeyIdNotIssued => {
+                forged_opening(&p.copied_seed, 1, 1, key_id(&[9; 32]), [0; 16])
+            }
+            _ => forged_opening(&p.copied_seed, 1, 1, real_key_id, [0; 16]),
+        };
+        p.receiver.read(&[forged], START + 2 * DAY);
+        assert_eq!(p.receiver.alarms(), &[expected], "{case}");
+        assert_eq!(
+            p.receiver.current_epoch(),
+            p.receiver.seed_epoch(),
+            "{case}: did not move"
+        );
+    }
+}
+
+// @internal
+#[test]
+fn the_receiver_alarms_on_a_second_opening_under_a_number_it_used() {
+    let mut p = pair();
+    let refresh = p.receiver_session(&[], START);
+    let honest = p.sender_session(&refresh, START + DAY);
+    let real_key_id = match Record::from_plaintext(
+        &vauchi_core::notice::seal::open(
+            &opening_address(p.copied_seed.opening_key(), 1, 0),
+            &honest[0],
+        )
+        .expect("the honest opening"),
+    ) {
+        Ok(Record::Opening { key_id, .. }) => key_id,
+        _ => panic!("not an opening"),
+    };
+    p.receiver.read(&honest, START + 2 * DAY);
+    let moved_into = p.receiver.current_epoch();
+    p.assert_no_alarm();
+
+    let forged = forged_opening(&p.copied_seed, 2, 1, real_key_id, [0; 16]);
+    p.receiver.read(&[forged], START + 3 * DAY);
+    assert_eq!(p.receiver.alarms(), &[Alarm::TwoOpeningsOnOneNumber]);
+    assert_eq!(p.receiver.current_epoch(), moved_into);
 }
 
 // Red team, pass 1: four unanswered openings stopped healing for good.
@@ -310,6 +483,80 @@ fn a_late_copy_of_a_refresh_naming_an_erased_epoch_raises_nothing() {
     p.assert_no_alarm();
 }
 
+// Red team on the code, 2026-11-22 (Claude and Codex, independently): an
+// older refresh delivered late moves the sender back; three periods on it
+// erases the named epoch the receiver is still in, and with it every
+// address the receiver seals a refresh at. No alarm, and no way back.
+// @internal
+#[test]
+fn a_sender_moved_back_keeps_the_epoch_the_receiver_is_in() {
+    let mut p = pair();
+    let (key, commitment) = update(7);
+    p.sender.queue_update(&key, &commitment);
+    let withheld_first = p.receiver_session(&[], START);
+    for week in 1..3 {
+        let now = START + week * WEEK;
+        let refresh = p.receiver_session(&[], now);
+        let opening = p.sender_session(&refresh, now + DAY);
+        p.receiver_session(&opening, now + 2 * DAY);
+    }
+    let receiver_is_in = p.receiver.current_epoch();
+    let fourth = p.receiver_session(&[], START + 3 * WEEK);
+    let _dropped = p.sender_session(&fourth, START + 3 * WEEK + DAY);
+    assert_eq!(p.sender.writes_in(), receiver_is_in);
+
+    p.sender_session(&withheld_first, START + 3 * WEEK + 2 * DAY);
+    assert_eq!(p.sender.writes_in(), p.receiver.seed_epoch(), "moved back");
+    for week in 4..7 {
+        let _dropped = p.receiver_session(&[], START + week * WEEK);
+        let _dropped = p.sender_session(&[], START + week * WEEK + DAY);
+    }
+    p.sender_session(&[], START + 6 * WEEK + 3 * DAY);
+    assert!(
+        p.sender.keeps(&receiver_is_in),
+        "the receiver still seals there"
+    );
+
+    let mut arrived = false;
+    for week in 7..11 {
+        let now = START + week * WEEK;
+        let refreshes = p.receiver_session(&[], now);
+        let answers = p.sender_session(&refreshes, now + DAY);
+        arrived |= p
+            .receiver
+            .read(&answers, now + 2 * DAY)
+            .iter()
+            .any(|read| *read.update_key == key);
+    }
+    p.assert_healed();
+    assert!(arrived, "the update key arrives once the gateway delivers");
+    p.assert_no_alarm();
+}
+
+// Red team on the code, 2026-11-22: more refreshes than a session handles
+// were cut lowest first, and the cut ones were marked read for good.
+// @internal
+#[test]
+fn a_session_with_more_refreshes_than_it_handles_follows_the_newest() {
+    let mut p = pair();
+    let mut backlog = Vec::new();
+    for week in 0..12 {
+        backlog.extend(p.receiver_session(&[], START + week * WEEK));
+    }
+    let opening = p.sender_session(&backlog, START + 12 * WEEK);
+    // The receiver's own session is due a refresh too: it names the epoch
+    // the newest opening moved it into.
+    let naming = p.receiver_session(&opening, START + 12 * WEEK + DAY);
+    assert_ne!(
+        p.receiver.current_epoch(),
+        p.receiver.seed_epoch(),
+        "the newest was opened"
+    );
+    p.sender_session(&naming, START + 12 * WEEK + 2 * DAY);
+    p.assert_healed();
+    p.assert_no_alarm();
+}
+
 // Red team, pass 3: withheld acknowledgements made the sender assign new
 // positions every session until the chain ran past the reader's window.
 // @internal
@@ -378,6 +625,7 @@ struct Step {
     deliver: Vec<(usize, bool)>,
     acknowledged: bool,
     edit: bool,
+    clock_ahead_days: u64,
 }
 
 fn step() -> impl Strategy<Value = Step> {
@@ -387,14 +635,18 @@ fn step() -> impl Strategy<Value = Step> {
         proptest::collection::vec((0usize..64, any::<bool>()), 0..12),
         any::<bool>(),
         any::<bool>(),
+        0u64..4,
     )
-        .prop_map(|(days, receiver_acts, deliver, acknowledged, edit)| Step {
-            days,
-            receiver_acts,
-            deliver,
-            acknowledged,
-            edit,
-        })
+        .prop_map(
+            |(days, receiver_acts, deliver, acknowledged, edit, clock_ahead_days)| Step {
+                days,
+                receiver_acts,
+                deliver,
+                acknowledged,
+                edit,
+                clock_ahead_days,
+            },
+        )
 }
 
 proptest! {
@@ -413,6 +665,7 @@ proptest! {
         let mut to_receiver: Vec<Notice> = Vec::new();
         let mut now = START;
         let mut edits = 0u8;
+        let mut tags = std::collections::BTreeSet::new();
 
         for s in steps {
             now += s.days * DAY;
@@ -428,7 +681,10 @@ proptest! {
                 if *altered { notice[20 + pick % 70] ^= 1; }
                 delivered.push(notice);
             }
+            // The receiver's clock runs up to three days ahead of the
+            // sender's, the difference the specification allows.
             let written = if s.receiver_acts {
+                let now = now + s.clock_ahead_days * DAY;
                 p.receiver.read(&delivered, now);
                 let written = p.receiver.write(now);
                 if s.acknowledged { p.receiver.acknowledge(); }
@@ -444,6 +700,9 @@ proptest! {
                 if s.acknowledged { p.sender.acknowledge(); }
                 written
             };
+            for notice in &written {
+                prop_assert!(tags.insert(notice[..16].to_vec()), "a tag written twice");
+            }
             outbox.extend(written);
             prop_assert_eq!(p.sender.alarms(), &[] as &[Alarm]);
             prop_assert_eq!(p.receiver.alarms(), &[] as &[Alarm]);
@@ -451,19 +710,24 @@ proptest! {
 
         let (key, commitment) = update(200);
         p.sender.queue_update(&key, &commitment);
+        // Four weeks in which the gateway delivers everything each device
+        // writes, the receiver's second write of a week included.
         let mut latest_arrived = false;
+        let mut carried: Vec<Notice> = Vec::new();
         for _ in 0..4 {
             now += WEEK;
-            let refreshes = p.receiver_session(&[], now);
+            let mut refreshes = std::mem::take(&mut carried);
+            refreshes.extend(p.receiver_session(&[], now));
             let answers = p.sender_session(&refreshes, now + DAY);
             latest_arrived |= p
                 .receiver
                 .read(&answers, now + 2 * DAY)
                 .iter()
                 .any(|read| *read.update_key == key);
-            p.receiver.write(now + 2 * DAY);
+            carried = p.receiver.write(now + 2 * DAY);
             p.receiver.acknowledge();
         }
+        p.sender_session(&carried, now + 3 * DAY);
         prop_assert_eq!(p.sender.alarms(), &[] as &[Alarm]);
         prop_assert_eq!(p.receiver.alarms(), &[] as &[Alarm]);
         prop_assert_eq!(Some(p.sender.writes_in()), p.receiver.newest_name());

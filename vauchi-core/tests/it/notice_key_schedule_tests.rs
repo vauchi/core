@@ -30,9 +30,13 @@ fn key_pair(value: &serde_json::Value) -> X25519KeyPair {
     X25519KeyPair::from_bytes(bytes(value))
 }
 
-fn assert_epoch_matches(epoch: &Epoch, recorded: &serde_json::Value) {
+fn assert_epoch_matches(epoch: &mut Epoch, recorded: &serde_json::Value) {
     assert_eq!(epoch.root(), &bytes::<32>(&recorded["root"]));
-    assert_eq!(epoch.notice_chain(), &bytes::<32>(&recorded["notice"]));
+    assert_eq!(
+        epoch.take_notice_chain().map(|key| *key),
+        Some(bytes::<32>(&recorded["notice"]))
+    );
+    assert!(epoch.take_notice_chain().is_none(), "given up once");
     assert_eq!(epoch.record_key(), &bytes::<32>(&recorded["record"]));
     assert_eq!(epoch.control_key(), &bytes::<32>(&recorded["control"]));
     assert_eq!(epoch.opening_key(), &bytes::<32>(&recorded["opening"]));
@@ -79,9 +83,9 @@ fn the_label_is_the_senders_device_key_then_the_receivers() {
 #[test]
 fn the_seed_epoch_matches_the_recorded_vector() {
     let v = vectors();
-    let r = recorded(&v);
+    let mut r = recorded(&v);
     assert_eq!(r.seed.number(), 0);
-    assert_epoch_matches(&r.seed, &v["seed_epoch"]);
+    assert_epoch_matches(&mut r.seed, &v["seed_epoch"]);
 }
 
 // @internal
@@ -89,7 +93,7 @@ fn the_seed_epoch_matches_the_recorded_vector() {
 fn an_opening_derives_the_same_epoch_on_both_devices() {
     let v = vectors();
     let r = recorded(&v);
-    let by_sender = open_as_sender(
+    let mut by_sender = open_as_sender(
         &r.seed,
         &r.label,
         1,
@@ -99,7 +103,7 @@ fn an_opening_derives_the_same_epoch_on_both_devices() {
         r.receiver_device.public_key(),
     )
     .expect("sender opens");
-    let by_receiver = open_as_receiver(
+    let mut by_receiver = open_as_receiver(
         &r.seed,
         &r.label,
         1,
@@ -113,8 +117,8 @@ fn an_opening_derives_the_same_epoch_on_both_devices() {
     assert_eq!(by_sender.confirmation, bytes::<16>(&opened["conf"]));
     assert_eq!(by_receiver.confirmation, by_sender.confirmation);
     assert_eq!(by_sender.epoch.number(), 1);
-    assert_epoch_matches(&by_sender.epoch, &opened["epoch"]);
-    assert_epoch_matches(&by_receiver.epoch, &opened["epoch"]);
+    assert_epoch_matches(&mut by_sender.epoch, &opened["epoch"]);
+    assert_epoch_matches(&mut by_receiver.epoch, &opened["epoch"]);
     assert_eq!(
         key_id(r.refresh.public_key()),
         bytes::<8>(&opened["key_id"])

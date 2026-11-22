@@ -8,7 +8,7 @@
 
 #![cfg(feature = "testing")]
 
-use vauchi_app::ui::{AppEngine, AppScreen, UserAction, WorkflowEngine};
+use vauchi_app::ui::{AppEngine, AppScreen, RepeatExchange, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
 use vauchi_core::exchange::{ProtocolState, QrPayload};
 use vauchi_core::platform::{
@@ -257,5 +257,86 @@ fn the_exchange_code_asks_for_the_error_correction_level_its_frame_names() {
         !serde_json::to_string(&unset)
             .unwrap()
             .contains("error_correction")
+    );
+}
+
+/// The Hover screen once the exchange finalized and this phone asks its
+/// person whether to reconnect (vauchi/private#1285).
+fn ask_to_reconnect(engine: &mut AppEngine) {
+    assert!(engine.apply_multi_stage_state(ProtocolState::Finalized));
+    assert!(engine.apply_multi_stage_finalized("Dana".into()));
+    assert!(engine.apply_multi_stage_repeat(Some(RepeatExchange::Asking)));
+}
+
+// With the two answers kept in view under it, an iPhone SE shows about
+// 86 % of the code's square. A code the trainer had put in the lower row
+// (layout 3) was cut there and a Pixel 3a 14 cm away decoded none of its
+// frames while the question was up (rig, 2026-11-22,
+// vauchi/private#1304). While the question waits for its answer the code
+// is drawn at 65 % in the top row, which ends at 70 % of the square, in
+// the column the trainer had it in; the owner chose this on 2026-11-22.
+// @internal
+#[test]
+fn the_reconnect_question_draws_its_code_in_the_top_row() {
+    let top_left = placement(650, 50, 50);
+    let top_middle = placement(650, 175, 50);
+    let top_right = placement(650, 300, 50);
+    let expected = [
+        (0, top_middle),
+        (1, top_left),
+        (2, top_right),
+        (3, top_left),
+        (4, top_right),
+        (5, top_left),
+        (6, top_middle),
+        (7, top_right),
+        (8, top_left),
+        (9, top_middle),
+        (10, top_right),
+        (11, top_left),
+        (12, top_middle),
+        (13, top_right),
+        (200, top_middle),
+    ];
+
+    for (layout, at) in expected {
+        let mut engine = engine_on_hover();
+        assert!(engine.apply_multi_stage_qr_payload(&frame_at_layout(layout)));
+        ask_to_reconnect(&mut engine);
+        let surface = presented_surface(&mut engine);
+        assert_eq!(
+            own_code_placement(&surface),
+            Some(Some(at)),
+            "layout {layout}"
+        );
+    }
+}
+
+// Once the question is answered or gone the other phone has to read this
+// one again, at the layout it was trained to read.
+// @internal
+#[test]
+fn the_code_returns_to_the_trainers_layout_after_the_question() {
+    let trained = Some(Some(placement(800, 50, 150)));
+
+    let mut answered = engine_on_hover();
+    assert!(answered.apply_multi_stage_qr_payload(&frame_at_layout(3)));
+    ask_to_reconnect(&mut answered);
+    let _ = answered.handle_action(UserAction::ListItemSelected {
+        component_id: "exchange_actions".into(),
+        item_id: "reconnect_accept".into(),
+    });
+    assert_eq!(
+        own_code_placement(&presented_surface(&mut answered)),
+        trained
+    );
+
+    let mut withdrawn = engine_on_hover();
+    assert!(withdrawn.apply_multi_stage_qr_payload(&frame_at_layout(3)));
+    ask_to_reconnect(&mut withdrawn);
+    assert!(withdrawn.apply_multi_stage_repeat(None));
+    assert_eq!(
+        own_code_placement(&presented_surface(&mut withdrawn)),
+        trained
     );
 }

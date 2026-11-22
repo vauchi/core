@@ -10,7 +10,7 @@ use vauchi_core::api::AuthMode;
 use vauchi_core::crypto::{SymmetricKey, encrypt};
 use vauchi_core::identity::Identity;
 use vauchi_core::storage::Storage;
-use vauchi_core::{Vauchi, crypto::SigningKeyPair};
+use vauchi_core::{Vauchi, VauchiConfig, crypto::SigningKeyPair};
 
 use crate::common::helpers::create_vauchi_with_identity;
 
@@ -128,6 +128,99 @@ fn no_key_is_created_in_a_store_without_an_identity() {
 
     assert_eq!(creation_refusal(&storage), NO_IDENTITY);
     assert_eq!(stored_key_rows(&storage), 0);
+}
+
+const ANOTHER_IDENTITY: &str =
+    "Invalid data: the stored device signing key belongs to another identity";
+
+/// An install whose identity row went while its key stayed (an earlier
+/// version, or a worker during a deletion) must not hand that key to the
+/// next identity: one key under two identities links them (ADR-079,
+/// vauchi/private#970).
+// @internal
+#[test]
+fn a_new_identity_over_a_left_over_key_signs_with_a_fresh_one() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
+        .with_storage_key(SymmetricKey::generate());
+    let mut first = Vauchi::new(config.clone()).unwrap();
+    first.create_identity("Alice").unwrap();
+    let left_over = public_key_of(first.storage());
+    first.storage().identity().delete_identity().unwrap();
+    drop(first);
+
+    let mut next = Vauchi::new(config).unwrap();
+    next.create_identity("Bob").unwrap();
+
+    assert_ne!(public_key_of(next.storage()), left_over);
+}
+
+// @internal
+#[test]
+fn a_key_stored_for_another_identity_is_refused() {
+    let (_dir, _path, _key, storage) = open_storage();
+    public_key_of(&storage);
+    let before = stored_row(&storage);
+
+    storage
+        .identity()
+        .save(&Identity::create("Bob", 1_700_000_000))
+        .unwrap();
+
+    assert_eq!(creation_refusal(&storage), ANOTHER_IDENTITY);
+    assert_eq!(stored_row(&storage), before);
+}
+
+// @internal
+#[test]
+fn adopting_a_key_without_a_stored_identity_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(dir.path().join("vauchi.db"), SymmetricKey::generate()).unwrap();
+
+    let adopted = storage
+        .device()
+        .adopt_device_signing_key(&zeroize::Zeroizing::new([0x0c; 32]))
+        .map_err(|error| error.to_string());
+
+    assert_eq!(adopted, Err(NO_IDENTITY.to_string()));
+    assert_eq!(stored_key_rows(&storage), 0);
+}
+
+/// Installs from before the key named its identity keep their key: their
+/// contacts have pinned it.
+// @internal
+#[test]
+fn a_key_stored_before_it_named_its_identity_keeps_its_public_key() {
+    let (_dir, _path, key, storage) = open_storage();
+    let seed = [0x2a; 32];
+    storage
+        .connection()
+        .execute(
+            "INSERT INTO device_signing_key (id, key_encrypted) VALUES (1, ?1)",
+            params![encrypt(&key, &seed).unwrap()],
+        )
+        .unwrap();
+
+    assert_eq!(
+        public_key_of(&storage),
+        *SigningKeyPair::from_seed(&seed).public_key().as_bytes()
+    );
+    assert_eq!(
+        public_key_of(&storage),
+        *SigningKeyPair::from_seed(&seed).public_key().as_bytes()
+    );
+}
+
+// @internal
+#[test]
+fn an_identity_created_after_a_wipe_signs_with_a_fresh_key() {
+    let mut wb = create_vauchi_with_identity("Alice");
+    let wiped = public_key_of(wb.storage());
+    wb.perform_emergency_wipe(true).unwrap();
+
+    wb.create_identity("Bob").unwrap();
+
+    assert_ne!(public_key_of(wb.storage()), wiped);
 }
 
 /// The app and its background worker open the same database.

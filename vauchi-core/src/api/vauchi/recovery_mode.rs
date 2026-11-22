@@ -112,6 +112,9 @@ fn restored_registry(
     registry
         .revoke_device(lost.device_id(), signing, now)
         .map_err(device_error)?;
+    // Contacts refuse a version not above the one they hold, and the lost
+    // device may have sent any; the restore time outranks them (#1247).
+    registry.lift_version_to(now, signing);
     Ok(registry)
 }
 

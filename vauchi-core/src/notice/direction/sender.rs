@@ -421,18 +421,20 @@ impl Sender {
         }
         self.openings.retain(|opening| !opening.spent);
 
-        if (self.view_due || self.update_queued)
-            && self.positions_assigned_at.len() < POSITIONS_A_PERIOD
+        // A position is assigned only for a notice that is written: with no
+        // update yet, a view due has nothing to say and steps nothing.
+        if let Some((update_key, commitment)) = self
+            .latest
+            .as_ref()
+            .filter(|_| self.view_due || self.update_queued)
+            .filter(|_| self.positions_assigned_at.len() < POSITIONS_A_PERIOD)
         {
             let writes_in = self.writes_in;
             let epoch = self.epochs.iter_mut().find(|e| e.keys.id() == writes_in);
             let writer = epoch.and_then(|epoch| epoch.writer.as_mut());
-            let assigned = writer.and_then(ChainWriter::assign);
             // An ended chain writes nothing more; the next epoch the
             // receiver names carries the update.
-            if let (Some((_, at)), Some((update_key, commitment))) =
-                (assigned, self.latest.as_ref())
-            {
+            if let Some((_, at)) = writer.and_then(ChainWriter::assign) {
                 self.positions_assigned_at.push_back(now);
                 let record = Record::UpdateKey {
                     update_key: update_key.clone(),

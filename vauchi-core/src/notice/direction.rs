@@ -549,7 +549,7 @@ impl Receiver {
         let current = self.epochs.len().saturating_sub(1);
         let mut index = 0usize;
         self.epochs.retain_mut(|epoch| {
-            let is_current = index == current || Some(epoch.keys.id()) == alarmed;
+            let is_current = index == current;
             index = index.saturating_add(1);
             if is_current {
                 if let Some(reader) = epoch.reader.as_mut() {
@@ -557,6 +557,10 @@ impl Receiver {
                 }
                 return true;
             }
+            // The epoch of the latest alarm keeps what sealing a refresh
+            // there needs; its notice chain ends three periods after the
+            // receiver left it, as every left epoch's does.
+            let keep_for_alarm = Some(epoch.keys.id()) == alarmed;
             let since_left = epoch.left_at.as_mut().map_or(0, |left| age(now, left));
             if since_left >= RETENTION_SECONDS {
                 epoch.reader = None;
@@ -567,7 +571,7 @@ impl Receiver {
                 .last_sealed_at
                 .as_mut()
                 .map_or(u64::MAX, |sealed| age(now, sealed));
-            since_left.min(since_sealed) < RETENTION_SECONDS
+            keep_for_alarm || since_left.min(since_sealed) < RETENTION_SECONDS
         });
 
         let newest = self.newest_number();
@@ -757,7 +761,6 @@ impl Sender {
     }
 
     fn find_refreshes(&mut self, notices: &[Notice], now: u64) -> Vec<RefreshFound> {
-        let _ = now;
         let this_week = week(now);
         let mut watched: BTreeMap<[u8; TAG_BYTES], (Keyed, EpochId, u32)> = BTreeMap::new();
         for epoch in &self.epochs {
@@ -791,6 +794,8 @@ impl Sender {
                 proof_tag,
             }) = Record::from_plaintext(&plaintext)
             else {
+                self.first_records
+                    .remember(tag, notice, now, Some(address_week));
                 continue;
             };
             found.push(RefreshFound {

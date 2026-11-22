@@ -269,7 +269,17 @@ impl AppEngine {
         self.clear_open_overlay(&event);
 
         if matches!(event, Event::PresentationInvalidated) {
+            // A rebuilt engine may stand on another step (onboarding starts
+            // again at Welcome); under the old revision a late event for the
+            // step just left would be refused, not dropped (private#1339).
+            let before = self.projected_visible_surface();
             self.invalidate_all();
+            if !self.preserves_binding_meaning(before.as_ref()) {
+                self.surface_revision = self
+                    .surface_revision
+                    .checked_add(1)
+                    .ok_or(AppPresentationError::RevisionExhausted)?;
+            }
             return self.initial_commands();
         }
 

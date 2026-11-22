@@ -92,6 +92,31 @@ attribution no no 0
 attribution yes no 1
 attribution yes yes 3
 
+# A merge request that moves Core to another contract cannot build e2e's
+# tools on its own Core: they pin the contract themselves and can follow
+# only after a Core release (vauchi/private#1343; core!2403 moved 0.98.0
+# to 0.99.0 and failed with two versions of the contract in one build).
+# That is "behind", exit 3, and the target is not tried. With the pins
+# equal a failure is still the merge request's.
+pin() { # dir tag
+    printf 'vauchi-contract = { git = "https://gitlab.com/vauchi/contract.git", tag = "%s", version = "^0" }\n' "$2" > "$1/Cargo.toml"
+}
+pin "$fake/mr" v0.99.0
+pin "$fake/target" v0.98.0
+rm -f "$fake/mr/BROKEN" "$fake/target/BROKEN"
+: > "$fake/mr/BROKEN"
+rc=0
+sh ci/e2e-tui-journey.sh "$fake/e2e" "$fake/mr" "$fake/target" > "$fake/out" 2>&1 || rc=$?
+if [ "$rc" = 3 ] && grep -qF "v0.98.0 to v0.99.0" "$fake/out" && ! grep -qF "journeys on $fake/target" "$fake/out"; then
+    echo "PASS: a merge request that moves the contract and fails exits 3 without trying the target"
+else
+    fail "a contract move that fails must exit 3 naming both pins and not try the target, got $rc: $(tail -3 "$fake/out")"
+fi
+attribution no no 0
+pin "$fake/target" v0.99.0
+attribution yes no 1
+rm -f "$fake/mr/Cargo.toml" "$fake/target/Cargo.toml"
+
 # The relay binaries are kept between jobs: the first run builds and saves
 # them, the next one reuses them, and a job never works in the kept
 # directory itself. Without the variable nothing is kept.

@@ -14,6 +14,7 @@ use sha2::{Digest, Sha256};
 use vauchi_core::api::{
     ReceiveOutcome, process_single_card_update, process_single_card_update_for_device,
 };
+use vauchi_core::identity::Identity;
 use vauchi_core::sync::guardian_piece::{HandBackShare, split_backup_for_hand_back};
 use vauchi_core::{AuthMode, ContactField, FieldType, Storage, SymmetricKey, Vauchi, VauchiConfig};
 
@@ -414,4 +415,87 @@ fn contacts_reconnect_with_the_restored_identity_without_a_rotation() {
     assert_eq!(dave.list_contacts().unwrap().len(), dave_contacts_before);
     assert!(dave.rekey_answer_deliveries().unwrap().is_empty());
     assert!(phone.rekey_offer_deliveries().unwrap().is_empty());
+}
+
+fn device_key_of(phone: &Vauchi) -> [u8; 32] {
+    *phone
+        .storage()
+        .device()
+        .load_or_create_device_signing_key(phone.identity().unwrap())
+        .unwrap()
+        .public_key()
+        .as_bytes()
+}
+
+/// A device key an identity this phone held before left behind, with that
+/// identity gone: the recovered identity signs with a fresh key (ADR-079).
+// @internal
+#[test]
+fn a_recovery_over_a_left_over_device_key_signs_with_a_fresh_one() {
+    let lost = lost();
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("phone.db");
+    let key = SymmetricKey::generate();
+    let left_over = {
+        let storage = Storage::open(&path, key.clone()).unwrap();
+        let earlier = Identity::create("Earlier", 1_700_000_000);
+        storage.identity().save(&earlier).unwrap();
+        let left_over = *storage
+            .device()
+            .load_or_create_device_signing_key(&earlier)
+            .unwrap()
+            .public_key()
+            .as_bytes();
+        storage
+            .connection()
+            .execute("DELETE FROM identity", [])
+            .unwrap();
+        left_over
+    };
+    let mut phone =
+        Vauchi::new(VauchiConfig::with_storage_path(&path).with_storage_key(key)).unwrap();
+    let claim = phone.begin_recovery(&alice_pk_hex(&lost)).unwrap();
+    for guardian in &lost.guardians {
+        hand_over(guardian.vauchi(), &claim, &phone);
+    }
+    phone.restore_identity_from_hand_backs(None).unwrap();
+
+    let broadcast = phone
+        .own_registry_broadcast(phone.identity().unwrap())
+        .expect("the recovered identity signs its registry");
+
+    assert_ne!(
+        device_key_of(&phone),
+        left_over,
+        "a fresh key, not the left-over one"
+    );
+    let identity_pk = phone.identity().unwrap().signing_keypair().public_key();
+    assert_eq!(broadcast.verify_device_signed(&identity_pk), Ok(()));
+}
+
+/// The restored registry names this device's key when it is saved, so the
+/// first broadcast does not have to re-sign it.
+// @internal
+#[test]
+fn the_restored_registry_names_this_devices_key() {
+    let lost = lost();
+    let mut phone = handed_back(&lost, 3);
+
+    phone.restore_identity_from_hand_backs(None).unwrap();
+
+    let registry = phone
+        .storage()
+        .device()
+        .load_device_registry()
+        .unwrap()
+        .unwrap();
+    let identity = phone.identity().unwrap();
+    assert_eq!(
+        registry
+            .find_device(identity.device_id())
+            .unwrap()
+            .signing_public_key,
+        Some(device_key_of(&phone))
+    );
+    assert!(registry.verify(&identity.signing_keypair().public_key()));
 }

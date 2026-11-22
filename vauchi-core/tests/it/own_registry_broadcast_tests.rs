@@ -157,3 +157,32 @@ fn a_registry_naming_this_device_under_another_identitys_signature_is_not_signed
         "refused as another identity's registry, got: {error}"
     );
 }
+
+/// An in-memory emergency wipe forgets the registry with the identity, so an
+/// identity created after it broadcasts (vauchi/private#970).
+// @scenario: device_management :: Device-specific keys
+// @internal
+#[test]
+fn an_identity_created_after_an_in_memory_wipe_broadcasts_its_own_registry() {
+    let mut wb = create_vauchi_with_identity("Alice");
+    let alice = wb.identity().unwrap();
+    let saved = alice.initial_device_registry_naming(stored_device_key(&wb));
+    wb.storage().device().save_device_registry(&saved).unwrap();
+
+    wb.perform_emergency_wipe(true).unwrap();
+
+    assert!(
+        wb.storage()
+            .device()
+            .load_device_registry()
+            .unwrap()
+            .is_none(),
+        "the wiped identity's registry is gone"
+    );
+    wb.create_identity("Bob").unwrap();
+    let bob_pk = wb.identity().unwrap().signing_keypair().public_key();
+    let broadcast = wb
+        .own_registry_broadcast(wb.identity().unwrap())
+        .expect("the new identity broadcasts");
+    assert_eq!(broadcast.verify_device_signed(&bob_pk), Ok(()));
+}

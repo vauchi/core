@@ -499,3 +499,32 @@ fn the_restored_registry_names_this_devices_key() {
     );
     assert!(registry.verify(&identity.signing_keypair().public_key()));
 }
+
+/// The restored registry's version is the restore time, as an identity-only
+/// restore's is (vauchi/private#1247): a contact refuses a version not
+/// above the one it holds, and the lost device may have sent any.
+// @internal
+#[test]
+fn the_restored_registry_outranks_any_version_the_lost_device_sent() {
+    let lost = lost();
+    let mut phone = handed_back(&lost, 3);
+    let before = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    phone.restore_identity_from_hand_backs(None).unwrap();
+
+    let registry = phone
+        .storage()
+        .device()
+        .load_device_registry()
+        .unwrap()
+        .unwrap();
+    assert!(
+        registry.version() >= before,
+        "version {} is below the restore time {before}",
+        registry.version()
+    );
+    assert!(registry.verify(&phone.identity().unwrap().signing_keypair().public_key()));
+}

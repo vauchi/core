@@ -61,7 +61,10 @@ pub fn outline_json(commands: &[Command]) -> String {
 /// One event's outline as one line of JSON, by the same rule: what reached
 /// Core, without what the person typed.
 pub fn event_outline_json(event: &Event) -> String {
-    redact(serde_json::to_value(event).unwrap_or(Value::Null), None).to_string()
+    match serde_json::to_value(event).unwrap_or(Value::Null) {
+        variant @ Value::String(_) => variant.to_string(),
+        fields => redact(fields, None).to_string(),
+    }
 }
 
 fn redact(value: Value, key: Option<&str>) -> Value {

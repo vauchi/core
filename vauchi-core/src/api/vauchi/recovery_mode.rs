@@ -86,10 +86,12 @@ impl BackupProgress {
 }
 
 /// The signed registry of the restored identity: the lost device, derived
-/// from the backup's seed and device index and revoked, and this device.
+/// from the backup's seed and device index and revoked, and this device
+/// naming its signing key.
 fn restored_registry(
     master_seed: &[u8; 32],
     identity: &Identity,
+    device_public_key: [u8; 32],
     lost_index: u32,
     lost_name: String,
     now: u64,
@@ -99,7 +101,13 @@ fn restored_registry(
     let mut registry = DeviceRegistry::new(lost.to_registered(master_seed), signing);
     let device_error = |e: crate::identity::DeviceError| VauchiError::InvalidState(e.to_string());
     registry
-        .add_device(identity.device_info().to_registered(master_seed), signing)
+        .add_device(
+            identity
+                .device_info()
+                .to_registered(master_seed)
+                .with_signing_key(device_public_key),
+            signing,
+        )
         .map_err(device_error)?;
     registry
         .revoke_device(lost.device_id(), signing, now)
@@ -371,19 +379,27 @@ impl ProfileEngine {
         if identity.signing_public_key() != &target_pk {
             return Err(refused());
         }
-        let registry = restored_registry(
-            &master_seed,
-            &identity,
-            lost_index,
-            envelope.sections.identity.device_name.clone(),
-            now,
-        )?;
         let restored = self.storage.with_savepoint(|| -> VauchiResult<usize> {
             // A sibling may initialize storage while this instance opens the backup (#796).
             if self.storage.identity().has_identity()? {
                 return Err(VauchiError::AlreadyInitialized);
             }
             self.storage.identity().save(&identity)?;
+            // A key an identity this phone held before left behind must not
+            // sign for the recovered one (ADR-079).
+            self.storage.device().clear_device_signing_key()?;
+            let device_key = self
+                .storage
+                .device()
+                .load_or_create_device_signing_key(&identity)?;
+            let registry = restored_registry(
+                &master_seed,
+                &identity,
+                *device_key.public_key().as_bytes(),
+                lost_index,
+                envelope.sections.identity.device_name.clone(),
+                now,
+            )?;
             self.storage.device().save_device_registry(&registry)?;
             for contact in &contacts {
                 self.storage.contacts().save_contact(contact)?;

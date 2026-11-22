@@ -545,7 +545,7 @@ release:verify-published:
       echo ""
       echo "Release ${CI_COMMIT_TAG} is consumable by every binding consumer."
 
-# Update windows/ repo with new CABI DLL version + SHA.
+# Update windows-app with the new CABI DLL version + SHA.
 # Mirrors update:swift-bindings pattern.
 trigger:windows:
   extends: [.linux-runner, .timeout-quick]
@@ -602,7 +602,7 @@ trigger:windows:
       echo "✓ Cosign signature verified"
 
       # Clone windows/ and update cabi-version.json
-      WINDOWS_REPO="https://project-access-token:${CI_PUSH_TOKEN_WINDOWS}@gitlab.com/vauchi/windows.git"
+      WINDOWS_REPO="https://project-access-token:${CI_PUSH_TOKEN_WINDOWS}@gitlab.com/vauchi/windows-app.git"
       git clone --depth 1 "$WINDOWS_REPO" windows-checkout
       cd windows-checkout
       BRANCH="chore/bump-vauchi-cabi-${CLEAN_VERSION}"
@@ -613,7 +613,7 @@ trigger:windows:
           --header "PRIVATE-TOKEN: ${PROJECT_ACCESS_TOKEN}" \
           --data-urlencode "state=opened" \
           --data-urlencode "source_branch=$BRANCH" \
-          "${CI_API_V4_URL}/projects/vauchi%2Fwindows/merge_requests" \
+          "${CI_API_V4_URL}/projects/vauchi%2Fwindows-app/merge_requests" \
           | jq -r '.[0].web_url // empty')
         if [ -n "$OPEN_MR_URL" ]; then
           echo "Branch $BRANCH is already under review: $OPEN_MR_URL"
@@ -678,7 +678,7 @@ trigger:windows:
             description: $description,
             remove_source_branch: true
           }')" \
-        "${CI_API_V4_URL}/projects/vauchi%2Fwindows/merge_requests")
+        "${CI_API_V4_URL}/projects/vauchi%2Fwindows-app/merge_requests")
       MR_URL=$(printf '%s' "$MR_RESPONSE" | jq -r '.web_url')
       echo "✓ Opened Draft Windows CABI update: $MR_URL"
 

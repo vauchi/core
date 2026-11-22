@@ -163,3 +163,41 @@ fn the_checked_in_outline_fixture_matches_the_checked_in_catalog() {
         "outline fixture drifted for {drifted:?}; run the ignored regenerate_outline_fixture test"
     );
 }
+
+// An event's outline names the variant and the ids Core minted, so a dev
+// log can say which event reached Core after a page changed, without what
+// the person typed (vauchi/private#1339).
+// @internal
+#[test]
+fn an_event_outline_keeps_the_variant_and_ids_and_replaces_a_typed_value_with_its_length() {
+    let event = vauchi_core::Event::ValueChanged {
+        surface_id: vauchi_core::SurfaceId::new("onboarding").unwrap(),
+        binding_id: vauchi_core::BindingId::new("surface.2.display_name").unwrap(),
+        value: vauchi_core::InputValue::Text("Carol".to_owned()),
+    };
+
+    let outline = vauchi_app::ui::event_outline_json(&event);
+
+    assert_eq!(
+        outline,
+        r#"{"ValueChanged":{"binding_id":"surface.2.display_name","surface_id":"onboarding","value":{"text":"len:5"}}}"#
+    );
+    assert!(!outline.contains("Carol"));
+}
+
+// @internal
+#[test]
+fn an_event_outline_of_a_tap_keeps_its_interaction_id() {
+    let event = vauchi_core::Event::ActionActivated {
+        surface_id: vauchi_core::SurfaceId::new("onboarding").unwrap(),
+        interaction_id: vauchi_core::InteractionId::new(
+            "surface.2.context.presentation.navigation.onboarding",
+        )
+        .unwrap(),
+    };
+
+    assert_eq!(
+        vauchi_app::ui::event_outline_json(&event),
+        r#"{"ActionActivated":{"interaction_id":"surface.2.context.presentation.navigation.onboarding","surface_id":"onboarding"}}"#
+    );
+}

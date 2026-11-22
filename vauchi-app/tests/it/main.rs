@@ -87,6 +87,7 @@ mod onboarding_engine_tests;
 mod parent_tab_tests;
 mod personal_note_app_sync_tests;
 mod phase3_engine_proptest;
+mod presentation_invalidated_revision_tests;
 mod qr_landing_url_tests;
 mod reciprocity_tests;
 mod recovery_ceremony_acceptance_tests;

@@ -103,6 +103,25 @@ mod tests {
         assert!(!event_kind(&typed).contains("Carol"));
     }
 
+    /// The Core-minted id the event names, which says whether a refused
+    /// event targets the page on screen; never the value it carries.
+    // @internal
+    #[test]
+    fn a_rejected_event_is_targeted_by_its_core_minted_id_only() {
+        let typed = Event::ValueChanged {
+            surface_id: SurfaceId::new("onboarding").unwrap(),
+            binding_id: BindingId::new("surface.2.display_name").unwrap(),
+            value: vauchi_core::platform::InputValue::Text("Carol".into()),
+        };
+        assert_eq!(event_target(&typed), "surface.2.display_name");
+        let focus = Event::InputFocusEnded {
+            surface_id: SurfaceId::new("onboarding").unwrap(),
+            binding_id: BindingId::new("surface.3.display_name").unwrap(),
+        };
+        assert_eq!(event_target(&focus), "surface.3.display_name");
+        assert_eq!(event_target(&Event::AppBackgrounded), "-");
+    }
+
     /// "prepared" alone did not say whether the binding was unknown, the
     /// surface another one, or the value of the wrong type.
     // @internal

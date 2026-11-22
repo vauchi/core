@@ -134,6 +134,14 @@ impl Sender {
         self.writes_in
     }
 
+    /// The number of the epoch update keys are written in.
+    pub fn writes_in_number(&self) -> u32 {
+        self.epochs
+            .iter()
+            .find(|epoch| epoch.keys.id() == self.writes_in)
+            .map_or(0, |epoch| epoch.keys.number())
+    }
+
     /// The numbers of the epochs it keeps, in rising order: what a later
     /// copy of the device could still read or write in.
     pub fn kept_numbers(&self) -> Vec<u32> {

@@ -117,11 +117,14 @@ impl Receiver {
         self.issued.last().map(|issued| issued.name)
     }
 
-    fn current_number(&self) -> u32 {
+    /// The number of the refresh the current epoch was opened on; 0 for
+    /// the seed.
+    pub fn current_number(&self) -> u32 {
         self.epochs.last().map_or(0, |epoch| epoch.keys.number())
     }
 
-    fn newest_number(&self) -> u32 {
+    /// The number of the newest refresh made.
+    pub fn newest_number(&self) -> u32 {
         self.issued.last().map_or(0, |issued| issued.number)
     }
 

@@ -43,6 +43,24 @@ fn rejection_alert(locale: Locale, message: String) -> Vec<Command> {
     }]
 }
 
+/// Dev instrumentation (no content): which event `dispatch` refused, what
+/// it targeted and why, against which screen and revision; `kind` alone
+/// did not say (vauchi/private#1339).
+pub(crate) fn log_refused(
+    event: &vauchi_core::Event,
+    error: &crate::ui::AppPresentationError,
+    (screen, revision): (&str, u64),
+) {
+    tracing::warn!(
+        event = %event_kind(event),
+        target = %event_target(event),
+        reason = %rejection_detail(error),
+        screen,
+        revision,
+        "event refused"
+    );
+}
+
 /// An event's variant, never its fields: a value may be what the person
 /// typed (logging rules). For the log line of a refused event
 /// (vauchi/private#1339).

@@ -8,6 +8,7 @@
 use rusqlite::params;
 use vauchi_core::api::AuthMode;
 use vauchi_core::crypto::{SymmetricKey, encrypt};
+use vauchi_core::identity::Identity;
 use vauchi_core::storage::Storage;
 use vauchi_core::{Vauchi, crypto::SigningKeyPair};
 
@@ -27,7 +28,15 @@ fn open_storage() -> (tempfile::TempDir, std::path::PathBuf, SymmetricKey, Stora
     let path = dir.path().join("vauchi.db");
     let key = SymmetricKey::generate();
     let storage = Storage::open(&path, key.clone()).unwrap();
+    save_an_identity(&storage);
     (dir, path, key, storage)
+}
+
+fn save_an_identity(storage: &Storage) {
+    storage
+        .identity()
+        .save(&Identity::create("Alice", 1_700_000_000))
+        .unwrap();
 }
 
 fn stored_row(storage: &Storage) -> Vec<u8> {
@@ -104,6 +113,7 @@ fn two_connections_racing_to_create_the_key_get_the_same_one() {
         // 180 s test timeout (private#1207). The race under test is the key
         // creation, which starts at the barrier.
         let first_storage = Storage::open(&path, key.clone()).unwrap();
+        save_an_identity(&first_storage);
         let second_storage = Storage::open(&path, key.clone()).unwrap();
         let start = std::sync::Barrier::new(2);
         let start = &start;

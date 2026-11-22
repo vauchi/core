@@ -168,7 +168,10 @@ impl Sender {
     /// leaves the others unread so that a later delivery can still be
     /// read.
     pub fn read(&mut self, notices: &[Notice], now: u64) {
-        self.retain(now);
+        // Epochs are erased after the session's refreshes are handled
+        // (protocol section 7, step 3): a late refresh may still name one
+        // on the day its three periods end.
+        self.forget(now);
         let mut new = Vec::new();
         for refresh in self.find_refreshes(notices, now) {
             if self.knows(&refresh) {
@@ -527,6 +530,13 @@ impl Sender {
             }
         }
 
+        self.forget(now);
+    }
+
+    /// What lapses with time alone: the refreshes remembered, the
+    /// positions counted against the period's cap, the first-record
+    /// hashes of addresses no longer watched.
+    fn forget(&mut self, now: u64) {
         self.refreshes
             .retain_mut(|read| age(now, &mut read.read_at) < REFRESH_MEMORY_SECONDS);
         while self.refreshes.len() > REFRESHES_REMEMBERED {

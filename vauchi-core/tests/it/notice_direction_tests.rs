@@ -497,9 +497,11 @@ fn a_late_refresh_names_an_epoch_on_the_day_it_would_expire() {
         p.sender.kept_numbers().contains(&1),
         "named again by the late refresh"
     );
+    // Epochs are numbered by the refresh they were opened on.
+    assert_eq!(p.receiver.current_number(), 4);
     assert_eq!(
         p.sender.writes_in_number(),
-        3,
+        4,
         "then the newer refresh's name"
     );
     p.assert_no_alarm();

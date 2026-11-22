@@ -92,10 +92,12 @@ fn finish_duress_setup(engine: &mut AppEngine) -> ActionResult {
 
 fn with_second_device(engine: &mut AppEngine) {
     let vauchi = engine.vauchi_mut();
-    let mut registry = vauchi.identity().unwrap().initial_device_registry();
+    let identity = vauchi.identity().unwrap();
+    let mut registry = identity.initial_device_registry();
     registry
-        .add_device_unsigned(
+        .add_device(
             DeviceInfo::derive(&OTHER_SEED, 1, "Laptop".into(), 0).to_registered(&OTHER_SEED),
+            identity.signing_keypair(),
         )
         .unwrap();
     vauchi

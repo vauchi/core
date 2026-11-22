@@ -15720,6 +15720,11 @@
                 "payloads": [
                   "len:13"
                 ],
+                "placement": {
+                  "size": 650,
+                  "x": 175,
+                  "y": 50
+                },
                 "purpose": "display"
               }
             },

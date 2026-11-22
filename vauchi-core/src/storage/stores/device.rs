@@ -29,6 +29,9 @@ pub struct DeviceStore<'a> {
     conn: &'a Connection,
     key: &'a SymmetricKey,
     clock: &'a Arc<dyn Clock>,
+    /// A mask profile's identity is derived from the mask seed and has no
+    /// identity row of its own (ADR-080).
+    identity_is_derived: bool,
 }
 
 impl Storage {
@@ -43,6 +46,7 @@ impl Storage {
                 conn: &self.conn,
                 key: &self.encryption_key,
                 clock: &self.clock,
+                identity_is_derived: self.mask.is_none(),
             }
         })
     }
@@ -139,13 +143,25 @@ impl DeviceStore<'_> {
                 let sealed = crate::crypto::encrypt(self.key, candidate.as_slice())
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 // IGNORE, then read back: the app and its background worker can
-                // both get here, and only one key may ever exist.
+                // both get here, and only one key may ever exist. The identity
+                // check is in the same statement because a worker that outlives
+                // an identity deletion would otherwise leave a key for the next
+                // identity to sign with (ADR-079, vauchi/private#970).
+                let holder = if self.identity_is_derived {
+                    "SELECT 1, ?1"
+                } else {
+                    "SELECT 1, ?1 WHERE EXISTS (SELECT 1 FROM identity WHERE id = 1)"
+                };
                 self.conn.execute(
-                    "INSERT OR IGNORE INTO device_signing_key (id, key_encrypted) VALUES (1, ?1)",
+                    &format!(
+                        "INSERT OR IGNORE INTO device_signing_key (id, key_encrypted) {holder}"
+                    ),
                     params![sealed],
                 )?;
                 self.stored_device_signing_key()?.ok_or_else(|| {
-                    StorageError::InvalidData("device signing key was not stored".into())
+                    StorageError::InvalidData(
+                        "a device signing key is created only while an identity is stored".into(),
+                    )
                 })?
             }
         };

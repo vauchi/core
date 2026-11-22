@@ -20014,6 +20014,17 @@
                   }
                 },
                 {
+                  "Text": {
+                    "id": "reconnect_question",
+                    "content": "Is Dana next to you?",
+                    "style": "body",
+                    "accessibility": {
+                      "label": "Is Dana next to you?",
+                      "description": null
+                    }
+                  }
+                },
+                {
                   "Qr": {
                     "id": "surface.1.own_qr",
                     "payloads": [
@@ -20029,34 +20040,12 @@
                   }
                 },
                 {
-                  "Text": {
-                    "id": "reconnect_title",
-                    "content": "Dana's phone no longer has you",
-                    "style": "body",
-                    "accessibility": {
-                      "label": "Dana's phone no longer has you",
-                      "description": null
-                    }
-                  }
-                },
-                {
-                  "Text": {
-                    "id": "reconnect_question",
-                    "content": "Start a new connection only if Dana is with you. Your notes and groups stay.",
-                    "style": "body",
-                    "accessibility": {
-                      "label": "Start a new connection only if Dana is with you. Your notes and groups stay.",
-                      "description": null
-                    }
-                  }
-                },
-                {
                   "List": {
                     "id": "exchange_actions",
                     "label": null,
                     "rows": [
                       {
-                        "title": "Start a new connection",
+                        "title": "Yes, reconnect Dana",
                         "subtitle": null,
                         "detail": null,
                         "icon_token": null,
@@ -20066,8 +20055,8 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.0",
-                          "label": "Start a new connection",
-                          "accessibility_label": "Start a new connection",
+                          "label": "Yes, reconnect Dana",
+                          "accessibility_label": "Yes, reconnect Dana",
                           "icon_token": null,
                           "enabled": true,
                           "shortcut": null
@@ -20075,12 +20064,12 @@
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
-                          "label": "Start a new connection",
+                          "label": "Yes, reconnect Dana",
                           "description": null
                         }
                       },
                       {
-                        "title": "Leave it",
+                        "title": "No, stop the exchange",
                         "subtitle": null,
                         "detail": null,
                         "icon_token": null,
@@ -20090,8 +20079,8 @@
                         "enabled": true,
                         "activation": {
                           "interaction_id": "surface.1.interaction.1",
-                          "label": "Leave it",
-                          "accessibility_label": "Leave it",
+                          "label": "No, stop the exchange",
+                          "accessibility_label": "No, stop the exchange",
                           "icon_token": null,
                           "enabled": true,
                           "shortcut": null
@@ -20099,7 +20088,7 @@
                         "secondary_actions": [],
                         "controls": [],
                         "accessibility": {
-                          "label": "Leave it",
+                          "label": "No, stop the exchange",
                           "description": null
                         }
                       }

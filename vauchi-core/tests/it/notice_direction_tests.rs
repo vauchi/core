@@ -352,6 +352,67 @@ fn the_receiver_alarms_on_a_second_opening_under_a_number_it_used() {
     assert_eq!(p.receiver.current_epoch(), moved_into);
 }
 
+// Discussion round 1, 2026-11-22 (Codex): a record that opens but is no
+// refresh was not remembered at its address, so a second record there
+// later raised nothing.
+// @internal
+#[test]
+fn a_malformed_record_at_an_address_still_makes_a_second_one_alarm() {
+    let mut p = pair();
+    let at = refresh_address(p.copied_seed.control_key(), week(START), 0);
+    let mut unknown_kind = [0u8; 64];
+    unknown_kind[0] = 0x07;
+    let malformed = seal(&at, &unknown_kind);
+    p.sender_session(&[malformed], START + DAY);
+    assert_eq!(p.sender.alarms(), &[] as &[Alarm]);
+
+    let valid = forged_refresh(
+        &p.copied_seed,
+        START,
+        0,
+        1,
+        [1; 32],
+        p.receiver.seed_epoch(),
+    );
+    p.sender_session(&[valid], START + DAY);
+    assert_eq!(p.sender.alarms(), &[Alarm::TwoRecordsAtOneAddress]);
+}
+
+// Discussion round 1, 2026-11-22 (Codex): keeping the alarm epoch for
+// its control keys kept its notice chain readable too, past the three
+// periods after leaving that P2 states.
+// @internal
+#[test]
+fn an_alarm_in_an_epoch_left_does_not_keep_its_notices_readable() {
+    let mut p = pair();
+    let refresh = p.receiver_session(&[], START);
+    let opening = p.sender_session(&refresh, START + DAY);
+    p.receiver_session(&opening, START + 2 * DAY);
+    let left_on = START + 2 * DAY;
+    assert_ne!(p.receiver.current_epoch(), p.receiver.seed_epoch());
+
+    // The sender still writes in the seed until a refresh names the new
+    // epoch: this notice lies ahead on the seed's chain, not skipped.
+    let (key, commitment) = update(5);
+    p.sender.queue_update(&key, &commitment);
+    // With it goes the opening, again: it is not named yet.
+    let withheld_update = p.sender_session(&[], START + 3 * DAY);
+    assert_eq!(withheld_update.len(), 2);
+
+    p.receiver_session(&[], START + WEEK);
+    // Two refreshes are issued; the receiver watches the next numbers too.
+    let forged = forged_opening(&p.copied_seed, 0, 3, [0; 8], [0; 16]);
+    p.receiver.read(&[forged], START + 20 * DAY);
+    assert_eq!(p.receiver.alarms(), &[Alarm::OpeningOnNumberNotIssued]);
+
+    let read = p.receiver.read(&withheld_update, left_on + 3 * WEEK + DAY);
+    assert_eq!(
+        read.len(),
+        0,
+        "three periods after leaving, the chain is gone"
+    );
+}
+
 // Red team, pass 1: four unanswered openings stopped healing for good.
 // @internal
 #[test]

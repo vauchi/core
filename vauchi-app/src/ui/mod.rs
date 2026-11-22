@@ -155,7 +155,7 @@ pub use duress_pin::{DuressConfig, DuressPinEngine};
 pub use emergency_broadcast::{EmergencyBroadcastEngine, TrustedContactChoice};
 pub use emergency_shred::EmergencyShredEngine;
 pub use engine::WorkflowEngine;
-pub use envelope_outline::{command_outline, outline_json};
+pub use envelope_outline::{command_outline, event_outline_json, outline_json};
 pub use exchange::ble_engine::{
     ACTION_CANCEL as BLE_EXCHANGE_ACTION_CANCEL,
     ACTION_CONNECT_CODE as BLE_EXCHANGE_ACTION_CONNECT_CODE,

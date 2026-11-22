@@ -391,6 +391,7 @@ impl PlatformAppEngine {
 impl PlatformAppEngine {
     /// Return Core's complete initial presentation command batch.
     pub fn initial_commands_json(&self) -> Result<String, MobileError> {
+        crate::json_helpers::log_entry("initial_commands", None);
         if let Some(commands) = self.locked_initial_commands()? {
             return crate::json_helpers::batch_to_json(
                 &commands,
@@ -421,7 +422,10 @@ impl PlatformAppEngine {
     /// other behavior this path doesn't already cover.
     pub fn dispatch_json(&self, event_json: String) -> Result<String, MobileError> {
         let event = match vauchi_core::event_from_json(&event_json) {
-            Ok(event) => event,
+            Ok(event) => {
+                crate::json_helpers::log_entry("dispatch", Some(&event));
+                event
+            }
             Err(error) => {
                 if let Some(commands) = self.locked_reject_event_json(&error)? {
                     return commands_envelope_to_json(&commands);
@@ -551,6 +555,7 @@ impl PlatformAppEngine {
     /// UI-shaped to preserve the humble-allowlist invariant (no domain
     /// words).
     pub fn set_render_context_json(&self, json: String) -> Result<(), MobileError> {
+        crate::json_helpers::log_entry("set_render_context", None);
         let ctx: vauchi_app::ui::RenderContext =
             serde_json::from_str(&json).map_err(|e| MobileError::Other {
                 detail: format!("Invalid render context JSON: {e}"),

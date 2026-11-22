@@ -14,7 +14,7 @@
 //! name, number or address.
 
 use serde_json::Value;
-use vauchi_core::Command;
+use vauchi_core::{Command, Event};
 
 /// Keys whose string values are structure, not content: identifiers Core
 /// mints and closed vocabularies the contract defines. Everything else that
@@ -56,6 +56,12 @@ pub fn command_outline(commands: &[Command]) -> Value {
 /// `command_outline` as one line of JSON, for a log sink.
 pub fn outline_json(commands: &[Command]) -> String {
     command_outline(commands).to_string()
+}
+
+/// One event's outline as one line of JSON, by the same rule: what reached
+/// Core, without what the person typed.
+pub fn event_outline_json(event: &Event) -> String {
+    redact(serde_json::to_value(event).unwrap_or(Value::Null), None).to_string()
 }
 
 fn redact(value: Value, key: Option<&str>) -> Value {

@@ -35,6 +35,14 @@ pub(crate) fn wakeup_envelope_to_json(
     commands: &[Command],
     hardware: &[Command],
 ) -> Result<String, MobileError> {
+    #[cfg(feature = "dev-logging")]
+    if !commands.is_empty() {
+        tracing::info!(
+            target: "vauchi.presentation.outline",
+            "{}",
+            vauchi_app::ui::outline_json(commands)
+        );
+    }
     let envelope = WakeupEnvelope {
         notifications,
         commands,
@@ -53,6 +61,20 @@ struct CommandsEnvelope<'a> {
     commands: &'a [Command],
     #[serde(skip_serializing_if = "<[Command]>::is_empty")]
     hardware: &'a [Command],
+}
+
+/// Dev builds log which platform entry ran and, for an event, its outline:
+/// the command outline alone cannot say what took a page back
+/// (vauchi/private#1339).
+pub(crate) fn log_entry(entry: &str, event: Option<&vauchi_core::Event>) {
+    #[cfg(feature = "dev-logging")]
+    tracing::info!(
+        target: "vauchi.presentation.entry",
+        "{entry} {}",
+        event.map_or_else(String::new, vauchi_app::ui::event_outline_json)
+    );
+    #[cfg(not(feature = "dev-logging"))]
+    let _ = (entry, event);
 }
 
 /// Serialize generic Core-owned presentation commands.

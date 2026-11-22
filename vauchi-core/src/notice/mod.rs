@@ -8,6 +8,7 @@
 //! protocol still under review (vauchi/private#1281), built behind the
 //! `notice-core` feature so that no shipped build contains it.
 
+pub mod chain;
 pub mod keys;
 pub mod record;
 pub mod seal;

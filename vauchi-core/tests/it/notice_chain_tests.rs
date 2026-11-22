@@ -131,12 +131,8 @@ fn beyond_256_skipped_positions_the_lowest_are_erased() {
         Some(ahead)
     );
     assert_eq!(reader.skipped(), SKIPPED_KEPT as usize);
-    for erased in 0..10 {
-        assert_eq!(
-            read(&mut reader, &notices[erased], NOW),
-            None,
-            "position {erased}"
-        );
+    for (erased, notice) in notices.iter().enumerate().take(10) {
+        assert_eq!(read(&mut reader, notice, NOW), None, "position {erased}");
     }
     assert_eq!(read(&mut reader, &notices[10], NOW), Some(10));
     assert_eq!(

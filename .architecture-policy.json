@@ -70,6 +70,7 @@
     "vauchi-core/limits": 0,
     "vauchi-core/monotonic": 0,
     "vauchi-core/network": 4,
+    "vauchi-core/notice": 1,
     "vauchi-core/onboarding": 3,
     "vauchi-core/platform": 2,
     "vauchi-core/qr": 3,

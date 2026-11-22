@@ -10,7 +10,7 @@
 //! operations (ADR-021).
 
 use vauchi_core::Vauchi;
-use vauchi_core::exchange::{EncryptedExchangeMessage, X3DHKeyPair};
+use vauchi_core::exchange::{EncryptedExchangeMessage, X25519KeyPair};
 
 /// Helper: Bob creates an encrypted exchange message for Alice.
 fn bob_exchange_for(alice: &Vauchi) -> Vec<u8> {
@@ -65,7 +65,7 @@ fn test_create_encrypted_exchange_response() {
     let mut alice = Vauchi::in_memory().unwrap();
     alice.create_identity("Alice").unwrap();
 
-    let bob_x3dh = X3DHKeyPair::generate();
+    let bob_x3dh = X25519KeyPair::generate();
     let bob_exchange_key = *bob_x3dh.public_key();
 
     let response_bytes = alice

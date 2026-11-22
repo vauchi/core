@@ -8,7 +8,7 @@
 
 use vauchi_core::api::{CardUpdateError, ReceiveOutcome, process_single_card_update};
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::sync::delta::{
     DeltaError, PAYLOAD_VERSION_GUARDIAN_BACKUP_PIECE, VersionedPayload,
     encode_guardian_backup_piece,
@@ -22,7 +22,7 @@ use crate::common::helpers::create_vauchi_with_identity;
 fn bob_receiving_from_alice() -> (Vauchi, String, DoubleRatchetState) {
     let bob = create_vauchi_with_identity("Bob");
     let alice = create_vauchi_with_identity("Alice");
-    let alice_dh = X3DHKeyPair::generate();
+    let alice_dh = X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
     let alice_contact = Contact::from_exchange(
         *alice.identity().unwrap().signing_public_key(),
@@ -35,7 +35,7 @@ fn bob_receiving_from_alice() -> (Vauchi, String, DoubleRatchetState) {
     bob.create_ratchet_as_responder(
         &alice_id,
         &shared_secret,
-        X3DHKeyPair::from_bytes(*alice_dh.secret_bytes()),
+        X25519KeyPair::from_bytes(*alice_dh.secret_bytes()),
     )
     .unwrap();
     let alice_ratchet =

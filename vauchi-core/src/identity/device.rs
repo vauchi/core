@@ -18,7 +18,7 @@
     )
 )]
 
-use crate::crypto::X3DHKeyPair;
+use crate::crypto::X25519KeyPair;
 use crate::crypto::{HKDF, Signature, SigningKeyPair};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -110,7 +110,7 @@ pub struct DeviceInfo {
     /// Device index used for deterministic key derivation.
     device_index: u32,
     /// Device-specific X25519 keypair for communication.
-    device_exchange_keypair: X3DHKeyPair,
+    device_exchange_keypair: X25519KeyPair,
     /// Human-readable device name.
     device_name: String,
     /// Unix timestamp when this device was created.
@@ -139,7 +139,7 @@ impl DeviceInfo {
         let mut exchange_info = DEVICE_EXCHANGE_INFO.to_vec();
         exchange_info.extend_from_slice(&index_bytes);
         let exchange_seed = HKDF::derive_key(None, master_seed, &exchange_info);
-        let device_exchange_keypair = X3DHKeyPair::from_bytes(*exchange_seed);
+        let device_exchange_keypair = X25519KeyPair::from_bytes(*exchange_seed);
 
         Self {
             device_id: *device_id,
@@ -166,7 +166,7 @@ impl DeviceInfo {
     }
 
     /// Returns the device exchange keypair.
-    pub fn exchange_keypair(&self) -> &X3DHKeyPair {
+    pub fn exchange_keypair(&self) -> &X25519KeyPair {
         &self.device_exchange_keypair
     }
 

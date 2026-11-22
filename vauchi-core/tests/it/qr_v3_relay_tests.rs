@@ -7,7 +7,7 @@
 //! Validates the extended QR binary format that includes relay URL
 //! for per-contact relay routing.
 
-use vauchi_core::exchange::{ExchangeQR, X3DHKeyPair};
+use vauchi_core::exchange::{ExchangeQR, X25519KeyPair};
 use vauchi_core::identity::Identity;
 
 // ── Roundtrip without relay metadata ───────────────────────────────
@@ -16,7 +16,7 @@ use vauchi_core::identity::Identity;
 #[test]
 fn v3_roundtrip_no_relay_metadata() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
     let qr = ExchangeQR::generate(
         &identity,
         &ephemeral,
@@ -38,7 +38,7 @@ fn v3_roundtrip_no_relay_metadata() {
 // @internal
 #[test]
 fn v3_roundtrip_keeps_a_full_length_multibyte_name() {
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
     let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
     let full = "𝄞".repeat(100);
     let over = "名".repeat(101);
@@ -63,7 +63,7 @@ fn v3_roundtrip_keeps_a_full_length_multibyte_name() {
 #[test]
 fn v3_roundtrip_with_relay_url_and_noise_pubkey() {
     let identity = Identity::create("Bob", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
     let relay_url = "https://relay.bobs-server.com";
 
     let qr =
@@ -85,7 +85,7 @@ fn v3_relay_url_without_noise_pubkey_now_accepted() {
     // parse. The gateway pins relay TLS (SPKI); operator separation
     // provides the privacy property the TOFU pin used to.
     let identity = Identity::create("Carol", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let qr = ExchangeQR::generate_with_relay(
         &identity,
@@ -104,7 +104,7 @@ fn v3_relay_url_without_noise_pubkey_now_accepted() {
 #[test]
 fn v3_roundtrip_unicode_name_with_relay() {
     let identity = Identity::create("Müller 日本語", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let qr = ExchangeQR::generate_with_relay(
         &identity,
@@ -127,7 +127,7 @@ fn v3_roundtrip_unicode_name_with_relay() {
 #[test]
 fn v3_signature_covers_relay_fields() {
     let identity = Identity::create("Dave", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let qr = ExchangeQR::generate_with_relay(
         &identity,
@@ -146,7 +146,7 @@ fn v3_signature_covers_relay_fields() {
 #[test]
 fn v3_empty_relay_url_rejected_on_parse() {
     let identity = Identity::create("Eve", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let qr = ExchangeQR::generate_with_relay(&identity, &ephemeral, Some(String::new()), 0u64);
 
@@ -164,7 +164,7 @@ fn v3_empty_relay_url_rejected_on_parse() {
 #[test]
 fn v3_private_host_relay_url_rejected_on_parse() {
     let identity = Identity::create("Mallory", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let qr = ExchangeQR::generate_with_relay(
         &identity,
@@ -187,7 +187,7 @@ fn v3_private_host_relay_url_rejected_on_parse() {
 #[test]
 fn v3_insecure_scheme_relay_url_rejected_on_parse() {
     let identity = Identity::create("Oscar", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let qr = ExchangeQR::generate_with_relay(
         &identity,
@@ -210,7 +210,7 @@ fn v3_insecure_scheme_relay_url_rejected_on_parse() {
 #[test]
 fn v3_roundtrip_long_relay_url() {
     let identity = Identity::create("Frank", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
     let long_url = format!("https://{}.example.com", "a".repeat(200));
 
     let qr = ExchangeQR::generate_with_relay(&identity, &ephemeral, Some(long_url.clone()), 0u64);
@@ -228,7 +228,7 @@ fn v3_roundtrip_long_relay_url() {
 #[test]
 fn v3_qr_image_generation_with_relay() {
     let identity = Identity::create("Grace", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let qr = ExchangeQR::generate_with_relay(
         &identity,
@@ -248,7 +248,7 @@ fn v3_qr_image_generation_with_relay() {
 #[test]
 fn v3_qr_image_rejects_a_payload_past_qr_capacity() {
     let identity = Identity::create("Grace", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
     let relay_url = format!("https://relay.vauchi.app/{}", "a".repeat(4000));
 
     let qr = ExchangeQR::generate_with_relay(&identity, &ephemeral, Some(relay_url), 0u64);

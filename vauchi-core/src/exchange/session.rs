@@ -16,7 +16,7 @@ use crate::monotonic::{MonotonicClock, SystemMonotonicClock};
 use super::direct_transport::UsbRole;
 use super::nfc_handshake::NfcHandshakeSession;
 use super::trust_metrics::TrustMetrics;
-use super::{ExchangeError, ExchangeQR, ProximityConfidence, ProximityVerifier, X3DHKeyPair};
+use super::{ExchangeError, ExchangeQR, ProximityConfidence, ProximityVerifier, X25519KeyPair};
 use crate::card::ContactCard;
 use crate::contact::Contact;
 use crate::crypto::hkdf::HKDF;
@@ -148,7 +148,7 @@ pub struct ExchangeSession {
     /// Our contact card to share
     our_card: ContactCard,
     /// Our X3DH keypair for this session (fresh ephemeral)
-    our_x3dh: X3DHKeyPair,
+    our_x3dh: X25519KeyPair,
     /// The peer's X25519 exchange (DH) public key, captured at key agreement.
     /// Retained past `AwaitingCardExchange` so the post-`Complete` save sites
     /// can initialize the Double Ratchet against the *exchange* key the X3DH
@@ -241,7 +241,7 @@ impl ExchangeSession {
         clock: Arc<dyn crate::clock::Clock>,
     ) -> Self {
         // Fresh ephemeral keypair — NOT derived from identity
-        let our_x3dh = X3DHKeyPair::generate();
+        let our_x3dh = X25519KeyPair::generate();
         ExchangeSession {
             state: ExchangeState::Idle,
             transport: ExchangeTransport::Qr,
@@ -303,7 +303,7 @@ impl ExchangeSession {
             ));
         }
 
-        let our_x3dh = X3DHKeyPair::from_bytes(ephemeral_secret);
+        let our_x3dh = X25519KeyPair::from_bytes(ephemeral_secret);
         if our_qr.exchange_key() != our_x3dh.public_key() {
             return Err(ExchangeError::InvalidState(
                 "pending QR does not match its ephemeral secret".into(),
@@ -326,7 +326,7 @@ impl ExchangeSession {
         identity: Identity,
         our_card: ContactCard,
         proximity: impl ProximityVerifier + 'static,
-        our_x3dh: X3DHKeyPair,
+        our_x3dh: X25519KeyPair,
         clock: Arc<dyn crate::clock::Clock>,
     ) -> Self {
         ExchangeSession {
@@ -372,7 +372,7 @@ impl ExchangeSession {
         proximity: impl ProximityVerifier + 'static,
         clock: Arc<dyn crate::clock::Clock>,
     ) -> Self {
-        let our_x3dh = X3DHKeyPair::generate();
+        let our_x3dh = X25519KeyPair::generate();
         let display_name = our_card.display_name().to_string();
         let nfc_handshake = NfcHandshakeSession::new_initiator(&identity, display_name);
         ExchangeSession {
@@ -423,7 +423,7 @@ impl ExchangeSession {
         role: UsbRole,
         clock: Arc<dyn crate::clock::Clock>,
     ) -> Self {
-        let our_x3dh = X3DHKeyPair::generate();
+        let our_x3dh = X25519KeyPair::generate();
         let our_qr = ExchangeQR::generate(&identity, &our_x3dh, clock.unix_seconds());
         ExchangeSession {
             state: ExchangeState::AwaitingDirectPayload {
@@ -524,7 +524,7 @@ impl ExchangeSession {
             )
         })?;
 
-        let our_dh = X3DHKeyPair::from_bytes(*self.our_x3dh.secret_bytes());
+        let our_dh = X25519KeyPair::from_bytes(*self.our_x3dh.secret_bytes());
         super::ratchet_bootstrap::bootstrap_exchange_ratchet(
             shared_key,
             self.identity.signing_public_key(),

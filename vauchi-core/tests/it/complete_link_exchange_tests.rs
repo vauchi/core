@@ -15,7 +15,7 @@
 //! Record: `_private/docs/problems/2026-06-03-link-symmetric-exchange-wiring/`.
 
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::exchange::link_mode::{LinkExchangeBinding, serialize_link_card_payload};
 use vauchi_core::{ExchangeTransport, Vauchi, VauchiError};
 
@@ -35,10 +35,10 @@ const EXCHANGE: LinkExchangeBinding = LinkExchangeBinding {
 /// Build the bootstrap a side would deposit for [`EXCHANGE`], returning the
 /// payload, the retained X3DH keypair (kept for completion), and the side's
 /// identity key.
-fn build_v2(v: &Vauchi, relay_url: &str) -> (Vec<u8>, X3DHKeyPair, [u8; 32]) {
+fn build_v2(v: &Vauchi, relay_url: &str) -> (Vec<u8>, X25519KeyPair, [u8; 32]) {
     let identity = v.identity().expect("identity exists");
     let identity_pubkey = *identity.signing_public_key();
-    let x3dh = X3DHKeyPair::generate();
+    let x3dh = X25519KeyPair::generate();
     let card = ContactCard::new(identity.display_name());
     let payload = serialize_link_card_payload(
         identity.signing_keypair(),

@@ -29,7 +29,7 @@ use super::exchange_payload::{
 };
 use crate::identity::Identity;
 
-use super::x3dh::X3DHKeyPair;
+use super::x3dh::X25519KeyPair;
 
 /// NFC payload magic bytes.
 const NFC_MAGIC: &[u8; 4] = b"VNFC";
@@ -58,7 +58,7 @@ pub struct ExchangeNfc {
 
 impl ExchangeNfc {
     /// Generates a new NFC exchange payload.
-    pub fn generate(identity: &Identity, ephemeral: &X3DHKeyPair, now: u64) -> Self {
+    pub fn generate(identity: &Identity, ephemeral: &X25519KeyPair, now: u64) -> Self {
         use crate::crypto::random_bytes;
 
         let token: [u8; 32] = random_bytes();
@@ -71,7 +71,7 @@ impl ExchangeNfc {
     /// Generates with explicit timestamp (for testing).
     pub fn generate_with_timestamp(
         identity: &Identity,
-        ephemeral: &X3DHKeyPair,
+        ephemeral: &X25519KeyPair,
         token: [u8; 32],
         timestamp: u64,
     ) -> Self {

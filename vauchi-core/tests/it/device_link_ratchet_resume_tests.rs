@@ -11,7 +11,7 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey};
 use vauchi_core::identity::{DeviceInfo, DeviceRegistry, Identity, RegistryBroadcast};
 use vauchi_core::sync::DeviceLinkIntent;
-use vauchi_core::{SigningKeyPair, Storage, X3DHKeyPair};
+use vauchi_core::{SigningKeyPair, Storage, X25519KeyPair};
 
 fn identity_and_registry(
     seed: [u8; 32],
@@ -73,7 +73,7 @@ fn linked_device_receives_signed_peer_registry_but_no_live_ratchet() {
     // Even if legacy replacement state exists, it is not exported.
     let ratchet = DoubleRatchetState::initialize_initiator(
         &SymmetricKey::generate(),
-        *X3DHKeyPair::generate().public_key(),
+        *X25519KeyPair::generate().public_key(),
     )
     .unwrap();
     source_storage

@@ -18,7 +18,7 @@
 
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::crypto::ratchet::DoubleRatchetState;
-use crate::exchange::X3DHKeyPair;
+use crate::exchange::X25519KeyPair;
 use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
 use crate::recovery::authorization::RecoveryAuthorization;
 use crate::recovery::rekey::{RekeyAnswer, RekeyOffer, rekey_shared_key};
@@ -103,7 +103,7 @@ impl ProfileEngine {
             .shared_key()
             .ok_or_else(|| VauchiError::InvalidState("The contact has no shared key".into()))?
             .clone();
-        let exchange = X3DHKeyPair::generate();
+        let exchange = X25519KeyPair::generate();
         let Ok(shared) = rekey_shared_key(
             &exchange,
             offer.exchange_key(),

@@ -11,7 +11,7 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SigningKeyPair;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::sync::delta::{
     PAYLOAD_VERSION_RETURNED_BACKUP_PIECE, VersionedPayload, encode_returned_backup_piece,
 };
@@ -25,7 +25,7 @@ use crate::common::helpers::create_vauchi_with_identity;
 fn new_identity_receiving_from_guardian() -> (Vauchi, String, DoubleRatchetState) {
     let recovering = create_vauchi_with_identity("Alice, new phone");
     let guardian = create_vauchi_with_identity("Guardian");
-    let guardian_dh = X3DHKeyPair::generate();
+    let guardian_dh = X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
     let guardian_contact = Contact::from_exchange(
         *guardian.identity().unwrap().signing_public_key(),
@@ -39,7 +39,7 @@ fn new_identity_receiving_from_guardian() -> (Vauchi, String, DoubleRatchetState
         .create_ratchet_as_responder(
             &guardian_id,
             &shared_secret,
-            X3DHKeyPair::from_bytes(*guardian_dh.secret_bytes()),
+            X25519KeyPair::from_bytes(*guardian_dh.secret_bytes()),
         )
         .unwrap();
     let guardian_ratchet =

@@ -10,7 +10,7 @@
 use vauchi_core::{
     Contact, ContactCard, ContactField, FieldType, Storage, SymmetricKey, SyncManager, Vauchi,
     crypto::ratchet::DoubleRatchetState,
-    exchange::X3DHKeyPair,
+    exchange::X25519KeyPair,
     network::{MockTransport, RelayClient, RelayClientConfig, TransportConfig},
     sync::CardDelta,
 };
@@ -76,7 +76,7 @@ fn test_relay_disconnect_clears_state() {
     client.connect().unwrap();
     assert!(client.is_connected());
 
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -139,8 +139,8 @@ fn test_decrypt_fails_with_wrong_ratchet() {
     let shared_secret1 = SymmetricKey::generate();
     let shared_secret2 = SymmetricKey::generate(); // Different secret
 
-    let bob_dh1 = X3DHKeyPair::generate();
-    let bob_dh2 = X3DHKeyPair::generate();
+    let bob_dh1 = X25519KeyPair::generate();
+    let bob_dh2 = X25519KeyPair::generate();
 
     let mut alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret1, *bob_dh1.public_key()).unwrap();
@@ -158,7 +158,7 @@ fn test_decrypt_fails_with_wrong_ratchet() {
 #[test]
 fn test_decrypt_fails_with_corrupted_ciphertext() {
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let mut alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();

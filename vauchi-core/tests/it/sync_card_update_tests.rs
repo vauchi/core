@@ -16,7 +16,7 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::cek::ContentEncryptionKey;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
 
 /// Helper: create Alice and Bob with a mutual contact, ratchet states stored,
@@ -54,7 +54,7 @@ pub(crate) fn setup_exchange_with_ratchets() -> (
 
     // Create ratchets: Bob is initiator so he can encrypt to Alice,
     // Alice is responder so she can decrypt Bob's messages.
-    let alice_dh = X3DHKeyPair::generate();
+    let alice_dh = X25519KeyPair::generate();
     let bob_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *alice_dh.public_key()).unwrap();
     let alice_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, alice_dh);
@@ -441,7 +441,7 @@ fn test_decryption_failed_rejected() {
 
     // Create a ratchet message encrypted with a DIFFERENT ratchet (wrong key)
     let different_secret = SymmetricKey::generate();
-    let wrong_dh = X3DHKeyPair::generate();
+    let wrong_dh = X25519KeyPair::generate();
     let mut wrong_ratchet =
         DoubleRatchetState::initialize_initiator(&different_secret, *wrong_dh.public_key())
             .unwrap();

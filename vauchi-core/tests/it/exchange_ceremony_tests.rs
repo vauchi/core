@@ -120,8 +120,8 @@ fn test_qr_ceremony_shared_keys_match_and_encrypt() {
 // @internal
 #[test]
 fn test_tampered_ephemeral_key_causes_decrypt_failure() {
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     let alice_identity = [0x41u8; 32];
 
@@ -149,8 +149,8 @@ fn test_tampered_ephemeral_key_causes_decrypt_failure() {
 // @internal
 #[test]
 fn test_tampered_sender_exchange_key_causes_decrypt_failure() {
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     let (mut msg, _) =
         EncryptedExchangeMessage::create(&alice, bob.public_key(), &[0x01u8; 32], "Alice").unwrap();
@@ -175,8 +175,8 @@ fn test_tampered_sender_exchange_key_causes_decrypt_failure() {
 // @internal
 #[test]
 fn test_tampered_ciphertext_causes_decrypt_failure() {
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     let (mut msg, _) =
         EncryptedExchangeMessage::create(&alice, bob.public_key(), &[0x01u8; 32], "Alice").unwrap();
@@ -204,9 +204,9 @@ fn test_tampered_ciphertext_causes_decrypt_failure() {
 // @internal
 #[test]
 fn test_identity_binding_changes_shared_secret() {
-    let alice1 = X3DHKeyPair::generate();
-    let alice2 = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice1 = X25519KeyPair::generate();
+    let alice2 = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     let (secret1, _) = X3DH::initiate(&alice1, bob.public_key()).unwrap();
     let (secret2, _) = X3DH::initiate(&alice2, bob.public_key()).unwrap();
@@ -223,8 +223,8 @@ fn test_identity_binding_changes_shared_secret() {
 // @internal
 #[test]
 fn test_ephemeral_changes_shared_secret() {
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     let (secret1, eph1) = X3DH::initiate(&alice, bob.public_key()).unwrap();
     let (secret2, eph2) = X3DH::initiate(&alice, bob.public_key()).unwrap();
@@ -351,8 +351,8 @@ fn test_independent_sessions_produce_different_secrets() {
 // @internal
 #[test]
 fn test_encrypted_message_secret_matches_raw_x3dh() {
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     let (msg, alice_secret) =
         EncryptedExchangeMessage::create(&alice, bob.public_key(), &[0x42u8; 32], "Alice").unwrap();
@@ -398,8 +398,8 @@ fn test_transcript_binding_includes_identity_keys() {
 
     // Use the same ephemeral X3DH keypair for both sessions
     let fixed_x3dh_seed = [0x42u8; 32];
-    let fixed_x3dh_a = X3DHKeyPair::from_bytes(fixed_x3dh_seed);
-    let fixed_x3dh_b = X3DHKeyPair::from_bytes(fixed_x3dh_seed);
+    let fixed_x3dh_a = X25519KeyPair::from_bytes(fixed_x3dh_seed);
+    let fixed_x3dh_b = X25519KeyPair::from_bytes(fixed_x3dh_seed);
 
     let card_a = ContactCard::new("Alice-A");
     let card_b = ContactCard::new("Alice-B");
@@ -475,8 +475,8 @@ fn test_transcript_binding_includes_ephemeral_keys() {
     let alice_identity_2 = Identity::create("Alice", 0);
     let bob_identity = Identity::create("Bob", 0);
 
-    let x3dh_1 = X3DHKeyPair::from_bytes([0x01u8; 32]);
-    let x3dh_2 = X3DHKeyPair::from_bytes([0x02u8; 32]);
+    let x3dh_1 = X25519KeyPair::from_bytes([0x01u8; 32]);
+    let x3dh_2 = X25519KeyPair::from_bytes([0x02u8; 32]);
 
     let card_1 = ContactCard::new("Alice");
     let card_2 = ContactCard::new("Alice");

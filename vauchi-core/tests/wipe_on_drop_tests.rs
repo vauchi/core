@@ -19,7 +19,7 @@
 use std::mem::{ManuallyDrop, size_of};
 
 use vauchi_core::crypto::cek::ContentEncryptionKey;
-use vauchi_core::crypto::{MessageKey, SymmetricKey, X3DHKeyPair};
+use vauchi_core::crypto::{MessageKey, SymmetricKey, X25519KeyPair};
 #[cfg(feature = "testing")]
 use vauchi_core::identity::Identity;
 
@@ -88,7 +88,7 @@ fn a_message_key_is_all_zero_after_drop() {
 // @internal
 #[test]
 fn an_x3dh_key_pair_holds_no_secret_after_drop() {
-    let left = bytes_left_after_drop(X3DHKeyPair::from_bytes(SECRET));
+    let left = bytes_left_after_drop(X25519KeyPair::from_bytes(SECRET));
 
     assert!(!still_holds(&left, &SECRET));
 }
@@ -130,7 +130,7 @@ fn a_double_ratchet_root_key_is_all_zero_after_drop() {
     use vauchi_core::crypto::DoubleRatchetState;
     let ratchet = DoubleRatchetState::initialize_responder(
         &SymmetricKey::from_bytes(SECRET),
-        X3DHKeyPair::generate(),
+        X25519KeyPair::generate(),
     );
 
     let left: [u8; 32] = field_left_after_drop(ratchet, DoubleRatchetState::ROOT_KEY_OFFSET);

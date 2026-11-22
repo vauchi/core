@@ -9,7 +9,7 @@
 
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::crypto::ratchet::{DoubleRatchetState, RatchetError};
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 
 // =============================================================================
 // Message Nonce/Index Based Replay Detection
@@ -21,7 +21,7 @@ use vauchi_core::exchange::X3DHKeyPair;
 #[test]
 fn test_same_message_decrypted_once() {
     let x3dh_secret = SymmetricKey::generate();
-    let bob_keypair = X3DHKeyPair::generate();
+    let bob_keypair = X25519KeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
@@ -48,7 +48,7 @@ fn test_same_message_decrypted_once() {
 #[test]
 fn test_replay_after_chain_advance() {
     let x3dh_secret = SymmetricKey::generate();
-    let bob_keypair = X3DHKeyPair::generate();
+    let bob_keypair = X25519KeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
@@ -77,7 +77,7 @@ fn test_replay_after_chain_advance() {
 #[test]
 fn test_out_of_order_vs_duplicate() {
     let x3dh_secret = SymmetricKey::generate();
-    let bob_keypair = X3DHKeyPair::generate();
+    let bob_keypair = X25519KeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
@@ -111,7 +111,7 @@ fn test_out_of_order_vs_duplicate() {
 #[test]
 fn test_old_dh_generation_rejected() {
     let x3dh_secret = SymmetricKey::generate();
-    let bob_keypair = X3DHKeyPair::generate();
+    let bob_keypair = X25519KeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
@@ -148,7 +148,7 @@ fn test_old_dh_generation_rejected() {
 #[test]
 fn test_skipped_keys_deleted_after_use() {
     let x3dh_secret = SymmetricKey::generate();
-    let bob_keypair = X3DHKeyPair::generate();
+    let bob_keypair = X25519KeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
@@ -182,7 +182,7 @@ fn test_skipped_keys_deleted_after_use() {
 #[test]
 fn test_too_many_skipped_messages() {
     let x3dh_secret = SymmetricKey::generate();
-    let bob_keypair = X3DHKeyPair::generate();
+    let bob_keypair = X25519KeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
@@ -209,7 +209,7 @@ fn test_too_many_skipped_messages() {
 #[test]
 fn test_replay_detection_timestamp_independent() {
     let x3dh_secret = SymmetricKey::generate();
-    let bob_keypair = X3DHKeyPair::generate();
+    let bob_keypair = X25519KeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
@@ -237,7 +237,7 @@ fn test_replay_detection_timestamp_independent() {
 #[test]
 fn test_cross_chain_replay_prevention() {
     let x3dh_secret = SymmetricKey::generate();
-    let bob_keypair = X3DHKeyPair::generate();
+    let bob_keypair = X25519KeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();

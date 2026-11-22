@@ -12,7 +12,7 @@ use proptest::prelude::*;
 use vauchi_core::exchange::oob_bootstrap::OobBootstrapQr;
 use vauchi_core::exchange::{
     ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession, ManualConfirmationVerifier,
-    X3DHKeyPair,
+    X25519KeyPair,
 };
 use vauchi_core::identity::Identity;
 use vauchi_core::{Command, ContactCard, Event, Vauchi};
@@ -22,13 +22,13 @@ const NOW: u64 = 1_000;
 
 fn glance_qr() -> (Identity, OobBootstrapQr) {
     let identity = Identity::create("Displayer", 0);
-    let qr = OobBootstrapQr::generate(&identity, &X3DHKeyPair::generate(), NOW);
+    let qr = OobBootstrapQr::generate(&identity, &X25519KeyPair::generate(), NOW);
     (identity, qr)
 }
 
 fn exchange_qr() -> (Identity, ExchangeQR) {
     let identity = Identity::create("Zoë", 0);
-    let qr = ExchangeQR::generate(&identity, &X3DHKeyPair::generate(), NOW);
+    let qr = ExchangeQR::generate(&identity, &X25519KeyPair::generate(), NOW);
     (identity, qr)
 }
 
@@ -184,7 +184,7 @@ proptest! {
     #[test]
     fn both_qr_forms_scan_to_the_same_glance_payload(timestamp in 0u64..4_000_000_000) {
         let identity = Identity::create("Displayer", 0);
-        let qr = OobBootstrapQr::generate(&identity, &X3DHKeyPair::generate(), timestamp);
+        let qr = OobBootstrapQr::generate(&identity, &X25519KeyPair::generate(), timestamp);
 
         let from_url = OobBootstrapQr::from_data_string(&qr.to_qr_url()).unwrap();
         let from_raw = OobBootstrapQr::from_data_string(&qr.to_data_string()).unwrap();

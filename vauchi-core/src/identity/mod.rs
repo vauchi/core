@@ -25,7 +25,7 @@ pub use device::{
     classify_device_type,
 };
 
-use crate::crypto::X3DHKeyPair;
+use crate::crypto::X25519KeyPair;
 use crate::crypto::{
     HKDF, Signature, SigningKeyPair, decrypt, derive_key_argon2id, encrypt, random_bytes,
 };
@@ -136,7 +136,7 @@ impl Identity {
         // master_seed is IKM (high-entropy input), no salt needed
         let exchange_seed = HKDF::derive_key(None, &master_seed, b"Vauchi_Exchange_Seed_v2");
 
-        let x3dh = X3DHKeyPair::from_bytes(*exchange_seed);
+        let x3dh = X25519KeyPair::from_bytes(*exchange_seed);
         let exchange_public_key = *x3dh.public_key();
 
         let device_info = DeviceInfo::derive(&master_seed, device_index, device_name, now);
@@ -199,10 +199,10 @@ impl Identity {
     ///
     /// The keypair is derived from the master seed using HKDF with domain
     /// separation, ensuring consistency with exchange_public_key.
-    pub fn x3dh_keypair(&self) -> X3DHKeyPair {
+    pub fn x3dh_keypair(&self) -> X25519KeyPair {
         // Uses same derivation as exchange_public_key for consistency
         let x25519_secret = HKDF::derive_key(None, &self.master_seed, b"Vauchi_Exchange_Seed_v2");
-        X3DHKeyPair::from_bytes(*x25519_secret)
+        X25519KeyPair::from_bytes(*x25519_secret)
     }
 
     /// Returns the public ID (hex fingerprint of signing key).

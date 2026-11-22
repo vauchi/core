@@ -9,7 +9,7 @@
 
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 
 // =============================================================================
 // =============================================================================
@@ -20,7 +20,7 @@ use vauchi_core::exchange::X3DHKeyPair;
 #[test]
 fn test_ratchet_state_serialization_roundtrip() {
     let x3dh_secret = SymmetricKey::generate();
-    let bob_keypair = X3DHKeyPair::generate();
+    let bob_keypair = X25519KeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
@@ -44,7 +44,7 @@ fn test_ratchet_state_serialization_roundtrip() {
 #[test]
 fn test_both_parties_restore_state() {
     let x3dh_secret = SymmetricKey::generate();
-    let bob_keypair = X3DHKeyPair::generate();
+    let bob_keypair = X25519KeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
@@ -81,7 +81,7 @@ fn test_both_parties_restore_state() {
 #[test]
 fn test_restore_mid_conversation() {
     let x3dh_secret = SymmetricKey::generate();
-    let bob_keypair = X3DHKeyPair::generate();
+    let bob_keypair = X25519KeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
@@ -110,7 +110,7 @@ fn test_restore_mid_conversation() {
 #[test]
 fn test_dh_ratchet_state_survives() {
     let x3dh_secret = SymmetricKey::generate();
-    let bob_keypair = X3DHKeyPair::generate();
+    let bob_keypair = X25519KeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
@@ -147,7 +147,7 @@ fn test_dh_ratchet_state_survives() {
 #[test]
 fn test_skipped_keys_survive_serialization() {
     let x3dh_secret = SymmetricKey::generate();
-    let bob_keypair = X3DHKeyPair::generate();
+    let bob_keypair = X25519KeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
@@ -181,7 +181,7 @@ fn test_skipped_keys_survive_serialization() {
 #[test]
 fn test_responder_restore_before_first_message() {
     let x3dh_secret = SymmetricKey::generate();
-    let bob_keypair = X3DHKeyPair::generate();
+    let bob_keypair = X25519KeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
     // Initialize responder (hasn't received anything yet)
@@ -206,7 +206,7 @@ fn test_responder_restore_before_first_message() {
 #[test]
 fn test_invalid_send_chain_rejected() {
     let x3dh_secret = SymmetricKey::generate();
-    let bob_keypair = X3DHKeyPair::generate();
+    let bob_keypair = X25519KeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
     let alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
@@ -230,7 +230,7 @@ fn test_invalid_send_chain_rejected() {
 #[test]
 fn test_many_serialization_cycles() {
     let x3dh_secret = SymmetricKey::generate();
-    let bob_keypair = X3DHKeyPair::generate();
+    let bob_keypair = X25519KeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();

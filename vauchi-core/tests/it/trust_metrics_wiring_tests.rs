@@ -15,7 +15,7 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::{
     ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState, ExchangeTransport,
-    MockProximityVerifier, ProximityConfidence, TransportProximity, X3DHKeyPair,
+    MockProximityVerifier, ProximityConfidence, TransportProximity, X25519KeyPair,
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -23,7 +23,7 @@ use vauchi_core::exchange::{
 /// Runs a full QR exchange ceremony and returns the contact from Bob's perspective.
 fn run_full_qr_exchange_with_mock() -> Contact {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(

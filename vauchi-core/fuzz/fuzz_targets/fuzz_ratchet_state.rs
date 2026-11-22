@@ -18,7 +18,7 @@ fuzz_target!(|data: &[u8]| {
     // Try to deserialize as a RatchetMessage and decrypt it
     if let Ok(msg) = serde_json::from_slice::<RatchetMessage>(data) {
         let shared_secret = SymmetricKey::generate();
-        let dh_pair = vauchi_core::exchange::X3DHKeyPair::generate();
+        let dh_pair = vauchi_core::exchange::X25519KeyPair::generate();
         let mut state = DoubleRatchetState::initialize_responder(&shared_secret, dh_pair);
 
         // This should never panic, only return errors

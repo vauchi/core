@@ -11,7 +11,7 @@
 use vauchi_core::{
     Contact, ContactCard, ContactField, FieldType, Storage, SymmetricKey, SyncManager, Vauchi,
     crypto::ratchet::DoubleRatchetState,
-    exchange::X3DHKeyPair,
+    exchange::X25519KeyPair,
     network::{MockTransport, RelayClient, RelayClientConfig, TransportConfig},
 };
 
@@ -88,7 +88,7 @@ fn test_relay_send_update() {
     client.connect().unwrap();
 
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
@@ -125,7 +125,7 @@ fn test_relay_multiple_in_flight() {
     client.connect().unwrap();
 
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
@@ -286,7 +286,7 @@ fn test_full_update_propagation() {
     let alice_id = alice_contact.id().to_string();
     bob_wb.add_contact(alice_contact).unwrap();
 
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
@@ -414,7 +414,7 @@ fn test_relay_empty_payload() {
     client.connect().unwrap();
 
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
@@ -440,7 +440,7 @@ fn test_relay_large_payload() {
     client.connect().unwrap();
 
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 

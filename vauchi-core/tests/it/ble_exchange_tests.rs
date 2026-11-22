@@ -16,7 +16,7 @@
 use vauchi_core::exchange::{
     BLE_PAYLOAD_SIZE, CHAR_CARD_EXCHANGE, CHAR_CHALLENGE, CHAR_EXCHANGE_PAYLOAD, ExchangeBle,
     ExchangeError, ExchangeEvent, ExchangeSession, ExchangeState, MockProximityVerifier,
-    VAUCHI_BLE_SERVICE_UUID, X3DHKeyPair,
+    VAUCHI_BLE_SERVICE_UUID, X25519KeyPair,
 };
 use vauchi_core::{ContactCard, Identity};
 
@@ -27,7 +27,7 @@ use vauchi_core::{ContactCard, Identity};
 #[test]
 fn test_ble_payload_generate() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let payload = ExchangeBle::generate(
         &identity,
@@ -45,7 +45,7 @@ fn test_ble_payload_generate() {
 #[test]
 fn test_ble_payload_roundtrip() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let payload = ExchangeBle::generate(
         &identity,
@@ -71,7 +71,7 @@ fn test_ble_payload_roundtrip() {
 #[test]
 fn test_ble_payload_signature() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let payload = ExchangeBle::generate(
         &identity,
@@ -86,7 +86,7 @@ fn test_ble_payload_signature() {
 #[test]
 fn test_ble_payload_tamper() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let payload = ExchangeBle::generate(
         &identity,
@@ -109,7 +109,7 @@ fn test_ble_payload_tamper() {
 #[test]
 fn test_ble_payload_magic() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let payload = ExchangeBle::generate(
         &identity,
@@ -128,7 +128,7 @@ fn test_ble_payload_magic() {
 #[test]
 fn test_ble_payload_expiry() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -187,8 +187,8 @@ fn test_gatt_service_uuid_match() {
 // @scenario: ble_exchange :: Symmetric DH produces identical shared keys
 #[test]
 fn test_ble_shared_keys_match() {
-    let alice_eph = X3DHKeyPair::generate();
-    let bob_eph = X3DHKeyPair::generate();
+    let alice_eph = X25519KeyPair::generate();
+    let bob_eph = X25519KeyPair::generate();
 
     let alice_shared = alice_eph.diffie_hellman(bob_eph.public_key()).unwrap();
     let bob_shared = bob_eph.diffie_hellman(alice_eph.public_key()).unwrap();
@@ -254,7 +254,7 @@ fn test_ble_payload_size() {
     assert_eq!(BLE_PAYLOAD_SIZE, 174, "BLE payload should be 174 bytes");
 
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
     let payload = ExchangeBle::generate(
         &identity,
         &ephemeral,
@@ -274,7 +274,7 @@ fn test_ble_forward_secrecy() {
     let identity = Identity::create("Alice", 0);
 
     let identity_x3dh = identity.x3dh_keypair();
-    let ble_eph = X3DHKeyPair::generate();
+    let ble_eph = X25519KeyPair::generate();
 
     assert_ne!(
         ble_eph.public_key(),

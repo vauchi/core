@@ -15,7 +15,7 @@ use vauchi_core::api::{
 };
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 
 // @claim: S2
 // A multi-device sender numbers deltas per device, from its own storage.
@@ -62,7 +62,7 @@ fn delta_version_floor_is_tracked_per_peer_device() {
     // Sender device A2 gets its own ratchet session (its versions count from
     // its own storage, independently of A1).
     let a2_device_id = [2; 32];
-    let alice_dh_a2 = X3DHKeyPair::generate();
+    let alice_dh_a2 = X25519KeyPair::generate();
     let bob_ratchet_a2 =
         DoubleRatchetState::initialize_initiator(&shared_secret, *alice_dh_a2.public_key())
             .unwrap();

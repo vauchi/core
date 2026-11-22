@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use vauchi_core::contact::reciprocity_tokens::derive_confirmation_tokens;
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::crypto::{HKDF, SymmetricKey, X3DHKeyPair, decrypt};
+use vauchi_core::crypto::{HKDF, SymmetricKey, X25519KeyPair, decrypt};
 use vauchi_core::exchange::confirmation_escrow::ConfirmationEscrowKeys;
 use vauchi_core::exchange::escrow::{EscrowKeys, EscrowRole};
 use vauchi_core::exchange::key_order::is_initiator;
@@ -127,7 +127,7 @@ fn vector_identity(seed_byte: u8, name: &str) -> Identity {
 /// reciprocity tokens the session derived.
 fn qr_side(
     identity: Identity,
-    ephemeral: X3DHKeyPair,
+    ephemeral: X25519KeyPair,
     peer_qr: &vauchi_core::exchange::ExchangeQR,
 ) -> ([u8; 32], [u8; 32], [u8; 32]) {
     let mut session = ExchangeSession::new_qr_with_x3dh(
@@ -163,7 +163,7 @@ fn qr_side(
 /// the key and the tokens depend only on the four public keys and the DH.
 fn qr_exchange(a_seed: u8, b_seed: u8, a_eph: u8, b_eph: u8) -> ([u8; 32], [u8; 32], [u8; 32]) {
     // Identity is not Clone, so each session gets its own copy from the seed.
-    let qr_of = |identity: Identity, eph: X3DHKeyPair| {
+    let qr_of = |identity: Identity, eph: X25519KeyPair| {
         let mut session = ExchangeSession::new_qr_with_x3dh(
             identity,
             ContactCard::new("Vector"),
@@ -176,20 +176,20 @@ fn qr_exchange(a_seed: u8, b_seed: u8, a_eph: u8, b_eph: u8) -> ([u8; 32], [u8; 
     };
     let qr_a = qr_of(
         vector_identity(a_seed, "Vector A"),
-        X3DHKeyPair::from_bytes(seed(a_eph)),
+        X25519KeyPair::from_bytes(seed(a_eph)),
     );
     let qr_b = qr_of(
         vector_identity(b_seed, "Vector B"),
-        X3DHKeyPair::from_bytes(seed(b_eph)),
+        X25519KeyPair::from_bytes(seed(b_eph)),
     );
     let (key_a, a_token, a_expects) = qr_side(
         vector_identity(a_seed, "Vector A"),
-        X3DHKeyPair::from_bytes(seed(a_eph)),
+        X25519KeyPair::from_bytes(seed(a_eph)),
         &qr_b,
     );
     let (key_b, b_token, b_expects) = qr_side(
         vector_identity(b_seed, "Vector B"),
-        X3DHKeyPair::from_bytes(seed(b_eph)),
+        X25519KeyPair::from_bytes(seed(b_eph)),
         &qr_a,
     );
     assert_eq!(key_a, key_b, "both sides derive the same key");
@@ -202,8 +202,8 @@ pub(crate) fn compute_qr_symmetric() -> QrSymmetricVector {
     let (a_seed, b_seed, a_eph_seed, b_eph_seed) = (0x60u8, 0x61u8, 0x62u8, 0x63u8);
     let a = vector_identity(a_seed, "Vector A");
     let b = vector_identity(b_seed, "Vector B");
-    let a_eph = X3DHKeyPair::from_bytes(seed(a_eph_seed));
-    let b_eph = X3DHKeyPair::from_bytes(seed(b_eph_seed));
+    let a_eph = X25519KeyPair::from_bytes(seed(a_eph_seed));
+    let b_eph = X25519KeyPair::from_bytes(seed(b_eph_seed));
     let dh = a_eph.diffie_hellman(b_eph.public_key()).expect("dh");
     let (id_lo, id_hi) = vauchi_core::exchange::key_order::sorted_pair(
         a.signing_public_key().as_slice(),
@@ -320,8 +320,8 @@ fn vector_card() -> ContactCard {
 
 pub(crate) fn compute_link_exchange() -> LinkExchangeVector {
     let nonce = seed(0x70);
-    let initiator = X3DHKeyPair::from_bytes(seed(0x71));
-    let responder = X3DHKeyPair::from_bytes(seed(0x72));
+    let initiator = X25519KeyPair::from_bytes(seed(0x71));
+    let responder = X25519KeyPair::from_bytes(seed(0x72));
     let url = format!(
         "https://vauchi.app/x#pk={}&n={}&v=2",
         base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(initiator.public_key()),
@@ -339,8 +339,8 @@ pub(crate) fn compute_link_exchange() -> LinkExchangeVector {
     );
 
     let identity = vector_identity(0x73, "Vector Link");
-    let x3dh_i = X3DHKeyPair::from_bytes(seed(0x74));
-    let x3dh_r = X3DHKeyPair::from_bytes(seed(0x75));
+    let x3dh_i = X25519KeyPair::from_bytes(seed(0x74));
+    let x3dh_r = X25519KeyPair::from_bytes(seed(0x75));
     let relay_url = "https://relay.vauchi.app";
     let card = vector_card();
     let binding = LinkExchangeBinding {
@@ -427,7 +427,7 @@ fn link_exchange_vector_matches_the_url_slots_escrow_payload_and_shared_key() {
 
     // Escrow: both roles derive the same gate; slots swap with the role;
     // the card key is HKDF(DH, card_key_info) and opens what the keys encrypt.
-    let responder = X3DHKeyPair::from_bytes(hex32(&v.responder_secret));
+    let responder = X25519KeyPair::from_bytes(hex32(&v.responder_secret));
     let dh = responder
         .diffie_hellman(&hex32(&v.initiator_public))
         .expect("dh");
@@ -463,7 +463,7 @@ fn link_exchange_vector_matches_the_url_slots_escrow_payload_and_shared_key() {
         hex::encode(identity.signing_public_key()),
         v.initiator_identity_public
     );
-    let x3dh_i = X3DHKeyPair::from_bytes(hex32(&v.initiator_x3dh_secret));
+    let x3dh_i = X25519KeyPair::from_bytes(hex32(&v.initiator_x3dh_secret));
     let binding = LinkExchangeBinding {
         nonce,
         initiator_epk: hex32(&v.initiator_public),
@@ -507,7 +507,7 @@ fn link_exchange_vector_matches_the_url_slots_escrow_payload_and_shared_key() {
     assert!(parse_link_card_payload(&tampered, &binding).is_err());
 
     // The shared key is symmetric and HKDF(X25519(x3dh_i, x3dh_r), info).
-    let x3dh_r = X3DHKeyPair::from_bytes(hex32(&v.responder_x3dh_secret));
+    let x3dh_r = X25519KeyPair::from_bytes(hex32(&v.responder_x3dh_secret));
     assert_eq!(
         hex::encode(
             derive_link_shared_key(&x3dh_i, x3dh_r.public_key())

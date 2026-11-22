@@ -55,7 +55,7 @@ fn test_start_qr_transitions_to_displaying_qr() {
 #[test]
 fn test_process_qr_transitions_to_peer_scanned() {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(
@@ -88,7 +88,7 @@ fn test_process_qr_transitions_to_peer_scanned() {
 #[test]
 fn test_process_qr_requires_displaying_qr_state() {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(
@@ -114,7 +114,7 @@ fn test_process_qr_requires_displaying_qr_state() {
 #[test]
 fn test_expired_qr_rejected() {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let old_qr = ExchangeQR::generate_with_timestamp(
         &alice_identity,
         &alice_ephemeral,
@@ -146,7 +146,7 @@ fn test_expired_qr_rejected() {
 #[test]
 fn test_they_scanned_our_qr_transitions_to_awaiting_key_agreement() {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(
@@ -181,7 +181,7 @@ fn test_they_scanned_our_qr_transitions_to_awaiting_key_agreement() {
 #[test]
 fn test_full_qr_exchange_flow() {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(
@@ -270,7 +270,7 @@ fn test_detect_duplicate_contact() {
     use vauchi_core::crypto::SymmetricKey;
 
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
@@ -315,7 +315,7 @@ fn test_no_duplicate_for_new_contact() {
     use vauchi_core::crypto::SymmetricKey;
 
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
     let charlie_identity = Identity::create("Charlie", 0);
 

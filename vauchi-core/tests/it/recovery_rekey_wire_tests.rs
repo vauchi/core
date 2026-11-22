@@ -11,7 +11,7 @@
 
 use proptest::prelude::*;
 use vauchi_core::Identity;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::recovery::rekey::{
     MAX_PROOF_BYTES, RekeyAnswer, RekeyError, RekeyOffer, rekey_shared_key,
 };
@@ -21,16 +21,16 @@ const PROOF: &[u8] = b"a recovery proof's bytes";
 struct Parties {
     alice: Identity,
     john: Identity,
-    alice_exchange: X3DHKeyPair,
-    john_exchange: X3DHKeyPair,
+    alice_exchange: X25519KeyPair,
+    john_exchange: X25519KeyPair,
 }
 
 fn parties() -> Parties {
     Parties {
         alice: Identity::create("Alice, new phone", 0),
         john: Identity::create("John", 0),
-        alice_exchange: X3DHKeyPair::generate(),
-        john_exchange: X3DHKeyPair::generate(),
+        alice_exchange: X25519KeyPair::generate(),
+        john_exchange: X25519KeyPair::generate(),
     }
 }
 
@@ -72,7 +72,7 @@ fn an_answer_verifies_only_for_the_contact_key_and_the_offer_it_names() {
     ));
     assert!(!decoded.verify(
         p.john.signing_public_key(),
-        X3DHKeyPair::generate().public_key()
+        X25519KeyPair::generate().public_key()
     ));
 }
 
@@ -98,7 +98,7 @@ fn both_sides_derive_the_same_shared_key_and_a_third_does_not() {
     )
     .unwrap();
     let stranger = rekey_shared_key(
-        &X3DHKeyPair::generate(),
+        &X25519KeyPair::generate(),
         p.alice_exchange.public_key(),
         alice_pk,
         john_pk,

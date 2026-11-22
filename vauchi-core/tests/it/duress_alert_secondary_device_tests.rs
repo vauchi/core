@@ -50,7 +50,7 @@ use vauchi_core::api::{CardUpdateError, ReceiveOutcome, process_single_card_upda
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::ratchet::{DoubleRatchetState, RatchetMessage};
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::exchange::genesis::GenesisEnvelope;
 use vauchi_core::identity::{Identity, RegistryBroadcast};
 use vauchi_core::storage::GENESIS_CONTACT_ATTEMPTS_PER_WINDOW;
@@ -153,7 +153,7 @@ fn real_owner_sync_leaves_secondary_device_without_ratchet_or_registry() {
     let bob = create_test_contact("Bob");
     let bob_id = bob.id().to_string();
     a1.contacts().save_contact(&bob).unwrap();
-    let dh = X3DHKeyPair::generate();
+    let dh = X25519KeyPair::generate();
     let a1_ratchet =
         DoubleRatchetState::initialize_initiator(&SymmetricKey::generate(), *dh.public_key())
             .unwrap();

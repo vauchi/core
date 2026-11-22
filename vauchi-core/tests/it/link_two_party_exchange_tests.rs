@@ -19,7 +19,7 @@ use crate::common;
 
 use common::helpers::create_vauchi_with_card;
 use vauchi_core::contact::statistics::compute_statistics;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::exchange::link_mode::{LinkExchangeBinding, serialize_link_card_payload};
 use vauchi_core::{ContactField, ExchangeTransport, FieldType, Vauchi};
 
@@ -33,10 +33,10 @@ const EXCHANGE: LinkExchangeBinding = LinkExchangeBinding {
 /// Build the v2 bootstrap a side deposits, embedding its real own card so a
 /// later update has a meaningful baseline. Returns the payload, the retained
 /// X3DH keypair (kept for completion), and the side's identity key.
-fn deposit_v2(v: &Vauchi, relay_url: &str) -> (Vec<u8>, X3DHKeyPair, [u8; 32]) {
+fn deposit_v2(v: &Vauchi, relay_url: &str) -> (Vec<u8>, X25519KeyPair, [u8; 32]) {
     let identity = v.identity().expect("identity exists");
     let identity_pubkey = *identity.signing_public_key();
-    let x3dh = X3DHKeyPair::generate();
+    let x3dh = X25519KeyPair::generate();
     let card = v.own_card().expect("own_card ok").expect("own card exists");
     let payload = serialize_link_card_payload(
         identity.signing_keypair(),

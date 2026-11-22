@@ -60,7 +60,7 @@ fn bench_symmetric_encryption(c: &mut Criterion) {
 
 fn bench_key_generation(c: &mut Criterion) {
     use vauchi_core::crypto::{SigningKeyPair, SymmetricKey};
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
 
     let mut group = c.benchmark_group("key_generation");
 
@@ -68,7 +68,7 @@ fn bench_key_generation(c: &mut Criterion) {
 
     group.bench_function("signing_keypair", |b| b.iter(SigningKeyPair::generate));
 
-    group.bench_function("x3dh_keypair", |b| b.iter(X3DHKeyPair::generate));
+    group.bench_function("x3dh_keypair", |b| b.iter(X25519KeyPair::generate));
 
     group.finish();
 }
@@ -176,11 +176,11 @@ fn bench_double_ratchet(c: &mut Criterion) {
     use vauchi_core::crypto::ratchet::{
         DoubleRatchetState, RatchetMessage, SerializedRatchetState,
     };
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
 
     fn decrypt_fixture(skipped_keys: usize) -> (SerializedRatchetState, RatchetMessage) {
         let secret = SymmetricKey::generate();
-        let bob_keys = X3DHKeyPair::generate();
+        let bob_keys = X25519KeyPair::generate();
         let mut alice =
             DoubleRatchetState::initialize_initiator(&secret, *bob_keys.public_key()).unwrap();
         let mut bob = DoubleRatchetState::initialize_responder(&secret, bob_keys);
@@ -200,7 +200,7 @@ fn bench_double_ratchet(c: &mut Criterion) {
 
     // Setup: fixed values for benchmarks
     let shared_secret = SymmetricKey::generate();
-    let bob_public = *X3DHKeyPair::generate().public_key();
+    let bob_public = *X25519KeyPair::generate().public_key();
 
     group.bench_function("initialize_initiator", |b| {
         b.iter(|| {
@@ -213,7 +213,7 @@ fn bench_double_ratchet(c: &mut Criterion) {
 
     group.bench_function("initialize_responder", |b| {
         b.iter(|| {
-            let dh = X3DHKeyPair::generate();
+            let dh = X25519KeyPair::generate();
             DoubleRatchetState::initialize_responder(black_box(&shared_secret), black_box(dh))
         })
     });
@@ -227,7 +227,7 @@ fn bench_double_ratchet(c: &mut Criterion) {
             || {
                 // Setup: create a fresh initiator state that can send
                 let secret = SymmetricKey::generate();
-                let bob = X3DHKeyPair::generate();
+                let bob = X25519KeyPair::generate();
                 DoubleRatchetState::initialize_initiator(&secret, *bob.public_key()).unwrap()
             },
             |mut ratchet| ratchet.encrypt(black_box(message)),
@@ -240,7 +240,7 @@ fn bench_double_ratchet(c: &mut Criterion) {
             || {
                 // Setup: create alice and bob, exchange messages so bob can decrypt
                 let secret = SymmetricKey::generate();
-                let bob_keys = X3DHKeyPair::generate();
+                let bob_keys = X25519KeyPair::generate();
                 let bob_pub = *bob_keys.public_key();
 
                 let mut alice = DoubleRatchetState::initialize_initiator(&secret, bob_pub).unwrap();
@@ -283,12 +283,12 @@ fn bench_double_ratchet(c: &mut Criterion) {
 // =============================================================================
 
 fn bench_x3dh(c: &mut Criterion) {
-    use vauchi_core::exchange::{X3DH, X3DHKeyPair};
+    use vauchi_core::exchange::{X3DH, X25519KeyPair};
 
     let mut group = c.benchmark_group("x3dh");
 
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     group.bench_function("initiate", |b| {
         b.iter(|| X3DH::initiate(black_box(&alice), black_box(bob.public_key())))

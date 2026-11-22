@@ -12,7 +12,7 @@ use crate::common;
 use common::device_sync::{
     create_test_contact, create_test_device, create_test_registry, create_test_storage,
 };
-use vauchi_core::crypto::{DoubleRatchetState, SigningKeyPair, SymmetricKey, X3DHKeyPair};
+use vauchi_core::crypto::{DoubleRatchetState, SigningKeyPair, SymmetricKey, X25519KeyPair};
 use vauchi_core::identity::DeviceInfo;
 use vauchi_core::sync::*;
 use vauchi_core::*;
@@ -612,7 +612,7 @@ fn field_timestamps_persist_across_reload_for_lww() {
 }
 
 fn save_ratchet_for(storage: &Storage, contact_id: &str) {
-    let their_dh = X3DHKeyPair::generate();
+    let their_dh = X25519KeyPair::generate();
     let ratchet =
         DoubleRatchetState::initialize_initiator(&SymmetricKey::generate(), *their_dh.public_key())
             .unwrap();

@@ -16,7 +16,7 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::cek::ContentEncryptionKey;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::crypto::x25519::X3DHKeyPair;
+use vauchi_core::crypto::x25519::X25519KeyPair;
 use vauchi_core::exchange::genesis::GenesisEnvelope;
 use vauchi_core::identity::{Identity, RegistryBroadcast};
 use vauchi_core::network::mailbox_token::current_day_epoch;
@@ -217,7 +217,7 @@ fn device_scoped_receive_opens_genesis_card_after_ratchet_decrypt_fails() {
     // Active F4 delivery resolves the authenticated origin device before
     // decrypting. Keep an ordinary device-pair ratchet at that key so the
     // receive path takes the established device-scoped branch first.
-    let peer_dh = X3DHKeyPair::generate();
+    let peer_dh = X25519KeyPair::generate();
     let established =
         DoubleRatchetState::initialize_initiator(&world.shared_key, *peer_dh.public_key()).unwrap();
     world
@@ -314,7 +314,7 @@ fn safety_alert_budget_does_not_block_device_scoped_genesis_card() {
     let world = cold_start_world();
     let bob_pk = *world.bob.identity().unwrap().signing_public_key();
     let alice_device_id = *world.alice_a1.device_id();
-    let peer_dh = X3DHKeyPair::generate();
+    let peer_dh = X25519KeyPair::generate();
     let established =
         DoubleRatchetState::initialize_initiator(&world.shared_key, *peer_dh.public_key()).unwrap();
     world

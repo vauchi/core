@@ -91,10 +91,10 @@ fn test_sas_different_secrets_differ() {
 // @internal
 #[test]
 fn test_sas_both_sides_match() {
-    use vauchi_core::exchange::{X3DH, X3DHKeyPair};
+    use vauchi_core::exchange::{X3DH, X25519KeyPair};
 
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
     let alice_id = [1u8; 32];
     let bob_id = [2u8; 32];
 
@@ -110,16 +110,16 @@ fn test_sas_both_sides_match() {
 #[cfg(feature = "testing")]
 #[test]
 fn test_crypto_hardening_two_dh_static_responder_compromise_recovers_past_secret() {
-    use vauchi_core::exchange::{X3DH, X3DHKeyPair};
+    use vauchi_core::exchange::{X3DH, X25519KeyPair};
 
-    let initiator = X3DHKeyPair::from_bytes([0x11; 32]);
-    let responder = X3DHKeyPair::from_bytes([0x22; 32]);
+    let initiator = X25519KeyPair::from_bytes([0x11; 32]);
+    let responder = X25519KeyPair::from_bytes([0x22; 32]);
     let compromised_responder_secret = *responder.secret_bytes();
 
     let (past_secret, recorded_ephemeral) =
         X3DH::initiate(&initiator, responder.public_key()).unwrap();
 
-    let compromised_responder = X3DHKeyPair::from_bytes(compromised_responder_secret);
+    let compromised_responder = X25519KeyPair::from_bytes(compromised_responder_secret);
     let recovered = X3DH::respond(
         &compromised_responder,
         initiator.public_key(),
@@ -395,10 +395,10 @@ fn the_sas_is_the_hmac_of_the_identities_in_ascending_order() {
 #[test]
 fn adaptive_relay_transcripts_do_not_share_an_authentication_string() {
     use sha2::{Digest, Sha256};
-    use vauchi_core::exchange::{X3DH, X3DHKeyPair};
+    use vauchi_core::exchange::{X3DH, X25519KeyPair};
 
-    fn key(label: &str) -> X3DHKeyPair {
-        X3DHKeyPair::from_bytes(Sha256::digest(label.as_bytes()).into())
+    fn key(label: &str) -> X25519KeyPair {
+        X25519KeyPair::from_bytes(Sha256::digest(label.as_bytes()).into())
     }
 
     let offer = key("honest-offer");

@@ -15,7 +15,7 @@
 use vauchi_core::ContactCard;
 use vauchi_core::exchange::{
     ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState,
-    MockProximityVerifier, X3DHKeyPair,
+    MockProximityVerifier, X25519KeyPair,
 };
 use vauchi_core::identity::Identity;
 
@@ -144,7 +144,7 @@ fn test_different_identity_exchange_succeeds() {
 #[test]
 fn test_qr_expiration() {
     let alice = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let fresh_qr = ExchangeQR::generate(
         &alice,
@@ -161,7 +161,7 @@ fn test_qr_expiration() {
 fn test_expired_qr_rejected_on_process() {
     let alice = Identity::create("Alice", 0);
     let bob = Identity::create("Bob", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     // Create an expired QR (6 minutes ago)
     let expired_ts = std::time::SystemTime::now()
@@ -328,7 +328,7 @@ fn test_interrupted_session_resumable() {
 fn test_cannot_process_qr_from_idle() {
     let alice = Identity::create("Alice", 0);
     let bob = Identity::create("Bob", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let bob_qr = ExchangeQR::generate(
         &bob,

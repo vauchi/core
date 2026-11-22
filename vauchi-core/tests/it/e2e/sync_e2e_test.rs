@@ -10,7 +10,7 @@
 use vauchi_core::{
     Contact, ContactCard, ContactField, FieldType, Storage, SymmetricKey, SyncManager, Vauchi,
     crypto::ratchet::DoubleRatchetState,
-    exchange::X3DHKeyPair,
+    exchange::X25519KeyPair,
     network::{MockTransport, RelayClient, RelayClientConfig, TransportConfig},
     sync::CardDelta,
 };
@@ -60,7 +60,7 @@ fn test_sync_update_propagation_happy_path() {
     let alice_contact_id = alice_contact.id().to_string();
     bob_wb.add_contact(alice_contact).unwrap();
 
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let mut alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
@@ -381,7 +381,7 @@ fn test_relay_update_delivery_happy_path() {
     assert!(client.is_connected());
 
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let mut alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 

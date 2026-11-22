@@ -28,7 +28,7 @@ use std::sync::Arc;
 use proptest::prelude::*;
 use vauchi_core::api::*;
 use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey};
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::exchange::key_order;
 use vauchi_core::exchange::link_mode::{
     LinkExchangeBinding, derive_link_shared_key, serialize_link_card_payload,
@@ -89,8 +89,8 @@ proptest! {
         prop_assume!(our_x3dh_seed != their_x3dh_seed);
 
         let shared = SymmetricKey::from_bytes(shared_bytes);
-        let our_x3dh = X3DHKeyPair::from_bytes(our_x3dh_seed);
-        let their_x3dh = X3DHKeyPair::from_bytes(their_x3dh_seed);
+        let our_x3dh = X25519KeyPair::from_bytes(our_x3dh_seed);
+        let their_x3dh = X25519KeyPair::from_bytes(their_x3dh_seed);
 
         // The exact recipe hand-rolled by the BLE persist path
         // (ble_handshake.rs: `is_initiator = our_identity < their_identity`,
@@ -103,7 +103,7 @@ proptest! {
         } else {
             DoubleRatchetState::initialize_responder(
                 &shared,
-                X3DHKeyPair::from_bytes(*our_x3dh.secret_bytes()),
+                X25519KeyPair::from_bytes(*our_x3dh.secret_bytes()),
             )
         };
 
@@ -113,7 +113,7 @@ proptest! {
             &their_id,
             &our_id,
             Some(*our_x3dh.public_key()),
-            Some(X3DHKeyPair::from_bytes(*their_x3dh.secret_bytes())),
+            Some(X25519KeyPair::from_bytes(*their_x3dh.secret_bytes())),
         )
         .expect("helper bootstrap");
 
@@ -162,8 +162,8 @@ fn link_persisted_ratchet_interoperates_with_helper_built_peer() {
         .expect("bob identity exists")
         .signing_public_key();
 
-    let alice_x3dh = X3DHKeyPair::generate();
-    let bob_x3dh = X3DHKeyPair::generate();
+    let alice_x3dh = X25519KeyPair::generate();
+    let bob_x3dh = X25519KeyPair::generate();
 
     let bob_payload = {
         let identity = bob.identity().expect("bob identity");
@@ -219,7 +219,7 @@ fn link_persisted_ratchet_interoperates_with_helper_built_peer() {
         &bob_id,
         &alice_id,
         Some(*alice_x3dh.public_key()),
-        Some(X3DHKeyPair::from_bytes(*bob_x3dh.secret_bytes())),
+        Some(X25519KeyPair::from_bytes(*bob_x3dh.secret_bytes())),
     )
     .expect("helper bootstrap for bob");
     assert_ne!(
@@ -301,7 +301,7 @@ fn sync_cycle_without_traffic_does_not_mutate_stored_ratchets() {
             .contacts()
             .save_contact(&contact)
             .expect("persist contact row (ratchet rows are FK-bound to it)");
-        let peer_dh = X3DHKeyPair::generate();
+        let peer_dh = X25519KeyPair::generate();
         let ratchet = DoubleRatchetState::initialize_initiator(
             &SymmetricKey::generate(),
             *peer_dh.public_key(),

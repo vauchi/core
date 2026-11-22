@@ -15,7 +15,7 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::exchange::multistage::qr_codec::{StageQr, format_ini2_qr_with_relay, parse_qr};
-use vauchi_core::exchange::{ExchangeQR, X3DHKeyPair};
+use vauchi_core::exchange::{ExchangeQR, X25519KeyPair};
 use vauchi_core::identity::Identity;
 use vauchi_core::network::relay_url::validate_relay_url;
 use vauchi_core::storage::Storage;
@@ -35,7 +35,7 @@ proptest! {
         relay_url in valid_relay_url_strategy()
     ) {
         let identity = Identity::create("PropTest", 0);
-        let ephemeral = X3DHKeyPair::generate();
+        let ephemeral = X25519KeyPair::generate();
 
         let qr = ExchangeQR::generate_with_relay(
             &identity,

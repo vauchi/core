@@ -28,14 +28,14 @@ use proptest::prelude::*;
 
 use vauchi_core::exchange::multistage::base45;
 use vauchi_core::exchange::shake_protocol;
-use vauchi_core::exchange::{ExchangeQR, X3DHKeyPair, link_mode};
+use vauchi_core::exchange::{ExchangeQR, X25519KeyPair, link_mode};
 use vauchi_core::identity::Identity;
 use vauchi_core::network::protocol::decode_message;
 
 /// Build one genuinely-valid QR data string (base64 ASCII) to truncate.
 fn valid_qr_data_string() -> String {
     let identity = Identity::create("PanicSafety", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
     ExchangeQR::generate_with_relay(
         &identity,
         &ephemeral,

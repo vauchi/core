@@ -16,7 +16,7 @@ use vauchi_app::ui::AppEngine;
 use vauchi_core::Event;
 use vauchi_core::api::Vauchi;
 use vauchi_core::contact::TrustLevel;
-use vauchi_core::crypto::X3DHKeyPair;
+use vauchi_core::crypto::X25519KeyPair;
 use vauchi_core::exchange::BleCardPayload;
 use vauchi_core::platform::BleLinkDirection;
 
@@ -26,10 +26,10 @@ fn fresh_engine() -> AppEngine {
     AppEngine::new(vauchi)
 }
 
-fn fixture_card() -> (BleCardPayload, [u8; 32], X3DHKeyPair) {
+fn fixture_card() -> (BleCardPayload, [u8; 32], X25519KeyPair) {
     let identity_key = [3u8; 32];
     let exchange_secret = [4u8; 32];
-    let x3dh = X3DHKeyPair::from_bytes(exchange_secret);
+    let x3dh = X25519KeyPair::from_bytes(exchange_secret);
     let exchange_pub = *x3dh.public_key();
     let card = BleCardPayload::new(identity_key, "Bob".into(), exchange_pub, vec![], None);
     (card, identity_key, x3dh)
@@ -66,7 +66,7 @@ fn ensure_is_idempotent_under_repeat() {
     let phase_a = engine.ble_machine_phase();
 
     // Second call with a different role must be a no-op — the
-    // already-held session wins. X3DHKeyPair has no Clone, so we
+    // already-held session wins. X25519KeyPair has no Clone, so we
     // rebuild from the same secret bytes the fixture used.
     let (card2, id2, x3dh2) = fixture_card();
     engine.ensure_ble_handshake_session(BleRole::Initiator, id2, x3dh2, card2, None);

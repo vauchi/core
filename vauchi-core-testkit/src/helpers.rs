@@ -8,7 +8,7 @@
 
 use vauchi_core::{
     Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi, VisibilityRules,
-    crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair,
+    crypto::ratchet::DoubleRatchetState, exchange::X25519KeyPair,
 };
 
 /// Create an in-memory Vauchi with an identity.
@@ -42,7 +42,7 @@ pub fn add_contact_with_ratchet_and_visibility(
     let contact_id = contact.id().to_string();
     setup_rules(contact.visibility_rules_mut().unwrap());
     wb.add_contact(contact).unwrap();
-    let their_dh = X3DHKeyPair::generate();
+    let their_dh = X25519KeyPair::generate();
     wb.create_ratchet_as_initiator(&contact_id, &shared, *their_dh.public_key())
         .unwrap();
     contact_id
@@ -94,7 +94,7 @@ pub fn setup_alice_bob_exchange() -> (Vauchi, Vauchi, SymmetricKey, String, Stri
 /// Set up ratchet states for Alice and Bob.
 /// Returns (alice_ratchet, bob_ratchet)
 pub fn setup_ratchets(shared_secret: &SymmetricKey) -> (DoubleRatchetState, DoubleRatchetState) {
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let alice_ratchet =
         DoubleRatchetState::initialize_initiator(shared_secret, *bob_dh.public_key()).unwrap();
     let bob_ratchet = DoubleRatchetState::initialize_responder(shared_secret, bob_dh);

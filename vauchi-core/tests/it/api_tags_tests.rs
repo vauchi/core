@@ -9,7 +9,7 @@
 
 use crate::common::device_sync::link_tablet;
 use vauchi_core::api::sync::DeviceSyncOrchestrator;
-use vauchi_core::exchange::{X3DH, X3DHKeyPair};
+use vauchi_core::exchange::{X3DH, X25519KeyPair};
 use vauchi_core::sync::SyncItem;
 use vauchi_core::{ContactField, FieldType, Vauchi};
 
@@ -22,8 +22,8 @@ fn setup() -> Vauchi {
 
 /// Adds an exchanged contact with the given display name, returns its id.
 fn add_contact(wb: &Vauchi, name: &str) -> String {
-    let their_identity = X3DHKeyPair::generate();
-    let their_ephemeral = X3DHKeyPair::generate();
+    let their_identity = X25519KeyPair::generate();
+    let their_ephemeral = X25519KeyPair::generate();
     let our_x3dh = wb.identity().unwrap().x3dh_keypair();
     let (_, their_ephemeral_pub) = X3DH::initiate(&their_ephemeral, our_x3dh.public_key()).unwrap();
     wb.accept_relay_exchange(their_identity.public_key(), &their_ephemeral_pub, name)

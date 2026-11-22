@@ -12,7 +12,7 @@
 use super::ProfileEngine;
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::card::ContactCard;
-use crate::exchange::X3DHKeyPair;
+use crate::exchange::X25519KeyPair;
 use crate::exchange::link_initiator::{
     LinkInitiatorFailureReason, LinkInitiatorSession, LinkInitiatorState,
 };
@@ -35,7 +35,7 @@ pub struct LinkExchange {
     role: Role,
     /// Fresh per exchange: its public half is signed into our bootstrap,
     /// its secret completes the exchange (ADR-050).
-    x3dh: X3DHKeyPair,
+    x3dh: X25519KeyPair,
     /// Our card as it was when the exchange started; each side signs it only
     /// once its escrow keys exist (#942).
     card: ContactCard,
@@ -96,7 +96,7 @@ impl ProfileEngine {
     /// Start a link-mode exchange as the initiator: returns the link to send
     /// and the exchange to advance.
     pub fn start_link_exchange(&self) -> VauchiResult<(String, LinkExchange)> {
-        let x3dh = X3DHKeyPair::generate();
+        let x3dh = X25519KeyPair::generate();
         let card = self.link_card()?;
         let display_name = self
             .identity()
@@ -137,7 +137,7 @@ impl ProfileEngine {
         payload: &crate::exchange::link_mode::DeepLinkPayload,
         code: &LinkCode,
     ) -> VauchiResult<LinkExchange> {
-        let x3dh = X3DHKeyPair::generate();
+        let x3dh = X25519KeyPair::generate();
         let card = self.link_card()?;
         let opening = responder_open(payload.as_parsed(), code)
             .map_err(|e| VauchiError::InvalidState(format!("link exchange: {e}")))?;
@@ -294,7 +294,7 @@ impl ProfileEngine {
 
     fn signed_card(
         &self,
-        x3dh: &X3DHKeyPair,
+        x3dh: &X25519KeyPair,
         card: &ContactCard,
         binding: &LinkExchangeBinding,
     ) -> Option<Vec<u8>> {

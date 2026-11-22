@@ -7,7 +7,7 @@
 //! persist seams are covered: with a session ratchet and without one.
 
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::{Contact, ContactCard, Identity, SymmetricKey, Vauchi, VauchiError};
 
 fn alice_with_blocked(eve: &Identity) -> Vauchi {
@@ -55,7 +55,7 @@ fn reexchange_with_a_blocked_contact_is_rejected() {
     let alice = alice_with_blocked(&eve);
     let (contact, shared) = fresh_exchange_with(&eve);
     let ratchet =
-        DoubleRatchetState::initialize_initiator(&shared, *X3DHKeyPair::generate().public_key())
+        DoubleRatchetState::initialize_initiator(&shared, *X25519KeyPair::generate().public_key())
             .unwrap();
 
     let result = alice.save_exchanged_contact(&contact, &ratchet, true);

@@ -53,7 +53,7 @@
 //! `subscribe_notify` delegate method outright.
 
 use vauchi_core::Command;
-use vauchi_core::crypto::X3DHKeyPair;
+use vauchi_core::crypto::X25519KeyPair;
 use vauchi_core::exchange::{
     BLE_CHUNK_OVERHEAD, BLE_DEFAULT_USABLE, BleCardPayload, BleChunker, BleExchangeResult,
     BleHandshakeSession, BleHandshakeState, BleReassembler, CHAR_DATA_NOTIFY, CHAR_DATA_WRITE,
@@ -254,7 +254,7 @@ impl BleHandshakeMachine {
     /// `None` is the radio-only case.
     pub fn new_initiator(
         identity_key: [u8; 32],
-        identity_x3dh: X3DHKeyPair,
+        identity_x3dh: X25519KeyPair,
         card: BleCardPayload,
         now: u64,
         oob: Option<BleOobBinding>,
@@ -284,7 +284,7 @@ impl BleHandshakeMachine {
     /// `None` is the radio-only case.
     pub fn new_responder(
         identity_key: [u8; 32],
-        identity_x3dh: X3DHKeyPair,
+        identity_x3dh: X25519KeyPair,
         card: BleCardPayload,
         now: u64,
         oob: Option<BleOobBinding>,

@@ -11,7 +11,7 @@
 //! mailbox too and drain it, which delays a rekey and cannot forge one.
 
 use crate::api::error::{VauchiError, VauchiResult};
-use crate::exchange::X3DHKeyPair;
+use crate::exchange::X25519KeyPair;
 use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
 use crate::recovery::rekey::RekeyOffer;
 
@@ -91,9 +91,9 @@ impl ProfileEngine {
                 {
                     continue;
                 }
-                Some((secret, _)) => X3DHKeyPair::from_bytes(*secret),
+                Some((secret, _)) => X25519KeyPair::from_bytes(*secret),
                 None => {
-                    let fresh = X3DHKeyPair::generate();
+                    let fresh = X25519KeyPair::generate();
                     self.storage
                         .recovery()
                         .save_rekey_exchange(&contact_id, &fresh.secret_bytes())?;
@@ -147,7 +147,7 @@ impl ProfileEngine {
         let Some((secret, _)) = self.storage.recovery().rekey_exchange(&contact_id)? else {
             return Ok(RekeyAnswerTaken::Dropped);
         };
-        let exchange = X3DHKeyPair::from_bytes(*secret);
+        let exchange = X25519KeyPair::from_bytes(*secret);
         let Some(mut contact) = self.storage.contacts().load_contact(&contact_id)? else {
             return Ok(RekeyAnswerTaken::Dropped);
         };

@@ -17,8 +17,8 @@ use vauchi_core::exchange::ratchet_bootstrap::{
 #[test]
 fn device_pair_bootstrap_is_symmetric_and_bidirectional() {
     let relationship = SymmetricKey::from_bytes([3u8; 32]);
-    let alice_key = X3DHKeyPair::from_bytes([4u8; 32]);
-    let bob_key = X3DHKeyPair::from_bytes([5u8; 32]);
+    let alice_key = X25519KeyPair::from_bytes([4u8; 32]);
+    let bob_key = X25519KeyPair::from_bytes([5u8; 32]);
     let alice_identity = [10u8; 32];
     let bob_identity = [20u8; 32];
     let alice_device = [11u8; 32];
@@ -59,13 +59,13 @@ fn six_devices_establish_nine_independent_bidirectional_ratchets() {
     let alice_identity = [21u8; 32];
     let bob_identity = [201u8; 32];
     let alice: Vec<_> = (0..3u8)
-        .map(|index| ([index + 1; 32], X3DHKeyPair::from_bytes([index + 31; 32])))
+        .map(|index| ([index + 1; 32], X25519KeyPair::from_bytes([index + 31; 32])))
         .collect();
     let bob: Vec<_> = (0..3u8)
         .map(|index| {
             (
                 [index + 101; 32],
-                X3DHKeyPair::from_bytes([index + 131; 32]),
+                X25519KeyPair::from_bytes([index + 131; 32]),
             )
         })
         .collect();
@@ -164,7 +164,7 @@ fn bootstrap_builds_interoperable_role_complementary_ratchets() {
     let initiator_id = [1u8; 32];
     let responder_id = [2u8; 32];
 
-    let responder_eph = X3DHKeyPair::generate();
+    let responder_eph = X25519KeyPair::generate();
     let responder_eph_public = *responder_eph.public_key();
 
     let (mut initiator_ratchet, initiator_flag) = bootstrap_exchange_ratchet(
@@ -208,7 +208,7 @@ fn initiator_without_peer_ephemeral_is_rejected() {
         &[1u8; 32],
         &[2u8; 32],
         None,
-        Some(X3DHKeyPair::generate()),
+        Some(X25519KeyPair::generate()),
     );
     assert_eq!(
         result.unwrap_err(),
@@ -245,7 +245,7 @@ proptest! {
         } else {
             (id_b, id_a)
         };
-        let responder_eph = X3DHKeyPair::generate();
+        let responder_eph = X25519KeyPair::generate();
         let responder_eph_public = *responder_eph.public_key();
 
         let (mut initiator_ratchet, initiator_flag) = bootstrap_exchange_ratchet(

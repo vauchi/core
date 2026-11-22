@@ -21,7 +21,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{ExchangeError, X3DH, X3DHKeyPair};
+use super::{ExchangeError, X3DH, X25519KeyPair};
 use crate::crypto::{SymmetricKey, decrypt, encrypt};
 use crate::identifiers::{DhPublicKey, IdentityKey};
 
@@ -96,7 +96,7 @@ impl EncryptedExchangeMessage {
     /// A tuple of (EncryptedExchangeMessage, shared_secret) where the shared
     /// secret can be used for subsequent communication.
     pub fn create(
-        our_keys: &X3DHKeyPair,
+        our_keys: &X25519KeyPair,
         their_public: &[u8; 32],
         our_identity_key: &[u8; 32],
         our_display_name: &str,
@@ -139,7 +139,7 @@ impl EncryptedExchangeMessage {
     /// identity key, exchange key, and display name.
     pub fn decrypt(
         &self,
-        our_keys: &X3DHKeyPair,
+        our_keys: &X25519KeyPair,
     ) -> Result<(DecryptedExchangePayload, SymmetricKey), ExchangeError> {
         // DH1 uses sender_exchange_key for identity binding. The X3DH
         // primitive still takes raw 32-byte references; the wire-side

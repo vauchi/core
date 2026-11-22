@@ -4,7 +4,8 @@
 
 use proptest::prelude::*;
 use vauchi_core::exchange::{
-    ExchangeError, ExchangeNfc, NfcCardPayload, NfcHandshakeSession, NfcHandshakeState, X3DHKeyPair,
+    ExchangeError, ExchangeNfc, NfcCardPayload, NfcHandshakeSession, NfcHandshakeState,
+    X25519KeyPair,
 };
 use vauchi_core::identity::Identity;
 
@@ -133,7 +134,7 @@ fn test_expired_key_offer_rejected() {
     let alice_id = make_test_identity();
     let bob_id = make_test_identity();
 
-    let x3dh = X3DHKeyPair::generate();
+    let x3dh = X25519KeyPair::generate();
     let token = [0xAA; 32];
     // Timestamp 0 = far in the past (expired)
     let expired_nfc = ExchangeNfc::generate_with_timestamp(&alice_id, &x3dh, token, 0);
@@ -199,7 +200,7 @@ fn test_nfc_process_key_ack_rejects_self_identity() {
     alice.create_key_offer(&identity, now).expect("key offer");
 
     // Reflection on the ack path: an ack signed by Alice's own identity.
-    let self_ack = ExchangeNfc::generate(&identity, &X3DHKeyPair::generate(), now);
+    let self_ack = ExchangeNfc::generate(&identity, &X25519KeyPair::generate(), now);
     let ack_bytes = self_ack.to_bytes();
     let result = alice.process_key_ack(&ack_bytes, &[0u8; 120], now);
 

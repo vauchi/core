@@ -418,8 +418,8 @@ fn run_unorphaning_flow(alice_initiator: bool) {
     // Bob's [0;32] session is anchored to the DEAD device — A2 cannot use it.
     {
         use vauchi_core::crypto::ratchet::DoubleRatchetState;
-        use vauchi_core::exchange::X3DHKeyPair;
-        let dead_dh = X3DHKeyPair::generate();
+        use vauchi_core::exchange::X25519KeyPair;
+        let dead_dh = X25519KeyPair::generate();
         let dead_shared = bob_wb
             .storage()
             .contacts()

@@ -88,7 +88,7 @@ impl ProfileEngine {
         ephemeral_key: &[u8; 32],
         display_name: &str,
     ) -> VauchiResult<String> {
-        use crate::exchange::{X3DH, X3DHKeyPair};
+        use crate::exchange::{X3DH, X25519KeyPair};
 
         let identity = self
             .identity
@@ -127,7 +127,7 @@ impl ProfileEngine {
         manager.add_contact(contact)?;
 
         // Initialize Double Ratchet
-        let ratchet_dh = X3DHKeyPair::from_bytes(*our_x3dh.secret_bytes());
+        let ratchet_dh = X25519KeyPair::from_bytes(*our_x3dh.secret_bytes());
         self.create_ratchet_as_responder(&contact_id, &shared_secret, ratchet_dh)?;
 
         Ok(contact_id)
@@ -486,7 +486,7 @@ impl ProfileEngine {
         &self,
         contact_id: &str,
         shared_secret: &SymmetricKey,
-        our_dh: crate::exchange::X3DHKeyPair,
+        our_dh: crate::exchange::X25519KeyPair,
     ) -> VauchiResult<()> {
         let ratchet = DoubleRatchetState::initialize_responder(shared_secret, our_dh);
         self.storage

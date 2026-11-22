@@ -10,7 +10,7 @@ use super::common::device_sync::{create_test_device, create_test_registry};
 use std::sync::Arc;
 use vauchi_core::api::*;
 use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey};
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::network::{MockTransport, RelayClientConfig, TransportConfig};
 use vauchi_core::storage::{PendingUpdate, UpdateStatus};
 use vauchi_core::sync::SyncItem;
@@ -48,7 +48,7 @@ fn queue_sendable_update(storage: &Storage, contact_id: &str, shared: &Symmetric
 }
 
 fn queue_sendable_update_as(storage: &Storage, contact_id: &str, shared: &SymmetricKey, id: &str) {
-    let peer_dh = X3DHKeyPair::generate();
+    let peer_dh = X25519KeyPair::generate();
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(shared, *peer_dh.public_key()).unwrap();
     let msg = ratchet.encrypt(b"payload").unwrap();
@@ -133,7 +133,7 @@ fn controller_reporting_to(
         .device()
         .save_device_info(&[0x55; 32], 0, "Local", 0)
         .unwrap();
-    let peer_dh = X3DHKeyPair::generate();
+    let peer_dh = X25519KeyPair::generate();
     let ratchet = DoubleRatchetState::initialize_initiator(&shared, *peer_dh.public_key()).unwrap();
     storage
         .ratchets()
@@ -448,7 +448,7 @@ fn a_device_routed_handshake_without_local_device_info_fails() {
     let contact = Contact::from_exchange([0x33u8; 32], ContactCard::new("Peer"), shared.clone(), 0);
     let contact_id = contact.id().to_string();
     storage.contacts().save_contact(&contact).unwrap();
-    let peer_dh = X3DHKeyPair::generate();
+    let peer_dh = X25519KeyPair::generate();
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(&shared, *peer_dh.public_key()).unwrap();
     let msg = ratchet.encrypt(b"payload").unwrap();

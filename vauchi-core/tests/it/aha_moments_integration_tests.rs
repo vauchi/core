@@ -614,7 +614,7 @@ fn exchanged_with(
     );
     let ratchet = vauchi_core::crypto::ratchet::DoubleRatchetState::initialize_initiator(
         &shared,
-        *vauchi_core::exchange::X3DHKeyPair::generate().public_key(),
+        *vauchi_core::exchange::X25519KeyPair::generate().public_key(),
     )
     .unwrap();
     (contact, ratchet)

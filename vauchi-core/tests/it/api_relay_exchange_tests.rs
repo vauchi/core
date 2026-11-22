@@ -10,7 +10,7 @@
 
 use vauchi_core::Vauchi;
 use vauchi_core::VauchiError;
-use vauchi_core::exchange::{X3DH, X3DHKeyPair};
+use vauchi_core::exchange::{X3DH, X25519KeyPair};
 
 /// Helper: create a Vauchi instance with identity.
 fn setup_vauchi(name: &str) -> Vauchi {
@@ -26,8 +26,8 @@ fn test_accept_relay_exchange_creates_contact() {
     let wb = setup_vauchi("Alice");
 
     // Simulate a remote peer (Bob) who initiated exchange
-    let bob_identity = X3DHKeyPair::generate();
-    let bob_ephemeral = X3DHKeyPair::generate();
+    let bob_identity = X25519KeyPair::generate();
+    let bob_ephemeral = X25519KeyPair::generate();
 
     let alice_identity = wb.identity().unwrap();
     let alice_x3dh = alice_identity.x3dh_keypair();
@@ -54,8 +54,8 @@ fn test_accept_relay_exchange_creates_contact() {
 fn test_accept_relay_exchange_initializes_ratchet() {
     let wb = setup_vauchi("Alice");
 
-    let bob_identity = X3DHKeyPair::generate();
-    let bob_ephemeral = X3DHKeyPair::generate();
+    let bob_identity = X25519KeyPair::generate();
+    let bob_ephemeral = X25519KeyPair::generate();
 
     let alice_identity = wb.identity().unwrap();
     let alice_x3dh = alice_identity.x3dh_keypair();
@@ -80,8 +80,8 @@ fn test_accept_relay_exchange_initializes_ratchet() {
 fn test_accept_relay_exchange_rejects_duplicate() {
     let wb = setup_vauchi("Alice");
 
-    let bob_identity = X3DHKeyPair::generate();
-    let bob_ephemeral = X3DHKeyPair::generate();
+    let bob_identity = X25519KeyPair::generate();
+    let bob_ephemeral = X25519KeyPair::generate();
 
     let alice_identity = wb.identity().unwrap();
     let alice_x3dh = alice_identity.x3dh_keypair();
@@ -102,8 +102,8 @@ fn test_accept_relay_exchange_rejects_duplicate() {
 fn test_accept_relay_exchange_requires_identity() {
     let wb = Vauchi::in_memory().unwrap();
 
-    let bob_identity = X3DHKeyPair::generate();
-    let bob_ephemeral = X3DHKeyPair::generate();
+    let bob_identity = X25519KeyPair::generate();
+    let bob_ephemeral = X25519KeyPair::generate();
 
     let result =
         wb.accept_relay_exchange(bob_identity.public_key(), bob_ephemeral.public_key(), "Bob");
@@ -121,8 +121,8 @@ fn test_accept_relay_exchange_requires_identity() {
 fn test_relay_contact_cannot_be_recovery_trusted() {
     let wb = setup_vauchi("Alice");
 
-    let bob_identity = X3DHKeyPair::generate();
-    let bob_ephemeral = X3DHKeyPair::generate();
+    let bob_identity = X25519KeyPair::generate();
+    let bob_ephemeral = X25519KeyPair::generate();
 
     let alice_identity = wb.identity().unwrap();
     let alice_x3dh = alice_identity.x3dh_keypair();
@@ -176,8 +176,8 @@ fn test_accept_relay_exchange_records_exchange_time() {
     let mut wb = Vauchi::in_memory_with_clock(clock).unwrap();
     wb.create_identity("Alice").unwrap();
 
-    let bob_identity = X3DHKeyPair::generate();
-    let bob_ephemeral = X3DHKeyPair::generate();
+    let bob_identity = X25519KeyPair::generate();
+    let bob_ephemeral = X25519KeyPair::generate();
 
     let alice_identity = wb.identity().unwrap();
     let alice_x3dh = alice_identity.x3dh_keypair();

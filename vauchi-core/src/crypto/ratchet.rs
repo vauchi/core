@@ -28,7 +28,7 @@ use subtle::ConstantTimeEq;
 use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-use super::X3DHKeyPair;
+use super::X25519KeyPair;
 use super::chain::{ChainError, ChainKey, MessageKey};
 use super::encryption::{EncryptionError, SymmetricKey, decrypt_with_ad, encrypt_with_ad};
 use super::hkdf::HKDF;
@@ -184,7 +184,7 @@ pub struct DoubleRatchetState {
     /// Root key for deriving new chain keys
     root_key: [u8; 32],
     /// Our current DH keypair
-    our_dh: X3DHKeyPair,
+    our_dh: X25519KeyPair,
     /// Their current DH public key (None until we receive a message)
     their_dh: Option<[u8; 32]>,
     /// Sending chain key
@@ -230,7 +230,7 @@ impl DoubleRatchetState {
         x3dh_secret: &SymmetricKey,
         their_dh_public: [u8; 32],
     ) -> Result<Self, RatchetError> {
-        let our_dh = X3DHKeyPair::generate();
+        let our_dh = X25519KeyPair::generate();
 
         let dh_output = our_dh.diffie_hellman(&their_dh_public)?;
         let (root_key_z, send_chain_key_z) =
@@ -255,7 +255,7 @@ impl DoubleRatchetState {
     /// Initialize as the responder (Bob) after X3DH.
     ///
     /// The responder waits for Alice's first message before they can send.
-    pub fn initialize_responder(x3dh_secret: &SymmetricKey, our_dh: X3DHKeyPair) -> Self {
+    pub fn initialize_responder(x3dh_secret: &SymmetricKey, our_dh: X25519KeyPair) -> Self {
         DoubleRatchetState {
             root_key: *x3dh_secret.as_bytes(),
             our_dh,
@@ -434,7 +434,7 @@ impl DoubleRatchetState {
         self.recv_message_count = 0;
 
         self.previous_send_chain_length = self.send_message_count;
-        self.our_dh = X3DHKeyPair::generate();
+        self.our_dh = X25519KeyPair::generate();
 
         // DH with their key and our NEW key -> new sending chain
         let dh_send = self.our_dh.diffie_hellman(their_new_public)?;
@@ -507,7 +507,7 @@ impl DoubleRatchetState {
         let recv_chain_data = s.recv_chain.take();
         let skipped_keys_data = std::mem::take(&mut s.skipped_keys);
 
-        let our_dh = X3DHKeyPair::from_bytes(*our_dh_secret);
+        let our_dh = X25519KeyPair::from_bytes(*our_dh_secret);
 
         let send_chain = send_chain_data.map(|(key, r#gen)| ChainKey::with_generation(key, r#gen));
         let recv_chain = recv_chain_data.map(|(key, r#gen)| ChainKey::with_generation(key, r#gen));

@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use super::error::ExchangeError;
 use super::nfc_active::ExchangeNfc;
 use super::nfc_card_payload::NfcCardPayload;
-use super::x3dh::X3DHKeyPair;
+use super::x3dh::X25519KeyPair;
 use crate::crypto::encryption::{self, SymmetricKey};
 use crate::crypto::hkdf::HKDF;
 use crate::identity::Identity;
@@ -62,7 +62,7 @@ pub struct NfcExchangeResult {
 /// Manages the three-phase NFC encrypted handshake.
 pub struct NfcHandshakeSession {
     state: NfcHandshakeState,
-    our_x3dh: X3DHKeyPair,
+    our_x3dh: X25519KeyPair,
     our_display_name: String,
     our_identity_key: [u8; 32],
     shared_key: Option<SymmetricKey>,
@@ -77,7 +77,7 @@ impl NfcHandshakeSession {
     pub fn new_initiator(identity: &Identity, display_name: String) -> Self {
         Self {
             state: NfcHandshakeState::Idle,
-            our_x3dh: X3DHKeyPair::generate(),
+            our_x3dh: X25519KeyPair::generate(),
             our_display_name: display_name,
             our_identity_key: *identity.signing_public_key(),
             shared_key: None,
@@ -412,7 +412,7 @@ fn verify_peer_payload(their_nfc: &ExchangeNfc, now: u64) -> Result<(), Exchange
 /// first — the Ed25519 signature is what authenticates each ephemeral to its
 /// identity; this binding is defence-in-depth on top (review C-1).
 fn derive_symmetric_key(
-    our_keys: &X3DHKeyPair,
+    our_keys: &X25519KeyPair,
     our_identity: &[u8; 32],
     their_identity: &[u8; 32],
     their_pub: &[u8; 32],

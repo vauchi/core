@@ -11,16 +11,16 @@ use vauchi_core::exchange::*;
 // @internal
 #[test]
 fn test_keypair_generation() {
-    let kp = X3DHKeyPair::generate();
+    let kp = X25519KeyPair::generate();
     assert_eq!(kp.public_key().len(), 32);
 }
 
 // @internal
 #[test]
 fn test_keypair_from_bytes_roundtrip() {
-    let kp1 = X3DHKeyPair::generate();
+    let kp1 = X25519KeyPair::generate();
     let bytes = kp1.secret_bytes();
-    let kp2 = X3DHKeyPair::from_bytes(*bytes);
+    let kp2 = X25519KeyPair::from_bytes(*bytes);
 
     assert_eq!(kp1.public_key(), kp2.public_key());
 }
@@ -46,8 +46,8 @@ fn test_crypto_hardening_x25519_rfc7748_vector() {
     let expected_shared =
         hex::decode("4a5d9d5ba4ce2de1728e3bf480350f25e07e21c947d19e3376f09b3c1e161742").unwrap();
 
-    let alice = X3DHKeyPair::from_bytes(alice_secret);
-    let bob = X3DHKeyPair::from_bytes(bob_secret);
+    let alice = X25519KeyPair::from_bytes(alice_secret);
+    let bob = X25519KeyPair::from_bytes(bob_secret);
 
     assert_eq!(alice.public_key().as_slice(), expected_alice_public);
     assert_eq!(bob.public_key().as_slice(), expected_bob_public);
@@ -70,8 +70,8 @@ fn test_crypto_hardening_x25519_rfc7748_vector() {
 // @internal
 #[test]
 fn test_x3dh_respond_key_differs_from_raw_dh() {
-    let responder_keys = X3DHKeyPair::generate();
-    let initiator_keys = X3DHKeyPair::generate();
+    let responder_keys = X25519KeyPair::generate();
+    let initiator_keys = X25519KeyPair::generate();
 
     // Initiate exchange to get ephemeral public key
     let (initiator_key, ephemeral_public) =
@@ -115,9 +115,9 @@ fn test_x3dh_respond_key_differs_from_raw_dh() {
 // @internal
 #[test]
 fn test_x3dh_identity_binding_wrong_key_fails() {
-    let alice_keys = X3DHKeyPair::generate();
-    let bob_keys = X3DHKeyPair::generate();
-    let carol_keys = X3DHKeyPair::generate();
+    let alice_keys = X25519KeyPair::generate();
+    let bob_keys = X25519KeyPair::generate();
+    let carol_keys = X25519KeyPair::generate();
 
     let (alice_secret, ephemeral) = X3DH::initiate(&alice_keys, bob_keys.public_key()).unwrap();
 
@@ -144,7 +144,7 @@ fn test_x3dh_identity_binding_wrong_key_fails() {
 // @internal
 #[test]
 fn test_x3dh_zero_identity_rejected() {
-    let bob_keys = X3DHKeyPair::generate();
+    let bob_keys = X25519KeyPair::generate();
 
     // DH with zero public key must return error
     let result = bob_keys.diffie_hellman(&[0u8; 32]);
@@ -159,8 +159,8 @@ fn test_x3dh_zero_identity_rejected() {
 // @internal
 #[test]
 fn test_x3dh_respond_zero_identity_rejected() {
-    let alice_keys = X3DHKeyPair::generate();
-    let bob_keys = X3DHKeyPair::generate();
+    let alice_keys = X25519KeyPair::generate();
+    let bob_keys = X25519KeyPair::generate();
 
     let (_alice_secret, ephemeral) = X3DH::initiate(&alice_keys, bob_keys.public_key()).unwrap();
 
@@ -180,8 +180,8 @@ fn test_x3dh_respond_zero_identity_rejected() {
 // @internal
 #[test]
 fn test_x3dh_full_bidirectional_agreement() {
-    let alice_keys = X3DHKeyPair::generate();
-    let bob_keys = X3DHKeyPair::generate();
+    let alice_keys = X25519KeyPair::generate();
+    let bob_keys = X25519KeyPair::generate();
 
     let (alice_secret, ephemeral) = X3DH::initiate(&alice_keys, bob_keys.public_key()).unwrap();
     let bob_secret = X3DH::respond(&bob_keys, alice_keys.public_key(), &ephemeral).unwrap();
@@ -209,8 +209,8 @@ fn test_x3dh_full_bidirectional_agreement() {
 // @internal
 #[test]
 fn test_x3dh_ephemeral_key_uniqueness() {
-    let alice_keys = X3DHKeyPair::generate();
-    let bob_keys = X3DHKeyPair::generate();
+    let alice_keys = X25519KeyPair::generate();
+    let bob_keys = X25519KeyPair::generate();
 
     let mut ephemeral_pubs: Vec<Vec<u8>> = Vec::with_capacity(20);
     for _ in 0..20 {
@@ -240,8 +240,8 @@ fn test_x3dh_ephemeral_key_uniqueness() {
 // @internal
 #[test]
 fn test_x3dh_forward_secrecy_different_sessions() {
-    let alice_keys = X3DHKeyPair::generate();
-    let bob_keys = X3DHKeyPair::generate();
+    let alice_keys = X25519KeyPair::generate();
+    let bob_keys = X25519KeyPair::generate();
 
     let (secret1, eph1) = X3DH::initiate(&alice_keys, bob_keys.public_key()).unwrap();
     let (secret2, eph2) = X3DH::initiate(&alice_keys, bob_keys.public_key()).unwrap();

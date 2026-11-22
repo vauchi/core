@@ -12,7 +12,7 @@
 //! and the same role bug had to be fixed twice (2026-05-25).
 
 use super::key_order;
-use crate::crypto::x25519::X3DHKeyPair;
+use crate::crypto::x25519::X25519KeyPair;
 use crate::crypto::{DoubleRatchetState, HKDF, SymmetricKey};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -38,7 +38,7 @@ pub fn bootstrap_device_pair_ratchet(
     relationship_key: &SymmetricKey,
     our_identity: &[u8; 32],
     our_device_id: &[u8; 32],
-    our_device_keypair: &X3DHKeyPair,
+    our_device_keypair: &X25519KeyPair,
     their_identity: &[u8; 32],
     their_device_id: &[u8; 32],
     their_device_public_key: &[u8; 32],
@@ -70,7 +70,7 @@ pub fn bootstrap_device_pair_ratchet(
     } else {
         DoubleRatchetState::initialize_responder(
             &pair_key,
-            X3DHKeyPair::from_bytes(*our_device_keypair.secret_bytes()),
+            X25519KeyPair::from_bytes(*our_device_keypair.secret_bytes()),
         )
     };
     Ok((ratchet, is_initiator))
@@ -97,7 +97,7 @@ pub fn bootstrap_exchange_ratchet(
     our_identity: &[u8; 32],
     their_identity: &[u8; 32],
     peer_ephemeral: Option<[u8; 32]>,
-    our_ephemeral: Option<X3DHKeyPair>,
+    our_ephemeral: Option<X25519KeyPair>,
 ) -> Result<(DoubleRatchetState, bool), RatchetBootstrapError> {
     let is_initiator = key_order::is_initiator(our_identity, their_identity);
     let ratchet = if is_initiator {

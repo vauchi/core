@@ -30,7 +30,7 @@ use zeroize::Zeroize;
 
 use super::ExchangeError;
 use crate::crypto::SymmetricKey;
-pub use crate::crypto::X3DHKeyPair;
+pub use crate::crypto::X25519KeyPair;
 use crate::crypto::hkdf::HKDF;
 
 /// Domain separation info for X3DH key derivation via HKDF.
@@ -53,7 +53,7 @@ impl X3DH {
     ///
     /// Returns: (shared_secret, ephemeral_public_key_to_send)
     pub fn initiate(
-        our_keys: &X3DHKeyPair,
+        our_keys: &X25519KeyPair,
         their_public: &[u8; 32],
     ) -> Result<(SymmetricKey, [u8; 32]), ExchangeError> {
         let ephemeral_secret = EphemeralSecret::random_from_rng(OsRng);
@@ -88,7 +88,7 @@ impl X3DH {
     /// - DH1: our_static × their_static (identity binding)
     /// - DH2: our_static × their_ephemeral (forward secrecy)
     pub fn respond(
-        our_keys: &X3DHKeyPair,
+        our_keys: &X25519KeyPair,
         their_identity_public: &[u8; 32],
         their_ephemeral_public: &[u8; 32],
     ) -> Result<SymmetricKey, ExchangeError> {

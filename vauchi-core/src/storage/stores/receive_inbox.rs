@@ -19,7 +19,7 @@ use sha2::Sha256;
 use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::Zeroizing;
 
-use crate::crypto::{SymmetricKey, X3DHKeyPair, decrypt, encrypt, hkdf::HKDF};
+use crate::crypto::{SymmetricKey, X25519KeyPair, decrypt, encrypt, hkdf::HKDF};
 use crate::recovery::sealed_box;
 
 use super::super::{Storage, StorageError};
@@ -122,7 +122,7 @@ pub(in crate::storage) fn ensure_inbox_key(
     if exists.is_some() {
         return Ok(());
     }
-    let keypair = X3DHKeyPair::generate();
+    let keypair = X25519KeyPair::generate();
     let private_key_encrypted = encrypt(storage_key, keypair.secret_bytes().as_ref())
         .map_err(|e| StorageError::Encryption(e.to_string()))?;
     conn.execute(

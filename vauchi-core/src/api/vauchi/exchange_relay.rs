@@ -47,7 +47,7 @@ use crate::api::error::{VauchiError, VauchiResult};
 use crate::card::ContactCard;
 use crate::contact::Contact;
 use crate::exchange::relay_exchange::derive_sas;
-use crate::exchange::{X3DH, X3DHKeyPair};
+use crate::exchange::{X3DH, X25519KeyPair};
 use crate::network::HttpTransport;
 
 /// Result of `start_relay_exchange`: the code to display and secret
@@ -160,7 +160,7 @@ impl ProfileEngine {
             .as_ref()
             .ok_or(VauchiError::IdentityNotInitialized)?;
 
-        let our_x3dh = X3DHKeyPair::generate();
+        let our_x3dh = X25519KeyPair::generate();
         let our_identity_key = *identity.signing_public_key();
 
         // Build offer payload
@@ -350,7 +350,7 @@ impl ProfileEngine {
         // X3DH as responder: we are the "displayer" in X3DH terms.
         // DH1: our_static × their_static (their_exchange_key is identity for DH1)
         // DH2: our_static × their_ephemeral
-        let our_x3dh = X3DHKeyPair::from_bytes(offer.sas_key_material);
+        let our_x3dh = X25519KeyPair::from_bytes(offer.sas_key_material);
         let shared_secret = X3DH::respond(&our_x3dh, &their_exchange_key, &their_ephemeral_key)
             .map_err(|e| {
                 VauchiError::Exchange(crate::exchange::ExchangeError::KeyAgreementFailed(format!(
@@ -372,7 +372,7 @@ impl ProfileEngine {
         manager.add_contact(contact)?;
 
         // Initialize Double Ratchet as X3DH responder
-        let ratchet_dh = X3DHKeyPair::from_bytes(*our_x3dh.secret_bytes());
+        let ratchet_dh = X25519KeyPair::from_bytes(*our_x3dh.secret_bytes());
         self.create_ratchet_as_responder(&contact_id, &shared_secret, ratchet_dh)?;
 
         // Derive SAS

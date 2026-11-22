@@ -246,7 +246,7 @@ fn full_qr_session_produces_latency_summary() {
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let alice_qr = ExchangeQR::generate(
         &alice_identity,
         &alice_ephemeral,

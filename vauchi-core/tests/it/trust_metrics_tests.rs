@@ -14,7 +14,7 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::exchange::{
     ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState, ExchangeTransport,
-    MockProximityVerifier, ProximityConfidence, TransportProximity, TrustMetrics, X3DHKeyPair,
+    MockProximityVerifier, ProximityConfidence, TransportProximity, TrustMetrics, X25519KeyPair,
 };
 use vauchi_core::{Identity, Storage};
 
@@ -283,7 +283,7 @@ fn test_update_card_timestamp_increases() {
 /// Helper: run a full QR exchange ceremony and return the completed contact.
 fn run_full_qr_exchange() -> Contact {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(

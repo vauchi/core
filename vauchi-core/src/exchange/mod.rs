@@ -163,7 +163,7 @@ pub use session::{
     ExchangeSession, ExchangeState, ExchangeTransport,
 };
 pub use trust_metrics::{TransportProximity, TrustMetrics};
-pub use x3dh::{X3DH, X3DHKeyPair};
+pub use x3dh::{X3DH, X25519KeyPair};
 
 pub use multistage::confirmation::{Ending, Holding};
 pub use multistage::payload::PeerPayload;

@@ -14,7 +14,7 @@ use vauchi_core::{
     Contact, ContactCard, SymmetricKey, Vauchi,
     api::{ReceiveOutcome, process_single_card_update},
     crypto::cek::ContentEncryptionKey,
-    exchange::X3DHKeyPair,
+    exchange::X25519KeyPair,
 };
 
 /// A recipient instance plus the contact ids that bridge it to the sharer.
@@ -89,7 +89,7 @@ fn pair(
     let sharer_id_here = sharer_here.id().to_string();
     wb.add_contact(sharer_here).unwrap();
 
-    let recipient_dh = X3DHKeyPair::generate();
+    let recipient_dh = X25519KeyPair::generate();
     sharer
         .create_ratchet_as_initiator(&id_at_sharer, &shared, *recipient_dh.public_key())
         .unwrap();

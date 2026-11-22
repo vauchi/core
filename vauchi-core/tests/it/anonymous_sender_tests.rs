@@ -1010,7 +1010,7 @@ fn test_resolve_sender_id_epoch_boundary() {
 #[test]
 fn test_send_update_with_shared_key_uses_anonymous_id() {
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
     use vauchi_core::network::*;
 
     let transport = MockTransport::new();
@@ -1024,7 +1024,7 @@ fn test_send_update_with_shared_key_uses_anonymous_id() {
     let mut client = RelayClient::new(transport, config, "real-sender-id".into());
     client.connect().unwrap();
 
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -1069,7 +1069,7 @@ fn test_send_update_with_shared_key_uses_anonymous_id() {
 #[test]
 fn test_send_update_without_shared_key_uses_real_identity() {
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
     use vauchi_core::network::*;
 
     let transport = MockTransport::new();
@@ -1083,7 +1083,7 @@ fn test_send_update_without_shared_key_uses_real_identity() {
     let mut client = RelayClient::new(transport, config, "real-sender-id".into());
     client.connect().unwrap();
 
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -1111,7 +1111,7 @@ fn test_send_update_without_shared_key_uses_real_identity() {
 #[test]
 fn test_send_update_anonymous_id_differs_per_contact() {
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
     use vauchi_core::network::*;
 
     let transport = MockTransport::new();
@@ -1125,7 +1125,7 @@ fn test_send_update_anonymous_id_differs_per_contact() {
     let mut client = RelayClient::new(transport, config, "sender".into());
     client.connect().unwrap();
 
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -1138,7 +1138,7 @@ fn test_send_update_anonymous_id_differs_per_contact() {
         .send_update(0, "alice", &mut ratchet, b"hi", "u1", Some(&key_alice))
         .unwrap();
 
-    let bob_dh2 = X3DHKeyPair::generate();
+    let bob_dh2 = X25519KeyPair::generate();
     let mut ratchet2 =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh2.public_key()).unwrap();
     client

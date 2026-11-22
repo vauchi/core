@@ -141,7 +141,7 @@ fn test_start_qr_from_non_idle_rejected() {
 #[test]
 fn test_process_qr_from_idle_rejected() {
     let alice_identity = vauchi_core::Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
 
     let alice_qr = ExchangeQR::generate(
         &alice_identity,
@@ -251,7 +251,7 @@ fn test_complete_exchange_from_wrong_state_rejected() {
 #[test]
 fn test_self_exchange_detected() {
     let alice_identity = vauchi_core::Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
 
     // Generate QR with Alice's identity (using a separate ephemeral)
     let alice_qr = ExchangeQR::generate(
@@ -314,7 +314,7 @@ fn test_qr_reuse_rejected() {
 #[test]
 fn test_ratchet_bidirectional_communication() {
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let mut alice =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -342,8 +342,8 @@ fn test_ratchet_bidirectional_communication() {
 fn test_ratchet_rejects_foreign_messages() {
     let shared_secret_1 = SymmetricKey::generate();
     let shared_secret_2 = SymmetricKey::generate();
-    let bob_dh_1 = X3DHKeyPair::generate();
-    let bob_dh_2 = X3DHKeyPair::generate();
+    let bob_dh_1 = X25519KeyPair::generate();
+    let bob_dh_2 = X25519KeyPair::generate();
 
     let mut alice_1 =
         DoubleRatchetState::initialize_initiator(&shared_secret_1, *bob_dh_1.public_key()).unwrap();
@@ -364,7 +364,7 @@ fn test_ratchet_rejects_foreign_messages() {
 #[test]
 fn test_ratchet_rejects_tampered_ciphertext() {
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let mut alice =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -388,7 +388,7 @@ fn test_ratchet_rejects_tampered_ciphertext() {
 #[test]
 fn test_ratchet_rejects_truncated_ciphertext() {
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let mut alice =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -411,7 +411,7 @@ fn test_ratchet_rejects_truncated_ciphertext() {
 #[test]
 fn test_ratchet_forged_message_index_rejected() {
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let mut alice =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -647,7 +647,7 @@ fn test_encrypt_truncated_ciphertext_rejected() {
 #[test]
 fn test_ratchet_multiple_dh_steps() {
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let mut alice =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -695,7 +695,7 @@ fn test_ratchet_multiple_dh_steps() {
 #[test]
 fn test_ratchet_forward_secrecy_across_steps() {
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let mut alice =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -730,7 +730,7 @@ fn test_ratchet_forward_secrecy_across_steps() {
 #[test]
 fn test_expired_qr_rejected_in_state_machine() {
     let alice_identity = vauchi_core::Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
 
     // Create a QR with a backdated timestamp (expired)
     let expired_qr = ExchangeQR::generate_with_timestamp(
@@ -767,7 +767,7 @@ fn test_invalid_signature_qr_rejected_via_data_string() {
     use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
     let alice_identity = vauchi_core::Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
 
     let valid_qr = ExchangeQR::generate(
         &alice_identity,
@@ -796,7 +796,7 @@ fn test_qr_parser_rejects_trailing_bytes() {
     use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
     let alice_identity = vauchi_core::Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
 
     let valid_qr = ExchangeQR::generate(
         &alice_identity,

@@ -12,7 +12,7 @@
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey};
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::identity::Identity;
 use vauchi_core::storage::{LockedReceiveStorage, Storage, StorageError};
 
@@ -25,7 +25,7 @@ fn db(dir: &tempfile::TempDir) -> std::path::PathBuf {
 /// A ratchet pair: the contact's sending side and our receiving side.
 fn pair() -> (DoubleRatchetState, DoubleRatchetState) {
     let secret = SymmetricKey::generate();
-    let ours = X3DHKeyPair::generate();
+    let ours = X25519KeyPair::generate();
     let theirs = DoubleRatchetState::initialize_initiator(&secret, *ours.public_key()).unwrap();
     (
         theirs,

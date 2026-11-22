@@ -8,7 +8,7 @@
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::{SymmetricKey, Vauchi};
 
 /// Exchanges `host` and `peer` (exchange time 0) and stores both ratchets.
@@ -27,7 +27,7 @@ pub fn link_contacts(host: &Vauchi, peer: &Vauchi, label: &str) -> LinkedPeer {
     let host_contact_id = host_at_peer.id().to_string();
     peer.add_contact(host_at_peer).unwrap();
 
-    let host_dh = X3DHKeyPair::generate();
+    let host_dh = X25519KeyPair::generate();
     let peer_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *host_dh.public_key()).unwrap();
     let host_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, host_dh);

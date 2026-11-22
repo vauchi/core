@@ -180,7 +180,7 @@ fn duress_unlock_enters_decoy_mode_without_wiping() {
     let trusted = Contact::from_exchange([5u8; 32], ContactCard::new("Ally"), shared.clone(), 0);
     let trusted_id = trusted.id().to_string();
     engine.vauchi().add_contact(trusted).unwrap();
-    let dh = vauchi_core::exchange::X3DHKeyPair::generate();
+    let dh = vauchi_core::exchange::X25519KeyPair::generate();
     engine
         .vauchi()
         .create_ratchet_as_initiator(&trusted_id, &shared, *dh.public_key())

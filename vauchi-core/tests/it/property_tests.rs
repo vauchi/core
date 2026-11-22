@@ -482,7 +482,7 @@ proptest! {
 mod extended_property_tests {
     use super::*;
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
     use vauchi_core::sync::CardDelta;
 
     /// Strategy for generating message counts for stress tests.
@@ -508,7 +508,7 @@ mod extended_property_tests {
                 message_count in message_count_strategy()
             ) {
                 let shared_secret = SymmetricKey::from_bytes(seed);
-                let bob_dh = X3DHKeyPair::generate();
+                let bob_dh = X25519KeyPair::generate();
 
                 let mut alice_ratchet =
                     DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -619,7 +619,7 @@ mod extended_property_tests {
                 exchanges in 1usize..20usize
             ) {
                 let shared_secret = SymmetricKey::from_bytes(seed);
-                let bob_dh = X3DHKeyPair::generate();
+                let bob_dh = X25519KeyPair::generate();
 
                 let mut alice_ratchet =
                     DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();

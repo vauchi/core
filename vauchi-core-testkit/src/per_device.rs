@@ -12,7 +12,7 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SigningKeyPair;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::identity::{DeviceRegistry, RegisteredDevice, RegistryBroadcast};
 use vauchi_core::sync::delta::VersionedPayload;
 use vauchi_core::sync::registry_activation::RegistryPushPayload;
@@ -38,7 +38,7 @@ pub fn two_parties() -> Party {
         Contact::from_exchange(alice_pk, ContactCard::new("Alice"), shared.clone(), 0);
     let alice_at_bob = alice_contact.id().to_string();
     bob.add_contact(alice_contact).unwrap();
-    let alice_dh = X3DHKeyPair::generate();
+    let alice_dh = X25519KeyPair::generate();
     let bob_ratchet =
         DoubleRatchetState::initialize_initiator(&shared, *alice_dh.public_key()).unwrap();
     let alice_ratchet = DoubleRatchetState::initialize_responder(&shared, alice_dh);

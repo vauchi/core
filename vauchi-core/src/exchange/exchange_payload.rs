@@ -15,7 +15,7 @@ use super::ExchangeError;
 use crate::crypto::{PublicKey, Signature};
 use crate::identity::Identity;
 
-use super::x3dh::X3DHKeyPair;
+use super::x3dh::X25519KeyPair;
 
 /// Common payload size for NFC and BLE exchange payloads.
 pub const EXCHANGE_PAYLOAD_SIZE: usize = 174;
@@ -39,7 +39,7 @@ pub struct ParsedPayload {
 pub fn build_exchange_payload(
     magic: &[u8; 4],
     identity: &Identity,
-    ephemeral: &X3DHKeyPair,
+    ephemeral: &X25519KeyPair,
     token: [u8; 32],
     timestamp: u64,
 ) -> [u8; EXCHANGE_PAYLOAD_SIZE] {

@@ -12,7 +12,7 @@ use vauchi_core::Vauchi;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 
 use crate::common::helpers::create_vauchi_with_identity;
 use crate::common::meeting::signing_pk;
@@ -35,7 +35,7 @@ fn dave_met_in_person(world: &World) -> (Contact, DoubleRatchetState) {
         0,
     );
     let ratchet =
-        DoubleRatchetState::initialize_initiator(&shared, *X3DHKeyPair::generate().public_key())
+        DoubleRatchetState::initialize_initiator(&shared, *X25519KeyPair::generate().public_key())
             .unwrap();
     (dave, ratchet)
 }
@@ -117,7 +117,7 @@ fn a_contact_not_waiting_for_a_rekey_is_saved_whole_before_the_peer_saved() {
     let contact =
         Contact::from_exchange(signing_pk(&bob), ContactCard::new("Bob"), shared.clone(), 0);
     let ratchet =
-        DoubleRatchetState::initialize_initiator(&shared, *X3DHKeyPair::generate().public_key())
+        DoubleRatchetState::initialize_initiator(&shared, *X25519KeyPair::generate().public_key())
             .unwrap();
 
     let awaiting = phone

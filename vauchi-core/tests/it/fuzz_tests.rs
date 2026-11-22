@@ -368,11 +368,11 @@ proptest! {
     fn fuzz_key_generation_consistency(_seed in any::<u64>()) {
         // allow(zero_assertions): No-panic fuzz test — validates key generation never crashes
         use vauchi_core::crypto::{SigningKeyPair, SymmetricKey};
-        use vauchi_core::exchange::X3DHKeyPair;
+        use vauchi_core::exchange::X25519KeyPair;
 
         let _sym = SymmetricKey::generate();
         let _signing = SigningKeyPair::generate();
-        let _x3dh = X3DHKeyPair::generate();
+        let _x3dh = X25519KeyPair::generate();
     }
 }
 

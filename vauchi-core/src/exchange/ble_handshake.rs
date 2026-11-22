@@ -64,7 +64,7 @@ use zeroize::Zeroize;
 
 use super::ble_payload::BleCardPayload;
 use super::error::ExchangeError;
-use super::x3dh::X3DHKeyPair;
+use super::x3dh::X25519KeyPair;
 use crate::crypto::encryption::{self, SymmetricKey};
 use crate::crypto::hkdf::HKDF;
 use crate::identity::Identity;
@@ -164,8 +164,8 @@ pub struct BleExchangeResult {
 /// - Private key material: should not be used after `derive_session_key` completes.
 pub struct BleHandshakeSession {
     state: BleHandshakeState,
-    our_x3dh: X3DHKeyPair,
-    our_identity_x3dh: X3DHKeyPair,
+    our_x3dh: X25519KeyPair,
+    our_identity_x3dh: X25519KeyPair,
     our_nonce: [u8; NONCE_SIZE],
     our_identity_key: [u8; 32],
     our_exchange_key: [u8; 32],
@@ -235,7 +235,7 @@ impl BleHandshakeSession {
     /// Requires both the Ed25519 signing key and the X25519 exchange keypair.
     pub fn new_initiator_from_key(
         identity_key: [u8; 32],
-        identity_x3dh: X3DHKeyPair,
+        identity_x3dh: X25519KeyPair,
         card: BleCardPayload,
         now: u64,
     ) -> Self {
@@ -249,7 +249,7 @@ impl BleHandshakeSession {
     /// Requires both the Ed25519 signing key and the X25519 exchange keypair.
     pub fn new_responder_from_key(
         identity_key: [u8; 32],
-        identity_x3dh: X3DHKeyPair,
+        identity_x3dh: X25519KeyPair,
         card: BleCardPayload,
         now: u64,
     ) -> Self {
@@ -308,7 +308,7 @@ impl BleHandshakeSession {
     /// Internal constructor from raw key material.
     fn new_from_keys(
         identity_key: [u8; 32],
-        identity_x3dh: X3DHKeyPair,
+        identity_x3dh: X25519KeyPair,
         exchange_key: [u8; 32],
         card: BleCardPayload,
         now: u64,
@@ -319,7 +319,7 @@ impl BleHandshakeSession {
 
         Self {
             state: BleHandshakeState::Idle,
-            our_x3dh: X3DHKeyPair::generate(),
+            our_x3dh: X25519KeyPair::generate(),
             our_identity_x3dh: identity_x3dh,
             our_nonce: nonce,
             our_identity_key: identity_key,
@@ -477,7 +477,7 @@ impl BleHandshakeSession {
     /// sent is ignored by the peer (which stays initiator).
     pub fn reset(&mut self, now: u64) {
         self.state = BleHandshakeState::Idle;
-        self.our_x3dh = X3DHKeyPair::generate();
+        self.our_x3dh = X25519KeyPair::generate();
         self.our_nonce = crate::crypto::random_bytes();
         self.our_timestamp = now;
         self.their_timestamp = None;
@@ -1001,9 +1001,9 @@ impl Drop for BleHandshakeSession {
 
 /// Parameters for v2 session key derivation.
 struct SessionKeyParams<'a> {
-    our_identity: &'a X3DHKeyPair,
+    our_identity: &'a X25519KeyPair,
     their_exchange_pub: &'a [u8; 32],
-    our_ephemeral: &'a X3DHKeyPair,
+    our_ephemeral: &'a X25519KeyPair,
     their_ephemeral: &'a [u8; 32],
     our_exchange_pub: &'a [u8; 32],
     our_nonce: &'a [u8; NONCE_SIZE],
@@ -1115,10 +1115,10 @@ mod tests {
     // @internal
     #[test]
     fn session_key_sorts_nonces_and_exchange_keys_ascending() {
-        let our_identity = X3DHKeyPair::generate();
-        let their_exchange = X3DHKeyPair::generate();
-        let our_ephemeral = X3DHKeyPair::generate();
-        let their_ephemeral = X3DHKeyPair::generate();
+        let our_identity = X25519KeyPair::generate();
+        let their_exchange = X25519KeyPair::generate();
+        let our_ephemeral = X25519KeyPair::generate();
+        let their_ephemeral = X25519KeyPair::generate();
         let (low_nonce, high_nonce) = ([1u8; NONCE_SIZE], [2u8; NONCE_SIZE]);
         let our_exchange_pub = [6u8; 32];
 

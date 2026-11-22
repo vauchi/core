@@ -14,7 +14,7 @@ use vauchi_core::api::Vauchi;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 
 fn engine_ready() -> AppEngine {
     let mut vauchi: Vauchi = Vauchi::in_memory().unwrap();
@@ -46,7 +46,7 @@ fn add_reachable_contact(engine: &AppEngine, name: &str, key_byte: u8) -> String
     engine.vauchi().add_contact(contact).unwrap();
     engine
         .vauchi()
-        .create_ratchet_as_initiator(&id, &shared, *X3DHKeyPair::generate().public_key())
+        .create_ratchet_as_initiator(&id, &shared, *X25519KeyPair::generate().public_key())
         .unwrap();
     id
 }

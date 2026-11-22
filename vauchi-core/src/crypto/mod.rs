@@ -30,4 +30,4 @@ pub use random::{random_bytes, random_fill};
 pub use ratchet::{DoubleRatchetState, RATCHET_STATE_VERSION, RatchetError, RatchetMessage};
 pub use shredding::ShreddingMasterKey;
 pub use signing::{PublicKey, Signature, SigningKeyPair};
-pub use x25519::{DhError, X3DHKeyPair};
+pub use x25519::{DhError, X25519KeyPair};

@@ -103,7 +103,7 @@ fn start_qr_logs_qr_generated() {
 #[test]
 fn process_qr_logs_qr_scanned() {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let alice_qr = ExchangeQR::generate(
         &alice_identity,
         &alice_ephemeral,
@@ -142,7 +142,7 @@ fn key_agreement_logs_completion_and_proximity() {
     let alice_identity = Identity::create("Alice", 0);
     let bob_identity = Identity::create("Bob", 0);
 
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let alice_qr = ExchangeQR::generate(
         &alice_identity,
         &alice_ephemeral,
@@ -201,7 +201,7 @@ fn complete_exchange_logs_completed() {
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let alice_qr = ExchangeQR::generate(
         &alice_identity,
         &alice_ephemeral,

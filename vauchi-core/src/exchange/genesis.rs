@@ -33,7 +33,7 @@
 //! registry handshakes persist activation state without installing a genesis
 //! session. Active card traffic uses independent device-pair ratchets.
 
-use crate::crypto::x25519::X3DHKeyPair;
+use crate::crypto::x25519::X25519KeyPair;
 use crate::crypto::{DoubleRatchetState, HKDF, RatchetMessage, SymmetricKey};
 use crate::identity::{Identity, RegistryBroadcast};
 use crate::sync_control::is_registry_control;
@@ -293,12 +293,12 @@ fn genesis_responder_keypair(
     shared_key: &SymmetricKey,
     sender_identity: &[u8; 32],
     recipient_identity: &[u8; 32],
-) -> X3DHKeyPair {
+) -> X25519KeyPair {
     let mut info = Vec::with_capacity(GENESIS_RESPONDER_INFO.len() + 64);
     info.extend_from_slice(GENESIS_RESPONDER_INFO);
     info.extend_from_slice(sender_identity);
     info.extend_from_slice(recipient_identity);
-    X3DHKeyPair::from_bytes(*HKDF::derive_key(None, shared_key.as_bytes(), &info))
+    X25519KeyPair::from_bytes(*HKDF::derive_key(None, shared_key.as_bytes(), &info))
 }
 
 #[allow(clippy::too_many_arguments)]

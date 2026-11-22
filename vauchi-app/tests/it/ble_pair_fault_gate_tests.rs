@@ -26,7 +26,7 @@ use vauchi_app::orchestrator::ble_handshake_machine::{
     BleHandshakeMachine, BleMachineEvent, BleMachinePhase,
 };
 use vauchi_core::Command;
-use vauchi_core::crypto::X3DHKeyPair;
+use vauchi_core::crypto::X25519KeyPair;
 use vauchi_core::exchange::{
     BleCardPayload, BleExchangeResult, CHAR_DATA_NOTIFY, CHAR_DATA_WRITE, CHAR_HANDSHAKE_NOTIFY,
     CHAR_HANDSHAKE_WRITE,
@@ -47,8 +47,8 @@ const MAX_STEPS: usize = 200;
 /// (`backlog/2026-07-28-ble-pair-benign-handshake-reorder-expires`).
 const DELIVERY_SECS: u64 = 1;
 
-fn card_for(identity: [u8; 32], secret: [u8; 32], name: &str) -> (BleCardPayload, X3DHKeyPair) {
-    let x3dh = X3DHKeyPair::from_bytes(secret);
+fn card_for(identity: [u8; 32], secret: [u8; 32], name: &str) -> (BleCardPayload, X25519KeyPair) {
+    let x3dh = X25519KeyPair::from_bytes(secret);
     let card = BleCardPayload::new(identity, name.into(), *x3dh.public_key(), vec![], None);
     (card, x3dh)
 }

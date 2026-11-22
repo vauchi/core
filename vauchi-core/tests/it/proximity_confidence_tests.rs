@@ -187,7 +187,7 @@ fn test_proximity_check_completed_event_exists() {
 #[test]
 fn test_exchange_with_proximity_sets_high_confidence() {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(
@@ -234,7 +234,7 @@ fn test_exchange_with_proximity_sets_high_confidence() {
 #[test]
 fn test_exchange_without_proximity_sets_low_confidence() {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(
@@ -281,7 +281,7 @@ fn test_exchange_without_proximity_sets_low_confidence() {
 #[test]
 fn test_exchange_proximity_timeout_sets_low_confidence() {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(
@@ -328,7 +328,7 @@ fn test_exchange_proximity_timeout_sets_low_confidence() {
 #[test]
 fn test_manual_confirmation_sets_medium_confidence() {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(
@@ -377,7 +377,7 @@ fn test_manual_confirmation_sets_medium_confidence() {
 #[test]
 fn test_session_stores_audio_challenge_from_qr() {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(
@@ -415,7 +415,7 @@ fn test_session_stores_audio_challenge_from_qr() {
 #[test]
 fn test_stored_audio_challenge_is_not_zeros() {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(
@@ -451,7 +451,7 @@ fn test_stored_audio_challenge_is_not_zeros() {
 #[test]
 fn test_proximity_check_uses_qr_challenge_not_zeros() {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(
@@ -500,7 +500,7 @@ fn test_proximity_check_uses_qr_challenge_not_zeros() {
 #[test]
 fn test_key_agreement_auto_runs_proximity_check_high() {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(
@@ -551,7 +551,7 @@ fn test_key_agreement_auto_runs_proximity_check_high() {
 #[test]
 fn test_key_agreement_auto_runs_proximity_check_medium() {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(
@@ -602,7 +602,7 @@ fn test_key_agreement_auto_runs_proximity_check_medium() {
 #[test]
 fn test_key_agreement_auto_runs_proximity_check_low_on_failure() {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(

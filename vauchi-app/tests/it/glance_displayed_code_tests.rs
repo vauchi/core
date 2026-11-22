@@ -11,7 +11,7 @@ use vauchi_app::orchestrator::ble_handshake_machine::{
     BleHandshakeMachine, BleMachineEvent, BleOobBinding,
 };
 use vauchi_core::Command;
-use vauchi_core::crypto::X3DHKeyPair;
+use vauchi_core::crypto::X25519KeyPair;
 use vauchi_core::exchange::{
     BleCardPayload, CHAR_DATA_NOTIFY, CHAR_DATA_WRITE, CHAR_HANDSHAKE_NOTIFY, CHAR_HANDSHAKE_WRITE,
 };
@@ -19,9 +19,9 @@ use vauchi_core::platform::BleLinkDirection;
 
 const DISPLAYED_NONCE: [u8; 16] = [7u8; 16];
 
-fn party(seed: u8, name: &str) -> ([u8; 32], X3DHKeyPair, BleCardPayload) {
+fn party(seed: u8, name: &str) -> ([u8; 32], X25519KeyPair, BleCardPayload) {
     let identity_key = [seed; 32];
-    let x3dh = X3DHKeyPair::from_bytes([seed.wrapping_add(100); 32]);
+    let x3dh = X25519KeyPair::from_bytes([seed.wrapping_add(100); 32]);
     let card = BleCardPayload::new(
         identity_key,
         name.into(),

@@ -197,7 +197,7 @@ pub fn is_usable_public_key(public_key: &[u8; 32]) -> bool {
 
 // INLINE_TEST_REQUIRED: the guardian seal/open key contract is validated
 // against crate-internal derivations (HKDF Vauchi_Exchange_Seed_v2 negative
-// case via crypto::X3DHKeyPair) and the raw x25519_dalek primitive, neither of
+// case via crypto::X25519KeyPair) and the raw x25519_dalek primitive, neither of
 // which is on the public integration-test surface. The end-to-end contract via
 // the public API lives in tests/it/guardian_identity_key_contract_tests.rs.
 #[cfg(test)]
@@ -230,7 +230,7 @@ mod tests {
         let recipient = kp.public_key().to_x25519().unwrap();
         let exchange_seed =
             crate::crypto::HKDF::derive_key(None, &seed, b"Vauchi_Exchange_Seed_v2");
-        let x3dh = crate::crypto::X3DHKeyPair::from_bytes(*exchange_seed);
+        let x3dh = crate::crypto::X25519KeyPair::from_bytes(*exchange_seed);
         assert_ne!(x3dh.public_key(), recipient.as_bytes());
     }
 

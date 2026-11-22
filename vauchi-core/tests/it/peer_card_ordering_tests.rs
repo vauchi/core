@@ -15,7 +15,7 @@ fn wrapped(delta: &CardDelta) -> Vec<u8> {
 }
 
 fn ordinary_blob(world: &ColdStartWorld, sender: &Identity, mut delta: CardDelta) -> Vec<u8> {
-    let receiver_dh = X3DHKeyPair::generate();
+    let receiver_dh = X25519KeyPair::generate();
     let mut sending =
         DoubleRatchetState::initialize_initiator(&world.shared_key, *receiver_dh.public_key())
             .unwrap();

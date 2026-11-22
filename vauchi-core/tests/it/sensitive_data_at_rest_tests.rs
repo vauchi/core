@@ -11,7 +11,7 @@
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::identity::Identity;
 use vauchi_core::{SymmetricKey, Vauchi, VauchiConfig};
 
@@ -63,7 +63,7 @@ fn no_card_name_or_key_is_stored_in_plaintext() {
         let contact_id = contact.id().to_string();
         vauchi.add_contact(contact).unwrap();
         let ratchet =
-            DoubleRatchetState::initialize_responder(&shared_secret, X3DHKeyPair::generate());
+            DoubleRatchetState::initialize_responder(&shared_secret, X25519KeyPair::generate());
         vauchi
             .storage()
             .ratchets()

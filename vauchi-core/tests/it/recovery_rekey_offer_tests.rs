@@ -14,7 +14,7 @@ use std::time::{Duration, SystemTime};
 use vauchi_core::clock::FakeClock;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
 use vauchi_core::recovery::rekey::RekeyOffer;
 use vauchi_core::{Storage, SymmetricKey, Vauchi};
@@ -158,7 +158,7 @@ fn the_kept_exchange_key_and_proof_survive_a_storage_rekey() {
         0,
     );
     storage.contacts().save_contact(&contact).unwrap();
-    let exchange = X3DHKeyPair::generate();
+    let exchange = X25519KeyPair::generate();
     storage
         .recovery()
         .save_rekey_exchange(contact.id(), &exchange.secret_bytes())
@@ -173,7 +173,7 @@ fn the_kept_exchange_key_and_proof_survive_a_storage_rekey() {
         .unwrap()
         .unwrap();
     assert_eq!(
-        X3DHKeyPair::from_bytes(*kept.0).public_key(),
+        X25519KeyPair::from_bytes(*kept.0).public_key(),
         exchange.public_key()
     );
     assert_eq!(

@@ -7,7 +7,7 @@
 //! Tests for Double Ratchet error conditions and edge cases.
 //! These tests ensure the cryptographic protocol handles errors correctly.
 
-use vauchi_core::{SymmetricKey, crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair};
+use vauchi_core::{SymmetricKey, crypto::ratchet::DoubleRatchetState, exchange::X25519KeyPair};
 
 // =============================================================================
 // =============================================================================
@@ -17,7 +17,7 @@ use vauchi_core::{SymmetricKey, crypto::ratchet::DoubleRatchetState, exchange::X
 #[test]
 fn test_ratchet_messages_in_order() {
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let mut alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -45,7 +45,7 @@ fn test_ratchet_messages_in_order() {
 #[test]
 fn test_ratchet_handles_message_skip() {
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let mut alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -76,7 +76,7 @@ fn test_ratchet_handles_message_skip() {
 #[test]
 fn test_ratchet_rejects_duplicate_message() {
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let mut alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -105,7 +105,7 @@ fn test_ratchet_rejects_duplicate_message() {
 #[test]
 fn test_ratchet_fails_on_corrupted_dh_key() {
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let mut alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -126,7 +126,7 @@ fn test_ratchet_fails_on_corrupted_dh_key() {
 #[test]
 fn test_ratchet_handles_empty_plaintext() {
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let mut alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -144,7 +144,7 @@ fn test_ratchet_handles_empty_plaintext() {
 #[test]
 fn test_ratchet_handles_large_plaintext() {
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let mut alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -168,7 +168,7 @@ fn test_ratchet_handles_large_plaintext() {
 fn test_different_secrets_produce_different_ratchets() {
     let secret1 = SymmetricKey::generate();
     let secret2 = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let mut ratchet1 =
         DoubleRatchetState::initialize_initiator(&secret1, *bob_dh.public_key()).unwrap();
@@ -191,7 +191,7 @@ fn test_different_secrets_produce_different_ratchets() {
 #[test]
 fn test_same_plaintext_different_ciphertext() {
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let mut alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -215,7 +215,7 @@ fn test_same_plaintext_different_ciphertext() {
 #[test]
 fn test_bidirectional_conversation() {
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let mut alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -247,7 +247,7 @@ fn test_bidirectional_conversation() {
 #[test]
 fn test_consecutive_messages_same_party() {
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let mut alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -288,7 +288,7 @@ fn test_ratchet_state_serialization() {
     bob_wb.create_identity("Bob").unwrap();
 
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     // Create contacts first (required for foreign key)
     let bob_pk = *bob_wb.identity().unwrap().signing_public_key();
@@ -355,7 +355,7 @@ fn test_ratchet_state_serialization() {
 #[test]
 fn test_ratchet_message_serialization() {
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let mut alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();

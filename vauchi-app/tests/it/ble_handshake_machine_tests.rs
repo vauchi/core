@@ -23,17 +23,17 @@ use vauchi_app::orchestrator::ble_handshake_machine::{
     BleHandshakeMachine, BleMachineEvent, BleMachinePhase, BleOobBinding, BleRole, decide_ble_role,
 };
 use vauchi_core::Command;
-use vauchi_core::crypto::X3DHKeyPair;
+use vauchi_core::crypto::X25519KeyPair;
 use vauchi_core::exchange::{
     BLE_DEFAULT_USABLE, BleCardPayload, CHAR_DATA_NOTIFY, CHAR_DATA_WRITE, CHAR_HANDSHAKE_NOTIFY,
     CHAR_HANDSHAKE_WRITE,
 };
 use vauchi_core::platform::BleLinkDirection;
 
-fn fixture_card() -> (BleCardPayload, [u8; 32], X3DHKeyPair) {
+fn fixture_card() -> (BleCardPayload, [u8; 32], X25519KeyPair) {
     let identity_key = [1u8; 32];
     let exchange_secret = [2u8; 32];
-    let x3dh = X3DHKeyPair::from_bytes(exchange_secret);
+    let x3dh = X25519KeyPair::from_bytes(exchange_secret);
     let exchange_pub = *x3dh.public_key();
     let card = BleCardPayload::new(
         identity_key,
@@ -435,7 +435,7 @@ fn radio_only_binding_leaves_the_echo_zero() {
 /// initiator's self-exchange check does not reject the pair.
 fn fresh_peer_responder() -> BleHandshakeMachine {
     let identity_key = [3u8; 32];
-    let x3dh = X3DHKeyPair::from_bytes([4u8; 32]);
+    let x3dh = X25519KeyPair::from_bytes([4u8; 32]);
     let card = BleCardPayload::new(
         identity_key,
         "Bob".into(),
@@ -450,7 +450,7 @@ fn fresh_peer_responder() -> BleHandshakeMachine {
 /// ([1;32]) — for the glare tiebreak.
 fn fresh_peer_initiator() -> BleHandshakeMachine {
     let identity_key = [3u8; 32];
-    let x3dh = X3DHKeyPair::from_bytes([4u8; 32]);
+    let x3dh = X25519KeyPair::from_bytes([4u8; 32]);
     let card = BleCardPayload::new(
         identity_key,
         "Bob".into(),

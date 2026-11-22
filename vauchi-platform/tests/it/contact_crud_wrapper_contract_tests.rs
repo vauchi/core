@@ -357,7 +357,7 @@ fn add_field_propagates_to_a_ratcheted_contact() {
     );
     let contact_id = contact.id().to_string();
     engine.save_test_contact(&contact).unwrap();
-    let their_dh = vauchi_core::exchange::X3DHKeyPair::generate();
+    let their_dh = vauchi_core::exchange::X25519KeyPair::generate();
     engine
         .create_test_ratchet_as_initiator(contact_id.clone(), &shared, *their_dh.public_key())
         .unwrap();

@@ -10,7 +10,7 @@
 //! Feature file: features/contact_exchange.feature @e2e
 
 use vauchi_core::exchange::{
-    ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState, MockProximityVerifier, X3DHKeyPair,
+    ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState, MockProximityVerifier, X25519KeyPair,
 };
 use vauchi_core::{ContactCard, Identity};
 
@@ -137,8 +137,8 @@ fn test_full_exchange_produces_matching_shared_keys() {
 // @scenario: contact_exchange :: X3DH key agreement during exchange
 #[test]
 fn test_symmetric_dh_produces_matching_keys() {
-    let alice_keys = X3DHKeyPair::generate();
-    let bob_keys = X3DHKeyPair::generate();
+    let alice_keys = X25519KeyPair::generate();
+    let bob_keys = X25519KeyPair::generate();
 
     let alice_shared = alice_keys.diffie_hellman(bob_keys.public_key()).unwrap();
     let bob_shared = bob_keys.diffie_hellman(alice_keys.public_key()).unwrap();
@@ -154,7 +154,7 @@ fn test_symmetric_dh_produces_matching_keys() {
 #[test]
 fn test_qr_contains_ephemeral_exchange_key() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
     let qr = ExchangeQR::generate(
         &identity,
         &ephemeral,
@@ -230,7 +230,7 @@ fn test_process_qr_requires_displaying_qr_state() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    let bob_ephemeral = X3DHKeyPair::generate();
+    let bob_ephemeral = X25519KeyPair::generate();
     let bob_qr = ExchangeQR::generate(
         &bob_identity,
         &bob_ephemeral,
@@ -376,9 +376,9 @@ fn test_complete_state_transition_sequence() {
 // @scenario: security :: Man-in-the-middle detection during exchange
 #[test]
 fn test_wrong_dh_key_produces_different_secret() {
-    let alice_keys = X3DHKeyPair::generate();
-    let bob_keys = X3DHKeyPair::generate();
-    let eve_keys = X3DHKeyPair::generate();
+    let alice_keys = X25519KeyPair::generate();
+    let bob_keys = X25519KeyPair::generate();
+    let eve_keys = X25519KeyPair::generate();
 
     let alice_shared = alice_keys.diffie_hellman(bob_keys.public_key()).unwrap();
 
@@ -397,7 +397,7 @@ fn test_wrong_dh_key_produces_different_secret() {
 fn test_self_exchange_rejected() {
     let alice_identity = Identity::create("Alice", 0);
 
-    let own_ephemeral = X3DHKeyPair::generate();
+    let own_ephemeral = X25519KeyPair::generate();
     let own_qr = ExchangeQR::generate(
         &alice_identity,
         &own_ephemeral,
@@ -445,7 +445,7 @@ fn test_expired_qr_rejected() {
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
 
     // Bob's expired QR (6 minutes ago)
-    let bob_ephemeral = X3DHKeyPair::generate();
+    let bob_ephemeral = X25519KeyPair::generate();
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()

@@ -14,7 +14,7 @@
 use proptest::prelude::*;
 use vauchi_core::api::{Vauchi, VauchiConfig};
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::{
     Contact, ContactCard, ContactField, FieldType, Identity, OwnCardRepropagateState,
     sync::SyncItem,
@@ -37,7 +37,7 @@ fn alice_with_ratcheted_bob() -> (Vauchi, String) {
     let bob_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
-    let their_dh = X3DHKeyPair::generate();
+    let their_dh = X25519KeyPair::generate();
     wb.create_ratchet_as_initiator(&bob_id, &shared, *their_dh.public_key())
         .unwrap();
 

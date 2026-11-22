@@ -10,7 +10,7 @@
 
 use vauchi_core::{
     Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi, VauchiError,
-    api::CardUpdateError, crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair,
+    api::CardUpdateError, crypto::ratchet::DoubleRatchetState, exchange::X25519KeyPair,
     sync::delta::CardDelta,
 };
 
@@ -155,7 +155,7 @@ fn test_blocked_contact_update_rejected() {
     alice.create_identity("Alice").unwrap();
 
     let bob_identity = Identity::create("Bob", 0);
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 
     let bob_contact = Contact::from_exchange(
@@ -172,7 +172,7 @@ fn test_blocked_contact_update_rejected() {
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
+            X25519KeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
 
@@ -240,12 +240,12 @@ fn test_propagate_skips_blocked_contacts() {
     let carol_id = carol.id().to_string();
     alice.add_contact(carol).unwrap();
 
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     alice
         .create_ratchet_as_initiator(&bob_id, &shared, *bob_dh.public_key())
         .unwrap();
 
-    let carol_dh = X3DHKeyPair::generate();
+    let carol_dh = X25519KeyPair::generate();
     let carol_secret = SymmetricKey::generate();
     alice
         .create_ratchet_as_initiator(&carol_id, &carol_secret, *carol_dh.public_key())
@@ -321,7 +321,7 @@ fn owed_repropagation_skips_blocked_contacts() {
         let id = contact.id().to_string();
         alice.add_contact(contact).unwrap();
         alice
-            .create_ratchet_as_initiator(&id, &shared, *X3DHKeyPair::generate().public_key())
+            .create_ratchet_as_initiator(&id, &shared, *X25519KeyPair::generate().public_key())
             .unwrap();
         ids.push(id);
     }

@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use vauchi_core::clock::FakeClock;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
 use vauchi_core::recovery::rekey::{RekeyAnswer, RekeyOffer, rekey_shared_key};
 use vauchi_core::{Contact, ContactCard, Identity, Storage, SymmetricKey, Vauchi};
@@ -81,7 +81,7 @@ fn accepting_moves_alice_to_her_new_key_with_the_key_both_sides_derive() {
         .unwrap()
         .unwrap();
     let at_phone = rekey_shared_key(
-        &X3DHKeyPair::from_bytes(*secret),
+        &X25519KeyPair::from_bytes(*secret),
         answer.exchange_key(),
         &phone_pk,
         &signing_pk(dave),

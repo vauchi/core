@@ -192,7 +192,7 @@ impl ProfileEngine {
     pub fn complete_link_exchange(
         &self,
         card_bytes: &[u8],
-        our_x3dh: &crate::exchange::X3DHKeyPair,
+        our_x3dh: &crate::exchange::X25519KeyPair,
         binding: &crate::exchange::link_mode::LinkExchangeBinding,
     ) -> VauchiResult<String> {
         self.complete_link_exchange_reporting(card_bytes, our_x3dh, binding)
@@ -206,7 +206,7 @@ impl ProfileEngine {
     pub(crate) fn complete_link_exchange_reporting(
         &self,
         card_bytes: &[u8],
-        our_x3dh: &crate::exchange::X3DHKeyPair,
+        our_x3dh: &crate::exchange::X25519KeyPair,
         binding: &crate::exchange::link_mode::LinkExchangeBinding,
     ) -> VauchiResult<(String, bool)> {
         use crate::exchange::ExchangeError;
@@ -282,7 +282,7 @@ impl ProfileEngine {
                 &our_identity,
                 &identity_pubkey,
                 Some(x3dh_pubkey),
-                Some(crate::exchange::X3DHKeyPair::from_bytes(
+                Some(crate::exchange::X25519KeyPair::from_bytes(
                     *our_x3dh.secret_bytes(),
                 )),
             )

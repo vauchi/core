@@ -26,8 +26,8 @@ use vauchi_core::backup::{FullBackupIdentityData, export_full_backup, import_ful
 use vauchi_core::clock::FakeClock;
 use vauchi_core::crypto::ratchet::SerializedRatchetState;
 use vauchi_core::crypto::{
-    ChainKey, DoubleRatchetState, HKDF, RatchetMessage, SigningKeyPair, SymmetricKey, X3DHKeyPair,
-    decrypt, decrypt_with_ad,
+    ChainKey, DoubleRatchetState, HKDF, RatchetMessage, SigningKeyPair, SymmetricKey,
+    X25519KeyPair, decrypt, decrypt_with_ad,
 };
 use vauchi_core::exchange::X3DH;
 use vauchi_core::identifiers::IdentityKey;
@@ -248,7 +248,7 @@ pub(crate) fn load() -> Vectors {
 fn compute_identity(master_seed: [u8; 32]) -> IdentityVector {
     let signing = SigningKeyPair::from_seed(&master_seed);
     let exchange_seed = HKDF::derive_key(None, &master_seed, EXCHANGE_SEED_INFO.as_bytes());
-    let exchange = X3DHKeyPair::from_bytes(*exchange_seed);
+    let exchange = X25519KeyPair::from_bytes(*exchange_seed);
     let device = DeviceInfo::derive(&master_seed, 0, "vector-device".to_string(), 0);
     IdentityVector {
         master_seed: hex::encode(master_seed),
@@ -287,9 +287,9 @@ fn identity_vector_matches_the_shipped_key_derivations() {
 // ── X3DH ──────────────────────────────────────────────────────────────
 
 fn compute_x3dh() -> (X3dhVector, SymmetricKey) {
-    let initiator = X3DHKeyPair::from_bytes(seed(0x10));
-    let responder = X3DHKeyPair::from_bytes(seed(0x20));
-    let ephemeral = X3DHKeyPair::from_bytes(seed(0x30));
+    let initiator = X25519KeyPair::from_bytes(seed(0x10));
+    let responder = X25519KeyPair::from_bytes(seed(0x20));
+    let ephemeral = X25519KeyPair::from_bytes(seed(0x30));
     let dh1 = initiator
         .diffie_hellman(responder.public_key())
         .expect("dh1");
@@ -318,7 +318,7 @@ fn compute_x3dh() -> (X3dhVector, SymmetricKey) {
 #[test]
 fn x3dh_vector_matches_the_responder_derivation_and_its_formula() {
     let v = load().x3dh;
-    let responder = X3DHKeyPair::from_bytes(hex32(&v.responder_static_secret));
+    let responder = X25519KeyPair::from_bytes(hex32(&v.responder_static_secret));
     let shared = X3DH::respond(
         &responder,
         &hex32(&v.initiator_static_public),
@@ -337,8 +337,8 @@ fn x3dh_vector_matches_the_responder_derivation_and_its_formula() {
 // ── Double Ratchet ────────────────────────────────────────────────────
 
 fn compute_ratchet(x3dh_secret: &SymmetricKey) -> RatchetVector {
-    let responder_dh = X3DHKeyPair::from_bytes(seed(0x40));
-    let initiator_dh = X3DHKeyPair::from_bytes(seed(0x50));
+    let responder_dh = X25519KeyPair::from_bytes(seed(0x40));
+    let initiator_dh = X25519KeyPair::from_bytes(seed(0x50));
     let dh_output = initiator_dh
         .diffie_hellman(responder_dh.public_key())
         .expect("dh");
@@ -368,8 +368,10 @@ fn compute_ratchet(x3dh_secret: &SymmetricKey) -> RatchetVector {
     let plaintext = b"vauchi test vector";
     let message = initiator.encrypt(plaintext).expect("encrypt");
     let send_chain_key_1 = send_chain_after(&initiator, 1);
-    let mut responder =
-        DoubleRatchetState::initialize_responder(x3dh_secret, X3DHKeyPair::from_bytes(seed(0x40)));
+    let mut responder = DoubleRatchetState::initialize_responder(
+        x3dh_secret,
+        X25519KeyPair::from_bytes(seed(0x40)),
+    );
     assert_eq!(
         responder.decrypt(&message).expect("decrypt"),
         plaintext.to_vec()
@@ -483,7 +485,7 @@ fn ratchet_vector_message_decrypts_on_a_fresh_responder() {
     assert_eq!(v.message.dh_public, v.initiator_dh_public);
 
     let x3dh_secret = SymmetricKey::from_bytes(hex32(&v.x3dh_secret));
-    let responder_dh = X3DHKeyPair::from_bytes(hex32(&v.responder_dh_secret));
+    let responder_dh = X25519KeyPair::from_bytes(hex32(&v.responder_dh_secret));
     let mut responder = DoubleRatchetState::initialize_responder(&x3dh_secret, responder_dh);
     let plaintext = responder.decrypt(&message).expect("decrypt");
     assert_eq!(hex::encode(plaintext), v.plaintext);

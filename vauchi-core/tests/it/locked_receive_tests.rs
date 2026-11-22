@@ -13,7 +13,7 @@ use vauchi_core::api::locked_receive::{LockedInboxItem, LockedReceipt, store_loc
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey};
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::identity::Identity;
 use vauchi_core::storage::{LockedReceiveStorage, RECEIVE_INBOX_CAPACITY, Storage, StorageError};
 
@@ -89,7 +89,7 @@ fn world_with_session_on(device: [u8; 32]) -> World {
     );
     storage.contacts().save_contact(&contact).unwrap();
     let secret = SymmetricKey::generate();
-    let ours = X3DHKeyPair::generate();
+    let ours = X25519KeyPair::generate();
     let theirs = DoubleRatchetState::initialize_initiator(&secret, *ours.public_key()).unwrap();
     storage
         .ratchets()
@@ -182,7 +182,7 @@ fn a_blob_no_session_opens_is_left_and_changes_nothing() {
     let mut world = world_with_session_on(SHARED);
     let (mut stranger, _) = {
         let secret = SymmetricKey::generate();
-        let other = X3DHKeyPair::generate();
+        let other = X25519KeyPair::generate();
         (
             DoubleRatchetState::initialize_initiator(&secret, *other.public_key()).unwrap(),
             other,

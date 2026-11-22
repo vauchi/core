@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use tempfile::TempDir;
-use vauchi_core::{Contact, ContactCard, Identity, SymmetricKey, exchange::X3DHKeyPair};
+use vauchi_core::{Contact, ContactCard, Identity, SymmetricKey, exchange::X25519KeyPair};
 use vauchi_platform::{
     DomainCommand, DomainCommandResult, MobileFieldType, MobileVisibilityLabel, PlatformAppEngine,
     PlatformAppEngineTestHelpers,
@@ -179,7 +179,7 @@ fn add_ratcheted_contact(engine: &PlatformAppEngine, name: &str) -> String {
     );
     let contact_id = contact.id().to_string();
     engine.save_test_contact(&contact).expect("save contact");
-    let their_dh = X3DHKeyPair::generate();
+    let their_dh = X25519KeyPair::generate();
     engine
         .create_test_ratchet_as_initiator(contact_id.clone(), &shared, *their_dh.public_key())
         .expect("create ratchet");

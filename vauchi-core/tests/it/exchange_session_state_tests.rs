@@ -29,7 +29,7 @@ fn bob_session() -> ExchangeSession {
 fn bob_after_key_agreement() -> ExchangeSession {
     let alice_qr = ExchangeQR::generate(
         &Identity::create("Alice", 0),
-        &X3DHKeyPair::generate(),
+        &X25519KeyPair::generate(),
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
     let mut bob = bob_session();

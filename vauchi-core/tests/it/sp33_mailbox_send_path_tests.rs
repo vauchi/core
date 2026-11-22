@@ -10,7 +10,7 @@
 //! that IdentityRevoked verification works correctly.
 
 use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey};
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::identity::Identity;
 use vauchi_core::network::mailbox_token::{
     compute_device_sync_token, compute_mailbox_token, current_day_epoch, token_hex,
@@ -29,7 +29,7 @@ fn create_test_config() -> RelayClientConfig {
 }
 
 fn create_test_ratchet() -> (DoubleRatchetState, DoubleRatchetState) {
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
     let alice =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();

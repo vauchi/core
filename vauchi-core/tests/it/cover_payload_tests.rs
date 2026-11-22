@@ -13,7 +13,8 @@ use vauchi_core::sync::delta::{
 };
 use vauchi_core::{
     Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi,
-    crypto::cek::ContentEncryptionKey, crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair,
+    crypto::cek::ContentEncryptionKey, crypto::ratchet::DoubleRatchetState,
+    exchange::X25519KeyPair,
 };
 
 /// Alice as the responder, Bob's initiator ratchet held by the test.
@@ -21,7 +22,7 @@ fn alice_receiving_from_bob() -> (Vauchi, String, Identity, DoubleRatchetState) 
     let mut alice = Vauchi::in_memory().unwrap();
     alice.create_identity("Alice").unwrap();
     let bob_identity = Identity::create("Bob", 0);
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
     let bob_contact = Contact::from_exchange(
         *bob_identity.signing_public_key(),
@@ -35,7 +36,7 @@ fn alice_receiving_from_bob() -> (Vauchi, String, Identity, DoubleRatchetState) 
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
+            X25519KeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
     let bob_ratchet =

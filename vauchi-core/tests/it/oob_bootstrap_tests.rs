@@ -14,14 +14,14 @@
 //! same QR), signature/expiry enforcement, and adversarial rejection (CC-14).
 
 use proptest::prelude::*;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::exchange::oob_bootstrap::{
     OOB_EXPIRY_SECONDS, OOB_NONCE_SIZE, OobBootstrapQr, derive_oob_nonce,
 };
 use vauchi_core::identity::Identity;
 
-fn displayer() -> (Identity, X3DHKeyPair) {
-    (Identity::create("Displayer", 0), X3DHKeyPair::generate())
+fn displayer() -> (Identity, X25519KeyPair) {
+    (Identity::create("Displayer", 0), X25519KeyPair::generate())
 }
 
 // @internal
@@ -201,7 +201,7 @@ proptest! {
         ts in 0u64..u64::MAX / 2,
     ) {
         let id = Identity::create("D", 0);
-        let eph = X3DHKeyPair::generate();
+        let eph = X25519KeyPair::generate();
         let qr = OobBootstrapQr::generate_with_timestamp(&id, &eph, token, ts);
         let parsed = OobBootstrapQr::from_data_string(&qr.to_data_string())
             .expect("roundtrip must parse");
@@ -216,7 +216,7 @@ proptest! {
 fn an_oob_qr_carries_its_time_and_the_nonce_derived_from_its_token() {
     let qr = OobBootstrapQr::generate_with_timestamp(
         &Identity::create("Alice", 0),
-        &X3DHKeyPair::generate(),
+        &X25519KeyPair::generate(),
         [0x42; 32],
         1_700_000_123,
     );

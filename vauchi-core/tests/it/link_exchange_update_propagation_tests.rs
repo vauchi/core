@@ -11,7 +11,7 @@
 
 use vauchi_core::Vauchi;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::exchange::key_order::is_initiator;
 use vauchi_core::exchange::link_mode::{LinkExchangeBinding, serialize_link_card_payload};
 
@@ -28,9 +28,9 @@ fn vauchi_with_identity(name: &str) -> Vauchi {
     v
 }
 
-fn link_payload(v: &Vauchi) -> (Vec<u8>, X3DHKeyPair) {
+fn link_payload(v: &Vauchi) -> (Vec<u8>, X25519KeyPair) {
     let identity = v.identity().expect("identity exists");
-    let x3dh = X3DHKeyPair::generate();
+    let x3dh = X25519KeyPair::generate();
     let card = ContactCard::new(identity.display_name());
     let payload = serialize_link_card_payload(
         identity.signing_keypair(),

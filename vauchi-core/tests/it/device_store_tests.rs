@@ -14,7 +14,7 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::DoubleRatchetState;
 use vauchi_core::identity::{DeviceInfo, DeviceRegistry, RegistryBroadcast};
-use vauchi_core::{DeviceStore, SigningKeyPair, Storage, SymmetricKey, X3DHKeyPair};
+use vauchi_core::{DeviceStore, SigningKeyPair, Storage, SymmetricKey, X25519KeyPair};
 
 fn test_storage() -> Storage {
     Storage::in_memory(SymmetricKey::generate()).unwrap()
@@ -168,7 +168,7 @@ fn test_contact_device_registry_accepts_only_newer_identity_signed_broadcasts() 
     let revoked_id = *second.device_id();
     let ratchet = DoubleRatchetState::initialize_initiator(
         &SymmetricKey::generate(),
-        *X3DHKeyPair::generate().public_key(),
+        *X25519KeyPair::generate().public_key(),
     )
     .unwrap();
     storage
@@ -302,7 +302,7 @@ fn test_contact_device_registry_prune_failure_rolls_back_registry() {
 
     let ratchet = DoubleRatchetState::initialize_initiator(
         &SymmetricKey::generate(),
-        *X3DHKeyPair::generate().public_key(),
+        *X25519KeyPair::generate().public_key(),
     )
     .unwrap();
     storage

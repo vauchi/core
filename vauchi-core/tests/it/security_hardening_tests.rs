@@ -19,7 +19,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use vauchi_core::Identity;
 use vauchi_core::crypto::{SigningKeyPair, SymmetricKey, derive_key_argon2id};
 use vauchi_core::exchange::{
-    ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession, MockProximityVerifier, X3DHKeyPair,
+    ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession, MockProximityVerifier, X25519KeyPair,
 };
 use vauchi_core::storage::Storage;
 
@@ -115,7 +115,7 @@ fn test_brute_force_rate_calculation() {
 #[test]
 fn test_qr_screenshot_attack_prevention() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     // Generate QR with timestamp in the past (6 minutes ago = expired)
     let six_minutes_ago = SystemTime::now()
@@ -147,7 +147,7 @@ fn test_qr_screenshot_attack_prevention() {
 #[test]
 fn test_expired_qr_rejected_in_session() {
     let alice_identity = Identity::create("Alice", 0);
-    let alice_ephemeral = X3DHKeyPair::generate();
+    let alice_ephemeral = X25519KeyPair::generate();
 
     // Alice generates QR (with timestamp 6 minutes ago = expired)
     let six_minutes_ago = SystemTime::now()
@@ -575,7 +575,7 @@ fn test_kdf_no_intermediate_leakage() {
 #[test]
 fn test_exchange_token_randomness() {
     let identity = Identity::create("Test", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let qr1 = ExchangeQR::generate(
         &identity,
@@ -616,7 +616,7 @@ fn test_exchange_token_randomness() {
 #[test]
 fn test_audio_challenge_randomness() {
     let identity = Identity::create("Test", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let qr1 = ExchangeQR::generate(
         &identity,
@@ -641,7 +641,7 @@ fn test_audio_challenge_randomness() {
 #[test]
 fn test_qr_signature_prevents_tampering() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
     let qr = ExchangeQR::generate(
         &identity,
         &ephemeral,

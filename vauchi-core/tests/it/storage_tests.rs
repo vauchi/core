@@ -241,7 +241,7 @@ fn test_storage_update_status() {
 fn test_storage_save_load_ratchet_state() {
     use vauchi_core::crypto::SymmetricKey;
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
 
     let storage = create_test_storage();
     let contact = create_test_contact("Alice");
@@ -249,7 +249,7 @@ fn test_storage_save_load_ratchet_state() {
 
     // Create ratchet state (as initiator)
     let shared_secret = SymmetricKey::generate();
-    let their_dh = X3DHKeyPair::generate();
+    let their_dh = X25519KeyPair::generate();
     let ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key()).unwrap();
 
@@ -274,19 +274,19 @@ fn test_storage_save_load_ratchet_state() {
 fn ratchet_states_are_isolated_by_peer_device_id() {
     use vauchi_core::crypto::SymmetricKey;
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
 
     let storage = create_test_storage();
     let contact = create_test_contact("Alice");
     storage.contacts().save_contact(&contact).unwrap();
 
     let first_secret = SymmetricKey::generate();
-    let first_dh = X3DHKeyPair::generate();
+    let first_dh = X25519KeyPair::generate();
     let first =
         DoubleRatchetState::initialize_initiator(&first_secret, *first_dh.public_key()).unwrap();
 
     let second_secret = SymmetricKey::generate();
-    let second_dh = X3DHKeyPair::generate();
+    let second_dh = X25519KeyPair::generate();
     let second =
         DoubleRatchetState::initialize_initiator(&second_secret, *second_dh.public_key()).unwrap();
     let first_device_id = [1; 32];
@@ -344,14 +344,14 @@ fn ratchet_states_are_isolated_by_peer_device_id() {
 fn test_storage_ratchet_state_encryption() {
     use vauchi_core::crypto::SymmetricKey;
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
 
     let storage = create_test_storage();
     let contact = create_test_contact("Alice");
     storage.contacts().save_contact(&contact).unwrap();
 
     let shared_secret = SymmetricKey::generate();
-    let their_dh = X3DHKeyPair::generate();
+    let their_dh = X25519KeyPair::generate();
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key()).unwrap();
 
@@ -376,7 +376,7 @@ fn test_storage_ratchet_state_encryption() {
 fn test_storage_ratchet_deleted_with_contact() {
     use vauchi_core::crypto::SymmetricKey;
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
 
     let storage = create_test_storage();
     let contact = create_test_contact("Alice");
@@ -384,7 +384,7 @@ fn test_storage_ratchet_deleted_with_contact() {
     storage.contacts().save_contact(&contact).unwrap();
 
     let shared_secret = SymmetricKey::generate();
-    let their_dh = X3DHKeyPair::generate();
+    let their_dh = X25519KeyPair::generate();
     let ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key()).unwrap();
 
@@ -432,7 +432,7 @@ fn test_storage_ratchet_not_found() {
 fn test_storage_ratchet_per_contact_key_isolation() {
     use vauchi_core::crypto::SymmetricKey;
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
 
     let storage = create_test_storage();
 
@@ -453,7 +453,7 @@ fn test_storage_ratchet_per_contact_key_isolation() {
     storage.contacts().save_contact(&bob).unwrap();
 
     let secret_a = SymmetricKey::generate();
-    let dh_a = X3DHKeyPair::generate();
+    let dh_a = X25519KeyPair::generate();
     let ratchet_a =
         DoubleRatchetState::initialize_initiator(&secret_a, *dh_a.public_key()).unwrap();
     storage
@@ -462,7 +462,7 @@ fn test_storage_ratchet_per_contact_key_isolation() {
         .unwrap();
 
     let secret_b = SymmetricKey::generate();
-    let dh_b = X3DHKeyPair::generate();
+    let dh_b = X25519KeyPair::generate();
     let ratchet_b =
         DoubleRatchetState::initialize_initiator(&secret_b, *dh_b.public_key()).unwrap();
     storage

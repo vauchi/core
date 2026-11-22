@@ -8,7 +8,7 @@
 
 use vauchi_core::api::Vauchi;
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::{Contact, ContactCard, ContactField, FieldType};
 
 use crate::common::helpers::create_vauchi_with_identity;
@@ -36,7 +36,7 @@ fn fresh_exchange() -> FreshExchange {
     let alice_at_bob = alice_contact.id().to_string();
     bob.add_contact(alice_contact).unwrap();
 
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     alice
         .create_ratchet_as_initiator(&bob_at_alice, &shared, *bob_dh.public_key())
         .unwrap();

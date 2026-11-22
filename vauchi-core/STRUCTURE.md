@@ -43,12 +43,20 @@ Low-level cryptographic operations using RustCrypto crates.
 
 | File | Purpose |
 |------|---------|
-| `signing.rs` | Ed25519 signatures (`SigningKey`, `VerifyingKey`) |
+| `signing.rs` | Ed25519 signatures (`SigningKeyPair`, `PublicKey`, `Signature`) |
+| `x25519.rs` | X25519 key pair and Diffie-Hellman (`X25519KeyPair`) |
 | `encryption.rs` | XChaCha20-Poly1305 encryption (`SymmetricKey`) |
-| `key_exchange.rs` | X25519 key agreement (`ExchangeKey`) |
-| `kdf.rs` | HKDF key derivation |
-| `chain.rs` | Symmetric ratchet chain |
-| `ratchet.rs` | Double Ratchet implementation |
+| `hkdf.rs` | HKDF key derivation (`HKDF`) |
+| `password_kdf.rs` | Argon2id key derivation from a password |
+| `random.rs` | Random bytes from the operating system |
+| `chain.rs` | Symmetric ratchet chain (`ChainKey`, `MessageKey`) |
+| `ratchet.rs` | Double Ratchet (`DoubleRatchetState`) |
+| `cek.rs` | Per-contact content encryption key |
+| `shredding.rs` | Shredding master key and the keys derived from it |
+| `shamir.rs`, `shamir_proofs.rs` | Shamir secret sharing and its Kani proofs |
+| `padding.rs`, `padding_proofs.rs` | Fixed-size message padding and its Kani proofs |
+| `pinning.rs` | Certificate pin verification (SPKI SHA-256) |
+| `ohttp_key_trust.rs` | Verification of fetched OHTTP gateway keys |
 
 ### `identity/` - Identity Management
 
@@ -75,7 +83,7 @@ Protocols for exchanging keys with new contacts.
 
 | File | Purpose |
 |------|---------|
-| `x3dh.rs` | X3DH key agreement (`X3DHKeyPair`, `X3DHBundle`) |
+| `x3dh.rs` | X3DH key agreement on `crypto::X25519KeyPair` |
 | `qr.rs` | QR code generation and parsing |
 | `ble.rs` | Bluetooth LE exchange (placeholder) |
 | `proximity.rs` | Proximity detection helpers |

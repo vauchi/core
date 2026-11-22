@@ -21,7 +21,7 @@ fn alice_with_friend() -> (Vauchi, String) {
     );
     let friend_id = friend.id().to_string();
     wb.add_contact(friend).unwrap();
-    let dh = vauchi_core::exchange::X3DHKeyPair::generate();
+    let dh = vauchi_core::exchange::X25519KeyPair::generate();
     wb.create_ratchet_as_initiator(
         &friend_id,
         &vauchi_core::crypto::SymmetricKey::generate(),

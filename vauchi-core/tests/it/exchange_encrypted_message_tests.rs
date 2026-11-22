@@ -11,8 +11,8 @@ use vauchi_core::exchange::*;
 // @internal
 #[test]
 fn test_encrypted_message_basic_roundtrip() {
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     let alice_identity_key = [0x41u8; 32];
     let alice_name = "Alice";
@@ -33,8 +33,8 @@ fn test_encrypted_message_basic_roundtrip() {
 // @internal
 #[test]
 fn test_encrypted_message_contains_sender_exchange_key() {
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     let (msg, _) =
         EncryptedExchangeMessage::create(&alice, bob.public_key(), &[0x01u8; 32], "Alice").unwrap();
@@ -51,8 +51,8 @@ fn test_encrypted_message_contains_sender_exchange_key() {
 // @internal
 #[test]
 fn test_encrypted_message_roundtrip_with_identity_binding() {
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     let alice_identity = [0x02u8; 32];
     let (msg, alice_secret) =
@@ -77,8 +77,8 @@ fn test_encrypted_message_roundtrip_with_identity_binding() {
 // @internal
 #[test]
 fn test_encrypted_message_serialization_preserves_exchange_key() {
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     let (original, _) =
         EncryptedExchangeMessage::create(&alice, bob.public_key(), &[0x03u8; 32], "Test").unwrap();

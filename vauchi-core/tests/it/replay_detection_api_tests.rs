@@ -12,7 +12,7 @@ use vauchi_core::{
     api::process_single_card_update,
     crypto::cek::ContentEncryptionKey,
     crypto::ratchet::DoubleRatchetState,
-    exchange::X3DHKeyPair,
+    exchange::X25519KeyPair,
     sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload},
 };
 
@@ -23,7 +23,7 @@ fn setup_alice_receiving_from_bob() -> (Vauchi, String, Identity, DoubleRatchetS
     alice.create_identity("Alice").unwrap();
 
     let bob_identity = Identity::create("Bob", 0);
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 
     let bob_contact = Contact::from_exchange(
@@ -40,7 +40,7 @@ fn setup_alice_receiving_from_bob() -> (Vauchi, String, Identity, DoubleRatchetS
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
+            X25519KeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
 

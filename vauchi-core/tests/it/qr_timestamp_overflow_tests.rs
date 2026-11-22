@@ -7,7 +7,7 @@
 //! Release builds keep overflow checks and abort on panic
 //! (vauchi/private#795).
 
-use vauchi_core::crypto::X3DHKeyPair;
+use vauchi_core::crypto::X25519KeyPair;
 use vauchi_core::exchange::{
     DeviceLinkQR, DeviceLinkResponder, ExchangeError, ExchangeQR, check_clock_drift,
 };
@@ -55,7 +55,7 @@ fn a_fresh_link_qr_is_still_joinable() {
 // @internal
 #[test]
 fn an_exchange_qr_timestamped_at_the_top_of_u64_counts_as_expired() {
-    let qr = ExchangeQR::generate_with_timestamp(&alice(), &X3DHKeyPair::generate(), FAR_FUTURE);
+    let qr = ExchangeQR::generate_with_timestamp(&alice(), &X25519KeyPair::generate(), FAR_FUTURE);
 
     assert!(qr.is_expired(NOW));
 }

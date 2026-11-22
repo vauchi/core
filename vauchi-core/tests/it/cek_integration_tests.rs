@@ -13,7 +13,7 @@ use vauchi_core::api::*;
 use vauchi_core::contact_card::FieldType;
 use vauchi_core::crypto::cek::ContentEncryptionKey;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
 use vauchi_core::*;
 
@@ -23,12 +23,12 @@ fn create_test_vauchi() -> Vauchi {
 
 /// Helper: create Alice with identity and a contact Bob with an established ratchet.
 /// Returns (alice_vauchi, bob_contact_id, bob_identity, bob_dh_keypair, shared_secret).
-fn setup_alice_with_bob_ratchet() -> (Vauchi, String, Identity, X3DHKeyPair, SymmetricKey) {
+fn setup_alice_with_bob_ratchet() -> (Vauchi, String, Identity, X25519KeyPair, SymmetricKey) {
     let mut alice = create_test_vauchi();
     alice.create_identity("Alice").unwrap();
 
     let bob_identity = Identity::create("Bob", 0);
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 
     let contact = Contact::from_exchange(
@@ -45,7 +45,7 @@ fn setup_alice_with_bob_ratchet() -> (Vauchi, String, Identity, X3DHKeyPair, Sym
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
+            X25519KeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
 
@@ -68,7 +68,7 @@ fn setup_alice_as_sender_to_bob() -> (Vauchi, String) {
     alice.add_contact(contact).unwrap();
 
     let shared_secret = SymmetricKey::generate();
-    let their_dh = X3DHKeyPair::generate();
+    let their_dh = X25519KeyPair::generate();
     alice
         .create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key())
         .unwrap();
@@ -439,7 +439,7 @@ fn test_cek_wrapped_forged_signature_rejected() {
 #[test]
 fn test_cek_wrapped_end_to_end_flow() {
     let shared_secret = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     // Alice's side — create identity first to get actual keys
     let mut alice = create_test_vauchi();
@@ -487,7 +487,7 @@ fn test_cek_wrapped_end_to_end_flow() {
     bob.create_ratchet_as_responder(
         &alice_id,
         &shared_secret,
-        X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
+        X25519KeyPair::from_bytes(*bob_dh.secret_bytes()),
     )
     .unwrap();
 

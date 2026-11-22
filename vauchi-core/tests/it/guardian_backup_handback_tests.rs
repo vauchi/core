@@ -15,7 +15,7 @@ use vauchi_core::api::process_single_card_update;
 use vauchi_core::clock::FakeClock;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::recovery::RecoveryClaim;
 use vauchi_core::sync::guardian_piece::GuardianDelivery;
 use vauchi_core::{AuthMode, SymmetricKey, Vauchi, VauchiError};
@@ -36,7 +36,7 @@ fn exchange(a: &Vauchi, b: &Vauchi) -> (String, String) {
     let (b_id, a_id) = (b_at_a.id().to_string(), a_at_b.id().to_string());
     a.add_contact(b_at_a).unwrap();
     b.add_contact(a_at_b).unwrap();
-    let b_dh = X3DHKeyPair::generate();
+    let b_dh = X25519KeyPair::generate();
     a.create_ratchet_as_initiator(&b_id, &shared, *b_dh.public_key())
         .unwrap();
     b.create_ratchet_as_responder(&a_id, &shared, b_dh).unwrap();

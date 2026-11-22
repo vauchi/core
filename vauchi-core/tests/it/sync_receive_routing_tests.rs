@@ -24,7 +24,7 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::cek::ContentEncryptionKey;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::exchange::reciprocity::{ConfirmationChannel, Reciprocity};
 use vauchi_core::exchange::reciprocity_tokens::derive_confirmation_tokens;
 use vauchi_core::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
@@ -1046,7 +1046,7 @@ fn origin_hint_routes_a_secondary_device_delta_the_legacy_path_drops() {
     // Establish a secondary-device (A2) ratchet pair, distinct from the [0;32]
     // primary link_contacts set up: Bob-A2 initiator, Alice responder.
     let device_a2 = [7u8; 32];
-    let alice_dh = X3DHKeyPair::generate();
+    let alice_dh = X25519KeyPair::generate();
     let mut bob_a2 =
         DoubleRatchetState::initialize_initiator(&link.shared_secret, *alice_dh.public_key())
             .unwrap();

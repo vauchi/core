@@ -10,7 +10,7 @@
 use proptest::prelude::*;
 use vauchi_core::api::{AuthMode, ReceiveOutcome, process_single_card_update};
 use vauchi_core::crypto::{RatchetMessage, SymmetricKey};
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::{Contact, ContactCard, ContactField, FieldType, Vauchi};
 
 use crate::common::helpers::create_vauchi_with_identity;
@@ -35,7 +35,7 @@ fn world(credential: &str, expected_mode: AuthMode) -> World {
         .unwrap();
     let bob = create_vauchi_with_identity("Bob");
     let shared = SymmetricKey::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
 
     let bob_contact = Contact::from_exchange(
         *bob.identity().unwrap().signing_public_key(),

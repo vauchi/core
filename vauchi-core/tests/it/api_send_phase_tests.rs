@@ -8,7 +8,7 @@
 use std::sync::Arc;
 use vauchi_core::api::*;
 use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey};
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::identity::RegistryBroadcast;
 use vauchi_core::network::anonymous::{
     compute_anonymous_id, compute_anonymous_id_for_device, current_epoch,
@@ -538,7 +538,7 @@ fn test_sync_send_clears_pending_update_on_relay_accept() {
         .unwrap();
 
     // Role-correct ratchet + a queued update carrying a real ratchet message.
-    let peer_dh = X3DHKeyPair::generate();
+    let peer_dh = X25519KeyPair::generate();
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(&shared, *peer_dh.public_key()).unwrap();
     let msg = ratchet.encrypt(b"card-delta").unwrap();
@@ -650,7 +650,7 @@ fn test_sync_send_does_not_downgrade_modern_peer_without_local_device_info() {
         )
         .unwrap();
 
-    let peer_dh = X3DHKeyPair::generate();
+    let peer_dh = X25519KeyPair::generate();
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(&shared, *peer_dh.public_key()).unwrap();
     let message = ratchet.encrypt(b"device-scoped update").unwrap();
@@ -769,7 +769,7 @@ fn queue_ratchet_update(
     target_device_id: Option<[u8; 32]>,
 ) {
     use vauchi_core::storage::{PendingUpdate, UpdateStatus};
-    let peer_dh = X3DHKeyPair::generate();
+    let peer_dh = X25519KeyPair::generate();
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(shared, *peer_dh.public_key()).unwrap();
     let msg = ratchet.encrypt(b"payload").unwrap();
@@ -1018,7 +1018,7 @@ fn sync_contact_counts_every_update_the_relay_accepts() {
         .device()
         .save_device_info(&[0x55; 32], 0, "Local", 0)
         .unwrap();
-    let peer_dh = X3DHKeyPair::generate();
+    let peer_dh = X25519KeyPair::generate();
     let ratchet = DoubleRatchetState::initialize_initiator(&shared, *peer_dh.public_key()).unwrap();
     storage
         .ratchets()

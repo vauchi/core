@@ -19,7 +19,7 @@ use vauchi_core::api::{CardUpdateError, ReceiveOutcome, process_single_card_upda
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::sync::delta::{ReciprocityConfirmPayload, VersionedPayload};
 
 /// Two mutual contacts with ratchets stored: Bob is the initiator (can
@@ -47,7 +47,7 @@ fn setup_two_party() -> (vauchi_core::Vauchi, vauchi_core::Vauchi, String, Strin
     let alice_contact_id = alice_contact.id().to_string();
     bob_wb.add_contact(alice_contact).unwrap();
 
-    let alice_dh = X3DHKeyPair::generate();
+    let alice_dh = X25519KeyPair::generate();
     let bob_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *alice_dh.public_key()).unwrap();
     let alice_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, alice_dh);

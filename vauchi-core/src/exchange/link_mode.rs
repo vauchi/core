@@ -24,7 +24,7 @@ use crate::card::ContactCard;
 use crate::crypto::encryption::SymmetricKey;
 use crate::crypto::hkdf::HKDF;
 use crate::crypto::signing::{Signature, SigningKeyPair, verify_signature};
-use crate::crypto::x25519::X3DHKeyPair;
+use crate::crypto::x25519::X25519KeyPair;
 use crate::exchange::escrow::{EscrowKeys, EscrowRole};
 use crate::exchange::link_pake::{LINK_PAKE_MESSAGE_LEN, LinkCode, LinkPake, LinkPakeError};
 use crate::platform::Command;
@@ -729,7 +729,7 @@ pub fn parse_link_card_payload(
 /// Both sides derive the **same** key (X25519 DH is commutative), so the
 /// resulting `ExchangedData.shared_key` is symmetric.
 pub fn derive_link_shared_key(
-    our_x3dh: &X3DHKeyPair,
+    our_x3dh: &X25519KeyPair,
     their_x3dh_public: &[u8; 32],
 ) -> Result<SymmetricKey, LinkModeError> {
     let shared = our_x3dh

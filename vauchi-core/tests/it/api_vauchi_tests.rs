@@ -350,7 +350,7 @@ fn test_vauchi_builder_with_identity() {
 // @internal
 #[test]
 fn test_propagate_card_update_to_contacts() {
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
 
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
@@ -366,7 +366,7 @@ fn test_propagate_card_update_to_contacts() {
     wb.add_contact(contact).unwrap();
 
     let shared_secret = SymmetricKey::generate();
-    let their_dh = X3DHKeyPair::generate();
+    let their_dh = X25519KeyPair::generate();
     wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key())
         .unwrap();
 
@@ -423,7 +423,7 @@ fn test_propagate_skips_contacts_without_ratchet() {
 // @internal
 #[test]
 fn test_propagate_empty_delta_not_queued() {
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
 
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
@@ -438,7 +438,7 @@ fn test_propagate_empty_delta_not_queued() {
     wb.add_contact(contact).unwrap();
 
     let shared_secret = SymmetricKey::generate();
-    let their_dh = X3DHKeyPair::generate();
+    let their_dh = X25519KeyPair::generate();
     wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key())
         .unwrap();
 
@@ -458,7 +458,7 @@ fn test_propagate_empty_delta_not_queued() {
 // @internal
 #[test]
 fn test_propagate_respects_visibility_rules() {
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
 
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
@@ -482,7 +482,7 @@ fn test_propagate_respects_visibility_rules() {
     wb.add_contact(contact).unwrap();
 
     let shared_secret = SymmetricKey::generate();
-    let their_dh = X3DHKeyPair::generate();
+    let their_dh = X25519KeyPair::generate();
     wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key())
         .unwrap();
 
@@ -503,7 +503,7 @@ fn test_propagate_respects_visibility_rules() {
 // @internal
 #[test]
 fn test_propagate_partial_visibility() {
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
 
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
@@ -528,7 +528,7 @@ fn test_propagate_partial_visibility() {
     wb.add_contact(contact).unwrap();
 
     let shared_secret = SymmetricKey::generate();
-    let their_dh = X3DHKeyPair::generate();
+    let their_dh = X25519KeyPair::generate();
     wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key())
         .unwrap();
 
@@ -561,14 +561,14 @@ fn test_process_incoming_card_update() {
     use vauchi_core::Identity;
     use vauchi_core::crypto::cek::ContentEncryptionKey;
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
     use vauchi_core::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
 
     let mut alice_wb = create_test_vauchi();
     alice_wb.create_identity("Alice").unwrap();
 
     let bob_identity = Identity::create("Bob", 0);
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 
     let contact = Contact::from_exchange(
@@ -585,7 +585,7 @@ fn test_process_incoming_card_update() {
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
+            X25519KeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
 
@@ -640,14 +640,14 @@ fn test_crypto_hardening_process_incoming_card_update_zero_cek_returns_error() {
 
     use vauchi_core::Identity;
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
     use vauchi_core::sync::delta::{CekWrappedPayload, VersionedPayload};
 
     let mut alice_wb = create_test_vauchi();
     alice_wb.create_identity("Alice").unwrap();
 
     let bob_identity = Identity::create("Bob", 0);
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
     let contact = Contact::from_exchange(
         *bob_identity.signing_public_key(),
@@ -661,7 +661,7 @@ fn test_crypto_hardening_process_incoming_card_update_zero_cek_returns_error() {
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
+            X25519KeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
 
@@ -842,14 +842,14 @@ fn test_process_update_rejects_invalid_signature() {
     use vauchi_core::Identity;
     use vauchi_core::crypto::cek::ContentEncryptionKey;
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
     use vauchi_core::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
 
     let mut alice_wb = create_test_vauchi();
     alice_wb.create_identity("Alice").unwrap();
 
     let bob_identity = Identity::create("Bob", 0);
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 
     let contact = Contact::from_exchange(
@@ -865,7 +865,7 @@ fn test_process_update_rejects_invalid_signature() {
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
+            X25519KeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
 
@@ -918,7 +918,7 @@ fn test_process_card_update_truncated_message() {
     alice_wb.create_identity("Alice").unwrap();
 
     let bob_identity = Identity::create("Bob", 0);
-    let bob_dh = vauchi_core::exchange::X3DHKeyPair::generate();
+    let bob_dh = vauchi_core::exchange::X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 
     let contact = Contact::from_exchange(
@@ -933,7 +933,7 @@ fn test_process_card_update_truncated_message() {
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            vauchi_core::exchange::X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
+            vauchi_core::exchange::X25519KeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
 
@@ -954,7 +954,7 @@ fn test_process_card_update_empty_payload() {
     alice_wb.create_identity("Alice").unwrap();
 
     let bob_identity = Identity::create("Bob", 0);
-    let bob_dh = vauchi_core::exchange::X3DHKeyPair::generate();
+    let bob_dh = vauchi_core::exchange::X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 
     let contact = Contact::from_exchange(
@@ -969,7 +969,7 @@ fn test_process_card_update_empty_payload() {
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            vauchi_core::exchange::X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
+            vauchi_core::exchange::X25519KeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
 
@@ -991,7 +991,7 @@ fn test_process_card_update_malformed_json_in_ratchet() {
     alice_wb.create_identity("Alice").unwrap();
 
     let bob_identity = Identity::create("Bob", 0);
-    let bob_dh = vauchi_core::exchange::X3DHKeyPair::generate();
+    let bob_dh = vauchi_core::exchange::X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 
     let contact = Contact::from_exchange(
@@ -1006,7 +1006,7 @@ fn test_process_card_update_malformed_json_in_ratchet() {
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            vauchi_core::exchange::X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
+            vauchi_core::exchange::X25519KeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
 

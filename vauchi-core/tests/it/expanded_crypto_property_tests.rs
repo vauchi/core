@@ -13,7 +13,7 @@
 use proptest::prelude::*;
 
 use vauchi_core::crypto::{DoubleRatchetState, HKDF, SymmetricKey, derive_key_argon2id};
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::identity::Identity;
 use vauchi_core::network::{
     AckStatus, Acknowledgment, DeletionStage, EncryptedUpdate, Handshake, IdentityDeletionNotice,
@@ -676,7 +676,7 @@ proptest! {
         message_count in 3usize..8
     ) {
         let shared_secret = SymmetricKey::from_bytes(seed);
-        let bob_dh = X3DHKeyPair::generate();
+        let bob_dh = X25519KeyPair::generate();
 
         let mut alice_ratchet =
             DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -725,7 +725,7 @@ proptest! {
     ) {
         let total = total_count.max(skip_count + 2);
         let shared_secret = SymmetricKey::from_bytes(seed);
-        let bob_dh = X3DHKeyPair::generate();
+        let bob_dh = X25519KeyPair::generate();
 
         let mut alice_ratchet =
             DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -775,7 +775,7 @@ proptest! {
         seed in bytes32_strategy()
     ) {
         let shared_secret = SymmetricKey::from_bytes(seed);
-        let bob_dh = X3DHKeyPair::generate();
+        let bob_dh = X25519KeyPair::generate();
 
         let mut alice_ratchet =
             DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();

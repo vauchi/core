@@ -24,7 +24,7 @@ fn world_with_visible_field() -> (Vauchi, String, String) {
     let contact = Contact::from_exchange([9u8; 32], ContactCard::new("Bob"), shared.clone(), 0);
     let bob = contact.id().to_string();
     wb.add_contact(contact).unwrap();
-    let their_dh = vauchi_core::exchange::X3DHKeyPair::generate();
+    let their_dh = vauchi_core::exchange::X25519KeyPair::generate();
     wb.create_ratchet_as_initiator(&bob, &shared, *their_dh.public_key())
         .unwrap();
     (wb, bob, field_id)

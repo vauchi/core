@@ -989,7 +989,7 @@ fn test_full_duress_flow_sends_nothing() {
     let trusted_id = trusted_contact.id().to_string();
     wb.add_contact(trusted_contact).unwrap();
     let (ratchet, is_initiator) = {
-        let dh = vauchi_core::exchange::X3DHKeyPair::generate();
+        let dh = vauchi_core::exchange::X25519KeyPair::generate();
         let r = vauchi_core::crypto::ratchet::DoubleRatchetState::initialize_initiator(
             &vauchi_core::crypto::SymmetricKey::generate(),
             *dh.public_key(),

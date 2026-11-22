@@ -20,7 +20,7 @@ use vauchi_core::api::{ReceiveOutcome, process_single_card_update};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::identity::RegistryBroadcast;
 use vauchi_core::sync::delta::VersionedPayload;
 use vauchi_core::sync::registry_activation::{
@@ -49,7 +49,7 @@ fn setup_two_party() -> (vauchi_core::Vauchi, vauchi_core::Vauchi, String, Strin
     let alice_contact_id = alice_contact.id().to_string();
     bob_wb.add_contact(alice_contact).unwrap();
 
-    let alice_dh = X3DHKeyPair::generate();
+    let alice_dh = X25519KeyPair::generate();
     let bob_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *alice_dh.public_key()).unwrap();
     let alice_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, alice_dh);
@@ -462,7 +462,7 @@ fn device_session_decrypt_failure_demotes_activation_and_drops_the_session() {
         .save_activation(&bob_contact_id, &tracker)
         .unwrap();
     let unrelated = SymmetricKey::generate();
-    let dh = X3DHKeyPair::generate();
+    let dh = X25519KeyPair::generate();
     let alice_side = DoubleRatchetState::initialize_responder(&unrelated, dh);
     alice_wb
         .storage()
@@ -472,7 +472,7 @@ fn device_session_decrypt_failure_demotes_activation_and_drops_the_session() {
 
     // Bob's send rides a chain Alice's stored session does not match.
     let divergent = SymmetricKey::generate();
-    let other_dh = X3DHKeyPair::generate();
+    let other_dh = X25519KeyPair::generate();
     let mut bob_side =
         DoubleRatchetState::initialize_initiator(&divergent, *other_dh.public_key()).unwrap();
     let blob = serde_json::to_vec(&bob_side.encrypt(b"card bytes").unwrap()).unwrap();

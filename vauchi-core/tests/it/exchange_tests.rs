@@ -7,7 +7,7 @@
 //! These tests are written FIRST (RED phase) before implementation.
 
 use vauchi_core::Identity;
-use vauchi_core::exchange::{ExchangeQR, X3DH, X3DHKeyPair};
+use vauchi_core::exchange::{ExchangeQR, X3DH, X25519KeyPair};
 
 // =============================================================================
 // X3DH Key Agreement Tests
@@ -19,8 +19,8 @@ use vauchi_core::exchange::{ExchangeQR, X3DH, X3DHKeyPair};
 // @internal
 #[test]
 fn test_x3dh_key_agreement_produces_same_secret() {
-    let alice_keys = X3DHKeyPair::generate();
-    let bob_keys = X3DHKeyPair::generate();
+    let alice_keys = X25519KeyPair::generate();
+    let bob_keys = X25519KeyPair::generate();
 
     let (alice_secret, alice_ephemeral_public) =
         X3DH::initiate(&alice_keys, bob_keys.public_key()).expect("Key agreement should succeed");
@@ -37,9 +37,9 @@ fn test_x3dh_key_agreement_produces_same_secret() {
 // @internal
 #[test]
 fn test_x3dh_different_keys_different_secrets() {
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
-    let charlie = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
+    let charlie = X25519KeyPair::generate();
 
     let (alice_bob_secret, _alice_ephemeral) = X3DH::initiate(&alice, bob.public_key()).unwrap();
 
@@ -53,8 +53,8 @@ fn test_x3dh_different_keys_different_secrets() {
 // @internal
 #[test]
 fn test_x3dh_ephemeral_keys_unique_per_session() {
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     let (_, ephemeral1) = X3DH::initiate(&alice, bob.public_key()).unwrap();
     let (_, ephemeral2) = X3DH::initiate(&alice, bob.public_key()).unwrap();
@@ -70,8 +70,8 @@ fn test_x3dh_ephemeral_keys_unique_per_session() {
 fn test_x3dh_shared_secret_usable_for_encryption() {
     use vauchi_core::crypto::{decrypt, encrypt};
 
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     let (alice_secret, ephemeral) = X3DH::initiate(&alice, bob.public_key()).unwrap();
     let bob_secret = X3DH::respond(&bob, alice.public_key(), &ephemeral).unwrap();
@@ -92,7 +92,7 @@ fn test_x3dh_shared_secret_usable_for_encryption() {
 #[test]
 fn test_generate_qr_contains_public_key() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
     let qr = ExchangeQR::generate(
         &identity,
         &ephemeral,
@@ -108,7 +108,7 @@ fn test_generate_qr_contains_public_key() {
 #[test]
 fn test_qr_roundtrip_encode_decode() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
     let original = ExchangeQR::generate(
         &identity,
         &ephemeral,
@@ -128,7 +128,7 @@ fn test_qr_roundtrip_encode_decode() {
 #[test]
 fn test_qr_expires_after_5_minutes() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
     let qr = ExchangeQR::generate(
         &identity,
         &ephemeral,
@@ -156,7 +156,7 @@ fn test_qr_expires_after_5_minutes() {
 #[test]
 fn test_qr_signature_verification() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
     let qr = ExchangeQR::generate(
         &identity,
         &ephemeral,
@@ -265,8 +265,8 @@ use vauchi_core::exchange::EncryptedExchangeMessage;
 #[test]
 fn test_exchange_message_is_encrypted_not_plaintext() {
     // Given Alice and Bob want to exchange contacts
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     // When Alice creates an encrypted exchange message
     let alice_identity_key = [0x41u8; 32]; // Alice's signing key
@@ -306,8 +306,8 @@ fn test_exchange_message_is_encrypted_not_plaintext() {
 #[test]
 fn test_exchange_message_recipient_can_decrypt() {
     // Given Alice creates an encrypted exchange message for Bob
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     let alice_identity_key = [0x42u8; 32];
     let alice_display_name = "Alice Johnson";
@@ -336,9 +336,9 @@ fn test_exchange_message_recipient_can_decrypt() {
 #[test]
 fn test_exchange_message_wrong_key_fails_decrypt() {
     // Given Alice creates an encrypted exchange message for Bob
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
-    let charlie = X3DHKeyPair::generate(); // Attacker
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
+    let charlie = X25519KeyPair::generate(); // Attacker
 
     let alice_identity_key = [0x43u8; 32];
     let alice_display_name = "Alice";
@@ -365,8 +365,8 @@ fn test_exchange_message_wrong_key_fails_decrypt() {
 // @internal
 #[test]
 fn test_relay_cannot_read_exchange_message() {
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     let sensitive_name = "John Doe - CEO of SecretCorp";
     let identity_key = [0x44u8; 32];
@@ -400,8 +400,8 @@ fn test_relay_cannot_read_exchange_message() {
 // @internal
 #[test]
 fn test_encrypted_exchange_message_roundtrip() {
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     let (original, _) =
         EncryptedExchangeMessage::create(&alice, bob.public_key(), &[0x45u8; 32], "Test User")
@@ -419,7 +419,7 @@ fn test_encrypted_exchange_message_roundtrip() {
 #[test]
 fn a_ble_payload_keeps_the_time_it_was_generated_at() {
     let alice = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let payload = vauchi_core::exchange::ExchangeBle::generate(&alice, &ephemeral, 1_234_567);
 

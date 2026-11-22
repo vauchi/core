@@ -11,7 +11,7 @@
 
 use vauchi_core::exchange::{
     ExchangeError, ExchangeEvent, ExchangeNfc, ExchangeSession, ExchangeState, ExchangeTransport,
-    MockProximityVerifier, NFC_PAYLOAD_SIZE, NfcHandshakeSession, X3DHKeyPair,
+    MockProximityVerifier, NFC_PAYLOAD_SIZE, NfcHandshakeSession, X25519KeyPair,
 };
 use vauchi_core::{ContactCard, Identity};
 
@@ -40,7 +40,7 @@ fn test_nfc_error_variants_exist() {
 #[test]
 fn test_nfc_generate() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let payload = ExchangeNfc::generate(
         &identity,
@@ -58,7 +58,7 @@ fn test_nfc_generate() {
 #[test]
 fn test_nfc_roundtrip() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let payload = ExchangeNfc::generate(
         &identity,
@@ -84,7 +84,7 @@ fn test_nfc_roundtrip() {
 #[test]
 fn test_nfc_signature_verify() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let payload = ExchangeNfc::generate(
         &identity,
@@ -102,7 +102,7 @@ fn test_nfc_signature_verify() {
 #[test]
 fn test_nfc_tamper_rejection() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let payload = ExchangeNfc::generate(
         &identity,
@@ -124,7 +124,7 @@ fn test_nfc_tamper_rejection() {
 #[test]
 fn test_nfc_magic_check() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let payload = ExchangeNfc::generate(
         &identity,
@@ -146,7 +146,7 @@ fn test_nfc_magic_check() {
 #[test]
 fn test_nfc_version_check() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let payload = ExchangeNfc::generate(
         &identity,
@@ -180,7 +180,7 @@ fn test_nfc_too_short_payload() {
 #[test]
 fn test_nfc_expiry() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -207,7 +207,7 @@ fn test_nfc_expiry() {
 #[test]
 fn test_nfc_clock_drift_tolerance() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -227,8 +227,8 @@ fn test_nfc_clock_drift_tolerance() {
 #[test]
 fn test_nfc_different_ephemerals() {
     let identity = Identity::create("Alice", 0);
-    let eph1 = X3DHKeyPair::generate();
-    let eph2 = X3DHKeyPair::generate();
+    let eph1 = X25519KeyPair::generate();
+    let eph2 = X25519KeyPair::generate();
 
     let p1 = ExchangeNfc::generate(
         &identity,
@@ -252,7 +252,7 @@ fn test_nfc_payload_size() {
     assert_eq!(NFC_PAYLOAD_SIZE, 174, "NFC payload should be 174 bytes");
 
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
     let payload = ExchangeNfc::generate(
         &identity,
         &ephemeral,
@@ -267,7 +267,7 @@ fn test_nfc_payload_size() {
 #[test]
 fn test_nfc_identity_key_matches_signer() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let payload = ExchangeNfc::generate(
         &identity,
@@ -294,7 +294,7 @@ fn test_nfc_apdu_select_build() {
     // indirectly since the module is private when not using testing feature.
     // The key assertion is that ExchangeNfc payloads can be embedded in APDU.
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
     let payload = ExchangeNfc::generate(
         &identity,
         &ephemeral,
@@ -422,7 +422,7 @@ fn test_nfc_tap_transitions_to_key_agreement() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    let bob_eph = X3DHKeyPair::generate();
+    let bob_eph = X25519KeyPair::generate();
     let bob_payload = ExchangeNfc::generate(
         &bob_identity,
         &bob_eph,
@@ -485,7 +485,7 @@ fn test_nfc_expired_payload_rejected_by_session() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    let bob_eph = X3DHKeyPair::generate();
+    let bob_eph = X25519KeyPair::generate();
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -531,7 +531,7 @@ fn test_nfc_rejects_wrong_transport() {
 fn test_nfc_self_exchange_rejected() {
     let alice_identity = Identity::create("Alice", 0);
 
-    let eph = X3DHKeyPair::generate();
+    let eph = X25519KeyPair::generate();
     let self_payload = ExchangeNfc::generate(
         &alice_identity,
         &eph,
@@ -592,8 +592,8 @@ fn test_nfc_full_exchange_via_session() {
     let alice_id2 = Identity::create("Alice2", 0);
     let bob_id2 = Identity::create("Bob2", 0);
 
-    let alice_eph = X3DHKeyPair::generate();
-    let bob_eph = X3DHKeyPair::generate();
+    let alice_eph = X25519KeyPair::generate();
+    let bob_eph = X25519KeyPair::generate();
 
     let alice_nfc = ExchangeNfc::generate(
         &alice_id2,
@@ -662,8 +662,8 @@ fn test_nfc_full_exchange_payload_crypto() {
     let alice_id = Identity::create("Alice", 0);
     let bob_id = Identity::create("Bob", 0);
 
-    let alice_eph = X3DHKeyPair::generate();
-    let bob_eph = X3DHKeyPair::generate();
+    let alice_eph = X25519KeyPair::generate();
+    let bob_eph = X25519KeyPair::generate();
 
     let alice_nfc = ExchangeNfc::generate(
         &alice_id,
@@ -704,15 +704,15 @@ fn test_nfc_key_independence_from_qr() {
     // NFC and QR use independent ephemeral keys — shared secrets should differ
 
     // NFC path: fresh ephemerals
-    let alice_nfc_eph = X3DHKeyPair::generate();
-    let bob_nfc_eph = X3DHKeyPair::generate();
+    let alice_nfc_eph = X25519KeyPair::generate();
+    let bob_nfc_eph = X25519KeyPair::generate();
     let nfc_shared = alice_nfc_eph
         .diffie_hellman(bob_nfc_eph.public_key())
         .unwrap();
 
     // QR path: also uses fresh ephemerals (mutual QR)
-    let alice_qr_eph = X3DHKeyPair::generate();
-    let bob_qr_eph = X3DHKeyPair::generate();
+    let alice_qr_eph = X25519KeyPair::generate();
+    let bob_qr_eph = X25519KeyPair::generate();
     let qr_shared = alice_qr_eph
         .diffie_hellman(bob_qr_eph.public_key())
         .unwrap();
@@ -731,8 +731,8 @@ fn test_nfc_apdu_round_trip_simulation() {
     let alice_identity = Identity::create("Alice", 0);
     let bob_identity = Identity::create("Bob", 0);
 
-    let alice_eph = X3DHKeyPair::generate();
-    let bob_eph = X3DHKeyPair::generate();
+    let alice_eph = X25519KeyPair::generate();
+    let bob_eph = X25519KeyPair::generate();
 
     let alice_payload = ExchangeNfc::generate(
         &alice_identity,
@@ -768,7 +768,7 @@ fn test_nfc_apdu_round_trip_simulation() {
 #[test]
 fn test_nfc_expired_payload_rejection() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -800,8 +800,8 @@ fn test_nfc_payload_with_different_identities() {
     let alice = Identity::create("Alice", 0);
     let bob = Identity::create("Bob", 0);
 
-    let eph1 = X3DHKeyPair::generate();
-    let eph2 = X3DHKeyPair::generate();
+    let eph1 = X25519KeyPair::generate();
+    let eph2 = X25519KeyPair::generate();
 
     let alice_payload = ExchangeNfc::generate(
         &alice,
@@ -825,7 +825,7 @@ fn test_nfc_signature_failure_with_wrong_key() {
     let alice = Identity::create("Alice", 0);
     let _bob = Identity::create("Bob", 0);
 
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let alice_payload = ExchangeNfc::generate(
         &alice,
@@ -851,7 +851,7 @@ fn test_nfc_signature_failure_with_wrong_key() {
 #[test]
 fn test_nfc_payload_tampering_in_token_field() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let payload = ExchangeNfc::generate(
         &identity,
@@ -874,7 +874,7 @@ fn test_nfc_payload_tampering_in_token_field() {
 #[test]
 fn test_nfc_payload_tampering_in_exchange_key() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let payload = ExchangeNfc::generate(
         &identity,
@@ -897,7 +897,7 @@ fn test_nfc_payload_tampering_in_exchange_key() {
 #[test]
 fn test_nfc_payload_tampering_in_signature() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let payload = ExchangeNfc::generate(
         &identity,
@@ -920,7 +920,7 @@ fn test_nfc_payload_tampering_in_signature() {
 #[test]
 fn test_nfc_payload_boundary_at_expiry_window() {
     let identity = Identity::create("Alice", 0);
-    let ephemeral = X3DHKeyPair::generate();
+    let ephemeral = X25519KeyPair::generate();
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

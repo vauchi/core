@@ -17,7 +17,7 @@ use proptest::prelude::*;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::{DoubleRatchetState, ShreddingMasterKey, SymmetricKey};
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::identity::Identity;
 use vauchi_core::storage::{KeyAccess, MemoryKeyStorage, SecureStorage, Storage, StorageError};
 use vauchi_core::{Vauchi, VauchiConfig};
@@ -27,7 +27,7 @@ const MESSAGE: &[u8] = b"an update from the contact";
 /// A ratchet pair: the contact's sending side and our receiving side.
 fn pair() -> (DoubleRatchetState, DoubleRatchetState) {
     let secret = SymmetricKey::generate();
-    let ours = X3DHKeyPair::generate();
+    let ours = X25519KeyPair::generate();
     let theirs = DoubleRatchetState::initialize_initiator(&secret, *ours.public_key()).unwrap();
     (
         theirs,

@@ -34,7 +34,7 @@ use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 use super::ExchangeError;
 use super::qr_url::{decode_scanned_qr, encode_qr_url};
-use super::x3dh::X3DHKeyPair;
+use super::x3dh::X25519KeyPair;
 use crate::byte_reader::ByteReader;
 use crate::card::MAX_DISPLAY_NAME_LENGTH;
 use crate::crypto::{PublicKey, Signature};
@@ -94,7 +94,7 @@ impl ExchangeQR {
     ///
     /// The exchange key in the QR is the provided ephemeral key, not the
     /// identity's static X3DH key. This gives full forward secrecy.
-    pub fn generate(identity: &Identity, ephemeral: &X3DHKeyPair, now: u64) -> Self {
+    pub fn generate(identity: &Identity, ephemeral: &X25519KeyPair, now: u64) -> Self {
         Self::generate_with_relay(identity, ephemeral, None, now)
     }
 
@@ -105,7 +105,7 @@ impl ExchangeQR {
     /// exchange.
     pub fn generate_with_relay(
         identity: &Identity,
-        ephemeral: &X3DHKeyPair,
+        ephemeral: &X25519KeyPair,
         relay_url: Option<String>,
         now: u64,
     ) -> Self {
@@ -117,7 +117,7 @@ impl ExchangeQR {
     /// Generates a QR code with a specific timestamp (for testing).
     pub fn generate_with_timestamp(
         identity: &Identity,
-        ephemeral: &X3DHKeyPair,
+        ephemeral: &X25519KeyPair,
         timestamp: u64,
     ) -> Self {
         Self::generate_with_relay_and_timestamp(identity, ephemeral, timestamp, None)
@@ -126,7 +126,7 @@ impl ExchangeQR {
     /// Full constructor with all parameters.
     fn generate_with_relay_and_timestamp(
         identity: &Identity,
-        ephemeral: &X3DHKeyPair,
+        ephemeral: &X25519KeyPair,
         timestamp: u64,
         relay_url: Option<String>,
     ) -> Self {
@@ -474,7 +474,7 @@ mod tests {
     #[test]
     fn test_qr_generation() {
         let identity = Identity::create("Alice", 0);
-        let ephemeral = X3DHKeyPair::generate();
+        let ephemeral = X25519KeyPair::generate();
         let qr = ExchangeQR::generate(&identity, &ephemeral, 0u64);
 
         assert_eq!(qr.version, PROTOCOL_VERSION);
@@ -487,7 +487,7 @@ mod tests {
     #[test]
     fn test_qr_signature_valid() {
         let identity = Identity::create("Alice", 0);
-        let ephemeral = X3DHKeyPair::generate();
+        let ephemeral = X25519KeyPair::generate();
         let qr = ExchangeQR::generate(&identity, &ephemeral, 0u64);
 
         assert!(qr.verify_signature());
@@ -496,7 +496,7 @@ mod tests {
     #[test]
     fn test_qr_not_expired_initially() {
         let identity = Identity::create("Alice", 0);
-        let ephemeral = X3DHKeyPair::generate();
+        let ephemeral = X25519KeyPair::generate();
         let qr = ExchangeQR::generate(&identity, &ephemeral, 0u64);
 
         assert!(!qr.is_expired(0u64));
@@ -505,7 +505,7 @@ mod tests {
     #[test]
     fn test_qr_roundtrip_with_display_name() {
         let identity = Identity::create("Alice", 0);
-        let ephemeral = X3DHKeyPair::generate();
+        let ephemeral = X25519KeyPair::generate();
         let qr = ExchangeQR::generate(&identity, &ephemeral, 0u64);
 
         let data_string = qr.to_data_string();
@@ -521,7 +521,7 @@ mod tests {
     #[test]
     fn test_qr_roundtrip_unicode_name() {
         let identity = Identity::create("Müller 日本語", 0);
-        let ephemeral = X3DHKeyPair::generate();
+        let ephemeral = X25519KeyPair::generate();
         let qr = ExchangeQR::generate(&identity, &ephemeral, 0u64);
 
         let data_string = qr.to_data_string();
@@ -534,7 +534,7 @@ mod tests {
     #[test]
     fn test_qr_roundtrip_empty_name() {
         let identity = Identity::create("", 0);
-        let ephemeral = X3DHKeyPair::generate();
+        let ephemeral = X25519KeyPair::generate();
         let qr = ExchangeQR::generate(&identity, &ephemeral, 0u64);
 
         let data_string = qr.to_data_string();
@@ -558,7 +558,7 @@ mod tests {
     fn test_v3_relay_fields_in_signature() {
         // Verify that changing relay fields invalidates the signature
         let identity = Identity::create("Test", 0);
-        let ephemeral = X3DHKeyPair::generate();
+        let ephemeral = X25519KeyPair::generate();
 
         let qr_with_relay = ExchangeQR::generate_with_relay(
             &identity,

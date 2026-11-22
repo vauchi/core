@@ -24,7 +24,7 @@ use super::exchange_payload::{
     EXCHANGE_PAYLOAD_SIZE, ParsedPayload, build_exchange_payload, is_payload_expired,
     parse_exchange_payload, verify_payload_signature,
 };
-use super::x3dh::X3DHKeyPair;
+use super::x3dh::X25519KeyPair;
 use crate::crypto::{PublicKey, SigningKeyPair};
 use crate::identity::Identity;
 use crate::monotonic::{MonotonicClock, SystemMonotonicClock};
@@ -432,7 +432,7 @@ pub struct ExchangeBle {
 
 impl ExchangeBle {
     /// Generates a new BLE exchange payload.
-    pub fn generate(identity: &Identity, ephemeral: &X3DHKeyPair, now: u64) -> Self {
+    pub fn generate(identity: &Identity, ephemeral: &X25519KeyPair, now: u64) -> Self {
         use crate::crypto::random_bytes;
 
         let token: [u8; 32] = random_bytes();
@@ -445,7 +445,7 @@ impl ExchangeBle {
     /// Generates with explicit timestamp (for testing).
     pub fn generate_with_timestamp(
         identity: &Identity,
-        ephemeral: &X3DHKeyPair,
+        ephemeral: &X25519KeyPair,
         token: [u8; 32],
         timestamp: u64,
     ) -> Self {

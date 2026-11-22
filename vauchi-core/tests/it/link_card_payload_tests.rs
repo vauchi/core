@@ -7,7 +7,7 @@
 //! routing. The signature covers the whole body and the exchange it was
 //! made for (#942); retired versions are refused.
 
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::exchange::link_mode::{
     LinkCardPayload, LinkExchangeBinding, derive_link_shared_key, parse_link_card_payload,
     serialize_link_card_payload,
@@ -23,7 +23,7 @@ const EXCHANGE: LinkExchangeBinding = LinkExchangeBinding {
 fn sample() -> (SigningKeyPair, [u8; 32], [u8; 32], ContactCard) {
     let keypair = SigningKeyPair::generate();
     let identity = *keypair.public_key().as_bytes();
-    let x3dh = *X3DHKeyPair::generate().public_key();
+    let x3dh = *X25519KeyPair::generate().public_key();
     let card = ContactCard::new("Alice");
     (keypair, identity, x3dh, card)
 }
@@ -148,8 +148,8 @@ fn unknown_version_and_empty_payloads_rejected() {
 // @internal
 #[test]
 fn link_shared_key_is_symmetric() {
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     let alice_view = derive_link_shared_key(&alice, bob.public_key()).expect("alice derives");
     let bob_view = derive_link_shared_key(&bob, alice.public_key()).expect("bob derives");
@@ -164,9 +164,9 @@ fn link_shared_key_is_symmetric() {
 // @internal
 #[test]
 fn link_shared_key_differs_per_peer() {
-    let ours = X3DHKeyPair::generate();
-    let peer_a = X3DHKeyPair::generate();
-    let peer_b = X3DHKeyPair::generate();
+    let ours = X25519KeyPair::generate();
+    let peer_a = X25519KeyPair::generate();
+    let peer_b = X25519KeyPair::generate();
 
     let ka = derive_link_shared_key(&ours, peer_a.public_key()).unwrap();
     let kb = derive_link_shared_key(&ours, peer_b.public_key()).unwrap();
@@ -177,8 +177,8 @@ fn link_shared_key_differs_per_peer() {
 // @internal
 #[test]
 fn from_link_exchange_stamps_link_transport_and_relay() {
-    let ours = X3DHKeyPair::generate();
-    let peer = X3DHKeyPair::generate();
+    let ours = X25519KeyPair::generate();
+    let peer = X25519KeyPair::generate();
     let shared = derive_link_shared_key(&ours, peer.public_key()).unwrap();
     let peer_identity = *SigningKeyPair::generate().public_key().as_bytes();
 

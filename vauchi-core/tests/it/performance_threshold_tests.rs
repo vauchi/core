@@ -282,13 +282,13 @@ fn test_queue_100_pending_updates_under_2s() {
 #[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_sequential_ratchet_operations() {
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
-    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::exchange::X25519KeyPair;
 
     let mut results = Vec::with_capacity(10);
     let start = Instant::now();
 
     for _ in 0..10 {
-        let bob_kp = X3DHKeyPair::generate();
+        let bob_kp = X25519KeyPair::generate();
         let shared = SymmetricKey::generate();
 
         let mut alice =

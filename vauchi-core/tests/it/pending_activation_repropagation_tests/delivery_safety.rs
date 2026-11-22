@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use super::*;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 
 // @scenario: visibility_control :: Granting visibility sends update to contact
 // @internal
@@ -21,7 +21,7 @@ fn waiting_for_one_peer_does_not_repeat_updates_to_a_ready_peer() {
     world.alice.add_contact(contact).unwrap();
     world
         .alice
-        .create_ratchet_as_initiator(&carol_id, &shared, *X3DHKeyPair::generate().public_key())
+        .create_ratchet_as_initiator(&carol_id, &shared, *X25519KeyPair::generate().public_key())
         .unwrap();
     world
         .alice

@@ -16,7 +16,7 @@ use crate::ui::{ActionResult, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey, X3DHKeyPair};
+use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey, X25519KeyPair};
 
 /// An `AppEngine` whose source-side replacement wizard has finished the
 /// transfer and sits on the Complete step, with one live ratchet session.
@@ -31,7 +31,7 @@ fn app_with_replacement_at_complete() -> (AppEngine, String) {
     );
     let contact_id = app_contact.id().to_string();
     vauchi.add_contact(app_contact).expect("contact");
-    let their_dh = X3DHKeyPair::generate();
+    let their_dh = X25519KeyPair::generate();
     let ratchet =
         DoubleRatchetState::initialize_initiator(&SymmetricKey::generate(), *their_dh.public_key())
             .expect("ratchet");

@@ -10,7 +10,7 @@ use vauchi_core::api::{ReceiveOutcome, process_single_card_update};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::{SymmetricKey, Vauchi};
 
 fn person(name: &str) -> Vauchi {
@@ -38,7 +38,7 @@ fn exchanged(bob: &Vauchi, alice: &Vauchi) -> (String, String) {
     let (alice_id, bob_id) = (alice_at_bob.id().to_string(), bob_at_alice.id().to_string());
     bob.add_contact(alice_at_bob).unwrap();
     alice.add_contact(bob_at_alice).unwrap();
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let alice_ratchet =
         DoubleRatchetState::initialize_initiator(&secret, *bob_dh.public_key()).unwrap();
     let bob_ratchet = DoubleRatchetState::initialize_responder(&secret, bob_dh);

@@ -16,7 +16,7 @@ use vauchi_core::Identity;
 use vauchi_core::Vauchi;
 use vauchi_core::api::RekeyAnswerTaken;
 use vauchi_core::clock::FakeClock;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::recovery::rekey::{RekeyAnswer, RekeyOffer};
 
 use crate::common::meeting::{deliver, signing_pk};
@@ -109,7 +109,7 @@ fn an_answer_signed_by_another_key_or_naming_another_offer_is_dropped() {
     let mallory = Identity::create("Mallory", 0);
     let by_mallory = RekeyAnswer::create(
         &mallory,
-        *X3DHKeyPair::generate().public_key(),
+        *X25519KeyPair::generate().public_key(),
         *offer.exchange_key(),
     )
     .encode();

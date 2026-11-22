@@ -45,7 +45,7 @@ use super::types::{
 use crate::card::ContactCard;
 use crate::identity::Identity;
 
-use crate::crypto::x25519::X3DHKeyPair;
+use crate::crypto::x25519::X25519KeyPair;
 use crate::crypto::{DoubleRatchetState, SymmetricKey};
 use crate::exchange::ratchet_bootstrap;
 
@@ -930,7 +930,7 @@ impl MultiStageSession {
         let our_ephemeral = self
             .ratchet_ephemeral
             .as_ref()
-            .map(|secret| X3DHKeyPair::from_bytes(secret.to_bytes()));
+            .map(|secret| X25519KeyPair::from_bytes(secret.to_bytes()));
         ratchet_bootstrap::bootstrap_exchange_ratchet(
             &shared,
             our_identity,

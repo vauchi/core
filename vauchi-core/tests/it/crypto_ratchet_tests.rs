@@ -12,7 +12,7 @@ fn create_test_pair() -> (DoubleRatchetState, DoubleRatchetState) {
     let shared_secret = SymmetricKey::from_bytes([42u8; 32]);
 
     // Bob's initial DH keypair (used in X3DH)
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let bob_public = *bob_dh.public_key();
 
     let alice = DoubleRatchetState::initialize_initiator(&shared_secret, bob_public).unwrap();
@@ -322,7 +322,7 @@ fn test_dr_multiple_ratchets() {
 #[test]
 fn test_dr_responder_cannot_send_first() {
     let shared_secret = SymmetricKey::from_bytes([42u8; 32]);
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let mut bob = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
     // Bob (responder) tries to send first - should fail

@@ -6,7 +6,7 @@
 //! Extracted from relay_client.rs
 
 use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey};
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::network::*;
 
 fn create_test_config() -> RelayClientConfig {
@@ -20,8 +20,8 @@ fn create_test_config() -> RelayClientConfig {
 }
 
 fn create_test_ratchet() -> (DoubleRatchetState, DoubleRatchetState) {
-    let _alice_dh = X3DHKeyPair::generate();
-    let bob_dh = X3DHKeyPair::generate();
+    let _alice_dh = X25519KeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 
     let alice =

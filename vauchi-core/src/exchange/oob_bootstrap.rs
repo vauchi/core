@@ -34,7 +34,7 @@ use super::exchange_payload::{
     parse_exchange_payload, verify_payload_signature,
 };
 use super::qr_url::{decode_scanned_qr, encode_qr_url};
-use super::x3dh::X3DHKeyPair;
+use super::x3dh::X25519KeyPair;
 use crate::crypto::hkdf::HKDF;
 use crate::identity::Identity;
 
@@ -82,7 +82,7 @@ pub struct OobBootstrapQr {
 
 impl OobBootstrapQr {
     /// Generate a fresh OOB QR for `identity` with a random token at `now`.
-    pub fn generate(identity: &Identity, ephemeral: &X3DHKeyPair, now: u64) -> Self {
+    pub fn generate(identity: &Identity, ephemeral: &X25519KeyPair, now: u64) -> Self {
         let token: [u8; 32] = crate::crypto::random_bytes();
         Self::generate_with_timestamp(identity, ephemeral, token, now)
     }
@@ -90,7 +90,7 @@ impl OobBootstrapQr {
     /// Generate with an explicit token + timestamp (deterministic / tests).
     pub fn generate_with_timestamp(
         identity: &Identity,
-        ephemeral: &X3DHKeyPair,
+        ephemeral: &X25519KeyPair,
         token: [u8; 32],
         timestamp: u64,
     ) -> Self {

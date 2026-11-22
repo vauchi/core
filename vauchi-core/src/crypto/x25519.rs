@@ -2,11 +2,10 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! X25519 keypair for X3DH key agreement.
+//! X25519 key pair and Diffie-Hellman.
 //!
-//! This type is placed in the crypto module because it is a pure cryptographic
-//! primitive (X25519 keypair) used by both exchange and identity modules.
-//! The X3DH *protocol* logic remains in `exchange::x3dh`.
+//! A pure primitive, used by the exchange, identity and storage modules.
+//! The X3DH protocol built on it is `exchange::x3dh`.
 
 #![cfg_attr(
     not(test),
@@ -32,20 +31,20 @@ pub struct DhError;
 /// X25519 keypair for X3DH key agreement.
 ///
 /// Used for establishing shared secrets during contact exchange.
-pub struct X3DHKeyPair {
+pub struct X25519KeyPair {
     /// The static secret key
     secret: StaticSecret,
     /// The public key (cached for efficiency)
     public: PublicKey,
 }
 
-impl X3DHKeyPair {
+impl X25519KeyPair {
     /// Generates a new random X25519 keypair.
     pub fn generate() -> Self {
         let secret = StaticSecret::random_from_rng(OsRng);
         let public = PublicKey::from(&secret);
 
-        X3DHKeyPair { secret, public }
+        X25519KeyPair { secret, public }
     }
 
     /// Creates a keypair from a 32-byte seed.
@@ -53,7 +52,7 @@ impl X3DHKeyPair {
         let secret = StaticSecret::from(bytes);
         let public = PublicKey::from(&secret);
 
-        X3DHKeyPair { secret, public }
+        X25519KeyPair { secret, public }
     }
 
     /// Returns the public key bytes.

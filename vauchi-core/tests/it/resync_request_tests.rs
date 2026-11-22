@@ -10,7 +10,7 @@
 
 use vauchi_core::api::{CardUpdateError, ReceiveOutcome, process_single_card_update};
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::sync::delta::{
     DeltaError, PAYLOAD_VERSION_RESYNC_REQUEST, VersionedPayload, encode_resync_request,
 };
@@ -22,7 +22,7 @@ use crate::common::helpers::create_vauchi_with_identity;
 fn alice_receiving_from_bob() -> (Vauchi, String, DoubleRatchetState) {
     let alice = create_vauchi_with_identity("Alice");
     let bob = create_vauchi_with_identity("Bob");
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let shared_secret = SymmetricKey::generate();
     let bob_contact = Contact::from_exchange(
         *bob.identity().unwrap().signing_public_key(),
@@ -36,7 +36,7 @@ fn alice_receiving_from_bob() -> (Vauchi, String, DoubleRatchetState) {
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
+            X25519KeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
     let bob_ratchet =
@@ -161,7 +161,7 @@ fn requesting_a_resync_queues_one_request_per_ratcheted_contact() {
     );
     let bob_id = bob.id().to_string();
     alice.add_contact(bob).unwrap();
-    let dh = X3DHKeyPair::generate();
+    let dh = X25519KeyPair::generate();
     alice
         .create_ratchet_as_initiator(&bob_id, &SymmetricKey::generate(), *dh.public_key())
         .unwrap();

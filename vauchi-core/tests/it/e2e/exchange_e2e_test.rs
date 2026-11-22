@@ -9,7 +9,7 @@
 
 use vauchi_core::{
     Contact, ContactField, FieldType, SymmetricKey, Vauchi, crypto::ratchet::DoubleRatchetState,
-    exchange::X3DHKeyPair,
+    exchange::X25519KeyPair,
 };
 
 /// Tests the complete contact exchange workflow between two users.
@@ -84,7 +84,7 @@ fn test_contact_exchange_happy_path() {
     bob_wb.add_contact(alice_contact).unwrap();
 
     // Step 5: Initialize Double Ratchet for encrypted communication
-    let bob_dh = X3DHKeyPair::generate();
+    let bob_dh = X25519KeyPair::generate();
     let alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);

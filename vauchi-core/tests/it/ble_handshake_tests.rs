@@ -13,7 +13,7 @@ use vauchi_core::ExchangeError;
 use vauchi_core::crypto::encryption::{self, SymmetricKey};
 use vauchi_core::crypto::hkdf::HKDF;
 use vauchi_core::exchange::{
-    BLE_HANDSHAKE_VERSION, BleCardPayload, BleHandshakeSession, BleHandshakeState, X3DHKeyPair,
+    BLE_HANDSHAKE_VERSION, BleCardPayload, BleHandshakeSession, BleHandshakeState, X25519KeyPair,
 };
 use vauchi_core::identity::Identity;
 
@@ -38,8 +38,8 @@ fn make_test_card(identity: &Identity, name: &str) -> BleCardPayload {
 // @scenario: ble_exchange :: X25519 shared secret symmetry
 #[test]
 fn test_x25519_shared_secret_symmetry() {
-    let alice = X3DHKeyPair::generate();
-    let bob = X3DHKeyPair::generate();
+    let alice = X25519KeyPair::generate();
+    let bob = X25519KeyPair::generate();
 
     let alice_shared = alice.diffie_hellman(bob.public_key()).unwrap();
     let bob_shared = bob.diffie_hellman(alice.public_key()).unwrap();

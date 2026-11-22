@@ -49,7 +49,7 @@ use crate::orchestrator::ble_handshake_machine::{
 use vauchi_core::Contact;
 use vauchi_core::Event;
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::crypto::X3DHKeyPair;
+use vauchi_core::crypto::X25519KeyPair;
 use vauchi_core::exchange::{BleCardPayload, BleExchangeResult};
 
 /// Wraps the machine on `AppEngine`. Same shape as
@@ -77,7 +77,7 @@ impl AppEngine {
         &mut self,
         role: BleRole,
         identity_key: [u8; 32],
-        identity_x3dh: X3DHKeyPair,
+        identity_x3dh: X25519KeyPair,
         card: BleCardPayload,
         oob: Option<BleOobBinding>,
     ) {
@@ -298,7 +298,7 @@ impl AppEngine {
     /// `exchange_public_key`.
     pub(super) fn build_ble_session_inputs(
         &self,
-    ) -> Option<([u8; 32], X3DHKeyPair, BleCardPayload)> {
+    ) -> Option<([u8; 32], X25519KeyPair, BleCardPayload)> {
         let identity = self.vauchi.identity()?;
         let identity_key = *identity.signing_public_key();
         let x3dh = identity.x3dh_keypair();

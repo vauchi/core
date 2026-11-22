@@ -24,7 +24,7 @@
 
 use crate::crypto::hkdf::HKDF;
 use crate::crypto::{PublicKey, Signature, SymmetricKey};
-use crate::exchange::X3DHKeyPair;
+use crate::exchange::X25519KeyPair;
 use crate::identity::Identity;
 
 const OFFER_DOMAIN: &[u8] = b"vauchi-recovery-rekey-offer";
@@ -319,7 +319,7 @@ impl RekeyAnswer {
 /// [`RekeyError::WeakExchangeKey`] when `their_exchange_key` gives no
 /// usable secret (a low-order point).
 pub fn rekey_shared_key(
-    own_exchange: &X3DHKeyPair,
+    own_exchange: &X25519KeyPair,
     their_exchange_key: &[u8; KEY],
     new_pk: &[u8; KEY],
     contact_pk: &[u8; KEY],

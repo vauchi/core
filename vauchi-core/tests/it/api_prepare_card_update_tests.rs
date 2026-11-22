@@ -8,7 +8,7 @@
 //! and ratchet encryption — keeping crypto out of frontends (ADR-021).
 
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::exchange::{X3DH, X3DHKeyPair};
+use vauchi_core::exchange::{X3DH, X25519KeyPair};
 use vauchi_core::identity::{DeviceInfo, DeviceRegistry, RegistryBroadcast};
 use vauchi_core::{Contact, ContactField, FieldType, SigningKeyPair, SymmetricKey, Vauchi};
 
@@ -47,8 +47,8 @@ fn exchange_as_initiator(wb: &Vauchi) -> String {
     let alice_x3dh = alice_identity.x3dh_keypair();
 
     // Bob's keys (simulated remote peer)
-    let bob_identity = X3DHKeyPair::generate();
-    let bob_x3dh = X3DHKeyPair::generate();
+    let bob_identity = X25519KeyPair::generate();
+    let bob_x3dh = X25519KeyPair::generate();
 
     // Alice initiates X3DH toward Bob
     let (shared_secret, _) = X3DH::initiate(&alice_x3dh, bob_x3dh.public_key()).unwrap();

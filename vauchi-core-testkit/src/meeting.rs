@@ -10,7 +10,7 @@ use vauchi_core::api::{ReceiveOutcome, process_single_card_update};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::X3DHKeyPair;
+use vauchi_core::exchange::X25519KeyPair;
 use vauchi_core::{SymmetricKey, Vauchi};
 
 pub fn signing_pk(wb: &Vauchi) -> [u8; 32] {
@@ -41,7 +41,7 @@ pub fn exchange_material(guardian: &Vauchi, phone: &Vauchi, guardian_initiates: 
         shared.clone(),
         0,
     );
-    let responder_dh = X3DHKeyPair::generate();
+    let responder_dh = X25519KeyPair::generate();
     let initiator =
         DoubleRatchetState::initialize_initiator(&shared, *responder_dh.public_key()).unwrap();
     let responder = DoubleRatchetState::initialize_responder(&shared, responder_dh);

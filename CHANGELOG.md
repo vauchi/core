@@ -14,6 +14,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   Spanish and Italian beside English, so a phone opens in its language
   with no shell file or content-update cycle. The avatar's edit action
   speaks the screen's language too (vauchi/private#1237).
+- Pinned actions (vauchi/private#1304): a screen can keep a decision in
+  view. Core sends up to three actions in the bar's `pinned` group to a
+  shell that reports `pinned_actions`, and leaves them in the content for
+  one that does not. The reconnect question uses it, and asks in one line
+  over the code whether the other person is there. The contract moves to
+  v0.99.0, which carries the group and the report.
 - The native status item (vauchi/private#1029): Core shows a status item
   to a shell that has a system tray, and `vauchi_core` re-exports
   `StatusItemSpec`. The contract moves to v0.98.0, which carries the

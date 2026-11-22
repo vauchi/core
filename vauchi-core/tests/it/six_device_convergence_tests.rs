@@ -33,6 +33,7 @@ fn make_party(seed: [u8; 32], name: &str, email: &str) -> Party {
             format!("{name} device {}", index + 1),
             1,
         );
+        device.storage().identity().save(&identity).unwrap();
         device.set_identity(identity).unwrap();
         device.add_own_field(field.clone()).unwrap();
         device.set_own_field_public(&field_id).unwrap();

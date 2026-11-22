@@ -327,7 +327,7 @@ fn adopting_a_key_keeps_it_and_repeats_harmlessly() {
 // @internal
 #[test]
 fn adopting_a_second_key_is_refused_and_the_first_stays() {
-    let vauchi = Vauchi::in_memory().unwrap();
+    let vauchi = crate::common::helpers::create_vauchi_with_identity("Alice");
     let existing = public_key_of_stored_key(&vauchi);
 
     let result = vauchi

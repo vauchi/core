@@ -360,6 +360,7 @@ fn active_responder_device_genesis_seals_emergency_alert() {
 
     let shared = SymmetricKey::from_bytes([0x5au8; 32]);
     let mut sender = Vauchi::in_memory().unwrap();
+    sender.storage().identity().save(&sender_identity).unwrap();
     sender.set_identity(sender_identity).unwrap();
     let recipient_contact =
         Contact::from_exchange(recipient_pk, ContactCard::new("Bob"), shared.clone(), 0);

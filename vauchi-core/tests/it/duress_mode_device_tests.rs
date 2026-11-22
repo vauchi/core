@@ -20,10 +20,12 @@ const OTHER_SEED: [u8; 32] = [9u8; 32];
 fn in_duress_mode() -> Vauchi {
     let mut wb = create_vauchi_with_identity("Alice");
     wb.setup_app_password(APP_PIN).unwrap();
-    let mut registry = wb.identity().unwrap().initial_device_registry();
+    let identity = wb.identity().unwrap();
+    let mut registry = identity.initial_device_registry();
     registry
-        .add_device_unsigned(
+        .add_device(
             DeviceInfo::derive(&OTHER_SEED, 1, "RealLaptop".into(), 0).to_registered(&OTHER_SEED),
+            identity.signing_keypair(),
         )
         .unwrap();
     wb.storage()

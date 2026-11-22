@@ -53,8 +53,11 @@ fn revoking_a_lost_laptop_from_the_phone_reaches_contacts() {
     let seed = [9u8; 32];
     let laptop = DeviceInfo::derive(&seed, 1, "Laptop".into(), 0).to_registered(&seed);
     let laptop_id = laptop.device_id;
-    let mut registry = alice.identity().unwrap().initial_device_registry();
-    registry.add_device_unsigned(laptop).unwrap();
+    let identity = alice.identity().unwrap();
+    let mut registry = identity.initial_device_registry();
+    registry
+        .add_device(laptop, identity.signing_keypair())
+        .unwrap();
     alice
         .storage()
         .device()

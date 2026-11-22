@@ -82,7 +82,7 @@ def main():
         report = dict(base, verdict="inconclusive", reason="backend_failed")
     else:
         try:
-            document = json.loads(args.report.read_text())
+            document = json.loads(args.report.read_text(encoding="utf-8"))
             report = assess(document, args.harness, args.require_cover,
                             args.backend_exit, args.verifier_version)
         except (OSError, ValueError, KeyError, TypeError, IndexError):

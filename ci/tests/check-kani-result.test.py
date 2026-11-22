@@ -34,7 +34,7 @@ class KaniResultContract(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             report = Path(temporary) / "proof.json"
             if document is not None:
-                report.write_text(document if isinstance(document, str) else json.dumps(document))
+                report.write_text(document if isinstance(document, str) else json.dumps(document), encoding="utf-8")
             command = [sys.executable, str(SCRIPT), str(report), "--harness", HARNESS,
                        "--backend-exit", str(backend_exit), "--verifier-version", "0.68.0"]
             for name in WITNESSES:
@@ -49,11 +49,14 @@ class KaniResultContract(unittest.TestCase):
 
     def test_missing_checker_trigger_cannot_disable_its_formal_job(self):
         root = SCRIPT.parent.parent
-        configuration = (root / ".gitlab-ci.yml").read_text()
+        configuration = (root / ".gitlab-ci.yml").read_text(encoding="utf-8")
         for path in ["ci/check-kani-result.py", "ci/tests/check-kani-result.test.py"]:
             with self.subTest(path=path), tempfile.TemporaryDirectory() as temporary:
                 modified = Path(temporary) / "ci.yml"
-                modified.write_text("\n".join(line for line in configuration.splitlines() if line.strip() != "- " + path) + "\n")
+                modified.write_text(
+                    "\n".join(line for line in configuration.splitlines() if line.strip() != "- " + path) + "\n",
+                    encoding="utf-8",
+                )
                 result = subprocess.run(["sh", "ci/tests/formal-triggers.test.sh", str(modified)],
                                         cwd=root, capture_output=True, text=True, check=False)
                 self.assertNotEqual(result.returncode, 0)

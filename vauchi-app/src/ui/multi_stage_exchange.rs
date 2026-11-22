@@ -685,7 +685,7 @@ impl MultiStageExchangeEngine {
                 // of height goes to the preview on a compact screen.
                 label: None,
                 scan_quality: None,
-                placement: placement_for_layout(self.current_qr_layout),
+                placement: self.own_code_placement(),
                 error_correction: self.current_qr_error_correction,
                 size: None,
                 a11y: None,

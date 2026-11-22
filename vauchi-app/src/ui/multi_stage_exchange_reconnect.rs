@@ -31,6 +31,20 @@ pub(crate) fn asks_to_reconnect(screen: &ScreenModel) -> bool {
     )
 }
 
+/// The 65 % layout in the top row (5, 6, 7 from the left) in the column
+/// `layout` draws its code in; the middle for a code that fills the square.
+fn top_row_layout(layout: u8) -> u8 {
+    const TOP_LEFT: u8 = 5;
+    const TOP_MIDDLE: u8 = 6;
+    const TOP_RIGHT: u8 = 7;
+    match layout {
+        1..=4 if layout % 2 == 1 => TOP_LEFT,
+        1..=4 => TOP_RIGHT,
+        5..=13 => TOP_LEFT + (layout - TOP_LEFT) % 3,
+        _ => TOP_MIDDLE,
+    }
+}
+
 /// Where a repeat exchange stands when the two phones hold different
 /// things for each other.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -87,6 +101,23 @@ impl MultiStageExchangeEngine {
     /// AppEngine acts on it once, and a later tap cannot change it.
     pub fn reconnect_answer(&self) -> Option<bool> {
         self.reconnect_answer
+    }
+
+    /// Where the own code is drawn in its square. While the question
+    /// waits for its answer the two answers are kept in view under the
+    /// code and an iPhone SE shows about 86 % of the square: a code the
+    /// trainer put in the lower row was cut there and the other phone
+    /// decoded none of it (rig, 2026-11-22, vauchi/private#1304). The top
+    /// row at 65 % ends at 70 % of the square. Once answered, the other
+    /// phone reads this one again at the layout it was trained to.
+    pub(super) fn own_code_placement(&self) -> Option<QrPlacement> {
+        let asking = self.repeat == Some(RepeatExchange::Asking) && self.reconnect_answer.is_none();
+        let layout = if asking {
+            top_row_layout(self.current_qr_layout)
+        } else {
+            self.current_qr_layout
+        };
+        super::placement_for_layout(layout)
     }
 
     pub(super) fn answer_reconnect(&mut self, accept: bool) -> ActionResult {

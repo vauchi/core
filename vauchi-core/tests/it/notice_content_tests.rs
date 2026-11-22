@@ -35,10 +35,17 @@ fn body(length: usize) -> Vec<u8> {
     (0..length).map(|i| (i % 251) as u8).collect()
 }
 
+/// A distinct nonce per record: a nonce is never used twice under one key.
+fn nonce_for(index: u16) -> [u8; 24] {
+    let mut nonce = NONCE;
+    nonce[..2].copy_from_slice(&index.to_be_bytes());
+    nonce
+}
+
 /// Every record of a body, each sealed as transmission 0.
 fn publication(key: &[u8; 32], body: &[u8], week: u32) -> Vec<[u8; RECORD_BYTES]> {
     (0..record_count(body.len()).expect("a body that fits"))
-        .map(|index| seal_record(key, body, week, index, 0, &NONCE).expect("sealed"))
+        .map(|index| seal_record(key, body, week, index, 0, &nonce_for(index)).expect("sealed"))
         .collect()
 }
 
@@ -172,7 +179,7 @@ fn a_chunk_that_disagrees_or_a_body_off_its_commitment_is_refused() {
     let other = self::body(700);
     let mut assembly = Assembly::new(commitment(&KEY, &body));
     let chunk = |body: &[u8], index| {
-        let sealed = seal_record(&KEY, body, WEEK, index, 0, &NONCE).expect("sealed");
+        let sealed = seal_record(&KEY, body, WEEK, index, 0, &nonce_for(index)).expect("sealed");
         open_record(&KEY, WEEK, index, 0, &sealed).expect("opens")
     };
     assert_eq!(assembly.add(chunk(&body, 0)), Ok(()));
@@ -197,7 +204,7 @@ fn a_record_carrying_another_index_than_its_id_is_refused() {
     use vauchi_core::crypto::HKDF;
 
     let body = body(1_500);
-    let honest = seal_record(&KEY, &body, WEEK, 1, 0, &NONCE).expect("sealed");
+    let honest = seal_record(&KEY, &body, WEEK, 1, 0, &nonce_for(1)).expect("sealed");
     let record_key = HKDF::derive_array::<32>(None, &KEY, b"Vauchi_Update_Record_v4");
     let id_of_index_0 = record_id(&KEY, WEEK, 0, 0);
     let mut plaintext = Vec::new();

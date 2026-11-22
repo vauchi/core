@@ -133,20 +133,19 @@ fn the_direction_decides_as_the_independent_implementation_does() {
         std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("notice-conformance-rust.json");
     std::fs::write(&out, serde_json::to_string_pretty(&actual).expect("json")).expect("written");
 
-    let expected_path = format!("{fixtures}notice-conformance-expected-v1.json");
-    if let Ok(text) = std::fs::read_to_string(&expected_path) {
-        let expected: Vec<Value> = serde_json::from_str(&text).expect("json");
-        assert_eq!(expected.len(), actual.len());
-        for (want, got) in expected.iter().zip(&actual) {
-            for (index, (w, g)) in want["observed"]
-                .as_array()
-                .expect("observed")
-                .iter()
-                .zip(got["observed"].as_array().expect("observed"))
-                .enumerate()
-            {
-                assert_eq!(w, g, "{}: step {index}", want["name"]);
-            }
+    let expected: Vec<Value> = serde_json::from_str(
+        &std::fs::read_to_string(format!("{fixtures}notice-conformance-expected-v1.json"))
+            .expect("the other implementation's decisions are checked in"),
+    )
+    .expect("json");
+    assert_eq!(expected.len(), actual.len(), "schedules");
+    for (want, got) in expected.iter().zip(&actual) {
+        assert_eq!(want["name"], got["name"]);
+        let want = want["observed"].as_array().expect("observed");
+        let got = got["observed"].as_array().expect("observed");
+        assert_eq!(want.len(), got.len(), "steps of {}", got.len());
+        for (index, (w, g)) in want.iter().zip(got).enumerate() {
+            assert_eq!(w, g, "step {index}");
         }
     }
 }

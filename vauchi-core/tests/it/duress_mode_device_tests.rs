@@ -129,7 +129,10 @@ fn tablet_in_duress_mode() -> Vauchi {
         &signing,
     );
     registry
-        .add_device_unsigned(DeviceInfo::derive(&seed, 1, "Tablet".into(), 0).to_registered(&seed))
+        .add_device(
+            DeviceInfo::derive(&seed, 1, "Tablet".into(), 0).to_registered(&seed),
+            &signing,
+        )
         .unwrap();
     wb.storage()
         .device()

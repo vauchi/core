@@ -55,10 +55,13 @@ fn a_revocation_is_stamped_with_the_app_clock() {
     let clock = FakeClock::new(SystemTime::UNIX_EPOCH + Duration::from_secs(NOW)).shared();
     let mut wb = vauchi_core::Vauchi::in_memory_with_clock(clock).unwrap();
     wb.create_identity("Alice").unwrap();
-    let mut registry = wb.identity().unwrap().initial_device_registry();
+    let identity = wb.identity().unwrap();
+    let mut registry = identity.initial_device_registry();
     let laptop = DeviceInfo::derive(&seed, 1, "Laptop".into(), 0).to_registered(&seed);
     let laptop_id = laptop.device_id;
-    registry.add_device_unsigned(laptop).unwrap();
+    registry
+        .add_device(laptop, identity.signing_keypair())
+        .unwrap();
     wb.storage()
         .device()
         .save_device_registry(&registry)

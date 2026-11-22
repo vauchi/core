@@ -16,6 +16,13 @@
 # When the target fails too, tui or e2e is behind Core, not this MR's
 # doing: exit 3, which the job allows as a warning.
 #
+# A merge request that moves Core's contract pin is behind the same way:
+# e2e's tools pin the contract themselves and follow a new one only after
+# a Core release, so on this Core they build with two contracts and do
+# not compile (core!2403, vauchi/private#1343). Then the target is not
+# tried and the job exits 3 naming both pins. A journey regression in
+# such a merge request shows only once the tools have moved.
+#
 # The relays the journeys run against stay at e2e's pins and do not depend
 # on this Core, so E2E_PINNED_BIN_CACHE keeps them between jobs: building
 # them cold was most of this job's first ten minutes. Each job works on its
@@ -70,9 +77,20 @@ journeys_against() { # core-dir name
     return "$rc"
 }
 
+contract_pin() { # core-dir
+    sed -n -E 's/^vauchi-contract *=.*tag *= *"([^"]+)".*/\1/p' "$1/Cargo.toml" 2>/dev/null | head -n 1
+}
+
 if journeys_against "$mr_core" mr; then
     echo "the TUI journeys pass against this merge request's Core"
     exit 0
+fi
+mr_pin=$(contract_pin "$mr_core")
+target_pin=$(contract_pin "$target_core")
+if [ -n "$mr_pin" ] && [ -n "$target_pin" ] && [ "$mr_pin" != "$target_pin" ]; then
+    echo "WARN: this merge request moves the contract from $target_pin to $mr_pin; e2e's tools still pin" >&2
+    echo "      their own and follow only after a Core release. A journey regression shows once they moved." >&2
+    exit 3
 fi
 echo "the TUI journeys failed against this merge request's Core; trying the target branch's Core"
 if journeys_against "$target_core" target; then

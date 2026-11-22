@@ -76,9 +76,8 @@ fn records_and_the_commitment_match_the_recorded_vector() {
 fn a_record_opens_under_its_id_and_tells_its_place() {
     let body = body(1_200);
     let sealed = seal_record(&KEY, &body, WEEK, 2, 1, &NONCE).expect("sealed");
-    let id = record_id(&KEY, WEEK, 2, 1);
-    assert_eq!(&sealed[..16], &id);
-    let chunk = open_record(&KEY, &id, &sealed).expect("opens");
+    assert_eq!(&sealed[..16], &record_id(&KEY, WEEK, 2, 1));
+    let chunk = open_record(&KEY, WEEK, 2, 1, &sealed).expect("opens");
     assert_eq!((chunk.index, chunk.count, chunk.length), (2, 3, 1_200));
     assert_eq!(&chunk.bytes[..176], &body[1_024..]);
     assert!(chunk.bytes[176..].iter().all(|byte| *byte == 0));
@@ -103,14 +102,16 @@ fn no_id_repeats_across_weeks_indices_and_transmissions() {
 fn a_record_altered_or_looked_up_under_another_id_or_key_does_not_open() {
     let body = body(700);
     let sealed = seal_record(&KEY, &body, WEEK, 1, 0, &NONCE).expect("sealed");
-    let id = record_id(&KEY, WEEK, 1, 0);
     for byte in [0usize, 15, 16, 39, 40, 300, 559, 560, 575] {
         let mut altered = sealed;
         altered[byte] ^= 1;
-        assert!(open_record(&KEY, &id, &altered).is_none(), "byte {byte}");
+        assert!(
+            open_record(&KEY, WEEK, 1, 0, &altered).is_none(),
+            "byte {byte}"
+        );
     }
-    assert!(open_record(&KEY, &record_id(&KEY, WEEK, 0, 0), &sealed).is_none());
-    assert!(open_record(&[4; 32], &id, &sealed).is_none());
+    assert!(open_record(&KEY, WEEK, 0, 0, &sealed).is_none());
+    assert!(open_record(&[4; 32], WEEK, 1, 0, &sealed).is_none());
 }
 
 // @internal
@@ -153,7 +154,7 @@ fn chunks_from_different_publications_complete_one_body() {
 
     let mut assembly = Assembly::new(expected);
     let open = |record: &[u8; RECORD_BYTES], week, index, transmission| {
-        open_record(&KEY, &record_id(&KEY, week, index, transmission), record).expect("opens")
+        open_record(&KEY, week, index, transmission, record).expect("opens")
     };
     assert_eq!(assembly.add(open(&first_week[0], WEEK, 0, 0)), Ok(()));
     assert_eq!(assembly.missing(), vec![1, 2]);
@@ -172,7 +173,7 @@ fn a_chunk_that_disagrees_or_a_body_off_its_commitment_is_refused() {
     let mut assembly = Assembly::new(commitment(&KEY, &body));
     let chunk = |body: &[u8], index| {
         let sealed = seal_record(&KEY, body, WEEK, index, 0, &NONCE).expect("sealed");
-        open_record(&KEY, &record_id(&KEY, WEEK, index, 0), &sealed).expect("opens")
+        open_record(&KEY, WEEK, index, 0, &sealed).expect("opens")
     };
     assert_eq!(assembly.add(chunk(&body, 0)), Ok(()));
     assert_eq!(assembly.add(chunk(&other, 1)), Err(ContentError::Disagrees));
@@ -183,6 +184,54 @@ fn a_chunk_that_disagrees_or_a_body_off_its_commitment_is_refused() {
         assert_eq!(off_commitment.add(chunk(&body, index)), Ok(()));
     }
     assert!(off_commitment.complete(&KEY).is_none());
+}
+
+// Codex, reading the protocol text alone, 2026-11-22: a record must carry
+// the index its ID was wanted for. Only a holder of the update key can
+// seal one that does not, so this seals one by hand.
+// @internal
+#[test]
+fn a_record_carrying_another_index_than_its_id_is_refused() {
+    use chacha20poly1305::XChaCha20Poly1305;
+    use chacha20poly1305::aead::{Aead, KeyInit, Payload};
+    use vauchi_core::crypto::HKDF;
+
+    let body = body(1_500);
+    let honest = seal_record(&KEY, &body, WEEK, 1, 0, &NONCE).expect("sealed");
+    let record_key = HKDF::derive_array::<32>(None, &KEY, b"Vauchi_Update_Record_v4");
+    let id_of_index_0 = record_id(&KEY, WEEK, 0, 0);
+    let mut plaintext = Vec::new();
+    plaintext.extend_from_slice(&1u16.to_be_bytes());
+    plaintext.extend_from_slice(&3u16.to_be_bytes());
+    plaintext.extend_from_slice(&1_500u32.to_be_bytes());
+    plaintext.extend_from_slice(&body[512..1_024]);
+    let sealed = XChaCha20Poly1305::new(record_key.as_ref().into())
+        .encrypt(
+            chacha20poly1305::XNonce::from_slice(&NONCE),
+            Payload {
+                msg: &plaintext,
+                aad: &id_of_index_0,
+            },
+        )
+        .expect("seals");
+    let mut forged = [0u8; RECORD_BYTES];
+    for (to, from) in forged.iter_mut().zip(
+        id_of_index_0
+            .iter()
+            .chain(NONCE.iter())
+            .chain(sealed.iter()),
+    ) {
+        *to = *from;
+    }
+
+    assert!(
+        open_record(&KEY, WEEK, 1, 0, &honest).is_some(),
+        "the honest record opens"
+    );
+    assert!(
+        open_record(&KEY, WEEK, 0, 0, &forged).is_none(),
+        "index 1 under the ID of index 0"
+    );
 }
 
 proptest! {
@@ -208,7 +257,7 @@ proptest! {
         let mut assembly = Assembly::new(commitment(&key, &body));
         for (index, record) in &records {
             prop_assert!(assembly.complete(&key).is_none());
-            let chunk = open_record(&key, &record_id(&key, WEEK, *index, 0), record).expect("opens");
+            let chunk = open_record(&key, WEEK, *index, 0, record).expect("opens");
             prop_assert_eq!(assembly.add(chunk), Ok(()));
         }
         prop_assert_eq!(assembly.complete(&key).expect("complete").to_vec(), body);

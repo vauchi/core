@@ -220,10 +220,11 @@ fn a_key_stored_before_it_named_its_identity_keeps_its_public_key() {
         public_key_of(&storage),
         *SigningKeyPair::from_seed(&seed).public_key().as_bytes()
     );
-    assert_eq!(
-        public_key_of(&storage),
-        *SigningKeyPair::from_seed(&seed).public_key().as_bytes()
-    );
+    storage
+        .identity()
+        .save(&Identity::create("Bob", 1_700_000_000))
+        .unwrap();
+    assert_eq!(creation_refusal(&storage), ANOTHER_IDENTITY);
 }
 
 // @internal

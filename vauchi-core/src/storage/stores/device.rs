@@ -208,6 +208,14 @@ impl DeviceStore<'_> {
     /// named their identity is the current identity's (its contacts pinned
     /// it) and is rewritten to name it.
     fn open_device_signing_key(&self, owner: &[u8; 32]) -> Result<SigningKeyPair, StorageError> {
+        self.open_device_signing_key_once(owner, true)
+    }
+
+    fn open_device_signing_key_once(
+        &self,
+        owner: &[u8; 32],
+        may_name_owner: bool,
+    ) -> Result<SigningKeyPair, StorageError> {
         let stored = self.stored_device_signing_key()?.ok_or_else(|| {
             StorageError::InvalidData(
                 "a device signing key is created only while an identity is stored".into(),
@@ -236,12 +244,20 @@ impl DeviceStore<'_> {
                     "the stored device signing key belongs to another identity".into(),
                 ));
             }
-            None => {
+            None if may_name_owner => {
                 let sealed = self.seal_device_signing_key(owner, &seed)?;
                 self.conn.execute(
                     "UPDATE device_signing_key SET key_encrypted = ?1 WHERE id = 1 AND key_encrypted = ?2",
                     params![sealed, stored],
                 )?;
+                // Read back: another connection may have named a different
+                // identity first, and then this one must not sign with it.
+                return self.open_device_signing_key_once(owner, false);
+            }
+            None => {
+                return Err(StorageError::InvalidData(
+                    "the stored device signing key names no identity".into(),
+                ));
             }
         }
         Ok(SigningKeyPair::from_seed(&seed))

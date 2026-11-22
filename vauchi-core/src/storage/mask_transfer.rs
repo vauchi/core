@@ -26,6 +26,7 @@ impl Storage {
         let mask = self.mask_profile();
         let copy = Self::empty_mask_profile(mask.encryption_key.clone(), None)?;
         copy.load_body(&mask.sealed_body()?, &mask.encryption_key)?;
+        copy.conn.execute("DELETE FROM device_signing_key", [])?;
         let key = SymmetricKey::generate();
         copy.rekey_mask_rows(&mask.encryption_key, &key)?;
         Ok(MaskTransfer {
@@ -54,6 +55,7 @@ impl Storage {
     ) -> Result<(), StorageError> {
         let copy = Self::empty_mask_profile(transfer.key.clone(), None)?;
         copy.load_body(&transfer.body, &transfer.key)?;
+        copy.conn.execute("DELETE FROM device_signing_key", [])?;
         let mask = self.mask_profile();
         copy.rekey_mask_rows(&transfer.key, &mask.encryption_key)?;
         let tables = decode_tables(&copy.sealed_body()?)?;

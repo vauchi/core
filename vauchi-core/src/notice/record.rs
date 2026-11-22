@@ -17,7 +17,7 @@ const KIND_OPENING: u8 = 0x02;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Malformed;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub enum Record {
     /// The key of one card update and the commitment to its body.
     UpdateKey {
@@ -39,6 +39,54 @@ pub enum Record {
         confirmation: [u8; 16],
     },
 }
+
+/// Compares update keys in constant time; the other fields are public.
+impl PartialEq for Record {
+    fn eq(&self, other: &Self) -> bool {
+        use subtle::ConstantTimeEq;
+        match (self, other) {
+            (
+                Record::UpdateKey {
+                    update_key: a,
+                    commitment: ca,
+                },
+                Record::UpdateKey {
+                    update_key: b,
+                    commitment: cb,
+                },
+            ) => bool::from(a.as_ref().ct_eq(b.as_ref())) && ca == cb,
+            (
+                Record::Refresh {
+                    refresh_public: a,
+                    number: na,
+                    proof_tag: pa,
+                },
+                Record::Refresh {
+                    refresh_public: b,
+                    number: nb,
+                    proof_tag: pb,
+                },
+            ) => a == b && na == nb && pa == pb,
+            (
+                Record::Opening {
+                    ephemeral_public: a,
+                    number: na,
+                    key_id: ka,
+                    confirmation: fa,
+                },
+                Record::Opening {
+                    ephemeral_public: b,
+                    number: nb,
+                    key_id: kb,
+                    confirmation: fb,
+                },
+            ) => a == b && na == nb && ka == kb && fa == fb,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Record {}
 
 impl std::fmt::Debug for Record {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -83,6 +131,15 @@ impl<'a> Reader<'a> {
         let (field, rest) = self.rest.split_first_chunk::<N>().ok_or(Malformed)?;
         self.rest = rest;
         Ok(*field)
+    }
+
+    /// A secret field, copied straight into memory that is wiped on drop.
+    fn take_secret(&mut self) -> Result<Zeroizing<[u8; 32]>, Malformed> {
+        let (field, rest) = self.rest.split_first_chunk::<32>().ok_or(Malformed)?;
+        self.rest = rest;
+        let mut secret = Zeroizing::new([0u8; 32]);
+        secret.copy_from_slice(field);
+        Ok(secret)
     }
 
     fn end_in_zeros(self) -> Result<(), Malformed> {
@@ -138,7 +195,7 @@ impl Record {
         let [kind] = reader.take::<1>()?;
         match kind {
             KIND_UPDATE_KEY => {
-                let update_key = Zeroizing::new(reader.take::<32>()?);
+                let update_key = reader.take_secret()?;
                 let commitment = reader.take::<31>()?;
                 reader.end_in_zeros()?;
                 Ok(Record::UpdateKey {

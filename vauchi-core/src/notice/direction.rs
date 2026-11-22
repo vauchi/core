@@ -698,6 +698,14 @@ impl Sender {
         self.writes_in
     }
 
+    /// The numbers of the epochs it keeps, in rising order: what a later
+    /// copy of the device could still read or write in.
+    pub fn kept_numbers(&self) -> Vec<u32> {
+        let mut numbers: Vec<u32> = self.epochs.iter().map(|e| e.keys.number()).collect();
+        numbers.sort_unstable();
+        numbers
+    }
+
     pub fn keeps(&self, epoch: &EpochId) -> bool {
         self.epochs.iter().any(|kept| kept.keys.id() == *epoch)
     }

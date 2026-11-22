@@ -413,6 +413,28 @@ fn an_alarm_in_an_epoch_left_does_not_keep_its_notices_readable() {
     );
 }
 
+// Discussion round 2, 2026-11-22 (Kimi and Codex): protecting every
+// epoch at or above the highest number followed keeps every epoch opened
+// on a refresh whose opening was lost, without bound, and the unnamed cap
+// then evicted protected ones anyway. After refresh m the receiver can no
+// longer move into an unnamed epoch numbered m - 3 or lower.
+// @internal
+#[test]
+fn after_lost_openings_the_sender_keeps_only_the_three_newest_unnamed_epochs() {
+    let mut p = pair();
+    for week in 0..13 {
+        let now = START + week * WEEK;
+        let refresh = p.receiver_session(&[], now);
+        let _lost = p.sender_session(&refresh, now + DAY);
+    }
+    assert_eq!(p.sender.kept_numbers(), vec![0, 11, 12, 13]);
+
+    p.faithful_week(START + 13 * WEEK);
+    p.faithful_week(START + 14 * WEEK);
+    p.assert_healed();
+    p.assert_no_alarm();
+}
+
 // Red team, pass 1: four unanswered openings stopped healing for good.
 // @internal
 #[test]

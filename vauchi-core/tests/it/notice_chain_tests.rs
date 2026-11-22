@@ -29,7 +29,7 @@ fn written(count: u32) -> Vec<[u8; NOTICE_BYTES]> {
     let mut writer = ChainWriter::new(&CHAIN_KEY);
     (0..count)
         .map(|expected| {
-            let (position, at) = writer.assign();
+            let (position, at) = writer.assign().expect("a position is left");
             assert_eq!(position, expected);
             seal(&at, &plaintext(position))
         })
@@ -187,10 +187,47 @@ fn a_writer_never_assigns_a_position_twice() {
     let mut writer = ChainWriter::new(&CHAIN_KEY);
     let mut tags = BTreeSet::new();
     for expected in 0..300 {
-        let (position, at) = writer.assign();
+        let (position, at) = writer.assign().expect("a position is left");
         assert_eq!(position, expected);
         assert!(tags.insert(at.tag), "tag of position {position} repeats");
     }
+}
+
+// Discussion round 1, 2026-11-22 (Kimi, Codex): at the last position the
+// writer handed out the same position again with a new key. Out of
+// reach in honest use (2^32 positions at 128 a period), but a position is
+// never written twice, so the chain ends instead.
+// @internal
+#[test]
+fn a_chain_ends_at_its_last_position_and_never_repeats_one() {
+    let mut writer = ChainWriter::resume(&CHAIN_KEY, u32::MAX - 1);
+    assert_eq!(
+        writer.assign().map(|(position, _)| position),
+        Some(u32::MAX - 1)
+    );
+    assert!(writer.assign().is_none(), "no position after the last");
+    assert!(writer.assign().is_none());
+
+    let mut reader = ChainReader::resume(&CHAIN_KEY, u32::MAX - 1);
+    let mut at_end = ChainWriter::resume(&CHAIN_KEY, u32::MAX - 1);
+    let (position, at) = at_end.assign().expect("the last position");
+    let notice = seal(&at, &plaintext(position));
+    assert_eq!(
+        reader.read(&notice, NOW).map(|(read, _)| read),
+        Some(u32::MAX - 1)
+    );
+    assert!(reader.read(&notice, NOW).is_none());
+}
+
+// @internal
+#[test]
+fn a_chain_resumed_at_a_position_continues_the_same_chain() {
+    let notices = written(6);
+    let mut writer = ChainWriter::resume(&CHAIN_KEY, 0);
+    let (_, at) = writer.assign().expect("position 0");
+    assert_eq!(seal(&at, &plaintext(0)), notices[0]);
+    let mut reader = ChainReader::resume(&CHAIN_KEY, 0);
+    assert_eq!(read(&mut reader, &notices[5], NOW), Some(5));
 }
 
 proptest! {

@@ -464,6 +464,47 @@ fn the_sender_keeps_an_unnamed_epoch_two_below_the_newest_refresh() {
     p.assert_no_alarm();
 }
 
+// The independent implementation, 2026-11-23 (Codex, from the text alone):
+// protocol section 7 erases epochs after a session's refreshes are
+// handled, so a late refresh can name an epoch on the day it would have
+// expired. The Rust erased first and treated the name as erased.
+// @internal
+#[test]
+fn a_late_refresh_names_an_epoch_on_the_day_it_would_expire() {
+    let mut p = pair();
+    let first = p.receiver_session(&[], START);
+    let opening_1 = p.sender_session(&first, START + DAY);
+    p.receiver_session(&opening_1, START + 2 * DAY);
+
+    let second = p.receiver_session(&[], START + WEEK);
+    let opening_2 = p.sender_session(&second, START + WEEK + DAY);
+    let late_third = p.receiver_session(&[], START + 2 * WEEK);
+    p.sender_session(&[], START + 2 * WEEK + DAY);
+    p.receiver_session(&opening_2, START + 2 * WEEK + 2 * DAY);
+    assert_eq!(p.receiver.current_number(), 2);
+
+    for week in 3..4 {
+        let now = START + week * WEEK;
+        let refresh = p.receiver_session(&[], now);
+        let opening = p.sender_session(&refresh, now + DAY);
+        p.receiver_session(&opening, now + 2 * DAY);
+    }
+    let fifth = p.receiver_session(&[], START + 4 * WEEK);
+    let both: Vec<Notice> = late_third.into_iter().chain(fifth).collect();
+    p.sender_session(&both, START + 4 * WEEK + DAY);
+
+    assert!(
+        p.sender.kept_numbers().contains(&1),
+        "named again by the late refresh"
+    );
+    assert_eq!(
+        p.sender.writes_in_number(),
+        3,
+        "then the newer refresh's name"
+    );
+    p.assert_no_alarm();
+}
+
 // Red team, pass 1: four unanswered openings stopped healing for good.
 // @internal
 #[test]

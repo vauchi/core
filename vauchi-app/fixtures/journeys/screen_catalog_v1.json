@@ -20032,6 +20032,11 @@
                     ],
                     "purpose": "display",
                     "label": null,
+                    "placement": {
+                      "size": 650,
+                      "x": 175,
+                      "y": 50
+                    },
                     "error_correction": "low",
                     "accessibility": {
                       "label": "own_qr",

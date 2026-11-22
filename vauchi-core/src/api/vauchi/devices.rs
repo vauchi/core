@@ -144,7 +144,7 @@ impl ProfileEngine {
         let mut registry = self
             .storage
             .device()
-            .load_device_registry()?
+            .load_own_device_registry(identity)?
             .ok_or_else(|| VauchiError::InvalidState("No device registry found".into()))?;
 
         let devices = registry.all_devices().to_vec();
@@ -209,7 +209,7 @@ impl ProfileEngine {
         let mut registry = self
             .storage
             .device()
-            .load_device_registry()?
+            .load_own_device_registry(identity)?
             .ok_or_else(|| VauchiError::InvalidState("No device registry found".into()))?;
         let now = self.storage.now_secs();
         registry

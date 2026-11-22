@@ -182,7 +182,15 @@ impl AppEngine {
         let Some(event) = self.correlate_file_event(event) else {
             return Ok(self.drain_pending_commands());
         };
-        let mut commands = self.dispatch_event(event.clone())?;
+        let mut commands = self.dispatch_event(event.clone()).inspect_err(|error| {
+            // Dev instrumentation (no content): which event was refused and
+            // why, which `kind` alone did not say (vauchi/private#1339).
+            tracing::warn!(
+                event = %rejection::event_kind(&event),
+                reason = %rejection::rejection_detail(error),
+                "event refused"
+            );
+        })?;
         if std::mem::take(&mut self.needs_storage_unlock) {
             self.held_for_unlock = Some(event);
             commands.push(Command::RequestBiometricUnlock);

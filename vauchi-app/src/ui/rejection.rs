@@ -43,6 +43,41 @@ fn rejection_alert(locale: Locale, message: String) -> Vec<Command> {
     }]
 }
 
+/// An event's variant, never its fields: a value may be what the person
+/// typed (logging rules). For the log line of a refused event
+/// (vauchi/private#1339).
+pub(crate) fn event_kind(event: &vauchi_core::Event) -> String {
+    match serde_json::to_value(event) {
+        Ok(serde_json::Value::String(unit)) => unit,
+        Ok(serde_json::Value::Object(fields)) => fields
+            .keys()
+            .next()
+            .cloned()
+            .unwrap_or_else(|| "unknown".to_owned()),
+        _ => "unknown".to_owned(),
+    }
+}
+
+/// Why `dispatch` refused, one level deeper than
+/// `AppPresentationError::kind` where the prepared surface said why.
+pub(crate) fn rejection_detail(error: &crate::ui::AppPresentationError) -> String {
+    use crate::ui::{AppPresentationError, PreparedSurfaceError};
+    match error {
+        AppPresentationError::Prepared(reason) => format!(
+            "prepared.{}",
+            match reason {
+                PreparedSurfaceError::InvalidIdentifier(_) => "invalid_identifier",
+                PreparedSurfaceError::UnsupportedComponent => "unsupported_component",
+                PreparedSurfaceError::SurfaceMismatch => "surface_mismatch",
+                PreparedSurfaceError::UnknownBinding => "unknown_binding",
+                PreparedSurfaceError::ValueTypeMismatch => "value_type_mismatch",
+                PreparedSurfaceError::UnsupportedEvent => "unsupported_event",
+            }
+        ),
+        other => other.kind().to_owned(),
+    }
+}
+
 // INLINE_TEST_REQUIRED: tests exercise the crate-private diagnostics helpers
 #[cfg(test)]
 mod tests {

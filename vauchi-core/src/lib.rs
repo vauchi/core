@@ -36,6 +36,10 @@ pub mod rng;
 pub mod sleeper;
 
 pub mod crypto;
+
+#[cfg(feature = "notice-core")]
+pub mod notice;
+
 pub use crypto::{DhError, PublicKey, Signature, SigningKeyPair, SymmetricKey, decrypt, encrypt};
 
 #[cfg(feature = "flame")]

@@ -93,6 +93,23 @@ impl HKDF {
         Zeroizing::new(okm)
     }
 
+    /// Derives `N` bytes into a fixed array, zeroized when dropped.
+    ///
+    /// `N` is checked at compile time against HKDF-SHA256's limit, so the
+    /// call cannot fail.
+    pub fn derive_array<const N: usize>(
+        salt: Option<&[u8]>,
+        ikm: &[u8],
+        info: &[u8],
+    ) -> Zeroizing<[u8; N]> {
+        const { assert!(N <= 255 * 32) };
+        let hk = Hkdf::<Sha256>::new(salt, ikm);
+        let mut okm = Zeroizing::new([0u8; N]);
+        hk.expand(info, okm.as_mut())
+            .expect("N is within HKDF-SHA256's output limit");
+        okm
+    }
+
     /// Derives two 32-byte keys from the same input.
     ///
     /// Used in Double Ratchet for deriving (root_key, chain_key) pairs.

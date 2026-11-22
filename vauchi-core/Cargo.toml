@@ -31,7 +31,11 @@ secure-storage-linux = ["secure-storage", "keyring/linux-native-sync-persistent"
 secure-storage-apple = ["secure-storage", "keyring/apple-native"]
 secure-storage-windows = ["secure-storage", "keyring/windows-native"]
 # Enable this feature to expose internal modules for integration tests
-testing = []
+testing = ["notice-core"]
+# The notice core of mailbox cohorts (ADR-081): experimental, wired to
+# nothing, and built only for tests until its protocol is reviewed
+# (vauchi/private#1281). No shipped build enables it.
+notice-core = []
 # Reduces Argon2id KDF cost parameters for faster test execution (~5x speedup).
 # MUST NOT be enabled in production builds — only for test/dev profiles.
 test-kdf = []

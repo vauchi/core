@@ -155,3 +155,69 @@ fn in_duress_mode_this_device_never_revokes_itself_in_the_real_registry() {
         (true, false)
     );
 }
+
+const ANOTHER_IDENTITYS_REGISTRY: &str = "the saved device registry belongs to another identity";
+
+/// My phone, holding a registry that names it and a laptop but that
+/// another identity signed: what an identity this phone held before left.
+fn phone_over_another_identitys_registry() -> Vauchi {
+    let mut phone = Vauchi::in_memory().unwrap();
+    phone.create_identity("Alice").unwrap();
+    let identity = phone.identity().unwrap();
+    let seed = *identity.master_seed();
+    let mut registry = identity.initial_device_registry();
+    let laptop = DeviceInfo::derive(&seed, 1, "laptop".into(), 0);
+    registry
+        .add_device(laptop.to_registered(&seed), identity.signing_keypair())
+        .unwrap();
+    let other = vauchi_core::identity::Identity::create("Mallory", 1_700_000_000);
+    registry.lift_version_to(registry.version() + 1, other.signing_keypair());
+    phone
+        .storage()
+        .device()
+        .save_device_registry(&registry)
+        .unwrap();
+    phone
+}
+
+fn saved_registry_verifies_as_mine(phone: &Vauchi) -> bool {
+    let registry = phone
+        .storage()
+        .device()
+        .load_device_registry()
+        .unwrap()
+        .unwrap();
+    registry.verify(&phone.identity().unwrap().signing_keypair().public_key())
+}
+
+// @internal
+#[test]
+fn revoking_a_device_does_not_re_sign_another_identitys_registry() {
+    let phone = phone_over_another_identitys_registry();
+
+    let error = phone
+        .revoke_device(1)
+        .expect_err("another identity's registry is not revoked in and re-signed");
+
+    assert!(
+        error.to_string().contains(ANOTHER_IDENTITYS_REGISTRY),
+        "got: {error}"
+    );
+    assert!(!saved_registry_verifies_as_mine(&phone), "left as it was");
+}
+
+// @internal
+#[test]
+fn removing_this_device_does_not_re_sign_another_identitys_registry() {
+    let phone = phone_over_another_identitys_registry();
+
+    let error = phone
+        .revoke_this_device()
+        .expect_err("another identity's registry is not revoked in and re-signed");
+
+    assert!(
+        error.to_string().contains(ANOTHER_IDENTITYS_REGISTRY),
+        "got: {error}"
+    );
+    assert!(!saved_registry_verifies_as_mine(&phone), "left as it was");
+}

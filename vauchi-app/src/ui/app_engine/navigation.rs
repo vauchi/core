@@ -537,9 +537,18 @@ impl AppEngine {
 
     /// Invalidates all cached engines. Use after bulk mutations.
     /// Rebuilds the live current engine too, same as `invalidate_screen`.
+    ///
+    /// A rebuilt engine may stand on another step (onboarding starts again
+    /// at Welcome), so the revision moves with the fields: a late event for
+    /// the step just left is then dropped as stale, not refused as unknown
+    /// (vauchi/private#1339).
     pub fn invalidate_all(&mut self) {
+        let before = self.projected_visible_surface();
         self.engine_cache.clear();
         self.invalidate_screen(&self.screen.clone());
+        if let Err(error) = self.renew_revision_unless_bindings_kept(before.as_ref()) {
+            tracing::warn!(?error, "rebuilt screens keep their revision");
+        }
     }
 
     /// Returns the default landing screen.

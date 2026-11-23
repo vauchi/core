@@ -346,6 +346,7 @@ mod render_context_tests;
 mod responsive_presentation_tests;
 mod restorable_state_tests;
 mod restore_over_identity_tests;
+mod restore_runs_behind_progress_tests;
 mod result_routing_wiring_tests;
 mod row_info_tests;
 mod sent_not_delivered_copy_tests;

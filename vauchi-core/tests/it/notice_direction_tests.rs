@@ -528,6 +528,53 @@ fn a_view_with_no_update_yet_uses_no_chain_position() {
     assert_eq!(*read[0].update_key, key);
 }
 
+// Gate review, 2026-11-23 (Claude): the m - 3 erasure removed the epoch
+// a refresh was sealed in, the receiver's epoch left most recently,
+// together with the opening the sender had just queued on it.
+// @internal
+#[test]
+fn the_m_minus_3_erasure_keeps_the_base_of_an_opening_just_queued() {
+    let mut p = pair();
+    let first = p.receiver_session(&[], START);
+    let opening_1 = p.sender_session(&first, START + DAY);
+
+    // Opening 2 is lost for good: it spends its four attempts, with
+    // opening 1's resends, in sessions the gateway never delivers.
+    let second = p.receiver_session(&[], START + WEEK);
+    for day in 1..5 {
+        let delivered: &[Notice] = if day == 1 { &second } else { &[] };
+        let _lost = p.sender_session(delivered, START + WEEK + day * DAY);
+    }
+    let third = p.receiver_session(&[], START + 2 * WEEK);
+    let opening_3 = p.sender_session(&third, START + 2 * WEEK + DAY);
+    assert_eq!(
+        opening_3.len(),
+        1,
+        "only the opening on refresh 3 is left to write"
+    );
+
+    p.receiver_session(&opening_1, START + 2 * WEEK + 2 * DAY);
+    assert_eq!(p.receiver.current_number(), 1);
+    p.receiver_session(&opening_3, START + 2 * WEEK + 3 * DAY);
+    assert_eq!(
+        p.receiver.current_number(),
+        3,
+        "epoch 1 is the one left most recently"
+    );
+
+    let fourth = p.receiver_session(&[], START + 3 * WEEK);
+    assert_eq!(fourth.len(), 2, "sealed in epoch 3, then in epoch 1");
+    let answer = p.sender_session(&fourth[1..], START + 3 * WEEK + DAY);
+    assert_eq!(p.sender.writes_in_number(), 3);
+    p.receiver_session(&answer, START + 3 * WEEK + 2 * DAY);
+    assert_eq!(
+        p.receiver.current_number(),
+        4,
+        "the opening on refresh 4 arrived"
+    );
+    p.assert_no_alarm();
+}
+
 // Red team, pass 1: four unanswered openings stopped healing for good.
 // @internal
 #[test]
@@ -636,7 +683,7 @@ fn a_late_copy_of_a_refresh_naming_an_erased_epoch_raises_nothing() {
         "sealed in the second epoch and in the first"
     );
     let late_copy = fourth[1];
-    let opening = p.sender_session(&fourth[..1], START + 3 * WEEK + DAY);
+    let opening = p.sender_session(&fourth[1..], START + 3 * WEEK + DAY);
     assert_eq!(p.sender.writes_in(), second_epoch);
     p.receiver_session(&opening, START + 3 * WEEK + 2 * DAY);
 

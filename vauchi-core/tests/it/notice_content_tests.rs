@@ -300,3 +300,28 @@ proptest! {
         prop_assert_eq!(assembly.complete().expect("complete").to_vec(), body);
     }
 }
+
+// Gate review 8 (Claude, Kimi): with the honest record 0 held, a later
+// chunk of the same shape but other bytes, as a group member can seal it,
+// is refused by its hash, and the honest chunk then completes the body.
+// @internal
+#[test]
+fn a_later_chunk_of_the_right_shape_but_forged_bytes_is_refused_by_its_hash() {
+    let honest_body = body(1_500);
+    let mut forged_body = honest_body.clone();
+    forged_body[700] ^= 1;
+    let mut assembly = Assembly::new(commitment(&KEY, &honest_body));
+    let chunk = |body: &[u8], index| {
+        let sealed = seal_record(&KEY, body, WEEK, index, 0, &nonce_for(index)).expect("sealed");
+        open_record(&KEY, WEEK, index, 0, &sealed).expect("opens")
+    };
+    assert_eq!(assembly.add(&KEY, chunk(&honest_body, 0)), Ok(()));
+    assert_eq!(
+        assembly.add(&KEY, chunk(&forged_body, 1)),
+        Err(ContentError::Disagrees)
+    );
+    assert_eq!(assembly.missing(), vec![1, 2]);
+    assert_eq!(assembly.add(&KEY, chunk(&honest_body, 1)), Ok(()));
+    assert_eq!(assembly.add(&KEY, chunk(&honest_body, 2)), Ok(()));
+    assert_eq!(assembly.complete().expect("complete").to_vec(), honest_body);
+}

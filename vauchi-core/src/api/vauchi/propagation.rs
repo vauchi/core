@@ -481,7 +481,13 @@ impl ProfileEngine {
         &self,
         hex_prefix: &str,
     ) -> VauchiResult<Option<crate::identity::RegisteredDevice>> {
-        let registry = self.storage.device().load_device_registry()?;
+        let Some(identity) = self.identity.as_ref() else {
+            return Ok(None);
+        };
+        let registry = self
+            .storage
+            .device()
+            .load_device_registry_if_own(identity)?;
         match registry {
             Some(reg) => Ok(reg.find_device_by_prefix(hex_prefix).cloned()),
             None => Ok(None),
@@ -591,7 +597,7 @@ impl ProfileEngine {
                         let current_version = self
                             .storage
                             .device()
-                            .load_device_registry()?
+                            .load_device_registry_if_own(identity)?
                             .map(|current| current.version())
                             .unwrap_or(0);
                         if registry.version() > current_version {

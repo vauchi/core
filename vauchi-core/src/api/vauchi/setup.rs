@@ -67,8 +67,12 @@ impl ProfileEngine {
         let has_contacts = contact_count > 0;
         let has_three_contacts = contact_count >= 3;
 
-        let device_linked = match self.storage.device().load_device_registry()? {
-            Some(registry) => registry.device_count() > 1,
+        let device_linked = match self.identity.as_ref() {
+            Some(identity) => self
+                .storage
+                .device()
+                .load_device_registry_if_own(identity)?
+                .is_some_and(|registry| registry.device_count() > 1),
             None => false,
         };
 

@@ -541,7 +541,7 @@ fn full_sync_payload(ctx: &DeviceLinkPersistence, now: u64) -> Result<String, St
     let identity = Identity::from_storage_bytes(&identity_bytes, now).map_err(|e| e.to_string())?;
     let registry = storage
         .device()
-        .load_device_registry()
+        .load_device_registry_if_own(&identity)
         .map_err(|e| e.to_string())?
         .unwrap_or_else(|| identity.initial_device_registry());
     let payload = DeviceSyncOrchestrator::new(&storage, identity.create_device_info(now), registry)

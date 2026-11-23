@@ -154,7 +154,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         }
         if let Some(current) = storage
             .device()
-            .load_device_registry()
+            .load_device_registry_if_own(identity)
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
             && registry.version() <= current.version()
         {
@@ -939,7 +939,7 @@ pub fn build_device_sync_envelopes(
 ) -> Result<Vec<Vec<u8>>, DeviceSyncError> {
     let registry = match storage
         .device()
-        .load_device_registry()
+        .load_device_registry_if_own(identity)
         .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
     {
         Some(r) if r.device_count() > 1 => r,

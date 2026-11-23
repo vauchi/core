@@ -285,7 +285,7 @@ fn try_journal_for_siblings(
 
     let Some(own_registry) = storage
         .device()
-        .load_device_registry()
+        .load_device_registry_if_own(identity)
         .map_err(|e| e.to_string())?
     else {
         return Ok(());

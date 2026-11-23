@@ -780,7 +780,7 @@ impl ProfileEngine {
             None => return,
         };
 
-        let registry = match self.storage.device().load_device_registry() {
+        let registry = match self.storage.device().load_device_registry_if_own(identity) {
             Ok(Some(r)) if r.device_count() > 1 => r,
             _ => return,
         };

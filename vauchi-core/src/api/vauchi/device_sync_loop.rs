@@ -144,7 +144,7 @@ impl ProfileEngine {
         identity: &Identity,
     ) -> VauchiResult<usize> {
         // Gate: a sync target requires ≥2 registered devices.
-        let registry = match self.storage.device().load_device_registry() {
+        let registry = match self.storage.device().load_device_registry_if_own(identity) {
             Ok(Some(r)) if r.device_count() > 1 => r,
             _ => return Ok(0),
         };
@@ -213,7 +213,11 @@ impl ProfileEngine {
             .identity
             .as_ref()
             .ok_or(VauchiError::IdentityNotInitialized)?;
-        let Some(registry) = self.storage.device().load_device_registry()? else {
+        let Some(registry) = self
+            .storage
+            .device()
+            .load_device_registry_if_own(identity)?
+        else {
             return Ok(());
         };
         if registry.device_count() <= 1 {
@@ -254,7 +258,11 @@ impl ProfileEngine {
         identity: &Identity,
         ciphertext: &[u8],
     ) -> VauchiResult<usize> {
-        let registry = match self.storage.device().load_device_registry()? {
+        let registry = match self
+            .storage
+            .device()
+            .load_device_registry_if_own(identity)?
+        {
             Some(r) if r.device_count() > 1 => r,
             _ => return Ok(0),
         };

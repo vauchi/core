@@ -46,7 +46,11 @@ impl ProfileEngine {
 
         let current_device_id = identity.device_id();
 
-        if let Some(registry) = self.storage.device().load_device_registry()? {
+        if let Some(registry) = self
+            .storage
+            .device()
+            .load_device_registry_if_own(identity)?
+        {
             let devices = registry
                 .all_devices()
                 .iter()

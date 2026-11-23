@@ -40,11 +40,14 @@ impl ProfileEngine {
     /// Storage errors.
     pub fn loss_safeguards(&self) -> VauchiResult<LossSafeguards> {
         let now = self.clock.unix_seconds();
-        let linked_device = self
-            .storage
-            .device()
-            .load_device_registry()?
-            .is_some_and(|registry| registry.active_devices().len() > 1);
+        let linked_device = match self.identity.as_ref() {
+            Some(identity) => self
+                .storage
+                .device()
+                .load_device_registry_if_own(identity)?
+                .is_some_and(|registry| registry.active_devices().len() > 1),
+            None => false,
+        };
         let guardians = !self.guardian_groups()?.is_empty();
         let recent_backup = self
             .load_backup_reminder_state()?

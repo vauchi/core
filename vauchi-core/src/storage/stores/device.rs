@@ -337,6 +337,27 @@ impl DeviceStore<'_> {
         Ok(Some(saved))
     }
 
+    /// The saved registry if `identity` signed it, and none otherwise: for
+    /// reads that only list, count or sync to this identity's devices. A
+    /// registry another identity left must not name sync targets or linked
+    /// devices, and must not outrank this identity's next registry by its
+    /// version (private#970). Paths that re-sign use
+    /// [`Self::load_own_device_registry`], which refuses it instead.
+    pub fn load_device_registry_if_own(
+        &self,
+        identity: &Identity,
+    ) -> Result<Option<DeviceRegistry>, StorageError> {
+        let owner = identity.signing_keypair().public_key();
+        let Some(saved) = self.load_device_registry()? else {
+            return Ok(None);
+        };
+        if !saved.verify(&owner) {
+            tracing::warn!("[DeviceStore] ignored a saved device registry another identity signed");
+            return Ok(None);
+        }
+        Ok(Some(saved))
+    }
+
     /// Forgets this install's device registry.
     pub fn clear_device_registry(&self) -> Result<(), StorageError> {
         self.conn.execute("DELETE FROM device_registry", [])?;

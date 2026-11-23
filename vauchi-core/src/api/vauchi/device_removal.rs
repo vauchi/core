@@ -66,7 +66,7 @@ impl ProfileEngine {
         Ok(self
             .storage
             .device()
-            .load_device_registry()?
+            .load_device_registry_if_own(identity)?
             .and_then(|registry| {
                 registry
                     .find_device(identity.device_id())

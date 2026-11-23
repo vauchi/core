@@ -30,10 +30,11 @@ struct GroupUpdate {
     queued: bool,
     /// Its key went out since the view was last due.
     viewed: bool,
-    /// When a notice of it was last written in an acknowledged session:
-    /// the group sent longest ago goes first, so no group is starved by
-    /// the cap of positions a period (gate review 8, Codex).
-    sent_at: Option<u64>,
+    /// When a notice of it was last written, acknowledged or not: the
+    /// group written longest ago goes first, updates and views alike, so
+    /// no group is starved by the cap of positions a period (gate reviews
+    /// 8 and 9, Codex).
+    written_at: Option<u64>,
 }
 
 #[cfg_attr(feature = "testing", derive(Clone))]
@@ -221,7 +222,7 @@ impl Sender {
             edit: 0,
             queued: false,
             viewed: false,
-            sent_at: None,
+            written_at: None,
         });
         entry.update_key = Zeroizing::new(*update_key);
         entry.commitment = *commitment;
@@ -573,18 +574,18 @@ impl Sender {
                 control: self.openings.len(),
             };
         }
-        // Updates and views share the positions left in the period.
+        // Updates and views share the positions left in the period, in
+        // one queue.
         let positions_left = POSITIONS_A_PERIOD.saturating_sub(recent);
-        let update = self
-            .groups
-            .iter()
-            .filter(|(group, entry)| entry.queued && eligible(**group))
-            .count()
-            .min(positions_left);
-        let view = self.view_candidates().count().min(positions_left - update);
+        let chosen: Vec<(GroupId, bool)> = self
+            .notice_queue(&eligible)
+            .into_iter()
+            .take(positions_left)
+            .collect();
+        let update = chosen.iter().filter(|(_, is_update)| *is_update).count();
         Wants {
             update,
-            control: self.openings.len().saturating_add(view),
+            control: self.openings.len().saturating_add(chosen.len() - update),
         }
     }
 
@@ -597,15 +598,23 @@ impl Sender {
             .map(|(group, _)| *group)
     }
 
-    /// `groups` in the order their notices go: sent longest ago first.
-    fn least_recently_sent(&self, mut groups: Vec<GroupId>) -> Vec<GroupId> {
-        groups.sort_by_key(|group| {
+    /// The notices this direction would write, updates (`true`) and views
+    /// (`false`) in one queue: the group written longest ago first.
+    fn notice_queue(&self, eligible: &impl Fn(GroupId) -> bool) -> Vec<(GroupId, bool)> {
+        let mut queue: Vec<(GroupId, bool)> = self
+            .groups
+            .iter()
+            .filter(|(group, entry)| entry.queued && eligible(**group))
+            .map(|(group, _)| (*group, true))
+            .chain(self.view_candidates().map(|group| (group, false)))
+            .collect();
+        queue.sort_by_key(|(group, _)| {
             (
-                self.groups.get(group).and_then(|entry| entry.sent_at),
+                self.groups.get(group).and_then(|entry| entry.written_at),
                 *group,
             )
         });
-        groups
+        queue
     }
 
     /// Writes at most `control_slots` control records (openings, then a
@@ -667,23 +676,13 @@ impl Sender {
         }
         self.openings.retain(|opening| !opening.spent);
         let mut update_left = update_slots;
-        let updates: Vec<GroupId> = self.least_recently_sent(
-            self.groups
-                .iter()
-                .filter(|(group, entry)| entry.queued && eligible(**group))
-                .map(|(group, _)| *group)
-                .collect(),
-        );
-        let views: Vec<GroupId> = self.least_recently_sent(self.view_candidates().collect());
-        let chosen = updates
-            .into_iter()
-            .take(update_left)
-            .map(|group| (group, true))
-            .chain(views.into_iter().map(|group| (group, false)));
-        let chosen: Vec<(GroupId, bool)> = chosen.collect();
+        let chosen = self.notice_queue(&eligible);
         for (group, is_update) in chosen {
             let slot_left = if is_update { update_left } else { control_left };
-            if slot_left == 0 || self.positions_assigned_at.len() >= POSITIONS_A_PERIOD {
+            if slot_left == 0
+                || self.positions_assigned_at.len() >= POSITIONS_A_PERIOD
+                || !self.groups.contains_key(&group)
+            {
                 continue;
             }
             let writes_in = self.writes_in;
@@ -695,10 +694,11 @@ impl Sender {
             let Some((_, at)) = writer.and_then(ChainWriter::assign) else {
                 break;
             };
-            let Some(entry) = self.groups.get(&group) else {
+            self.positions_assigned_at.push_back(now);
+            let Some(entry) = self.groups.get_mut(&group) else {
                 continue;
             };
-            self.positions_assigned_at.push_back(now);
+            entry.written_at = Some(now);
             let record = Record::UpdateKey {
                 update_key: entry.update_key.clone(),
                 commitment: entry.commitment,
@@ -716,10 +716,9 @@ impl Sender {
 
     /// The relay took the last write.
     pub fn acknowledge(&mut self) {
-        for (group, edit, written_at) in self.written_groups.drain(..) {
+        for (group, edit, _) in self.written_groups.drain(..) {
             if let Some(entry) = self.groups.get_mut(&group) {
                 entry.viewed = true;
-                entry.sent_at = Some(written_at);
                 if entry.edit == edit {
                     entry.queued = false;
                 }

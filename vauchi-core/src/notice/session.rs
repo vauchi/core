@@ -190,7 +190,7 @@ impl Session {
 
     /// Writes one session. `senders` and `receivers` are the device's
     /// directions, in the same order every session; `publishers` its
-    /// groups' bodies, new edits first.
+    /// groups' bodies, served by how long each has waited.
     pub fn write(
         &mut self,
         senders: &mut [&mut Sender],

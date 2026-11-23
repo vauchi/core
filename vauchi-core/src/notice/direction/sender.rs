@@ -642,8 +642,8 @@ impl Sender {
         queue
     }
 
-    /// Writes at most `control_slots` control records (openings, then a
-    /// view) and `update_slots` update notices. A record left out stays
+    /// Writes at most `control_slots` control records (openings and views,
+    /// by how long each has waited) and `update_slots` update notices. A record left out stays
     /// queued and advances no counter (protocol section 8).
     pub fn write_within(
         &mut self,

@@ -295,3 +295,18 @@ fn a_card_lost_once_installs_when_each_view_renews_its_pending_key() {
     let day = installed_on.expect("the card never installed");
     assert!(day <= 40, "installed only on day {day}");
 }
+
+// Gate review 6 (Kimi, Codex, Claude): a publisher given no slot fixed its
+// week anyway, so a publication starved for weeks wrote with a week R no
+// longer looks in.
+// @internal
+#[test]
+fn a_publication_takes_its_week_only_when_its_first_record_is_written() {
+    let mut publisher = Publisher::new([17; 32], &body(100, 12));
+    publisher.queue_due(W0);
+    assert!(publisher.write(W0, 0).is_empty());
+    assert_eq!(publisher.last_week(), None);
+    let later = W0 + 3 * WEEK;
+    assert_eq!(publisher.write(later, 1).len(), 1);
+    assert_eq!(publisher.last_week(), Some(week(later)));
+}

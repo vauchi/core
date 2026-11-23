@@ -246,3 +246,29 @@ fn real_records_take_a_random_place_among_the_dummies() {
         "the refresh sat at {places:?} in every session"
     );
 }
+
+// Gate review 6 (Claude, Codex): copies cut by a grant were dropped once
+// the session was acknowledged, so the copy for the epoch left never went.
+// @internal
+#[test]
+fn a_refresh_copy_cut_by_a_grant_goes_in_a_later_session() {
+    let mut p = pair();
+    p.faithful_week(START);
+    assert_eq!(
+        p.receiver.wants(START + WEEK),
+        2,
+        "the current epoch and the one left"
+    );
+    let first = p.receiver.write_within(START + WEEK, 1);
+    p.receiver.acknowledge();
+    assert_eq!(first.len(), 1);
+    assert_eq!(
+        p.receiver.wants(START + WEEK + 60),
+        1,
+        "the cut copy still waits"
+    );
+    let second = p.receiver.write_within(START + WEEK + 60, 1);
+    p.receiver.acknowledge();
+    assert_eq!(second.len(), 1);
+    assert_eq!(p.receiver.wants(START + WEEK + 120), 0);
+}

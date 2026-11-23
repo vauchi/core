@@ -51,6 +51,19 @@ pub struct Grant {
 /// control waits, and control fills what updates leave. Within a queue
 /// the directions take turns, the first listed first.
 pub fn plan(slots: usize, wants: &[Wants]) -> Vec<Grant> {
+    let order: Vec<usize> = (0..wants.len()).collect();
+    plan_ordered(slots, wants, &order, &order)
+}
+
+/// As `plan`, with each queue's turn order its own: directions take turns
+/// in `update_order` for update slots and in `control_order` for control
+/// slots (gate review 11, Codex).
+pub fn plan_ordered(
+    slots: usize,
+    wants: &[Wants],
+    update_order: &[usize],
+    control_order: &[usize],
+) -> Vec<Grant> {
     let mut grants = vec![Grant::default(); wants.len()];
     let mut next_update = 0;
     let mut next_control = 0;
@@ -61,13 +74,17 @@ pub fn plan(slots: usize, wants: &[Wants]) -> Vec<Grant> {
         let any_control = (0..wants.len()).any(|i| control_left(&grants, i));
         let take_control = any_control && (slot % CONTROL_EVERY == 0 || !any_update);
         if take_control {
-            let i = next_turn(wants.len(), next_control, |i| control_left(&grants, i));
-            grants[i].control += 1;
-            next_control = i + 1;
+            let place = next_turn(control_order.len(), next_control, |place| {
+                control_left(&grants, control_order[place])
+            });
+            grants[control_order[place]].control += 1;
+            next_control = place + 1;
         } else if any_update {
-            let i = next_turn(wants.len(), next_update, |i| update_left(&grants, i));
-            grants[i].update += 1;
-            next_update = i + 1;
+            let place = next_turn(update_order.len(), next_update, |place| {
+                update_left(&grants, update_order[place])
+            });
+            grants[update_order[place]].update += 1;
+            next_update = place + 1;
         } else {
             break;
         }
@@ -129,10 +146,40 @@ impl SessionWrite {
 /// Codex).
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct Session {
-    last_served: Vec<u64>,
+    /// When each direction's update queue and control queue was last
+    /// served: an update is no turn of the control queue (gate review 11).
+    served_update: Vec<u64>,
+    served_control: Vec<u64>,
 }
 
 impl Session {
+    /// Shares `slots` among directions, each queue taking turns by when
+    /// it was last served, the one served longest ago first.
+    pub fn plan_turns(&mut self, slots: usize, wants: &[Wants]) -> Vec<Grant> {
+        let directions = wants.len();
+        self.served_update.resize(directions, 0);
+        self.served_control.resize(directions, 0);
+        let mut update_order: Vec<usize> = (0..directions).collect();
+        update_order.sort_by_key(|i| (self.served_update[*i], *i));
+        let mut control_order: Vec<usize> = (0..directions).collect();
+        control_order.sort_by_key(|i| (self.served_control[*i], *i));
+        plan_ordered(slots, wants, &update_order, &control_order)
+    }
+
+    /// Records which queues of which directions wrote at `now`.
+    pub fn record_turns(&mut self, wrote: &[Grant], now: u64) {
+        self.served_update.resize(wrote.len(), 0);
+        self.served_control.resize(wrote.len(), 0);
+        for (i, grant) in wrote.iter().enumerate() {
+            if grant.update > 0 {
+                self.served_update[i] = now;
+            }
+            if grant.control > 0 {
+                self.served_control[i] = now;
+            }
+        }
+    }
+
     pub fn save(&self) -> Result<zeroize::Zeroizing<Vec<u8>>, super::saved::SavedError> {
         super::saved::save(super::saved::Kind::Session, self)
     }
@@ -162,7 +209,6 @@ impl Session {
         };
 
         let directions = senders.len() + receivers.len();
-        self.last_served.resize(directions, 0);
         let mut wants: Vec<Wants> = senders
             .iter()
             .map(|sender| sender.wants_for(now, eligible))
@@ -171,35 +217,32 @@ impl Session {
             update: 0,
             control: receiver.wants(now),
         }));
-        let mut order: Vec<usize> = (0..directions).collect();
-        order.sort_by_key(|i| (self.last_served[*i], *i));
-        let ordered: Vec<Wants> = order.iter().map(|i| wants[*i]).collect();
-        let mut grants = vec![Grant::default(); directions];
-        for (place, grant) in plan(slots.notices, &ordered).into_iter().enumerate() {
-            grants[order[place]] = grant;
-        }
+        let grants = self.plan_turns(slots.notices, &wants);
 
         let mut notices = Vec::with_capacity(slots.notices);
-        let mut wrote = vec![false; directions];
+        let mut wrote = vec![Grant::default(); directions];
         for (i, sender) in senders.iter_mut().enumerate() {
             let written =
                 sender.write_within_for(now, grants[i].control, grants[i].update, eligible);
-            wrote[i] = !written.is_empty();
+            let counts = sender.last_written();
+            wrote[i] = Grant {
+                update: counts.update,
+                control: counts.control,
+            };
             notices.extend(written);
         }
         for (j, receiver) in receivers.iter_mut().enumerate() {
             let i = senders.len() + j;
             let written = receiver.write_within(now, grants[i].control);
-            wrote[i] = !written.is_empty();
+            wrote[i] = Grant {
+                update: 0,
+                control: written.len(),
+            };
             notices.extend(written);
         }
-        // A direction is served when it wrote, not when it was granted a
-        // slot it could not use (gate review 6).
-        for (i, served) in wrote.iter().enumerate() {
-            if *served {
-                self.last_served[i] = now;
-            }
-        }
+        // A queue is served when it wrote, not when it was granted a slot
+        // it could not use (gate review 6).
+        self.record_turns(&wrote, now);
         notices.truncate(slots.notices);
         notices.resize_with(slots.notices, random_bytes::<NOTICE_BYTES>);
         shuffle(&mut notices);

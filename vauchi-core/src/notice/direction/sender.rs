@@ -119,6 +119,10 @@ pub struct Sender {
     view_due: bool,
     /// The groups, edit numbers and time of this session's notices.
     written_groups: Vec<(GroupId, u64, u64)>,
+    /// What the last write wrote, by queue, so a session counts a turn
+    /// only for the queue served (gate review 11, Codex).
+    #[serde(skip)]
+    last_written: Wants,
     positions_assigned_at: VecDeque<u64>,
     highest_opened_this_session: Option<u32>,
     first_records: FirstRecords,
@@ -141,6 +145,7 @@ impl Clone for Sender {
             groups: self.groups.clone(),
             view_due: self.view_due,
             written_groups: self.written_groups.clone(),
+            last_written: self.last_written,
             positions_assigned_at: self.positions_assigned_at.clone(),
             highest_opened_this_session: self.highest_opened_this_session,
             first_records: self.first_records.clone(),
@@ -171,6 +176,7 @@ impl Sender {
             groups: BTreeMap::new(),
             view_due: false,
             written_groups: Vec::new(),
+            last_written: Wants::default(),
             positions_assigned_at: VecDeque::new(),
             highest_opened_this_session: None,
             first_records: FirstRecords::default(),
@@ -690,10 +696,18 @@ impl Sender {
             .filter(|(_, is_opening)| *is_opening)
             .count();
         let mut openings_written = 0usize;
-        for opening in self.openings.iter_mut().rev() {
+        // The openings themselves in waiting order, the newest first on a
+        // tie, so that the ones chosen are the ones that waited (gate review
+        // 11, Codex) and a second key under a number still gets the last
+        // address left (spec S4).
+        let mut opening_order: Vec<usize> = (0..self.openings.len()).collect();
+        opening_order
+            .sort_by_key(|index| (self.openings[*index].written_at, std::cmp::Reverse(*index)));
+        for index in opening_order {
             if control_left == 0 || openings_written >= openings_allowed {
                 break;
             }
+            let opening = &mut self.openings[index];
             let Some(base) = self.epochs.iter_mut().find(|e| e.keys.id() == opening.base) else {
                 continue;
             };
@@ -722,6 +736,8 @@ impl Sender {
         }
         self.openings.retain(|opening| !opening.spent);
         let mut update_left = update_slots;
+        let mut written_updates = 0usize;
+        let mut written_views = 0usize;
         let chosen = self.notice_queue(&eligible);
         for (group, is_update) in chosen {
             let slot_left = if is_update { update_left } else { control_left };
@@ -753,11 +769,22 @@ impl Sender {
             self.written_groups.push((group, entry.edit, now));
             if is_update {
                 update_left -= 1;
+                written_updates += 1;
             } else {
                 control_left -= 1;
+                written_views += 1;
             }
         }
+        self.last_written = Wants {
+            update: written_updates,
+            control: openings_written + written_views,
+        };
         written
+    }
+
+    /// What the last write wrote, by queue.
+    pub fn last_written(&self) -> Wants {
+        self.last_written
     }
 
     /// The relay took the last write.

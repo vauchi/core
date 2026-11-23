@@ -28,6 +28,7 @@ mod app_engine_preview_as_tests;
 mod app_engine_serde_exchange_tests;
 mod app_engine_settings_lock_tests;
 mod app_lifecycle_tests;
+mod app_lock_fails_closed_tests;
 #[path = "../app_reducer_protocol_tests.rs"]
 mod app_reducer_protocol_tests;
 #[path = "../app_undo_protocol_tests.rs"]

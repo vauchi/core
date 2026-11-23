@@ -469,10 +469,25 @@ impl AppEngine {
     /// (2026-07-01-android-contacts-list-stale-after-mutation).
     pub fn invalidate_screen(&mut self, screen: &AppScreen) {
         self.engine_cache.remove(screen);
-        if *screen == self.screen
-            && !Self::holds_live_machine_state(screen)
-            && !Self::holds_unsaved_input(screen)
-        {
+        if *screen == self.screen {
+            self.rebuild_current_engine();
+        }
+    }
+
+    /// The one way the live engine is rebuilt in place, whatever asked for
+    /// it: an invalidation, content applied in the background, or a new
+    /// language. A screen holding unsaved input or a live machine keeps its
+    /// engine and only takes the current language; any other is built
+    /// again. The revision moves only when the fields change, so a late
+    /// event for fields that are gone is dropped as stale, and a kept page
+    /// keeps its keyboard (vauchi/private#1339, #821).
+    pub(super) fn rebuild_current_engine(&mut self) {
+        let before = self.projected_visible_surface();
+        if Self::holds_live_machine_state(&self.screen) || Self::holds_unsaved_input(&self.screen) {
+            let _ = self.engine.apply_update(crate::ui::EngineUpdate::Locale(
+                self.render_context.resolved_locale(),
+            ));
+        } else {
             self.engine = Self::create_engine(
                 &self.vauchi,
                 &self.screen,
@@ -484,6 +499,9 @@ impl AppEngine {
                 self.glance_display_qr.as_deref(),
                 &self.ble_attempt_token,
             );
+        }
+        if let Err(error) = self.renew_revision_unless_bindings_kept(before.as_ref()) {
+            tracing::warn!(?error, "rebuilt screen keeps its revision");
         }
     }
 
@@ -525,10 +543,15 @@ impl AppEngine {
     /// is left by Save or Back, both of which reload what it edits. The
     /// password and duress PIN setups lost their input the same way, the
     /// duress one falling back to its overview mid-setup.
+    ///
+    /// Onboarding holds the step and the name typed so far: a language
+    /// catalogue arriving mid-way sent the person back to Welcome
+    /// (vauchi/private#821, #1339).
     fn holds_unsaved_input(screen: &AppScreen) -> bool {
         matches!(
             screen,
-            AppScreen::FormDialog { .. }
+            AppScreen::Onboarding
+                | AppScreen::FormDialog { .. }
                 | AppScreen::ContactEdit { .. }
                 | AppScreen::ChangePassword
                 | AppScreen::DuressPin
@@ -543,12 +566,8 @@ impl AppEngine {
     /// the step just left is then dropped as stale, not refused as unknown
     /// (vauchi/private#1339).
     pub fn invalidate_all(&mut self) {
-        let before = self.projected_visible_surface();
         self.engine_cache.clear();
-        self.invalidate_screen(&self.screen.clone());
-        if let Err(error) = self.renew_revision_unless_bindings_kept(before.as_ref()) {
-            tracing::warn!(?error, "rebuilt screens keep their revision");
-        }
+        self.rebuild_current_engine();
     }
 
     /// Returns the default landing screen.

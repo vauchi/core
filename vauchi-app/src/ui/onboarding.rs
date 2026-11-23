@@ -831,6 +831,10 @@ impl WorkflowEngine for OnboardingEngine {
                 self.has_camera = capabilities.has_camera;
                 return true;
             }
+            crate::ui::EngineUpdate::Locale(locale) => {
+                self.locale = locale;
+                return true;
+            }
             _ => return false,
         };
         match update {

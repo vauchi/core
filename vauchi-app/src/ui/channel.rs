@@ -207,6 +207,10 @@ pub enum EngineUpdate {
     /// live engine so a screen gated on a capability re-prepares without a
     /// rebuild that would drop its state (the lock screen's attempt count).
     DeviceCapabilities(vauchi_core::exchange::capability::types::DeviceCapabilities),
+    /// The language to render in changed, or its catalogue arrived. Pushed
+    /// into a live engine Core keeps through a rebuild (onboarding), so it
+    /// shows the new language without losing its step (vauchi/private#821).
+    Locale(crate::i18n::Locale),
     /// The biometric prompt succeeded but a duress PIN is set, so the lock
     /// screen asks for the password only (ADR-032, #591).
     BiometricUnlockPassed,
@@ -568,6 +572,7 @@ impl EngineUpdate {
             },
             Self::ConfirmPendingDelete => "ConfirmPendingDelete",
             Self::DeviceCapabilities(_) => "DeviceCapabilities",
+            Self::Locale(_) => "Locale",
             Self::BiometricUnlockPassed => "BiometricUnlockPassed",
             Self::DuressAppPasswordRefused => "DuressAppPasswordRefused",
             Self::SessionPinRejected => "SessionPinRejected",

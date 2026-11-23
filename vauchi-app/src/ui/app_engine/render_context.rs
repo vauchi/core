@@ -112,18 +112,7 @@ impl AppEngine {
                 AppScreen::Settings | AppScreen::SettingsAppearance
             )
         {
-            let screen = self.screen.clone();
-            self.engine = Self::create_engine(
-                &self.vauchi,
-                &screen,
-                self.preview_as_contact.as_deref(),
-                &self.device_capabilities,
-                &self.transport_readiness,
-                &self.render_context,
-                &self.pending_exchange_groups,
-                self.glance_display_qr.as_deref(),
-                &self.ble_attempt_token,
-            );
+            self.rebuild_current_engine();
         }
     }
 }

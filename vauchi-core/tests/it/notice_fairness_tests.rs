@@ -105,3 +105,60 @@ fn the_views_that_compete_for_control_are_the_ones_the_request_counted() {
         "the update and the opening"
     );
 }
+
+// Gate review 12 (Codex, Claude): the times the queues are ordered by were
+// not pulled back to the clock, as every stored time is (protocol section
+// 1), so a group written while the clock was ahead stayed behind every
+// group written after the clock was set back, for up to three days.
+// @internal
+#[test]
+fn a_group_written_with_the_clock_ahead_is_not_kept_behind_once_it_is_set_back() {
+    let mut p = pair();
+    let refresh = p.receiver_session(&[], START);
+    let (a, commitment_a) = update(91);
+    p.sender
+        .queue_group_update(1, &a, &commitment_a)
+        .expect("within 32 groups");
+    assert_eq!(p.sender.write_within(START + 3 * DAY, 0, 1).len(), 1);
+    p.sender.acknowledge();
+    let (b, commitment_b) = update(92);
+    p.sender
+        .queue_group_update(2, &b, &commitment_b)
+        .expect("within 32 groups");
+    assert_eq!(p.sender.write_within(START + 60, 0, 1).len(), 1);
+    p.sender.acknowledge();
+    p.sender.read(&refresh, START + 90);
+    let view = p.sender.write_within(START + 120, 1, 0);
+    let read: Vec<[u8; 32]> = p
+        .receiver
+        .read(&view, START + 180)
+        .iter()
+        .map(|r| *r.update_key)
+        .collect();
+    assert_eq!(read, vec![a], "group 1's view, pulled back to the clock");
+}
+
+// @internal
+#[test]
+fn a_turn_recorded_with_the_clock_ahead_is_pulled_back() {
+    use vauchi_core::notice::direction::Wants;
+    use vauchi_core::notice::session::{Grant, Session};
+    let control = Grant {
+        update: 0,
+        control: 1,
+    };
+    let mut session = Session::default();
+    session.record_turns(&[control, Grant::default()], START + 3 * DAY);
+    let wants = [Wants {
+        update: 0,
+        control: 1,
+    }; 2];
+    session.plan_turns(0, &wants, START);
+    session.record_turns(&[Grant::default(), control], START + 60);
+    let grants = session.plan_turns(1, &wants, START + 120);
+    assert_eq!(
+        (grants[0].control, grants[1].control),
+        (1, 0),
+        "direction 0's turn is pulled back to the set-back clock"
+    );
+}

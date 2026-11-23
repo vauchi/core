@@ -128,13 +128,18 @@ impl Publisher {
         let Some(current) = self.current.as_mut() else {
             return Vec::new();
         };
+        // Fewest transmissions first, so that with too few slots every
+        // record goes once before any goes again (gate review 5).
+        let mut order: Vec<usize> = (0..usize::from(self.records))
+            .filter(|index| {
+                !current.acknowledged[*index] && current.next_transmission[*index] < TRANSMISSIONS
+            })
+            .collect();
+        order.sort_by_key(|index| (current.next_transmission[*index], *index));
         let mut written = Vec::new();
-        for index in 0..usize::from(self.records) {
+        for index in order {
             if written.len() >= slots {
                 break;
-            }
-            if current.acknowledged[index] || current.next_transmission[index] >= TRANSMISSIONS {
-                continue;
             }
             let transmission = current.next_transmission[index];
             let record = seal_record(

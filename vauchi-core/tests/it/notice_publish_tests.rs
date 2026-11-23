@@ -244,3 +244,23 @@ fn pending_keys_are_kept_14_days_and_32_a_direction() {
         "an installed commitment is not pending again"
     );
 }
+
+// Gate review 5 (Claude): under withheld acknowledgements, writing records
+// in index order sent the first ones four times before the last ones
+// went once.
+// @internal
+#[test]
+fn with_too_few_slots_every_record_goes_once_before_any_goes_twice() {
+    let key = [15; 32];
+    let text = body(2_000, 10);
+    let mut publisher = Publisher::new(key, &text);
+    publisher.queue_due(W0);
+    let first = publisher.write(W0, 2);
+    let second = publisher.write(W0 + 3_600, 2);
+    let mut pending = Pending::default();
+    pending.note(&key, &commitment(&key, &text), W0);
+    let mut records = first;
+    records.extend(second);
+    let bodies = pending.read(&records, W0 + 7_200, accept_all);
+    assert_eq!(bodies.len(), 1, "four records in two sessions of two slots");
+}

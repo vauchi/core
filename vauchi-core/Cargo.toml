@@ -123,7 +123,7 @@ hex = "0.4"
 subtle = "2.6"
 
 # Zeroize sensitive data in memory
-zeroize = { version = "1.8", features = ["derive"] }
+zeroize = { version = "1.8", features = ["derive", "serde"] }
 
 # JSON Schema generation (optional, behind schema-gen feature)
 schemars = { version = "0.8", optional = true }

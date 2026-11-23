@@ -219,9 +219,11 @@ pub fn open_record(
 }
 
 /// The chunks of one update as they arrive, from any publication.
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Assembly {
     commitment: [u8; COMMITMENT_BYTES],
     shape: Option<(u16, u32)>,
+    #[serde(with = "crate::notice::saved::chunks")]
     chunks: Vec<Option<Zeroizing<[u8; CHUNK_BYTES]>>>,
 }
 

@@ -38,6 +38,7 @@ fn age(now: u64, stamp: &mut u64) -> u64 {
     now - *stamp
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 struct Publication {
     week: u32,
     next_transmission: Vec<u8>,
@@ -55,6 +56,7 @@ impl Publication {
 }
 
 /// One group's body as its sender publishes it.
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Publisher {
     update_key: Zeroizing<[u8; 32]>,
     body: Zeroizing<Vec<u8>>,
@@ -81,6 +83,14 @@ impl Publisher {
             queued: true,
             completed_at: None,
         }
+    }
+
+    pub fn save(&self) -> Zeroizing<Vec<u8>> {
+        super::saved::save(super::saved::Kind::Publisher, self)
+    }
+
+    pub fn load(bytes: &[u8]) -> Result<Self, super::saved::SavedError> {
+        super::saved::load(super::saved::Kind::Publisher, bytes)
     }
 
     /// The `w` of the last publication under this update key.
@@ -183,6 +193,7 @@ impl Publisher {
     }
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 struct Entry {
     update_key: Zeroizing<[u8; 32]>,
     commitment: [u8; COMMITMENT_BYTES],
@@ -192,13 +203,26 @@ struct Entry {
 
 /// One direction's update keys read and not yet installed, and the
 /// commitments installed most recently.
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct Pending {
     entries: VecDeque<Entry>,
     installed: VecDeque<[u8; COMMITMENT_BYTES]>,
 }
 
 impl Pending {
+    pub fn save(&self) -> Zeroizing<Vec<u8>> {
+        super::saved::save(super::saved::Kind::Pending, self)
+    }
+
+    /// Loads saved state and erases entries 14 days old first.
+    pub fn load(bytes: &[u8], now: u64) -> Result<Self, super::saved::SavedError> {
+        let mut pending: Self = super::saved::load(super::saved::Kind::Pending, bytes)?;
+        pending
+            .entries
+            .retain_mut(|entry| age(now, &mut entry.noted_at) < PENDING_KEPT_SECONDS);
+        Ok(pending)
+    }
+
     /// Notes an update key read in a notice. False when its commitment
     /// was installed lately or the key is already pending.
     pub fn note(

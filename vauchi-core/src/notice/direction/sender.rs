@@ -19,6 +19,7 @@ use crate::notice::record::Record;
 use crate::notice::seal::{TAG_BYTES, open, seal};
 
 #[cfg_attr(feature = "testing", derive(Clone))]
+#[derive(serde::Serialize, serde::Deserialize)]
 struct SenderEpoch {
     keys: Epoch,
     /// `None` only if the epoch's chain key was already taken.
@@ -46,6 +47,7 @@ impl SenderEpoch {
 }
 
 #[cfg_attr(feature = "testing", derive(Clone))]
+#[derive(serde::Serialize, serde::Deserialize)]
 struct RefreshRead {
     number: u32,
     public: [u8; 32],
@@ -55,6 +57,7 @@ struct RefreshRead {
 }
 
 #[cfg_attr(feature = "testing", derive(Clone))]
+#[derive(serde::Serialize, serde::Deserialize)]
 struct OpeningQueued {
     number: u32,
     base: EpochId,
@@ -76,8 +79,10 @@ struct RefreshFound {
     address_week: u32,
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Sender {
     label: Label,
+    #[serde(with = "crate::notice::saved::key_pair")]
     device: X25519KeyPair,
     receiver_device_public: [u8; 32],
     epochs: Vec<SenderEpoch>,
@@ -479,6 +484,18 @@ impl Sender {
     /// or an edit is waiting.
     pub fn write(&mut self, now: u64) -> Vec<Notice> {
         self.write_within(now, usize::MAX, usize::MAX)
+    }
+
+    /// This direction's state as saved between sessions (section 5).
+    pub fn save(&self) -> Zeroizing<Vec<u8>> {
+        crate::notice::saved::save(crate::notice::saved::Kind::Sender, self)
+    }
+
+    /// Loads saved state. S holds no notice key but its newest update key
+    /// and erases epochs after a session's refreshes (S4), so loading
+    /// erases nothing.
+    pub fn load(bytes: &[u8], _now: u64) -> Result<Self, crate::notice::saved::SavedError> {
+        crate::notice::saved::load(crate::notice::saved::Kind::Sender, bytes)
     }
 
     /// The notice chains a copy of this state can read from here on, one

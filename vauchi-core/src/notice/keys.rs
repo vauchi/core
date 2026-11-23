@@ -18,7 +18,9 @@ const TAG_BYTES: usize = 16;
 /// A direction's name in every derivation: the sender's device public
 /// key followed by the receiver's.
 #[derive(Clone, PartialEq, Eq)]
-pub struct Label([u8; 64]);
+#[serde_with::serde_as]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct Label(#[serde_as(as = "[_; 64]")] [u8; 64]);
 
 impl Label {
     pub fn new(sender_device_public: &[u8; 32], receiver_device_public: &[u8; 32]) -> Self {
@@ -38,6 +40,7 @@ type Key = Zeroizing<[u8; KEY_BYTES]>;
 
 /// The keys of one epoch of one direction.
 #[cfg_attr(feature = "testing", derive(Clone))]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Epoch {
     number: u32,
     id: [u8; TAG_BYTES],
@@ -97,6 +100,7 @@ pub struct Opened {
 /// A 16-byte tag a reader recognises a record by, and the single-use key
 /// the record is sealed under.
 #[cfg_attr(feature = "testing", derive(Clone))]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Keyed {
     pub tag: [u8; TAG_BYTES],
     pub key: Key,

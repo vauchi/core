@@ -29,6 +29,7 @@ pub const SKIPPED_SECONDS: u64 = 3 * PERIOD_SECONDS;
 pub const LAST_POSITION: u32 = u32::MAX - 1;
 
 #[cfg_attr(feature = "testing", derive(Clone))]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct ChainWriter {
     position: u32,
     chain_key: Zeroizing<[u8; 32]>,
@@ -72,12 +73,14 @@ impl ChainWriter {
 }
 
 #[cfg_attr(feature = "testing", derive(Clone))]
+#[derive(serde::Serialize, serde::Deserialize)]
 struct Skipped {
     at: Keyed,
     skipped_at: u64,
 }
 
 #[cfg_attr(feature = "testing", derive(Clone))]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct ChainReader {
     /// The lowest position not stepped past.
     position: u32,

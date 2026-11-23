@@ -47,7 +47,7 @@ pub fn week(now: u64) -> u32 {
     u32::try_from(now / PERIOD_SECONDS).unwrap_or(u32::MAX)
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Alarm {
     OpeningOnNumberNotIssued,
     OpeningKeyIdNotIssued,
@@ -84,9 +84,11 @@ pub(super) enum Seen {
 /// epoch's keys. An entry is kept while its address is watched.
 #[derive(Default)]
 #[cfg_attr(feature = "testing", derive(Clone))]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub(super) struct FirstRecords(BTreeMap<[u8; TAG_BYTES], FirstRecord>);
 
 #[cfg_attr(feature = "testing", derive(Clone))]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub(super) struct FirstRecord {
     hash: [u8; 32],
     read_at: u64,

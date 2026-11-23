@@ -18,9 +18,11 @@ use crate::notice::keys::{
 use crate::notice::record::Record;
 use crate::notice::seal::{TAG_BYTES, open, seal};
 
+#[derive(serde::Serialize, serde::Deserialize)]
 struct Issued {
     number: u32,
     public: [u8; 32],
+    #[serde(with = "crate::notice::saved::optional_key_pair")]
     private: Option<X25519KeyPair>,
     key_id: [u8; 8],
     name: EpochId,
@@ -29,6 +31,7 @@ struct Issued {
 }
 
 #[cfg_attr(feature = "testing", derive(Clone))]
+#[derive(serde::Serialize, serde::Deserialize)]
 struct ReceiverEpoch {
     keys: Epoch,
     reader: Option<ChainReader>,
@@ -53,6 +56,7 @@ impl ReceiverEpoch {
 }
 
 #[cfg_attr(feature = "testing", derive(Clone))]
+#[derive(serde::Serialize, serde::Deserialize)]
 struct OpeningRead {
     number: u32,
     attempt: u8,
@@ -62,8 +66,10 @@ struct OpeningRead {
     confirmation: [u8; 16],
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Receiver {
     label: Label,
+    #[serde(with = "crate::notice::saved::key_pair")]
     device: X25519KeyPair,
     sender_device_public: [u8; 32],
     seed: EpochId,
@@ -132,6 +138,21 @@ impl Receiver {
             first_records: FirstRecords::default(),
             alarms: Vec::new(),
         }
+    }
+
+    /// This direction's state as saved between sessions (section 5).
+    pub fn save(&self) -> Zeroizing<Vec<u8>> {
+        crate::notice::saved::save(crate::notice::saved::Kind::Receiver, self)
+    }
+
+    /// Loads saved state and erases what expired before anything reads
+    /// (P2, owner 2026-11-23): a device off for weeks keeps its expired
+    /// keys only until it next runs.
+    pub fn load(bytes: &[u8], now: u64) -> Result<Self, crate::notice::saved::SavedError> {
+        let mut receiver: Self =
+            crate::notice::saved::load(crate::notice::saved::Kind::Receiver, bytes)?;
+        receiver.expire(now);
+        Ok(receiver)
     }
 
     pub fn alarms(&self) -> &[Alarm] {

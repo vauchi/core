@@ -19,7 +19,7 @@ fn due_engine() -> AppEngine {
     vauchi.save_backup_reminder_state(&state).unwrap();
     // A linked device is a safeguard, so the ordinary reminder shows rather
     // than the safeguard prompt (vauchi/private#796, D8b).
-    link_tablet(&vauchi, [9u8; 32]);
+    link_tablet(&vauchi);
 
     AppEngine::new(vauchi)
 }

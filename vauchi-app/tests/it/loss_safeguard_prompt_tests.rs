@@ -15,7 +15,6 @@ use vauchi_core_testkit::helpers::create_vauchi_with_identity;
 use vauchi_core_testkit::two_recipient::add_recipient;
 
 const DAY: u64 = 24 * 60 * 60;
-const LAPTOP_SEED: [u8; 32] = [9u8; 32];
 const PROMPT: &str = "If you lose this phone, your contact list goes with it. \
                       Link a second device, choose guardians or make a backup to keep it.";
 
@@ -76,7 +75,7 @@ fn with_no_safeguard_the_reminder_slot_offers_all_three_and_opens_settings() {
 #[test]
 fn a_linked_device_brings_back_the_backup_reminder() {
     let vauchi = alice_due(ReminderFrequency::Weekly, None);
-    link_tablet(&vauchi, LAPTOP_SEED);
+    link_tablet(&vauchi);
 
     let action = toast_action(AppEngine::new(vauchi).drain_backup_reminder());
 

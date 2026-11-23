@@ -107,7 +107,7 @@ fn removed_contact_leaves_every_group_so_a_re_exchange_starts_default_closed() {
 #[test]
 fn removing_a_contact_journals_the_groups_it_left_for_linked_devices() {
     let (alice, dave_id, _mobile_id, family_id) = alice_with_dave_in_family();
-    let (registry, tablet_id) = link_tablet(&alice, [7u8; 32]);
+    let (registry, tablet_id) = link_tablet(&alice);
 
     alice.remove_contact(&dave_id).unwrap();
 

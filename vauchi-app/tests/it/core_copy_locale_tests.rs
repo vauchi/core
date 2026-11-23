@@ -83,7 +83,7 @@ fn reminder_message(locale: Option<&str>) -> String {
     state.frequency = ReminderFrequency::Weekly;
     state.last_backup_timestamp = Some(1);
     vauchi.save_backup_reminder_state(&state).unwrap();
-    link_tablet(&vauchi, [9u8; 32]);
+    link_tablet(&vauchi);
     match engine_in(locale, vauchi).drain_backup_reminder() {
         Some(ActionResult::ShowToast { message, .. }) => message,
         other => panic!("a due reminder shows a toast, got {other:?}"),

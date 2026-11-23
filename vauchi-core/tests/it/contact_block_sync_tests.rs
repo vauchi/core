@@ -43,7 +43,7 @@ fn capture_events(wb: &Vauchi) -> Arc<Mutex<Vec<VauchiEvent>>> {
 #[test]
 fn block_contact_is_journaled_for_linked_devices() {
     let (wb, bob) = vauchi_with_contact("Bob");
-    let (registry, tablet_id) = link_tablet(&wb, [21u8; 32]);
+    let (registry, tablet_id) = link_tablet(&wb);
 
     wb.block_contact(&bob).unwrap();
 
@@ -62,7 +62,7 @@ fn block_contact_is_journaled_for_linked_devices() {
 fn unblock_contact_is_journaled_for_linked_devices() {
     let (wb, bob) = vauchi_with_contact("Bob");
     wb.block_contact(&bob).unwrap();
-    let (registry, tablet_id) = link_tablet(&wb, [22u8; 32]);
+    let (registry, tablet_id) = link_tablet(&wb);
 
     wb.unblock_contact(&bob).unwrap();
 

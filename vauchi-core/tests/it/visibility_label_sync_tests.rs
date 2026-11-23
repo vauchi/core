@@ -56,7 +56,7 @@ fn group_mutations_journal_complete_state_for_linked_devices() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
-    let (registry, tablet_id) = link_tablet(&vauchi, [7u8; 32]);
+    let (registry, tablet_id) = link_tablet(&vauchi);
 
     let created = vauchi.create_group("Work").unwrap();
     vauchi
@@ -122,7 +122,7 @@ fn contact_visibility_override_is_journaled_for_linked_devices() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
-    let (registry, tablet_id) = link_tablet(&vauchi, [11u8; 32]);
+    let (registry, tablet_id) = link_tablet(&vauchi);
 
     vauchi
         .set_contact_visibility_override("contact-bob", "field-email", true)
@@ -151,7 +151,7 @@ fn contact_visibility_override_is_journaled_for_linked_devices() {
 fn contact_visibility_override_removal_is_journaled_for_linked_devices() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
-    let (registry, tablet_id) = link_tablet(&vauchi, [13u8; 32]);
+    let (registry, tablet_id) = link_tablet(&vauchi);
     vauchi
         .set_contact_visibility_override("contact-bob", "field-email", true)
         .unwrap();
@@ -186,7 +186,7 @@ fn contact_override_removal_with_repropagation_is_journaled_for_linked_devices()
     vauchi.create_identity("Alice").unwrap();
     let alice_pk = *vauchi.identity().unwrap().signing_public_key();
     let bob = add_recipient(&vauchi, &alice_pk, "Bob");
-    let (registry, tablet_id) = link_tablet(&vauchi, [17u8; 32]);
+    let (registry, tablet_id) = link_tablet(&vauchi);
     vauchi
         .set_contact_visibility_override(&bob.id_at_sharer, "field-email", true)
         .unwrap();
@@ -523,7 +523,7 @@ fn making_an_own_field_public_or_private_is_journaled_for_linked_devices() {
     let field = ContactField::new(FieldType::Phone, "Phone", "5550301", now());
     let field_id = field.id().to_string();
     vauchi.add_own_field(field).unwrap();
-    let (registry, tablet_id) = link_tablet(&vauchi, [7u8; 32]);
+    let (registry, tablet_id) = link_tablet(&vauchi);
 
     vauchi.set_own_field_public(&field_id).unwrap();
     let after_public = journal_for_tablet(&vauchi, registry.clone(), &tablet_id);
@@ -567,7 +567,7 @@ fn editing_the_second_same_label_entry_is_journaled_by_its_id() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let (_, second_id) = two_phone_entries(&vauchi);
-    let (registry, tablet_id) = link_tablet(&vauchi, [19u8; 32]);
+    let (registry, tablet_id) = link_tablet(&vauchi);
     let mut card = vauchi.own_card().unwrap().unwrap();
     card.update_field_value(&second_id, "5559999", now() + 1)
         .unwrap();
@@ -593,7 +593,7 @@ fn removing_an_entry_by_id_removes_that_entry_and_journals_its_id() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let (first_id, second_id) = two_phone_entries(&vauchi);
-    let (registry, tablet_id) = link_tablet(&vauchi, [23u8; 32]);
+    let (registry, tablet_id) = link_tablet(&vauchi);
 
     assert!(vauchi.remove_own_field_by_id(&second_id).unwrap());
 
@@ -624,7 +624,7 @@ fn re_saving_unchanged_entries_journals_nothing() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let (first_id, _) = two_phone_entries(&vauchi);
-    let (registry, tablet_id) = link_tablet(&vauchi, [29u8; 32]);
+    let (registry, tablet_id) = link_tablet(&vauchi);
     let before = journal_for_tablet(&vauchi, registry.clone(), &tablet_id).len();
     let mut card = vauchi.own_card().unwrap().unwrap();
     card.update_field_value(&first_id, "5550404", now() + 5)
@@ -650,7 +650,7 @@ fn in_duress_mode_visibility_changes_are_journaled_only_as_cover() {
     let field = ContactField::new(FieldType::Phone, "Phone", "5550301", now());
     let field_id = field.id().to_string();
     vauchi.add_own_field(field).unwrap();
-    let (registry, tablet_id) = link_tablet(&vauchi, [31u8; 32]);
+    let (registry, tablet_id) = link_tablet(&vauchi);
     vauchi.setup_app_password("app-password-123").unwrap();
     vauchi
         .setup_duress_pin_with_biometric_unlock("135790")
@@ -684,7 +684,7 @@ fn the_entry_visibility_toggle_is_journaled_for_linked_devices() {
     let field = ContactField::new(FieldType::Phone, "Phone", "5550404", now());
     let field_id = field.id().to_string();
     vauchi.add_own_field(field).unwrap();
-    let (registry, tablet_id) = link_tablet(&vauchi, [37u8; 32]);
+    let (registry, tablet_id) = link_tablet(&vauchi);
 
     vauchi.set_field_shown(&field_id, true).unwrap();
     let after_shown = journal_for_tablet(&vauchi, registry.clone(), &tablet_id);

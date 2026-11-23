@@ -40,7 +40,7 @@ const LEAVE_AND_WIPE: DeletionChoice = DeletionChoice {
 #[test]
 fn leaving_with_wipe_records_the_choice_and_journals_it_for_my_tablet() {
     let wb = phone();
-    let (registry, tablet) = link_tablet(&wb, [41u8; 32]);
+    let (registry, tablet) = link_tablet(&wb);
 
     wb.schedule_identity_deletion(LEAVE_AND_WIPE).unwrap();
 
@@ -125,7 +125,7 @@ fn without_the_instruction_nothing_is_wiped() {
 fn when_leaving_runs_with_the_wipe_choice_my_tablet_is_told_to_wipe() {
     let dir = tempfile::tempdir().unwrap();
     let mut wb = offline_phone(&dir);
-    let (registry, tablet) = link_tablet(&wb, [43u8; 32]);
+    let (registry, tablet) = link_tablet(&wb);
     wb.schedule_identity_deletion(LEAVE_AND_WIPE).unwrap();
 
     let sent = wb.tell_other_devices_to_wipe().unwrap();
@@ -142,7 +142,7 @@ fn when_leaving_runs_with_the_wipe_choice_my_tablet_is_told_to_wipe() {
 fn without_the_wipe_choice_no_device_is_told_to_wipe() {
     let dir = tempfile::tempdir().unwrap();
     let mut wb = offline_phone(&dir);
-    let (registry, tablet) = link_tablet(&wb, [44u8; 32]);
+    let (registry, tablet) = link_tablet(&wb);
     wb.schedule_identity_deletion(DeletionChoice::default())
         .unwrap();
 

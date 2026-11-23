@@ -147,7 +147,7 @@ fn the_linked_device_completes_with_an_answer_the_phone_did_not_fetch() {
 fn a_rekey_one_device_completes_reaches_the_others_with_the_new_shared_key() {
     let world = restored_and_offered();
     let tablet = linked_tablet(&world.phone);
-    let (registry, tablet_id) = link_tablet(&world.phone, [71u8; 32]);
+    let (registry, tablet_id) = link_tablet(&world.phone);
     let offer = offer_to_dave(&world);
     let dave = world.dave.vauchi();
     world.dave_takes_as_authorized(&offer);

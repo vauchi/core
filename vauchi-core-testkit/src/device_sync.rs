@@ -38,17 +38,17 @@ pub fn create_test_contact(name: &str) -> Contact {
 }
 
 /// Registers a "tablet" sibling beside the current device, so mutations
-/// on `vauchi` journal sync items for it.
-pub fn link_tablet(vauchi: &Vauchi, seed: [u8; 32]) -> (DeviceRegistry, [u8; 32]) {
-    let signing = SigningKeyPair::from_seed(&seed);
-    let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&seed, 0, "phone".into(), 0).to_registered(&seed),
-        &signing,
-    );
+/// on `vauchi` journal sync items for it. The registry is the one a real
+/// link saves: this identity's, naming the current device and the tablet,
+/// signed by the identity.
+pub fn link_tablet(vauchi: &Vauchi) -> (DeviceRegistry, [u8; 32]) {
+    let identity = vauchi.identity().expect("link_tablet needs an identity");
+    let seed = *identity.master_seed();
+    let mut registry = identity.initial_device_registry();
     let tablet = DeviceInfo::derive(&seed, 1, "tablet".into(), 0);
     let tablet_id = *tablet.device_id();
     registry
-        .add_device_unsigned(tablet.to_registered(&seed))
+        .add_device(tablet.to_registered(&seed), identity.signing_keypair())
         .unwrap();
     vauchi
         .storage()

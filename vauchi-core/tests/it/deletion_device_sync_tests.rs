@@ -23,7 +23,7 @@ fn phone() -> Vauchi {
 #[test]
 fn scheduling_my_identitys_deletion_is_journaled_for_my_tablet() {
     let wb = phone();
-    let (registry, tablet) = link_tablet(&wb, [31u8; 32]);
+    let (registry, tablet) = link_tablet(&wb);
 
     wb.schedule_identity_deletion(DeletionChoice {
         erase_guardian_set: true,
@@ -52,7 +52,7 @@ fn cancelling_my_identitys_deletion_is_journaled_for_my_tablet() {
     let wb = phone();
     wb.schedule_identity_deletion(DeletionChoice::default())
         .unwrap();
-    let (registry, tablet) = link_tablet(&wb, [32u8; 32]);
+    let (registry, tablet) = link_tablet(&wb);
 
     wb.cancel_identity_deletion().unwrap();
 
@@ -71,7 +71,7 @@ fn a_delayed_older_schedule_cannot_resurrect_a_cancelled_deletion() {
 
     let wb = phone();
     let identity = wb.identity().unwrap();
-    let (registry, tablet) = link_tablet(&wb, *identity.master_seed());
+    let (registry, tablet) = link_tablet(&wb);
     let cancel = SyncItem::DeletionCancelled { timestamp: 2000 };
     let schedule = SyncItem::DeletionScheduled {
         scheduled_at: 1000,
@@ -109,7 +109,7 @@ fn a_persisted_legacy_cancellation_rejects_an_older_schedule_after_upgrade() {
 
     let wb = phone();
     let identity = wb.identity().unwrap();
-    let (registry, tablet) = link_tablet(&wb, *identity.master_seed());
+    let (registry, tablet) = link_tablet(&wb);
     let stamps = HashMap::from([
         (
             "deletion:scheduled".into(),
@@ -159,7 +159,7 @@ fn a_newer_schedule_after_cancellation_still_applies() {
 
     let wb = phone();
     let identity = wb.identity().unwrap();
-    let (registry, tablet) = link_tablet(&wb, *identity.master_seed());
+    let (registry, tablet) = link_tablet(&wb);
     for item in [
         SyncItem::DeletionCancelled { timestamp: 2000 },
         SyncItem::DeletionScheduled {

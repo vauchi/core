@@ -31,7 +31,7 @@ fn a_note_saved_in_the_app_is_journaled_for_linked_devices() {
     );
     let dave = contact.id().to_string();
     vauchi.add_contact(contact).unwrap();
-    let (registry, tablet_id) = link_tablet(&vauchi, [31; 32]);
+    let (registry, tablet_id) = link_tablet(&vauchi);
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::ContactDetail {
         contact_id: dave.clone(),

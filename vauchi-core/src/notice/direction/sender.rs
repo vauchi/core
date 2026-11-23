@@ -438,6 +438,17 @@ impl Sender {
         let Some(base) = self.epochs.get(read_in) else {
             return false;
         };
+        // Specification S4: an epoch whose opening has no address left in
+        // this base could never be sent.
+        if base
+            .opening_attempts
+            .get(&refresh.number)
+            .copied()
+            .unwrap_or(0)
+            >= ATTEMPTS
+        {
+            return false;
+        }
         let ephemeral = X25519KeyPair::generate();
         let Ok(opened) = open_as_sender(
             &base.keys,

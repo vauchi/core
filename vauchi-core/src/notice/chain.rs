@@ -48,6 +48,13 @@ impl ChainWriter {
         }
     }
 
+    /// A reader of every position from this writer's next one on: what a
+    /// copy of the writer's state can read (the tests of P3).
+    #[cfg(feature = "testing")]
+    pub fn reader_from_here(&self) -> ChainReader {
+        ChainReader::resume(&self.chain_key, self.position)
+    }
+
     /// The next position and where a record written there travels, or
     /// `None` once the chain has ended. The chain steps at once, so no
     /// position is assigned twice.

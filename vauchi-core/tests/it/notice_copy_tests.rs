@@ -10,8 +10,10 @@
 //! it, so that it fails if the copy reads nothing at all, or too much.
 
 use crate::common::notice_pair::*;
+use vauchi_core::notice::chain::ChainReader;
 use vauchi_core::notice::direction::Receiver;
 use vauchi_core::notice::keys::opening_address;
+use vauchi_core::notice::record::Record;
 use vauchi_core::notice::seal::open;
 
 fn keys_read(reader: &mut Receiver, relays: &[Notice], now: u64) -> Vec<[u8; 32]> {
@@ -159,5 +161,62 @@ fn an_epoch_left_is_readable_to_a_copy_only_within_three_periods() {
         keys_read(&mut outside.clone(), &relays, START + 3 * DAY + WEEK),
         Vec::<[u8; 32]>::new(),
         "after three periods and a session it reads nothing there"
+    );
+}
+
+/// The update keys a copy of the sender's chains reads among `notices`.
+fn sender_copy_reads(readers: &mut [ChainReader], notices: &[Notice], now: u64) -> Vec<[u8; 32]> {
+    let mut keys = Vec::new();
+    for notice in notices {
+        for reader in readers.iter_mut() {
+            if let Some((_, plaintext)) = reader.read(notice, now)
+                && let Ok(Record::UpdateKey { update_key, .. }) = Record::from_plaintext(&plaintext)
+            {
+                keys.push(*update_key);
+            }
+        }
+    }
+    keys
+}
+
+// Gate reviews 3 to 5 (Kimi, Claude): no test copied the sender. A copy
+// of S holds its writers' chain keys: it reads what S writes in those
+// chains, and nothing once S follows R into an epoch opened after the
+// copy with a fresh ephemeral key.
+// @internal
+#[test]
+fn a_copy_of_the_sender_reads_its_chain_until_the_sender_follows_a_new_epoch() {
+    let mut p = pair();
+    let mut readers = p.sender.copied_chain_readers();
+    assert_eq!(readers.len(), 1, "the seed epoch's writer");
+
+    let (before, commitment) = update(1);
+    p.sender.queue_update(&before, &commitment);
+    let in_seed = p.sender_session(&[], START);
+    assert_eq!(
+        sender_copy_reads(&mut readers, &in_seed, START),
+        vec![before]
+    );
+
+    let refresh = p.receiver_session(&in_seed, START + DAY);
+    let opening = p.sender_session(&refresh, START + 2 * DAY);
+    p.receiver_session(&opening, START + 3 * DAY);
+    let naming = p.receiver_session(&[], START + DAY + WEEK);
+    let (after, commitment) = update(2);
+    p.sender.queue_update(&after, &commitment);
+    let written = p.sender_session(&naming, START + 2 * DAY + WEEK);
+    assert_ne!(
+        p.sender.writes_in(),
+        p.receiver.seed_epoch(),
+        "followed the new epoch"
+    );
+    assert!(
+        keys_read(&mut p.receiver, &written, START + 3 * DAY + WEEK).contains(&after),
+        "R reads it"
+    );
+    assert_eq!(
+        sender_copy_reads(&mut readers, &written, START + 3 * DAY + WEEK),
+        Vec::<[u8; 32]>::new(),
+        "the copy reads nothing in the epoch opened after it"
     );
 }

@@ -481,6 +481,16 @@ impl Sender {
         self.write_within(now, usize::MAX, usize::MAX)
     }
 
+    /// The notice chains a copy of this state can read from here on, one
+    /// for each kept epoch that still writes (the tests of P3).
+    #[cfg(feature = "testing")]
+    pub fn copied_chain_readers(&self) -> Vec<crate::notice::chain::ChainReader> {
+        self.epochs
+            .iter()
+            .filter_map(|epoch| epoch.writer.as_ref().map(ChainWriter::reader_from_here))
+            .collect()
+    }
+
     /// What this direction would write now: its update-key notice when an
     /// edit is queued, else a view due, and its queued openings.
     pub fn wants(&self, _now: u64) -> Wants {

@@ -20,7 +20,7 @@ use super::content::{
     Assembly, COMMITMENT_BYTES, ID_BYTES, RECORD_BYTES, TRANSMISSIONS, open_record, record_count,
     record_id, seal_record,
 };
-use super::direction::week;
+use super::direction::{GroupId, week};
 use crate::crypto::random_bytes;
 
 pub type ContentRecord = [u8; RECORD_BYTES];
@@ -58,6 +58,7 @@ impl Publication {
 /// One group's body as its sender publishes it.
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Publisher {
+    group: GroupId,
     update_key: Zeroizing<[u8; 32]>,
     body: Zeroizing<Vec<u8>>,
     records: u16,
@@ -65,6 +66,9 @@ pub struct Publisher {
     current: Option<Publication>,
     queued: bool,
     completed_at: Option<u64>,
+    /// Record 0 of this key's first publication was written: its notice
+    /// may go (section 4).
+    first_record_written: bool,
 }
 
 impl Publisher {
@@ -73,8 +77,18 @@ impl Publisher {
     /// # Panics
     /// If `body` is longer than eight records hold.
     pub fn new(update_key: [u8; 32], body: &[u8]) -> Self {
+        Self::for_group(0, update_key, body)
+    }
+
+    /// The first publication of an edit of `group`: queued at once.
+    ///
+    /// # Panics
+    /// If `body` is longer than eight records hold.
+    pub fn for_group(group: GroupId, update_key: [u8; 32], body: &[u8]) -> Self {
         let records = record_count(body.len()).expect("a body of at most eight records");
         Self {
+            group,
+            first_record_written: false,
             update_key: Zeroizing::new(update_key),
             body: Zeroizing::new(body.to_vec()),
             records,
@@ -91,6 +105,16 @@ impl Publisher {
 
     pub fn load(bytes: &[u8]) -> Result<Self, super::saved::SavedError> {
         super::saved::load(super::saved::Kind::Publisher, bytes)
+    }
+
+    pub fn group(&self) -> GroupId {
+        self.group
+    }
+
+    /// Whether record 0 of this key has been written, so that the edit's
+    /// notice may go.
+    pub fn first_record_written(&self) -> bool {
+        self.first_record_written
     }
 
     /// The `w` of the last publication under this update key.
@@ -172,6 +196,9 @@ impl Publisher {
             .expect("a body sized when published");
             current.next_transmission[index] = transmission + 1;
             current.written_unacknowledged.push(index);
+            if index == 0 {
+                self.first_record_written = true;
+            }
             written.push(record);
         }
         self.complete_if_done(now);

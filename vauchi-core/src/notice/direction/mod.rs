@@ -41,6 +41,8 @@ pub(super) const REFRESHES_A_SESSION: usize = 8;
 pub(super) const POSITIONS_A_PERIOD: usize = 128;
 
 pub type EpochId = [u8; 16];
+/// A contact group as Core names it; opaque to the notice core.
+pub type GroupId = u32;
 pub(super) type Notice = [u8; NOTICE_BYTES];
 
 pub fn week(now: u64) -> u32 {

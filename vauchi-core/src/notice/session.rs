@@ -11,7 +11,7 @@
 //! writes says nothing of how much it had to say (P6).
 
 use super::content::RECORD_BYTES;
-use super::direction::{Receiver, Sender, Wants};
+use super::direction::{GroupId, Receiver, Sender, Wants};
 use super::publish::{ContentRecord, Publisher};
 use super::seal::NOTICE_BYTES;
 use crate::crypto::random_bytes;
@@ -106,9 +106,21 @@ impl Session {
         slots: Slots,
         now: u64,
     ) -> SessionWrite {
+        // Content first: a new edit's notice goes only once record 0 of its
+        // publication is written, in this session or before (section 4).
+        let contents = write_contents(publishers, slots.contents, now);
+        let eligible = |group: GroupId| {
+            publishers
+                .iter()
+                .any(|publisher| publisher.group() == group && publisher.first_record_written())
+        };
+
         let directions = senders.len() + receivers.len();
         self.last_served.resize(directions, 0);
-        let mut wants: Vec<Wants> = senders.iter().map(|sender| sender.wants(now)).collect();
+        let mut wants: Vec<Wants> = senders
+            .iter()
+            .map(|sender| sender.wants_for(now, eligible))
+            .collect();
         wants.extend(receivers.iter().map(|receiver| Wants {
             update: 0,
             control: receiver.wants(now),
@@ -124,7 +136,8 @@ impl Session {
         let mut notices = Vec::with_capacity(slots.notices);
         let mut wrote = vec![false; directions];
         for (i, sender) in senders.iter_mut().enumerate() {
-            let written = sender.write_within(now, grants[i].control, grants[i].update);
+            let written =
+                sender.write_within_for(now, grants[i].control, grants[i].update, eligible);
             wrote[i] = !written.is_empty();
             notices.extend(written);
         }
@@ -145,18 +158,6 @@ impl Session {
         notices.resize_with(slots.notices, random_bytes::<NOTICE_BYTES>);
         shuffle(&mut notices);
 
-        let mut contents = Vec::with_capacity(slots.contents);
-        for publisher in publishers.iter_mut() {
-            publisher.queue_due(now);
-        }
-        let mut publishing: Vec<&mut Publisher> = publishers.iter_mut().collect();
-        publishing.sort_by_key(|publisher| publisher.completed_at());
-        for publisher in publishing {
-            let room = slots.contents.saturating_sub(contents.len());
-            contents.extend(publisher.write(now, room));
-        }
-        contents.resize_with(slots.contents, random_bytes::<RECORD_BYTES>);
-        shuffle(&mut contents);
         SessionWrite { notices, contents }
     }
 
@@ -177,6 +178,25 @@ impl Session {
             publisher.acknowledge(now);
         }
     }
+}
+
+/// The session's content slots: new edits first, in the order given,
+/// then weekly publications, the one completed longest ago first; dummies
+/// in the rest, in random order.
+fn write_contents(publishers: &mut [Publisher], slots: usize, now: u64) -> Vec<ContentRecord> {
+    let mut contents = Vec::with_capacity(slots);
+    for publisher in publishers.iter_mut() {
+        publisher.queue_due(now);
+    }
+    let mut publishing: Vec<&mut Publisher> = publishers.iter_mut().collect();
+    publishing.sort_by_key(|publisher| publisher.completed_at());
+    for publisher in publishing {
+        let room = slots.saturating_sub(contents.len());
+        contents.extend(publisher.write(now, room));
+    }
+    contents.resize_with(slots, random_bytes::<RECORD_BYTES>);
+    shuffle(&mut contents);
+    contents
 }
 
 /// Fisher-Yates with the operating system's randomness.

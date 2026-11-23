@@ -18,6 +18,20 @@ use crate::notice::keys::{
 use crate::notice::record::Record;
 use crate::notice::seal::{TAG_BYTES, open, seal};
 
+/// One group's latest update in this direction.
+#[derive(serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "testing", derive(Clone))]
+struct GroupUpdate {
+    update_key: Zeroizing<[u8; 32]>,
+    commitment: [u8; 31],
+    /// Counts edits, so that an acknowledgement clears only the edit the
+    /// acknowledged write carried.
+    edit: u64,
+    queued: bool,
+    /// Its key went out since the view was last due.
+    viewed: bool,
+}
+
 #[cfg_attr(feature = "testing", derive(Clone))]
 #[derive(serde::Serialize, serde::Deserialize)]
 struct SenderEpoch {
@@ -91,13 +105,11 @@ pub struct Sender {
     erased: VecDeque<EpochId>,
     refreshes: Vec<RefreshRead>,
     openings: Vec<OpeningQueued>,
-    latest: Option<(Zeroizing<[u8; 32]>, [u8; 31])>,
+    /// Each group's latest update, by group ID (S5, section 8).
+    groups: BTreeMap<GroupId, GroupUpdate>,
     view_due: bool,
-    update_queued: bool,
-    /// Counts edits, so that an acknowledgement clears only the edit the
-    /// acknowledged write carried.
-    edits: u64,
-    edits_written: Option<u64>,
+    /// The groups and edit numbers this session's notices carried.
+    written_groups: Vec<(GroupId, u64)>,
     positions_assigned_at: VecDeque<u64>,
     highest_opened_this_session: Option<u32>,
     first_records: FirstRecords,
@@ -117,11 +129,9 @@ impl Clone for Sender {
             erased: self.erased.clone(),
             refreshes: self.refreshes.clone(),
             openings: self.openings.clone(),
-            latest: self.latest.clone(),
+            groups: self.groups.clone(),
             view_due: self.view_due,
-            update_queued: self.update_queued,
-            edits: self.edits,
-            edits_written: self.edits_written,
+            written_groups: self.written_groups.clone(),
             positions_assigned_at: self.positions_assigned_at.clone(),
             highest_opened_this_session: self.highest_opened_this_session,
             first_records: self.first_records.clone(),
@@ -149,11 +159,9 @@ impl Sender {
             erased: VecDeque::new(),
             refreshes: Vec::new(),
             openings: Vec::new(),
-            latest: None,
+            groups: BTreeMap::new(),
             view_due: false,
-            update_queued: false,
-            edits: 0,
-            edits_written: None,
+            written_groups: Vec::new(),
             positions_assigned_at: VecDeque::new(),
             highest_opened_this_session: None,
             first_records: FirstRecords::default(),
@@ -190,12 +198,37 @@ impl Sender {
         self.epochs.iter().any(|kept| kept.keys.id() == *epoch)
     }
 
-    /// The newest update of the contact's group; it replaces one still
-    /// queued, and the replaced key is erased.
+    /// The newest update of a direction with one group (group 0).
     pub fn queue_update(&mut self, update_key: &[u8; 32], commitment: &[u8; 31]) {
-        self.latest = Some((Zeroizing::new(*update_key), *commitment));
-        self.update_queued = true;
-        self.edits = self.edits.saturating_add(1);
+        self.queue_group_update(0, update_key, commitment);
+    }
+
+    /// The newest update of one of the contact's groups; it replaces one
+    /// still queued for that group, and the replaced key is erased.
+    pub fn queue_group_update(
+        &mut self,
+        group: GroupId,
+        update_key: &[u8; 32],
+        commitment: &[u8; 31],
+    ) {
+        let entry = self.groups.entry(group).or_insert_with(|| GroupUpdate {
+            update_key: Zeroizing::new(*update_key),
+            commitment: *commitment,
+            edit: 0,
+            queued: false,
+            viewed: false,
+        });
+        entry.update_key = Zeroizing::new(*update_key);
+        entry.commitment = *commitment;
+        entry.edit = entry.edit.saturating_add(1);
+        entry.queued = true;
+    }
+
+    fn view_is_due(&mut self) {
+        self.view_due = true;
+        for group in self.groups.values_mut() {
+            group.viewed = false;
+        }
     }
 
     /// Reads one session's notices: refreshes at the addresses of every
@@ -383,14 +416,14 @@ impl Sender {
                     epoch.named_at = Some(now);
                     self.highest_named = self.highest_named.max(epoch.keys.number());
                     self.writes_in = id;
-                    self.view_due = true;
+                    self.view_is_due();
                     self.openings.retain(|opening| opening.epoch != id);
                 }
             }
             None => {
                 self.alarms.push(Alarm::ForeignName);
                 self.writes_in = refresh.read_in;
-                self.view_due = true;
+                self.view_is_due();
             }
         }
 
@@ -511,6 +544,12 @@ impl Sender {
     /// What this direction would write now: its update-key notice when an
     /// edit is queued, else a view due, and its queued openings.
     pub fn wants(&self, now: u64) -> Wants {
+        self.wants_for(now, |_| true)
+    }
+
+    /// As `wants`, counting an update only for a group `eligible` allows:
+    /// a new edit's notice goes only with its record 0 (section 4).
+    pub fn wants_for(&self, now: u64, eligible: impl Fn(GroupId) -> bool) -> Wants {
         let recent = self
             .positions_assigned_at
             .iter()
@@ -523,13 +562,31 @@ impl Sender {
                 .find(|epoch| epoch.keys.id() == self.writes_in)
                 .and_then(|epoch| epoch.writer.as_ref())
                 .is_some_and(ChainWriter::has_room);
-        let notice = room && self.latest.is_some() && (self.update_queued || self.view_due);
-        let update = usize::from(notice && self.update_queued);
-        let view = usize::from(notice && !self.update_queued);
+        if !room {
+            return Wants {
+                update: 0,
+                control: self.openings.len(),
+            };
+        }
+        let update = self
+            .groups
+            .iter()
+            .filter(|(group, entry)| entry.queued && eligible(**group))
+            .count();
+        let view = self.view_candidates().count();
         Wants {
             update,
             control: self.openings.len().saturating_add(view),
         }
+    }
+
+    /// Groups whose view is still to go this round: not viewed, and with
+    /// no update queued (a queued update carries the view).
+    fn view_candidates(&self) -> impl Iterator<Item = GroupId> + '_ {
+        self.groups
+            .iter()
+            .filter(|(_, entry)| self.view_due && !entry.viewed && !entry.queued)
+            .map(|(group, _)| *group)
     }
 
     /// Writes at most `control_slots` control records (openings, then a
@@ -541,8 +598,20 @@ impl Sender {
         control_slots: usize,
         update_slots: usize,
     ) -> Vec<Notice> {
+        self.write_within_for(now, control_slots, update_slots, |_| true)
+    }
+
+    /// As `write_within`, writing an update only for a group `eligible`
+    /// allows; an update waiting for its record 0 keeps its group's view.
+    pub fn write_within_for(
+        &mut self,
+        now: u64,
+        control_slots: usize,
+        update_slots: usize,
+        eligible: impl Fn(GroupId) -> bool,
+    ) -> Vec<Notice> {
         self.retain(now);
-        self.edits_written = None;
+        self.written_groups.clear();
         let mut control_left = control_slots;
         let mut written = Vec::new();
         // Newest first: openings under one number in one base share its
@@ -578,34 +647,48 @@ impl Sender {
             control_left -= 1;
         }
         self.openings.retain(|opening| !opening.spent);
-        let notice_slot = if self.update_queued {
-            update_slots > 0
-        } else {
-            control_left > 0
-        };
-
-        // A position is assigned only for a notice that is written: with no
-        // update yet, a view due has nothing to say and steps nothing.
-        if let Some((update_key, commitment)) = self
-            .latest
-            .as_ref()
-            .filter(|_| self.view_due || self.update_queued)
-            .filter(|_| notice_slot)
-            .filter(|_| self.positions_assigned_at.len() < POSITIONS_A_PERIOD)
-        {
+        let mut update_left = update_slots;
+        let updates: Vec<GroupId> = self
+            .groups
+            .iter()
+            .filter(|(group, entry)| entry.queued && eligible(**group))
+            .map(|(group, _)| *group)
+            .collect();
+        let views: Vec<GroupId> = self.view_candidates().collect();
+        let chosen = updates
+            .into_iter()
+            .take(update_left)
+            .map(|group| (group, true))
+            .chain(views.into_iter().map(|group| (group, false)));
+        let chosen: Vec<(GroupId, bool)> = chosen.collect();
+        for (group, is_update) in chosen {
+            let slot_left = if is_update { update_left } else { control_left };
+            if slot_left == 0 || self.positions_assigned_at.len() >= POSITIONS_A_PERIOD {
+                continue;
+            }
             let writes_in = self.writes_in;
             let epoch = self.epochs.iter_mut().find(|e| e.keys.id() == writes_in);
             let writer = epoch.and_then(|epoch| epoch.writer.as_mut());
-            // An ended chain writes nothing more; the next epoch the
+            // A position is assigned only for a notice that is written; an
+            // ended chain writes nothing more, and the next epoch the
             // receiver names carries the update.
-            if let Some((_, at)) = writer.and_then(ChainWriter::assign) {
-                self.positions_assigned_at.push_back(now);
-                let record = Record::UpdateKey {
-                    update_key: update_key.clone(),
-                    commitment: *commitment,
-                };
-                written.push(seal(&at, &record.to_plaintext()));
-                self.edits_written = Some(self.edits);
+            let Some((_, at)) = writer.and_then(ChainWriter::assign) else {
+                break;
+            };
+            let Some(entry) = self.groups.get(&group) else {
+                continue;
+            };
+            self.positions_assigned_at.push_back(now);
+            let record = Record::UpdateKey {
+                update_key: entry.update_key.clone(),
+                commitment: entry.commitment,
+            };
+            written.push(seal(&at, &record.to_plaintext()));
+            self.written_groups.push((group, entry.edit));
+            if is_update {
+                update_left -= 1;
+            } else {
+                control_left -= 1;
             }
         }
         written
@@ -613,11 +696,16 @@ impl Sender {
 
     /// The relay took the last write.
     pub fn acknowledge(&mut self) {
-        if let Some(edits_written) = self.edits_written.take() {
-            self.view_due = false;
-            if edits_written == self.edits {
-                self.update_queued = false;
+        for (group, edit) in self.written_groups.drain(..) {
+            if let Some(entry) = self.groups.get_mut(&group) {
+                entry.viewed = true;
+                if entry.edit == edit {
+                    entry.queued = false;
+                }
             }
+        }
+        if self.groups.values().all(|entry| entry.viewed) {
+            self.view_due = false;
         }
     }
 

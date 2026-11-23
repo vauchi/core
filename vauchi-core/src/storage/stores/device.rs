@@ -503,6 +503,15 @@ impl DeviceStore<'_> {
         })?;
 
         let contact_identity = PublicKey::from_bytes(*contact_signing_key);
+        if self.pin_a_re_sent_held_version(
+            contact_id,
+            broadcast,
+            &contact_identity,
+            last_version,
+            max_age_secs,
+        )? {
+            return Ok(());
+        }
         broadcast
             .verify_with_freshness(
                 &contact_identity,
@@ -514,19 +523,8 @@ impl DeviceStore<'_> {
         // SC-62: the broadcast is accepted per device. The signer must be an
         // active device of this broadcast and have signed it with its own
         // key, and no key a device showed before may change under its id
-        // (vauchi/private#970). A key is checked before it is pinned: the
-        // link checks keys on the way in, a contact's broadcast has not been
-        // through that.
-        if broadcast
-            .active_devices()
-            .iter()
-            .filter_map(|device| device.signing_public_key)
-            .any(|key| !crate::crypto::signing::is_usable_public_key(&key))
-        {
-            return Err(StorageError::InvalidData(
-                "contact device registry names an unusable signing key".into(),
-            ));
-        }
+        // (vauchi/private#970).
+        refuse_unusable_signing_keys(broadcast)?;
         let mut pins = self
             .load_contact_device_pins(contact_id)?
             .unwrap_or_default();
@@ -575,7 +573,59 @@ impl DeviceStore<'_> {
         Ok(())
     }
 
-    /// Loads the last verified signed registry retained for a contact.
+    /// Pins the keys of a broadcast at the version already held, when no
+    /// pins are held for the contact, and reports whether it did. A database
+    /// upgraded from before pins holds the registry, and the contact's
+    /// handshake only re-sends that version, which the version check refuses
+    /// before anything is pinned (private#970). Only a broadcast naming the
+    /// held devices and keys pins, verified as any other; the registry
+    /// itself stays as held.
+    fn pin_a_re_sent_held_version(
+        &self,
+        contact_id: &str,
+        broadcast: &RegistryBroadcast,
+        contact_identity: &PublicKey,
+        last_version: u64,
+        max_age_secs: u64,
+    ) -> Result<bool, StorageError> {
+        if last_version == 0 || broadcast.version() != last_version {
+            return Ok(false);
+        }
+        if self
+            .load_contact_device_pins(contact_id)?
+            .is_some_and(|pins| pins.pairs().next().is_some())
+        {
+            return Ok(false);
+        }
+        let Some(held) = self.load_contact_device_registry(contact_id)? else {
+            return Ok(false);
+        };
+        let devices = |registry: &RegistryBroadcast| {
+            registry
+                .active_devices()
+                .iter()
+                .map(|device| (device.device_id, device.signing_public_key))
+                .collect::<Vec<_>>()
+        };
+        if devices(&held) != devices(broadcast) {
+            return Ok(false);
+        }
+        broadcast
+            .verify_with_freshness(
+                contact_identity,
+                last_version - 1,
+                self.now_secs(),
+                max_age_secs,
+            )
+            .map_err(|error| StorageError::InvalidData(error.to_string()))?;
+        refuse_unusable_signing_keys(broadcast)?;
+        let mut pins = PinnedDeviceKeys::default();
+        pins.accept(contact_identity, broadcast)
+            .map_err(|error| StorageError::InvalidData(error.to_string()))?;
+        self.save_contact_device_pins(contact_id, &pins)?;
+        Ok(true)
+    }
+
     /// The signing keys this contact's devices showed first, or `None`
     /// before any device-signed broadcast was accepted from it.
     pub fn load_contact_device_pins(
@@ -624,6 +674,7 @@ impl DeviceStore<'_> {
         Ok(())
     }
 
+    /// Loads the last verified signed registry retained for a contact.
     pub fn load_contact_device_registry(
         &self,
         contact_id: &str,
@@ -679,4 +730,20 @@ impl DeviceStore<'_> {
             })
             .collect()
     }
+}
+
+/// A key is checked before it is pinned: the link checks keys on the way
+/// in, a contact's broadcast has not been through that.
+fn refuse_unusable_signing_keys(broadcast: &RegistryBroadcast) -> Result<(), StorageError> {
+    if broadcast
+        .active_devices()
+        .iter()
+        .filter_map(|device| device.signing_public_key)
+        .any(|key| !crate::crypto::signing::is_usable_public_key(&key))
+    {
+        return Err(StorageError::InvalidData(
+            "contact device registry names an unusable signing key".into(),
+        ));
+    }
+    Ok(())
 }

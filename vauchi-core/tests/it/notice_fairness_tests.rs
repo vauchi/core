@@ -305,3 +305,29 @@ fn the_write_counts_the_periods_positions_as_the_request_does_after_a_set_back()
         "the write takes what the request counted"
     );
 }
+
+// Gate review 14 (Claude): the highest refresh number read only ever rose,
+// so one refresh a copy forged with the highest number made every later
+// refresh of R's open nothing: healing ended for good, with no alarm.
+// A lower number may wait only while the higher number's opening is queued.
+// @internal
+#[test]
+fn a_forged_refresh_with_the_highest_number_does_not_end_healing() {
+    let mut p = pair();
+    let seed = p.receiver.seed_epoch();
+    let forged = forged_refresh(&p.copied_seed, START, 3, u32::MAX, [7; 32], seed);
+    p.sender_session(&[forged], START);
+    let mut to_receiver = Vec::new();
+    for week in 1..=4u64 {
+        let now = START + week * WEEK;
+        let refresh = p.receiver_session(&to_receiver, now);
+        to_receiver = p.sender_session(&refresh, now + DAY);
+    }
+    p.receiver_session(&to_receiver, START + 5 * WEEK);
+    assert_ne!(
+        p.receiver.current_epoch(),
+        seed,
+        "R moved on its own refresh"
+    );
+    p.assert_no_alarm();
+}

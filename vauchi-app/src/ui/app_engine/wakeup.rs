@@ -102,6 +102,7 @@ impl AppEngine {
     /// together in the canonical command batch.
     pub fn on_wakeup(&mut self) -> Vec<PendingNotification> {
         let before = self.current_screen();
+        self.run_pending_restore();
         self.sync_if_due();
         let notifications = self.poll_notifications();
         if self.current_screen() != before {
@@ -140,6 +141,12 @@ impl AppEngine {
         //
         // One second is this command's floor, not the right cadence: the frame
         // dwell core already computes cannot be expressed in whole seconds.
+        // The restore is the next thing to run, so the wakeup comes at
+        // once: its only purpose is to let "Restoring…" reach the screen
+        // first (vauchi/private#273).
+        if self.restore_pending() {
+            return vauchi_core::Command::schedule_wakeup(0, 1, 1, Some(0));
+        }
         if self.multi_stage_session_active() {
             // The frame currently on screen names its own dwell, so the
             // display runs at the protocol's cadence rather than the

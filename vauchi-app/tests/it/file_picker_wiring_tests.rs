@@ -320,16 +320,13 @@ fn submit_valid_password_imports_backup_and_navigates_to_main() {
         value: "correct horse battery staple".into(),
     });
 
-    let result = engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "submit_backup_password".into(),
     });
+    // The import runs on the wakeup the submit asks for (vauchi/private#273).
+    let _ = engine.dispatch(Event::WakeupFired).expect("wakeup");
 
-    match result {
-        ActionResult::NavigateTo(screen) => {
-            assert_eq!(screen.screen_id, "my_info");
-        }
-        other => panic!("expected NavigateTo(my_info), got {other:?}"),
-    }
+    assert_eq!(engine.current_app_screen(), &AppScreen::MyInfo);
     assert!(
         engine.vauchi().has_identity(),
         "identity should be restored after import"
@@ -358,14 +355,12 @@ fn an_identity_only_backup_restores_the_identity_and_no_contacts() {
         value: password.into(),
     });
 
-    let result = engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "submit_backup_password".into(),
     });
+    let _ = engine.dispatch(Event::WakeupFired).expect("wakeup");
 
-    match result {
-        ActionResult::NavigateTo(screen) => assert_eq!(screen.screen_id, "my_info"),
-        other => panic!("expected NavigateTo(my_info), got {other:?}"),
-    }
+    assert_eq!(engine.current_app_screen(), &AppScreen::MyInfo);
     let restored = engine.vauchi().identity().expect("an identity is restored");
     assert_eq!(*restored.signing_public_key(), donor_key);
     assert_eq!(restored.display_name(), "Bob");
@@ -389,13 +384,18 @@ fn submit_wrong_password_returns_alert_and_clears_state() {
         value: "wrong".into(),
     });
 
-    let result = engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "submit_backup_password".into(),
     });
+    let commands = engine.dispatch(Event::WakeupFired).expect("wakeup");
 
-    assert!(
-        matches!(result, ActionResult::ShowAlert { .. }),
-        "wrong password must produce ShowAlert, got {result:?}"
+    assert_eq!(
+        commands
+            .iter()
+            .filter(|command| matches!(command, Command::PresentAlert { .. }))
+            .count(),
+        1,
+        "wrong password must end in one alert, got {commands:?}"
     );
     assert!(
         !engine.vauchi().has_identity(),

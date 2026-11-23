@@ -518,7 +518,7 @@ impl AppEngine {
                 .apply_update(crate::ui::EngineUpdate::Onboarding(
                     crate::ui::OnboardingUpdate::ClearPendingBackup,
                 ));
-            return self.execute_backup_restore(pending.bytes, pending.password);
+            return self.defer_backup_restore(pending.bytes, pending.password);
         }
 
         // Dispatch on a cloned screen so the per-handler `&mut self` calls
@@ -591,7 +591,11 @@ impl AppEngine {
     /// On success, navigate to MainScreen (MyInfo). On failure
     /// (corrupt bytes, wrong password, IO), return to IdentityCheck with
     /// a `ShowAlert` so the user can retry.
-    fn execute_backup_restore(&mut self, bytes: Vec<u8>, password: String) -> ActionResult {
+    pub(super) fn execute_backup_restore(
+        &mut self,
+        bytes: Vec<u8>,
+        password: &str,
+    ) -> ActionResult {
         let backup_hex = match std::str::from_utf8(&bytes) {
             Ok(s) => s.trim().to_string(),
             Err(_) => {
@@ -603,7 +607,7 @@ impl AppEngine {
             }
         };
 
-        match self.vauchi.import_password_backup(&backup_hex, &password) {
+        match self.vauchi.import_password_backup(&backup_hex, password) {
             Ok(()) => {
                 let target = AppScreen::MyInfo;
                 let screen = self.navigate_to_internal(target);

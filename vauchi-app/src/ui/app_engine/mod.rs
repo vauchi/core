@@ -65,6 +65,7 @@ mod notifications;
 mod onboarding_shortfall_tests;
 mod overlays;
 mod pending_commands;
+mod pending_restore;
 mod pinned_actions;
 mod presentation_invalidation;
 mod presentation_protocol;
@@ -123,6 +124,8 @@ pub struct AppEngine {
     /// `persist_exchanged_contact` can assign the new contact + show the
     /// group on the success screen (2026-06-04-exchange-terminal-screens).
     pending_exchange_groups: Vec<String>,
+    /// A restore submitted and not yet run: it runs on the next wakeup.
+    pending_restore: Option<pending_restore::PendingRestore>,
     /// Navigation history stack for back-button support.
     nav_history: Vec<AppScreen>,
     /// Field pending undo after delete from MyInfoEntryDetail.
@@ -561,6 +564,7 @@ impl AppEngine {
             engine,
             engine_cache: HashMap::new(),
             pending_exchange_groups: Vec::new(),
+            pending_restore: None,
             nav_history: Vec::new(),
             pending_field_undo: None,
             pending_contact_undo: None,
@@ -740,7 +744,7 @@ impl AppEngine {
 
 impl WorkflowEngine for AppEngine {
     fn current_screen(&self) -> ScreenModel {
-        let screen = self.engine.current_screen();
+        let screen = self.apply_restore_in_progress(self.engine.current_screen());
         let screen = self.apply_exchange_mode_overlay(screen);
         let screen = self.apply_update_overlay(screen);
         let screen = self.apply_offline_overlay(screen);

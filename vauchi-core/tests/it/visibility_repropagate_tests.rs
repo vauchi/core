@@ -7,12 +7,10 @@
 //! Tests that changing visibility rules via set_field_*_and_repropagate()
 //! triggers a new card update to the affected contact.
 
+use crate::common::device_sync::link_tablet;
 use vauchi_core::{
     Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi, VauchiError,
-    api::sync::DeviceSyncOrchestrator,
-    exchange::X3DHKeyPair,
-    identity::{DeviceInfo, DeviceRegistry},
-    sync::SyncItem,
+    api::sync::DeviceSyncOrchestrator, exchange::X3DHKeyPair, sync::SyncItem,
 };
 
 fn create_test_vauchi() -> Vauchi {
@@ -354,21 +352,7 @@ fn test_set_contact_override_triggers_repropagate() {
 #[test]
 fn test_contact_override_and_repropagate_journals_linked_device_grant() {
     let wb = create_test_vauchi();
-    let identity = wb.identity().unwrap();
-    let seed = *identity.master_seed();
-    let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&seed, 0, "phone".into(), 0).to_registered(&seed),
-        identity.signing_keypair(),
-    );
-    let tablet = DeviceInfo::derive(&seed, 1, "tablet".into(), 0);
-    let tablet_id = *tablet.device_id();
-    registry
-        .add_device(tablet.to_registered(&seed), identity.signing_keypair())
-        .unwrap();
-    wb.storage()
-        .device()
-        .save_device_registry(&registry)
-        .unwrap();
+    let (registry, tablet_id) = link_tablet(&wb);
 
     wb.add_own_field(ContactField::new(
         FieldType::Email,

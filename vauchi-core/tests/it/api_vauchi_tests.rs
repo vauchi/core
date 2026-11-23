@@ -5,10 +5,10 @@
 //! Tests for api::vauchi
 //! Extracted from vauchi.rs
 
+use crate::common::device_sync::link_tablet;
 use vauchi_core::api::sync::DeviceSyncOrchestrator;
 use vauchi_core::api::*;
 use vauchi_core::contact_card::FieldType;
-use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
 use vauchi_core::sync::SyncItem;
 use vauchi_core::*;
 
@@ -89,21 +89,7 @@ fn test_vauchi_update_own_card_journals_field_removal() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
-    let identity = wb.identity().unwrap();
-    let seed = *identity.master_seed();
-    let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&seed, 0, "phone".into(), 0).to_registered(&seed),
-        identity.signing_keypair(),
-    );
-    let tablet = DeviceInfo::derive(&seed, 1, "tablet".into(), 0);
-    let tablet_id = *tablet.device_id();
-    registry
-        .add_device(tablet.to_registered(&seed), identity.signing_keypair())
-        .unwrap();
-    wb.storage()
-        .device()
-        .save_device_registry(&registry)
-        .unwrap();
+    let (registry, tablet_id) = link_tablet(&wb);
 
     let field = ContactField::new(FieldType::Phone, "phone", "+1234567890", 0);
     let field_id = field.id().to_string();
@@ -144,21 +130,7 @@ fn test_vauchi_add_own_field_journals_complete_stable_field() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
-    let identity = wb.identity().unwrap();
-    let seed = *identity.master_seed();
-    let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&seed, 0, "phone".into(), 0).to_registered(&seed),
-        identity.signing_keypair(),
-    );
-    let tablet = DeviceInfo::derive(&seed, 1, "tablet".into(), 0);
-    let tablet_id = *tablet.device_id();
-    registry
-        .add_device(tablet.to_registered(&seed), identity.signing_keypair())
-        .unwrap();
-    wb.storage()
-        .device()
-        .save_device_registry(&registry)
-        .unwrap();
+    let (registry, tablet_id) = link_tablet(&wb);
     let mut flags = wb.load_settings_flags().unwrap();
     flags.new_field_default_visible = true;
     wb.save_settings_flags(&flags).unwrap();
@@ -193,21 +165,7 @@ fn test_vauchi_remove_own_field() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
-    let identity = wb.identity().unwrap();
-    let seed = *identity.master_seed();
-    let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&seed, 0, "phone".into(), 0).to_registered(&seed),
-        identity.signing_keypair(),
-    );
-    let tablet = DeviceInfo::derive(&seed, 1, "tablet".into(), 0);
-    let tablet_id = *tablet.device_id();
-    registry
-        .add_device(tablet.to_registered(&seed), identity.signing_keypair())
-        .unwrap();
-    wb.storage()
-        .device()
-        .save_device_registry(&registry)
-        .unwrap();
+    let (registry, tablet_id) = link_tablet(&wb);
 
     let field = ContactField::new(FieldType::Phone, "phone", "+1234567890", 0);
     wb.add_own_field(field).unwrap();

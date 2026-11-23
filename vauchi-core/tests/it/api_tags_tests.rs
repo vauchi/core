@@ -7,9 +7,9 @@
 //! Covers autocomplete-or-create, per-contact tag listing, suggestions, and
 //! validation. See `ADR-051`.
 
+use crate::common::device_sync::link_tablet;
 use vauchi_core::api::sync::DeviceSyncOrchestrator;
 use vauchi_core::exchange::{X3DH, X3DHKeyPair};
-use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
 use vauchi_core::sync::SyncItem;
 use vauchi_core::{ContactField, FieldType, Vauchi};
 
@@ -28,25 +28,6 @@ fn add_contact(wb: &Vauchi, name: &str) -> String {
     let (_, their_ephemeral_pub) = X3DH::initiate(&their_ephemeral, our_x3dh.public_key()).unwrap();
     wb.accept_relay_exchange(their_identity.public_key(), &their_ephemeral_pub, name)
         .unwrap()
-}
-
-fn install_linked_registry(wb: &Vauchi) -> (DeviceRegistry, [u8; 32]) {
-    let identity = wb.identity().unwrap();
-    let seed = *identity.master_seed();
-    let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&seed, 0, "phone".into(), 0).to_registered(&seed),
-        identity.signing_keypair(),
-    );
-    let tablet = DeviceInfo::derive(&seed, 1, "tablet".into(), 0);
-    let tablet_id = *tablet.device_id();
-    registry
-        .add_device(tablet.to_registered(&seed), identity.signing_keypair())
-        .unwrap();
-    wb.storage()
-        .device()
-        .save_device_registry(&registry)
-        .unwrap();
-    (registry, tablet_id)
 }
 
 // @scenario: contact-annotations.feature - Create a new tag on a contact
@@ -118,7 +99,7 @@ fn add_tag_to_contact_creates_and_applies() {
 fn tag_mutations_journal_complete_state_for_linked_devices() {
     let wb = setup();
     let bob = add_contact(&wb, "Bob");
-    let (registry, tablet_id) = install_linked_registry(&wb);
+    let (registry, tablet_id) = link_tablet(&wb);
 
     let tag = wb.add_tag_to_contact(&bob, "work").unwrap();
     wb.remove_tag_from_contact(&tag.id, &bob).unwrap();

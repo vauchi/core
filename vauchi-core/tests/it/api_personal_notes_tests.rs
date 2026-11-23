@@ -7,6 +7,7 @@
 //! Verifies that note encryption/decryption is handled entirely
 //! within core (ADR-021: no crypto in frontends).
 
+use crate::common::device_sync::link_tablet;
 use vauchi_core::{Contact, ContactCard, SymmetricKey, Vauchi};
 
 /// Helper: create Vauchi with identity and an exchanged contact.
@@ -94,7 +95,7 @@ fn test_delete_note_clears() {
 #[test]
 fn note_mutations_journal_for_linked_devices() {
     let (wb, contact_id) = setup_with_contact();
-    let (registry, tablet_id) = install_linked_registry(&wb);
+    let (registry, tablet_id) = link_tablet(&wb);
 
     wb.add_personal_note(&contact_id, "met at conference")
         .unwrap();
@@ -126,7 +127,7 @@ fn note_mutations_journal_for_linked_devices() {
 #[test]
 fn deleted_note_journals_tombstone_for_linked_devices() {
     let (wb, contact_id) = setup_with_contact();
-    let (registry, tablet_id) = install_linked_registry(&wb);
+    let (registry, tablet_id) = link_tablet(&wb);
 
     wb.add_personal_note(&contact_id, "met at conference")
         .unwrap();
@@ -192,27 +193,4 @@ fn applied_synced_note_tombstone_clears_local_note() {
         wb.read_personal_note(&contact_id).unwrap().is_none(),
         "a synced personal-note tombstone must erase the local encrypted note"
     );
-}
-
-/// Copies the helper from api_tags_tests.rs: registers a second device so
-/// record_sync_item has a peer to journal for.
-fn install_linked_registry(wb: &Vauchi) -> (vauchi_core::identity::DeviceRegistry, [u8; 32]) {
-    use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
-
-    let identity = wb.identity().unwrap();
-    let seed = *identity.master_seed();
-    let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&seed, 0, "phone".into(), 0).to_registered(&seed),
-        identity.signing_keypair(),
-    );
-    let tablet = DeviceInfo::derive(&seed, 1, "tablet".into(), 0);
-    let tablet_id = *tablet.device_id();
-    registry
-        .add_device(tablet.to_registered(&seed), identity.signing_keypair())
-        .unwrap();
-    wb.storage()
-        .device()
-        .save_device_registry(&registry)
-        .unwrap();
-    (registry, tablet_id)
 }

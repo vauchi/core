@@ -577,3 +577,29 @@ fn a_group_edited_at_the_full_rate_does_not_starve_another_groups_view() {
         .collect();
     assert!(keys.contains(&b), "B's view takes the one position left");
 }
+
+// Gate review 9 (Kimi): the order counted only acknowledged writes, so a
+// gateway that delivered everything but withheld every acknowledgement
+// kept groups 0 to 79 first in every 80-slot session, and group 80's key
+// never went.
+// @internal
+#[test]
+fn withheld_acknowledgements_do_not_starve_a_group() {
+    let mut p = pair();
+    for group in 0..81u32 {
+        let (key, commitment) = update((group % 200) as u8);
+        p.sender.queue_group_update(group, &key, &commitment);
+    }
+    let last = update(80).0;
+    let mut read_last = false;
+    for session in 0..6u64 {
+        let now = START + session * WEEK;
+        let written = p.sender.write_within(now, 0, 80);
+        read_last |= p
+            .receiver
+            .read(&written, now + 1)
+            .iter()
+            .any(|read| *read.update_key == last);
+    }
+    assert!(read_last, "group 80's key never went");
+}

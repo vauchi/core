@@ -343,3 +343,68 @@ fn a_full_pending_list_drops_the_entry_renewed_longest_ago_and_an_expired_one_is
         "a 14-day entry is gone: the key is noted anew"
     );
 }
+
+// Gate review 7 (Claude): every group member holds the group's update key,
+// so a member could write records under wanted IDs; the first chunk locked
+// the body's shape and a failed commitment erased the entry, and the card
+// never installed. Record 0 carries the hash of every later chunk and the
+// notice's commitment binds record 0, so each record is checked alone
+// (owner, 2026-11-23).
+// @internal
+#[test]
+fn records_forged_by_a_group_member_cannot_block_the_card() {
+    use vauchi_core::notice::content::seal_record;
+    let key = [18; 32];
+    let text = body(1_500, 14);
+    let mut publisher = Publisher::new(key, &text);
+    let honest = session(&mut publisher, W0 + DAY, 8);
+    let w = week(W0 + DAY);
+    let forged_first = seal_record(&key, b"x", w, 0, 0, &[1; 24]).expect("a member seals");
+    let forged_other =
+        seal_record(&key, &body(1_500, 99), w, 1, 1, &[2; 24]).expect("a member seals");
+    let mut pending = Pending::default();
+    pending.note(&key, &commitment(&key, &text), W0 + DAY);
+    assert!(
+        pending
+            .read(&[forged_first, forged_other], W0 + 2 * DAY, accept_all)
+            .is_empty()
+    );
+    let bodies = pending.read(&honest, W0 + 2 * DAY, accept_all);
+    assert_eq!(bodies.len(), 1, "the honest records still install");
+    assert_eq!(bodies[0].as_slice(), text.as_slice());
+}
+
+// @internal
+#[test]
+fn a_later_chunk_read_before_record_zero_in_one_session_still_counts() {
+    let key = [19; 32];
+    let text = body(1_500, 15);
+    let mut publisher = Publisher::new(key, &text);
+    let mut honest = session(&mut publisher, W0 + DAY, 8);
+    honest.reverse();
+    let mut pending = Pending::default();
+    pending.note(&key, &commitment(&key, &text), W0 + DAY);
+    assert_eq!(pending.read(&honest, W0 + 2 * DAY, accept_all).len(), 1);
+}
+
+// Gate review 7 (Kimi): a sender away 14 days at a time kept writing an
+// open publication under its first week, which R stops looking for after
+// two weeks, so an eight-record card never converged.
+// @internal
+#[test]
+fn a_sender_away_two_weeks_at_a_time_still_gets_its_card_across() {
+    let key = [20; 32];
+    let text = body(3_984, 16);
+    let mut publisher = Publisher::new(key, &text);
+    let mut pending = Pending::default();
+    let mut installed_on = None;
+    for fortnight in 0..12u64 {
+        let now = W0 + fortnight * 2 * WEEK;
+        let written = session(&mut publisher, now, 2);
+        pending.note(&key, &commitment(&key, &text), now);
+        if !pending.read(&written, now + DAY, accept_all).is_empty() {
+            installed_on.get_or_insert(fortnight);
+        }
+    }
+    assert!(installed_on.is_some(), "the card never installed");
+}

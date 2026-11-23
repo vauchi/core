@@ -795,3 +795,40 @@ fn updates_do_not_count_as_a_directions_control_turn() {
         "control turns {served:?}"
     );
 }
+
+// Gate review 11 (Claude): with the period's positions spent, a view the
+// cap refuses still counted against an opening's control slot, so a grant
+// sized for the opening wrote nothing.
+// @internal
+#[test]
+fn a_view_the_cap_refuses_does_not_take_an_openings_slot() {
+    let step = WEEK / 128;
+    let mut p = pair();
+    let refresh = p.receiver_session(&[], START);
+    let (b, commitment_b) = update(70);
+    p.sender
+        .queue_group_update(2, &b, &commitment_b)
+        .expect("within 32 groups");
+    p.sender.write_within(START, 0, 1);
+    p.sender.acknowledge();
+    for j in 1..128u64 {
+        let (a, commitment_a) = update((j % 200) as u8);
+        p.sender
+            .queue_group_update(1, &a, &commitment_a)
+            .expect("within 32 groups");
+        p.sender.write_within(START + j * step, 0, 1);
+        p.sender.acknowledge();
+    }
+    let now = START + 127 * step + 60;
+    p.sender.read(&refresh, now);
+    let first = p.sender.write_within(now, p.sender.wants(now).control, 0);
+    p.sender.acknowledge();
+    assert_eq!(first.len(), 1, "the opening, which the gateway drops");
+    let later = now + 60;
+    let control = p.sender.wants(later).control;
+    assert!(control >= 1);
+    assert!(
+        !p.sender.write_within(later, control, 0).is_empty(),
+        "the grant sized for the opening writes it"
+    );
+}

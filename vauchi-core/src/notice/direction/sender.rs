@@ -481,7 +481,11 @@ impl Sender {
         self.retain(now);
         self.edits_written = None;
         let mut written = Vec::new();
-        for opening in &mut self.openings {
+        // Newest first: openings under one number in one base share its
+        // four addresses, and the newest key gets the last one left, so a
+        // forged key queued earlier cannot use up R's own (spec S4; gate
+        // review 4, Claude).
+        for opening in self.openings.iter_mut().rev() {
             let Some(base) = self.epochs.iter_mut().find(|e| e.keys.id() == opening.base) else {
                 continue;
             };

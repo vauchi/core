@@ -435,6 +435,7 @@ mod own_card_repropagate_tests;
 mod own_device_revocation_tests;
 mod own_field_label_resolution_tests;
 mod own_registry_broadcast_tests;
+mod own_registry_read_tests;
 mod panic_widget_tests;
 mod parser_panic_safety_tests;
 mod password_kdf_tests;

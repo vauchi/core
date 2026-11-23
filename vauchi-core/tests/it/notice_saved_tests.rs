@@ -119,14 +119,22 @@ fn a_publisher_and_pending_keys_carry_on_after_loading() {
 fn malformed_saved_state_is_refused() {
     let p = pair();
     let saved = p.receiver.save().expect("saves");
-    let mut wrong_version = saved.to_vec();
-    wrong_version[0] ^= 0xFF;
+    let mut wrong_kind = saved.to_vec();
+    wrong_kind[0] ^= 0xFF;
+    // Byte 1 is the format version (gate review 12, Kimi: the case named
+    // "another version" changed the kind).
+    let mut earlier_version = saved.to_vec();
+    earlier_version[1] -= 1;
+    let mut later_version = saved.to_vec();
+    later_version[1] += 1;
     let mut trailing = saved.to_vec();
     trailing.push(0);
-    let cases: [(&str, &[u8]); 4] = [
+    let cases: [(&str, &[u8]); 6] = [
         ("empty", &[]),
         ("truncated", &saved[..saved.len() / 2]),
-        ("another version", &wrong_version),
+        ("another kind", &wrong_kind),
+        ("an earlier version", &earlier_version),
+        ("a later version", &later_version),
         ("trailing bytes", &trailing),
     ];
     for (what, bytes) in cases {

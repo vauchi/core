@@ -12,5 +12,6 @@ pub mod chain;
 pub mod content;
 pub mod direction;
 pub mod keys;
+pub mod publish;
 pub mod record;
 pub mod seal;

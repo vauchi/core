@@ -3,12 +3,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! A shell sends `PresentationInvalidated` when content arrives after
-//! start, such as the locale catalogue on a fresh install. Core rebuilds the
-//! screen, and on the onboarding name page the rebuilt engine starts again
-//! at Welcome. Welcome then went out at the name page's revision, so a focus
-//! end for the name field that was already on its way read as current and
-//! was refused as an unknown binding: the person saw "Something went wrong"
-//! on Welcome (vauchi/private#1339, Pixel 3a, 2026-11-22).
+//! start, such as the locale catalogue on a fresh install. Core used to
+//! rebuild onboarding, which starts again at Welcome, and sent Welcome at
+//! the name page's revision: a focus end for the name field still on its
+//! way read as current and was refused as an unknown binding, and the
+//! person saw "Something went wrong" on Welcome (vauchi/private#1339,
+//! Pixel 3a, 2026-11-22). Onboarding now survives the rebuild
+//! (vauchi/private#821), so the page, its field and its revision stay.
 
 use vauchi_app::ui::AppEngine;
 use vauchi_core::api::Vauchi;
@@ -65,8 +66,8 @@ fn on_the_name_page() -> (AppEngine, SurfaceId, u64, BindingId) {
 
 // @internal
 #[test]
-fn an_invalidation_that_changes_the_page_shows_it_under_a_new_revision() {
-    let (mut engine, surface_id, name_revision, _) = on_the_name_page();
+fn an_invalidation_on_the_name_page_keeps_the_page_and_its_revision() {
+    let (mut engine, surface_id, name_revision, binding_id) = on_the_name_page();
 
     let rebuilt = engine
         .dispatch(Event::PresentationInvalidated)
@@ -74,17 +75,16 @@ fn an_invalidation_that_changes_the_page_shows_it_under_a_new_revision() {
 
     let (rebuilt_id, rebuilt_revision, nodes) = shown_surface(&rebuilt);
     assert_eq!(rebuilt_id, surface_id);
+    assert_eq!(input_binding(&nodes), Some(binding_id));
     assert_eq!(
-        input_binding(&nodes),
-        None,
-        "the rebuilt onboarding starts at Welcome, which has no field"
+        rebuilt_revision, name_revision,
+        "fields that keep their meaning keep their revision, so the keyboard stays"
     );
-    assert_eq!(rebuilt_revision, name_revision + 1);
 }
 
 // @internal
 #[test]
-fn a_late_focus_end_for_the_name_field_after_an_invalidation_is_dropped_not_refused() {
+fn a_late_focus_end_for_the_name_field_after_an_invalidation_is_accepted() {
     let (mut engine, surface_id, _, binding_id) = on_the_name_page();
     engine
         .dispatch(Event::PresentationInvalidated)
@@ -92,23 +92,23 @@ fn a_late_focus_end_for_the_name_field_after_an_invalidation_is_dropped_not_refu
 
     let late = engine.dispatch(Event::InputFocusEnded {
         surface_id,
-        binding_id,
+        binding_id: binding_id.clone(),
     });
 
     assert_eq!(
-        late.map_err(|rejection| rejection.to_string()),
-        Ok(Vec::new())
+        late.map(|_| ()).map_err(|rejection| rejection.to_string()),
+        Ok(())
     );
+    let (_, _, nodes) = shown_surface(&engine.initial_commands().expect("re-present"));
+    assert_eq!(input_binding(&nodes), Some(binding_id));
 }
 
 // On the phone the rebuild came before the invalidation event: locale
 // content applied in the background is absorbed at the start of the next
-// dispatch, which rebuilt onboarding to Welcome first, so the event's own
-// check saw Welcome on both sides and kept revision 2 (Pixel 3a,
-// 2026-11-22 23:17, core cec092e62).
+// dispatch (Pixel 3a, 2026-11-22 23:17, core cec092e62).
 // @internal
 #[test]
-fn a_late_focus_end_after_locales_reloaded_is_dropped_not_refused() {
+fn a_late_focus_end_after_locales_reloaded_is_accepted() {
     let (mut engine, surface_id, name_revision, binding_id) = on_the_name_page();
     engine.reload_locales();
 
@@ -117,17 +117,14 @@ fn a_late_focus_end_after_locales_reloaded_is_dropped_not_refused() {
         .expect("invalidation");
     let late = engine.dispatch(Event::InputFocusEnded {
         surface_id,
-        binding_id,
+        binding_id: binding_id.clone(),
     });
 
     let (_, rebuilt_revision, nodes) = shown_surface(&rebuilt);
-    assert_eq!(input_binding(&nodes), None, "onboarding is back at Welcome");
-    assert!(
-        rebuilt_revision > name_revision,
-        "Welcome came at revision {rebuilt_revision}, the name page's was {name_revision}"
-    );
+    assert_eq!(input_binding(&nodes), Some(binding_id));
+    assert_eq!(rebuilt_revision, name_revision);
     assert_eq!(
-        late.map_err(|rejection| rejection.to_string()),
-        Ok(Vec::new())
+        late.map(|_| ()).map_err(|rejection| rejection.to_string()),
+        Ok(())
     );
 }

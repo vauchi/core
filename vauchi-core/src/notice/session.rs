@@ -195,10 +195,19 @@ pub struct Session {
 impl Session {
     /// Shares `slots` among directions, each queue taking turns by when
     /// it was last served, the one served longest ago first.
-    pub fn plan_turns(&mut self, slots: usize, wants: &[Wants], _now: u64) -> Vec<Grant> {
+    pub fn plan_turns(&mut self, slots: usize, wants: &[Wants], now: u64) -> Vec<Grant> {
         let directions = wants.len();
         self.served_update.resize(directions, 0);
         self.served_control.resize(directions, 0);
+        // Pulled back to the clock as every stored time is (section 1;
+        // gate review 12, Codex, Claude).
+        for served in self
+            .served_update
+            .iter_mut()
+            .chain(&mut self.served_control)
+        {
+            *served = (*served).min(now);
+        }
         let mut update_order: Vec<usize> = (0..directions).collect();
         update_order.sort_by_key(|i| (self.served_update[*i], *i));
         let mut control_order: Vec<usize> = (0..directions).collect();

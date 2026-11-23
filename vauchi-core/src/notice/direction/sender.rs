@@ -281,6 +281,7 @@ impl Sender {
         // (protocol section 7, step 3): a late refresh may still name one
         // on the day its three periods end.
         self.forget(now);
+        self.pull_back(now);
         let mut new = Vec::new();
         for refresh in self.find_refreshes(notices, now) {
             if self.knows(&refresh) {
@@ -675,6 +676,7 @@ impl Sender {
         update_slots: usize,
         eligible: impl Fn(GroupId) -> bool,
     ) -> Vec<Notice> {
+        self.pull_back(now);
         self.retain(now);
         self.written_groups.clear();
         let mut control_left = control_slots;
@@ -795,6 +797,22 @@ impl Sender {
             control: openings_written + written_views,
         };
         written
+    }
+
+    /// The times the queues are ordered by, pulled back to the clock as
+    /// every stored time is (section 1; gate review 12, Codex, Claude).
+    fn pull_back(&mut self, now: u64) {
+        for entry in self.groups.values_mut() {
+            if let Some(written_at) = entry.written_at.as_mut() {
+                age(now, written_at);
+            }
+        }
+        for opening in &mut self.openings {
+            age(now, &mut opening.queued_at);
+            if let Some(written_at) = opening.written_at.as_mut() {
+                age(now, written_at);
+            }
+        }
     }
 
     /// How long each queued opening has waited, as the openings under its

@@ -12,7 +12,7 @@
 //! `Removed` for fields that dropped out of visibility.
 
 use crate::common::helpers::{add_contact_with_ratchet, create_vauchi_with_identity};
-use vauchi_core::{ContactField, FieldType, Vauchi};
+use vauchi_core::{ContactField, FieldType, Vauchi, contact::Group};
 
 use crate::common::two_recipient::{
     add_recipient, add_recipient_no_cek, deliver, stored_card_display_name, stored_card_has,
@@ -118,17 +118,9 @@ fn revoking_exchange_shared_field_as_first_repropagation_emits_removal() {
     );
 }
 
-// --- Two-recipient round-trip harness (G2/G3) ---
-//
-// The tests above assert the SEND side (a removal lands in the pending
-// queue). G2/G3 assert the RECEIVE side: a second `Vauchi` instance applies
-// the queued delta and its stored copy of the sharer's card actually loses
-// (or keeps) the field. Sharer is the ratchet initiator; each recipient is
-// the responder.
-
-// @scenario: visibility_control :: Revoking propagates to the peer; an un-revoked peer keeps the field
-#[test]
-fn revoking_for_one_recipient_does_not_affect_another_recipient() {
+/// Alice, her public key, her `work` field's id, and a Work group that
+/// grants `work`.
+fn alice_sharing_work_with_a_group() -> (Vauchi, [u8; 32], String, Group) {
     let alice = create_vauchi_with_identity("Alice");
     alice
         .add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
@@ -140,6 +132,21 @@ fn revoking_for_one_recipient_does_not_affect_another_recipient() {
     alice
         .set_group_field_visibility(group.id(), &work, true)
         .unwrap();
+    (alice, alice_pk, work, group)
+}
+
+// --- Two-recipient round-trip harness (G2/G3) ---
+//
+// The tests above assert the SEND side (a removal lands in the pending
+// queue). G2/G3 assert the RECEIVE side: a second `Vauchi` instance applies
+// the queued delta and its stored copy of the sharer's card actually loses
+// (or keeps) the field. Sharer is the ratchet initiator; each recipient is
+// the responder.
+
+// @scenario: visibility_control :: Revoking propagates to the peer; an un-revoked peer keeps the field
+#[test]
+fn revoking_for_one_recipient_does_not_affect_another_recipient() {
+    let (alice, alice_pk, work, group) = alice_sharing_work_with_a_group();
 
     let mut bob = add_recipient(&alice, &alice_pk, "Bob");
     let mut carol = add_recipient(&alice, &alice_pk, "Carol");
@@ -282,17 +289,7 @@ fn set_own_field_private_revokes_a_public_field_from_an_ungrouped_contact() {
 // @scenario: sync_updates :: First update to a freshly-exchanged (cek-less) contact is accepted
 #[test]
 fn first_repropagate_to_cek_less_contact_is_accepted() {
-    let alice = create_vauchi_with_identity("Alice");
-    alice
-        .add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
-        .unwrap();
-    let work = own_field_id(&alice, "work");
-    let alice_pk = *alice.identity().unwrap().signing_public_key();
-
-    let group = alice.create_group("Work").unwrap();
-    alice
-        .set_group_field_visibility(group.id(), &work, true)
-        .unwrap();
+    let (alice, alice_pk, _, group) = alice_sharing_work_with_a_group();
 
     // Freshly-exchanged contact: NO CEK.
     let mut bob = add_recipient_no_cek(&alice, &alice_pk, "Bob");

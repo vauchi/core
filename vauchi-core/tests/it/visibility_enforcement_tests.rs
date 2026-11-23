@@ -13,63 +13,15 @@
 use std::collections::HashSet;
 
 use vauchi_core::contact::{FieldVisibility, VisibilityRules};
-use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::sync::delta::{CardDelta, FieldChange};
-use vauchi_core::{Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi};
+use vauchi_core::{ContactCard, ContactField, FieldType};
 
+use crate::common::helpers::{
+    add_contact_with_ratchet, add_contact_with_ratchet_and_visibility, create_vauchi_with_identity,
+};
 use crate::common::two_recipient::{add_recipient, deliver, stored_card_has};
 
 // -- Helpers -----------------------------------------------------------
-
-fn create_test_vauchi() -> Vauchi {
-    let mut wb = Vauchi::in_memory().unwrap();
-    wb.create_identity("Alice").unwrap();
-    wb
-}
-
-fn add_contact_with_ratchet(wb: &Vauchi, name: &str) -> String {
-    let identity = Identity::create(name, 0);
-    let shared = SymmetricKey::generate();
-    let contact = Contact::from_exchange(
-        *identity.signing_public_key(),
-        ContactCard::new(name),
-        shared.clone(),
-        0,
-    );
-    let contact_id = contact.id().to_string();
-    wb.add_contact(contact).unwrap();
-
-    let their_dh = X3DHKeyPair::generate();
-    wb.create_ratchet_as_initiator(&contact_id, &shared, *their_dh.public_key())
-        .unwrap();
-
-    contact_id
-}
-
-fn add_contact_with_ratchet_and_visibility(
-    wb: &Vauchi,
-    name: &str,
-    setup_rules: impl FnOnce(&mut VisibilityRules),
-) -> String {
-    let identity = Identity::create(name, 0);
-    let shared = SymmetricKey::generate();
-    let mut contact = Contact::from_exchange(
-        *identity.signing_public_key(),
-        ContactCard::new(name),
-        shared.clone(),
-        0,
-    );
-    let contact_id = contact.id().to_string();
-
-    setup_rules(contact.visibility_rules_mut().unwrap());
-    wb.add_contact(contact).unwrap();
-
-    let their_dh = X3DHKeyPair::generate();
-    wb.create_ratchet_as_initiator(&contact_id, &shared, *their_dh.public_key())
-        .unwrap();
-
-    contact_id
-}
 
 // -- Tests: Default Visibility -----------------------------------------
 
@@ -91,7 +43,7 @@ fn test_default_visibility_is_everyone() {
 // @scenario: visibility_control :: New fields default to hidden for ungrouped contacts
 #[test]
 fn test_new_field_propagates_only_after_visible_toggle() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
 
     let bob_id = add_contact_with_ratchet(&wb, "Bob");
     let carol_id = add_contact_with_ratchet(&wb, "Carol");
@@ -128,7 +80,7 @@ fn test_new_field_propagates_only_after_visible_toggle() {
 // @scenario: visibility_control :: Show a field only to specific contacts
 #[test]
 fn test_contacts_variant_enforced_at_propagation() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
 
     let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com", 0);
     let email_id = email_field.id().to_string();
@@ -206,7 +158,7 @@ fn test_display_name_change_passes_through_nobody_rules() {
 // @scenario: visibility_control :: Encrypted updates reveal nothing about hidden fields
 #[test]
 fn test_display_name_propagated_alongside_hidden_field() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
 
     let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com", 0);
     let email_id = email_field.id().to_string();
@@ -307,7 +259,7 @@ fn test_nobody_excludes_from_all_contacts() {
 // @scenario: contacts_management :: Contact shows only fields I can see
 #[test]
 fn test_mixed_visibility_propagation() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
 
     let email_field = ContactField::new(FieldType::Email, "work", "alice@company.com", 0);
     let email_id = email_field.id().to_string();
@@ -374,7 +326,7 @@ fn test_mixed_visibility_propagation() {
 // @scenario: visibility_control :: A content edit reaches only the granting group
 #[test]
 fn content_edit_reaches_only_the_granting_group() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
     let wb_pk = *wb.identity().unwrap().signing_public_key();
 
     let work = ContactField::new(FieldType::Email, "work", "alice@company.com", 0);
@@ -430,7 +382,7 @@ fn content_edit_reaches_only_the_granting_group() {
 // @scenario: visibility_control :: A content edit reaches ungrouped contacts via the public base card
 #[test]
 fn content_edit_partitions_group_assigned_and_toggled_fields() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
     let wb_pk = *wb.identity().unwrap().signing_public_key();
 
     let work = ContactField::new(FieldType::Email, "work", "alice@company.com", 0);

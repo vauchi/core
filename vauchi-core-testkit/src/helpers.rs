@@ -7,7 +7,7 @@
 //! Common helper functions for setting up test scenarios.
 
 use vauchi_core::{
-    Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi,
+    Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi, VisibilityRules,
     crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair,
 };
 
@@ -21,15 +21,26 @@ pub fn create_vauchi_with_identity(name: &str) -> Vauchi {
 /// Adds a contact named `name` with a ratchet this device initiated, so
 /// card updates to it can be encrypted. Returns its contact id.
 pub fn add_contact_with_ratchet(wb: &Vauchi, name: &str) -> String {
+    add_contact_with_ratchet_and_visibility(wb, name, |_| {})
+}
+
+/// [`add_contact_with_ratchet`], with `setup_rules` applied to the
+/// contact's visibility rules before it is saved.
+pub fn add_contact_with_ratchet_and_visibility(
+    wb: &Vauchi,
+    name: &str,
+    setup_rules: impl FnOnce(&mut VisibilityRules),
+) -> String {
     let identity = Identity::create(name, 0);
     let shared = SymmetricKey::generate();
-    let contact = Contact::from_exchange(
+    let mut contact = Contact::from_exchange(
         *identity.signing_public_key(),
         ContactCard::new(name),
         shared.clone(),
         0,
     );
     let contact_id = contact.id().to_string();
+    setup_rules(contact.visibility_rules_mut().unwrap());
     wb.add_contact(contact).unwrap();
     let their_dh = X3DHKeyPair::generate();
     wb.create_ratchet_as_initiator(&contact_id, &shared, *their_dh.public_key())

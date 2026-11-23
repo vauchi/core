@@ -471,3 +471,27 @@ fn the_senders_demand_never_exceeds_the_positions_left_in_the_period() {
         "one position is left"
     );
 }
+
+// Gate review 7 (Kimi): R5 makes the epoch of an alarm a refresh target at
+// once, but an acknowledged refresh stayed dequeued until the next one was
+// due a week later.
+// @internal
+#[test]
+fn an_alarm_queues_the_refresh_again_for_the_epochs_it_now_needs() {
+    let mut p = pair();
+    let refresh = p.receiver_session(&[], START);
+    let honest = p.sender_session(&refresh, START + DAY);
+    p.receiver.read(&honest, START + 2 * DAY);
+    assert_eq!(
+        p.receiver.wants(START + 2 * DAY),
+        0,
+        "acknowledged, nothing due"
+    );
+    let forged = forged_opening(&p.copied_seed, 2, 1, [7; 8], [0; 16]);
+    p.receiver.read(&[forged], START + 3 * DAY);
+    assert_eq!(p.receiver.alarms().len(), 1);
+    assert!(
+        p.receiver.wants(START + 3 * DAY) > 0,
+        "the alarm queues the refresh again"
+    );
+}

@@ -296,3 +296,70 @@ fn leaving_the_scan_screen_stops_its_capture() {
 
     assert_eq!(stops(&engine.drain_hardware_commands()), vec![id]);
 }
+
+fn attached_with(capabilities: &str) -> AppEngine {
+    let mut engine = engine();
+    engine
+        .dispatch(
+            event_from_json(&format!(
+                r#"{{"HardwareCapabilitiesReported":{{"capabilities":{capabilities}}}}}"#
+            ))
+            .unwrap(),
+        )
+        .unwrap();
+    engine
+}
+
+/// Every command entering Glance sends, wherever Core routes it, as JSON.
+fn entering_glance(engine: &mut AppEngine) -> (Vec<Command>, String) {
+    engine.navigate_to(AppScreen::MultiStageExchange {
+        mode: ExchangeMode::Glance,
+    });
+    let mut sent = engine.drain_pending_commands();
+    sent.extend(engine.initial_commands().unwrap());
+    sent.extend(engine.drain_hardware_commands());
+    let json = serde_json::to_string(&sent).unwrap();
+    (sent, json)
+}
+
+fn switches(sent: &[Command]) -> usize {
+    sent.iter()
+        .filter(|command| matches!(command, Command::SwitchCamera { .. }))
+        .count()
+}
+
+const SWITCH_LABEL: &str = "Use Front Camera";
+
+// @internal — private#772: on a laptop with one camera there is nothing to
+// switch to (the maintainer, Windows rig, 2026-11-23).
+#[test]
+fn a_device_with_one_camera_is_offered_no_switch() {
+    let mut engine = attached_with(r#"{"has_camera":true,"camera_count":1}"#);
+
+    let (sent, json) = entering_glance(&mut engine);
+
+    assert_eq!(switches(&sent), 0, "{json}");
+    assert!(!json.contains(SWITCH_LABEL), "no switch button: {json}");
+}
+
+// @internal — a device that counted two cameras keeps the switch.
+#[test]
+fn a_device_with_two_cameras_keeps_the_switch() {
+    let mut engine = attached_with(r#"{"has_camera":true,"camera_count":2}"#);
+
+    let (sent, json) = entering_glance(&mut engine);
+
+    assert_eq!(switches(&sent), 1, "{json}");
+    assert!(json.contains(SWITCH_LABEL), "a switch button: {json}");
+}
+
+// @internal — a shell that does not count its cameras is offered what it was before.
+#[test]
+fn a_device_that_does_not_count_keeps_the_switch() {
+    let mut engine = attached_with(r#"{"has_camera":true}"#);
+
+    let (sent, json) = entering_glance(&mut engine);
+
+    assert_eq!(switches(&sent), 1, "{json}");
+    assert!(json.contains(SWITCH_LABEL), "a switch button: {json}");
+}

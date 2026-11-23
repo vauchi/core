@@ -347,14 +347,20 @@ struct DeviceStep {
     days: u64,
     receiver_acts: bool,
     dropped: bool,
+    /// Whether the relay's acknowledgement reaches the device, apart from
+    /// whether the write reaches the other (gate review 8, Kimi).
+    acknowledged: bool,
 }
 
 fn device_step() -> impl Strategy<Value = DeviceStep> {
-    (1u64..4, any::<bool>(), any::<bool>()).prop_map(|(days, receiver_acts, dropped)| DeviceStep {
-        days,
-        receiver_acts,
-        dropped,
-    })
+    (1u64..4, any::<bool>(), any::<bool>(), any::<bool>()).prop_map(
+        |(days, receiver_acts, dropped, acknowledged)| DeviceStep {
+            days,
+            receiver_acts,
+            dropped,
+            acknowledged,
+        },
+    )
 }
 
 proptest! {
@@ -384,7 +390,7 @@ proptest! {
         let mut to_sender = Vec::new();
         let mut installed = false;
         let mut now = START;
-        let faithful = (0..42).map(|i| DeviceStep { days: 1, receiver_acts: i % 2 == 1, dropped: false });
+        let faithful = (0..42).map(|i| DeviceStep { days: 1, receiver_acts: i % 2 == 1, dropped: false, acknowledged: true });
         for step in steps.into_iter().chain(faithful) {
             now += step.days * DAY;
             if step.receiver_acts {
@@ -394,14 +400,18 @@ proptest! {
                 }
                 installed |= !pending.read(&contents, now, |_| true).is_empty();
                 let written = r_session.write(&mut [], &mut [&mut p.receiver], &mut [], tier, now);
-                Session::acknowledge(&mut [], &mut [&mut p.receiver], &mut [], now);
+                if step.acknowledged {
+                    Session::acknowledge(&mut [], &mut [&mut p.receiver], &mut [], now);
+                }
                 if !step.dropped {
                     to_sender = written.notices;
                 }
             } else {
                 p.sender.read(&std::mem::take(&mut to_sender), now);
                 let written = s_session.write(&mut [&mut p.sender], &mut [], &mut publishers, tier, now);
-                Session::acknowledge(&mut [&mut p.sender], &mut [], &mut publishers, now);
+                if step.acknowledged {
+                    Session::acknowledge(&mut [&mut p.sender], &mut [], &mut publishers, now);
+                }
                 if !step.dropped {
                     to_receiver = (written.notices, written.contents);
                 }

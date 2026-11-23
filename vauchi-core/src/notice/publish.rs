@@ -25,7 +25,9 @@ use crate::crypto::random_bytes;
 
 pub type ContentRecord = [u8; RECORD_BYTES];
 
-const PENDING_KEPT_SECONDS: u64 = 14 * 86_400;
+/// A week longer than the longest absence the specification allows (14
+/// days), so a renewal is never lost on the boundary (owner, 2026-11-23).
+const PENDING_KEPT_SECONDS: u64 = 21 * 86_400;
 const PENDING_A_DIRECTION: usize = 32;
 const INSTALLED_REMEMBERED: usize = 32;
 
@@ -171,6 +173,14 @@ impl Publisher {
         let Some(current) = self.current.as_mut() else {
             return Vec::new();
         };
+        // R looks back two weeks only: a publication more than a week
+        // behind S's week writes what it still has under S's week, a week
+        // never used for this key (gate review 7, Kimi). The chunks are the
+        // same in every publication, so R completes the body from both.
+        if slots > 0 && this_week > current.week.saturating_add(1) {
+            current.week = this_week;
+            self.last_week = Some(this_week);
+        }
         // Fewest transmissions first, so that with too few slots every
         // record goes once before any goes again (gate review 5).
         let mut order: Vec<usize> = (0..usize::from(self.records))
@@ -244,14 +254,14 @@ impl Pending {
         super::saved::save(super::saved::Kind::Pending, self)
     }
 
-    /// Loads saved state and erases entries 14 days old first.
+    /// Loads saved state and erases entries 21 days old first.
     pub fn load(bytes: &[u8], now: u64) -> Result<Self, super::saved::SavedError> {
         let mut pending: Self = super::saved::load(super::saved::Kind::Pending, bytes)?;
         pending.expire(now);
         Ok(pending)
     }
 
-    /// Erases entries whose time is 14 days old, with their keys and chunks.
+    /// Erases entries whose time is 21 days old, with their keys and chunks.
     fn expire(&mut self, now: u64) {
         self.entries
             .retain_mut(|entry| age(now, &mut entry.noted_at) < PENDING_KEPT_SECONDS);
@@ -259,10 +269,10 @@ impl Pending {
 
     /// Notes an update key read in a notice. False when its commitment
     /// was installed lately or the key is already pending; a key already
-    /// pending is kept 14 days from this notice, with its chunks, so that a
-    /// card whose publication outlasts 14 days still completes (owner,
+    /// pending is kept 21 days from this notice, with its chunks, so that a
+    /// card whose publication outlasts 21 days still completes (owner,
     /// 2026-11-23, gate review 6). A superseded key is not sent again, so
-    /// it goes 14 days after its last notice.
+    /// it goes 21 days after its last notice.
     pub fn note(
         &mut self,
         update_key: &[u8; 32],
@@ -310,7 +320,18 @@ impl Pending {
     ) -> Vec<Zeroizing<Vec<u8>>> {
         self.expire(now);
         let wanted = self.wanted(now);
-        for record in records {
+        // Record 0 first: it carries the hashes the later chunks are
+        // checked against, whatever order they came in.
+        let mut ordered: Vec<(&ContentRecord, u16)> = records
+            .iter()
+            .filter_map(|record| {
+                let mut id = [0u8; ID_BYTES];
+                id.copy_from_slice(&record[..ID_BYTES]);
+                wanted.get(&id).map(|found| (record, found.2))
+            })
+            .collect();
+        ordered.sort_by_key(|(_, index)| *index);
+        for (record, _) in ordered {
             let mut id = [0u8; ID_BYTES];
             id.copy_from_slice(&record[..ID_BYTES]);
             let Some(&(entry, week, index, transmission)) = wanted.get(&id) else {
@@ -323,8 +344,9 @@ impl Pending {
             else {
                 continue;
             };
-            // A chunk that disagrees with those held is ignored (section 4).
-            if chunk.index == index && entry.assembly.add(chunk).is_err() {
+            // A chunk that does not check out is ignored and changes nothing
+            // (section 4): a forged record cannot lock the body out.
+            if chunk.index == index && entry.assembly.add(&entry.update_key, chunk).is_err() {
                 continue;
             }
         }
@@ -335,9 +357,9 @@ impl Pending {
                 kept.push_back(entry);
                 continue;
             }
-            // A body that fails its commitment or signature is erased with
-            // its entry and key (section 4).
-            if let Some(body) = entry.assembly.complete(&entry.update_key)
+            // A body whose signature fails is erased with its entry and key
+            // (section 4); every chunk was checked as it came.
+            if let Some(body) = entry.assembly.complete()
                 && verify(&body)
             {
                 if self.installed.len() >= INSTALLED_REMEMBERED {

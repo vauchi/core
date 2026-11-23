@@ -107,10 +107,10 @@ fn a_publisher_and_pending_keys_carry_on_after_loading() {
 
     let mut stale = Pending::default();
     stale.note(&key, &commitment(&key, &text), START);
-    let mut stale = Pending::load(&stale.save(), START + 14 * DAY).expect("loads");
+    let mut stale = Pending::load(&stale.save(), START + 21 * DAY).expect("loads");
     assert!(
-        stale.note(&key, &commitment(&key, &text), START + 14 * DAY),
-        "the 14-day entry was erased on load"
+        stale.note(&key, &commitment(&key, &text), START + 21 * DAY),
+        "the 21-day entry was erased on load"
     );
 }
 

@@ -205,7 +205,7 @@ fn an_altered_record_or_a_wrong_commitment_installs_nothing() {
 
 // @internal
 #[test]
-fn pending_keys_are_kept_14_days_and_32_a_direction() {
+fn pending_keys_are_kept_21_days_and_32_a_direction() {
     let text = body(50, 9);
     let mut pending = Pending::default();
     assert!(pending.note(&[1; 32], &commitment(&[1; 32], &text), W0));
@@ -214,9 +214,17 @@ fn pending_keys_are_kept_14_days_and_32_a_direction() {
         "already pending"
     );
     let mut publisher = Publisher::new([1; 32], &text);
-    let written = session(&mut publisher, W0 + 14 * DAY, 8);
+    let mut kept = Pending::default();
+    kept.note(&[1; 32], &commitment(&[1; 32], &text), W0);
+    let early = session(&mut Publisher::new([1; 32], &text), W0 + 20 * DAY, 8);
     assert_eq!(
-        pending.read(&written, W0 + 14 * DAY, accept_all).len(),
+        kept.read(&early, W0 + 20 * DAY, accept_all).len(),
+        1,
+        "kept 20 days"
+    );
+    let written = session(&mut publisher, W0 + 21 * DAY, 8);
+    assert_eq!(
+        pending.read(&written, W0 + 21 * DAY, accept_all).len(),
         0,
         "expired"
     );
@@ -275,7 +283,7 @@ fn with_too_few_slots_every_record_goes_once_before_any_goes_twice() {
 #[test]
 fn a_card_lost_once_installs_when_each_view_renews_its_pending_key() {
     let key = [16; 32];
-    let text = body(4_096, 11);
+    let text = body(3_984, 11);
     let mut publisher = Publisher::new(key, &text);
     let mut pending = Pending::default();
     let mut installed_on = None;
@@ -339,8 +347,8 @@ fn a_full_pending_list_drops_the_entry_renewed_longest_ago_and_an_expired_one_is
     let mut stale = Pending::default();
     stale.note(&[40; 32], &commitment(&[40; 32], &text), W0);
     assert!(
-        stale.note(&[40; 32], &commitment(&[40; 32], &text), W0 + 14 * DAY),
-        "a 14-day entry is gone: the key is noted anew"
+        stale.note(&[40; 32], &commitment(&[40; 32], &text), W0 + 21 * DAY),
+        "a 21-day entry is gone: the key is noted anew"
     );
 }
 
@@ -401,7 +409,8 @@ fn a_sender_away_two_weeks_at_a_time_still_gets_its_card_across() {
     for fortnight in 0..12u64 {
         let now = W0 + fortnight * 2 * WEEK;
         let written = session(&mut publisher, now, 2);
-        pending.note(&key, &commitment(&key, &text), now);
+        // R reads the session's view and content a day later.
+        pending.note(&key, &commitment(&key, &text), now + DAY);
         if !pending.read(&written, now + DAY, accept_all).is_empty() {
             installed_on.get_or_insert(fortnight);
         }

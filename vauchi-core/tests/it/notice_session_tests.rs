@@ -374,7 +374,7 @@ proptest! {
         let tier = if fast { FAST } else { BACKGROUND };
         let mut p = pair();
         let key = [21u8; 32];
-        let card = vec![5u8; 4_096];
+        let card = vec![5u8; 3_984];
         p.sender.queue_update(&key, &commitment(&key, &card));
         let mut publishers = vec![Publisher::new(key, &card)];
         let mut pending = Pending::default();

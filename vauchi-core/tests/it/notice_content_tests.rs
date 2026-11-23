@@ -86,8 +86,10 @@ fn a_record_opens_under_its_id_and_tells_its_place() {
     assert_eq!(&sealed[..16], &record_id(&KEY, WEEK, 2, 1));
     let chunk = open_record(&KEY, WEEK, 2, 1, &sealed).expect("opens");
     assert_eq!((chunk.index, chunk.count, chunk.length), (2, 3, 1_200));
-    assert_eq!(&chunk.bytes[..176], &body[1_024..]);
-    assert!(chunk.bytes[176..].iter().all(|byte| *byte == 0));
+    // Record 0 holds two 16-byte hashes before the body, so record 2 holds
+    // the last 208 bytes.
+    assert_eq!(&chunk.bytes[..208], &body[992..]);
+    assert!(chunk.bytes[208..].iter().all(|byte| *byte == 0));
 }
 
 // @internal
@@ -123,11 +125,18 @@ fn a_record_altered_or_looked_up_under_another_id_or_key_does_not_open() {
 
 // @internal
 #[test]
-fn a_body_must_be_one_to_4096_bytes_and_an_index_inside_it() {
+fn a_body_must_be_one_to_3984_bytes_and_an_index_inside_it() {
     assert_eq!(record_count(0), Err(ContentError::BodySize));
     assert_eq!(record_count(1), Ok(1));
     assert_eq!(record_count(512), Ok(1));
     assert_eq!(record_count(513), Ok(2));
+    assert_eq!(
+        record_count(1_008),
+        Ok(2),
+        "two records hold 1,024 bytes less one hash"
+    );
+    assert_eq!(record_count(1_009), Ok(3));
+    assert_eq!(MAX_BODY_BYTES, 3_984);
     assert_eq!(record_count(MAX_BODY_BYTES), Ok(8));
     assert_eq!(
         record_count(MAX_BODY_BYTES + 1),
@@ -163,13 +172,13 @@ fn chunks_from_different_publications_complete_one_body() {
     let open = |record: &[u8; RECORD_BYTES], week, index, transmission| {
         open_record(&KEY, week, index, transmission, record).expect("opens")
     };
-    assert_eq!(assembly.add(open(&first_week[0], WEEK, 0, 0)), Ok(()));
+    assert_eq!(assembly.add(&KEY, open(&first_week[0], WEEK, 0, 0)), Ok(()));
     assert_eq!(assembly.missing(), vec![1, 2]);
-    assert!(assembly.complete(&KEY).is_none());
-    assert_eq!(assembly.add(open(&first_week[2], WEEK, 2, 0)), Ok(()));
-    assert_eq!(assembly.add(open(&second, WEEK + 1, 1, 2)), Ok(()));
+    assert!(assembly.complete().is_none());
+    assert_eq!(assembly.add(&KEY, open(&first_week[2], WEEK, 2, 0)), Ok(()));
+    assert_eq!(assembly.add(&KEY, open(&second, WEEK + 1, 1, 2)), Ok(()));
     assert_eq!(assembly.missing(), Vec::<u16>::new());
-    assert_eq!(assembly.complete(&KEY).expect("complete").to_vec(), body);
+    assert_eq!(assembly.complete().expect("complete").to_vec(), body);
 }
 
 // @internal
@@ -182,15 +191,25 @@ fn a_chunk_that_disagrees_or_a_body_off_its_commitment_is_refused() {
         let sealed = seal_record(&KEY, body, WEEK, index, 0, &nonce_for(index)).expect("sealed");
         open_record(&KEY, WEEK, index, 0, &sealed).expect("opens")
     };
-    assert_eq!(assembly.add(chunk(&body, 0)), Ok(()));
-    assert_eq!(assembly.add(chunk(&other, 1)), Err(ContentError::Disagrees));
+    assert_eq!(assembly.add(&KEY, chunk(&body, 0)), Ok(()));
+    assert_eq!(
+        assembly.add(&KEY, chunk(&other, 1)),
+        Err(ContentError::Disagrees)
+    );
     assert_eq!(assembly.missing(), vec![1, 2]);
 
     let mut off_commitment = Assembly::new([0; 31]);
-    for index in 0..3 {
-        assert_eq!(off_commitment.add(chunk(&body, index)), Ok(()));
+    assert_eq!(
+        off_commitment.add(&KEY, chunk(&body, 0)),
+        Err(ContentError::Disagrees)
+    );
+    for index in 1..3 {
+        assert_eq!(
+            off_commitment.add(&KEY, chunk(&body, index)),
+            Err(ContentError::NeedsFirstRecord)
+        );
     }
-    assert!(off_commitment.complete(&KEY).is_none());
+    assert!(off_commitment.complete().is_none());
 }
 
 // Codex, reading the protocol text alone, 2026-11-22: a record must carry
@@ -205,7 +224,7 @@ fn a_record_carrying_another_index_than_its_id_is_refused() {
 
     let body = body(1_500);
     let honest = seal_record(&KEY, &body, WEEK, 1, 0, &nonce_for(1)).expect("sealed");
-    let record_key = HKDF::derive_array::<32>(None, &KEY, b"Vauchi_Update_Record_v4");
+    let record_key = HKDF::derive_array::<32>(None, &KEY, b"Vauchi_Update_Record_v5");
     let id_of_index_0 = record_id(&KEY, WEEK, 0, 0);
     let mut plaintext = Vec::new();
     plaintext.extend_from_slice(&1u16.to_be_bytes());
@@ -261,12 +280,23 @@ proptest! {
         records.rotate_left(rotate);
         if seed % 2 == 0 { records.reverse(); }
 
+        // A later chunk before record 0 is refused and changes nothing;
+        // it comes again, as in a later publication.
         let mut assembly = Assembly::new(commitment(&key, &body));
+        let mut again = Vec::new();
         for (index, record) in &records {
-            prop_assert!(assembly.complete(&key).is_none());
+            prop_assert!(assembly.complete().is_none());
             let chunk = open_record(&key, WEEK, *index, 0, record).expect("opens");
-            prop_assert_eq!(assembly.add(chunk), Ok(()));
+            match assembly.add(&key, chunk) {
+                Ok(()) => {}
+                Err(ContentError::NeedsFirstRecord) => again.push((*index, *record)),
+                Err(other) => prop_assert!(false, "refused: {:?}", other),
+            }
         }
-        prop_assert_eq!(assembly.complete(&key).expect("complete").to_vec(), body);
+        for (index, record) in &again {
+            let chunk = open_record(&key, WEEK, *index, 0, record).expect("opens");
+            prop_assert_eq!(assembly.add(&key, chunk), Ok(()));
+        }
+        prop_assert_eq!(assembly.complete().expect("complete").to_vec(), body);
     }
 }

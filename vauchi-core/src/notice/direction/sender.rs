@@ -592,6 +592,19 @@ impl Sender {
     /// As `wants`, counting an update only for a group `eligible` allows:
     /// a new edit's notice goes only with its record 0 (section 4).
     pub fn wants_for(&self, now: u64, eligible: impl Fn(GroupId) -> bool) -> Wants {
+        let chosen = self.admitted(now, &eligible);
+        let update = chosen.iter().filter(|(_, is_update)| *is_update).count();
+        Wants {
+            update,
+            control: self.openings.len().saturating_add(chosen.len() - update),
+        }
+    }
+
+    /// The updates (`true`) and views (`false`) the positions left in the
+    /// period can take, in queue order. The request and the write both use
+    /// it, so the views that compete for control slots are the ones the
+    /// request counted (gate review 12, Codex, Claude).
+    fn admitted(&self, now: u64, eligible: &impl Fn(GroupId) -> bool) -> Vec<(GroupId, bool)> {
         let recent = self
             .positions_assigned_at
             .iter()
@@ -605,24 +618,12 @@ impl Sender {
                 .and_then(|epoch| epoch.writer.as_ref())
                 .is_some_and(ChainWriter::has_room);
         if !room {
-            return Wants {
-                update: 0,
-                control: self.openings.len(),
-            };
+            return Vec::new();
         }
-        // Updates and views share the positions left in the period, in
-        // one queue.
-        let positions_left = POSITIONS_A_PERIOD.saturating_sub(recent);
-        let chosen: Vec<(GroupId, bool)> = self
-            .notice_queue(&eligible)
+        self.notice_queue(eligible)
             .into_iter()
-            .take(positions_left)
-            .collect();
-        let update = chosen.iter().filter(|(_, is_update)| *is_update).count();
-        Wants {
-            update,
-            control: self.openings.len().saturating_add(chosen.len() - update),
-        }
+            .take(POSITIONS_A_PERIOD - recent)
+            .collect()
     }
 
     /// Groups whose view is still to go this round: not viewed, and with
@@ -686,12 +687,11 @@ impl Sender {
             .iter()
             .map(|rank| (*rank, true))
             .chain(
-                self.notice_queue(&eligible)
+                // Only views the period's positions can still take compete
+                // for a control slot (gate reviews 11 and 12).
+                self.admitted(now, &eligible)
                     .into_iter()
                     .filter(|(_, is_update)| !is_update)
-                    // Only views the period's positions can still take
-                    // compete for a control slot (gate review 11, Claude).
-                    .take(POSITIONS_A_PERIOD.saturating_sub(self.positions_assigned_at.len()))
                     .map(|(group, _)| {
                         (
                             self.groups

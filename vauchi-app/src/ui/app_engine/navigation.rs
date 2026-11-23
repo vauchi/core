@@ -153,7 +153,7 @@ impl AppEngine {
     pub fn bootstrap(&mut self) -> ScreenModel {
         let screen = if !self.vauchi().has_identity() {
             AppScreen::Onboarding
-        } else if self.vauchi().is_password_enabled().unwrap_or(false)
+        } else if super::startup::password_guards_the_app(self.vauchi())
             && self.vauchi().auth_mode() == vauchi_core::api::AuthMode::Unauthenticated
         {
             AppScreen::Lock

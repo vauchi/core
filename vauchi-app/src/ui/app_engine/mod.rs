@@ -722,8 +722,7 @@ impl AppEngine {
         if matches!(self.screen, AppScreen::Lock | AppScreen::Onboarding) {
             return None;
         }
-        // Only lock if a password is set
-        if !self.vauchi.is_password_enabled().unwrap_or(false) {
+        if !startup::password_guards_the_app(&self.vauchi) {
             return None;
         }
         Some(self.navigate_to(AppScreen::Lock))

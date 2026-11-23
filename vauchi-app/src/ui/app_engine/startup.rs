@@ -18,13 +18,21 @@ use vauchi_core::api::Vauchi;
 // implies "past onboarding"; the atomic
 // `create_identity_with_onboarding` helper still closes the
 // *new* crash window for installs after this commit.
+/// Whether the app password guards this app. A password state that cannot
+/// be read counts as set: the lock fails closed, because treating an
+/// unreadable record as "no password" opened the app without it
+/// (vauchi/private#1370).
+pub(super) fn password_guards_the_app(vauchi: &Vauchi) -> bool {
+    vauchi.is_password_enabled().unwrap_or(true)
+}
+
 pub(super) fn initial_screen(vauchi: &Vauchi) -> AppScreen {
     if !vauchi.has_identity() {
         match vauchi.pending_recovery_claim() {
             Ok(None) => AppScreen::Onboarding,
             Ok(Some(_)) | Err(_) => AppScreen::Recovery,
         }
-    } else if vauchi.is_password_enabled().unwrap_or(false)
+    } else if password_guards_the_app(vauchi)
         && vauchi.auth_mode() == vauchi_core::api::AuthMode::Unauthenticated
     {
         // A Vauchi already opened with the password (the CLI's --pin)

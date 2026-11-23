@@ -91,6 +91,7 @@ pub struct Sender {
     edits: u64,
     edits_written: Option<u64>,
     positions_assigned_at: VecDeque<u64>,
+    highest_opened_this_session: Option<u32>,
     first_records: FirstRecords,
     alarms: Vec<Alarm>,
 }
@@ -120,6 +121,7 @@ impl Sender {
             edits: 0,
             edits_written: None,
             positions_assigned_at: VecDeque::new(),
+            highest_opened_this_session: None,
             first_records: FirstRecords::default(),
             alarms: Vec::new(),
         }
@@ -187,6 +189,7 @@ impl Sender {
         }
         new.sort_by_key(|refresh| refresh.number);
         let skip = new.len().saturating_sub(REFRESHES_A_SESSION);
+        self.highest_opened_this_session = None;
         for refresh in new.into_iter().skip(skip) {
             self.first_records.remember(
                 refresh.tag,
@@ -196,7 +199,23 @@ impl Sender {
             );
             self.handle(&refresh, now);
         }
-        self.retain(now);
+        // Once per session, after every refresh is handled (protocol
+        // section 7, step 3): a refresh later in the session may have been
+        // sealed in an epoch an earlier one would make unreachable.
+        let opened = self.highest_opened_this_session.take();
+        // Repeated until nothing more is erased: an opening whose epoch is
+        // erased leaves the queue, and its base is then no longer kept for
+        // it in the same step (protocol section 7, step 3).
+        loop {
+            let kept = self.epochs.len();
+            if let Some(number) = opened {
+                self.erase_unreachable(number);
+            }
+            self.retain(now);
+            if self.epochs.len() == kept {
+                break;
+            }
+        }
     }
 
     /// Whether this refresh, with this key and this name, was read before.
@@ -332,7 +351,8 @@ impl Sender {
 
         if !opened_before {
             self.open_on(refresh, read_in, now);
-            self.erase_unreachable(refresh.number);
+            self.highest_opened_this_session =
+                self.highest_opened_this_session.max(Some(refresh.number));
         }
         self.refreshes.push(RefreshRead {
             number: refresh.number,
@@ -352,11 +372,19 @@ impl Sender {
             return;
         };
         let writes_in = self.writes_in;
+        // The receiver may seal its refreshes in an epoch it can no longer
+        // move into: the one it left most recently. An opening queued on
+        // that base must still go out, so the base waits for it (at most
+        // four sessions).
+        let bases = self.opening_bases();
         let unreachable: Vec<EpochId> = self
             .epochs
             .iter()
             .filter(|e| {
-                e.named_at.is_none() && e.keys.number() <= below && e.keys.id() != writes_in
+                e.named_at.is_none()
+                    && e.keys.number() <= below
+                    && e.keys.id() != writes_in
+                    && !bases.contains(&e.keys.id())
             })
             .map(|e| e.keys.id())
             .collect();
@@ -411,6 +439,11 @@ impl Sender {
             }
             let at = opening_address(base.keys.opening_key(), opening.number, *attempt);
             *attempt = attempt.saturating_add(1);
+            // After its fourth attempt the opening leaves the queue at once
+            // (protocol section 8), so its base is no longer held for it.
+            if *attempt >= ATTEMPTS {
+                opening.spent = true;
+            }
             let record = Record::Opening {
                 ephemeral_public: opening.ephemeral_public,
                 number: opening.number,
@@ -457,6 +490,12 @@ impl Sender {
         }
     }
 
+    /// The epochs a queued opening is to be sealed in. Each waits for its
+    /// openings, which leave the queue after four attempts or a naming.
+    fn opening_bases(&self) -> Vec<EpochId> {
+        self.openings.iter().map(|opening| opening.base).collect()
+    }
+
     fn erase(&mut self, id: EpochId) {
         self.epochs.retain(|epoch| epoch.keys.id() != id);
         self.openings
@@ -470,10 +509,11 @@ impl Sender {
     fn retain(&mut self, now: u64) {
         let writes_in = self.writes_in;
         let highest_named = self.highest_named;
+        let bases = self.opening_bases();
         let mut to_erase = Vec::new();
         for epoch in &mut self.epochs {
             let id = epoch.keys.id();
-            if id == writes_in {
+            if id == writes_in || bases.contains(&id) {
                 continue;
             }
             // The receiver only moves upwards and seals every refresh in
@@ -504,6 +544,7 @@ impl Sender {
                 .epochs
                 .iter()
                 .filter(|e| e.keys.id() != writes_in && e.keys.number() < highest_named)
+                .filter(|e| !bases.contains(&e.keys.id()))
                 .filter_map(|e| e.named_at.map(|at| (at, e.keys.id())))
                 .min();
             match oldest {
@@ -523,6 +564,7 @@ impl Sender {
                     e.named_at.is_none()
                         && e.keys.id() != writes_in
                         && e.keys.number() < highest_named
+                        && !bases.contains(&e.keys.id())
                 })
                 .map(|e| (e.keys.number(), e.keys.id()))
                 .min();

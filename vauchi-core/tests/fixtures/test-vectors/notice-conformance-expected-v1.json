@@ -21017,12 +21017,13 @@
         "s_alarms": []
       },
       {
-        "written": 2,
+        "written": 3,
         "updates_read": [],
         "r_current": 2,
         "r_newest": 6,
         "s_writes_in": 2,
         "s_kept": [
+          1,
           2,
           3,
           5
@@ -35115,12 +35116,13 @@
         "s_alarms": []
       },
       {
-        "written": 2,
+        "written": 3,
         "updates_read": [],
         "r_current": 4,
         "r_newest": 6,
         "s_writes_in": 2,
         "s_kept": [
+          0,
           2,
           3,
           4
@@ -35129,12 +35131,13 @@
         "s_alarms": []
       },
       {
-        "written": 1,
+        "written": 2,
         "updates_read": [],
         "r_current": 4,
         "r_newest": 6,
         "s_writes_in": 2,
         "s_kept": [
+          0,
           2,
           3,
           4
@@ -35149,6 +35152,7 @@
         "r_newest": 6,
         "s_writes_in": 2,
         "s_kept": [
+          0,
           2,
           3,
           4

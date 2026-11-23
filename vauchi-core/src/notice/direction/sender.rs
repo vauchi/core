@@ -205,7 +205,8 @@ impl Sender {
 
     /// The newest update of a direction with one group (group 0).
     pub fn queue_update(&mut self, update_key: &[u8; 32], commitment: &[u8; 31]) {
-        self.queue_group_update(0, update_key, commitment);
+        let queued = self.queue_group_update(0, update_key, commitment);
+        debug_assert!(queued.is_ok(), "group 0 alone never reaches the cap");
     }
 
     /// The newest update of one of the contact's groups; it replaces one
@@ -215,7 +216,10 @@ impl Sender {
         group: GroupId,
         update_key: &[u8; 32],
         commitment: &[u8; 31],
-    ) {
+    ) -> Result<(), TooManyGroups> {
+        if !self.groups.contains_key(&group) && self.groups.len() >= GROUPS_A_CONTACT {
+            return Err(TooManyGroups);
+        }
         let entry = self.groups.entry(group).or_insert_with(|| GroupUpdate {
             update_key: Zeroizing::new(*update_key),
             commitment: *commitment,
@@ -228,6 +232,7 @@ impl Sender {
         entry.commitment = *commitment;
         entry.edit = entry.edit.saturating_add(1);
         entry.queued = true;
+        Ok(())
     }
 
     fn view_is_due(&mut self) {

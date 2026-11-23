@@ -43,6 +43,14 @@ pub(super) const POSITIONS_A_PERIOD: usize = 128;
 pub type EpochId = [u8; 16];
 /// A contact group as Core names it; opaque to the notice core.
 pub type GroupId = u32;
+/// A contact is in at most 32 of a user's groups, so a receiver's 32
+/// pending keys and 32 installed commitments hold every group's latest
+/// (owner, 2026-11-23, gate review 9).
+pub const GROUPS_A_CONTACT: usize = 32;
+
+/// A 33rd group for one contact is refused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TooManyGroups;
 pub(super) type Notice = [u8; NOTICE_BYTES];
 
 pub fn week(now: u64) -> u32 {

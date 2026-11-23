@@ -280,12 +280,16 @@ fn a_refresh_copy_cut_by_a_grant_goes_in_a_later_session() {
 fn a_view_carries_the_latest_key_of_every_group() {
     let mut p = pair();
     let (a, commitment_a) = update(10);
-    p.sender.queue_group_update(1, &a, &commitment_a);
+    p.sender
+        .queue_group_update(1, &a, &commitment_a)
+        .expect("within 32 groups");
     let lost = p.sender_session(&[], START);
     assert_eq!(lost.len(), 1, "group 1's notice, which the gateway drops");
     let refresh = p.receiver_session(&[], START + DAY);
     let (b, commitment_b) = update(11);
-    p.sender.queue_group_update(2, &b, &commitment_b);
+    p.sender
+        .queue_group_update(2, &b, &commitment_b)
+        .expect("within 32 groups");
     let answer = p.sender_session(&refresh, START + 2 * DAY);
     let keys: Vec<[u8; 32]> = p
         .receiver
@@ -305,7 +309,9 @@ fn a_view_carries_the_latest_key_of_every_group() {
 fn a_new_edits_notice_waits_for_record_zero_of_its_publication() {
     let mut p = pair();
     let (key, commitment) = update(12);
-    p.sender.queue_group_update(3, &key, &commitment);
+    p.sender
+        .queue_group_update(3, &key, &commitment)
+        .expect("within 32 groups");
     let mut busy = Publisher::for_group(4, [13; 32], &[1; 2_000]);
     busy.queue_due(START);
     let mut publishers = vec![busy, Publisher::for_group(3, key, &[2; 100])];
@@ -469,12 +475,16 @@ fn a_refresh_waits_for_an_epoch_whose_addresses_of_the_week_are_spent() {
 fn the_senders_demand_never_exceeds_the_positions_left_in_the_period() {
     let mut p = pair();
     let (a, commitment) = update(30);
-    p.sender.queue_group_update(1, &a, &commitment);
+    p.sender
+        .queue_group_update(1, &a, &commitment)
+        .expect("within 32 groups");
     for second in 0..127 {
         assert_eq!(p.sender.write_within(START + second, 0, 1).len(), 1);
     }
     let (b, commitment) = update(31);
-    p.sender.queue_group_update(2, &b, &commitment);
+    p.sender
+        .queue_group_update(2, &b, &commitment)
+        .expect("within 32 groups");
     assert_eq!(
         p.sender.wants(START + 200).update,
         1,
@@ -506,32 +516,43 @@ fn an_alarm_queues_the_refresh_again_for_the_epochs_it_now_needs() {
     );
 }
 
-// Gate review 8 (Codex): each followed refresh made every view due again,
-// and views went in group order under the cap of 128 positions a period,
-// so with 129 groups the last group's view never went and one lost notice
-// of it was never replaced. Views and updates now go least recently sent
+// Gate review 8 (Codex, Kimi): each followed refresh made every view due
+// again and views went in group order, so when a session had room for
+// fewer views than there were groups, the last group's view never went and
+// a lost notice of it was never replaced. With at most 32 groups a contact
+// (gate review 9), the same holds whenever a session's control slots hold
+// fewer views than groups. Notices now go the group written longest ago
 // first.
 // @internal
 #[test]
-fn with_more_groups_than_positions_every_groups_view_still_goes() {
+fn with_more_groups_than_slots_every_groups_view_still_goes() {
     let mut p = pair();
-    for group in 0..=128u32 {
-        let (key, commitment) = update((group % 200) as u8);
-        p.sender.queue_group_update(group, &key, &commitment);
+    for group in 0..32u32 {
+        let (key, commitment) = update(group as u8);
+        p.sender
+            .queue_group_update(group, &key, &commitment)
+            .expect("within 32 groups");
     }
     let mut now = START;
-    for _ in 0..3 {
-        p.sender_session(&[], now);
-        now += WEEK;
-    }
-    let (lost, commitment) = update(250);
-    p.sender.queue_group_update(128, &lost, &commitment);
     p.sender_session(&[], now);
+    now += DAY;
+    let (lost, commitment) = update(250);
+    p.sender
+        .queue_group_update(31, &lost, &commitment)
+        .expect("within 32 groups");
+    assert_eq!(
+        p.sender.write_within(now, 0, 1).len(),
+        1,
+        "group 31's edit, which the gateway drops"
+    );
+    p.sender.acknowledge();
     let mut read_lost = false;
     for _ in 0..6 {
         now += WEEK;
         let refresh = p.receiver_session(&[], now);
-        let written = p.sender_session(&refresh, now);
+        p.sender.read(&refresh, now);
+        let written = p.sender.write_within(now, 31, 0);
+        p.sender.acknowledge();
         read_lost |= p
             .receiver
             .read(&written, now + 1)
@@ -539,7 +560,7 @@ fn with_more_groups_than_positions_every_groups_view_still_goes() {
             .any(|read| *read.update_key == lost);
         p.receiver_session(&[], now + 2);
     }
-    assert!(read_lost, "group 128's view never went");
+    assert!(read_lost, "group 31's view never went");
 }
 
 // Gate review 9 (Codex): updates took the period's positions before any
@@ -553,13 +574,17 @@ fn a_group_edited_at_the_full_rate_does_not_starve_another_groups_view() {
     let mut p = pair();
     let refresh = p.receiver_session(&[], START);
     let (b, commitment_b) = update(40);
-    p.sender.queue_group_update(2, &b, &commitment_b);
+    p.sender
+        .queue_group_update(2, &b, &commitment_b)
+        .expect("within 32 groups");
     let lost = p.sender.write_within(START, 0, 1);
     assert_eq!(lost.len(), 1, "B's notice, which the gateway drops");
     p.sender.acknowledge();
     for j in 1..128u64 {
         let (a, commitment_a) = update((j % 200) as u8);
-        p.sender.queue_group_update(1, &a, &commitment_a);
+        p.sender
+            .queue_group_update(1, &a, &commitment_a)
+            .expect("within 32 groups");
         assert_eq!(p.sender.write_within(START + j * step, 0, 1).len(), 1);
         p.sender.acknowledge();
     }
@@ -567,7 +592,9 @@ fn a_group_edited_at_the_full_rate_does_not_starve_another_groups_view() {
     let now = START + WEEK + 1;
     p.sender.read(&refresh, now);
     let (a, commitment_a) = update(250);
-    p.sender.queue_group_update(1, &a, &commitment_a);
+    p.sender
+        .queue_group_update(1, &a, &commitment_a)
+        .expect("within 32 groups");
     let written = p.sender.write_within(now, usize::MAX, usize::MAX);
     let keys: Vec<[u8; 32]> = p
         .receiver
@@ -580,26 +607,57 @@ fn a_group_edited_at_the_full_rate_does_not_starve_another_groups_view() {
 
 // Gate review 9 (Kimi): the order counted only acknowledged writes, so a
 // gateway that delivered everything but withheld every acknowledgement
-// kept groups 0 to 79 first in every 80-slot session, and group 80's key
-// never went.
+// kept the same groups first in every session too small for all of them,
+// and the last group's key never went.
 // @internal
 #[test]
 fn withheld_acknowledgements_do_not_starve_a_group() {
     let mut p = pair();
-    for group in 0..81u32 {
-        let (key, commitment) = update((group % 200) as u8);
-        p.sender.queue_group_update(group, &key, &commitment);
+    for group in 0..32u32 {
+        let (key, commitment) = update(group as u8);
+        p.sender
+            .queue_group_update(group, &key, &commitment)
+            .expect("within 32 groups");
     }
-    let last = update(80).0;
+    let last = update(31).0;
     let mut read_last = false;
     for session in 0..6u64 {
         let now = START + session * WEEK;
-        let written = p.sender.write_within(now, 0, 80);
+        let written = p.sender.write_within(now, 0, 31);
         read_last |= p
             .receiver
             .read(&written, now + 1)
             .iter()
             .any(|read| *read.update_key == last);
     }
-    assert!(read_last, "group 80's key never went");
+    assert!(read_last, "group 31's key never went");
+}
+
+// Gate review 9 (Claude): a receiver holds 32 pending keys and remembers 32
+// installed, so a contact in more than 32 groups saw keys push each other
+// out. Owner, 2026-11-23: a contact is in at most 32 groups.
+// @internal
+#[test]
+fn a_contact_is_in_at_most_32_groups() {
+    use vauchi_core::notice::direction::{GROUPS_A_CONTACT, TooManyGroups};
+    let mut p = pair();
+    for group in 0..GROUPS_A_CONTACT as u32 {
+        let (key, commitment) = update(group as u8);
+        assert_eq!(
+            p.sender.queue_group_update(group, &key, &commitment),
+            Ok(())
+        );
+    }
+    let (key, commitment) = update(99);
+    assert_eq!(
+        p.sender
+            .queue_group_update(GROUPS_A_CONTACT as u32, &key, &commitment),
+        Err(TooManyGroups)
+    );
+    assert_eq!(
+        p.sender.queue_group_update(0, &key, &commitment),
+        Ok(()),
+        "an existing group takes a new edit"
+    );
+    assert_eq!(GROUPS_A_CONTACT, 32);
 }

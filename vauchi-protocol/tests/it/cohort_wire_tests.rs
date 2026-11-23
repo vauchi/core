@@ -7,8 +7,8 @@
 
 use serde_json::json;
 use vauchi_protocol::cohort::{
-    CohortBatchRequest, CohortChunkRequest, CohortClass, CohortRegisterRequest, CohortResponse,
-    CohortTier, CohortWriteRequest,
+    CHUNK_BYTES, CohortBatchRequest, CohortChunkRequest, CohortClass, CohortRegisterRequest,
+    CohortResponse, CohortTier, CohortWriteRequest,
 };
 
 // @internal
@@ -85,4 +85,16 @@ fn the_relays_answers_parse() {
     assert_eq!(refused.error.as_deref(), Some("not_published"));
     assert!(!refused.is_ok());
     assert!(written.is_ok());
+}
+
+// The relay serves a batch in chunks of whole records of either class, so
+// a reader can split one without knowing the other class (relay!623).
+// @internal
+#[test]
+fn a_chunk_holds_whole_records_of_either_class() {
+    assert_eq!(CohortClass::Notice.record_bytes(), 96);
+    assert_eq!(CohortClass::Content.record_bytes(), 576);
+    assert_eq!(CHUNK_BYTES, 64_512);
+    assert_eq!(CHUNK_BYTES % CohortClass::Notice.record_bytes(), 0);
+    assert_eq!(CHUNK_BYTES / CohortClass::Content.record_bytes(), 112);
 }

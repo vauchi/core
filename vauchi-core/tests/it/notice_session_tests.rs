@@ -832,3 +832,38 @@ fn a_view_the_cap_refuses_does_not_take_an_openings_slot() {
         "the grant sized for the opening writes it"
     );
 }
+
+// Gate review 11 (Codex, Kimi): the number of openings followed waiting
+// time, but the ones written were always the newest, so an older opening
+// waited through all four attempts of a newer one.
+// @internal
+#[test]
+fn the_opening_that_waited_longest_is_the_one_written() {
+    use vauchi_core::notice::direction::Receiver;
+    let mut p = pair();
+    let first = p.receiver_session(&[], START);
+    p.sender.read(&first, START + 60);
+    let older = p.sender.write_within(START + 120, 1, 0);
+    p.sender.acknowledge();
+    assert_eq!(older.len(), 1, "the first opening, which the gateway drops");
+    let second = p.receiver_session(&[], START + WEEK);
+    p.sender.read(&second, START + WEEK + 60);
+    let newer = p.sender.write_within(START + WEEK + 120, 1, 0);
+    p.sender.acknowledge();
+    let again = p.sender.write_within(START + WEEK + DAY, 1, 0);
+    p.sender.acknowledge();
+    assert_eq!((newer.len(), again.len()), (1, 1));
+    let now = START + WEEK + 2 * DAY;
+    let saved = p.receiver.save().expect("saves");
+    let mut opened_by_newer = Receiver::load(&saved, now).expect("loads");
+    let mut opened_by_again = Receiver::load(&saved, now).expect("loads");
+    opened_by_newer.read(&newer, now);
+    opened_by_again.read(&again, now);
+    assert_ne!(opened_by_newer.current_epoch(), p.receiver.current_epoch());
+    assert_ne!(opened_by_again.current_epoch(), p.receiver.current_epoch());
+    assert_ne!(
+        opened_by_newer.current_epoch(),
+        opened_by_again.current_epoch(),
+        "the second session wrote the older opening, not the newer one again"
+    );
+}

@@ -247,10 +247,14 @@ impl Pending {
     /// Loads saved state and erases entries 14 days old first.
     pub fn load(bytes: &[u8], now: u64) -> Result<Self, super::saved::SavedError> {
         let mut pending: Self = super::saved::load(super::saved::Kind::Pending, bytes)?;
-        pending
-            .entries
-            .retain_mut(|entry| age(now, &mut entry.noted_at) < PENDING_KEPT_SECONDS);
+        pending.expire(now);
         Ok(pending)
+    }
+
+    /// Erases entries whose time is 14 days old, with their keys and chunks.
+    fn expire(&mut self, now: u64) {
+        self.entries
+            .retain_mut(|entry| age(now, &mut entry.noted_at) < PENDING_KEPT_SECONDS);
     }
 
     /// Notes an update key read in a notice. False when its commitment
@@ -265,6 +269,7 @@ impl Pending {
         commitment: &[u8; COMMITMENT_BYTES],
         now: u64,
     ) -> bool {
+        self.expire(now);
         let installed = self
             .installed
             .iter()
@@ -280,8 +285,11 @@ impl Pending {
             entry.noted_at = now.max(entry.noted_at);
             return false;
         }
-        if self.entries.len() >= PENDING_A_DIRECTION {
-            self.entries.pop_front();
+        if self.entries.len() >= PENDING_A_DIRECTION
+            && let Some(oldest) = (0..self.entries.len()).min_by_key(|i| self.entries[*i].noted_at)
+        {
+            // The oldest by its time, which a view renews (section 4).
+            self.entries.remove(oldest);
         }
         self.entries.push_back(Entry {
             update_key: Zeroizing::new(*update_key),
@@ -300,8 +308,7 @@ impl Pending {
         now: u64,
         verify: impl Fn(&[u8]) -> bool,
     ) -> Vec<Zeroizing<Vec<u8>>> {
-        self.entries
-            .retain_mut(|entry| age(now, &mut entry.noted_at) < PENDING_KEPT_SECONDS);
+        self.expire(now);
         let wanted = self.wanted(now);
         for record in records {
             let mut id = [0u8; ID_BYTES];

@@ -661,3 +661,73 @@ fn a_contact_is_in_at_most_32_groups() {
     );
     assert_eq!(GROUPS_A_CONTACT, 32);
 }
+
+// Gate review 10 (Codex): a direction's one control slot always went to its
+// pending opening first, so with refreshes arriving each week a lost key
+// notice's view never went. Owner, 2026-11-23: every queue serves what has
+// waited longest, openings and views alike.
+// @internal
+#[test]
+fn an_opening_always_pending_does_not_starve_a_view() {
+    let mut p = pair();
+    let (key, commitment) = update(60);
+    p.sender.queue_update(&key, &commitment);
+    assert_eq!(
+        p.sender.write_within(START, 0, 1).len(),
+        1,
+        "the notice the gateway drops"
+    );
+    p.sender.acknowledge();
+    let mut now = START;
+    let mut read = false;
+    for _ in 0..6 {
+        now += WEEK;
+        let refresh = p.receiver_session(&[], now);
+        p.sender.read(&refresh, now + DAY);
+        for day in 1..4u64 {
+            let written = p.sender.write_within(now + day * DAY, 1, 0);
+            p.sender.acknowledge();
+            read |= p
+                .receiver
+                .read(&written, now + day * DAY + 1)
+                .iter()
+                .any(|r| *r.update_key == key);
+        }
+    }
+    assert!(read, "the view never had the control slot");
+}
+
+// Gate review 10 (Codex): new edits always took the content slots before
+// another group's weekly republication, so that group's lost card body was
+// never replaced while the editing went on.
+// @internal
+#[test]
+fn constant_new_edits_do_not_starve_a_weekly_republication() {
+    use vauchi_core::notice::content::commitment;
+    use vauchi_core::notice::publish::Pending;
+    let b_key = [61; 32];
+    let b_body = vec![7u8; 400];
+    let mut publishers = vec![Publisher::for_group(2, b_key, &b_body)];
+    let mut session = Session::default();
+    let mut now = START;
+    session.write(&mut [], &mut [], &mut publishers, BACKGROUND, now);
+    Session::acknowledge(&mut [], &mut [], &mut publishers, now);
+    let mut pending = Pending::default();
+    pending.note(&b_key, &commitment(&b_key, &b_body), now);
+    let mut installed = false;
+    for edit in 0..20u8 {
+        now += 3 * DAY;
+        publishers.retain(|publisher| publisher.group() != 1);
+        publishers.insert(0, Publisher::for_group(1, [edit; 32], &vec![edit; 2_400]));
+        let written = session.write(&mut [], &mut [], &mut publishers, BACKGROUND, now);
+        Session::acknowledge(&mut [], &mut [], &mut publishers, now);
+        pending.note(&b_key, &commitment(&b_key, &b_body), now);
+        installed |= !pending
+            .read(&written.contents, now + 1, |_| true)
+            .is_empty();
+    }
+    assert!(
+        installed,
+        "group 2's republication never had a content slot"
+    );
+}

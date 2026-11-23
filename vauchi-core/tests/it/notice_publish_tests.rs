@@ -278,7 +278,8 @@ fn with_too_few_slots_every_record_goes_once_before_any_goes_twice() {
 // completes, an 18-day cycle. With the 14 days counted from the first
 // notice, the first chunks always arrived in the session that expired the
 // entry, and the card never installed. Each notice carrying the key now
-// restarts the 14 days (owner, 2026-11-23).
+// restarts the pending window, 21 days since gate review 7 (owner,
+// 2026-11-23).
 // @internal
 #[test]
 fn a_card_lost_once_installs_when_each_view_renews_its_pending_key() {

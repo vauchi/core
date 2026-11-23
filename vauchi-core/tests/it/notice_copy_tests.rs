@@ -33,39 +33,65 @@ fn first_opening(p: &Pair, written: &[Notice]) -> Vec<Notice> {
         .collect()
 }
 
+// Gate review 3 (Codex): a copy holding a refresh's private key is the
+// harder case; it reads the epoch opened on that key, and heals only once
+// a refresh made after the copy is opened, named and followed.
 // @internal
 #[test]
-fn a_copy_of_the_receiver_made_before_a_refresh_reads_nothing_after_healing() {
+fn a_copy_holding_a_refresh_key_reads_until_a_later_refresh_heals_it() {
     let mut p = pair();
-    let copy = p.receiver.clone();
     let mut relays = Vec::new();
+    let first_refresh = p.receiver_session(&[], START);
+    relays.extend(first_refresh.iter().copied());
+    let copy = p.receiver.clone();
 
-    let (before, commitment) = update(1);
-    p.sender.queue_update(&before, &commitment);
-    relays.extend(p.sender_session(&[], START));
-    let refresh = p.receiver_session(&relays, START + DAY);
-    relays.extend(refresh.iter().copied());
-    let opening = p.sender_session(&refresh, START + 2 * DAY);
+    let opening = p.sender_session(&first_refresh, START + DAY);
     relays.extend(opening.iter().copied());
-    p.receiver_session(&opening, START + 3 * DAY);
-    let naming = p.receiver_session(&[], START + DAY + WEEK);
-    relays.extend(naming.iter().copied());
-    p.sender_session(&naming, START + 2 * DAY + WEEK);
-    p.assert_healed();
-    assert_ne!(p.sender.writes_in(), p.receiver.seed_epoch());
+    p.receiver_session(&opening, START + 2 * DAY);
+    let first_epoch = p.receiver.current_epoch();
 
-    let (after, commitment) = update(2);
-    p.sender.queue_update(&after, &commitment);
-    let written = p.sender_session(&[], START + 3 * DAY + WEEK);
+    let naming_first = p.receiver_session(&[], START + WEEK);
+    relays.extend(naming_first.iter().copied());
+    let (in_first, commitment) = update(1);
+    p.sender.queue_update(&in_first, &commitment);
+    let written = p.sender_session(&naming_first, START + DAY + WEEK);
     relays.extend(written.iter().copied());
     assert_eq!(
-        keys_read(&mut p.receiver, &written, START + 4 * DAY + WEEK),
-        vec![after]
+        p.sender.writes_in(),
+        first_epoch,
+        "followed into the copied key's epoch"
+    );
+    assert!(keys_read(&mut p.receiver, &written, START + 2 * DAY + WEEK).contains(&in_first));
+    assert_ne!(
+        p.receiver.current_epoch(),
+        first_epoch,
+        "moved on a refresh made after the copy"
     );
 
-    let read = keys_read(&mut copy.clone(), &relays, START + 4 * DAY + WEEK);
-    assert!(read.contains(&before), "the copy reads what came before");
-    assert!(!read.contains(&after), "and nothing written after healing");
+    let naming_second = p.receiver_session(&[], START + 2 * WEEK);
+    relays.extend(naming_second.iter().copied());
+    let (in_second, commitment) = update(2);
+    p.sender.queue_update(&in_second, &commitment);
+    let written = p.sender_session(&naming_second, START + DAY + 2 * WEEK);
+    relays.extend(written.iter().copied());
+    assert_eq!(p.sender.writes_in(), p.receiver.current_epoch(), "healed");
+    assert!(keys_read(&mut p.receiver, &written, START + 2 * DAY + 2 * WEEK).contains(&in_second));
+
+    let mut attacker = copy.clone();
+    let mut read = keys_read(&mut attacker, &relays, START + 2 * DAY + 2 * WEEK);
+    read.extend(keys_read(
+        &mut attacker,
+        &relays,
+        START + 3 * DAY + 2 * WEEK,
+    ));
+    assert!(
+        read.contains(&in_first),
+        "the copy reads the epoch opened on its key"
+    );
+    assert!(
+        !read.contains(&in_second),
+        "and nothing once a later refresh healed"
+    );
 }
 
 // @internal
@@ -95,13 +121,11 @@ fn a_skipped_position_is_readable_to_a_copy_only_within_three_periods() {
     for week in 1..=3 {
         p.receiver_session(&[], START + 2 * DAY + week * WEEK + DAY);
     }
+    // Read on a clock set back into the window (gate review 3, Codex): the
+    // copy's own expiry then erases nothing, so only what R erased counts.
     let outside = p.receiver.clone();
     assert_eq!(
-        keys_read(
-            &mut outside.clone(),
-            &relays,
-            START + 2 * DAY + 3 * WEEK + DAY
-        ),
+        keys_read(&mut outside.clone(), &relays, START + 2 * DAY + WEEK),
         Vec::<[u8; 32]>::new(),
         "after three periods and a session it reads nothing"
     );
@@ -132,11 +156,7 @@ fn an_epoch_left_is_readable_to_a_copy_only_within_three_periods() {
     }
     let outside = p.receiver.clone();
     assert_eq!(
-        keys_read(
-            &mut outside.clone(),
-            &relays,
-            START + 3 * DAY + 3 * WEEK + DAY
-        ),
+        keys_read(&mut outside.clone(), &relays, START + 3 * DAY + WEEK),
         Vec::<[u8; 32]>::new(),
         "after three periods and a session it reads nothing there"
     );

@@ -15,7 +15,7 @@ use super::direction::{GroupId, Receiver, Sender, Wants};
 use super::publish::{ContentRecord, Publisher};
 use super::seal::NOTICE_BYTES;
 use crate::crypto::random_bytes;
-use vauchi_protocol::cohort::{CohortClass, CohortTier, CohortWriteRequest};
+use vauchi_protocol::cohort::{CHUNK_BYTES, CohortClass, CohortTier, CohortWriteRequest};
 
 pub type Notice = [u8; NOTICE_BYTES];
 
@@ -103,6 +103,46 @@ fn next_turn(count: usize, from: usize, wants_more: impl Fn(usize) -> bool) -> u
 pub struct SessionWrite {
     pub notices: Vec<Notice>,
     pub contents: Vec<ContentRecord>,
+}
+
+const _: () = assert!(NOTICE_BYTES == CohortClass::Notice.record_bytes());
+const _: () = assert!(RECORD_BYTES == CohortClass::Content.record_bytes());
+
+/// Why a chunk from the relay was not read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChunkRefused {
+    WrongLength,
+    NoSuchChunk,
+}
+
+/// The records of chunk `index` of a batch of `batch_records` records of
+/// `N` bytes each, without the padding after the last one. The chunk is
+/// relay input: its length and index are checked first.
+pub fn records_in_chunk<const N: usize>(
+    batch_records: usize,
+    index: usize,
+    chunk: &[u8],
+) -> Result<Vec<[u8; N]>, ChunkRefused> {
+    if chunk.len() != CHUNK_BYTES {
+        return Err(ChunkRefused::WrongLength);
+    }
+    let per_chunk = CHUNK_BYTES / N;
+    let first = index
+        .checked_mul(per_chunk)
+        .ok_or(ChunkRefused::NoSuchChunk)?;
+    if first >= batch_records {
+        return Err(ChunkRefused::NoSuchChunk);
+    }
+    let count = (batch_records - first).min(per_chunk);
+    Ok(chunk
+        .chunks_exact(N)
+        .take(count)
+        .map(|record| {
+            let mut bytes = [0u8; N];
+            bytes.copy_from_slice(record);
+            bytes
+        })
+        .collect())
 }
 
 impl SessionWrite {

@@ -22,6 +22,19 @@ pub enum CohortClass {
     Content,
 }
 
+impl CohortClass {
+    pub const fn record_bytes(self) -> usize {
+        match self {
+            Self::Notice => 96,
+            Self::Content => 576,
+        }
+    }
+}
+
+/// The relay serves a batch in chunks of this many bytes, whole records of
+/// either class, the last zero-padded (relay!623).
+pub const CHUNK_BYTES: usize = 576 * 112;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CohortRegisterRequest {

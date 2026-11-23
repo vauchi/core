@@ -12,6 +12,7 @@ use base64::engine::general_purpose::STANDARD;
 use serde_json::json;
 use vauchi_core::network::http_transport::{HttpTransport, HttpTransportConfig};
 use vauchi_core::network::ohttp_client::OhttpClient;
+use vauchi_core::notice::publish::Publisher;
 use vauchi_core::notice::seal::NOTICE_BYTES;
 use vauchi_core::notice::session::{ChunkRefused, FAST, Session, records_in_chunk};
 use vauchi_protocol::cohort::{CHUNK_BYTES, CohortClass, CohortTier};
@@ -143,8 +144,13 @@ fn served_chunks(mut records: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
 fn a_receiver_reads_its_update_from_the_relays_chunk() {
     let mut p = pair();
     let (key, commitment) = update(40);
-    p.sender.queue_update(&key, &commitment);
-    let written = Session::default().write(&mut [&mut p.sender], &mut [], &mut [], FAST, START);
+    p.sender
+        .queue_group_update(3, &key, &commitment)
+        .expect("within 32 groups");
+    // The notice goes only with record 0 of its group's publication.
+    let mut publishers = vec![Publisher::for_group(3, key, &[2; 100])];
+    let written =
+        Session::default().write(&mut [&mut p.sender], &mut [], &mut publishers, FAST, START);
     let chunks = served_chunks(written.notices.iter().map(|n| n.to_vec()).collect());
     assert_eq!(chunks.len(), 1);
     let notices = records_in_chunk::<NOTICE_BYTES>(FAST.notices, 0, &chunks[0]).expect("a chunk");

@@ -140,3 +140,67 @@ fn own_device_order_initial_floor_read_failure_is_retryable() {
     );
     assert_eq!(pair.value("Email"), "owner@example.test");
 }
+
+// The live receive loop acknowledged every device-sync blob as stored, even
+// one whose apply failed, and the relay deletes an acknowledged blob: a
+// failure a retry would have cleared became permanent loss
+// (vauchi/private#177).
+// @internal
+#[test]
+fn a_device_sync_blob_that_fails_to_apply_is_not_acknowledged_and_applies_on_retry() {
+    let pair = Pair::new();
+    let blob = pair.batch("Email", "owner@example.test");
+    pair.receiver.storage().connection().execute_batch(
+        "CREATE TRIGGER reject_own_card BEFORE INSERT ON own_card BEGIN SELECT RAISE(ABORT, 'injected apply failure'); END;"
+    ).unwrap();
+
+    let failed = pair
+        .receiver
+        .receive_device_sync_blob(pair.receiver.identity().unwrap(), &blob);
+    pair.receiver
+        .storage()
+        .connection()
+        .execute_batch("DROP TRIGGER reject_own_card;")
+        .unwrap();
+    let retried = pair
+        .receiver
+        .receive_device_sync_blob(pair.receiver.identity().unwrap(), &blob);
+
+    assert_eq!(
+        failed,
+        DeviceBlobReceipt {
+            applied: 0,
+            acknowledge: false
+        }
+    );
+    assert_eq!(
+        retried,
+        DeviceBlobReceipt {
+            applied: 1,
+            acknowledge: true
+        }
+    );
+    assert_eq!(pair.value("Email"), "owner@example.test");
+}
+
+// A blob no retry can apply (not from one of this identity's devices, not
+// decryptable) is still acknowledged, or the relay would hand it back on
+// every sync.
+// @internal
+#[test]
+fn a_device_sync_blob_that_can_never_apply_is_still_acknowledged() {
+    let pair = Pair::new();
+
+    let receipt = pair.receiver.receive_device_sync_blob(
+        pair.receiver.identity().unwrap(),
+        b"not a device-sync batch",
+    );
+
+    assert_eq!(
+        receipt,
+        DeviceBlobReceipt {
+            applied: 0,
+            acknowledge: true
+        }
+    );
+}

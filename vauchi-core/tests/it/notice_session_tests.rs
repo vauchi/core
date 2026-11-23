@@ -541,3 +541,39 @@ fn with_more_groups_than_positions_every_groups_view_still_goes() {
     }
     assert!(read_lost, "group 128's view never went");
 }
+
+// Gate review 9 (Codex): updates took the period's positions before any
+// view, so a group edited at the full rate starved another group's view
+// for good. Updates and views now share one queue, the group written
+// longest ago first.
+// @internal
+#[test]
+fn a_group_edited_at_the_full_rate_does_not_starve_another_groups_view() {
+    let step = WEEK / 128;
+    let mut p = pair();
+    let refresh = p.receiver_session(&[], START);
+    let (b, commitment_b) = update(40);
+    p.sender.queue_group_update(2, &b, &commitment_b);
+    let lost = p.sender.write_within(START, 0, 1);
+    assert_eq!(lost.len(), 1, "B's notice, which the gateway drops");
+    p.sender.acknowledge();
+    for j in 1..128u64 {
+        let (a, commitment_a) = update((j % 200) as u8);
+        p.sender.queue_group_update(1, &a, &commitment_a);
+        assert_eq!(p.sender.write_within(START + j * step, 0, 1).len(), 1);
+        p.sender.acknowledge();
+    }
+    // A week on, the refresh is followed and B's view is due; A edits again.
+    let now = START + WEEK + 1;
+    p.sender.read(&refresh, now);
+    let (a, commitment_a) = update(250);
+    p.sender.queue_group_update(1, &a, &commitment_a);
+    let written = p.sender.write_within(now, usize::MAX, usize::MAX);
+    let keys: Vec<[u8; 32]> = p
+        .receiver
+        .read(&written, now + 1)
+        .iter()
+        .map(|read| *read.update_key)
+        .collect();
+    assert!(keys.contains(&b), "B's view takes the one position left");
+}

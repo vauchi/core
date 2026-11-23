@@ -190,16 +190,21 @@ impl Session {
     }
 }
 
-/// The session's content slots: new edits first, in the order given,
-/// then weekly publications, the one completed longest ago first; dummies
-/// in the rest, in random order.
+/// The session's content slots: the publication waiting longest first,
+/// new edits first among those waiting as long (owner, 2026-11-23, gate
+/// review 10); dummies in the rest, in random order.
 fn write_contents(publishers: &mut [Publisher], slots: usize, now: u64) -> Vec<ContentRecord> {
     let mut contents = Vec::with_capacity(slots);
     for publisher in publishers.iter_mut() {
         publisher.queue_due(now);
     }
     let mut publishing: Vec<&mut Publisher> = publishers.iter_mut().collect();
-    publishing.sort_by_key(|publisher| publisher.completed_at());
+    publishing.sort_by_key(|publisher| {
+        (
+            publisher.waiting_since().unwrap_or(u64::MAX),
+            publisher.completed_at().is_some(),
+        )
+    });
     for publisher in publishing {
         let room = slots.saturating_sub(contents.len());
         contents.extend(publisher.write(now, room));

@@ -71,6 +71,10 @@ pub struct Publisher {
     /// Record 0 of this key's first publication was written: its notice
     /// may go (section 4).
     first_record_written: bool,
+    /// Since when the queued or open publication has waited: content
+    /// slots go to the one waiting longest (owner, 2026-11-23, gate review
+    /// 10).
+    waiting_since: Option<u64>,
 }
 
 impl Publisher {
@@ -91,6 +95,7 @@ impl Publisher {
         Self {
             group,
             first_record_written: false,
+            waiting_since: None,
             update_key: Zeroizing::new(update_key),
             body: Zeroizing::new(body.to_vec()),
             records,
@@ -134,13 +139,23 @@ impl Publisher {
     /// period ago.
     pub fn queue_due(&mut self, now: u64) {
         if self.queued || self.current.is_some() {
+            if self.waiting_since.is_none() {
+                self.waiting_since = Some(now);
+            }
             return;
         }
         if let Some(completed_at) = self.completed_at.as_mut()
             && age(now, completed_at) >= PERIOD_SECONDS
         {
             self.queued = true;
+            self.waiting_since = Some(completed_at.saturating_add(PERIOD_SECONDS).min(now));
         }
+    }
+
+    /// Since when this publisher's next record has waited; `None` when it
+    /// has nothing due.
+    pub fn waiting_since(&self) -> Option<u64> {
+        self.waiting_since
     }
 
     /// The records of this session, at most `slots`. A queued
@@ -229,6 +244,7 @@ impl Publisher {
         if self.current.as_ref().is_some_and(Publication::done) {
             self.current = None;
             self.completed_at = Some(now);
+            self.waiting_since = None;
         }
     }
 }

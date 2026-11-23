@@ -86,6 +86,10 @@ struct OpeningQueued {
     confirmation: [u8; 16],
     /// No address is left for it under its number in its base.
     spent: bool,
+    /// When it was last written: openings and views share a direction's
+    /// control slots by how long each has waited (owner, 2026-11-23, gate
+    /// review 10).
+    written_at: Option<u64>,
 }
 
 struct RefreshFound {
@@ -518,6 +522,7 @@ impl Sender {
             key_id: key_id(&refresh.public),
             confirmation: opened.confirmation,
             spent: false,
+            written_at: None,
         });
         self.epochs.push(SenderEpoch::new(opened.epoch, now, None));
         true
@@ -651,8 +656,33 @@ impl Sender {
         // four addresses, and the newest key gets the last one left, so a
         // forged key queued earlier cannot use up R's own (spec S4; gate
         // review 4, Claude).
+        // Openings and views share the control slots, the one that went out
+        // longest ago first (never before ever), an opening first on a tie.
+        let mut waiting: Vec<(Option<u64>, bool)> = self
+            .openings
+            .iter()
+            .map(|opening| (opening.written_at, true))
+            .chain(
+                self.notice_queue(&eligible)
+                    .into_iter()
+                    .filter(|(_, is_update)| !is_update)
+                    .map(|(group, _)| {
+                        (
+                            self.groups.get(&group).and_then(|entry| entry.written_at),
+                            false,
+                        )
+                    }),
+            )
+            .collect();
+        waiting.sort_by_key(|(written_at, is_opening)| (*written_at, !*is_opening));
+        let openings_allowed = waiting
+            .iter()
+            .take(control_slots)
+            .filter(|(_, is_opening)| *is_opening)
+            .count();
+        let mut openings_written = 0usize;
         for opening in self.openings.iter_mut().rev() {
-            if control_left == 0 {
+            if control_left == 0 || openings_written >= openings_allowed {
                 break;
             }
             let Some(base) = self.epochs.iter_mut().find(|e| e.keys.id() == opening.base) else {
@@ -677,6 +707,8 @@ impl Sender {
                 confirmation: opening.confirmation,
             };
             written.push(seal(&at, &record.to_plaintext()));
+            opening.written_at = Some(now);
+            openings_written += 1;
             control_left -= 1;
         }
         self.openings.retain(|opening| !opening.spent);

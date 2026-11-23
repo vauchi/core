@@ -30,6 +30,10 @@ struct GroupUpdate {
     queued: bool,
     /// Its key went out since the view was last due.
     viewed: bool,
+    /// When a notice of it was last written in an acknowledged session:
+    /// the group sent longest ago goes first, so no group is starved by
+    /// the cap of positions a period (gate review 8, Codex).
+    sent_at: Option<u64>,
 }
 
 #[cfg_attr(feature = "testing", derive(Clone))]
@@ -108,8 +112,8 @@ pub struct Sender {
     /// Each group's latest update, by group ID (S5, section 8).
     groups: BTreeMap<GroupId, GroupUpdate>,
     view_due: bool,
-    /// The groups and edit numbers this session's notices carried.
-    written_groups: Vec<(GroupId, u64)>,
+    /// The groups, edit numbers and time of this session's notices.
+    written_groups: Vec<(GroupId, u64, u64)>,
     positions_assigned_at: VecDeque<u64>,
     highest_opened_this_session: Option<u32>,
     first_records: FirstRecords,
@@ -217,6 +221,7 @@ impl Sender {
             edit: 0,
             queued: false,
             viewed: false,
+            sent_at: None,
         });
         entry.update_key = Zeroizing::new(*update_key);
         entry.commitment = *commitment;
@@ -592,6 +597,17 @@ impl Sender {
             .map(|(group, _)| *group)
     }
 
+    /// `groups` in the order their notices go: sent longest ago first.
+    fn least_recently_sent(&self, mut groups: Vec<GroupId>) -> Vec<GroupId> {
+        groups.sort_by_key(|group| {
+            (
+                self.groups.get(group).and_then(|entry| entry.sent_at),
+                *group,
+            )
+        });
+        groups
+    }
+
     /// Writes at most `control_slots` control records (openings, then a
     /// view) and `update_slots` update notices. A record left out stays
     /// queued and advances no counter (protocol section 8).
@@ -651,13 +667,14 @@ impl Sender {
         }
         self.openings.retain(|opening| !opening.spent);
         let mut update_left = update_slots;
-        let updates: Vec<GroupId> = self
-            .groups
-            .iter()
-            .filter(|(group, entry)| entry.queued && eligible(**group))
-            .map(|(group, _)| *group)
-            .collect();
-        let views: Vec<GroupId> = self.view_candidates().collect();
+        let updates: Vec<GroupId> = self.least_recently_sent(
+            self.groups
+                .iter()
+                .filter(|(group, entry)| entry.queued && eligible(**group))
+                .map(|(group, _)| *group)
+                .collect(),
+        );
+        let views: Vec<GroupId> = self.least_recently_sent(self.view_candidates().collect());
         let chosen = updates
             .into_iter()
             .take(update_left)
@@ -687,7 +704,7 @@ impl Sender {
                 commitment: entry.commitment,
             };
             written.push(seal(&at, &record.to_plaintext()));
-            self.written_groups.push((group, entry.edit));
+            self.written_groups.push((group, entry.edit, now));
             if is_update {
                 update_left -= 1;
             } else {
@@ -699,9 +716,10 @@ impl Sender {
 
     /// The relay took the last write.
     pub fn acknowledge(&mut self) {
-        for (group, edit) in self.written_groups.drain(..) {
+        for (group, edit, written_at) in self.written_groups.drain(..) {
             if let Some(entry) = self.groups.get_mut(&group) {
                 entry.viewed = true;
+                entry.sent_at = Some(written_at);
                 if entry.edit == edit {
                     entry.queued = false;
                 }

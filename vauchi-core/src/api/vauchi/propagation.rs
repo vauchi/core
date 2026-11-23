@@ -304,7 +304,20 @@ impl ProfileEngine {
         &self,
         identity: &crate::identity::Identity,
     ) -> VauchiResult<crate::identity::RegistryBroadcast> {
+        let held_version = self
+            .storage
+            .device()
+            .load_device_registry_if_own(identity)?
+            .map(|held| held.version());
         let registry = self.storage.device().own_device_registry(identity)?;
+        // Naming this device's key changed the saved registry: the siblings
+        // merge it with theirs, or they never hear of the key (private#970).
+        if held_version.is_some_and(|held| held != registry.version()) {
+            self.record_sync_item(crate::sync::SyncItem::DeviceRegistryChanged {
+                registry_json: registry.to_json(),
+                version: registry.version(),
+            });
+        }
         let device_key = self
             .storage
             .device()

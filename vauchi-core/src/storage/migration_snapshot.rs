@@ -68,12 +68,14 @@ pub(crate) fn create(
     let destination = parent.join(destination);
 
     let directory = parent.join(format!(".vauchi-migration-{}", uuid::Uuid::new_v4()));
-    let mut builder = DirBuilder::new();
+    let builder = DirBuilder::new();
     #[cfg(unix)]
-    {
+    let builder = {
         use std::os::unix::fs::DirBuilderExt;
+        let mut builder = builder;
         builder.mode(0o700);
-    }
+        builder
+    };
     builder.create(&directory)?;
     let staging = StagingDirectory(directory);
     let snapshot = staging.0.join("snapshot.db");

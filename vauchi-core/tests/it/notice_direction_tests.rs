@@ -79,6 +79,20 @@ fn forged_refresh(
     seal(&at, &record.to_plaintext())
 }
 
+/// The key ID in the honest sender's first opening on refresh 1, as a
+/// holder of the seed epoch's keys reads it.
+fn honest_key_id(p: &Pair, honest: &[Notice]) -> [u8; 8] {
+    let opened = vauchi_core::notice::seal::open(
+        &opening_address(p.copied_seed.opening_key(), 1, 0),
+        &honest[0],
+    )
+    .expect("the honest opening");
+    match Record::from_plaintext(&opened) {
+        Ok(Record::Opening { key_id, .. }) => key_id,
+        _ => panic!("not an opening"),
+    }
+}
+
 /// An opening as a holder of the seed epoch's keys can seal it.
 fn forged_opening(
     seed: &Epoch,
@@ -297,16 +311,7 @@ fn the_receiver_alarms_on_each_opening_only_a_copy_can_make() {
         let mut p = pair();
         let refresh = p.receiver_session(&[], START);
         let honest = p.sender_session(&refresh, START + DAY);
-        let real_key_id = match Record::from_plaintext(
-            &vauchi_core::notice::seal::open(
-                &opening_address(p.copied_seed.opening_key(), 1, 0),
-                &honest[0],
-            )
-            .expect("the honest opening"),
-        ) {
-            Ok(Record::Opening { key_id, .. }) => key_id,
-            _ => panic!("not an opening"),
-        };
+        let real_key_id = honest_key_id(&p, &honest);
         let forged = match expected {
             Alarm::OpeningOnNumberNotIssued => {
                 forged_opening(&p.copied_seed, 0, 2, [0; 8], [0; 16])
@@ -332,16 +337,7 @@ fn the_receiver_alarms_on_a_second_opening_under_a_number_it_used() {
     let mut p = pair();
     let refresh = p.receiver_session(&[], START);
     let honest = p.sender_session(&refresh, START + DAY);
-    let real_key_id = match Record::from_plaintext(
-        &vauchi_core::notice::seal::open(
-            &opening_address(p.copied_seed.opening_key(), 1, 0),
-            &honest[0],
-        )
-        .expect("the honest opening"),
-    ) {
-        Ok(Record::Opening { key_id, .. }) => key_id,
-        _ => panic!("not an opening"),
-    };
+    let real_key_id = honest_key_id(&p, &honest);
     p.receiver.read(&honest, START + 2 * DAY);
     let moved_into = p.receiver.current_epoch();
     p.assert_no_alarm();

@@ -36,6 +36,15 @@ use crate::network::{
 use crate::rng::SecureRngExt;
 use crate::sync::device_sync::SyncItem;
 
+/// What the receive loop does with one device-sync blob: how many items
+/// it applied, and whether to acknowledge it to the relay, which deletes an
+/// acknowledged blob.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct DeviceBlobReceipt {
+    pub(super) applied: usize,
+    pub(super) acknowledge: bool,
+}
+
 impl ProfileEngine {
     /// Register mailbox tokens on the adapter for fetch routing.
     ///
@@ -242,6 +251,34 @@ impl ProfileEngine {
         orchestrator
             .record_local_change(item)
             .map_err(VauchiError::DeviceSync)
+    }
+
+    /// Applies one device-sync blob for the receive loop. A blob that
+    /// applied, or that no retry can apply (not decryptable for this
+    /// identity), is acknowledged; one whose apply failed is left on the
+    /// relay for the next sync, because an acknowledged blob is deleted and
+    /// a storage failure here clears on retry (vauchi/private#177).
+    pub(super) fn receive_device_sync_blob(
+        &self,
+        identity: &Identity,
+        ciphertext: &[u8],
+    ) -> DeviceBlobReceipt {
+        match self.apply_device_sync_blob(identity, ciphertext) {
+            Ok(applied) => DeviceBlobReceipt {
+                applied,
+                acknowledge: true,
+            },
+            Err(error) => {
+                tracing::warn!(
+                    ?error,
+                    "device-sync blob not applied; left for the next sync"
+                );
+                DeviceBlobReceipt {
+                    applied: 0,
+                    acknowledge: false,
+                }
+            }
+        }
     }
 
     /// Decrypt + apply one inbound device-sync blob.

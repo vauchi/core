@@ -585,13 +585,15 @@ impl ProfileEngine {
         }
 
         // 2b. Device-sync blobs are sealed for the shared identity, not a
-        //     contact, so the contact router cannot decrypt them. Apply +
-        //     ACK each.
+        //     contact, so the contact router cannot decrypt them. Apply
+        //     each; acknowledge only what applied or never can.
         let mut device_applied = 0usize;
         for (message_id, ciphertext) in &device_blobs {
-            device_applied += self
-                .apply_device_sync_blob(identity, ciphertext)
-                .unwrap_or(0);
+            let receipt = self.receive_device_sync_blob(identity, ciphertext);
+            device_applied += receipt.applied;
+            if !receipt.acknowledge {
+                continue;
+            }
             let ack = create_envelope(
                 MessagePayload::Acknowledgment(Acknowledgment {
                     message_id: message_id.clone().into(),

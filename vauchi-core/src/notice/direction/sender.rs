@@ -916,12 +916,10 @@ impl Sender {
                 None => break,
             }
         }
-        while let Some(assigned_at) = self.positions_assigned_at.front_mut() {
-            if age(now, assigned_at) < PERIOD_SECONDS {
-                break;
-            }
-            self.positions_assigned_at.pop_front();
-        }
+        // Every position by its own age: after a set-back, older positions
+        // can sit behind younger ones (gate review 13, Claude).
+        self.positions_assigned_at
+            .retain_mut(|assigned_at| age(now, assigned_at) < PERIOD_SECONDS);
         self.first_records.forget_unwatched(now);
     }
 }

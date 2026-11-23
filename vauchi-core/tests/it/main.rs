@@ -425,6 +425,7 @@ mod notice_conformance_tests;
 mod notice_content_tests;
 mod notice_copy_tests;
 mod notice_direction_tests;
+mod notice_fairness_tests;
 mod notice_key_schedule_tests;
 mod notice_publish_tests;
 mod notice_saved_tests;

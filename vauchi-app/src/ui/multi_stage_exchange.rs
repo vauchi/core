@@ -180,6 +180,9 @@ pub struct MultiStageExchangeEngine {
     camera_gate: CameraGate,
     /// Front-camera toggle. Surfaces in the `SwitchCamera` command.
     use_front_camera: bool,
+    /// How many cameras the hardware shell counted; `None` when it does
+    /// not count, and the switch is offered as before (private#772).
+    camera_count: Option<u8>,
     /// Rolling viewfinder quality indicator.
     scan_quality_tracker: ScanQualityTracker,
     /// `true` once `cancel` was pressed — disables further state
@@ -247,6 +250,7 @@ impl MultiStageExchangeEngine {
             session_ended: false,
             camera_gate: CameraGate::Available,
             use_front_camera: false,
+            camera_count: None,
             scan_quality_tracker: ScanQualityTracker::new(),
             cancelled: false,
             audio_proximity: AudioProximityState::Pending,
@@ -267,6 +271,17 @@ impl MultiStageExchangeEngine {
     pub fn with_locale(mut self, locale: Locale) -> Self {
         self.locale = locale;
         self
+    }
+
+    /// The device's camera count, as its hardware shell reported it.
+    pub fn with_camera_count(mut self, camera_count: Option<u8>) -> Self {
+        self.camera_count = camera_count;
+        self
+    }
+
+    /// A device that counted one camera, or none, has nothing to switch to.
+    fn can_switch_camera(&self) -> bool {
+        !matches!(self.camera_count, Some(count) if count <= 1)
     }
 
     fn t(&self, key: &str) -> String {
@@ -628,7 +643,11 @@ impl MultiStageExchangeEngine {
             self.t("multi_stage.use_front_camera_button")
         };
         // No Cancel: Back in the title row ends the exchange (#534).
-        let buttons = vec![self.list_button(SWITCH_CAMERA_ACTION_ID, switch_camera_label)];
+        let buttons = if self.can_switch_camera() {
+            vec![self.list_button(SWITCH_CAMERA_ACTION_ID, switch_camera_label)]
+        } else {
+            Vec::new()
+        };
         let status = self.active_status();
         self.build_exchange_layout(title, status, buttons)
     }
@@ -793,6 +812,10 @@ impl WorkflowEngine for MultiStageExchangeEngine {
     }
 
     fn apply_update(&mut self, update: EngineUpdate) -> bool {
+        if let EngineUpdate::DeviceCapabilities(capabilities) = &update {
+            self.camera_count = capabilities.camera_count;
+            return true;
+        }
         let EngineUpdate::MultiStage(update) = update else {
             return false;
         };
@@ -860,6 +883,9 @@ impl WorkflowEngine for MultiStageExchangeEngine {
                 self.cancelled = true;
                 ActionResult::StartLinkExchange
             }
+            SWITCH_CAMERA_ACTION_ID if !self.can_switch_camera() => {
+                ActionResult::UpdateScreen(self.build_screen())
+            }
             SWITCH_CAMERA_ACTION_ID => {
                 self.use_front_camera = !self.use_front_camera;
                 ActionResult::Commands {
@@ -919,22 +945,26 @@ impl WorkflowEngine for MultiStageExchangeEngine {
     /// `android/app/src/main/kotlin/app/vauchi/ui/FaceToFaceExchangeScreen.kt`.
     /// Phase 2b + Phase 2c of `2026-05-04-exchange-command-screen-presentation`.
     fn screen_entered(&mut self) -> Vec<vauchi_core::Command> {
-        vec![
+        let mut entered = vec![
             vauchi_core::Command::SetScreenBrightness { level: Some(0.35) },
             vauchi_core::Command::SetIdleTimerDisabled { disabled: true },
             vauchi_core::Command::SetOrientationLock {
                 orientation: Some(vauchi_core::Orientation::Portrait),
             },
-            // Announce the engine's chosen camera selector explicitly so
-            // the consumer aligns with engine state on entry rather than
-            // coincidentally matching its own back-default. Hover ships
-            // `use_front: true` here (face-to-face screen-to-screen UX);
-            // Glance keeps `use_front: false`. Phase 1.B of
-            // `2026-05-11-hover-graduation-plan.md`.
-            vauchi_core::Command::SwitchCamera {
+        ];
+        // Announce the engine's chosen camera selector explicitly so the
+        // consumer aligns with engine state on entry rather than
+        // coincidentally matching its own back-default. Hover ships
+        // `use_front: true` here (face-to-face screen-to-screen UX); Glance
+        // keeps `use_front: false`. Phase 1.B of
+        // `2026-05-11-hover-graduation-plan.md`. A device that counted one
+        // camera has no selector to align (private#772).
+        if self.can_switch_camera() {
+            entered.push(vauchi_core::Command::SwitchCamera {
                 use_front: self.use_front_camera,
-            },
-        ]
+            });
+        }
+        entered
     }
 
     /// Symmetric counterpart to [`Self::screen_entered`]: restore the

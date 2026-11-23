@@ -297,7 +297,8 @@ impl AppEngine {
                     }
                     _ => crate::ui::MultiStageExchangeEngine::new_glance(),
                 }
-                .with_locale(locale);
+                .with_locale(locale)
+                .with_camera_count(device_capabilities.camera_count);
                 Box::new(engine)
             }
             other => unreachable!("non-exchange screen {other:?} routed to exchange factory"),

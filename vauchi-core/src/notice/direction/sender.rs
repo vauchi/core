@@ -86,20 +86,6 @@ struct OpeningQueued {
     confirmation: [u8; 16],
     /// No address is left for it under its number in its base.
     spent: bool,
-    /// When it was last written: openings and views share a direction's
-    /// control slots by how long each has waited (owner, 2026-11-23, gate
-    /// review 10).
-    written_at: Option<u64>,
-    /// When it was queued, which is how long a never-written opening has
-    /// waited: ranking it before every view let a fresh opening each
-    /// refresh starve a view (gate review 12, Codex).
-    queued_at: u64,
-}
-
-impl OpeningQueued {
-    fn waiting_since(&self) -> u64 {
-        self.written_at.unwrap_or(self.queued_at)
-    }
 }
 
 struct RefreshFound {
@@ -133,6 +119,13 @@ pub struct Sender {
     /// only for the queue served (gate review 11, Codex).
     #[serde(skip)]
     last_written: Wants,
+    /// Control turns alternate between the opening and the views, so
+    /// neither waits more than one turn for the other (owner, 2026-11-23,
+    /// after gates 10 to 12 each found a stall in ordering them).
+    opening_next: bool,
+    /// The highest refresh number read: its opening is the only one held,
+    /// and a lower number opens nothing (owner, 2026-11-23).
+    highest_refresh_read: u32,
     positions_assigned_at: VecDeque<u64>,
     highest_opened_this_session: Option<u32>,
     first_records: FirstRecords,
@@ -156,6 +149,8 @@ impl Clone for Sender {
             view_due: self.view_due,
             written_groups: self.written_groups.clone(),
             last_written: self.last_written,
+            opening_next: self.opening_next,
+            highest_refresh_read: self.highest_refresh_read,
             positions_assigned_at: self.positions_assigned_at.clone(),
             highest_opened_this_session: self.highest_opened_this_session,
             first_records: self.first_records.clone(),
@@ -187,6 +182,8 @@ impl Sender {
             view_due: false,
             written_groups: Vec::new(),
             last_written: Wants::default(),
+            opening_next: true,
+            highest_refresh_read: 0,
             positions_assigned_at: VecDeque::new(),
             highest_opened_this_session: None,
             first_records: FirstRecords::default(),
@@ -468,6 +465,10 @@ impl Sender {
             }
         }
 
+        if refresh.number > self.highest_refresh_read {
+            self.highest_refresh_read = refresh.number;
+            self.openings.clear();
+        }
         if !opened_before && self.open_on(refresh, read_in, now) {
             self.highest_opened_this_session =
                 self.highest_opened_this_session.max(Some(refresh.number));
@@ -514,6 +515,13 @@ impl Sender {
     /// Whether an epoch was opened: an invalid Diffie-Hellman result opens
     /// none, and then the m - 3 rule has nothing to rest on.
     fn open_on(&mut self, refresh: &RefreshFound, read_in: usize, now: u64) -> bool {
+        // At most one opening a direction, for the highest refresh number;
+        // under one number the key read last replaces the one before (spec
+        // S4). Openings then never outnumber the turns that serve them
+        // (owner, 2026-11-23).
+        if refresh.number < self.highest_refresh_read {
+            return false;
+        }
         let Some(base) = self.epochs.get(read_in) else {
             return false;
         };
@@ -540,6 +548,7 @@ impl Sender {
         ) else {
             return false;
         };
+        self.openings.clear();
         self.openings.push(OpeningQueued {
             number: refresh.number,
             base: refresh.read_in,
@@ -548,8 +557,6 @@ impl Sender {
             key_id: key_id(&refresh.public),
             confirmation: opened.confirmation,
             spent: false,
-            written_at: None,
-            queued_at: now,
         });
         self.epochs.push(SenderEpoch::new(opened.epoch, now, None));
         true
@@ -685,75 +692,39 @@ impl Sender {
         self.written_groups.clear();
         let mut control_left = control_slots;
         let mut written = Vec::new();
-        // Openings and views share the control slots by how long each has
-        // waited: since it was last written, or for a never-written opening
-        // since it was queued; an opening first on a tie.
-        let opening_rank = self.opening_ranks();
-        let mut waiting: Vec<(u64, bool)> = opening_rank
+        let views_waiting = self
+            .admitted(now, &eligible)
             .iter()
-            .map(|rank| (*rank, true))
-            .chain(
-                // Only views the period's positions can still take compete
-                // for a control slot (gate reviews 11 and 12).
-                self.admitted(now, &eligible)
-                    .into_iter()
-                    .filter(|(_, is_update)| !is_update)
-                    .map(|(group, _)| {
-                        (
-                            self.groups
-                                .get(&group)
-                                .and_then(|entry| entry.written_at)
-                                .unwrap_or(0),
-                            false,
-                        )
-                    }),
-            )
-            .collect();
-        waiting.sort_by_key(|(written_at, is_opening)| (*written_at, !*is_opening));
-        let openings_allowed = waiting
-            .iter()
-            .take(control_slots)
-            .filter(|(_, is_opening)| *is_opening)
+            .filter(|(_, is_update)| !is_update)
             .count();
+        let opening_turn =
+            control_slots > 0 && (self.opening_next || views_waiting == 0 || control_slots >= 2);
         let mut openings_written = 0usize;
-        // The openings themselves in waiting order, so that the ones chosen
-        // are the ones that waited (gate review 11, Codex); the newest first
-        // on a tie, because openings under one number in one base share its
-        // four addresses and the newest key must get the last one left, so
-        // a forged key queued earlier cannot use up R's own (spec S4; gate
-        // review 4, Claude).
-        let mut opening_order: Vec<usize> = (0..self.openings.len()).collect();
-        opening_order.sort_by_key(|index| (opening_rank[*index], std::cmp::Reverse(*index)));
-        for index in opening_order {
-            if control_left == 0 || openings_written >= openings_allowed {
-                break;
-            }
-            let opening = &mut self.openings[index];
-            let Some(base) = self.epochs.iter_mut().find(|e| e.keys.id() == opening.base) else {
-                continue;
-            };
+        if let Some(opening) = self.openings.first_mut().filter(|_| opening_turn)
+            && let Some(base) = self.epochs.iter_mut().find(|e| e.keys.id() == opening.base)
+        {
             let attempt = base.opening_attempts.entry(opening.number).or_insert(0);
             if *attempt >= ATTEMPTS {
                 opening.spent = true;
-                continue;
+            } else {
+                let at = opening_address(base.keys.opening_key(), opening.number, *attempt);
+                *attempt = attempt.saturating_add(1);
+                // After its fourth attempt the opening leaves the queue
+                // at once (protocol section 8), so its base is no longer
+                // held for it.
+                if *attempt >= ATTEMPTS {
+                    opening.spent = true;
+                }
+                let record = Record::Opening {
+                    ephemeral_public: opening.ephemeral_public,
+                    number: opening.number,
+                    key_id: opening.key_id,
+                    confirmation: opening.confirmation,
+                };
+                written.push(seal(&at, &record.to_plaintext()));
+                openings_written = 1;
+                control_left -= 1;
             }
-            let at = opening_address(base.keys.opening_key(), opening.number, *attempt);
-            *attempt = attempt.saturating_add(1);
-            // After its fourth attempt the opening leaves the queue at once
-            // (protocol section 8), so its base is no longer held for it.
-            if *attempt >= ATTEMPTS {
-                opening.spent = true;
-            }
-            let record = Record::Opening {
-                ephemeral_public: opening.ephemeral_public,
-                number: opening.number,
-                key_id: opening.key_id,
-                confirmation: opening.confirmation,
-            };
-            written.push(seal(&at, &record.to_plaintext()));
-            opening.written_at = Some(now);
-            openings_written += 1;
-            control_left -= 1;
         }
         self.openings.retain(|opening| !opening.spent);
         let mut update_left = update_slots;
@@ -796,6 +767,11 @@ impl Sender {
                 written_views += 1;
             }
         }
+        match (openings_written > 0, written_views > 0) {
+            (true, false) => self.opening_next = false,
+            (false, true) => self.opening_next = true,
+            _ => {}
+        }
         self.last_written = Wants {
             update: written_updates,
             control: openings_written + written_views,
@@ -811,30 +787,6 @@ impl Sender {
                 age(now, written_at);
             }
         }
-        for opening in &mut self.openings {
-            age(now, &mut opening.queued_at);
-            if let Some(written_at) = opening.written_at.as_mut() {
-                age(now, written_at);
-            }
-        }
-    }
-
-    /// How long each queued opening has waited, as the openings under its
-    /// number in its base: they share four addresses and go newest first
-    /// among themselves (spec S4), while across numbers the one that waited
-    /// longest goes first (gate review 12, Codex).
-    fn opening_ranks(&self) -> Vec<u64> {
-        self.openings
-            .iter()
-            .map(|opening| {
-                self.openings
-                    .iter()
-                    .filter(|other| other.base == opening.base && other.number == opening.number)
-                    .map(OpeningQueued::waiting_since)
-                    .min()
-                    .unwrap_or_else(|| opening.waiting_since())
-            })
-            .collect()
     }
 
     /// What the last write wrote, by queue.

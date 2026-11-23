@@ -68,14 +68,9 @@ fn the_views_that_compete_for_control_are_the_ones_the_request_counted() {
     }
     p.sender.read(&refresh, START + 25);
     assert_eq!(
-        p.sender.write_within(START + 26, 2, 0).len(),
-        2,
-        "both views, not acknowledged"
-    );
-    assert_eq!(
-        p.sender.write_within(START + 27, 1, 0).len(),
-        1,
-        "the opening, which the gateway drops"
+        p.sender.write_within(START + 26, 3, 0).len(),
+        3,
+        "the opening, which the gateway drops, and both views, not acknowledged"
     );
     p.sender.acknowledge();
     for j in 0..123u64 {
@@ -128,7 +123,8 @@ fn a_group_written_with_the_clock_ahead_is_not_kept_behind_once_it_is_set_back()
     assert_eq!(p.sender.write_within(START + 60, 0, 1).len(), 1);
     p.sender.acknowledge();
     p.sender.read(&refresh, START + 90);
-    let view = p.sender.write_within(START + 120, 1, 0);
+    // Two control slots: the opening and one view (owner, 2026-11-23).
+    let view = p.sender.write_within(START + 120, 2, 0);
     let read: Vec<[u8; 32]> = p
         .receiver
         .read(&view, START + 180)

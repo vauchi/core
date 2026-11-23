@@ -133,10 +133,10 @@ fn the_sender_alarms_on_a_second_key_under_a_number_and_opens_it_at_its_own_addr
             "two openings at one address"
         );
     }
-    assert!(
-        tags.len() >= 3,
-        "the first again and the second key's opening"
-    );
+    // One opening a direction: the second key under the number replaces
+    // the first and takes the next address (owner, 2026-11-23; S4).
+    assert_eq!(second.len(), 1, "the second key's opening only");
+    assert_eq!(tags.len(), first.len() + 1);
 }
 
 // @internal

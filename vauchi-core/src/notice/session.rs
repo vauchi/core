@@ -122,14 +122,22 @@ impl Session {
         }
 
         let mut notices = Vec::with_capacity(slots.notices);
+        let mut wrote = vec![false; directions];
         for (i, sender) in senders.iter_mut().enumerate() {
-            notices.extend(sender.write_within(now, grants[i].control, grants[i].update));
+            let written = sender.write_within(now, grants[i].control, grants[i].update);
+            wrote[i] = !written.is_empty();
+            notices.extend(written);
         }
         for (j, receiver) in receivers.iter_mut().enumerate() {
-            notices.extend(receiver.write_within(now, grants[senders.len() + j].control));
+            let i = senders.len() + j;
+            let written = receiver.write_within(now, grants[i].control);
+            wrote[i] = !written.is_empty();
+            notices.extend(written);
         }
-        for (i, grant) in grants.iter().enumerate() {
-            if grant.update + grant.control > 0 {
+        // A direction is served when it wrote, not when it was granted a
+        // slot it could not use (gate review 6).
+        for (i, served) in wrote.iter().enumerate() {
+            if *served {
                 self.last_served[i] = now;
             }
         }

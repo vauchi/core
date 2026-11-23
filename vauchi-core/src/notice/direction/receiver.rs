@@ -78,6 +78,12 @@ pub struct Receiver {
     issued: Vec<Issued>,
     refresh_queued: bool,
     refresh_written: bool,
+    /// The epochs the newest refresh was sealed in by an acknowledged
+    /// session, and those this session sealed it in; a copy cut by a grant
+    /// waits for a later session (gate review 6).
+    sealed_in: Vec<EpochId>,
+    written_in: Vec<EpochId>,
+    copies_left_after_write: bool,
     alarm_epoch: Option<(EpochId, u64)>,
     first_records: FirstRecords,
     alarms: Vec<Alarm>,
@@ -110,6 +116,9 @@ impl Clone for Receiver {
             issued: self.issued.clone(),
             refresh_queued: self.refresh_queued,
             refresh_written: self.refresh_written,
+            sealed_in: self.sealed_in.clone(),
+            written_in: self.written_in.clone(),
+            copies_left_after_write: self.copies_left_after_write,
             alarm_epoch: self.alarm_epoch,
             first_records: self.first_records.clone(),
             alarms: self.alarms.clone(),
@@ -134,6 +143,9 @@ impl Receiver {
             issued: Vec::new(),
             refresh_queued: false,
             refresh_written: false,
+            sealed_in: Vec::new(),
+            written_in: Vec::new(),
+            copies_left_after_write: false,
             alarm_epoch: None,
             first_records: FirstRecords::default(),
             alarms: Vec::new(),
@@ -382,7 +394,9 @@ impl Receiver {
         self.write_within(now, usize::MAX)
     }
 
-    /// How many refresh copies this direction would write now.
+    /// How many refresh copies this direction would write now: one for
+    /// each epoch it seals in that has an address left this week and has
+    /// no acknowledged copy yet.
     pub fn wants(&self, now: u64) -> usize {
         let due = self
             .issued
@@ -391,14 +405,32 @@ impl Receiver {
         if !due && !self.refresh_queued {
             return 0;
         }
-        let alarm_extra = self.alarm_epoch.is_some_and(|(alarmed, _)| {
-            let count = self.epochs.len();
-            self.epochs
-                .iter()
-                .position(|e| e.keys.id() == alarmed)
-                .is_some_and(|index| index + 2 < count)
+        let sealed: &[EpochId] = if due { &[] } else { &self.sealed_in };
+        self.refresh_targets(week(now), sealed).len()
+    }
+
+    /// The epochs a refresh is sealed in, current first, then the one left
+    /// most recently and the epoch of the most recent alarm: those with an
+    /// address left in `this_week` and not in `sealed`.
+    fn refresh_targets(&self, this_week: u32, sealed: &[EpochId]) -> Vec<usize> {
+        let count = self.epochs.len();
+        let mut targets = vec![count.saturating_sub(1)];
+        if count >= 2 {
+            targets.push(count.saturating_sub(2));
+        }
+        if let Some((alarmed, _)) = self.alarm_epoch {
+            let index = self.epochs.iter().position(|e| e.keys.id() == alarmed);
+            if let Some(index) = index.filter(|index| !targets.contains(index)) {
+                targets.push(index);
+            }
+        }
+        targets.retain(|index| {
+            self.epochs.get(*index).is_some_and(|epoch| {
+                !sealed.contains(&epoch.keys.id())
+                    && epoch.refresh_attempts.get(&this_week).copied().unwrap_or(0) < ATTEMPTS
+            })
         });
-        self.epochs.len().min(2) + usize::from(alarm_extra)
+        targets
     }
 
     /// Writes at most `copies` refresh copies, the current epoch first; a
@@ -421,20 +453,11 @@ impl Receiver {
         };
         let (number, public, name) = (newest.number, newest.public, newest.name);
 
-        let count = self.epochs.len();
-        let mut targets = vec![count.saturating_sub(1)];
-        if count >= 2 {
-            targets.push(count.saturating_sub(2));
-        }
-        if let Some((alarmed, _)) = self.alarm_epoch {
-            let index = self.epochs.iter().position(|e| e.keys.id() == alarmed);
-            if let Some(index) = index.filter(|index| !targets.contains(index)) {
-                targets.push(index);
-            }
-        }
-
-        targets.truncate(copies);
         let this_week = week(now);
+        let mut targets = self.refresh_targets(this_week, &self.sealed_in);
+        self.copies_left_after_write = targets.len() > copies;
+        targets.truncate(copies);
+        self.written_in.clear();
         let mut written = Vec::new();
         for index in targets {
             let Some(epoch) = self.epochs.get_mut(index) else {
@@ -453,6 +476,7 @@ impl Receiver {
             };
             written.push(seal(&at, &record.to_plaintext()));
             epoch.last_sealed_at = Some(now);
+            self.written_in.push(epoch.keys.id());
         }
         self.refresh_written = !written.is_empty();
         written
@@ -474,6 +498,7 @@ impl Receiver {
             accepted: None,
         });
         self.refresh_queued = true;
+        self.sealed_in.clear();
         let mut held = 0usize;
         for issued in self.issued.iter_mut().rev() {
             if issued.private.is_none() {
@@ -489,7 +514,10 @@ impl Receiver {
     /// The relay took the last write.
     pub fn acknowledge(&mut self) {
         if self.refresh_written {
-            self.refresh_queued = false;
+            self.sealed_in.append(&mut self.written_in);
+            if !self.copies_left_after_write {
+                self.refresh_queued = false;
+            }
         }
     }
 

@@ -510,8 +510,20 @@ impl Sender {
 
     /// What this direction would write now: its update-key notice when an
     /// edit is queued, else a view due, and its queued openings.
-    pub fn wants(&self, _now: u64) -> Wants {
-        let notice = self.latest.is_some() && (self.update_queued || self.view_due);
+    pub fn wants(&self, now: u64) -> Wants {
+        let recent = self
+            .positions_assigned_at
+            .iter()
+            .filter(|at| now.saturating_sub(**at) < PERIOD_SECONDS)
+            .count();
+        let room = recent < POSITIONS_A_PERIOD
+            && self
+                .epochs
+                .iter()
+                .find(|epoch| epoch.keys.id() == self.writes_in)
+                .and_then(|epoch| epoch.writer.as_ref())
+                .is_some_and(ChainWriter::has_room);
+        let notice = room && self.latest.is_some() && (self.update_queued || self.view_due);
         let update = usize::from(notice && self.update_queued);
         let view = usize::from(notice && !self.update_queued);
         Wants {

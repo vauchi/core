@@ -56,6 +56,11 @@ impl ChainWriter {
         ChainReader::resume(&self.chain_key, self.position)
     }
 
+    /// Whether a position is left on this chain.
+    pub fn has_room(&self) -> bool {
+        self.position <= LAST_POSITION
+    }
+
     /// The next position and where a record written there travels, or
     /// `None` once the chain has ended. The chain steps at once, so no
     /// position is assigned twice.

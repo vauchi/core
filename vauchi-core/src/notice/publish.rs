@@ -127,7 +127,10 @@ impl Publisher {
             current.written_unacknowledged.clear();
         }
         let this_week = week(now);
+        // The week is fixed when the first record is assigned (section 4):
+        // a publication given no slot takes none.
         if self.current.is_none()
+            && slots > 0
             && self.queued
             && self.last_week.is_none_or(|last| this_week > last)
         {

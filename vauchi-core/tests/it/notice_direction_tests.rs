@@ -15,7 +15,7 @@ use crate::common::notice_pair::*;
 use vauchi_core::crypto::X25519KeyPair;
 use vauchi_core::notice::direction::{Alarm, week};
 use vauchi_core::notice::keys::{key_id, refresh_address};
-use vauchi_core::notice::seal::seal;
+use vauchi_core::notice::seal::{NOTICE_BYTES, seal};
 
 // @internal
 #[test]
@@ -760,6 +760,8 @@ struct Step {
     deliver: Vec<(usize, bool)>,
     acknowledged: bool,
     edit: bool,
+    /// How far the acting device's clock runs ahead of true time: each
+    /// device's own, so either may be set back by up to three days.
     clock_ahead_days: u64,
 }
 
@@ -767,7 +769,7 @@ fn step() -> impl Strategy<Value = Step> {
     (
         0u64..5,
         any::<bool>(),
-        proptest::collection::vec((0usize..64, any::<bool>()), 0..12),
+        proptest::collection::vec((any::<usize>(), any::<bool>()), 0..12),
         any::<bool>(),
         any::<bool>(),
         0u64..4,
@@ -813,13 +815,16 @@ proptest! {
             for (pick, altered) in &s.deliver {
                 if pool.is_empty() { break; }
                 let mut notice = pool[pick % pool.len()];
-                if *altered { notice[20 + pick % 70] ^= 1; }
+                if *altered { notice[pick % NOTICE_BYTES] ^= 1; }
                 delivered.push(notice);
             }
-            // The receiver's clock runs up to three days ahead of the
-            // sender's, the difference the specification allows.
+            // Each device's clock runs up to three days ahead of true
+            // time, so they differ by at most the three days the
+            // specification allows, and either may be set back by that
+            // (gate reviews 2 and 3, Claude and Kimi).
+            let clock = now + s.clock_ahead_days * DAY;
             let written = if s.receiver_acts {
-                let now = now + s.clock_ahead_days * DAY;
+                let now = clock;
                 p.receiver.read(&delivered, now);
                 let written = p.receiver.write(now);
                 if s.acknowledged { p.receiver.acknowledge(); }
@@ -830,8 +835,8 @@ proptest! {
                     let (key, commitment) = update(edits);
                     p.sender.queue_update(&key, &commitment);
                 }
-                p.sender.read(&delivered, now);
-                let written = p.sender.write(now);
+                p.sender.read(&delivered, clock);
+                let written = p.sender.write(clock);
                 if s.acknowledged { p.sender.acknowledge(); }
                 written
             };

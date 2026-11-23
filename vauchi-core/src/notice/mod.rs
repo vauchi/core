@@ -15,3 +15,4 @@ pub mod keys;
 pub mod publish;
 pub mod record;
 pub mod seal;
+pub mod session;

@@ -88,6 +88,12 @@ impl Publisher {
         self.last_week
     }
 
+    /// When the last publication was completed; `None` for an edit not
+    /// yet published once, which goes first (section 4).
+    pub fn completed_at(&self) -> Option<u64> {
+        self.completed_at
+    }
+
     /// Queues the weekly publication once the last was completed a
     /// period ago.
     pub fn queue_due(&mut self, now: u64) {

@@ -478,14 +478,42 @@ impl Sender {
     /// its fourth, and the newest update key when a refresh was followed
     /// or an edit is waiting.
     pub fn write(&mut self, now: u64) -> Vec<Notice> {
+        self.write_within(now, usize::MAX, usize::MAX)
+    }
+
+    /// What this direction would write now: its update-key notice when an
+    /// edit is queued, else a view due, and its queued openings.
+    pub fn wants(&self, _now: u64) -> Wants {
+        let notice = self.latest.is_some() && (self.update_queued || self.view_due);
+        let update = usize::from(notice && self.update_queued);
+        let view = usize::from(notice && !self.update_queued);
+        Wants {
+            update,
+            control: self.openings.len().saturating_add(view),
+        }
+    }
+
+    /// Writes at most `control_slots` control records (openings, then a
+    /// view) and `update_slots` update notices. A record left out stays
+    /// queued and advances no counter (protocol section 8).
+    pub fn write_within(
+        &mut self,
+        now: u64,
+        control_slots: usize,
+        update_slots: usize,
+    ) -> Vec<Notice> {
         self.retain(now);
         self.edits_written = None;
+        let mut control_left = control_slots;
         let mut written = Vec::new();
         // Newest first: openings under one number in one base share its
         // four addresses, and the newest key gets the last one left, so a
         // forged key queued earlier cannot use up R's own (spec S4; gate
         // review 4, Claude).
         for opening in self.openings.iter_mut().rev() {
+            if control_left == 0 {
+                break;
+            }
             let Some(base) = self.epochs.iter_mut().find(|e| e.keys.id() == opening.base) else {
                 continue;
             };
@@ -508,8 +536,14 @@ impl Sender {
                 confirmation: opening.confirmation,
             };
             written.push(seal(&at, &record.to_plaintext()));
+            control_left -= 1;
         }
         self.openings.retain(|opening| !opening.spent);
+        let notice_slot = if self.update_queued {
+            update_slots > 0
+        } else {
+            control_left > 0
+        };
 
         // A position is assigned only for a notice that is written: with no
         // update yet, a view due has nothing to say and steps nothing.
@@ -517,6 +551,7 @@ impl Sender {
             .latest
             .as_ref()
             .filter(|_| self.view_due || self.update_queued)
+            .filter(|_| notice_slot)
             .filter(|_| self.positions_assigned_at.len() < POSITIONS_A_PERIOD)
         {
             let writes_in = self.writes_in;

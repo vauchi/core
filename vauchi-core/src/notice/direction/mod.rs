@@ -58,6 +58,15 @@ pub enum Alarm {
     TwoRecordsAtOneAddress,
 }
 
+/// What one direction would write this session, by queue (protocol
+/// section 8): update-key notices of new edits, and control records
+/// (refresh copies, openings, a view).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Wants {
+    pub update: usize,
+    pub control: usize,
+}
+
 /// An update key the receiver read, to be matched with its content.
 pub struct UpdateKeyRead {
     pub update_key: Zeroizing<[u8; 32]>,

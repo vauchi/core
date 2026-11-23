@@ -358,6 +358,31 @@ impl Receiver {
     /// acknowledged, in the current epoch, the one left most recently
     /// and the epoch of the most recent alarm.
     pub fn write(&mut self, now: u64) -> Vec<Notice> {
+        self.write_within(now, usize::MAX)
+    }
+
+    /// How many refresh copies this direction would write now.
+    pub fn wants(&self, now: u64) -> usize {
+        let due = self
+            .issued
+            .last()
+            .is_none_or(|newest| now.saturating_sub(newest.made_at) >= REFRESH_EVERY_SECONDS);
+        if !due && !self.refresh_queued {
+            return 0;
+        }
+        let alarm_extra = self.alarm_epoch.is_some_and(|(alarmed, _)| {
+            let count = self.epochs.len();
+            self.epochs
+                .iter()
+                .position(|e| e.keys.id() == alarmed)
+                .is_some_and(|index| index + 2 < count)
+        });
+        self.epochs.len().min(2) + usize::from(alarm_extra)
+    }
+
+    /// Writes at most `copies` refresh copies, the current epoch first; a
+    /// copy left out spends no address (protocol section 8).
+    pub fn write_within(&mut self, now: u64, copies: usize) -> Vec<Notice> {
         self.expire(now);
         self.refresh_written = false;
         let due = match self.issued.last_mut() {
@@ -387,6 +412,7 @@ impl Receiver {
             }
         }
 
+        targets.truncate(copies);
         let this_week = week(now);
         let mut written = Vec::new();
         for index in targets {

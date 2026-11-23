@@ -34,10 +34,11 @@ impl Pair {
         );
         let mut registry = identity.initial_device_registry();
         registry
-            .add_device_unsigned(
+            .add_device(
                 sender
                     .create_device_info(NOW)
                     .to_registered(sender.master_seed()),
+                identity.signing_keypair(),
             )
             .unwrap();
         receiver

@@ -307,7 +307,6 @@ fn an_update_in_flight_across_a_repeat_exchange_still_applies() {
 #[test]
 fn first_exchange_journals_contact_added_for_linked_devices() {
     use vauchi_core::api::sync::DeviceSyncOrchestrator;
-    use vauchi_core::crypto::SigningKeyPair;
     use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
     use vauchi_core::sync::SyncItem;
 
@@ -315,14 +314,17 @@ fn first_exchange_journals_contact_added_for_linked_devices() {
     let bob = create_vauchi_with_card("Bob", vec![(FieldType::Email, "personal", "b@v1.com")]);
 
     // Two linked devices — record_sync_item is a deliberate no-op below 2.
-    const SEED: [u8; 32] = [7u8; 32];
-    let signing = SigningKeyPair::from_seed(&SEED);
+    let identity = alice.identity().unwrap();
+    let seed = *identity.master_seed();
     let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
-        &signing,
+        DeviceInfo::derive(&seed, 0, "phone".into(), 0).to_registered(&seed),
+        identity.signing_keypair(),
     );
     registry
-        .add_device_unsigned(DeviceInfo::derive(&SEED, 1, "tablet".into(), 0).to_registered(&SEED))
+        .add_device(
+            DeviceInfo::derive(&seed, 1, "tablet".into(), 0).to_registered(&seed),
+            identity.signing_keypair(),
+        )
         .unwrap();
     alice
         .storage()

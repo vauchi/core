@@ -8,7 +8,6 @@
 //! validation. See `ADR-051`.
 
 use vauchi_core::api::sync::DeviceSyncOrchestrator;
-use vauchi_core::crypto::SigningKeyPair;
 use vauchi_core::exchange::{X3DH, X3DHKeyPair};
 use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
 use vauchi_core::sync::SyncItem;
@@ -32,16 +31,16 @@ fn add_contact(wb: &Vauchi, name: &str) -> String {
 }
 
 fn install_linked_registry(wb: &Vauchi) -> (DeviceRegistry, [u8; 32]) {
-    const SEED: [u8; 32] = [9u8; 32];
-    let signing = SigningKeyPair::from_seed(&SEED);
+    let identity = wb.identity().unwrap();
+    let seed = *identity.master_seed();
     let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
-        &signing,
+        DeviceInfo::derive(&seed, 0, "phone".into(), 0).to_registered(&seed),
+        identity.signing_keypair(),
     );
-    let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
+    let tablet = DeviceInfo::derive(&seed, 1, "tablet".into(), 0);
     let tablet_id = *tablet.device_id();
     registry
-        .add_device_unsigned(tablet.to_registered(&SEED))
+        .add_device(tablet.to_registered(&seed), identity.signing_keypair())
         .unwrap();
     wb.storage()
         .device()

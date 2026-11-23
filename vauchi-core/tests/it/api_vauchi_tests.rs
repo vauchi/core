@@ -8,7 +8,6 @@
 use vauchi_core::api::sync::DeviceSyncOrchestrator;
 use vauchi_core::api::*;
 use vauchi_core::contact_card::FieldType;
-use vauchi_core::crypto::SigningKeyPair;
 use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
 use vauchi_core::sync::SyncItem;
 use vauchi_core::*;
@@ -90,16 +89,16 @@ fn test_vauchi_update_own_card_journals_field_removal() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
-    const SEED: [u8; 32] = [12u8; 32];
-    let signing = SigningKeyPair::from_seed(&SEED);
+    let identity = wb.identity().unwrap();
+    let seed = *identity.master_seed();
     let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
-        &signing,
+        DeviceInfo::derive(&seed, 0, "phone".into(), 0).to_registered(&seed),
+        identity.signing_keypair(),
     );
-    let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
+    let tablet = DeviceInfo::derive(&seed, 1, "tablet".into(), 0);
     let tablet_id = *tablet.device_id();
     registry
-        .add_device_unsigned(tablet.to_registered(&SEED))
+        .add_device(tablet.to_registered(&seed), identity.signing_keypair())
         .unwrap();
     wb.storage()
         .device()
@@ -145,16 +144,16 @@ fn test_vauchi_add_own_field_journals_complete_stable_field() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
-    const SEED: [u8; 32] = [13u8; 32];
-    let signing = SigningKeyPair::from_seed(&SEED);
+    let identity = wb.identity().unwrap();
+    let seed = *identity.master_seed();
     let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
-        &signing,
+        DeviceInfo::derive(&seed, 0, "phone".into(), 0).to_registered(&seed),
+        identity.signing_keypair(),
     );
-    let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
+    let tablet = DeviceInfo::derive(&seed, 1, "tablet".into(), 0);
     let tablet_id = *tablet.device_id();
     registry
-        .add_device_unsigned(tablet.to_registered(&SEED))
+        .add_device(tablet.to_registered(&seed), identity.signing_keypair())
         .unwrap();
     wb.storage()
         .device()
@@ -194,16 +193,16 @@ fn test_vauchi_remove_own_field() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
-    const SEED: [u8; 32] = [11u8; 32];
-    let signing = SigningKeyPair::from_seed(&SEED);
+    let identity = wb.identity().unwrap();
+    let seed = *identity.master_seed();
     let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
-        &signing,
+        DeviceInfo::derive(&seed, 0, "phone".into(), 0).to_registered(&seed),
+        identity.signing_keypair(),
     );
-    let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
+    let tablet = DeviceInfo::derive(&seed, 1, "tablet".into(), 0);
     let tablet_id = *tablet.device_id();
     registry
-        .add_device_unsigned(tablet.to_registered(&SEED))
+        .add_device(tablet.to_registered(&seed), identity.signing_keypair())
         .unwrap();
     wb.storage()
         .device()

@@ -11,18 +11,18 @@ use vauchi_core::identity::DeviceInfo;
 use vauchi_core::sync::SyncItem;
 use vauchi_core::{ContactField, FieldType, Vauchi};
 
-const OTHER_SEED: [u8; 32] = [9u8; 32];
-
 fn vauchi_with_devices(extra_device: bool) -> (Vauchi, Option<[u8; 32]>) {
     let mut wb = Vauchi::in_memory().unwrap();
     wb.create_identity("Alice").unwrap();
-    let mut registry = wb.identity().unwrap().initial_device_registry();
+    let identity = wb.identity().unwrap();
+    let seed = *identity.master_seed();
+    let mut registry = identity.initial_device_registry();
     let mut other = None;
     if extra_device {
-        let laptop = DeviceInfo::derive(&OTHER_SEED, 1, "Laptop".into(), 0);
+        let laptop = DeviceInfo::derive(&seed, 1, "Laptop".into(), 0);
         other = Some(*laptop.device_id());
         registry
-            .add_device_unsigned(laptop.to_registered(&OTHER_SEED))
+            .add_device(laptop.to_registered(&seed), identity.signing_keypair())
             .unwrap();
     }
     wb.storage()

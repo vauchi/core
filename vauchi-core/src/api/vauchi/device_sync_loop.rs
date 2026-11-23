@@ -350,16 +350,15 @@ mod tests {
         let identity_b = b.identity().unwrap();
         let device_b = identity_b.create_device_info(NOW);
 
-        // Synthetic sender device A (independent keypair — ECDH needs no
-        // shared seed, only that B's registry carries A's public key).
-        let seed_a = [0x11u8; 32];
-        let device_a = DeviceInfo::derive(&seed_a, 0, "DeviceA".into(), NOW);
+        // Sender A, B's linked sibling at index 1.
+        let seed = *identity_b.master_seed();
+        let device_a = DeviceInfo::derive(&seed, 1, "DeviceA".into(), NOW);
 
         // B's registry must hold both devices so device_count > 1 and the
         // sender-trial loop can find A's key.
         let mut registry = identity_b.initial_device_registry();
         registry
-            .add_device_unsigned(device_a.to_registered(&seed_a))
+            .add_device(device_a.to_registered(&seed), identity_b.signing_keypair())
             .unwrap();
         b.storage()
             .device()
@@ -396,11 +395,11 @@ mod tests {
         let identity_b = b.identity().unwrap();
 
         // Two-device registry, but the blob is random bytes from no one.
-        let seed_a = [0x22u8; 32];
-        let device_a = DeviceInfo::derive(&seed_a, 0, "DeviceA".into(), NOW);
+        let seed = *identity_b.master_seed();
+        let device_a = DeviceInfo::derive(&seed, 1, "DeviceA".into(), NOW);
         let mut registry = identity_b.initial_device_registry();
         registry
-            .add_device_unsigned(device_a.to_registered(&seed_a))
+            .add_device(device_a.to_registered(&seed), identity_b.signing_keypair())
             .unwrap();
         b.storage()
             .device()
@@ -422,11 +421,14 @@ mod tests {
         let identity = receiver.identity().unwrap();
         let current_device = identity.create_device_info(NOW);
 
-        let sibling_seed = [0x33u8; 32];
+        let sibling_seed = *identity.master_seed();
         let sibling = DeviceInfo::derive(&sibling_seed, 1, "Bob tablet".into(), NOW);
         let mut registry = identity.initial_device_registry();
         registry
-            .add_device_unsigned(sibling.to_registered(&sibling_seed))
+            .add_device(
+                sibling.to_registered(&sibling_seed),
+                identity.signing_keypair(),
+            )
             .unwrap();
         receiver
             .storage()
@@ -475,11 +477,14 @@ mod tests {
         let mut owner = Vauchi::in_memory().unwrap();
         owner.create_identity("Bob").unwrap();
         let identity = owner.identity().unwrap();
-        let sibling_seed = [0x33u8; 32];
+        let sibling_seed = *identity.master_seed();
         let sibling = DeviceInfo::derive(&sibling_seed, 1, "Bob tablet".into(), NOW);
         let mut registry = identity.initial_device_registry();
         registry
-            .add_device_unsigned(sibling.to_registered(&sibling_seed))
+            .add_device(
+                sibling.to_registered(&sibling_seed),
+                identity.signing_keypair(),
+            )
             .unwrap();
         owner
             .storage()

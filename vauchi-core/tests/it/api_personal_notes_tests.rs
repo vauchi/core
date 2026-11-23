@@ -197,19 +197,18 @@ fn applied_synced_note_tombstone_clears_local_note() {
 /// Copies the helper from api_tags_tests.rs: registers a second device so
 /// record_sync_item has a peer to journal for.
 fn install_linked_registry(wb: &Vauchi) -> (vauchi_core::identity::DeviceRegistry, [u8; 32]) {
-    use vauchi_core::crypto::SigningKeyPair;
     use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
 
-    const SEED: [u8; 32] = [9u8; 32];
-    let signing = SigningKeyPair::from_seed(&SEED);
+    let identity = wb.identity().unwrap();
+    let seed = *identity.master_seed();
     let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
-        &signing,
+        DeviceInfo::derive(&seed, 0, "phone".into(), 0).to_registered(&seed),
+        identity.signing_keypair(),
     );
-    let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
+    let tablet = DeviceInfo::derive(&seed, 1, "tablet".into(), 0);
     let tablet_id = *tablet.device_id();
     registry
-        .add_device_unsigned(tablet.to_registered(&SEED))
+        .add_device(tablet.to_registered(&seed), identity.signing_keypair())
         .unwrap();
     wb.storage()
         .device()

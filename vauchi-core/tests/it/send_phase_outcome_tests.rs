@@ -267,7 +267,10 @@ fn a_device_with_a_sibling_builds_envelopes_for_its_pending_changes() {
     );
 
     registry
-        .add_device_unsigned(create_test_device(&seed, 1, "Laptop").to_registered(&seed))
+        .add_device(
+            create_test_device(&seed, 1, "Laptop").to_registered(&seed),
+            identity.signing_keypair(),
+        )
         .unwrap();
     storage.device().save_device_registry(&registry).unwrap();
     DeviceSyncOrchestrator::new(&storage, phone, registry)

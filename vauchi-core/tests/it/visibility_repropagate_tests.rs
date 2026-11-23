@@ -10,7 +10,6 @@
 use vauchi_core::{
     Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi, VauchiError,
     api::sync::DeviceSyncOrchestrator,
-    crypto::SigningKeyPair,
     exchange::X3DHKeyPair,
     identity::{DeviceInfo, DeviceRegistry},
     sync::SyncItem,
@@ -355,16 +354,16 @@ fn test_set_contact_override_triggers_repropagate() {
 #[test]
 fn test_contact_override_and_repropagate_journals_linked_device_grant() {
     let wb = create_test_vauchi();
-    const SEED: [u8; 32] = [41u8; 32];
-    let signing = SigningKeyPair::from_seed(&SEED);
+    let identity = wb.identity().unwrap();
+    let seed = *identity.master_seed();
     let mut registry = DeviceRegistry::new(
-        DeviceInfo::derive(&SEED, 0, "phone".into(), 0).to_registered(&SEED),
-        &signing,
+        DeviceInfo::derive(&seed, 0, "phone".into(), 0).to_registered(&seed),
+        identity.signing_keypair(),
     );
-    let tablet = DeviceInfo::derive(&SEED, 1, "tablet".into(), 0);
+    let tablet = DeviceInfo::derive(&seed, 1, "tablet".into(), 0);
     let tablet_id = *tablet.device_id();
     registry
-        .add_device_unsigned(tablet.to_registered(&SEED))
+        .add_device(tablet.to_registered(&seed), identity.signing_keypair())
         .unwrap();
     wb.storage()
         .device()

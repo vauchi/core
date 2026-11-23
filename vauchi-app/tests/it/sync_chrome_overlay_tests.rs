@@ -106,10 +106,13 @@ fn a_linked_device_without_contacts_gets_the_sync_indicator() {
     // run, 2026-10-12).
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
-    let mut registry = vauchi.identity().unwrap().initial_device_registry();
+    let identity = vauchi.identity().unwrap();
+    let seed = *identity.master_seed();
+    let mut registry = identity.initial_device_registry();
     registry
-        .add_device_unsigned(
-            DeviceInfo::derive(&[9u8; 32], 1, "Laptop".into(), 0).to_registered(&[9u8; 32]),
+        .add_device(
+            DeviceInfo::derive(&seed, 1, "Laptop".into(), 0).to_registered(&seed),
+            identity.signing_keypair(),
         )
         .unwrap();
     vauchi

@@ -12,15 +12,17 @@ use vauchi_core::api::Vauchi;
 use vauchi_core::identity::DeviceInfo;
 
 const DURESS_PIN: &str = "135790";
-const OTHER_SEED: [u8; 32] = [9u8; 32];
 
 fn engine_in_duress_mode() -> AppEngine {
     let mut vauchi: Vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
-    let mut registry = vauchi.identity().unwrap().initial_device_registry();
+    let identity = vauchi.identity().unwrap();
+    let seed = *identity.master_seed();
+    let mut registry = identity.initial_device_registry();
     registry
-        .add_device_unsigned(
-            DeviceInfo::derive(&OTHER_SEED, 1, "RealLaptop".into(), 0).to_registered(&OTHER_SEED),
+        .add_device(
+            DeviceInfo::derive(&seed, 1, "RealLaptop".into(), 0).to_registered(&seed),
+            identity.signing_keypair(),
         )
         .unwrap();
     vauchi

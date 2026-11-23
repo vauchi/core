@@ -569,16 +569,25 @@ impl OnboardingEngine {
             UserAction::ActionPressed { action_id }
                 if action_id == "continue" || action_id == "submit_display_name" =>
             {
-                if self.data.display_name.trim().is_empty() {
-                    ActionResult::ValidationError {
-                        component_id: "display_name".into(),
-                        message: self.t("onboarding.error_name_required"),
-                    }
-                } else {
-                    self.navigate_to(Step::GroupsSetup)
-                }
+                self.continue_from_the_name()
+            }
+            // The keyboard's Done key; on a phone Continue can sit under the
+            // keyboard (vauchi/private#1362).
+            UserAction::TextSubmitted { component_id } if component_id == "display_name" => {
+                self.continue_from_the_name()
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),
+        }
+    }
+
+    fn continue_from_the_name(&mut self) -> ActionResult {
+        if self.data.display_name.trim().is_empty() {
+            ActionResult::ValidationError {
+                component_id: "display_name".into(),
+                message: self.t("onboarding.error_name_required"),
+            }
+        } else {
+            self.navigate_to(Step::GroupsSetup)
         }
     }
 

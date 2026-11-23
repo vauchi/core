@@ -8,7 +8,7 @@
 
 use crate::common::notice_pair::*;
 use vauchi_core::notice::content::RECORD_BYTES;
-use vauchi_core::notice::direction::Wants;
+use vauchi_core::notice::direction::{Wants, week};
 use vauchi_core::notice::publish::Publisher;
 use vauchi_core::notice::seal::NOTICE_BYTES;
 use vauchi_core::notice::session::{BACKGROUND, FAST, Grant, Session, plan};
@@ -411,4 +411,63 @@ proptest! {
         prop_assert_eq!(p.receiver.alarms(), &[] as &[vauchi_core::notice::direction::Alarm]);
         prop_assert!(installed, "the card never installed");
     }
+}
+
+// Gate review 7 (Codex): an epoch whose four addresses of the week were
+// spent unacknowledged dropped out of the refresh's targets, so a copy in
+// the newer epoch alone cleared the refresh, and the old epoch never got
+// one once the week turned.
+// @internal
+#[test]
+fn a_refresh_waits_for_an_epoch_whose_addresses_of_the_week_are_spent() {
+    let mut p = pair();
+    let mut copies = Vec::new();
+    for second in 0..4 {
+        copies.extend(p.receiver.write_within(START + second, 1));
+    }
+    assert_eq!(
+        copies.len(),
+        4,
+        "the seed's four addresses this week, none acknowledged"
+    );
+    let opening = p.sender_session(&copies[..1], START + DAY);
+    p.receiver.read(&opening, START + 2 * DAY);
+    assert_ne!(p.receiver.current_epoch(), p.receiver.seed_epoch(), "moved");
+    assert_eq!(
+        p.receiver.write_within(START + 2 * DAY, 2).len(),
+        1,
+        "the new epoch only"
+    );
+    p.receiver.acknowledge();
+    let next_week = (week(START) as u64 + 1) * WEEK + 60;
+    assert!(
+        next_week < START + WEEK,
+        "the week turns before refresh 2 is due"
+    );
+    assert_eq!(
+        p.receiver.wants(next_week),
+        1,
+        "the seed still lacks an acknowledged copy"
+    );
+    assert_eq!(p.receiver.write_within(next_week, 1).len(), 1);
+}
+
+// Gate review 7 (Codex): the sender's demand counted every eligible group
+// once any position was left in the period.
+// @internal
+#[test]
+fn the_senders_demand_never_exceeds_the_positions_left_in_the_period() {
+    let mut p = pair();
+    let (a, commitment) = update(30);
+    p.sender.queue_group_update(1, &a, &commitment);
+    for second in 0..127 {
+        assert_eq!(p.sender.write_within(START + second, 0, 1).len(), 1);
+    }
+    let (b, commitment) = update(31);
+    p.sender.queue_group_update(2, &b, &commitment);
+    assert_eq!(
+        p.sender.wants(START + 200).update,
+        1,
+        "one position is left"
+    );
 }

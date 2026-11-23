@@ -128,3 +128,67 @@ fn pins_for_an_unknown_contact_are_refused() {
 
     assert!(result.is_err(), "the pins row references the contact row");
 }
+
+// A contact moving to a new identity (recovery, D25) keeps none of the old
+// identity's pins: the new identity has other devices.
+// @scenario: device_management :: Device-specific keys
+// @internal
+#[test]
+fn pins_end_with_the_old_identity_when_the_contact_moves() {
+    let (storage, ids) = storage_with_contacts(&["Alice"]);
+    storage
+        .device()
+        .save_contact_device_pins(&ids[0], &pins_of(&[([1u8; 32], [11u8; 32])]))
+        .unwrap();
+
+    storage.move_contact_id(&ids[0], "alice-new").unwrap();
+
+    assert_eq!(
+        storage
+            .device()
+            .load_contact_device_pins("alice-new")
+            .unwrap(),
+        None
+    );
+}
+
+// @scenario: device_management :: Device-specific keys
+// @internal
+#[test]
+fn a_fold_keeps_only_the_new_identitys_pins() {
+    let (storage, ids) = storage_with_contacts(&["Alice", "Alice met again"]);
+    let old_identitys = pins_of(&[([1u8; 32], [11u8; 32])]);
+    let new_identitys = pins_of(&[([2u8; 32], [22u8; 32])]);
+    let device = storage.device();
+    device
+        .save_contact_device_pins(&ids[0], &old_identitys)
+        .unwrap();
+    device
+        .save_contact_device_pins(&ids[1], &new_identitys)
+        .unwrap();
+
+    storage.fold_contact_into(&ids[0], &ids[1]).unwrap();
+
+    assert_eq!(
+        storage.device().load_contact_device_pins(&ids[1]).unwrap(),
+        Some(new_identitys)
+    );
+}
+
+// @scenario: device_management :: Device-specific keys
+// @internal
+#[test]
+fn a_fold_into_a_contact_without_pins_takes_none_of_the_old_identitys() {
+    let (storage, ids) = storage_with_contacts(&["Alice", "Alice met again"]);
+    storage
+        .device()
+        .save_contact_device_pins(&ids[0], &pins_of(&[([1u8; 32], [11u8; 32])]))
+        .unwrap();
+
+    storage.fold_contact_into(&ids[0], &ids[1]).unwrap();
+
+    assert_eq!(
+        storage.device().load_contact_device_pins(&ids[1]).unwrap(),
+        None
+    );
+}

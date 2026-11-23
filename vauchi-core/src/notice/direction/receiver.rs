@@ -153,7 +153,7 @@ impl Receiver {
     }
 
     /// This direction's state as saved between sessions (section 5).
-    pub fn save(&self) -> Zeroizing<Vec<u8>> {
+    pub fn save(&self) -> Result<Zeroizing<Vec<u8>>, crate::notice::saved::SavedError> {
         crate::notice::saved::save(crate::notice::saved::Kind::Receiver, self)
     }
 

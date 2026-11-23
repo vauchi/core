@@ -13,12 +13,12 @@ use vauchi_core::notice::publish::{Pending, Publisher};
 use vauchi_core::notice::saved::SavedError;
 
 fn reload_receiver(p: &mut Pair, now: u64) {
-    let saved = p.receiver.save();
+    let saved = p.receiver.save().expect("saves");
     p.receiver = Receiver::load(&saved, now).expect("loads");
 }
 
 fn reload_sender(p: &mut Pair, now: u64) {
-    let saved = p.sender.save();
+    let saved = p.sender.save().expect("saves");
     p.sender = Sender::load(&saved, now).expect("loads");
 }
 
@@ -58,7 +58,7 @@ fn loading_saved_state_first_erases_what_expired() {
     p.sender.queue_update(&newer, &commitment);
     let delivered = p.sender_session(&[], START + DAY);
     p.receiver.read(&delivered, START + 2 * DAY);
-    let saved = p.receiver.save();
+    let saved = p.receiver.save().expect("saves");
 
     let inside = Receiver::load(&saved, START + 2 * DAY + WEEK).expect("loads");
     assert_eq!(
@@ -84,7 +84,7 @@ fn a_publisher_and_pending_keys_carry_on_after_loading() {
     publisher.queue_due(START);
     let first = publisher.write(START, 1);
     publisher.acknowledge(START);
-    let mut publisher = Publisher::load(&publisher.save()).expect("loads");
+    let mut publisher = Publisher::load(&publisher.save().expect("saves")).expect("loads");
     let rest = publisher.write(START + 60, 8);
     publisher.acknowledge(START + 60);
     assert_eq!(
@@ -96,7 +96,7 @@ fn a_publisher_and_pending_keys_carry_on_after_loading() {
     let mut pending = Pending::default();
     pending.note(&key, &commitment(&key, &text), START);
     pending.read(&first, START, |_| true);
-    let mut pending = Pending::load(&pending.save(), START + DAY).expect("loads");
+    let mut pending = Pending::load(&pending.save().expect("saves"), START + DAY).expect("loads");
     let bodies = pending.read(&rest, START + DAY, |_| true);
     assert_eq!(
         bodies.len(),
@@ -107,7 +107,7 @@ fn a_publisher_and_pending_keys_carry_on_after_loading() {
 
     let mut stale = Pending::default();
     stale.note(&key, &commitment(&key, &text), START);
-    let mut stale = Pending::load(&stale.save(), START + 21 * DAY).expect("loads");
+    let mut stale = Pending::load(&stale.save().expect("saves"), START + 21 * DAY).expect("loads");
     assert!(
         stale.note(&key, &commitment(&key, &text), START + 21 * DAY),
         "the 21-day entry was erased on load"
@@ -118,7 +118,7 @@ fn a_publisher_and_pending_keys_carry_on_after_loading() {
 #[test]
 fn malformed_saved_state_is_refused() {
     let p = pair();
-    let saved = p.receiver.save();
+    let saved = p.receiver.save().expect("saves");
     let mut wrong_version = saved.to_vec();
     wrong_version[0] ^= 0xFF;
     let mut trailing = saved.to_vec();
@@ -140,5 +140,30 @@ fn malformed_saved_state_is_refused() {
         Sender::load(&saved, START).err(),
         Some(SavedError),
         "a receiver's state is not a sender's"
+    );
+}
+
+// Gate review 9 (Codex): a session's turn order between directions was not
+// saved, so a restart forgot which direction was served longest ago.
+// @internal
+#[test]
+fn a_sessions_turn_order_survives_saving() {
+    use vauchi_core::notice::session::{FAST, Session};
+    let mut first = pair();
+    let mut second = pair();
+    let mut session = Session::default();
+    session.write(
+        &mut [],
+        &mut [&mut first.receiver, &mut second.receiver],
+        &mut [],
+        FAST,
+        START,
+    );
+    let saved = session.save().expect("saves");
+    let loaded = Session::load(&saved).expect("loads");
+    assert_eq!(loaded.save().expect("saves").as_slice(), saved.as_slice());
+    assert_eq!(
+        Session::load(&first.receiver.save().expect("saves")).err(),
+        Some(SavedError)
     );
 }

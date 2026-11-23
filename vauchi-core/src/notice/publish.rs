@@ -101,7 +101,7 @@ impl Publisher {
         }
     }
 
-    pub fn save(&self) -> Zeroizing<Vec<u8>> {
+    pub fn save(&self) -> Result<Zeroizing<Vec<u8>>, super::saved::SavedError> {
         super::saved::save(super::saved::Kind::Publisher, self)
     }
 
@@ -250,7 +250,7 @@ pub struct Pending {
 }
 
 impl Pending {
-    pub fn save(&self) -> Zeroizing<Vec<u8>> {
+    pub fn save(&self) -> Result<Zeroizing<Vec<u8>>, super::saved::SavedError> {
         super::saved::save(super::saved::Kind::Pending, self)
     }
 

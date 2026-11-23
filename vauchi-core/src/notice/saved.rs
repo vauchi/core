@@ -27,13 +27,16 @@ pub(crate) enum Kind {
     Sender = 2,
     Publisher = 3,
     Pending = 4,
+    Session = 5,
 }
 
-pub(crate) fn save<T: Serialize>(kind: Kind, state: &T) -> Zeroizing<Vec<u8>> {
+/// A state that cannot be encoded is an error, never an empty save that a
+/// later load refuses (gate review 9, Claude).
+pub(crate) fn save<T: Serialize>(kind: Kind, state: &T) -> Result<Zeroizing<Vec<u8>>, SavedError> {
     let mut bytes = Zeroizing::new(vec![kind as u8, FORMAT_VERSION]);
-    let encoded = Zeroizing::new(postcard::to_allocvec(state).unwrap_or_default());
+    let encoded = Zeroizing::new(postcard::to_allocvec(state).map_err(|_| SavedError)?);
     bytes.extend_from_slice(&encoded);
-    bytes
+    Ok(bytes)
 }
 
 pub(crate) fn load<T: DeserializeOwned>(kind: Kind, bytes: &[u8]) -> Result<T, SavedError> {

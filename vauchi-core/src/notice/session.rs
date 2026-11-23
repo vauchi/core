@@ -88,13 +88,23 @@ pub struct SessionWrite {
 }
 
 /// A device's sessions over time: when each direction was last served,
-/// so that directions take turns, the one served longest ago first.
-#[derive(Default)]
+/// so that directions take turns, the one served longest ago first. Saved
+/// like the directions, so a restart keeps the turn order (gate review 9,
+/// Codex).
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct Session {
     last_served: Vec<u64>,
 }
 
 impl Session {
+    pub fn save(&self) -> Result<zeroize::Zeroizing<Vec<u8>>, super::saved::SavedError> {
+        super::saved::save(super::saved::Kind::Session, self)
+    }
+
+    pub fn load(bytes: &[u8]) -> Result<Self, super::saved::SavedError> {
+        super::saved::load(super::saved::Kind::Session, bytes)
+    }
+
     /// Writes one session. `senders` and `receivers` are the device's
     /// directions, in the same order every session; `publishers` its
     /// groups' bodies, new edits first.

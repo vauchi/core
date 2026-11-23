@@ -324,6 +324,7 @@ mod offline_social_field_tests;
 mod onboarding_custom_group_tests;
 mod onboarding_flow_tests;
 mod onboarding_i18n_tests;
+mod onboarding_name_submit_tests;
 mod onboarding_step_choices_tests;
 mod onboarding_survives_rebuild_tests;
 mod onboarding_welcome_entry_points_tests;

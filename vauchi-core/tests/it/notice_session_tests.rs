@@ -495,3 +495,39 @@ fn an_alarm_queues_the_refresh_again_for_the_epochs_it_now_needs() {
         "the alarm queues the refresh again"
     );
 }
+
+// Gate review 8 (Codex): each followed refresh made every view due again,
+// and views went in group order under the cap of 128 positions a period,
+// so with 129 groups the last group's view never went and one lost notice
+// of it was never replaced. Views and updates now go least recently sent
+// first.
+// @internal
+#[test]
+fn with_more_groups_than_positions_every_groups_view_still_goes() {
+    let mut p = pair();
+    for group in 0..=128u32 {
+        let (key, commitment) = update((group % 200) as u8);
+        p.sender.queue_group_update(group, &key, &commitment);
+    }
+    let mut now = START;
+    for _ in 0..3 {
+        p.sender_session(&[], now);
+        now += WEEK;
+    }
+    let (lost, commitment) = update(250);
+    p.sender.queue_group_update(128, &lost, &commitment);
+    p.sender_session(&[], now);
+    let mut read_lost = false;
+    for _ in 0..6 {
+        now += WEEK;
+        let refresh = p.receiver_session(&[], now);
+        let written = p.sender_session(&refresh, now);
+        read_lost |= p
+            .receiver
+            .read(&written, now + 1)
+            .iter()
+            .any(|read| *read.update_key == lost);
+        p.receiver_session(&[], now + 2);
+    }
+    assert!(read_lost, "group 128's view never went");
+}

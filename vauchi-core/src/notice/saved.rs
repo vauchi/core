@@ -19,9 +19,9 @@ use crate::crypto::X25519KeyPair;
 /// 2: openings, publishers and group entries gained fields (gate reviews
 /// 10 and 11); 3: openings keep when they were queued (gate review 12);
 /// 4: one opening a direction and alternating control turns (owner,
-/// 2026-11-23). State saved under an earlier version is refused, not
-/// misread.
-const FORMAT_VERSION: u8 = 4;
+/// 2026-11-23); 5: no highest refresh number kept (gate review 14).
+/// State saved under an earlier version is refused, not misread.
+const FORMAT_VERSION: u8 = 5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SavedError;

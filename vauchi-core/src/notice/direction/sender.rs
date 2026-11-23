@@ -123,9 +123,6 @@ pub struct Sender {
     /// neither waits more than one turn for the other (owner, 2026-11-23,
     /// after gates 10 to 12 each found a stall in ordering them).
     opening_next: bool,
-    /// The highest refresh number read: its opening is the only one held,
-    /// and a lower number opens nothing (owner, 2026-11-23).
-    highest_refresh_read: u32,
     positions_assigned_at: VecDeque<u64>,
     highest_opened_this_session: Option<u32>,
     first_records: FirstRecords,
@@ -150,7 +147,6 @@ impl Clone for Sender {
             written_groups: self.written_groups.clone(),
             last_written: self.last_written,
             opening_next: self.opening_next,
-            highest_refresh_read: self.highest_refresh_read,
             positions_assigned_at: self.positions_assigned_at.clone(),
             highest_opened_this_session: self.highest_opened_this_session,
             first_records: self.first_records.clone(),
@@ -183,7 +179,6 @@ impl Sender {
             written_groups: Vec::new(),
             last_written: Wants::default(),
             opening_next: true,
-            highest_refresh_read: 0,
             positions_assigned_at: VecDeque::new(),
             highest_opened_this_session: None,
             first_records: FirstRecords::default(),
@@ -465,8 +460,11 @@ impl Sender {
             }
         }
 
-        if refresh.number > self.highest_refresh_read {
-            self.highest_refresh_read = refresh.number;
+        if self
+            .openings
+            .iter()
+            .any(|opening| opening.number < refresh.number)
+        {
             self.openings.clear();
         }
         if !opened_before && self.open_on(refresh, read_in, now) {
@@ -519,7 +517,14 @@ impl Sender {
         // under one number the key read last replaces the one before (spec
         // S4). Openings then never outnumber the turns that serve them
         // (owner, 2026-11-23).
-        if refresh.number < self.highest_refresh_read {
+        // A lower number waits only while a higher number's opening is
+        // queued: a highest number kept for good let one forged refresh
+        // stop every later opening (gate review 14, Claude).
+        if self
+            .openings
+            .iter()
+            .any(|opening| opening.number > refresh.number)
+        {
             return false;
         }
         let Some(base) = self.epochs.get(read_in) else {
@@ -666,8 +671,8 @@ impl Sender {
         queue
     }
 
-    /// Writes at most `control_slots` control records (openings and views,
-    /// by how long each has waited) and `update_slots` update notices. A record left out stays
+    /// Writes at most `control_slots` control records (the opening and
+    /// views, in alternating turns) and `update_slots` update notices. A record left out stays
     /// queued and advances no counter (protocol section 8).
     pub fn write_within(
         &mut self,

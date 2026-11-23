@@ -233,6 +233,8 @@ fn a_direction_holds_one_opening_for_its_highest_refresh() {
             seed,
             "later first: {later_first}"
         );
+        // R accepts either; the one held is refresh 2's (gate review 14).
+        assert_eq!(p.receiver.current_number(), 2, "later first: {later_first}");
     }
 }
 

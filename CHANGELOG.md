@@ -72,6 +72,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   refused a link opened without its code. Every consumer now calls
   `accept_link_exchange_with_code` (vauchi/private#727). A consumer still
   calling the one-argument form stops compiling.
+- The crypto paths named for what the files did not hold
+  (vauchi/private#1359), with no alias left behind:
+  `crypto::kdf` is now `crypto::hkdf`, `crypto::x3dh` is now
+  `crypto::x25519`, and `X3DHKeyPair`, a plain X25519 key pair, is now
+  `X25519KeyPair` at every path it was exported from (`vauchi_core`,
+  `crypto`, `exchange`, `exchange::x3dh`). The OS random source moved
+  from the crypto module's root to `crypto::random`, still re-exported
+  as `crypto::random_bytes` and `crypto::random_fill`. A consumer using
+  an old path stops compiling; the next release is a breaking one.
 
 ### Security
 

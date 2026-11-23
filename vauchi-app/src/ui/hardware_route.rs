@@ -113,6 +113,7 @@ impl HardwareRoute {
     /// The hardware shell releases the camera once it reads a code
     /// (windows-hw `QrCamera`, linux-hw `camera.rs`): the scan is over, and
     /// the next scan screen starts a fresh capture.
+    #[cfg(feature = "network-rustls")]
     pub(crate) fn code_scanned(&mut self) {
         if self
             .capture

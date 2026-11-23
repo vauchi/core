@@ -406,13 +406,24 @@ impl Receiver {
             return 0;
         }
         let sealed: &[EpochId] = if due { &[] } else { &self.sealed_in };
-        self.refresh_targets(week(now), sealed).len()
+        let this_week = week(now);
+        self.refresh_targets(sealed)
+            .into_iter()
+            .filter(|index| self.has_refresh_address(*index, this_week))
+            .count()
+    }
+
+    fn has_refresh_address(&self, index: usize, this_week: u32) -> bool {
+        self.epochs.get(index).is_some_and(|epoch| {
+            epoch.refresh_attempts.get(&this_week).copied().unwrap_or(0) < ATTEMPTS
+        })
     }
 
     /// The epochs a refresh is sealed in, current first, then the one left
-    /// most recently and the epoch of the most recent alarm: those with an
-    /// address left in `this_week` and not in `sealed`.
-    fn refresh_targets(&self, this_week: u32, sealed: &[EpochId]) -> Vec<usize> {
+    /// most recently and the epoch of the most recent alarm, less those in
+    /// `sealed`. An epoch with no address left this week still needs its
+    /// copy, in a later week (gate review 7).
+    fn refresh_targets(&self, sealed: &[EpochId]) -> Vec<usize> {
         let count = self.epochs.len();
         let mut targets = vec![count.saturating_sub(1)];
         if count >= 2 {
@@ -425,10 +436,9 @@ impl Receiver {
             }
         }
         targets.retain(|index| {
-            self.epochs.get(*index).is_some_and(|epoch| {
-                !sealed.contains(&epoch.keys.id())
-                    && epoch.refresh_attempts.get(&this_week).copied().unwrap_or(0) < ATTEMPTS
-            })
+            self.epochs
+                .get(*index)
+                .is_some_and(|epoch| !sealed.contains(&epoch.keys.id()))
         });
         targets
     }
@@ -454,9 +464,14 @@ impl Receiver {
         let (number, public, name) = (newest.number, newest.public, newest.name);
 
         let this_week = week(now);
-        let mut targets = self.refresh_targets(this_week, &self.sealed_in);
-        self.copies_left_after_write = targets.len() > copies;
+        let required = self.refresh_targets(&self.sealed_in);
+        let mut targets: Vec<usize> = required
+            .iter()
+            .copied()
+            .filter(|index| self.has_refresh_address(*index, this_week))
+            .collect();
         targets.truncate(copies);
+        self.copies_left_after_write = required.len() > targets.len();
         self.written_in.clear();
         let mut written = Vec::new();
         for index in targets {

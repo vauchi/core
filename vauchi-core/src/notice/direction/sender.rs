@@ -568,12 +568,15 @@ impl Sender {
                 control: self.openings.len(),
             };
         }
+        // Updates and views share the positions left in the period.
+        let positions_left = POSITIONS_A_PERIOD.saturating_sub(recent);
         let update = self
             .groups
             .iter()
             .filter(|(group, entry)| entry.queued && eligible(**group))
-            .count();
-        let view = self.view_candidates().count();
+            .count()
+            .min(positions_left);
+        let view = self.view_candidates().count().min(positions_left - update);
         Wants {
             update,
             control: self.openings.len().saturating_add(view),

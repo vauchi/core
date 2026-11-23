@@ -265,3 +265,43 @@ fn views_do_not_hold_an_opening_back_more_than_one_turn() {
         "the opening had one of two turns"
     );
 }
+
+// Gate review 13 (Claude): after the clock was set back, the request
+// counted the period's positions by age but the write by how many were
+// still held, so positions assigned after the set-back and already out of
+// the period still blocked the write, and the control slots the request
+// asked for went to dummies, for up to the set-back.
+// @internal
+#[test]
+fn the_write_counts_the_periods_positions_as_the_request_does_after_a_set_back() {
+    let mut p = pair();
+    let ahead = START + 3 * DAY;
+    let set_back = START + 3_600;
+    for (base, count) in [(ahead, 64u64), (set_back, 64)] {
+        for j in 0..count {
+            let group = 1 + u32::try_from(j % 2).expect("small");
+            let (key, commitment) = update(1 + (j % 200) as u8);
+            p.sender
+                .queue_group_update(group, &key, &commitment)
+                .expect("within 32 groups");
+            assert_eq!(p.sender.write_within(base + j, 0, 1).len(), 1);
+            p.sender.acknowledge();
+        }
+    }
+    let now = set_back + WEEK + 100;
+    let refresh = p.receiver_session(&[], now);
+    p.sender.read(&refresh, now);
+    let wants = p.sender.wants(now);
+    assert_eq!(
+        (wants.update, wants.control),
+        (0, 3),
+        "the opening and both views, 63 positions in the period"
+    );
+    assert_eq!(
+        p.sender
+            .write_within(now, wants.control, wants.update)
+            .len(),
+        3,
+        "the write takes what the request counted"
+    );
+}

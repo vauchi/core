@@ -90,6 +90,16 @@ struct OpeningQueued {
     /// control slots by how long each has waited (owner, 2026-11-23, gate
     /// review 10).
     written_at: Option<u64>,
+    /// When it was queued, which is how long a never-written opening has
+    /// waited: ranking it before every view let a fresh opening each
+    /// refresh starve a view (gate review 12, Codex).
+    queued_at: u64,
+}
+
+impl OpeningQueued {
+    fn waiting_since(&self) -> u64 {
+        self.written_at.unwrap_or(self.queued_at)
+    }
 }
 
 struct RefreshFound {
@@ -538,6 +548,7 @@ impl Sender {
             confirmation: opened.confirmation,
             spent: false,
             written_at: None,
+            queued_at: now,
         });
         self.epochs.push(SenderEpoch::new(opened.epoch, now, None));
         true
@@ -667,16 +678,13 @@ impl Sender {
         self.written_groups.clear();
         let mut control_left = control_slots;
         let mut written = Vec::new();
-        // Newest first: openings under one number in one base share its
-        // four addresses, and the newest key gets the last one left, so a
-        // forged key queued earlier cannot use up R's own (spec S4; gate
-        // review 4, Claude).
-        // Openings and views share the control slots, the one that went out
-        // longest ago first (never before ever), an opening first on a tie.
-        let mut waiting: Vec<(Option<u64>, bool)> = self
-            .openings
+        // Openings and views share the control slots by how long each has
+        // waited: since it was last written, or for a never-written opening
+        // since it was queued; an opening first on a tie.
+        let opening_rank = self.opening_ranks();
+        let mut waiting: Vec<(u64, bool)> = opening_rank
             .iter()
-            .map(|opening| (opening.written_at, true))
+            .map(|rank| (*rank, true))
             .chain(
                 self.notice_queue(&eligible)
                     .into_iter()
@@ -686,7 +694,10 @@ impl Sender {
                     .take(POSITIONS_A_PERIOD.saturating_sub(self.positions_assigned_at.len()))
                     .map(|(group, _)| {
                         (
-                            self.groups.get(&group).and_then(|entry| entry.written_at),
+                            self.groups
+                                .get(&group)
+                                .and_then(|entry| entry.written_at)
+                                .unwrap_or(0),
                             false,
                         )
                     }),
@@ -699,13 +710,14 @@ impl Sender {
             .filter(|(_, is_opening)| *is_opening)
             .count();
         let mut openings_written = 0usize;
-        // The openings themselves in waiting order, the newest first on a
-        // tie, so that the ones chosen are the ones that waited (gate review
-        // 11, Codex) and a second key under a number still gets the last
-        // address left (spec S4).
+        // The openings themselves in waiting order, so that the ones chosen
+        // are the ones that waited (gate review 11, Codex); the newest first
+        // on a tie, because openings under one number in one base share its
+        // four addresses and the newest key must get the last one left, so
+        // a forged key queued earlier cannot use up R's own (spec S4; gate
+        // review 4, Claude).
         let mut opening_order: Vec<usize> = (0..self.openings.len()).collect();
-        opening_order
-            .sort_by_key(|index| (self.openings[*index].written_at, std::cmp::Reverse(*index)));
+        opening_order.sort_by_key(|index| (opening_rank[*index], std::cmp::Reverse(*index)));
         for index in opening_order {
             if control_left == 0 || openings_written >= openings_allowed {
                 break;
@@ -783,6 +795,24 @@ impl Sender {
             control: openings_written + written_views,
         };
         written
+    }
+
+    /// How long each queued opening has waited, as the openings under its
+    /// number in its base: they share four addresses and go newest first
+    /// among themselves (spec S4), while across numbers the one that waited
+    /// longest goes first (gate review 12, Codex).
+    fn opening_ranks(&self) -> Vec<u64> {
+        self.openings
+            .iter()
+            .map(|opening| {
+                self.openings
+                    .iter()
+                    .filter(|other| other.base == opening.base && other.number == opening.number)
+                    .map(OpeningQueued::waiting_since)
+                    .min()
+                    .unwrap_or_else(|| opening.waiting_since())
+            })
+            .collect()
     }
 
     /// What the last write wrote, by queue.

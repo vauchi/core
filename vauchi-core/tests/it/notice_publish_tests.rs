@@ -264,3 +264,34 @@ fn with_too_few_slots_every_record_goes_once_before_any_goes_twice() {
     let bodies = pending.read(&records, W0 + 7_200, accept_all);
     assert_eq!(bodies.len(), 1, "four records in two sessions of two slots");
 }
+
+// Gate review 6 (Codex): an 8-record card at 2 content slots a session
+// takes about 9 days, and the next publication is due a week after it
+// completes, an 18-day cycle. With the 14 days counted from the first
+// notice, the first chunks always arrived in the session that expired the
+// entry, and the card never installed. Each notice carrying the key now
+// restarts the 14 days (owner, 2026-11-23).
+// @internal
+#[test]
+fn a_card_lost_once_installs_when_each_view_renews_its_pending_key() {
+    let key = [16; 32];
+    let text = body(4_096, 11);
+    let mut publisher = Publisher::new(key, &text);
+    let mut pending = Pending::default();
+    let mut installed_on = None;
+    for day in (0..120).step_by(3) {
+        let written = session(&mut publisher, W0 + day * DAY, 2);
+        let read_on = W0 + (day + 1) * DAY;
+        if (day + 1) % 9 == 4 {
+            pending.note(&key, &commitment(&key, &text), read_on);
+        }
+        if day == 0 {
+            continue;
+        }
+        if !pending.read(&written, read_on, accept_all).is_empty() {
+            installed_on.get_or_insert(day + 1);
+        }
+    }
+    let day = installed_on.expect("the card never installed");
+    assert!(day <= 40, "installed only on day {day}");
+}

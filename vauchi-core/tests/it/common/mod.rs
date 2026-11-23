@@ -14,3 +14,5 @@ pub use vauchi_core_testkit::{
     linked_peer, locales_dir, lost_phone, meeting, mock_relay, per_device, recovered_phone,
     signed_gateway, strategies, two_recipient, verifiers,
 };
+
+pub mod notice_pair;

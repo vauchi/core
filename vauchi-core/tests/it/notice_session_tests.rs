@@ -731,3 +731,41 @@ fn constant_new_edits_do_not_starve_a_weekly_republication() {
         "group 2's republication never had a content slot"
     );
 }
+
+// Gate review 10 (Claude): a contact could not leave a group, so the cap
+// counted every group it was ever in, and views kept sending a left
+// group's key. Leaving erases that group's key from the direction.
+// @internal
+#[test]
+fn a_contact_leaving_a_group_frees_its_place_and_its_key_goes() {
+    use vauchi_core::notice::direction::GROUPS_A_CONTACT;
+    let mut p = pair();
+    for group in 0..GROUPS_A_CONTACT as u32 {
+        let (key, commitment) = update(group as u8);
+        p.sender
+            .queue_group_update(group, &key, &commitment)
+            .expect("within 32 groups");
+    }
+    p.sender_session(&[], START);
+    let left = update(5).0;
+    p.sender.leave_group(5);
+    let (key, commitment) = update(200);
+    assert_eq!(
+        p.sender.queue_group_update(99, &key, &commitment),
+        Ok(()),
+        "its place is free"
+    );
+    let refresh = p.receiver_session(&[], START + DAY);
+    let written = p.sender_session(&refresh, START + 2 * DAY);
+    let keys: Vec<[u8; 32]> = p
+        .receiver
+        .read(&written, START + 3 * DAY)
+        .iter()
+        .map(|read| *read.update_key)
+        .collect();
+    assert!(
+        keys.contains(&update(6).0),
+        "the views of the groups it is in still go"
+    );
+    assert!(!keys.contains(&left), "the left group's key goes no more");
+}

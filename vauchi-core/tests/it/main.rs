@@ -185,6 +185,7 @@ mod device_store_tests;
 mod device_sync_compatibility_tests;
 mod device_sync_convergence_proptest;
 mod device_sync_send_chunking_tests;
+mod device_type_classification_tests;
 #[cfg(feature = "diagnostic-scanner")]
 mod diagnostic_extended_pattern_tests;
 #[cfg(feature = "diagnostic-scanner")]

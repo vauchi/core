@@ -15,6 +15,7 @@ use super::direction::{GroupId, Receiver, Sender, Wants};
 use super::publish::{ContentRecord, Publisher};
 use super::seal::NOTICE_BYTES;
 use crate::crypto::random_bytes;
+use vauchi_protocol::cohort::{CohortClass, CohortTier, CohortWriteRequest};
 
 pub type Notice = [u8; NOTICE_BYTES];
 
@@ -85,6 +86,41 @@ fn next_turn(count: usize, from: usize, wants_more: impl Fn(usize) -> bool) -> u
 pub struct SessionWrite {
     pub notices: Vec<Notice>,
     pub contents: Vec<ContentRecord>,
+}
+
+impl SessionWrite {
+    /// The session as the relay's cohort writes: notice slots numbered
+    /// from 0, then content slots from 0, every slot of the session, real
+    /// or dummy, so the requests say nothing of what the device had to say.
+    pub fn cohort_writes(
+        &self,
+        cohort: u32,
+        device: &[u8; 32],
+        tier: CohortTier,
+    ) -> Vec<CohortWriteRequest> {
+        use base64::Engine;
+        let encode = |bytes: &[u8]| base64::engine::general_purpose::STANDARD.encode(bytes);
+        let device = encode(device);
+        let request = |class, slot: usize, record: &[u8]| CohortWriteRequest {
+            cohort,
+            device: device.clone(),
+            tier,
+            class,
+            slot: u16::try_from(slot).unwrap_or(u16::MAX),
+            record: encode(record),
+        };
+        self.notices
+            .iter()
+            .enumerate()
+            .map(|(slot, notice)| request(CohortClass::Notice, slot, notice))
+            .chain(
+                self.contents
+                    .iter()
+                    .enumerate()
+                    .map(|(slot, record)| request(CohortClass::Content, slot, record)),
+            )
+            .collect()
+    }
 }
 
 /// A device's sessions over time: when each direction was last served,

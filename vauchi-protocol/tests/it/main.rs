@@ -4,6 +4,7 @@
 
 //! Consolidated integration test binary for vauchi-protocol.
 
+mod cohort_wire_tests;
 mod contract_relay_consumer_tests;
 mod escrow_tests;
 mod ohttp_anchor_rollover_tests;

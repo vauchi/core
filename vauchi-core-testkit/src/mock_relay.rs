@@ -160,6 +160,8 @@ struct MockGateway {
     encoded_content: std::collections::HashMap<String, (String, Vec<u8>)>,
     /// The OHTTP relay's response cap: a larger `content` answer is a `502`.
     content_answer_limit: Option<usize>,
+    /// Fixed answers for inner actions the mock has no logic for, by action.
+    answers: std::collections::BTreeMap<String, serde_json::Value>,
     /// How many more `fetch` requests the gateway serves before answering
     /// `429` (private#691); `None` never limits.
     fetch_quota: Option<usize>,
@@ -255,6 +257,7 @@ impl MockRelay {
             compresses_content: false,
             encoded_content: std::collections::HashMap::new(),
             content_answer_limit: None,
+            answers: std::collections::BTreeMap::new(),
             fetch_quota: None,
         });
     }
@@ -380,6 +383,13 @@ impl MockRelay {
             .gateway
             .as_mut()
             .expect("enable_ohttp_gateway first"))
+    }
+
+    /// The gateway answers inner `action` with `reply` from now on.
+    pub fn answer_ohttp_action(&self, action: &str, reply: serde_json::Value) {
+        if let Some(gateway) = self.state.lock().unwrap().gateway.as_mut() {
+            gateway.answers.insert(action.to_string(), reply);
+        }
     }
 
     /// Inner request bodies the gateway has decapsulated, in arrival order.
@@ -579,6 +589,8 @@ fn serve_ohttp(gateway: &mut MockGateway, body: &[u8]) -> CannedResponse {
                 None => serde_json::json!({ "status": "error", "error": "content unavailable" }),
             }
         }
+    } else if let Some(answer) = gateway.answers.get(&action) {
+        answer.clone()
     } else if let Some(mailboxes) = &mut gateway.mailboxes {
         mailboxes.reply(&action, request)
     } else {

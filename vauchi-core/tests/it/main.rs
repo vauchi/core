@@ -15,6 +15,7 @@ fn _flame_install() {
 }
 
 #[allow(dead_code)]
+mod cohort_client_tests;
 mod common;
 mod contact_import_scenario_tests;
 mod contact_move_tests;

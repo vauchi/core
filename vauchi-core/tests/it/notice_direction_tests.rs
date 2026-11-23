@@ -14,7 +14,8 @@ use proptest::prelude::*;
 use crate::common::notice_pair::*;
 use vauchi_core::crypto::X25519KeyPair;
 use vauchi_core::notice::direction::{Alarm, week};
-use vauchi_core::notice::keys::{key_id, refresh_address};
+use vauchi_core::notice::keys::{key_id, opening_address, refresh_address};
+use vauchi_core::notice::record::Record;
 use vauchi_core::notice::seal::{NOTICE_BYTES, seal};
 
 // @internal
@@ -213,6 +214,34 @@ fn the_receiver_alarms_on_a_second_opening_under_a_number_it_used() {
     p.receiver.read(&[forged], START + 3 * DAY);
     assert_eq!(p.receiver.alarms(), &[Alarm::TwoOpeningsOnOneNumber]);
     assert_eq!(p.receiver.current_epoch(), moved_into);
+}
+
+// Gate review 4, 2026-11-23 (Claude): with one address left under a
+// number, a first opening queued there took it, and a second key opened
+// then was never written: R's own refresh could be shut out by a forged
+// one while an address was left.
+// @internal
+#[test]
+fn a_second_key_under_a_number_gets_the_last_address_left() {
+    let mut p = pair();
+    let seed = p.receiver.seed_epoch();
+    let first = forged_refresh(&p.copied_seed, START, 0, 50, [1; 32], seed);
+    p.sender_session(&[first], START);
+    for day in 1..3 {
+        p.sender_session(&[], START + day * DAY);
+    }
+    let second = forged_refresh(&p.copied_seed, START + 3 * DAY, 1, 50, [2; 32], seed);
+    let written = p.sender_session(&[second], START + 3 * DAY);
+    let last = opening_address(p.copied_seed.opening_key(), 50, 3);
+    let key_ids: Vec<[u8; 8]> = written
+        .iter()
+        .filter_map(|notice| vauchi_core::notice::seal::open(&last, notice))
+        .filter_map(|plain| match Record::from_plaintext(&plain) {
+            Ok(Record::Opening { key_id, .. }) => Some(key_id),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(key_ids, vec![key_id(&[2; 32])]);
 }
 
 // Gate review 3, 2026-11-23 (Claude): a second key under a number was

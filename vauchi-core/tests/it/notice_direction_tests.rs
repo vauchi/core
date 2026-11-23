@@ -348,6 +348,20 @@ fn the_receiver_alarms_on_a_second_opening_under_a_number_it_used() {
     assert_eq!(p.receiver.current_epoch(), moved_into);
 }
 
+// Gate review 2, 2026-11-23 (Codex and Claude, separately): two different
+// records at one address delivered in the same session both read as the
+// first, so the alarm the text promises was not raised.
+// @internal
+#[test]
+fn two_records_at_one_address_in_one_session_alarm() {
+    let mut p = pair();
+    let seed = p.receiver.seed_epoch();
+    let first = forged_refresh(&p.copied_seed, START, 0, 100, [1; 32], seed);
+    let second = forged_refresh(&p.copied_seed, START, 0, 101, [2; 32], seed);
+    p.sender_session(&[first, second], START + DAY);
+    assert_eq!(p.sender.alarms(), &[Alarm::TwoRecordsAtOneAddress]);
+}
+
 // Discussion round 1, 2026-11-22 (Codex): a record that opens but is no
 // refresh was not remembered at its address, so a second record there
 // later raised nothing.

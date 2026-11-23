@@ -215,6 +215,25 @@ fn the_receiver_alarms_on_a_second_opening_under_a_number_it_used() {
     assert_eq!(p.receiver.current_epoch(), moved_into);
 }
 
+// Gate review 3, 2026-11-23 (Claude): a second key under a number was
+// opened even when none of the number's four opening addresses was left,
+// so the epoch it made could never be sent.
+// @internal
+#[test]
+fn a_second_key_under_a_number_opens_nothing_once_its_addresses_are_spent() {
+    let mut p = pair();
+    let seed = p.receiver.seed_epoch();
+    let first = forged_refresh(&p.copied_seed, START, 0, 50, [1; 32], seed);
+    p.sender_session(&[first], START);
+    for day in 1..4 {
+        p.sender_session(&[], START + day * DAY);
+    }
+    assert_eq!(p.sender.kept_numbers(), vec![0, 50]);
+    let second = forged_refresh(&p.copied_seed, START + 4 * DAY, 1, 50, [2; 32], seed);
+    p.sender_session(&[second], START + 4 * DAY);
+    assert_eq!(p.sender.kept_numbers(), vec![0, 50]);
+}
+
 // Gate review 2, 2026-11-23 (Claude): a refresh whose Diffie-Hellman
 // result is invalid opens nothing, yet its number still drove the m - 3
 // erasure.

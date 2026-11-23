@@ -185,7 +185,7 @@ proptest! {
         // Seven weeks of background sessions every three days, the gateway
         // delivering everything and acknowledging every write.
         now += 4 * DAY;
-        for _ in 0..17 {
+        for round in 0..18 {
             for (i, p) in pairs.iter_mut().enumerate() {
                 arrived[i] |= p
                     .receiver
@@ -200,23 +200,15 @@ proptest! {
                 p.sender.read(&to_sender, now + 3_600);
             }
             to_sender.clear();
+            // The last round ends on the sender reading the receivers'
+            // newest refreshes, so a healed direction is one S follows.
+            if round == 17 {
+                break;
+            }
             let written = s_session.write(&mut senders(&mut pairs), &mut [], &mut publishers, BACKGROUND, now + 3_600);
             Session::acknowledge(&mut senders(&mut pairs), &mut [], &mut publishers, now + 3_600);
             to_receivers = written.notices;
             now += 3 * DAY;
-        }
-        for (i, p) in pairs.iter_mut().enumerate() {
-            arrived[i] |= p
-                .receiver
-                .read(&to_receivers, now)
-                .iter()
-                .any(|read| *read.update_key == key);
-            let written = r_sessions[i].write(&mut [], &mut [&mut p.receiver], &mut [], BACKGROUND, now);
-            Session::acknowledge(&mut [], &mut [&mut p.receiver], &mut [], now);
-            to_sender.extend(written.notices);
-        }
-        for p in &mut pairs {
-            p.sender.read(&to_sender, now + 3_600);
         }
         for (i, p) in pairs.iter().enumerate() {
             prop_assert_eq!(p.sender.alarms(), &[] as &[Alarm]);

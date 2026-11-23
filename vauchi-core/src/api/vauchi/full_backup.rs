@@ -162,13 +162,14 @@ impl ProfileEngine {
         let seed = crate::backup::extract_master_seed(&snapshot.identity).map_err(backup_error)?;
         let now = self.clock.unix_seconds();
         let backed_up_device = device_id_at(&seed, snapshot.identity.device_index);
+        let backed_up_registry = registry_signed_by(&seed, snapshot.device_registry.clone());
         // The restored install is a new device of the identity: signing as
         // the backed-up one with a fresh key would make every contact that
         // pinned that device refuse its deltas for good (vauchi/private#1247).
         let identity = Identity::from_device_link(
             *seed,
             snapshot.identity.display_name.clone(),
-            restored_device_index(&seed, snapshot.device_registry.as_ref()),
+            restored_device_index(&seed, backed_up_registry.as_ref()),
             snapshot.identity.device_name.clone(),
             now,
         );
@@ -201,7 +202,7 @@ impl ProfileEngine {
             self.storage.device().clear_device_signing_key()?;
             self.register_restored_device(
                 &identity,
-                snapshot.device_registry.clone(),
+                backed_up_registry.clone(),
                 &backed_up_device,
                 now,
             )?;
@@ -300,6 +301,15 @@ fn restored_device_index(seed: &[u8; 32], registry: Option<&DeviceRegistry>) -> 
             return index;
         }
     }
+}
+
+/// The backup's registry, unless another identity signed it. A backup made
+/// before core!2413 can carry one a previous identity left on the phone,
+/// and restoring would re-sign it as this identity's (private#970); without
+/// it the restore names only this device, as a backup with none does.
+fn registry_signed_by(seed: &[u8; 32], registry: Option<DeviceRegistry>) -> Option<DeviceRegistry> {
+    let owner = crate::crypto::SigningKeyPair::from_seed(seed).public_key();
+    registry.filter(|registry| registry.verify(&owner))
 }
 
 fn device_id_at(seed: &[u8; 32], index: u32) -> [u8; 32] {

@@ -196,8 +196,8 @@ user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.cookie]]
-version = "0.18.1"
-when = "2024-03-25"
+version = "0.18.3"
+when = "2026-11-23"
 user-id = 3864
 user-login = "SergioBenitez"
 user-name = "Sergio Benitez"

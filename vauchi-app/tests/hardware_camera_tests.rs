@@ -13,6 +13,7 @@ use std::time::{Duration, SystemTime};
 
 use vauchi_app::ui::{AppEngine, AppScreen};
 use vauchi_core::clock::FakeClock;
+use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::{CameraPurpose, Command, CommandTarget, Event, Vauchi, event_from_json};
 
 fn engine() -> AppEngine {
@@ -196,4 +197,102 @@ fn without_a_camera_a_photo_starts_no_capture_and_says_why() {
     assert_eq!(viewport(&display), None);
     assert_eq!(capture(&hardware), None);
     assert_eq!(toasts(&display), ["Camera is not available on this device"]);
+}
+
+/// Shows Glance, whose screen holds a QR code to capture.
+fn show_glance(engine: &mut AppEngine) -> (Vec<Command>, Vec<Command>) {
+    engine.navigate_to(AppScreen::MultiStageExchange {
+        mode: ExchangeMode::Glance,
+    });
+    let display = engine.initial_commands().unwrap();
+    (display, engine.drain_hardware_commands())
+}
+
+// @internal — private#772: a shell that runs its camera only when Core asks
+// (ADR-077) gets the camera for a screen that offers to scan, as the
+// phones' display shells open theirs for it.
+#[test]
+fn a_shown_scan_screen_starts_a_qr_capture() {
+    let mut engine = attached();
+
+    let (display, hardware) = show_glance(&mut engine);
+
+    let id = viewport(&display).expect("a viewport for the display shell");
+    assert_eq!(capture(&hardware), Some((id, CameraPurpose::QrScan)));
+}
+
+// @internal — phones whose display shells open the camera themselves are untouched.
+#[test]
+fn without_a_hardware_shell_a_scan_screen_starts_no_capture() {
+    let mut engine = engine();
+
+    let (display, hardware) = show_glance(&mut engine);
+
+    assert_eq!(viewport(&display), None);
+    assert!(!display.contains(&Command::QrRequestScan));
+    assert_eq!(capture(&hardware), None);
+}
+
+// @internal — a screen that only offers to scan does not announce, each
+// time it is shown, a camera the device does not have; a scan the person
+// asks for still says so (private#1070).
+#[test]
+fn without_a_camera_a_scan_screen_starts_none_and_says_nothing() {
+    let mut engine = attached_without_a_camera();
+
+    let (display, hardware) = show_glance(&mut engine);
+
+    assert_eq!(viewport(&display), None);
+    assert_eq!(capture(&hardware), None);
+    assert_eq!(toasts(&display), Vec::<String>::new());
+}
+
+// @internal — the scan screen redrawn keeps the camera it has.
+#[test]
+fn showing_the_scan_screen_again_keeps_its_capture() {
+    let mut engine = attached();
+    show_glance(&mut engine);
+
+    engine.initial_commands().unwrap();
+    let again = engine.drain_hardware_commands();
+
+    assert_eq!(capture(&again), None);
+    assert_eq!(stops(&again), Vec::<String>::new());
+}
+
+// @internal — the hardware shell releases the camera once it reads a code
+// (windows-hw QrCamera, linux-hw camera.rs): the next showing of a scan
+// screen starts a fresh capture instead of counting on the ended one.
+#[test]
+fn a_scanned_code_ends_the_capture() {
+    let mut engine = attached();
+    let (display, _) = show_glance(&mut engine);
+    let first = viewport(&display).unwrap();
+
+    let redrawn = engine
+        .dispatch(event_from_json(r#"{"QrScanned":{"data":"not a vauchi code"}}"#).unwrap())
+        .unwrap();
+    let hardware = engine.drain_hardware_commands();
+
+    let second = viewport(&redrawn).expect("a fresh viewport with the redrawn screen");
+    assert_ne!(first, second);
+    assert_eq!(capture(&hardware), Some((second, CameraPurpose::QrScan)));
+    assert_eq!(
+        stops(&hardware),
+        Vec::<String>::new(),
+        "the ended capture needs no stop"
+    );
+}
+
+// @internal — privacy: leaving the scan screen turns the camera off.
+#[test]
+fn leaving_the_scan_screen_stops_its_capture() {
+    let mut engine = attached();
+    let (display, _) = show_glance(&mut engine);
+    let id = viewport(&display).unwrap();
+
+    engine.navigate_to(AppScreen::Settings);
+    engine.initial_commands().unwrap();
+
+    assert_eq!(stops(&engine.drain_hardware_commands()), vec![id]);
 }

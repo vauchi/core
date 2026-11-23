@@ -8,8 +8,10 @@
 //! as specified in RFC 5869. Every key derived from other key material
 //! in Core goes through it (the Double Ratchet, exchange, backup, storage).
 //!
-//! All intermediate key material (PRK, T(i) blocks) is zeroized after use
-//! to prevent key extraction from memory dumps (#234).
+//! Outputs typed `Zeroizing` are wiped when dropped. The PRK and HMAC
+//! state inside `hkdf` 0.12 and `hmac` 0.12 are not: neither crate wipes
+//! on drop, so they can stay in freed memory until overwritten
+//! (vauchi/private#1361; #234 asked for that wiping).
 
 use hkdf::Hkdf;
 use sha2::Sha256;
@@ -50,8 +52,6 @@ impl HKDF {
     /// where T(i) = HMAC-SHA256(PRK, T(i-1) || info || i)
     ///
     /// Maximum output length is 255 * 32 = 8160 bytes.
-    ///
-    /// Intermediate buffers (T(i-1), input concatenation) are zeroized after use.
     pub fn expand(prk: &[u8; 32], info: &[u8], length: usize) -> Result<Vec<u8>, KDFError> {
         if length == 0 {
             return Ok(Vec::new());
@@ -67,7 +67,6 @@ impl HKDF {
     /// Full HKDF: Extract-then-Expand in one step.
     ///
     /// This is the most common usage pattern.
-    /// The intermediate PRK is zeroized after expansion.
     pub fn derive(
         salt: Option<&[u8]>,
         ikm: &[u8],
@@ -85,7 +84,6 @@ impl HKDF {
     /// cleanup when the caller's variable goes out of scope.
     ///
     /// Convenience method for the common case of deriving a single symmetric key.
-    /// The intermediate PRK and OKM buffer are zeroized after extraction.
     pub fn derive_key(salt: Option<&[u8]>, ikm: &[u8], info: &[u8]) -> Zeroizing<[u8; 32]> {
         let hk = Hkdf::<Sha256>::new(salt, ikm);
         let mut okm = [0u8; 32];
@@ -113,7 +111,6 @@ impl HKDF {
     /// Derives two 32-byte keys from the same input.
     ///
     /// Used in Double Ratchet for deriving (root_key, chain_key) pairs.
-    /// The intermediate PRK and OKM buffer are zeroized after extraction.
     pub fn derive_key_pair(
         salt: Option<&[u8]>,
         ikm: &[u8],

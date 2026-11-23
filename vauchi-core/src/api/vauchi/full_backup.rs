@@ -327,3 +327,10 @@ fn validate_backup_password(password: &str) -> VauchiResult<()> {
         .map(|_| ())
         .map_err(|e| VauchiError::Configuration(format!("Export failed: {:?}", e)))
 }
+
+// INLINE_TEST_REQUIRED: a backup carrying another identity's registry can
+// only be built with the crate-private snapshot codec; export refuses one
+// since core!2413, and the tests/ crate cannot reach the codec.
+#[cfg(test)]
+#[path = "full_backup_foreign_registry_tests.rs"]
+mod foreign_registry_tests;

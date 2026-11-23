@@ -425,6 +425,7 @@ mod notice_content_tests;
 mod notice_copy_tests;
 mod notice_direction_tests;
 mod notice_key_schedule_tests;
+mod notice_publish_tests;
 mod notice_seal_tests;
 mod offline_catch_up_sync_tests;
 mod offline_catch_up_tests;

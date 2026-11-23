@@ -21,7 +21,7 @@ pub mod password_config;
 pub use backup::IdentityBackup;
 pub use device::{
     BroadcastDevice, DeviceError, DeviceInfo, DeviceRegistry, DeviceType, MAX_DEVICES,
-    PinnedDeviceKeys, RegisteredDevice, RegistryBroadcast, check_identity_collision,
+    PinnedDeviceKeys, Reconciled, RegisteredDevice, RegistryBroadcast, check_identity_collision,
     classify_device_type,
 };
 

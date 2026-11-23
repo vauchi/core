@@ -4,7 +4,8 @@
 
 //! F4 sibling-relay apply arms (ADR-064 Amendment 2026-07-25).
 //!
-//! Bodies for the `ContactRegistryReceived` / `ContactActivationChanged`
+//! Bodies for the `DeviceRegistryChanged`, `ContactRegistryReceived` and
+//! `ContactActivationChanged`
 //! sync items — kept out of `propagation.rs`'s apply match for file-size
 //! reasons and so their failure mode is uniform: every rejection is a
 //! per-item `Err` value that the tolerant apply loop skips, never a
@@ -12,9 +13,56 @@
 
 use super::ProfileEngine;
 use crate::api::error::{VauchiError, VauchiResult};
+use crate::identity::Reconciled;
 use crate::sync::registry_activation::ActivationTracker;
 
 impl ProfileEngine {
+    /// Applies this identity's registry from a sibling, by
+    /// [`DeviceRegistry::reconcile`](crate::identity::DeviceRegistry::reconcile)
+    /// against the registry held.
+    pub(super) fn apply_owner_registry_changed(&self, registry_json: &str) -> VauchiResult<()> {
+        let registry = crate::identity::DeviceRegistry::from_json(registry_json)
+            .map_err(|error| VauchiError::InvalidState(error.to_string()))?;
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        if registry.device_count() > crate::identity::MAX_DEVICES
+            || registry.find_device(identity.device_id()).is_none()
+            || !registry.verify(&identity.signing_keypair().public_key())
+        {
+            return Err(VauchiError::InvalidState(
+                "invalid owner device registry update".to_string(),
+            ));
+        }
+        let Some(current) = self
+            .storage
+            .device()
+            .load_device_registry_if_own(identity)?
+        else {
+            if registry.version() > 0 {
+                self.storage.device().save_device_registry(&registry)?;
+            }
+            return Ok(());
+        };
+        match current
+            .reconcile(&registry, identity.signing_keypair())
+            .map_err(|error| VauchiError::InvalidState(error.to_string()))?
+        {
+            Reconciled::Keep => Ok(()),
+            Reconciled::Adopt => Ok(self.storage.device().save_device_registry(&registry)?),
+            Reconciled::Publish(merged) => {
+                crate::api::sync::DeviceSyncOrchestrator::persist_device_registry_change(
+                    &self.storage,
+                    identity,
+                    &merged,
+                    self.clock.unix_seconds(),
+                )
+                .map_err(|error| VauchiError::InvalidState(error.to_string()))
+            }
+        }
+    }
+
     /// Persist a relayed contact registry on this sibling.
     ///
     /// Same guard as direct receipt: signature re-verified against the

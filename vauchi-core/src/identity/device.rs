@@ -23,6 +23,9 @@ use crate::crypto::{HKDF, Signature, SigningKeyPair};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+mod reconcile;
+pub use reconcile::Reconciled;
+
 /// Device type classification based on device name.
 ///
 /// Used by UI clients to select platform-appropriate icons.

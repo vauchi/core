@@ -579,33 +579,7 @@ impl ProfileEngine {
                 SyncItem::RekeySettled { ref settled, .. } => self.apply_rekey_settled(settled),
                 SyncItem::DeviceRegistryChanged {
                     ref registry_json, ..
-                } => {
-                    let registry = crate::identity::DeviceRegistry::from_json(registry_json)
-                        .map_err(|error| VauchiError::InvalidState(error.to_string()))?;
-                    let identity = self
-                        .identity
-                        .as_ref()
-                        .ok_or(VauchiError::IdentityNotInitialized)?;
-                    if registry.device_count() > crate::identity::MAX_DEVICES
-                        || registry.find_device(identity.device_id()).is_none()
-                        || !registry.verify(&identity.signing_keypair().public_key())
-                    {
-                        Err(VauchiError::InvalidState(
-                            "invalid owner device registry update".to_string(),
-                        ))
-                    } else {
-                        let current_version = self
-                            .storage
-                            .device()
-                            .load_device_registry_if_own(identity)?
-                            .map(|current| current.version())
-                            .unwrap_or(0);
-                        if registry.version() > current_version {
-                            self.storage.device().save_device_registry(&registry)?;
-                        }
-                        Ok(())
-                    }
-                }
+                } => self.apply_owner_registry_changed(registry_json),
                 SyncItem::ContactRegistryReceived {
                     ref contact_id,
                     ref registry_json,

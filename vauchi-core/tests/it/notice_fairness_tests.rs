@@ -208,3 +208,64 @@ fn a_new_edits_notice_waits_for_its_own_record_zero_not_the_old_edits() {
         .collect();
     assert!(!read.contains(&new), "the new key went before its record 0");
 }
+
+// Owner, 2026-11-23, after gates 10 to 12 each found a stall in how
+// openings and views shared a direction's control slots: a direction holds
+// at most one opening, the one for the highest refresh number, so openings
+// cannot outnumber the turns that serve them.
+// @internal
+#[test]
+fn a_direction_holds_one_opening_for_its_highest_refresh() {
+    for later_first in [false, true] {
+        let mut p = pair();
+        let seed = p.receiver.current_epoch();
+        let first = p.receiver_session(&[], START);
+        let second = p.receiver_session(&[], START + WEEK);
+        let (early, late) = if later_first {
+            (second, first)
+        } else {
+            (first, second)
+        };
+        p.sender.read(&early, START + WEEK + 60);
+        p.sender.read(&late, START + WEEK + 120);
+        let now = START + WEEK + 180;
+        assert_eq!(p.sender.wants(now).control, 1, "later first: {later_first}");
+        let opening = p.sender.write_within(now, 1, 0);
+        p.receiver.read(&opening, now + 60);
+        assert_ne!(
+            p.receiver.current_epoch(),
+            seed,
+            "later first: {later_first}"
+        );
+    }
+}
+
+// Owner, 2026-11-23: a direction's control turns alternate between its
+// opening and its views, so neither kind waits more than one turn for the
+// other; before, six views written earlier went before the opening.
+// @internal
+#[test]
+fn views_do_not_hold_an_opening_back_more_than_one_turn() {
+    let mut p = pair();
+    let seed = p.receiver.current_epoch();
+    let refresh = p.receiver_session(&[], START);
+    for group in 1..=6u32 {
+        let (key, commitment) = update(100 + group as u8);
+        p.sender
+            .queue_group_update(group, &key, &commitment)
+            .expect("within 32 groups");
+        p.sender.write_within(START + u64::from(group), 0, 1);
+        p.sender.acknowledge();
+    }
+    p.sender.read(&refresh, START + 100);
+    for turn in 0..2u64 {
+        let written = p.sender.write_within(START + 200 + turn * DAY, 1, 0);
+        p.sender.acknowledge();
+        p.receiver.read(&written, START + 300 + turn * DAY);
+    }
+    assert_ne!(
+        p.receiver.current_epoch(),
+        seed,
+        "the opening had one of two turns"
+    );
+}

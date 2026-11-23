@@ -10,7 +10,7 @@ use crate::common::device_sync::device_signed_broadcast;
 use crate::common::per_device::{refused_with, tablet_entry, two_parties};
 use vauchi_core::api::ReceiveOutcome;
 use vauchi_core::crypto::SigningKeyPair;
-use vauchi_core::identity::RegistryBroadcast;
+use vauchi_core::identity::{PinnedDeviceKeys, RegistryBroadcast};
 
 // @scenario: device_management :: Device-specific keys
 // @internal
@@ -189,4 +189,45 @@ fn a_removed_device_cannot_sign_and_its_pin_is_kept() {
         Some(*tablet_key.public_key().as_bytes()),
         "a removed device's key stays pinned so it cannot come back under that id"
     );
+}
+
+// A database upgraded from before pins holds a contact's registry and no
+// pins; the contact's handshake re-sends the version it holds. That push
+// pins its keys, or the contact's deltas would pass on the identity
+// signature alone until its device list next changes.
+// @scenario: device_management :: Device-specific keys
+// @internal
+#[test]
+fn a_held_registry_without_pins_gains_them_from_a_push_of_the_same_version() {
+    let p = two_parties();
+    let honest = device_signed_broadcast(&p.bob);
+    p.push_to_alice(&honest).unwrap();
+    p.alice
+        .storage()
+        .device()
+        .save_contact_device_pins(&p.bob_at_alice, &PinnedDeviceKeys::default())
+        .unwrap();
+    assert_eq!(p.alice_pin_for(&p.bob_device_id()), None);
+
+    p.push_to_alice(&honest).unwrap();
+
+    assert_eq!(
+        p.alice_pin_for(&p.bob_device_id()),
+        Some(*p.bob_device_key().public_key().as_bytes()),
+        "the re-sent registry pinned Bob's phone key"
+    );
+}
+
+// @scenario: device_management :: Device-specific keys
+// @internal
+#[test]
+fn a_same_version_push_does_not_replace_pins_already_held() {
+    let p = two_parties();
+    let honest = device_signed_broadcast(&p.bob);
+    p.push_to_alice(&honest).unwrap();
+    let held = p.alice_pin_for(&p.bob_device_id());
+
+    p.push_to_alice(&honest).unwrap();
+
+    assert_eq!(p.alice_pin_for(&p.bob_device_id()), held);
 }

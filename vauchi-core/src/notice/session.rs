@@ -251,10 +251,14 @@ impl Session {
         // Content first: a new edit's notice goes only once record 0 of its
         // publication is written, in this session or before (section 4).
         let contents = write_contents(publishers, slots.contents, now);
-        let eligible = |group: GroupId| {
-            publishers
-                .iter()
-                .any(|publisher| publisher.group() == group && publisher.first_record_written())
+        // Keyed on the update key, not the group: an old edit's publisher
+        // still held must not let the new key go first (gate review 12).
+        let eligible = |group: GroupId, update_key: &[u8; 32]| {
+            publishers.iter().any(|publisher| {
+                publisher.group() == group
+                    && publisher.publishes(update_key)
+                    && publisher.first_record_written()
+            })
         };
 
         let directions = senders.len() + receivers.len();

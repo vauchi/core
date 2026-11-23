@@ -587,12 +587,12 @@ impl Sender {
     /// What this direction would write now: its update-key notice when an
     /// edit is queued, else a view due, and its queued openings.
     pub fn wants(&self, now: u64) -> Wants {
-        self.wants_for(now, |_| true)
+        self.wants_for(now, |_, _| true)
     }
 
     /// As `wants`, counting an update only for a group `eligible` allows:
     /// a new edit's notice goes only with its record 0 (section 4).
-    pub fn wants_for(&self, now: u64, eligible: impl Fn(GroupId) -> bool) -> Wants {
+    pub fn wants_for(&self, now: u64, eligible: impl Fn(GroupId, &[u8; 32]) -> bool) -> Wants {
         let chosen = self.admitted(now, &eligible);
         let update = chosen.iter().filter(|(_, is_update)| *is_update).count();
         Wants {
@@ -605,7 +605,11 @@ impl Sender {
     /// period can take, in queue order. The request and the write both use
     /// it, so the views that compete for control slots are the ones the
     /// request counted (gate review 12, Codex, Claude).
-    fn admitted(&self, now: u64, eligible: &impl Fn(GroupId) -> bool) -> Vec<(GroupId, bool)> {
+    fn admitted(
+        &self,
+        now: u64,
+        eligible: &impl Fn(GroupId, &[u8; 32]) -> bool,
+    ) -> Vec<(GroupId, bool)> {
         let recent = self
             .positions_assigned_at
             .iter()
@@ -638,11 +642,11 @@ impl Sender {
 
     /// The notices this direction would write, updates (`true`) and views
     /// (`false`) in one queue: the group written longest ago first.
-    fn notice_queue(&self, eligible: &impl Fn(GroupId) -> bool) -> Vec<(GroupId, bool)> {
+    fn notice_queue(&self, eligible: &impl Fn(GroupId, &[u8; 32]) -> bool) -> Vec<(GroupId, bool)> {
         let mut queue: Vec<(GroupId, bool)> = self
             .groups
             .iter()
-            .filter(|(group, entry)| entry.queued && eligible(**group))
+            .filter(|(group, entry)| entry.queued && eligible(**group, &entry.update_key))
             .map(|(group, _)| (*group, true))
             .chain(self.view_candidates().map(|group| (group, false)))
             .collect();
@@ -664,7 +668,7 @@ impl Sender {
         control_slots: usize,
         update_slots: usize,
     ) -> Vec<Notice> {
-        self.write_within_for(now, control_slots, update_slots, |_| true)
+        self.write_within_for(now, control_slots, update_slots, |_, _| true)
     }
 
     /// As `write_within`, writing an update only for a group `eligible`
@@ -674,7 +678,7 @@ impl Sender {
         now: u64,
         control_slots: usize,
         update_slots: usize,
-        eligible: impl Fn(GroupId) -> bool,
+        eligible: impl Fn(GroupId, &[u8; 32]) -> bool,
     ) -> Vec<Notice> {
         self.pull_back(now);
         self.retain(now);

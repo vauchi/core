@@ -120,6 +120,11 @@ impl Publisher {
 
     /// Whether record 0 of this key has been written, so that the edit's
     /// notice may go.
+    /// Whether this publisher holds `update_key`'s body.
+    pub fn publishes(&self, update_key: &[u8; 32]) -> bool {
+        bool::from(self.update_key.ct_eq(update_key))
+    }
+
     pub fn first_record_written(&self) -> bool {
         self.first_record_written
     }

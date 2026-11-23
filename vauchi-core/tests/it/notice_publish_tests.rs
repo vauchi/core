@@ -310,3 +310,36 @@ fn a_publication_takes_its_week_only_when_its_first_record_is_written() {
     assert_eq!(publisher.write(later, 1).len(), 1);
     assert_eq!(publisher.last_week(), Some(week(later)));
 }
+
+// Gate review 7 (Claude): the full pending list dropped the entry noted
+// first, though a view had just renewed it; and a note renewed an entry
+// already 14 days old, which section 4 erases.
+// @internal
+#[test]
+fn a_full_pending_list_drops_the_entry_renewed_longest_ago_and_an_expired_one_is_not_renewed() {
+    let text = body(50, 13);
+    let mut pending = Pending::default();
+    for seed in 0..32u8 {
+        pending.note(
+            &[seed; 32],
+            &commitment(&[seed; 32], &text),
+            W0 + u64::from(seed),
+        );
+    }
+    pending.note(&[0; 32], &commitment(&[0; 32], &text), W0 + 100);
+    pending.note(&[99; 32], &commitment(&[99; 32], &text), W0 + 101);
+    let read = |pending: &mut Pending, seed: u8| {
+        let mut publisher = Publisher::new([seed; 32], &text);
+        let written = session(&mut publisher, W0 + DAY, 8);
+        pending.read(&written, W0 + DAY, accept_all).len()
+    };
+    assert_eq!(read(&mut pending, 0), 1, "renewed, so kept");
+    assert_eq!(read(&mut pending, 1), 0, "renewed longest ago, so dropped");
+
+    let mut stale = Pending::default();
+    stale.note(&[40; 32], &commitment(&[40; 32], &text), W0);
+    assert!(
+        stale.note(&[40; 32], &commitment(&[40; 32], &text), W0 + 14 * DAY),
+        "a 14-day entry is gone: the key is noted anew"
+    );
+}

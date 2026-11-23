@@ -13,6 +13,7 @@ use vauchi_app::ui::{AppEngine, RenderContext};
 use vauchi_core::api::Vauchi;
 use vauchi_core::{BindingId, Command, Event, InputValue, PresentationNode, SurfaceId};
 
+use super::common::app_engine_helpers::present_the_name_page;
 use super::i18n_support::load_locale;
 
 struct NamePage {
@@ -46,27 +47,7 @@ fn input(nodes: &[PresentationNode]) -> Option<(BindingId, String)> {
 /// Welcome, "Create new identity", then "Carol" typed into the name field.
 fn carol_typed_on_the_name_page() -> (AppEngine, NamePage) {
     let mut engine = AppEngine::new(Vauchi::in_memory().unwrap());
-    let welcome = engine.initial_commands().expect("welcome");
-    let (surface_id, interaction_id) = welcome
-        .iter()
-        .find_map(|command| match command {
-            Command::SetContextBar {
-                surface_id, bar, ..
-            } => bar
-                .primary
-                .as_ref()
-                .map(|primary| (surface_id.clone(), primary.interaction_id.clone())),
-            _ => None,
-        })
-        .expect("welcome offers Create new identity");
-    let name_page = shown(
-        &engine
-            .dispatch(Event::ActionActivated {
-                surface_id: surface_id.clone(),
-                interaction_id,
-            })
-            .expect("create new identity"),
-    );
+    let name_page = shown(&present_the_name_page(&mut engine));
     let (binding_id, _) = name_page
         .field
         .clone()

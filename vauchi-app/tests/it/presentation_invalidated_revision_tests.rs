@@ -11,6 +11,7 @@
 //! Pixel 3a, 2026-11-22). Onboarding now survives the rebuild
 //! (vauchi/private#821), so the page, its field and its revision stay.
 
+use super::common::app_engine_helpers::present_the_name_page;
 use vauchi_app::ui::AppEngine;
 use vauchi_core::api::Vauchi;
 use vauchi_core::{BindingId, Command, Event, PresentationNode, SurfaceId};
@@ -40,25 +41,7 @@ fn input_binding(nodes: &[PresentationNode]) -> Option<BindingId> {
 /// Welcome, then "Create new identity": the name page with its field.
 fn on_the_name_page() -> (AppEngine, SurfaceId, u64, BindingId) {
     let mut engine = AppEngine::new(Vauchi::in_memory().unwrap());
-    let welcome = engine.initial_commands().expect("welcome");
-    let (surface_id, interaction_id) = welcome
-        .iter()
-        .find_map(|command| match command {
-            Command::SetContextBar {
-                surface_id, bar, ..
-            } => bar
-                .primary
-                .as_ref()
-                .map(|primary| (surface_id.clone(), primary.interaction_id.clone())),
-            _ => None,
-        })
-        .expect("welcome offers Create new identity");
-    let name_page = engine
-        .dispatch(Event::ActionActivated {
-            surface_id,
-            interaction_id,
-        })
-        .expect("create new identity");
+    let name_page = present_the_name_page(&mut engine);
     let (surface_id, revision, nodes) = shown_surface(&name_page);
     let binding_id = input_binding(&nodes).expect("the name page has its field");
     (engine, surface_id, revision, binding_id)

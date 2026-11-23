@@ -6,6 +6,7 @@
 
 use vauchi_app::ui::{ActionResult, AppEngine, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
+use vauchi_core::{Command, Event};
 
 /// Drive through the full onboarding flow, returning the final ActionResult.
 /// Each intermediate step is asserted to produce the expected ActionResult variant (T-12).
@@ -178,4 +179,28 @@ pub fn enter_pin(engine: &mut AppEngine, pin: &str) {
             value: entered.clone(),
         });
     }
+}
+
+/// Welcome, then its primary action ("Create new identity"), through the
+/// presentation protocol: the batch that shows the name page.
+pub fn present_the_name_page(engine: &mut AppEngine) -> Vec<Command> {
+    let welcome = engine.initial_commands().expect("welcome");
+    let (surface_id, interaction_id) = welcome
+        .iter()
+        .find_map(|command| match command {
+            Command::SetContextBar {
+                surface_id, bar, ..
+            } => bar
+                .primary
+                .as_ref()
+                .map(|primary| (surface_id.clone(), primary.interaction_id.clone())),
+            _ => None,
+        })
+        .expect("welcome offers Create new identity");
+    engine
+        .dispatch(Event::ActionActivated {
+            surface_id,
+            interaction_id,
+        })
+        .expect("create new identity")
 }

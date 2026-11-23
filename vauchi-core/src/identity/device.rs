@@ -599,9 +599,26 @@ pub struct RegistryBroadcast {
 ///
 /// Grow-only: a pin outlives the device leaving the registry, otherwise a seed
 /// holder removes a device and adds it back under its own key (ADR-079).
+///
+/// Serialized as a list of `(device id, key)` pairs, as the store keeps
+/// them: JSON map keys must be strings, and owner sync carries pins as JSON
+/// (private#970).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(from = "Vec<([u8; 32], [u8; 32])>", into = "Vec<([u8; 32], [u8; 32])>")]
 pub struct PinnedDeviceKeys {
     keys: std::collections::BTreeMap<[u8; 32], [u8; 32]>,
+}
+
+impl From<Vec<([u8; 32], [u8; 32])>> for PinnedDeviceKeys {
+    fn from(pairs: Vec<([u8; 32], [u8; 32])>) -> Self {
+        Self::from_pairs(pairs)
+    }
+}
+
+impl From<PinnedDeviceKeys> for Vec<([u8; 32], [u8; 32])> {
+    fn from(pins: PinnedDeviceKeys) -> Self {
+        pins.keys.into_iter().collect()
+    }
 }
 
 impl PinnedDeviceKeys {
@@ -617,6 +634,17 @@ impl PinnedDeviceKeys {
 
     pub fn pinned(&self, device_id: &[u8; 32]) -> Option<[u8; 32]> {
         self.keys.get(device_id).copied()
+    }
+
+    /// Adds the pins another of this identity's devices holds for the same
+    /// contact, keeping this device's own where the two differ: a pin never
+    /// changes once set (private#970). Returns whether any pin was added.
+    pub fn adopt(&mut self, carried: &PinnedDeviceKeys) -> bool {
+        let before = self.keys.len();
+        for (device_id, key) in carried.pairs() {
+            self.keys.entry(device_id).or_insert(key);
+        }
+        self.keys.len() > before
     }
 
     /// Verifies a broadcast against these pins, then pins the keys it names.

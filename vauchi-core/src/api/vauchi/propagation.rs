@@ -609,8 +609,9 @@ impl ProfileEngine {
                 SyncItem::ContactRegistryReceived {
                     ref contact_id,
                     ref registry_json,
+                    ref pins,
                     ..
-                } => self.apply_contact_registry_received(contact_id, registry_json),
+                } => self.apply_contact_registry_received(contact_id, registry_json, pins),
                 SyncItem::ContactActivationChanged {
                     ref contact_id,
                     ref push_nonce,

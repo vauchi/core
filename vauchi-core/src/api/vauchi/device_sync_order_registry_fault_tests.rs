@@ -82,9 +82,11 @@ fn own_device_order_registry_storage_failure_is_retryable_without_consuming_sequ
         pair.receiver.storage().connection().execute_batch(
             "CREATE TRIGGER reject_peer_registry BEFORE INSERT ON contact_device_registries BEGIN SELECT RAISE(ABORT, 'injected registry write failure'); END;"
         ).unwrap();
-        let direct = pair
-            .receiver
-            .apply_contact_registry_received(&contact_id, &registry_json);
+        let direct = pair.receiver.apply_contact_registry_received(
+            &contact_id,
+            &registry_json,
+            &Default::default(),
+        );
         assert!(
             matches!(direct, Err(VauchiError::Storage(_))),
             "actual write errors must retain their storage type"

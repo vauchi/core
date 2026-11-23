@@ -344,12 +344,20 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             .list_contact_device_registries()
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
             .into_iter()
-            .map(|(contact_id, broadcast)| ContactDeviceRegistrySyncData {
-                pins: Default::default(),
-                contact_id,
-                broadcast_json: broadcast.to_json(),
+            .map(|(contact_id, broadcast)| {
+                let pins = self
+                    .storage
+                    .device()
+                    .load_contact_device_pins(&contact_id)?
+                    .unwrap_or_default();
+                Ok(ContactDeviceRegistrySyncData {
+                    contact_id,
+                    broadcast_json: broadcast.to_json(),
+                    pins,
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, crate::storage::StorageError>>()
+            .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
 
         // F4: activation snapshots ride along so the joining device inherits
         // handshake progress instead of restarting every contact (ADR-064
@@ -452,6 +460,11 @@ impl<'a> DeviceSyncOrchestrator<'a> {
                 let broadcast =
                     crate::identity::RegistryBroadcast::from_json(&registry_data.broadcast_json)
                         .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
+                // Pins first, so the registry is checked against them too.
+                self.storage
+                    .device()
+                    .adopt_contact_device_pins(&registry_data.contact_id, &registry_data.pins)
+                    .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
                 let already_current = self
                     .storage
                     .device()

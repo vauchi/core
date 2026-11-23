@@ -20,15 +20,21 @@ impl ProfileEngine {
     /// Same guard as direct receipt: signature re-verified against the
     /// contact's pinned key, monotonic version, unbounded age (relay delay
     /// is unbounded). A version we already hold (or newer) is an idempotent
-    /// no-op; an owner-removed contact stays removed.
+    /// no-op; an owner-removed contact stays removed. The sibling's pins are
+    /// adopted first, keeping this device's own, so the registry is checked
+    /// against both (private#970).
     pub(super) fn apply_contact_registry_received(
         &self,
         contact_id: &str,
         registry_json: &str,
+        pins: &crate::identity::PinnedDeviceKeys,
     ) -> VauchiResult<()> {
         let Some(contact) = self.storage.contacts().load_contact(contact_id)? else {
             return Ok(());
         };
+        self.storage
+            .device()
+            .adopt_contact_device_pins(contact_id, pins)?;
         let broadcast = crate::identity::RegistryBroadcast::from_json(registry_json)
             .map_err(|error| VauchiError::InvalidState(error.to_string()))?;
         let contact_pk = contact

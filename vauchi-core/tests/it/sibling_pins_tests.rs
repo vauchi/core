@@ -176,3 +176,19 @@ fn a_linked_device_inherits_a_pin_for_a_device_the_broadcast_no_longer_names() {
         .expect("the link carries Bob's registry");
     assert_eq!(inherited.pinned(&DEPARTED), Some(key_of(&tablet_key)));
 }
+
+proptest::proptest! {
+    // Owner sync carries pins as JSON, whose map keys must be strings.
+    // @internal
+    #[test]
+    fn pins_round_trip_through_json(
+        pairs in proptest::collection::vec(
+            (proptest::array::uniform32(0u8..), proptest::array::uniform32(0u8..)),
+            0..8,
+        )
+    ) {
+        let pins = PinnedDeviceKeys::from_pairs(pairs);
+        let json = serde_json::to_string(&pins).unwrap();
+        proptest::prop_assert_eq!(serde_json::from_str::<PinnedDeviceKeys>(&json).unwrap(), pins);
+    }
+}

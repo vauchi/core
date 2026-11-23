@@ -651,8 +651,25 @@ impl DeviceStore<'_> {
         Ok(Some(PinnedDeviceKeys::from_pairs(pairs)))
     }
 
-    /// Replaces the contact's pins. Callers only ever grow them through
-    /// `PinnedDeviceKeys::accept`, so a replacement never forgets a key.
+    /// Adds the pins another of this identity's devices carried for the
+    /// contact, keeping this device's own where they differ (private#970).
+    pub fn adopt_contact_device_pins(
+        &self,
+        contact_id: &str,
+        carried: &PinnedDeviceKeys,
+    ) -> Result<(), StorageError> {
+        let mut pins = self
+            .load_contact_device_pins(contact_id)?
+            .unwrap_or_default();
+        if pins.adopt(carried) {
+            self.save_contact_device_pins(contact_id, &pins)?;
+        }
+        Ok(())
+    }
+
+    /// Replaces the contact's pins. Callers only ever grow them, through
+    /// `PinnedDeviceKeys::accept` or `adopt`, so a replacement never forgets
+    /// a key.
     pub fn save_contact_device_pins(
         &self,
         contact_id: &str,

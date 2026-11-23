@@ -162,3 +162,49 @@ fn a_turn_recorded_with_the_clock_ahead_is_pulled_back() {
         "direction 0's turn is pulled back to the set-back clock"
     );
 }
+
+// Gate review 12 (Claude): a new edit's notice was eligible once any
+// publisher of its group had written record 0, so with the old edit's
+// publisher still held the notice went before its own record 0.
+// @internal
+#[test]
+fn a_new_edits_notice_waits_for_its_own_record_zero_not_the_old_edits() {
+    use vauchi_core::notice::publish::Publisher;
+    use vauchi_core::notice::session::{FAST, Session};
+    let mut p = pair();
+    let (old, commitment_old) = update(93);
+    p.sender
+        .queue_group_update(3, &old, &commitment_old)
+        .expect("within 32 groups");
+    let mut publishers = vec![Publisher::for_group(3, old, &[3; 100])];
+    let mut session = Session::default();
+    session.write(&mut [&mut p.sender], &mut [], &mut publishers, FAST, START);
+    Session::acknowledge(&mut [&mut p.sender], &mut [], &mut publishers, START);
+    assert!(publishers[0].first_record_written());
+    let (new, commitment_new) = update(94);
+    p.sender
+        .queue_group_update(3, &new, &commitment_new)
+        .expect("within 32 groups");
+    let mut busy = Publisher::for_group(4, [95; 32], &[1; 2_000]);
+    busy.queue_due(START);
+    publishers.insert(0, busy);
+    publishers.push(Publisher::for_group(3, new, &[4; 100]));
+    let written = session.write(
+        &mut [&mut p.sender],
+        &mut [],
+        &mut publishers,
+        FAST,
+        START + 60,
+    );
+    assert!(
+        !publishers[2].first_record_written(),
+        "both content slots went to group 4"
+    );
+    let read: Vec<[u8; 32]> = p
+        .receiver
+        .read(&written.notices, START + 120)
+        .iter()
+        .map(|r| *r.update_key)
+        .collect();
+    assert!(!read.contains(&new), "the new key went before its record 0");
+}

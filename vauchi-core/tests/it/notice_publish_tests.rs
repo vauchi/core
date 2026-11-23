@@ -418,3 +418,15 @@ fn a_sender_away_two_weeks_at_a_time_still_gets_its_card_across() {
     }
     assert!(installed_on.is_some(), "the card never installed");
 }
+
+// Gate review 11 (Claude): a waiting time stamped by a clock later set back
+// stayed in the future, unlike every other stored time (protocol section 1).
+// @internal
+#[test]
+fn a_waiting_time_in_the_future_is_pulled_back_to_the_clock() {
+    let mut publisher = Publisher::new([22; 32], &body(100, 17));
+    publisher.queue_due(W0 + 3 * DAY);
+    assert_eq!(publisher.waiting_since(), Some(W0 + 3 * DAY));
+    publisher.queue_due(W0);
+    assert_eq!(publisher.waiting_since(), Some(W0));
+}

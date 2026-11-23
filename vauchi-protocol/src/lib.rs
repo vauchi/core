@@ -8,6 +8,7 @@
 //! clients and the relay server. It is intentionally minimal: serde only,
 //! no crypto, no storage.
 
+pub mod cohort;
 pub mod escrow;
 pub mod messages;
 pub mod ohttp_key;

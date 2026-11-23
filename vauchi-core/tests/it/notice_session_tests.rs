@@ -272,3 +272,66 @@ fn a_refresh_copy_cut_by_a_grant_goes_in_a_later_session() {
     assert_eq!(second.len(), 1);
     assert_eq!(p.receiver.wants(START + WEEK + 120), 0);
 }
+
+// Gate review 6 (Codex): the sender held one latest key, so an edit of a
+// second group took the first group's key out of every later view.
+// @internal
+#[test]
+fn a_view_carries_the_latest_key_of_every_group() {
+    let mut p = pair();
+    let (a, commitment_a) = update(10);
+    p.sender.queue_group_update(1, &a, &commitment_a);
+    let lost = p.sender_session(&[], START);
+    assert_eq!(lost.len(), 1, "group 1's notice, which the gateway drops");
+    let refresh = p.receiver_session(&[], START + DAY);
+    let (b, commitment_b) = update(11);
+    p.sender.queue_group_update(2, &b, &commitment_b);
+    let answer = p.sender_session(&refresh, START + 2 * DAY);
+    let keys: Vec<[u8; 32]> = p
+        .receiver
+        .read(&answer, START + 3 * DAY)
+        .iter()
+        .map(|read| *read.update_key)
+        .collect();
+    assert!(keys.contains(&b), "group 2's new edit");
+    assert!(keys.contains(&a), "group 1's latest key, in the view");
+}
+
+// Gate review 6 (all three): protocol section 4 writes a new edit's notice
+// only with record 0 of its publication, so a key never arrives with no
+// content in reach.
+// @internal
+#[test]
+fn a_new_edits_notice_waits_for_record_zero_of_its_publication() {
+    let mut p = pair();
+    let (key, commitment) = update(12);
+    p.sender.queue_group_update(3, &key, &commitment);
+    let mut busy = Publisher::for_group(4, [13; 32], &[1; 2_000]);
+    busy.queue_due(START);
+    let mut publishers = vec![busy, Publisher::for_group(3, key, &[2; 100])];
+    let mut session = Session::default();
+    let first = session.write(&mut [&mut p.sender], &mut [], &mut publishers, FAST, START);
+    Session::acknowledge(&mut [&mut p.sender], &mut [], &mut publishers, START);
+    assert!(
+        p.receiver.read(&first.notices, START + 1).is_empty(),
+        "both content slots went to group 4, so group 3's notice waits"
+    );
+    let mut wrote_notice_with_record = false;
+    for minute in 1..6 {
+        let now = START + minute * 60;
+        let written = session.write(&mut [&mut p.sender], &mut [], &mut publishers, FAST, now);
+        Session::acknowledge(&mut [&mut p.sender], &mut [], &mut publishers, now);
+        if p.receiver
+            .read(&written.notices, now)
+            .iter()
+            .any(|read| *read.update_key == key)
+        {
+            wrote_notice_with_record = true;
+            break;
+        }
+    }
+    assert!(
+        wrote_notice_with_record,
+        "the notice went once record 0 had a slot"
+    );
+}

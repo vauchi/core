@@ -77,27 +77,24 @@ pub(super) enum Seen {
 pub(super) struct FirstRecords(BTreeMap<[u8; TAG_BYTES], FirstRecord>);
 
 pub(super) struct FirstRecord {
-    hash: [u8; 8],
+    hash: [u8; 32],
     read_at: u64,
     /// The week in a refresh address, which says when it stops being
     /// watched; `None` for an opening address, watched by age.
     address_week: Option<u32>,
 }
 
-pub(super) fn short_hash(notice: &Notice) -> [u8; 8] {
-    let digest = Sha256::digest(notice);
-    let mut hash = [0u8; 8];
-    for (to, from) in hash.iter_mut().zip(digest.iter()) {
-        *to = *from;
-    }
-    hash
+/// The whole SHA-256 of a record: a key holder choosing both records must
+/// not find two that compare equal (gate review 2, Codex).
+pub(super) fn record_hash(notice: &Notice) -> [u8; 32] {
+    Sha256::digest(notice).into()
 }
 
 impl FirstRecords {
     pub(super) fn seen(&self, tag: &[u8; TAG_BYTES], notice: &Notice) -> Seen {
         match self.0.get(tag) {
             None => Seen::First,
-            Some(first) if first.hash == short_hash(notice) => Seen::Again,
+            Some(first) if first.hash == record_hash(notice) => Seen::Again,
             Some(_) => Seen::Different,
         }
     }
@@ -110,7 +107,7 @@ impl FirstRecords {
         address_week: Option<u32>,
     ) {
         self.0.entry(tag).or_insert(FirstRecord {
-            hash: short_hash(notice),
+            hash: record_hash(notice),
             read_at: now,
             address_week,
         });

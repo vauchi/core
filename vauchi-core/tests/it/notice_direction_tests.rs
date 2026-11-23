@@ -348,6 +348,22 @@ fn the_receiver_alarms_on_a_second_opening_under_a_number_it_used() {
     assert_eq!(p.receiver.current_epoch(), moved_into);
 }
 
+// Gate review 2, 2026-11-23 (Claude): a refresh whose Diffie-Hellman
+// result is invalid opens nothing, yet its number still drove the m - 3
+// erasure.
+// @internal
+#[test]
+fn a_refresh_that_opens_nothing_erases_nothing() {
+    let mut p = pair();
+    let refresh = p.receiver_session(&[], START);
+    p.sender_session(&refresh, START + DAY);
+    assert_eq!(p.sender.kept_numbers(), vec![0, 1]);
+    let seed = p.receiver.seed_epoch();
+    let invalid = forged_refresh(&p.copied_seed, START + 2 * DAY, 0, 100, [0; 32], seed);
+    p.sender_session(&[invalid], START + 2 * DAY);
+    assert_eq!(p.sender.kept_numbers(), vec![0, 1]);
+}
+
 // Gate review 2, 2026-11-23 (Codex and Claude, separately): two different
 // records at one address delivered in the same session both read as the
 // first, so the alarm the text promises was not raised.

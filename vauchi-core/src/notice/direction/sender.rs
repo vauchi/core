@@ -248,6 +248,11 @@ impl Sender {
         }
 
         let mut found = Vec::new();
+        // Records already opened in this batch, by address: a second,
+        // different one at an address alarms even before the first is
+        // remembered, and a refresh the session then leaves unread still
+        // keeps no hash.
+        let mut in_batch: BTreeMap<[u8; TAG_BYTES], [u8; 32]> = BTreeMap::new();
         for notice in notices {
             let tag = tag_of(notice);
             let Some((at, read_in, address_week)) = watched.get(&tag) else {
@@ -260,7 +265,13 @@ impl Sender {
             match self.first_records.seen(&tag, notice) {
                 Seen::Again => continue,
                 Seen::Different => self.alarms.push(Alarm::TwoRecordsAtOneAddress),
-                Seen::First => {}
+                Seen::First => match in_batch.get(&tag) {
+                    Some(earlier) if *earlier == record_hash(notice) => continue,
+                    Some(_) => self.alarms.push(Alarm::TwoRecordsAtOneAddress),
+                    None => {
+                        in_batch.insert(tag, record_hash(notice));
+                    }
+                },
             }
             let Ok(Record::Refresh {
                 refresh_public,
@@ -349,8 +360,7 @@ impl Sender {
             }
         }
 
-        if !opened_before {
-            self.open_on(refresh, read_in, now);
+        if !opened_before && self.open_on(refresh, read_in, now) {
             self.highest_opened_this_session =
                 self.highest_opened_this_session.max(Some(refresh.number));
         }
@@ -393,9 +403,11 @@ impl Sender {
         }
     }
 
-    fn open_on(&mut self, refresh: &RefreshFound, read_in: usize, now: u64) {
+    /// Whether an epoch was opened: an invalid Diffie-Hellman result opens
+    /// none, and then the m - 3 rule has nothing to rest on.
+    fn open_on(&mut self, refresh: &RefreshFound, read_in: usize, now: u64) -> bool {
         let Some(base) = self.epochs.get(read_in) else {
-            return;
+            return false;
         };
         let ephemeral = X25519KeyPair::generate();
         let Ok(opened) = open_as_sender(
@@ -407,7 +419,7 @@ impl Sender {
             &self.device,
             &self.receiver_device_public,
         ) else {
-            return;
+            return false;
         };
         self.openings.push(OpeningQueued {
             number: refresh.number,
@@ -419,6 +431,7 @@ impl Sender {
             spent: false,
         });
         self.epochs.push(SenderEpoch::new(opened.epoch, now, None));
+        true
     }
 
     /// Writes the openings not yet named, each at its next address until

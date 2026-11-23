@@ -555,6 +555,7 @@ mod send_phase_outcome_tests;
 mod sensitive_data_at_rest_tests;
 mod settings_flags_tests;
 mod shred_purge_freshness_tests;
+mod sibling_pins_tests;
 mod six_device_convergence_tests;
 mod sleeper_tests;
 mod smk_boot_tests;

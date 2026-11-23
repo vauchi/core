@@ -200,6 +200,12 @@ impl Receiver {
     fn raise(&mut self, alarm: Alarm, read_in: EpochId, now: u64) {
         self.alarms.push(alarm);
         self.alarm_epoch = Some((read_in, now));
+        // R5: the epoch of the alarm is a refresh target at once, so the
+        // newest refresh is queued again for the epochs it now lacks
+        // (gate review 7, Kimi).
+        if !self.issued.is_empty() {
+            self.refresh_queued = true;
+        }
     }
 
     /// Reads one session's notices: update keys on the chains it keeps,

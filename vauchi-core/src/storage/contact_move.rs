@@ -93,10 +93,16 @@ const FILLED_ON_FOLD: &[&str] = &[
 /// had them (a guardian stays one).
 const KEPT_SET_ON_FOLD: &[&str] = &["favorite", "proposal_trusted", "recovery_trusted"];
 
-/// Tables holding the old identity's devices and its device-registry
-/// handshake, which end with the old relationship: the new identity has
-/// other devices, and the contact runs the handshake with it again (D25).
-const ENDED_WITH_THE_OLD_IDENTITY: &[&str] = &["contact_device_registries", "registry_activation"];
+/// Tables holding the old identity's devices, their pinned keys and its
+/// device-registry handshake, which end with the old relationship: the new
+/// identity has other devices, and the contact runs the handshake with it
+/// again (D25). A pin carried over would refuse the new identity's device
+/// that happens to reuse an id under its own key (private#970).
+const ENDED_WITH_THE_OLD_IDENTITY: &[&str] = &[
+    "contact_device_registries",
+    "contact_device_key_pins",
+    "registry_activation",
+];
 
 impl Storage {
     /// Moves the contact `old_id` to `new_id`, with everything that names

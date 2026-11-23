@@ -69,6 +69,7 @@ fn own_device_order_registry_storage_failure_is_retryable_without_consuming_sequ
         let mut sender = pair.sender();
         sender
             .record_local_change(SyncItem::ContactRegistryReceived {
+                pins: Default::default(),
                 contact_id: contact_id.clone(),
                 registry_json: registry_json.clone(),
                 version,
@@ -91,6 +92,7 @@ fn own_device_order_registry_storage_failure_is_retryable_without_consuming_sequ
         let public = pair
             .receiver
             .apply_sync_items(vec![SyncItem::ContactRegistryReceived {
+                pins: Default::default(),
                 contact_id: contact_id.clone(),
                 registry_json,
                 version,
@@ -145,6 +147,7 @@ fn own_device_order_invalid_signed_registry_does_not_block_independent_item() {
     let mut sender = pair.sender();
     sender
         .record_local_change(SyncItem::ContactRegistryReceived {
+            pins: Default::default(),
             contact_id: contact_id.clone(),
             registry_json: invalid.to_string(),
             version: version + 1,

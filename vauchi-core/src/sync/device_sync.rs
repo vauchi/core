@@ -56,6 +56,11 @@ pub enum DeviceLinkIntent {
 pub struct ContactDeviceRegistrySyncData {
     pub contact_id: String,
     pub broadcast_json: String,
+    /// The contact's pinned device keys on the linking device, so the new
+    /// device refuses what it refuses (private#970). `#[serde(default)]`
+    /// for payloads from older devices.
+    #[serde(default)]
+    pub pins: crate::identity::PinnedDeviceKeys,
 }
 
 /// F4 activation-handshake snapshot for one contact, transferred with the
@@ -174,6 +179,12 @@ pub enum SyncItem {
         version: u64,
         /// When this device accepted the registry.
         timestamp: u64,
+        /// The contact's pinned device keys on this device, including
+        /// devices the broadcast no longer names, so a sibling refuses a
+        /// device re-added under a new key as this device does
+        /// (private#970). `#[serde(default)]` for items from older devices.
+        #[serde(default)]
+        pins: crate::identity::PinnedDeviceKeys,
     },
 
     /// This identity's F4 activation handshake state for a contact changed.

@@ -253,6 +253,7 @@ fn contact_registry_received_item_persists_the_verified_registry() {
 
     let applied = device
         .apply_sync_items(vec![SyncItem::ContactRegistryReceived {
+            pins: Default::default(),
             contact_id: contact_id.clone(),
             registry_json: broadcast.to_json(),
             version: broadcast.version(),
@@ -282,6 +283,7 @@ fn contact_registry_received_item_rejects_a_wrong_signer() {
 
     let applied = device
         .apply_sync_items(vec![SyncItem::ContactRegistryReceived {
+            pins: Default::default(),
             contact_id: contact_id.clone(),
             registry_json: forged.to_json(),
             version: forged.version(),

@@ -148,6 +148,7 @@ fn forged_peer_registry_in_owner_sync_is_rejected_atomically() {
     payload
         .contact_device_registries
         .push(vauchi_core::sync::ContactDeviceRegistrySyncData {
+            pins: Default::default(),
             contact_id: contact_id.clone(),
             broadcast_json: RegistryBroadcast::new(&attacker_registry, &attacker, 1).to_json(),
         });
@@ -217,6 +218,7 @@ fn owner_sync_replaces_an_older_peer_registry_with_the_newer_one() {
     payload
         .contact_device_registries
         .push(vauchi_core::sync::ContactDeviceRegistrySyncData {
+            pins: Default::default(),
             contact_id: contact_id.clone(),
             broadcast_json: newer.to_json(),
         });

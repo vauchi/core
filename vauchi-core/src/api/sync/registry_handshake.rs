@@ -307,6 +307,7 @@ fn try_journal_for_siblings(
     {
         orchestrator
             .record_local_change(SyncItem::ContactRegistryReceived {
+                pins: Default::default(),
                 contact_id: contact_id.to_string(),
                 registry_json: broadcast.to_json(),
                 version: broadcast.version(),

@@ -345,6 +345,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
             .into_iter()
             .map(|(contact_id, broadcast)| ContactDeviceRegistrySyncData {
+                pins: Default::default(),
                 contact_id,
                 broadcast_json: broadcast.to_json(),
             })

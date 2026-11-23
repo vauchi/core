@@ -11,37 +11,12 @@
 //! visible field-id set and diffs it against the new effective set, emitting
 //! `Removed` for fields that dropped out of visibility.
 
-use vauchi_core::{
-    Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi,
-    exchange::X3DHKeyPair,
-};
+use crate::common::helpers::{add_contact_with_ratchet, create_vauchi_with_identity};
+use vauchi_core::{ContactField, FieldType, Vauchi};
 
 use crate::common::two_recipient::{
     add_recipient, add_recipient_no_cek, deliver, stored_card_display_name, stored_card_has,
 };
-
-fn create_test_vauchi() -> Vauchi {
-    let mut wb = Vauchi::in_memory().unwrap();
-    wb.create_identity("Alice").unwrap();
-    wb
-}
-
-fn add_contact_with_ratchet(wb: &Vauchi, name: &str) -> String {
-    let identity = Identity::create(name, 0);
-    let shared = SymmetricKey::generate();
-    let contact = Contact::from_exchange(
-        *identity.signing_public_key(),
-        ContactCard::new(name),
-        shared.clone(),
-        0,
-    );
-    let contact_id = contact.id().to_string();
-    wb.add_contact(contact).unwrap();
-    let their_dh = X3DHKeyPair::generate();
-    wb.create_ratchet_as_initiator(&contact_id, &shared, *their_dh.public_key())
-        .unwrap();
-    contact_id
-}
 
 fn own_field_id(wb: &Vauchi, label: &str) -> String {
     wb.own_card()
@@ -58,7 +33,7 @@ fn own_field_id(wb: &Vauchi, label: &str) -> String {
 // @scenario: visibility_control :: Revoking the last visible field notifies the contact
 #[test]
 fn revoking_last_visible_field_queues_a_removal_update() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
     wb.add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
         .unwrap();
     let work = own_field_id(&wb, "work");
@@ -104,7 +79,7 @@ fn revoking_last_visible_field_queues_a_removal_update() {
 // @scenario: visibility_control :: Revoking an exchange-shared field notifies the contact
 #[test]
 fn revoking_exchange_shared_field_as_first_repropagation_emits_removal() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
     wb.add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
         .unwrap();
     let work = own_field_id(&wb, "work");
@@ -154,7 +129,7 @@ fn revoking_exchange_shared_field_as_first_repropagation_emits_removal() {
 // @scenario: visibility_control :: Revoking propagates to the peer; an un-revoked peer keeps the field
 #[test]
 fn revoking_for_one_recipient_does_not_affect_another_recipient() {
-    let alice = create_test_vauchi();
+    let alice = create_vauchi_with_identity("Alice");
     alice
         .add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
         .unwrap();
@@ -210,7 +185,7 @@ fn revoking_for_one_recipient_does_not_affect_another_recipient() {
 // @scenario: visibility_control :: A field still granted by another group is not over-removed
 #[test]
 fn removing_from_one_group_keeps_a_field_granted_by_another() {
-    let alice = create_test_vauchi();
+    let alice = create_vauchi_with_identity("Alice");
     alice
         .add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
         .unwrap();
@@ -256,7 +231,7 @@ fn removing_from_one_group_keeps_a_field_granted_by_another() {
 // @scenario: visibility_control :: Removing a field from the public base revokes it from an ungrouped contact
 #[test]
 fn set_own_field_private_revokes_a_public_field_from_an_ungrouped_contact() {
-    let alice = create_test_vauchi();
+    let alice = create_vauchi_with_identity("Alice");
     alice
         .add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
         .unwrap();
@@ -307,7 +282,7 @@ fn set_own_field_private_revokes_a_public_field_from_an_ungrouped_contact() {
 // @scenario: sync_updates :: First update to a freshly-exchanged (cek-less) contact is accepted
 #[test]
 fn first_repropagate_to_cek_less_contact_is_accepted() {
-    let alice = create_test_vauchi();
+    let alice = create_vauchi_with_identity("Alice");
     alice
         .add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
         .unwrap();
@@ -349,7 +324,7 @@ fn first_repropagate_to_cek_less_contact_is_accepted() {
 // @scenario: sync_updates :: A display-name change propagates to contacts
 #[test]
 fn renaming_own_card_propagates_the_new_name_to_contacts() {
-    let mut alice = create_test_vauchi(); // identity "Alice"
+    let mut alice = create_vauchi_with_identity("Alice"); // identity "Alice"
     let alice_pk = *alice.identity().unwrap().signing_public_key();
     let mut bob = add_recipient_no_cek(&alice, &alice_pk, "Bob");
 
@@ -377,7 +352,7 @@ fn renaming_own_card_propagates_the_new_name_to_contacts() {
 // @scenario: sync_updates :: Re-propagated deltas carry incrementing versions
 #[test]
 fn consecutive_repropagations_stamp_incrementing_delta_versions() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
     wb.add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
         .unwrap();
     let work = own_field_id(&wb, "work");
@@ -428,7 +403,7 @@ fn consecutive_repropagations_stamp_incrementing_delta_versions() {
 // @scenario: sync_updates :: Re-propagated deltas carry incrementing versions
 #[test]
 fn empty_repropagation_does_not_bump_the_sent_version() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
     let carol_id = add_contact_with_ratchet(&wb, "Carol");
     let label = wb.create_group("Empty").unwrap();
 

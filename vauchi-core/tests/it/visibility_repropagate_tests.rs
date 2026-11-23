@@ -8,36 +8,11 @@
 //! triggers a new card update to the affected contact.
 
 use crate::common::device_sync::link_tablet;
+use crate::common::helpers::{add_contact_with_ratchet, create_vauchi_with_identity};
 use vauchi_core::{
     Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi, VauchiError,
-    api::sync::DeviceSyncOrchestrator, exchange::X3DHKeyPair, sync::SyncItem,
+    api::sync::DeviceSyncOrchestrator, sync::SyncItem,
 };
-
-fn create_test_vauchi() -> Vauchi {
-    let mut wb = Vauchi::in_memory().unwrap();
-    wb.create_identity("Alice").unwrap();
-    wb
-}
-
-fn add_contact_with_ratchet(wb: &Vauchi, name: &str) -> String {
-    let identity = Identity::create(name, 0);
-    let shared = SymmetricKey::generate();
-    let contact = Contact::from_exchange(
-        *identity.signing_public_key(),
-        ContactCard::new(name),
-        shared.clone(),
-        0,
-    );
-    let contact_id = contact.id().to_string();
-    wb.add_contact(contact).unwrap();
-
-    // Set up ratchet as initiator so repropagate can encrypt
-    let their_dh = X3DHKeyPair::generate();
-    wb.create_ratchet_as_initiator(&contact_id, &shared, *their_dh.public_key())
-        .unwrap();
-
-    contact_id
-}
 
 /// Hex id of the own-card field with the given label. Group visibility is
 /// keyed by field **id** in production (`screens.rs` GroupDetail factory:
@@ -57,7 +32,7 @@ fn own_field_id(wb: &Vauchi, label: &str) -> String {
 // @scenario: visibility_control :: Revoking visibility sends update to contact
 #[test]
 fn test_set_field_private_queues_update() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
 
     wb.add_own_field(ContactField::new(
         FieldType::Email,
@@ -88,7 +63,7 @@ fn test_set_field_private_queues_update() {
 // @scenario: visibility_control :: Granting visibility sends update to contact
 #[test]
 fn test_set_field_public_queues_update() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
 
     wb.add_own_field(ContactField::new(
         FieldType::Phone,
@@ -114,7 +89,7 @@ fn test_set_field_public_queues_update() {
 // @scenario: visibility_control :: Revoking visibility sends update to contact
 #[test]
 fn test_repropagate_skips_no_ratchet() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
 
     wb.add_own_field(ContactField::new(
         FieldType::Email,
@@ -156,7 +131,7 @@ fn test_repropagate_skips_no_ratchet() {
 // @scenario: visibility_control :: Revoking visibility sends update to contact
 #[test]
 fn test_visibility_change_nonexistent_contact() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
 
     let result = wb.set_field_private_and_repropagate("nonexistent-id", "work");
     assert!(
@@ -168,7 +143,7 @@ fn test_visibility_change_nonexistent_contact() {
 // @scenario: visibility_control :: Show a field only to specific contacts
 #[test]
 fn test_set_field_restricted_queues_update() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
 
     wb.add_own_field(ContactField::new(
         FieldType::Email,
@@ -200,7 +175,7 @@ fn test_set_field_restricted_queues_update() {
 // @scenario: visibility_control :: Add contact to group updates their visibility
 #[test]
 fn test_add_contact_to_label_triggers_repropagate() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
 
     wb.add_own_field(ContactField::new(
         FieldType::Email,
@@ -233,7 +208,7 @@ fn test_add_contact_to_label_triggers_repropagate() {
 // @scenario: visibility_control :: Remove contact from group updates their visibility
 #[test]
 fn test_remove_contact_from_label_triggers_repropagate() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
 
     wb.add_own_field(ContactField::new(
         FieldType::Email,
@@ -278,7 +253,7 @@ fn test_remove_contact_from_label_triggers_repropagate() {
 // @scenario: visibility_control :: Apply visibility group to a field
 #[test]
 fn test_set_label_field_visibility_repropagates_to_all_members() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
 
     wb.add_own_field(ContactField::new(
         FieldType::Email,
@@ -319,7 +294,7 @@ fn test_set_label_field_visibility_repropagates_to_all_members() {
 // @scenario: visibility_control :: Hide a field from a specific contact
 #[test]
 fn test_set_contact_override_triggers_repropagate() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
 
     wb.add_own_field(ContactField::new(
         FieldType::Email,
@@ -351,7 +326,7 @@ fn test_set_contact_override_triggers_repropagate() {
 // @scenario: device_management :: Visibility grants converge across linked devices
 #[test]
 fn test_contact_override_and_repropagate_journals_linked_device_grant() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
     let (registry, tablet_id) = link_tablet(&wb);
 
     wb.add_own_field(ContactField::new(
@@ -393,7 +368,7 @@ fn test_contact_override_and_repropagate_journals_linked_device_grant() {
 // @internal
 #[test]
 fn synced_field_and_visibility_grant_repropagate_through_a_sibling_ratchet() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
     let bob_id = add_contact_with_ratchet(&wb, "Bob");
     let field = ContactField::new(FieldType::Phone, "secondary-phone", "+12025550100", 10);
     let field_id = field.id().to_string();
@@ -431,7 +406,7 @@ fn synced_field_and_visibility_grant_repropagate_through_a_sibling_ratchet() {
 // @scenario: visibility_control :: Hide a field from a specific contact
 #[test]
 fn test_repropagate_uses_effective_visibility() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
 
     wb.add_own_field(ContactField::new(
         FieldType::Email,
@@ -485,7 +460,7 @@ fn test_repropagate_uses_effective_visibility() {
 /// Own card with `work` + `personal`, a `Work` group exposing only `work`,
 /// Bob in `Work`. Returns the engine and Bob's id.
 fn vauchi_with_work_group_and_bob() -> (Vauchi, String) {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
     wb.add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
         .unwrap();
     wb.add_own_field(ContactField::new(
@@ -595,7 +570,7 @@ fn set_field_private_for_a_grouped_contact_hides_via_override() {
 fn no_groups_mode_defaults_hidden_until_toggled() {
     // With NO groups at all, an untoggled field is hidden (field-centric
     // default) and the Visible toggle is the single control that shows it.
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
     wb.add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
         .unwrap();
     let work = own_field_id(&wb, "work");
@@ -614,7 +589,7 @@ fn no_groups_mode_defaults_hidden_until_toggled() {
 // @scenario: visibility_control :: Deleting a group revokes its fields from members
 #[test]
 fn test_delete_group_revokes_group_only_field_from_members() {
-    let wb = create_test_vauchi();
+    let wb = create_vauchi_with_identity("Alice");
     wb.add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
         .unwrap();
     let work = own_field_id(&wb, "work");

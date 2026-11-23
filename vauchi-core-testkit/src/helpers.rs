@@ -7,7 +7,7 @@
 //! Common helper functions for setting up test scenarios.
 
 use vauchi_core::{
-    Contact, ContactCard, ContactField, FieldType, SymmetricKey, Vauchi,
+    Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi,
     crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair,
 };
 
@@ -16,6 +16,25 @@ pub fn create_vauchi_with_identity(name: &str) -> Vauchi {
     let mut wb: Vauchi = Vauchi::in_memory().unwrap();
     wb.create_identity(name).unwrap();
     wb
+}
+
+/// Adds a contact named `name` with a ratchet this device initiated, so
+/// card updates to it can be encrypted. Returns its contact id.
+pub fn add_contact_with_ratchet(wb: &Vauchi, name: &str) -> String {
+    let identity = Identity::create(name, 0);
+    let shared = SymmetricKey::generate();
+    let contact = Contact::from_exchange(
+        *identity.signing_public_key(),
+        ContactCard::new(name),
+        shared.clone(),
+        0,
+    );
+    let contact_id = contact.id().to_string();
+    wb.add_contact(contact).unwrap();
+    let their_dh = X3DHKeyPair::generate();
+    wb.create_ratchet_as_initiator(&contact_id, &shared, *their_dh.public_key())
+        .unwrap();
+    contact_id
 }
 
 /// Create a Vauchi with identity and some fields on the card.

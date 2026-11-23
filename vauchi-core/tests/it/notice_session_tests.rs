@@ -335,3 +335,80 @@ fn a_new_edits_notice_waits_for_record_zero_of_its_publication() {
         "the notice went once record 0 had a slot"
     );
 }
+
+use proptest::prelude::*;
+use vauchi_core::notice::content::commitment;
+use vauchi_core::notice::publish::Pending;
+
+/// One step of the device-level property: how many days pass, whose
+/// session it is, and whether the gateway drops that session's write.
+#[derive(Debug, Clone)]
+struct DeviceStep {
+    days: u64,
+    receiver_acts: bool,
+    dropped: bool,
+}
+
+fn device_step() -> impl Strategy<Value = DeviceStep> {
+    (1u64..4, any::<bool>(), any::<bool>()).prop_map(|(days, receiver_acts, dropped)| DeviceStep {
+        days,
+        receiver_acts,
+        dropped,
+    })
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(16))]
+
+    // Gate reviews 5 to 6 (Claude, Kimi, Codex): P5 was tested on the
+    // directions alone. Here both devices run whole background sessions,
+    // the sender publishing and the receiver assembling, while the gateway
+    // drops whole sessions; after six faithful weeks the card is installed
+    // and nothing alarmed.
+    // @internal
+    #[test]
+    fn whole_device_sessions_install_the_card_after_any_drops(
+        steps in proptest::collection::vec(device_step(), 0..30),
+        fast in any::<bool>(),
+    ) {
+        let tier = if fast { FAST } else { BACKGROUND };
+        let mut p = pair();
+        let key = [21u8; 32];
+        let card = vec![5u8; 4_096];
+        p.sender.queue_update(&key, &commitment(&key, &card));
+        let mut publishers = vec![Publisher::new(key, &card)];
+        let mut pending = Pending::default();
+        let mut s_session = Session::default();
+        let mut r_session = Session::default();
+        let mut to_receiver = (Vec::new(), Vec::new());
+        let mut to_sender = Vec::new();
+        let mut installed = false;
+        let mut now = START;
+        let faithful = (0..42).map(|i| DeviceStep { days: 1, receiver_acts: i % 2 == 1, dropped: false });
+        for step in steps.into_iter().chain(faithful) {
+            now += step.days * DAY;
+            if step.receiver_acts {
+                let (notices, contents): (Vec<Notice>, Vec<_>) = std::mem::take(&mut to_receiver);
+                for read in p.receiver.read(&notices, now) {
+                    pending.note(&read.update_key, &read.commitment, now);
+                }
+                installed |= !pending.read(&contents, now, |_| true).is_empty();
+                let written = r_session.write(&mut [], &mut [&mut p.receiver], &mut [], tier, now);
+                Session::acknowledge(&mut [], &mut [&mut p.receiver], &mut [], now);
+                if !step.dropped {
+                    to_sender = written.notices;
+                }
+            } else {
+                p.sender.read(&std::mem::take(&mut to_sender), now);
+                let written = s_session.write(&mut [&mut p.sender], &mut [], &mut publishers, tier, now);
+                Session::acknowledge(&mut [&mut p.sender], &mut [], &mut publishers, now);
+                if !step.dropped {
+                    to_receiver = (written.notices, written.contents);
+                }
+            }
+        }
+        prop_assert_eq!(p.sender.alarms(), &[] as &[vauchi_core::notice::direction::Alarm]);
+        prop_assert_eq!(p.receiver.alarms(), &[] as &[vauchi_core::notice::direction::Alarm]);
+        prop_assert!(installed, "the card never installed");
+    }
+}

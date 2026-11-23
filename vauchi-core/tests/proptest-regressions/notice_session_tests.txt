@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 55d5af93715f819796453450bcbd6be07f329ddf806288169dfd60dd624903aa # shrinks to steps = [DeviceStep { days: 1, receiver_acts: false, dropped: false }], fast = false

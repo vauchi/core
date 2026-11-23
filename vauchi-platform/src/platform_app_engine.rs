@@ -667,6 +667,7 @@ impl PlatformAppEngine {
     /// commands produced by the tick); the shell schedules it and calls this
     /// method again when it fires.
     pub fn on_wakeup(&self) -> Result<String, MobileError> {
+        crate::json_helpers::log_entry("on_wakeup", None);
         let (items, pending_commands, hardware, invalidation_targets) = {
             let mut engine_slot = self.lock_engine()?;
             let engine = crate::platform_app_engine_internals::open_engine(&mut engine_slot)?;

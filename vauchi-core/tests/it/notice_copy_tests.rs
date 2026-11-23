@@ -1,0 +1,143 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! What a copy of the receiver's state can read from the relays, which
+//! keep every record 120 days (P2 and P3, vauchi/private#1281).
+//!
+//! Gate review 2 (Codex, Kimi and Claude) found no test that copies a
+//! device. Each test here reads with a copy both inside a window and after
+//! it, so that it fails if the copy reads nothing at all, or too much.
+
+use crate::common::notice_pair::*;
+use vauchi_core::notice::direction::Receiver;
+use vauchi_core::notice::keys::opening_address;
+use vauchi_core::notice::seal::open;
+
+fn keys_read(reader: &mut Receiver, relays: &[Notice], now: u64) -> Vec<[u8; 32]> {
+    reader
+        .read(relays, now)
+        .iter()
+        .map(|read| *read.update_key)
+        .collect()
+}
+
+/// The records among `written` that are the first opening on refresh 1,
+/// as a holder of the seed epoch's keys finds them.
+fn first_opening(p: &Pair, written: &[Notice]) -> Vec<Notice> {
+    let at = opening_address(p.copied_seed.opening_key(), 1, 0);
+    written
+        .iter()
+        .filter(|notice| open(&at, notice).is_some())
+        .copied()
+        .collect()
+}
+
+// @internal
+#[test]
+fn a_copy_of_the_receiver_made_before_a_refresh_reads_nothing_after_healing() {
+    let mut p = pair();
+    let copy = p.receiver.clone();
+    let mut relays = Vec::new();
+
+    let (before, commitment) = update(1);
+    p.sender.queue_update(&before, &commitment);
+    relays.extend(p.sender_session(&[], START));
+    let refresh = p.receiver_session(&relays, START + DAY);
+    relays.extend(refresh.iter().copied());
+    let opening = p.sender_session(&refresh, START + 2 * DAY);
+    relays.extend(opening.iter().copied());
+    p.receiver_session(&opening, START + 3 * DAY);
+    let naming = p.receiver_session(&[], START + DAY + WEEK);
+    relays.extend(naming.iter().copied());
+    p.sender_session(&naming, START + 2 * DAY + WEEK);
+    p.assert_healed();
+    assert_ne!(p.sender.writes_in(), p.receiver.seed_epoch());
+
+    let (after, commitment) = update(2);
+    p.sender.queue_update(&after, &commitment);
+    let written = p.sender_session(&[], START + 3 * DAY + WEEK);
+    relays.extend(written.iter().copied());
+    assert_eq!(
+        keys_read(&mut p.receiver, &written, START + 4 * DAY + WEEK),
+        vec![after]
+    );
+
+    let read = keys_read(&mut copy.clone(), &relays, START + 4 * DAY + WEEK);
+    assert!(read.contains(&before), "the copy reads what came before");
+    assert!(!read.contains(&after), "and nothing written after healing");
+}
+
+// @internal
+#[test]
+fn a_skipped_position_is_readable_to_a_copy_only_within_three_periods() {
+    let mut p = pair();
+    let (lost, commitment) = update(1);
+    p.sender.queue_update(&lost, &commitment);
+    let dropped = p.sender_session(&[], START);
+    let (newer, commitment) = update(2);
+    p.sender.queue_update(&newer, &commitment);
+    let delivered = p.sender_session(&[], START + DAY);
+    assert_eq!(
+        keys_read(&mut p.receiver, &delivered, START + 2 * DAY),
+        vec![newer]
+    );
+
+    let inside = p.receiver.clone();
+    let mut relays = dropped.clone();
+    relays.extend(delivered.iter().copied());
+    assert_eq!(
+        keys_read(&mut inside.clone(), &relays, START + 2 * DAY + WEEK),
+        vec![lost],
+        "inside the window the copy reads the skipped position"
+    );
+
+    for week in 1..=3 {
+        p.receiver_session(&[], START + 2 * DAY + week * WEEK + DAY);
+    }
+    let outside = p.receiver.clone();
+    assert_eq!(
+        keys_read(
+            &mut outside.clone(),
+            &relays,
+            START + 2 * DAY + 3 * WEEK + DAY
+        ),
+        Vec::<[u8; 32]>::new(),
+        "after three periods and a session it reads nothing"
+    );
+}
+
+// @internal
+#[test]
+fn an_epoch_left_is_readable_to_a_copy_only_within_three_periods() {
+    let mut p = pair();
+    let (lost, commitment) = update(1);
+    p.sender.queue_update(&lost, &commitment);
+    let mut relays = p.sender_session(&[], START);
+    let refresh = p.receiver_session(&[], START + DAY);
+    let answer = p.sender_session(&refresh, START + 2 * DAY);
+    relays.extend(answer.iter().copied());
+    let seed = p.receiver.seed_epoch();
+    p.receiver_session(&first_opening(&p, &answer), START + 3 * DAY);
+    assert_ne!(p.receiver.current_epoch(), seed, "the receiver moved");
+
+    let inside = p.receiver.clone();
+    assert!(
+        keys_read(&mut inside.clone(), &relays, START + 3 * DAY + WEEK).contains(&lost),
+        "inside the window the copy reads the epoch left"
+    );
+
+    for week in 1..=3 {
+        p.receiver_session(&[], START + 3 * DAY + week * WEEK + DAY);
+    }
+    let outside = p.receiver.clone();
+    assert_eq!(
+        keys_read(
+            &mut outside.clone(),
+            &relays,
+            START + 3 * DAY + 3 * WEEK + DAY
+        ),
+        Vec::<[u8; 32]>::new(),
+        "after three periods and a session it reads nothing there"
+    );
+}

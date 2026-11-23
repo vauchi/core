@@ -74,8 +74,10 @@ pub(super) enum Seen {
 /// second, different record there can only come from a holder of the
 /// epoch's keys. An entry is kept while its address is watched.
 #[derive(Default)]
+#[cfg_attr(feature = "testing", derive(Clone))]
 pub(super) struct FirstRecords(BTreeMap<[u8; TAG_BYTES], FirstRecord>);
 
+#[cfg_attr(feature = "testing", derive(Clone))]
 pub(super) struct FirstRecord {
     hash: [u8; 32],
     read_at: u64,
@@ -129,6 +131,13 @@ pub(super) fn age(now: u64, stamp: &mut u64) -> u64 {
         *stamp = now;
     }
     now.saturating_sub(*stamp)
+}
+
+/// A device's state is copied whole only as an attacker who copies its
+/// storage holds it: the tests of P2 and P3 read with such a copy.
+#[cfg(feature = "testing")]
+pub(super) fn copy_key(key: &crate::crypto::X25519KeyPair) -> crate::crypto::X25519KeyPair {
+    crate::crypto::X25519KeyPair::from_bytes(*key.secret_bytes())
 }
 
 pub(super) fn tag_of(notice: &Notice) -> [u8; TAG_BYTES] {

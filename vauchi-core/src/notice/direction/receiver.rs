@@ -28,6 +28,7 @@ struct Issued {
     accepted: Option<[u8; 32]>,
 }
 
+#[cfg_attr(feature = "testing", derive(Clone))]
 struct ReceiverEpoch {
     keys: Epoch,
     reader: Option<ChainReader>,
@@ -51,6 +52,7 @@ impl ReceiverEpoch {
     }
 }
 
+#[cfg_attr(feature = "testing", derive(Clone))]
 struct OpeningRead {
     number: u32,
     attempt: u8,
@@ -73,6 +75,40 @@ pub struct Receiver {
     alarm_epoch: Option<(EpochId, u64)>,
     first_records: FirstRecords,
     alarms: Vec<Alarm>,
+}
+
+#[cfg(feature = "testing")]
+impl Clone for Issued {
+    fn clone(&self) -> Self {
+        Self {
+            number: self.number,
+            public: self.public,
+            private: self.private.as_ref().map(copy_key),
+            key_id: self.key_id,
+            name: self.name,
+            made_at: self.made_at,
+            accepted: self.accepted,
+        }
+    }
+}
+
+#[cfg(feature = "testing")]
+impl Clone for Receiver {
+    fn clone(&self) -> Self {
+        Self {
+            label: self.label.clone(),
+            device: copy_key(&self.device),
+            sender_device_public: self.sender_device_public,
+            seed: self.seed,
+            epochs: self.epochs.clone(),
+            issued: self.issued.clone(),
+            refresh_queued: self.refresh_queued,
+            refresh_written: self.refresh_written,
+            alarm_epoch: self.alarm_epoch,
+            first_records: self.first_records.clone(),
+            alarms: self.alarms.clone(),
+        }
+    }
 }
 
 impl Receiver {

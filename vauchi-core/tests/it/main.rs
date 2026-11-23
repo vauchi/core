@@ -422,6 +422,7 @@ mod nfc_handshake_tests;
 mod notice_chain_tests;
 mod notice_conformance_tests;
 mod notice_content_tests;
+mod notice_copy_tests;
 mod notice_direction_tests;
 mod notice_key_schedule_tests;
 mod notice_seal_tests;

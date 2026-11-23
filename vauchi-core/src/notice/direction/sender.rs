@@ -18,6 +18,7 @@ use crate::notice::keys::{
 use crate::notice::record::Record;
 use crate::notice::seal::{TAG_BYTES, open, seal};
 
+#[cfg_attr(feature = "testing", derive(Clone))]
 struct SenderEpoch {
     keys: Epoch,
     /// `None` only if the epoch's chain key was already taken.
@@ -44,6 +45,7 @@ impl SenderEpoch {
     }
 }
 
+#[cfg_attr(feature = "testing", derive(Clone))]
 struct RefreshRead {
     number: u32,
     public: [u8; 32],
@@ -52,6 +54,7 @@ struct RefreshRead {
     read_at: u64,
 }
 
+#[cfg_attr(feature = "testing", derive(Clone))]
 struct OpeningQueued {
     number: u32,
     base: EpochId,
@@ -94,6 +97,32 @@ pub struct Sender {
     highest_opened_this_session: Option<u32>,
     first_records: FirstRecords,
     alarms: Vec<Alarm>,
+}
+
+#[cfg(feature = "testing")]
+impl Clone for Sender {
+    fn clone(&self) -> Self {
+        Self {
+            label: self.label.clone(),
+            device: copy_key(&self.device),
+            receiver_device_public: self.receiver_device_public,
+            epochs: self.epochs.clone(),
+            writes_in: self.writes_in,
+            highest_named: self.highest_named,
+            erased: self.erased.clone(),
+            refreshes: self.refreshes.clone(),
+            openings: self.openings.clone(),
+            latest: self.latest.clone(),
+            view_due: self.view_due,
+            update_queued: self.update_queued,
+            edits: self.edits,
+            edits_written: self.edits_written,
+            positions_assigned_at: self.positions_assigned_at.clone(),
+            highest_opened_this_session: self.highest_opened_this_session,
+            first_records: self.first_records.clone(),
+            alarms: self.alarms.clone(),
+        }
+    }
 }
 
 impl Sender {

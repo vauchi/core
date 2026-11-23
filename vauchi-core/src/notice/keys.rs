@@ -37,6 +37,7 @@ impl Label {
 type Key = Zeroizing<[u8; KEY_BYTES]>;
 
 /// The keys of one epoch of one direction.
+#[cfg_attr(feature = "testing", derive(Clone))]
 pub struct Epoch {
     number: u32,
     id: [u8; TAG_BYTES],
@@ -95,6 +96,7 @@ pub struct Opened {
 
 /// A 16-byte tag a reader recognises a record by, and the single-use key
 /// the record is sealed under.
+#[cfg_attr(feature = "testing", derive(Clone))]
 pub struct Keyed {
     pub tag: [u8; TAG_BYTES],
     pub key: Key,

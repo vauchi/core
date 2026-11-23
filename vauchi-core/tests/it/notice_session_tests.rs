@@ -769,3 +769,29 @@ fn a_contact_leaving_a_group_frees_its_place_and_its_key_goes() {
     );
     assert!(!keys.contains(&left), "the left group's key goes no more");
 }
+
+// Gate review 11 (Codex): one "last served" time per direction counted an
+// update as service of its control queue, so with acknowledgements withheld
+// the same directions got the control slots every session and the others'
+// openings and views never went. Each queue now keeps its own turn order.
+// @internal
+#[test]
+fn updates_do_not_count_as_a_directions_control_turn() {
+    let wants = |update, control| Wants { update, control };
+    // 16 directions, each with five updates and one control record: 70
+    // update slots and 10 control slots a session.
+    let all: Vec<Wants> = (0..16).map(|_| wants(5, 1)).collect();
+    let mut served = vec![0usize; 16];
+    let mut session = Session::default();
+    for _ in 0..4 {
+        let grants = session.plan_turns(80, &all);
+        for (i, grant) in grants.iter().enumerate() {
+            served[i] += grant.control;
+        }
+        session.record_turns(&grants, START);
+    }
+    assert!(
+        served.iter().all(|count| *count >= 1),
+        "control turns {served:?}"
+    );
+}

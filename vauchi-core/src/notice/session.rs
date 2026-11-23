@@ -195,7 +195,7 @@ pub struct Session {
 impl Session {
     /// Shares `slots` among directions, each queue taking turns by when
     /// it was last served, the one served longest ago first.
-    pub fn plan_turns(&mut self, slots: usize, wants: &[Wants]) -> Vec<Grant> {
+    pub fn plan_turns(&mut self, slots: usize, wants: &[Wants], _now: u64) -> Vec<Grant> {
         let directions = wants.len();
         self.served_update.resize(directions, 0);
         self.served_control.resize(directions, 0);
@@ -257,7 +257,7 @@ impl Session {
             update: 0,
             control: receiver.wants(now),
         }));
-        let grants = self.plan_turns(slots.notices, &wants);
+        let grants = self.plan_turns(slots.notices, &wants, now);
 
         let mut notices = Vec::with_capacity(slots.notices);
         let mut wrote = vec![Grant::default(); directions];

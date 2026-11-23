@@ -784,7 +784,7 @@ fn updates_do_not_count_as_a_directions_control_turn() {
     let mut served = vec![0usize; 16];
     let mut session = Session::default();
     for _ in 0..4 {
-        let grants = session.plan_turns(80, &all);
+        let grants = session.plan_turns(80, &all, START);
         for (i, grant) in grants.iter().enumerate() {
             served[i] += grant.control;
         }

@@ -138,6 +138,11 @@ impl Publisher {
     /// Queues the weekly publication once the last was completed a
     /// period ago.
     pub fn queue_due(&mut self, now: u64) {
+        // A stored time in the future is pulled back to the clock (section
+        // 1; gate review 11, Claude).
+        if let Some(waiting_since) = self.waiting_since.as_mut() {
+            age(now, waiting_since);
+        }
         if self.queued || self.current.is_some() {
             if self.waiting_since.is_none() {
                 self.waiting_since = Some(now);

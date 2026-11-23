@@ -16,7 +16,9 @@ use zeroize::Zeroizing;
 
 use crate::crypto::X25519KeyPair;
 
-const FORMAT_VERSION: u8 = 1;
+/// 2: openings, publishers and group entries gained fields (gate reviews
+/// 10 and 11); state saved as 1 is refused, not misread.
+const FORMAT_VERSION: u8 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SavedError;

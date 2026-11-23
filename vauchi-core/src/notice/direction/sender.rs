@@ -681,6 +681,9 @@ impl Sender {
                 self.notice_queue(&eligible)
                     .into_iter()
                     .filter(|(_, is_update)| !is_update)
+                    // Only views the period's positions can still take
+                    // compete for a control slot (gate review 11, Claude).
+                    .take(POSITIONS_A_PERIOD.saturating_sub(self.positions_assigned_at.len()))
                     .map(|(group, _)| {
                         (
                             self.groups.get(&group).and_then(|entry| entry.written_at),

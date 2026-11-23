@@ -13,7 +13,9 @@
 //! camera never outlives its screen.
 
 use vauchi_core::exchange_types::DeviceCapabilities;
-use vauchi_core::{CameraPurpose, Command, CommandTarget, SurfaceId};
+use vauchi_core::{
+    CameraPurpose, Command, CommandTarget, PresentationNode, PresentationQrPurpose, SurfaceId,
+};
 
 #[derive(Debug, Default)]
 pub(crate) struct HardwareRoute {
@@ -37,6 +39,9 @@ struct Capture {
     purpose: CameraPurpose,
     /// `None` until the batch that started it has shown its surface.
     surface: Option<SurfaceId>,
+    /// Started because the surface offers a scan, not by a request: it
+    /// ends when the surface stops offering one.
+    offered: bool,
 }
 
 impl HardwareRoute {
@@ -59,7 +64,10 @@ impl HardwareRoute {
             match command {
                 Command::ReplaceSurface { surface } => {
                     self.surface_shown(&surface.surface_id, &mut routed);
+                    let surface_id = surface.surface_id.clone();
+                    let offers_scan = offers_capture(&surface.nodes);
                     routed.push(Command::ReplaceSurface { surface });
+                    self.scan_offered(surface_id, offers_scan, &mut routed);
                 }
                 Command::QrRequestScan | Command::ImageCaptureFromCamera
                     if !self.report.as_ref().is_some_and(|report| report.has_camera) =>
@@ -102,6 +110,19 @@ impl HardwareRoute {
         }
     }
 
+    /// The hardware shell releases the camera once it reads a code
+    /// (windows-hw `QrCamera`, linux-hw `camera.rs`): the scan is over, and
+    /// the next scan screen starts a fresh capture.
+    pub(crate) fn code_scanned(&mut self) {
+        if self
+            .capture
+            .as_ref()
+            .is_some_and(|capture| capture.purpose == CameraPurpose::QrScan)
+        {
+            self.capture = None;
+        }
+    }
+
     /// Whether a camera request since the last call found no camera.
     #[cfg(feature = "network-rustls")]
     pub(crate) fn take_camera_missing(&mut self) -> bool {
@@ -123,6 +144,31 @@ impl HardwareRoute {
         self.current_surface = Some(surface_id.clone());
     }
 
+    /// A surface that offers a scan gets the camera when the hardware shell
+    /// reported one, as a phone's display shell opens its own for it
+    /// (private#772); one the person asked for keeps running. Without a
+    /// camera nothing is said: the screen only offers, and its paste field
+    /// still works.
+    fn scan_offered(
+        &mut self,
+        surface_id: SurfaceId,
+        offers_scan: bool,
+        routed: &mut Vec<Command>,
+    ) {
+        let has_camera = self.report.as_ref().is_some_and(|report| report.has_camera);
+        match self.capture.as_ref() {
+            None if offers_scan && has_camera => {
+                self.start_capture(CameraPurpose::QrScan, routed);
+                if let Some(capture) = self.capture.as_mut() {
+                    capture.surface = Some(surface_id);
+                    capture.offered = true;
+                }
+            }
+            Some(capture) if capture.offered && !offers_scan => self.stop_capture(routed),
+            _ => {}
+        }
+    }
+
     fn start_capture(&mut self, purpose: CameraPurpose, routed: &mut Vec<Command>) {
         self.stop_capture(routed);
         self.captures_started += 1;
@@ -138,6 +184,7 @@ impl HardwareRoute {
             preview_id,
             purpose,
             surface: None,
+            offered: false,
         });
     }
 
@@ -148,4 +195,14 @@ impl HardwareRoute {
             });
         }
     }
+}
+
+/// Whether any node, nested in groups or list rows, is a QR code to capture.
+fn offers_capture(nodes: &[PresentationNode]) -> bool {
+    nodes.iter().any(|node| match node {
+        PresentationNode::Qr { purpose, .. } => *purpose == PresentationQrPurpose::Capture,
+        PresentationNode::Group { children, .. } => offers_capture(children),
+        PresentationNode::List { rows, .. } => rows.iter().any(|row| offers_capture(&row.controls)),
+        _ => false,
+    })
 }

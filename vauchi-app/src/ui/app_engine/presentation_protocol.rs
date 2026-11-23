@@ -205,6 +205,9 @@ impl AppEngine {
         ) {
             self.hardware_route.photo_answered();
         }
+        if matches!(event, Event::QrScanned { .. }) {
+            self.hardware_route.code_scanned();
+        }
         if let Event::PermissionRequired { transport } = event {
             return Ok(self.permission_required(transport));
         }

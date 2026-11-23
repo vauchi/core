@@ -224,7 +224,11 @@ impl Pending {
     }
 
     /// Notes an update key read in a notice. False when its commitment
-    /// was installed lately or the key is already pending.
+    /// was installed lately or the key is already pending; a key already
+    /// pending is kept 14 days from this notice, with its chunks, so that a
+    /// card whose publication outlasts 14 days still completes (owner,
+    /// 2026-11-23, gate review 6). A superseded key is not sent again, so
+    /// it goes 14 days after its last notice.
     pub fn note(
         &mut self,
         update_key: &[u8; 32],
@@ -235,11 +239,15 @@ impl Pending {
             .installed
             .iter()
             .any(|held| bool::from(held.ct_eq(commitment)));
-        let pending = self
+        if installed {
+            return false;
+        }
+        if let Some(entry) = self
             .entries
-            .iter()
-            .any(|entry| bool::from(entry.update_key.ct_eq(update_key)));
-        if installed || pending {
+            .iter_mut()
+            .find(|entry| bool::from(entry.update_key.ct_eq(update_key)))
+        {
+            entry.noted_at = now.max(entry.noted_at);
             return false;
         }
         if self.entries.len() >= PENDING_A_DIRECTION {

@@ -239,6 +239,15 @@ impl Sender {
         Ok(())
     }
 
+    /// The contact left `group`: its latest key is erased from this
+    /// direction, no view carries it, and its place under the cap of 32 is
+    /// free (gate review 10, Claude).
+    pub fn leave_group(&mut self, group: GroupId) {
+        self.groups.remove(&group);
+        self.written_groups
+            .retain(|(written, _, _)| *written != group);
+    }
+
     fn view_is_due(&mut self) {
         self.view_due = true;
         for group in self.groups.values_mut() {

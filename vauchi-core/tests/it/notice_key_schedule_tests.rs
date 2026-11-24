@@ -14,7 +14,7 @@ use vauchi_core::notice::keys::{
 
 fn vectors() -> serde_json::Value {
     serde_json::from_str(include_str!(
-        "../fixtures/test-vectors/notice-core-vectors-v7.json"
+        "../fixtures/test-vectors/notice-core-vectors-v8.json"
     ))
     .expect("notice vectors")
 }

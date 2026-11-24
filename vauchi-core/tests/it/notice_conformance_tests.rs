@@ -120,7 +120,7 @@ fn run(schedule: &Value, inputs: &Value, start: u64) -> Value {
 fn the_direction_decides_as_the_independent_implementation_does() {
     let fixtures = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/test-vectors/");
     let doc = json(&format!("{fixtures}notice-schedules-v1.json"));
-    let inputs = json(&format!("{fixtures}notice-core-vectors-v7.json"))["inputs"].clone();
+    let inputs = json(&format!("{fixtures}notice-core-vectors-v8.json"))["inputs"].clone();
     let start = doc["start_unix_seconds"].as_u64().expect("start");
     let actual: Vec<Value> = doc["schedules"]
         .as_array()

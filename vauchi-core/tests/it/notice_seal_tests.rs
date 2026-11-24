@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! The 96-byte notice: its synthetic-IV seal (ADR-019 amendment
-//! 2026-11-22) and its three record kinds, against vectors computed
-//! independently from the protocol text (vauchi/private#1281).
+//! The 96-byte notice: its XChaCha20-Poly1305 seal (ADR-019 amendment
+//! 2026-11-24) and its three record kinds, against vectors computed
+//! independently from the protocol text (vauchi/private#1281, #1388).
 
 use proptest::prelude::*;
 use vauchi_core::notice::keys::{Keyed, chain_step, opening_address, refresh_address};
@@ -14,7 +14,7 @@ use zeroize::Zeroizing;
 
 fn vectors() -> serde_json::Value {
     serde_json::from_str(include_str!(
-        "../fixtures/test-vectors/notice-core-vectors-v7.json"
+        "../fixtures/test-vectors/notice-core-vectors-v8.json"
     ))
     .expect("notice vectors")
 }
@@ -164,27 +164,16 @@ fn a_plaintext_with_an_unknown_kind_or_nonzero_padding_is_malformed() {
 proptest! {
     // @internal
     #[test]
-    fn a_sealed_plaintext_opens_to_itself_and_a_key_used_twice_shows_only_equality(
+    fn a_sealed_plaintext_opens_to_itself_and_seals_the_same_each_time(
         key in any::<[u8; 32]>(),
         tag in any::<[u8; 16]>(),
-        first in any::<[u8; 64]>(),
-        second in any::<[u8; 64]>(),
+        plaintext in any::<[u8; 64]>(),
     ) {
         let at = keyed(tag, key);
-        let sealed = seal(&at, &first);
+        let sealed = seal(&at, &plaintext);
         prop_assert_eq!(&sealed[..16], &tag[..]);
-        prop_assert_eq!(*open(&at, &sealed).expect("opens"), first);
-        prop_assert_eq!(seal(&at, &first), sealed);
-
-        prop_assume!(first != second);
-        let other = seal(&at, &second);
-        // The synthetic IV, bytes 16..32, differs with the plaintext, so the
-        // two keystreams differ and the XOR of the ciphertexts is not the
-        // XOR of the plaintexts.
-        prop_assert_ne!(&other[16..32], &sealed[16..32]);
-        let xor_matches = (32..NOTICE_BYTES)
-            .all(|i| sealed[i] ^ other[i] == first[i - 32] ^ second[i - 32]);
-        prop_assert!(!xor_matches);
+        prop_assert_eq!(*open(&at, &sealed).expect("opens"), plaintext);
+        prop_assert_eq!(seal(&at, &plaintext), sealed);
     }
 
     // @internal

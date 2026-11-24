@@ -5802,6 +5802,36 @@
                         }
                       },
                       {
+                        "title": "Remember Where I Met People",
+                        "subtitle": "When enabled, saves where you were with each new contact, on this phone and your own linked devices",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": null,
+                        "secondary_actions": [],
+                        "controls": [
+                          {
+                            "Toggle": {
+                              "binding_id": "surface.1.binding.3",
+                              "label": "",
+                              "value": false,
+                              "enabled": true,
+                              "accessibility": {
+                                "label": "Remember Where I Met People toggle",
+                                "description": "When enabled, saves where you were with each new contact, on this phone and your own linked devices"
+                              }
+                            }
+                          }
+                        ],
+                        "accessibility": {
+                          "label": "Remember Where I Met People toggle",
+                          "description": "When enabled, saves where you were with each new contact, on this phone and your own linked devices"
+                        }
+                      },
+                      {
                         "title": "Activity",
                         "subtitle": null,
                         "detail": null,
@@ -6321,6 +6351,36 @@
                         "accessibility": {
                           "label": "New Contact Added toggle",
                           "description": "When enabled, sends a notification when a new contact is added"
+                        }
+                      },
+                      {
+                        "title": "Remember Where I Met People",
+                        "subtitle": "When enabled, saves where you were with each new contact, on this phone and your own linked devices",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": null,
+                        "secondary_actions": [],
+                        "controls": [
+                          {
+                            "Toggle": {
+                              "binding_id": "surface.1.binding.3",
+                              "label": "",
+                              "value": false,
+                              "enabled": true,
+                              "accessibility": {
+                                "label": "Remember Where I Met People toggle",
+                                "description": "When enabled, saves where you were with each new contact, on this phone and your own linked devices"
+                              }
+                            }
+                          }
+                        ],
+                        "accessibility": {
+                          "label": "Remember Where I Met People toggle",
+                          "description": "When enabled, saves where you were with each new contact, on this phone and your own linked devices"
                         }
                       },
                       {
@@ -7571,6 +7631,36 @@
                         }
                       },
                       {
+                        "title": "Remember Where I Met People",
+                        "subtitle": "When enabled, saves where you were with each new contact, on this phone and your own linked devices",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": null,
+                        "secondary_actions": [],
+                        "controls": [
+                          {
+                            "Toggle": {
+                              "binding_id": "surface.1.binding.3",
+                              "label": "",
+                              "value": false,
+                              "enabled": true,
+                              "accessibility": {
+                                "label": "Remember Where I Met People toggle",
+                                "description": "When enabled, saves where you were with each new contact, on this phone and your own linked devices"
+                              }
+                            }
+                          }
+                        ],
+                        "accessibility": {
+                          "label": "Remember Where I Met People toggle",
+                          "description": "When enabled, saves where you were with each new contact, on this phone and your own linked devices"
+                        }
+                      },
+                      {
                         "title": "Activity",
                         "subtitle": null,
                         "detail": null,
@@ -8394,6 +8484,36 @@
                         "accessibility": {
                           "label": "New Contact Added toggle",
                           "description": "When enabled, sends a notification when a new contact is added"
+                        }
+                      },
+                      {
+                        "title": "Remember Where I Met People",
+                        "subtitle": "When enabled, saves where you were with each new contact, on this phone and your own linked devices",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": null,
+                        "secondary_actions": [],
+                        "controls": [
+                          {
+                            "Toggle": {
+                              "binding_id": "surface.1.binding.3",
+                              "label": "",
+                              "value": false,
+                              "enabled": true,
+                              "accessibility": {
+                                "label": "Remember Where I Met People toggle",
+                                "description": "When enabled, saves where you were with each new contact, on this phone and your own linked devices"
+                              }
+                            }
+                          }
+                        ],
+                        "accessibility": {
+                          "label": "Remember Where I Met People toggle",
+                          "description": "When enabled, saves where you were with each new contact, on this phone and your own linked devices"
                         }
                       },
                       {
@@ -24769,6 +24889,36 @@
                         "accessibility": {
                           "label": "Schalter für neuer Kontakt hinzugefügt",
                           "description": "Wenn aktiviert, wird eine Benachrichtigung gesendet, wenn ein neuer Kontakt hinzugefügt wird"
+                        }
+                      },
+                      {
+                        "title": "Merken, wo ich Leute getroffen habe",
+                        "subtitle": "Wenn aktiviert, wird bei jedem neuen Kontakt gespeichert, wo du warst, auf diesem Telefon und deinen eigenen verknüpften Geräten",
+                        "detail": null,
+                        "icon_token": null,
+                        "image_data": null,
+                        "fallback_text": null,
+                        "selected": false,
+                        "enabled": true,
+                        "activation": null,
+                        "secondary_actions": [],
+                        "controls": [
+                          {
+                            "Toggle": {
+                              "binding_id": "surface.1.binding.3",
+                              "label": "",
+                              "value": false,
+                              "enabled": true,
+                              "accessibility": {
+                                "label": "Schalter für merken, wo ich Leute getroffen habe",
+                                "description": "Wenn aktiviert, wird bei jedem neuen Kontakt gespeichert, wo du warst, auf diesem Telefon und deinen eigenen verknüpften Geräten"
+                              }
+                            }
+                          }
+                        ],
+                        "accessibility": {
+                          "label": "Schalter für merken, wo ich Leute getroffen habe",
+                          "description": "Wenn aktiviert, wird bei jedem neuen Kontakt gespeichert, wo du warst, auf diesem Telefon und deinen eigenen verknüpften Geräten"
                         }
                       },
                       {

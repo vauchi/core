@@ -71,6 +71,7 @@ mod help_encryption_answer_tests;
 mod help_engine_tests;
 mod i18n_cache_tests;
 mod i18n_integration_tests;
+mod in_screen_scanner_tests;
 mod info_key_proptest;
 mod kept_pick_tests;
 mod link_initiator_poll_tests;

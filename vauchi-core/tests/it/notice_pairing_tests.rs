@@ -7,8 +7,13 @@
 //! A1): each side derives on its own the seed the other side derives.
 #![cfg(feature = "notice-core")]
 
-use vauchi_core::crypto::X25519KeyPair;
-use vauchi_core::notice::pairing::open_directions;
+use vauchi_core::contact::Contact;
+use vauchi_core::contact_card::ContactCard;
+use vauchi_core::crypto::{SymmetricKey, X25519KeyPair};
+use vauchi_core::identity::Identity;
+use vauchi_core::notice::direction::Sender;
+use vauchi_core::notice::pairing::{PeerDevice, ensure_directions, open_directions};
+use vauchi_core::storage::{NoticeStateKind, Storage};
 
 const NOW: u64 = 1_800_000_000;
 const DAY: u64 = 86_400;
@@ -70,4 +75,92 @@ fn another_contacts_shared_key_opens_other_directions() {
     let (second, _) = open_directions(&[8u8; 32], &alice, bob.public_key(), NOW);
 
     assert_ne!(first.writes_in(), second.writes_in());
+}
+
+fn storage_with_contact() -> (tempfile::TempDir, Storage, String) {
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Storage::open(dir.path().join("vauchi.db"), SymmetricKey::generate()).unwrap();
+    let peer = Identity::create("Bob", 0);
+    let contact = Contact::from_exchange(
+        *peer.signing_public_key(),
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        0,
+    );
+    storage.contacts().save_contact(&contact).unwrap();
+    (dir, storage, contact.id().to_string())
+}
+
+fn peer(device_id: u8, key: &X25519KeyPair) -> PeerDevice {
+    PeerDevice {
+        device_id: [device_id; 32],
+        exchange_public: *key.public_key(),
+    }
+}
+
+// @internal
+#[test]
+fn a_contacts_directions_are_saved_once_per_peer_device() {
+    let (_dir, storage, contact) = storage_with_contact();
+    let shared_key = [7u8; 32];
+    let own = device(1);
+    let (phone, laptop) = (device(2), device(3));
+    let peers = [peer(0xA0, &phone), peer(0xB0, &laptop)];
+
+    let opened = ensure_directions(&storage, &contact, &shared_key, &own, &peers, NOW).unwrap();
+
+    assert_eq!(opened, 2);
+    let notices = storage.notices();
+    for (device_id, key) in [([0xA0; 32], &phone), ([0xB0; 32], &laptop)] {
+        let saved = notices
+            .load(&contact, NoticeStateKind::Sender, &device_id)
+            .unwrap()
+            .expect("a saved sender");
+        let (fresh, _) = open_directions(&shared_key, &own, key.public_key(), NOW);
+        assert_eq!(
+            Sender::load(&saved, NOW).unwrap().writes_in(),
+            fresh.writes_in()
+        );
+        assert!(
+            notices
+                .load(&contact, NoticeStateKind::Receiver, &device_id)
+                .unwrap()
+                .is_some()
+        );
+    }
+}
+
+// A direction opened again would restart its chain and seal new
+// plaintexts under keys it already used (ADR-019 amendment 2026-11-24).
+// @internal
+#[test]
+fn opening_again_leaves_a_direction_that_has_moved_as_it_is() {
+    let (_dir, storage, contact) = storage_with_contact();
+    let shared_key = [7u8; 32];
+    let own = device(1);
+    let phone = device(2);
+    let peers = [peer(0xA0, &phone)];
+    ensure_directions(&storage, &contact, &shared_key, &own, &peers, NOW).unwrap();
+    let notices = storage.notices();
+    let saved = notices
+        .load(&contact, NoticeStateKind::Sender, &[0xA0; 32])
+        .unwrap()
+        .unwrap();
+    let mut sender = Sender::load(&saved, NOW).unwrap();
+    sender.queue_update(&[9u8; 32], &[3u8; 31]);
+    assert_eq!(sender.write(NOW).len(), 1);
+    let moved = sender.save().unwrap();
+    notices
+        .save(&contact, NoticeStateKind::Sender, &[0xA0; 32], &moved)
+        .unwrap();
+
+    let opened =
+        ensure_directions(&storage, &contact, &shared_key, &own, &peers, NOW + DAY).unwrap();
+
+    assert_eq!(opened, 0);
+    let after = notices
+        .load(&contact, NoticeStateKind::Sender, &[0xA0; 32])
+        .unwrap()
+        .unwrap();
+    assert_eq!(*after, *moved);
 }

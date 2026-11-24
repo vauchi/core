@@ -590,7 +590,13 @@ impl Receiver {
 
         let newest = self.newest_number();
         self.issued.retain_mut(|issued| {
-            issued.number == newest || age(now, &mut issued.made_at) < RETENTION_SECONDS
+            let unexpired = age(now, &mut issued.made_at) < RETENTION_SECONDS;
+            if !unexpired {
+                // The newest stays for numbering; its key goes with the rest
+                // (protocol section 5; gate 16, Codex D1).
+                issued.private = None;
+            }
+            unexpired || issued.number == newest
         });
         self.first_records.forget_unwatched(now);
     }

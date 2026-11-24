@@ -294,7 +294,7 @@ impl Pending {
     }
 
     /// Notes an update key read in a notice. False when its commitment
-    /// was installed lately or the key is already pending; a key already
+    /// was installed lately or the key is already pending with it; a key already
     /// pending is kept 21 days from this notice, with its chunks, so that a
     /// card whose publication outlasts 21 days still completes (owner,
     /// 2026-11-23, gate review 6). A superseded key is not sent again, so
@@ -313,11 +313,12 @@ impl Pending {
         if installed {
             return false;
         }
-        if let Some(entry) = self
-            .entries
-            .iter_mut()
-            .find(|entry| bool::from(entry.update_key.ct_eq(update_key)))
-        {
+        // Found by key and commitment: an honest sender never sends one key
+        // with two commitments, so a second one is a copy's, and must not
+        // keep the honest view from being noted (gate 16, Claude).
+        if let Some(entry) = self.entries.iter_mut().find(|entry| {
+            bool::from(entry.update_key.ct_eq(update_key) & entry.commitment.ct_eq(commitment))
+        }) {
             entry.noted_at = now.max(entry.noted_at);
             return false;
         }

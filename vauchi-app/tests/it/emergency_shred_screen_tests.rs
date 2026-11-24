@@ -8,13 +8,14 @@
 //! used to be contextual actions, which shells fold into the Actions
 //! menu, so the one button that matters was hidden.
 
+use vauchi_app::i18n::{Locale, get_string};
 use vauchi_app::ui::{
     ActionResult, Component, EmergencyShredEngine, EngineOutput, GdprChoice, UserAction,
     WorkflowEngine,
 };
 
 fn engine() -> EmergencyShredEngine {
-    EmergencyShredEngine::new(vauchi_app::i18n::Locale::ENGLISH)
+    EmergencyShredEngine::new(Locale::ENGLISH)
 }
 
 fn type_word(engine: &mut EmergencyShredEngine, word: &str) {
@@ -36,11 +37,11 @@ fn the_wipe_screen_holds_the_warning_the_field_and_the_buttons() {
     let screen = engine().current_screen();
 
     assert_eq!(screen.title, "Emergency Data Wipe");
+    // The wording lives in locales; pinning it here made a copy fix there
+    // break Core's pipeline (vauchi/private#1329).
     assert_eq!(
-        screen.subtitle.as_deref(),
-        Some(
-            "Immediately destroys all data on this device and asks your contacts' apps to delete your card."
-        )
+        screen.subtitle,
+        Some(get_string(Locale::ENGLISH, "shred.wipe.subtitle"))
     );
     assert!(matches!(
         &screen.components[0],

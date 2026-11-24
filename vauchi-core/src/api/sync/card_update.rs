@@ -693,40 +693,12 @@ fn try_receive_genesis_alert(
         storage
             .replay()
             .save_replay_nonce(sender_id, alert.nonce(), alert.timestamp())?;
-        // F4 slice 4a: persist the carried identity-signed registry
-        // (additive, monotonic-guarded — ADR-068 req 6) so this receiver can
-        // afterwards address the sender identity's devices. Tolerates a
-        // held-or-newer version; a broadcast the store rejects otherwise is
-        // not fatal to the alert (the alert's own signature already
-        // verified) — registry seeding is opportunistic here.
-        if let Ok(broadcast_text) = std::str::from_utf8(&opened.sender_registry_broadcast_json)
-            && let Ok(broadcast) = crate::identity::RegistryBroadcast::from_json(broadcast_text)
-        {
-            let persisted = storage.device().save_contact_device_registry(
-                sender_id,
-                &broadcast,
-                peer_identity,
-                u64::MAX,
-            );
-            let held_version = match persisted {
-                Ok(()) => Some(broadcast.version()),
-                Err(_) => storage
-                    .device()
-                    .load_contact_device_registry(sender_id)?
-                    .filter(|stored| stored.version() >= broadcast.version())
-                    .map(|stored| stored.version()),
-            };
-            if let Some(version) = held_version {
-                let mut tracker = storage
-                    .registry_activation()
-                    .load_activation(sender_id)?
-                    .unwrap_or_default();
-                tracker.record_peer_registry(version);
-                storage
-                    .registry_activation()
-                    .save_activation(sender_id, &tracker)?;
-            }
-        }
+        retain_carried_registry(
+            storage,
+            sender_id,
+            peer_identity,
+            &opened.sender_registry_broadcast_json,
+        )?;
         match storage.safety_alerts().insert_or_compare_fact(
             sender_id,
             alert.nonce(),
@@ -766,6 +738,50 @@ fn try_receive_genesis_alert(
         location: alert.location().cloned(),
         nonce: *alert.nonce(),
     }))
+}
+
+/// Keeps the identity-signed registry a genesis envelope carries when it is
+/// newer than the one held (additive, monotonic-guarded — ADR-068 req 6), so
+/// this receiver can afterwards address the sender identity's devices. A
+/// broadcast the store refuses is not fatal: registry seeding from a genesis
+/// envelope is opportunistic.
+fn retain_carried_registry(
+    storage: &Storage,
+    sender_id: &str,
+    peer_identity: &[u8; 32],
+    carried_broadcast_json: &[u8],
+) -> Result<(), CardUpdateError> {
+    let Ok(broadcast_text) = std::str::from_utf8(carried_broadcast_json) else {
+        return Ok(());
+    };
+    let Ok(broadcast) = crate::identity::RegistryBroadcast::from_json(broadcast_text) else {
+        return Ok(());
+    };
+    let persisted = storage.device().save_contact_device_registry(
+        sender_id,
+        &broadcast,
+        peer_identity,
+        u64::MAX,
+    );
+    let held_version = match persisted {
+        Ok(()) => Some(broadcast.version()),
+        Err(_) => storage
+            .device()
+            .load_contact_device_registry(sender_id)?
+            .filter(|stored| stored.version() >= broadcast.version())
+            .map(|stored| stored.version()),
+    };
+    if let Some(version) = held_version {
+        let mut tracker = storage
+            .registry_activation()
+            .load_activation(sender_id)?
+            .unwrap_or_default();
+        tracker.record_peer_registry(version);
+        storage
+            .registry_activation()
+            .save_activation(sender_id, &tracker)?;
+    }
+    Ok(())
 }
 
 /// Apply a genesis-sealed CARD delta (the responder-side card fan-out

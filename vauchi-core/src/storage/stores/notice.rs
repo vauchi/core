@@ -115,6 +115,10 @@ impl NoticeStore<'_> {
         {
             return Err(StorageError::NoticeMoved);
         }
+        // The notices this state assigned leave after this save; a save a
+        // power loss could undo would let the next session seal new
+        // plaintexts under keys already used (ADR-019 amendment 2026-11-24).
+        let _durable = crate::storage::full_sync::FullSync::full(self.conn)?;
         let row_version: i64 = self.conn.query_row(
             "INSERT INTO notice_states
                  (contact_id, kind, peer_device_id, state_encrypted,

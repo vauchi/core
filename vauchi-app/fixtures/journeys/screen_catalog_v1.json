@@ -11243,7 +11243,7 @@
               "surface_id": "emergency_shred",
               "revision": 1,
               "title": "Emergency Data Wipe",
-              "subtitle": "Immediately destroys all data on this device and asks your contacts' apps to delete your card.",
+              "subtitle": "Immediately destroys all data on this device. It tells nobody: your contacts keep your card. To end your identity everywhere, use Leave Vauchi instead.",
               "accessibility_label": "Emergency Data Wipe",
               "layout": "scroll",
               "tokens": {

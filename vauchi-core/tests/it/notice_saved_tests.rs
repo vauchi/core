@@ -75,6 +75,25 @@ fn loading_saved_state_first_erases_what_expired() {
     );
 }
 
+// Gate 16 (Codex, D1): the newest refresh was kept whatever its age, with
+// its private key, past the three periods protocol section 5 gives an
+// unused one. Its number and name stay for numbering; the key goes.
+// @internal
+#[test]
+fn loading_after_three_periods_erases_the_newest_unused_refresh_key() {
+    let mut p = pair();
+    assert_eq!(p.receiver_session(&[], START).len(), 1, "refresh 1");
+    assert_eq!(p.receiver.refresh_private_keys_held(), 1);
+    let saved = p.receiver.save().expect("saves");
+
+    let inside = Receiver::load(&saved, START + 2 * WEEK).expect("loads");
+    let after = Receiver::load(&saved, START + 3 * WEEK + DAY).expect("loads");
+
+    assert_eq!(inside.refresh_private_keys_held(), 1);
+    assert_eq!(after.refresh_private_keys_held(), 0);
+    assert_eq!(after.newest_number(), 1, "the number is kept");
+}
+
 // @internal
 #[test]
 fn a_publisher_and_pending_keys_carry_on_after_loading() {

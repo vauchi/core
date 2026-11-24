@@ -567,6 +567,7 @@ mod rqrr_fork_tests;
 mod safety_alert_fact_storage_tests;
 mod safety_alert_receive_tests;
 mod safety_alert_tests;
+mod save_exchanged_card_keeps_contact_tests;
 mod schema_compat_tests;
 mod sealed_box_tests;
 mod secure_storage_failure_tests;

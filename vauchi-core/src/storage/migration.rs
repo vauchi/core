@@ -127,7 +127,7 @@ impl MigrationRunner {
             return Ok(None);
         }
 
-        let _durability = super::migration_durability::MigrationDurability::full(conn)?;
+        let _durability = super::full_sync::FullSync::full(conn)?;
 
         let mut created_backup = None;
         if let Some(path) = db_path {

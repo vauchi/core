@@ -19,6 +19,8 @@ use vauchi_core::{Command, Event};
 fn engine_with_contact() -> (AppEngine, String) {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Me").unwrap();
+    // Recording where a contact was met is opt-in (vauchi/private#1220).
+    vauchi.config_mut().remember_where_met = true;
     vauchi
         .import_contacts_from_vcf(b"BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Bob\r\nEND:VCARD\r\n")
         .unwrap();

@@ -20,6 +20,7 @@ fn config() -> SettingsConfig {
         display_name: "Sample User".into(),
         new_field_default_visible: false,
         contact_added_notifications: true,
+        remember_where_met: false,
         card_update_notifications: true,
         relay_url: "https://relay.test".into(),
         device_count: 1,

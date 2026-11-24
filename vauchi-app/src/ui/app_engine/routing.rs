@@ -148,7 +148,13 @@ impl AppEngine {
     /// annotate (ADR-051 capture-at-exchange). The frontend replies with
     /// `Event::LocationResult` (or a location `PermissionDenied` /
     /// `HardwareUnavailable`), consumed in `handle_hardware_event`.
+    ///
+    /// Only when the person turned on "Remember where I met people":
+    /// recording location is opt-in (vauchi/private#1220).
     pub fn request_exchange_location(&mut self, contact_id: String) {
+        if !self.vauchi.config().remember_where_met {
+            return;
+        }
         self.pending_location_contact = Some(contact_id);
         self.pending_commands
             .push_back(vauchi_core::Command::LocationRequest { timeout_ms: 10_000 });

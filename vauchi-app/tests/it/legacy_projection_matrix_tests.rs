@@ -60,6 +60,7 @@ fn sample_settings_config() -> SettingsConfig {
         display_name: "Alice".into(),
         new_field_default_visible: false,
         contact_added_notifications: false,
+        remember_where_met: false,
         card_update_notifications: true,
         relay_url: "https://relay.vauchi.app".into(),
         device_count: 2,

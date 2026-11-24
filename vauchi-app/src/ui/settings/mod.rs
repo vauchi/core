@@ -65,6 +65,8 @@ pub struct SettingsConfig {
     pub new_field_default_visible: bool,
     #[serde(default)]
     pub contact_added_notifications: bool,
+    #[serde(default)]
+    pub remember_where_met: bool,
     #[serde(default = "default_true")]
     pub card_update_notifications: bool,
     pub relay_url: String,
@@ -251,6 +253,9 @@ impl SettingsEngine {
             }
             ("privacy", "contact_added") => {
                 config.contact_added_notifications = !config.contact_added_notifications;
+            }
+            ("privacy", "remember_where_met") => {
+                config.remember_where_met = !config.remember_where_met;
             }
             ("privacy", "card_update") => {
                 config.card_update_notifications = !config.card_update_notifications;

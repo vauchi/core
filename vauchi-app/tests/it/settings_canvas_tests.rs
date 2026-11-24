@@ -177,6 +177,7 @@ fn privacy_section_keeps_the_toggles_next_to_your_data() {
             "new_field_default",
             "card_update",
             "contact_added",
+            "remember_where_met",
             "activity_log",
         ]
     );

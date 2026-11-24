@@ -181,6 +181,13 @@ impl SettingsEngine {
                     self.t("settings.contact_added_a11y"),
                     "settings.contact_added_hint",
                 ),
+                self.toggle_row(
+                    "remember_where_met",
+                    "settings.remember_where_met",
+                    self.config.remember_where_met,
+                    self.t("settings.remember_where_met_a11y"),
+                    "settings.remember_where_met_hint",
+                ),
                 self.destination_row("activity_log", "nav.activity", None),
             ],
         }

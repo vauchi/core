@@ -73,6 +73,9 @@ impl AppEngine {
                 "contact_added" => {
                     config.contact_added_notifications = !config.contact_added_notifications;
                 }
+                "remember_where_met" => {
+                    config.remember_where_met = !config.remember_where_met;
+                }
                 "card_update" => {
                     config.card_update_notifications = !config.card_update_notifications;
                 }

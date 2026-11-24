@@ -224,6 +224,7 @@ impl AppEngine {
                     display_name,
                     new_field_default_visible: vauchi.config().new_field_default_visible,
                     contact_added_notifications: vauchi.config().contact_added_notifications,
+                    remember_where_met: vauchi.config().remember_where_met,
                     card_update_notifications: vauchi.config().card_update_notifications,
                     relay_url: vauchi.config().relay.server_url.clone(),
                     device_count: 1,

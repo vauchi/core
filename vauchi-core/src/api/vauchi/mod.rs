@@ -576,6 +576,7 @@ impl ProfileEngine {
             config.suppress_presence = flags.suppress_presence;
             config.offline = flags.offline;
             config.contact_added_notifications = flags.contact_added_notifications;
+            config.remember_where_met = flags.remember_where_met;
             config.card_update_notifications = flags.card_update_notifications;
             config.reduce_motion = flags.reduce_motion;
             config.large_touch = flags.large_touch;

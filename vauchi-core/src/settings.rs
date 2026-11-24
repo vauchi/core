@@ -76,6 +76,10 @@ pub struct SettingsFlags {
     /// Notify when a new contact is added. Defaults to false.
     #[serde(default)]
     pub contact_added_notifications: bool,
+    /// Record where a contact was met at exchange. Defaults to false:
+    /// opt-in (vauchi/private#1220).
+    #[serde(default)]
+    pub remember_where_met: bool,
     /// Notify when a contact updates their card. Defaults to **true** — the
     /// product's core heartbeat (M4 S3). `default_true` for back-compat with
     /// flags stored before this field existed.
@@ -139,6 +143,7 @@ impl Default for SettingsFlags {
             suppress_presence: false,
             offline: false,
             contact_added_notifications: false,
+            remember_where_met: false,
             card_update_notifications: true,
             reduce_motion: false,
             large_touch: false,

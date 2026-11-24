@@ -67,6 +67,10 @@ pub struct VauchiConfig {
     /// Default: false (opt-in).
     pub contact_added_notifications: bool,
 
+    /// Whether an exchange records where the contact was met, asking the
+    /// phone for its location. Default: false, opt-in (vauchi/private#1220).
+    pub remember_where_met: bool,
+
     /// Whether to send an OS notification when a contact updates their card —
     /// the product's core heartbeat. Default: **true** (M4 S3). Self-seeded
     /// from `SettingsFlags` so it follows the user across devices.
@@ -115,6 +119,7 @@ impl Default for VauchiConfig {
             relay_list: None,
             ohttp: OhttpConfig::default(),
             contact_added_notifications: false,
+            remember_where_met: false,
             card_update_notifications: true,
             reduce_motion: false,
             large_touch: false,
@@ -137,6 +142,7 @@ impl crate::settings::SettingsFlags {
         self.suppress_presence = config.suppress_presence;
         self.offline = config.offline;
         self.contact_added_notifications = config.contact_added_notifications;
+        self.remember_where_met = config.remember_where_met;
         self.card_update_notifications = config.card_update_notifications;
         self.reduce_motion = config.reduce_motion;
         self.large_touch = config.large_touch;

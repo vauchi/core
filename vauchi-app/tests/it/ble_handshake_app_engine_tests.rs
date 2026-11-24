@@ -317,6 +317,8 @@ fn pump_capture(
 #[test]
 fn two_party_ble_exchange_persists_each_others_contact() {
     let mut alice = engine_named("Alice");
+    // Recording where a contact was met is opt-in (vauchi/private#1220).
+    alice.vauchi_mut().config_mut().remember_where_met = true;
     let mut bob = engine_named("Bob");
     let alice_token = token_of(&alice);
     let bob_token = token_of(&bob);

@@ -432,6 +432,7 @@ mod notice_publish_tests;
 mod notice_saved_tests;
 mod notice_seal_tests;
 mod notice_session_tests;
+mod notice_store_tests;
 mod offline_catch_up_sync_tests;
 mod offline_catch_up_tests;
 mod offline_mode_tests;

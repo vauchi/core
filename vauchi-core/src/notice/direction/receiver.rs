@@ -167,6 +167,15 @@ impl Receiver {
         Ok(receiver)
     }
 
+    /// How many refresh private keys this direction still holds: what a
+    /// later copy of the device could take (protocol section 5, P2).
+    pub fn refresh_private_keys_held(&self) -> usize {
+        self.issued
+            .iter()
+            .filter(|issued| issued.private.is_some())
+            .count()
+    }
+
     pub fn alarms(&self) -> &[Alarm] {
         &self.alarms
     }

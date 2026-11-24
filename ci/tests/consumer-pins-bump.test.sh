@@ -27,7 +27,8 @@ repos = {entry["repo"] for entry in consumers}
 assert "qt-display" in repos, "the Qt display's core-ref is bumped under its project name (ADR-078)"
 assert not repos & {"linux-gtk", "linux-qt"}, "GitLab's API does not find a project by its earlier path"
 assert "windows-app" in repos and "windows" not in repos, "the Windows app's CABI pin is bumped under its project name (ADR-078 step 4)"
-assert {"cli-display", "tui-display"} <= set(repos) and not {"cli", "tui"} & set(repos), "the terminal displays are bumped under their project names (ADR-078 step 3, private#1233)"
+assert "cli-display" in repos and "cli" not in repos, "the CLI is bumped under its project name until #381 removes its root crate (ADR-078 step 3, private#1233)"
+assert not {"tui", "tui-display"} & repos, "tui-display holds only its display library, which links no Core (owner, 2026-11-24, private#1233)"
 matrix = [line for line in Path(sys.argv[2]).read_text().splitlines() if "DOWNSTREAM:" in line]
 assert all("vauchi/gtk-display" not in line for line in matrix), "Core RC verification must not target the display"
 PY

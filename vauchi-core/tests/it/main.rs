@@ -297,6 +297,7 @@ mod gdpr_export_tests;
 mod genesis_card_per_device_floor_tests;
 mod genesis_envelope_crypto_tests;
 mod genesis_rate_limit_tests;
+mod genesis_revoked_device_tests;
 mod group_privacy_tests;
 mod group_tag_place_store_tests;
 mod group_transition_tests;

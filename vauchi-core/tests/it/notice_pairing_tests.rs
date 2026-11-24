@@ -12,7 +12,7 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::{SymmetricKey, X25519KeyPair};
 use vauchi_core::identity::Identity;
 use vauchi_core::notice::direction::Sender;
-use vauchi_core::notice::pairing::{PeerDevice, ensure_directions, open_directions};
+use vauchi_core::notice::pairing::{PeerDevice, open_directions};
 use vauchi_core::storage::{NoticeStateKind, Storage};
 
 const NOW: u64 = 1_800_000_000;
@@ -107,7 +107,10 @@ fn a_contacts_directions_are_saved_once_per_peer_device() {
     let (phone, laptop) = (device(2), device(3));
     let peers = [peer(0xA0, &phone), peer(0xB0, &laptop)];
 
-    let opened = ensure_directions(&storage, &contact, &shared_key, &own, &peers, NOW).unwrap();
+    let opened = storage
+        .notices()
+        .ensure_directions(&contact, &shared_key, &own, &peers, NOW)
+        .unwrap();
 
     assert_eq!(opened, 2);
     let notices = storage.notices();
@@ -140,7 +143,10 @@ fn opening_again_leaves_a_direction_that_has_moved_as_it_is() {
     let own = device(1);
     let phone = device(2);
     let peers = [peer(0xA0, &phone)];
-    ensure_directions(&storage, &contact, &shared_key, &own, &peers, NOW).unwrap();
+    storage
+        .notices()
+        .ensure_directions(&contact, &shared_key, &own, &peers, NOW)
+        .unwrap();
     let notices = storage.notices();
     let saved = notices
         .load(&contact, NoticeStateKind::Sender, &[0xA0; 32])
@@ -154,8 +160,10 @@ fn opening_again_leaves_a_direction_that_has_moved_as_it_is() {
         .save(&contact, NoticeStateKind::Sender, &[0xA0; 32], &moved)
         .unwrap();
 
-    let opened =
-        ensure_directions(&storage, &contact, &shared_key, &own, &peers, NOW + DAY).unwrap();
+    let opened = storage
+        .notices()
+        .ensure_directions(&contact, &shared_key, &own, &peers, NOW + DAY)
+        .unwrap();
 
     assert_eq!(opened, 0);
     let after = notices

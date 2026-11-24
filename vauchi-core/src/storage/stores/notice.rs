@@ -168,6 +168,60 @@ impl NoticeStore<'_> {
         Ok(Some(state))
     }
 
+    /// Opens and saves the directions `contact_id` lacks with each of `peers`,
+    /// and returns how many devices it opened. A saved direction is never
+    /// opened again: that would restart its chain under keys it already used.
+    pub fn ensure_directions(
+        &self,
+        contact_id: &str,
+        shared_key: &[u8; 32],
+        own_device: &crate::crypto::X25519KeyPair,
+        peers: &[crate::notice::pairing::PeerDevice],
+        now: u64,
+    ) -> Result<usize, StorageError> {
+        let mut opened = 0;
+        for peer in peers {
+            let has = |kind| -> Result<bool, StorageError> {
+                Ok(self.load(contact_id, kind, &peer.device_id)?.is_some())
+            };
+            let (has_sender, has_receiver) = (
+                has(NoticeStateKind::Sender)?,
+                has(NoticeStateKind::Receiver)?,
+            );
+            if has_sender && has_receiver {
+                continue;
+            }
+            // Opening is deterministic from the shared key, so a direction a
+            // crash left unsaved is opened again exactly as it would have been.
+            let (sender, receiver) = crate::notice::pairing::open_directions(
+                shared_key,
+                own_device,
+                &peer.exchange_public,
+                now,
+            );
+            if !has_sender {
+                let sender = sender.save().map_err(saved_notice_error)?;
+                self.save(
+                    contact_id,
+                    NoticeStateKind::Sender,
+                    &peer.device_id,
+                    &sender,
+                )?;
+            }
+            if !has_receiver {
+                let receiver = receiver.save().map_err(saved_notice_error)?;
+                self.save(
+                    contact_id,
+                    NoticeStateKind::Receiver,
+                    &peer.device_id,
+                    &receiver,
+                )?;
+            }
+            opened += 1;
+        }
+        Ok(opened)
+    }
+
     fn sealing_key(&self, contact_id: &str) -> Result<(SymmetricKey, bool), StorageError> {
         match (self.receive_key, self.key) {
             (Some(receive_key), _) => {
@@ -240,4 +294,8 @@ impl NoticeStore<'_> {
         )?;
         Ok(())
     }
+}
+
+fn saved_notice_error(error: crate::notice::saved::SavedError) -> StorageError {
+    StorageError::Serialization(format!("notice state: {error:?}"))
 }

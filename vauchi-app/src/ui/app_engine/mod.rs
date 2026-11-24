@@ -24,6 +24,7 @@ mod contact_visibility_view;
 mod glance;
 mod handover;
 mod hardware_routing;
+mod in_screen_scanner;
 #[cfg(any(test, feature = "testing"))]
 mod test_hooks;
 mod wakeup;
@@ -205,6 +206,8 @@ pub struct AppEngine {
     /// Phase 2b of `2026-05-04-exchange-command-screen-presentation`.
     pending_commands: std::collections::VecDeque<vauchi_core::Command>,
     hardware_route: crate::ui::hardware_route::HardwareRoute,
+    /// The screen showing Core's scanner, for a scan no shell runs (#1365).
+    in_screen_scanner: Option<String>,
     /// Where Core keeps the pick, once a shell names its data directory.
     kept_state_file: Option<crate::ui::restorable_state::KeptStateFile>,
     /// Contact id awaiting an `Event::LocationResult` after an exchange
@@ -592,6 +595,7 @@ impl AppEngine {
             sync_chrome_status: SyncChromeStatus::Idle,
             pending_commands: std::collections::VecDeque::new(),
             hardware_route: crate::ui::hardware_route::HardwareRoute::default(),
+            in_screen_scanner: None,
             kept_state_file: None,
             pending_location_contact: None,
             legacy_exchange_persisted: None,
@@ -743,7 +747,8 @@ impl AppEngine {
 
 impl WorkflowEngine for AppEngine {
     fn current_screen(&self) -> ScreenModel {
-        let screen = self.apply_restore_in_progress(self.engine.current_screen());
+        let screen = self.apply_in_screen_scanner(self.engine.current_screen());
+        let screen = self.apply_restore_in_progress(screen);
         let screen = self.apply_exchange_mode_overlay(screen);
         let screen = self.apply_update_overlay(screen);
         let screen = self.apply_offline_overlay(screen);
@@ -895,7 +900,8 @@ impl AppEngine {
     /// Everything that follows the active engine's answer to an action.
     fn finish_engine_result(&mut self, result: ActionResult) -> ActionResult {
         self.pin_typed_glance_code();
-        let result = self.route_result(result);
+        let routed = self.route_result(result);
+        let result = self.scan_in_screen_without_a_hardware_shell(routed);
         // Slice 32l T3.1b: feed typed DeviceLink* ActionResults into the engine-owned machine.
         #[cfg(all(feature = "network-http", feature = "storage"))]
         self.dispatch_device_link_side_effects(&result);

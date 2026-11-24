@@ -358,6 +358,9 @@ impl AppEngine {
         &mut self,
         action: &UserAction,
     ) -> Option<ActionResult> {
+        if let Some(result) = self.intercept_in_screen_scanner(action) {
+            return Some(result);
+        }
         if self.screen == AppScreen::Recovery
             && self.engine.current_screen().screen_id == "recovery_load_error"
             && matches!(action, UserAction::ActionPressed { action_id } if action_id == "retry_recovery_load")

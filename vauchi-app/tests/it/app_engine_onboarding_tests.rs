@@ -303,6 +303,12 @@ fn request_camera_result_routes_to_qr_request_scan_command() {
 
     let vauchi = Vauchi::in_memory().unwrap();
     let mut engine = AppEngine::new(vauchi);
+    // A hardware shell runs the scan; without one Core shows its own
+    // scanner instead (in_screen_scanner_tests, vauchi/private#1365).
+    let report = r#"{"HardwareCapabilitiesReported":{"capabilities":{"has_camera":true}}}"#;
+    engine
+        .dispatch(vauchi_core::event_from_json(report).unwrap())
+        .unwrap();
     engine.navigate_to(AppScreen::Onboarding);
 
     // Drive to the device-link instructions screen.

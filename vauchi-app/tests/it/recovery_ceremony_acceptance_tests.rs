@@ -74,12 +74,42 @@ fn press_primary(engine: &mut Actor, commands: &[Command]) -> Vec<Command> {
         .unwrap()
 }
 
+/// The surface and binding of the scanner a screen shows. The fixture's
+/// phones attach no hardware shell, so Core shows its own scanner in the
+/// screen rather than asking for `QrRequestScan` (vauchi/private#1365).
+fn shown_scanner(commands: &[Command]) -> Option<(Value, Value)> {
+    fn capture(value: &Value) -> Option<Value> {
+        match value {
+            Value::Object(fields) => {
+                if let Some(qr) = fields.get("Qr")
+                    && qr["purpose"] == "capture"
+                {
+                    return Some(qr["id"].clone());
+                }
+                fields.values().find_map(capture)
+            }
+            Value::Array(items) => items.iter().find_map(capture),
+            _ => None,
+        }
+    }
+    commands.iter().find_map(|command| match command {
+        Command::ReplaceSurface { surface } => {
+            let surface = serde_json::to_value(surface).unwrap();
+            capture(&surface).map(|binding| (surface["surface_id"].clone(), binding))
+        }
+        _ => None,
+    })
+}
+
 fn scan(engine: &mut Actor, commands: &[Command], data: String) -> Vec<Command> {
-    assert!(
-        commands.contains(&Command::QrRequestScan),
-        "the screen asks the hardware shell for a scan"
-    );
-    engine.dispatch(Event::QrScanned { data }).unwrap()
+    let (surface_id, binding_id) = shown_scanner(commands).expect("the screen shows a scanner");
+    engine
+        .dispatch(Event::ValueChanged {
+            surface_id: serde_json::from_value(surface_id).unwrap(),
+            binding_id: serde_json::from_value(binding_id).unwrap(),
+            value: vauchi_core::platform::InputValue::Text(data),
+        })
+        .unwrap()
 }
 
 /// An app engine whose traffic the fixture can record. `dispatch` and

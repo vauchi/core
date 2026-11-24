@@ -430,3 +430,33 @@ fn a_waiting_time_in_the_future_is_pulled_back_to_the_clock() {
     publisher.queue_due(W0);
     assert_eq!(publisher.waiting_since(), Some(W0));
 }
+
+// Gate 16 (Claude, 1.C): a copy of the sender that holds the chain key
+// read the honest (K, C), pushed it out with 32 keys of its own, then
+// noted (K, C'). Pending entries were found by update key alone, so the
+// weekly view of (K, C) only renewed (K, C') and the card never
+// installed until the next edit. An honest sender never sends one key
+// with two commitments (specification section 7: the view replaces it).
+// @internal
+#[test]
+fn a_view_installs_the_card_after_a_copy_noted_its_key_with_another_commitment() {
+    let key = [0xAB; 32];
+    let text = body(1_500, 1);
+    let honest = commitment(&key, &text);
+    let mut publisher = Publisher::new(key, &text);
+    let mut pending = Pending::default();
+    assert!(pending.note(&key, &honest, W0 + DAY));
+    for junk in 0..32u8 {
+        pending.note(&[junk; 32], &[junk; 31], W0 + DAY);
+    }
+    let forged = [0xEE; 31];
+    assert!(pending.note(&key, &forged, W0 + DAY));
+
+    let view = W0 + PERIOD_SECONDS + DAY;
+    assert!(pending.note(&key, &honest, view), "the view is noted anew");
+    let written = session(&mut publisher, view, 8);
+    let bodies = pending.read(&written, view + DAY, accept_all);
+
+    assert_eq!(bodies.len(), 1);
+    assert_eq!(bodies[0].as_slice(), text.as_slice());
+}

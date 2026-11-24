@@ -110,6 +110,20 @@ impl DeviceLinkJoinEngine {
         }
     }
 
+    fn start_join(&mut self) -> ActionResult {
+        // Effective name: an untouched field means "use this device's own
+        // name", so only a blank *default* is a validation failure.
+        if self.device_name().trim().is_empty() {
+            return ActionResult::ValidationError {
+                component_id: DEVICE_NAME_INPUT_ID.into(),
+                message: self.t("devices.link.device_name"),
+            };
+        }
+        let name = self.device_name().to_string();
+        self.step = JoinStep::PostingRequest;
+        ActionResult::DeviceLinkJoinStart { device_name: name }
+    }
+
     fn enter_name_screen(&self) -> ScreenModel {
         // Gated on the effective name, so an untouched field still joins
         // under the device's own name.
@@ -358,21 +372,15 @@ impl WorkflowEngine for DeviceLinkJoinEngine {
                 self.device_name = value;
                 ActionResult::UpdateScreen(self.build_screen())
             }
+            // The keyboard's Done joins as Confirm does: on the Pixel no
+            // Confirm button showed and Done did nothing (vauchi/private#1390).
+            UserAction::TextSubmitted { component_id }
+                if component_id == DEVICE_NAME_INPUT_ID && self.step == JoinStep::EnterName =>
+            {
+                self.start_join()
+            }
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
-                JOIN_ACTION_ID => {
-                    // Effective name: an untouched field means "use this
-                    // device's own name", so only a blank *default* is a
-                    // validation failure.
-                    if self.device_name().trim().is_empty() {
-                        return ActionResult::ValidationError {
-                            component_id: DEVICE_NAME_INPUT_ID.into(),
-                            message: self.t("devices.link.device_name"),
-                        };
-                    }
-                    let name = self.device_name().to_string();
-                    self.step = JoinStep::PostingRequest;
-                    ActionResult::DeviceLinkJoinStart { device_name: name }
-                }
+                JOIN_ACTION_ID => self.start_join(),
                 RETRY_ACTION_ID => {
                     self.step = JoinStep::EnterName;
                     ActionResult::UpdateScreen(self.build_screen())

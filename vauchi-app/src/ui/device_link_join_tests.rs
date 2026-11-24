@@ -273,3 +273,40 @@ fn the_failed_screen_gives_the_reason_the_host_stated() {
         assert_eq!(detail.as_deref(), Some(sentence), "reason {reason}");
     }
 }
+
+// @internal — the keyboard's Done (✓) on the name joins as Confirm does:
+// on the Pixel no Confirm button showed and the ✓ did nothing, so a
+// scanned link could not be completed (vauchi/private#1390).
+#[test]
+fn submitting_the_name_joins_as_confirm_does() {
+    let mut engine = engine();
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: DEVICE_NAME_INPUT_ID.into(),
+        value: "Pixel".into(),
+    });
+
+    let result = engine.handle_action(UserAction::TextSubmitted {
+        component_id: DEVICE_NAME_INPUT_ID.into(),
+    });
+
+    assert!(
+        matches!(&result, crate::ui::ActionResult::DeviceLinkJoinStart { device_name } if device_name == "Pixel"),
+        "expected the join to start, got {result:?}"
+    );
+    assert_eq!(screen_id(&engine), "device_link_join_posting");
+}
+
+// @internal — an untouched field submits under the device's own name.
+#[test]
+fn submitting_an_untouched_name_joins_under_the_devices_name() {
+    let mut engine = engine();
+
+    let result = engine.handle_action(UserAction::TextSubmitted {
+        component_id: DEVICE_NAME_INPUT_ID.into(),
+    });
+
+    assert!(
+        matches!(&result, crate::ui::ActionResult::DeviceLinkJoinStart { device_name } if device_name == "My Phone"),
+        "expected the join to start, got {result:?}"
+    );
+}

@@ -1,0 +1,73 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! Opening the two directions between one own device and one peer device
+//! from the contact's shared key (vauchi/private#1375, step 2, decision
+//! A1): each side derives on its own the seed the other side derives.
+#![cfg(feature = "notice-core")]
+
+use vauchi_core::crypto::X25519KeyPair;
+use vauchi_core::notice::pairing::open_directions;
+
+const NOW: u64 = 1_800_000_000;
+const DAY: u64 = 86_400;
+
+fn device(byte: u8) -> X25519KeyPair {
+    X25519KeyPair::from_bytes([byte; 32])
+}
+
+// @internal
+#[test]
+fn each_side_opens_the_direction_the_other_reads_and_an_update_crosses_it() {
+    let shared_key = [7u8; 32];
+    let (alice, bob) = (device(1), device(2));
+    let alice_public = *alice.public_key();
+    let bob_public = *bob.public_key();
+
+    let (mut alice_to_bob, bob_from_alice_seen_by_alice) =
+        open_directions(&shared_key, &alice, &bob_public, NOW);
+    let (bob_to_alice, mut bob_from_alice) = open_directions(&shared_key, &bob, &alice_public, NOW);
+
+    assert_eq!(alice_to_bob.writes_in(), bob_from_alice.seed_epoch());
+    assert_eq!(
+        bob_to_alice.writes_in(),
+        bob_from_alice_seen_by_alice.seed_epoch()
+    );
+    assert_ne!(alice_to_bob.writes_in(), bob_to_alice.writes_in());
+
+    let update_key = [9u8; 32];
+    let commitment = [3u8; 31];
+    alice_to_bob.queue_update(&update_key, &commitment);
+    let written = alice_to_bob.write(NOW);
+    let read = bob_from_alice.read(&written, NOW + DAY);
+    assert_eq!(read.len(), 1);
+    assert_eq!(*read[0].update_key, update_key);
+    assert_eq!(read[0].commitment, commitment);
+    assert!(alice_to_bob.alarms().is_empty());
+    assert!(bob_from_alice.alarms().is_empty());
+}
+
+// @internal
+#[test]
+fn a_device_linked_later_gets_directions_of_its_own() {
+    let shared_key = [7u8; 32];
+    let alice = device(1);
+    let (bob_phone, bob_laptop) = (device(2), device(3));
+
+    let (to_phone, _) = open_directions(&shared_key, &alice, bob_phone.public_key(), NOW);
+    let (to_laptop, _) = open_directions(&shared_key, &alice, bob_laptop.public_key(), NOW);
+
+    assert_ne!(to_phone.writes_in(), to_laptop.writes_in());
+}
+
+// @internal
+#[test]
+fn another_contacts_shared_key_opens_other_directions() {
+    let (alice, bob) = (device(1), device(2));
+
+    let (first, _) = open_directions(&[7u8; 32], &alice, bob.public_key(), NOW);
+    let (second, _) = open_directions(&[8u8; 32], &alice, bob.public_key(), NOW);
+
+    assert_ne!(first.writes_in(), second.writes_in());
+}

@@ -428,6 +428,7 @@ mod notice_device_tests;
 mod notice_direction_tests;
 mod notice_fairness_tests;
 mod notice_key_schedule_tests;
+mod notice_pairing_tests;
 mod notice_publish_tests;
 mod notice_saved_tests;
 mod notice_seal_tests;

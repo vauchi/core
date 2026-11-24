@@ -76,6 +76,7 @@ mod kept_pick_tests;
 mod link_initiator_poll_tests;
 mod link_responder_poll_tests;
 mod link_two_party_escrow_convergence_tests;
+mod location_capture_opt_in_tests;
 mod lock_screen_engine_tests;
 #[cfg(feature = "testing")]
 mod missed_background_run_tests;

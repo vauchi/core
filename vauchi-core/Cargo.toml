@@ -35,7 +35,7 @@ testing = ["notice-core"]
 # The notice core of mailbox cohorts (ADR-081): experimental, wired to
 # nothing, and built only for tests until its protocol is reviewed
 # (vauchi/private#1281). No shipped build enables it.
-notice-core = ["dep:chacha20"]
+notice-core = []
 # Reduces Argon2id KDF cost parameters for faster test execution (~5x speedup).
 # MUST NOT be enabled in production builds — only for test/dev profiles.
 test-kdf = []
@@ -67,7 +67,6 @@ spake2 = { git = "https://gitlab.com/vauchi/utils/spake2.git", tag = "v0.4.0+vau
 chacha20poly1305 = "0.10.1"
 # The stream cipher inside chacha20poly1305, directly, for the 96-byte
 # notice seal only (ADR-019 amendment 2026-11-22).
-chacha20 = { version = "0.9.1", optional = true, features = ["zeroize"] }
 
 # Argon2id password KDF (spec-mandated, outside RustCrypto primary set but spec-mandated)
 argon2 = "0.5.3"

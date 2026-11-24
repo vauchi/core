@@ -4187,7 +4187,6 @@ version = "0.109.0"
 dependencies = [
  "argon2",
  "base64",
- "chacha20",
  "chacha20poly1305",
  "crc32fast",
  "criterion",

@@ -62,6 +62,10 @@ dev-local-content = ["content-updates", "dev-build"]
 # Set by every dev-only feature so build.rs can refuse them in a tag
 # pipeline, where release bindings are built (private#794).
 dev-build = []
+# The notice core of mailbox cohorts (ADR-081, proposed), while it is wired
+# into the app (vauchi/private#1375). Dev-only: build.rs refuses it in a
+# tag pipeline, so no release ships it.
+notice-core = ["vauchi-core/notice-core", "dev-build"]
 # Forwards `vauchi-core/testing` so the integration test binary can
 # reach `FakeClock` + `DeterministicRng`. Mirrors vauchi-core's
 # `it` test target wiring. Enable via `--features testing`; the

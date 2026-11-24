@@ -89,11 +89,21 @@ impl ProfileEngine {
     }
 
     /// Upsert the card of a contact established via an in-person exchange,
-    /// without (re)keying the channel. A contact the owner blocked stays
-    /// blocked: the re-exchange is rejected before anything is written
-    /// (ADR-056, #295), and the caller reports an ordinary failure.
+    /// without (re)keying the channel. For a contact already held only the
+    /// card changes: its key, ratchet and what the owner set stay, even when
+    /// `contact` came from a new exchange and carries that exchange's key
+    /// (vauchi/private#1298). A contact the owner blocked stays blocked: the
+    /// re-exchange is rejected before anything is written (ADR-056, #295),
+    /// and the caller reports an ordinary failure.
     pub fn save_exchanged_card(&self, contact: &Contact) -> VauchiResult<()> {
-        if let Some(event) = self.persist_exchanged_card(contact)? {
+        let contact = match self.storage.contacts().load_contact(contact.id())? {
+            Some(mut stored) => {
+                stored.update_card(contact.card().clone(), self.clock.unix_seconds());
+                stored
+            }
+            None => contact.clone(),
+        };
+        if let Some(event) = self.persist_exchanged_card(&contact)? {
             self.events.dispatch(event);
         }
         Ok(())

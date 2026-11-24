@@ -9,18 +9,19 @@
 //! amendment 2026-11-24): a key that sealed two different plaintexts
 //! would expose their XOR and let its authenticator be forged. Each
 //! device here lives only as its saved bytes, as protocol section 7
-//! keeps it, and every session may end at any cut point.
+//! keeps it, and every session may end at any cut point. The gateway
+//! between them replays earlier uploads and alters bytes (claim P5).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use proptest::prelude::*;
 
 use crate::common::notice_pair::*;
-use vauchi_core::notice::content::commitment;
+use vauchi_core::notice::content::{RECORD_BYTES, commitment};
 use vauchi_core::notice::direction::{Alarm, Receiver, Sender};
-use vauchi_core::notice::publish::{Pending, Publisher};
-use vauchi_core::notice::seal::TAG_BYTES;
-use vauchi_core::notice::session::{BACKGROUND, FAST, Session};
+use vauchi_core::notice::publish::{ContentRecord, Pending, Publisher};
+use vauchi_core::notice::seal::{NOTICE_BYTES, TAG_BYTES};
+use vauchi_core::notice::session::{BACKGROUND, FAST, Session, SessionWrite};
 
 /// Where a session stops.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,6 +47,28 @@ fn cut() -> impl Strategy<Value = Cut> {
     ]
 }
 
+/// What the gateway does to an upload on its way to the other devices
+/// (claim P5: it replays, alters and injects bytes, and picks the order).
+#[derive(Debug, Clone, Copy)]
+enum Relay {
+    Faithful,
+    /// Also delivers, after it, an upload of any device from earlier on.
+    ReplayEarlier(usize),
+    /// Flips one byte in every other record, notices and content alike.
+    Alter(usize),
+    /// Delivers the notices and keeps the content back, to replay later.
+    WithholdContent,
+}
+
+fn relay() -> impl Strategy<Value = Relay> {
+    prop_oneof![
+        2 => Just(Relay::Faithful),
+        1 => any::<usize>().prop_map(Relay::ReplayEarlier),
+        1 => any::<usize>().prop_map(Relay::Alter),
+        1 => Just(Relay::WithholdContent),
+    ]
+}
+
 #[derive(Debug, Clone)]
 struct Step {
     days: u64,
@@ -58,6 +81,7 @@ struct Step {
     /// How far this device's clock runs ahead of true time, so a device
     /// may be set back by up to three days (specification section 1).
     clock_ahead_days: u64,
+    relay: Relay,
 }
 
 fn step() -> impl Strategy<Value = Step> {
@@ -70,17 +94,21 @@ fn step() -> impl Strategy<Value = Step> {
         any::<bool>(),
         any::<bool>(),
         0u64..4,
+        relay(),
     )
         .prop_map(
-            |(days, device, edit, fast, cut, dropped, acknowledged, clock_ahead_days)| Step {
-                days,
-                device,
-                edit,
-                fast,
-                cut,
-                dropped,
-                acknowledged,
-                clock_ahead_days,
+            |(days, device, edit, fast, cut, dropped, acknowledged, clock_ahead_days, relay)| {
+                Step {
+                    days,
+                    device,
+                    edit,
+                    fast,
+                    cut,
+                    dropped,
+                    acknowledged,
+                    clock_ahead_days,
+                    relay,
+                }
             },
         )
 }
@@ -190,10 +218,7 @@ fn world() -> [Saved; 3] {
 
 struct Run {
     devices: [Saved; 3],
-    inbox: [(
-        Vec<Notice>,
-        Vec<vauchi_core::notice::publish::ContentRecord>,
-    ); 3],
+    inbox: [(Vec<Notice>, Vec<ContentRecord>); 3],
     /// Every notice a saved session sealed, by tag.
     sealed: BTreeMap<[u8; TAG_BYTES], Notice>,
     latest_key: [u8; 32],
@@ -201,10 +226,16 @@ struct Run {
     edits: u8,
     /// An edit whose session ended before its save, so it is queued again.
     edit_lost: bool,
-    /// The newest update key each of devices 1 and 2 read, and whether it
-    /// installed device 0's latest card.
+    /// Every card a saved session of device 0 published.
+    published: BTreeSet<Vec<u8>>,
+    /// Every upload, which the gateway may deliver again later.
+    uploads: Vec<(Vec<Notice>, Vec<ContentRecord>)>,
+    /// Whether each of devices 1 and 2 read the newest update key, and
+    /// the card it shows: the highest version it installed (R4).
     read_latest: [bool; 2],
-    installed_latest: [bool; 2],
+    shown: [Vec<u8>; 2],
+    /// The versions each of devices 1 and 2 installed, in order.
+    installed_versions: [Vec<u8>; 2],
 }
 
 impl Run {
@@ -217,9 +248,43 @@ impl Run {
             latest_card: Vec::new(),
             edits: 0,
             edit_lost: false,
+            published: BTreeSet::new(),
+            uploads: Vec::new(),
             read_latest: [false; 2],
-            installed_latest: [false; 2],
+            shown: Default::default(),
+            installed_versions: Default::default(),
         }
+    }
+
+    /// What the other devices receive of an upload.
+    fn deliver(&self, relay: Relay, written: &SessionWrite) -> (Vec<Notice>, Vec<ContentRecord>) {
+        let mut notices = written.notices.clone();
+        let mut contents = written.contents.clone();
+        match relay {
+            Relay::Faithful => {}
+            Relay::WithholdContent => contents.clear(),
+            Relay::ReplayEarlier(pick) => {
+                if let Some((old_notices, old_contents)) =
+                    self.uploads.get(pick % self.uploads.len().max(1))
+                {
+                    notices.extend(old_notices.iter().copied());
+                    contents.extend(old_contents.iter().copied());
+                }
+            }
+            Relay::Alter(pick) => {
+                for (i, notice) in notices.iter_mut().enumerate() {
+                    if (i + pick) % 2 == 0 {
+                        notice[(pick / 2 + 7 * i) % NOTICE_BYTES] ^= 1;
+                    }
+                }
+                for (i, record) in contents.iter_mut().enumerate() {
+                    if (i + pick) % 2 == 0 {
+                        record[(pick / 2 + 7 * i) % RECORD_BYTES] ^= 1;
+                    }
+                }
+            }
+        }
+        (notices, contents)
     }
 
     /// One session of `step.device`; `Err` names a key sealed twice.
@@ -228,7 +293,7 @@ impl Run {
         let mut device = self.devices[d].load(now);
         let (notices, contents) = std::mem::take(&mut self.inbox[d]);
         let mut read_latest = false;
-        let mut installed_latest = false;
+        let mut installed = Vec::new();
         for sender in device.senders.iter_mut() {
             sender.read(&notices, now);
         }
@@ -239,8 +304,13 @@ impl Run {
             }
         }
         if d > 0 {
-            let installed = device.pending.read(&contents, now, |_| true);
-            installed_latest = installed.iter().any(|body| **body == self.latest_card);
+            installed = device.pending.read(&contents, now, |_| true);
+            if installed
+                .iter()
+                .any(|body| !self.published.contains(&**body))
+            {
+                return Err(format!("device {d} installed a card never published"));
+            }
         }
         // An edit is the app's card: one lost with its session is queued
         // again by the next, so only an edit that was saved counts.
@@ -276,13 +346,19 @@ impl Run {
         }
         let before = std::mem::replace(&mut self.devices[d], device.save());
         if let Some((key, card, edits)) = edit {
+            self.published.insert(card.clone());
             (self.latest_key, self.latest_card, self.edits) = (key, card, edits);
             self.edit_lost = false;
             self.read_latest = [false; 2];
-            self.installed_latest = [false; 2];
         } else if d > 0 {
             self.read_latest[d - 1] |= read_latest;
-            self.installed_latest[d - 1] |= installed_latest;
+            let shown = &mut self.shown[d - 1];
+            for body in installed {
+                self.installed_versions[d - 1].extend(body.first());
+                if body.first() > shown.first() {
+                    *shown = body.to_vec();
+                }
+            }
         }
         for notice in &written.notices {
             let mut tag = [0u8; TAG_BYTES];
@@ -297,11 +373,14 @@ impl Run {
             return Ok(());
         }
         if !step.dropped {
+            let (notices, contents) = self.deliver(step.relay, &written);
             for other in (0..3).filter(|o| *o != d) {
-                self.inbox[other].0.extend(written.notices.iter().copied());
-                self.inbox[other].1.extend(written.contents.iter().cloned());
+                self.inbox[other].0.extend(notices.iter().copied());
+                self.inbox[other].1.extend(contents.iter().copied());
             }
         }
+        self.uploads
+            .push((written.notices.clone(), written.contents.clone()));
         if step.cut == Cut::SaveUndoneAfterUpload {
             self.devices[d] = before;
             return Ok(());
@@ -331,7 +410,9 @@ proptest! {
 
     // Gate 16 (Codex, Kimi, Claude): no tag a saved session sealed is ever
     // sealed again with other bytes, whatever cut each session stops at;
-    // nothing alarms; and after faithful weeks the latest card arrives.
+    // nothing alarms, whatever the gateway replays or alters (P5); no card
+    // installs that was not published; and after faithful weeks each
+    // receiver shows the latest card.
     // @internal
     #[test]
     fn no_key_seals_twice_across_crashes_and_the_latest_card_arrives(
@@ -342,10 +423,12 @@ proptest! {
         let first_edit = Step {
             days: 0, device: 0, edit: true, fast: false, cut: Cut::Completed,
             dropped: false, acknowledged: true, clock_ahead_days: 0,
+            relay: Relay::Faithful,
         };
         let faithful = (0..63).map(|i| Step {
             days: 1, device: i % 3, edit: false, fast: false, cut: Cut::Completed,
             dropped: false, acknowledged: true, clock_ahead_days: 0,
+            relay: Relay::Faithful,
         });
         for step in std::iter::once(first_edit).chain(steps).chain(faithful) {
             now += step.days * DAY;
@@ -356,7 +439,8 @@ proptest! {
         }
         prop_assert_eq!(run.alarms(now), Vec::<Alarm>::new());
         prop_assert_eq!(run.read_latest, [true, true], "the latest update key never arrived");
-        prop_assert_eq!(run.installed_latest, [true, true], "the latest card never installed");
+        let latest = run.latest_card.clone();
+        prop_assert_eq!(run.shown, [latest.clone(), latest], "a receiver does not show the latest card");
     }
 }
 
@@ -376,6 +460,7 @@ fn a_save_undone_after_its_upload_seals_a_key_twice() {
         dropped: false,
         acknowledged: true,
         clock_ahead_days: 0,
+        relay: Relay::Faithful,
     };
 
     run.session(&edit(Cut::SaveUndoneAfterUpload), START)
@@ -383,4 +468,40 @@ fn a_save_undone_after_its_upload_seals_a_key_twice() {
     let fault = run.session(&edit(Cut::Completed), START + DAY);
 
     assert_eq!(fault, Err("device 0 sealed one key twice".to_string()));
+}
+
+// A gateway that delivers an edit's notice, holds its content back and
+// replays it once a newer card installed makes the receiver install the
+// older card last: only the highest version shown (R4) keeps the latest.
+// @internal
+#[test]
+fn an_older_card_replayed_after_the_latest_installs_and_is_not_shown() {
+    let mut run = Run::new();
+    let step = |device, edit, relay| Step {
+        days: 0,
+        device,
+        edit,
+        fast: false,
+        cut: Cut::Completed,
+        dropped: false,
+        acknowledged: true,
+        clock_ahead_days: 0,
+        relay,
+    };
+    let sessions = [
+        step(0, true, Relay::WithholdContent),
+        step(1, false, Relay::Faithful),
+        step(0, true, Relay::Faithful),
+        step(1, false, Relay::Faithful),
+        step(0, false, Relay::ReplayEarlier(0)),
+        step(1, false, Relay::Faithful),
+    ];
+
+    for (i, session) in sessions.iter().enumerate() {
+        run.session(session, START + i as u64 * 3600).unwrap();
+    }
+
+    assert_eq!(run.installed_versions[0], vec![2, 1]);
+    assert_eq!(run.shown[0], vec![2u8; 600]);
+    assert_eq!(run.alarms(START + DAY), Vec::<Alarm>::new());
 }

@@ -90,6 +90,55 @@ impl Storage {
         Ok(())
     }
 
+    /// Re-encrypt the notice core's state with per-contact derived keys
+    /// (vauchi/private#1375). Rows under the Background Receive Key do not
+    /// depend on the storage key and stay as they are.
+    pub(super) fn rekey_notice_states(
+        &self,
+        old_key: &SymmetricKey,
+        new_key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        use super::super::stores::notice::notice_key_under_storage_key;
+        let rows: Vec<(String, i64, Vec<u8>, Vec<u8>)> = self
+            .conn
+            .prepare(
+                "SELECT contact_id, kind, peer_device_id, state_encrypted
+                 FROM notice_states WHERE sealed_with_receive_key = 0",
+            )
+            .and_then(|mut stmt| {
+                stmt.query_map([], |row| {
+                    Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+                })?
+                .collect::<Result<Vec<_>, _>>()
+            })
+            .map_err(|e| StorageError::Migration(format!("Read notice states: {}", e)))?;
+        for (contact_id, kind, peer_device_id, encrypted) in &rows {
+            let plain = zeroize::Zeroizing::new(
+                decrypt(
+                    &notice_key_under_storage_key(old_key, contact_id),
+                    encrypted,
+                )
+                .map_err(|e| {
+                    StorageError::Migration(format!("Decrypt notice state {}: {}", contact_id, e))
+                })?,
+            );
+            let resealed = encrypt(&notice_key_under_storage_key(new_key, contact_id), &plain)
+                .map_err(|e| {
+                    StorageError::Migration(format!("Encrypt notice state {}: {}", contact_id, e))
+                })?;
+            self.conn
+                .execute(
+                    "UPDATE notice_states SET state_encrypted = ?1
+                     WHERE contact_id = ?2 AND kind = ?3 AND peer_device_id = ?4",
+                    params![resealed, contact_id, kind, peer_device_id],
+                )
+                .map_err(|e| {
+                    StorageError::Migration(format!("Update notice state {}: {}", contact_id, e))
+                })?;
+        }
+        Ok(())
+    }
+
     /// Re-encrypt the real own card:
     /// card_json_encrypted
     pub(super) fn rekey_own_card(

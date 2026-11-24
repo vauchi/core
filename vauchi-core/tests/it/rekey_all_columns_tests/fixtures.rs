@@ -53,6 +53,7 @@ pub(super) fn fixtures() -> Vec<(&'static str, &'static str, &'static [u8])> {
             "ratchet_state_encrypted",
             b"ratchet-state-blob",
         ),
+        ("notice_states", "state_encrypted", b"notice-state-blob"),
         ("contact_field_notes", "note_encrypted", b"phone is work"),
         ("own_card", "card_json_encrypted", b"{\"name\":\"Alice\"}"),
         ("mask_seed", "seed_encrypted", &[0x5a; 32]),

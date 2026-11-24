@@ -220,3 +220,35 @@ fn deleting_a_contact_erases_its_notice_state() {
         );
     }
 }
+
+// A locked background run holds only the receive key, so notice state saved
+// before the storage had it moves under it, as ratchet state does.
+// @internal
+#[test]
+fn notice_state_saved_before_the_receive_key_moves_under_it() {
+    let world = World::new();
+    world
+        .open()
+        .notices()
+        .save(
+            &world.contact,
+            NoticeStateKind::Sender,
+            &DEVICE_A,
+            &state(1),
+        )
+        .unwrap();
+
+    let mut storage = world.open();
+    storage.set_receive_key(SymmetricKey::generate()).unwrap();
+    drop(storage);
+
+    let conn = rusqlite::Connection::open(world.dir.path().join("vauchi.db")).unwrap();
+    let under_receive_key: i64 = conn
+        .query_row(
+            "SELECT sealed_with_receive_key FROM notice_states WHERE contact_id = ?1",
+            [&world.contact],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(under_receive_key, 1);
+}

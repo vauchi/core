@@ -54,6 +54,7 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("contacts", "shared_key_encrypted"),
     ("identity", "backup_data_encrypted"),
     ("contact_ratchets", "ratchet_state_encrypted"),
+    ("notice_states", "state_encrypted"),
     // V4 contact extras
     ("contacts", "personal_notes_encrypted"),
     ("contacts", "avatar_encrypted"),
@@ -293,6 +294,9 @@ impl Storage {
 
         self.rekey_ratchets(old_key, new_key)?;
         report("ratchets");
+
+        self.rekey_notice_states(old_key, new_key)?;
+        report("notice_states");
 
         self.rekey_own_card(old_key, new_key, "own_card")?;
         report("own_card");

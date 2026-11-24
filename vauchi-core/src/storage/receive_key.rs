@@ -13,6 +13,7 @@ use zeroize::Zeroizing;
 
 use crate::crypto::{SymmetricKey, decrypt, encrypt, hkdf::HKDF};
 
+use super::stores::notice::{notice_key_under_receive_key, notice_key_under_storage_key};
 use super::stores::ratchet::{ratchet_key_under_receive_key, ratchet_key_under_storage_key};
 use super::{Storage, StorageError};
 
@@ -122,6 +123,42 @@ impl Storage {
                  SET ratchet_state_encrypted = ?1, sealed_with_receive_key = 1
                  WHERE contact_id = ?2 AND peer_device_id = ?3",
                 params![under_receive_key, contact_id, peer_device_id],
+            )?;
+        }
+        self.seal_notice_states(receive_key)
+    }
+
+    /// Moves the notice core's state still under the storage key under the
+    /// receive key, as the ratchets above (vauchi/private#1375).
+    fn seal_notice_states(&self, receive_key: &SymmetricKey) -> Result<(), StorageError> {
+        let rows: Vec<(String, i64, Vec<u8>, Vec<u8>)> = self
+            .conn
+            .prepare(
+                "SELECT contact_id, kind, peer_device_id, state_encrypted
+                 FROM notice_states WHERE sealed_with_receive_key = 0",
+            )?
+            .query_map([], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            })?
+            .collect::<Result<_, _>>()?;
+        for (contact_id, kind, peer_device_id, under_storage_key) in rows {
+            let state = Zeroizing::new(
+                decrypt(
+                    &notice_key_under_storage_key(&self.encryption_key, &contact_id),
+                    &under_storage_key,
+                )
+                .map_err(|e| StorageError::Encryption(e.to_string()))?,
+            );
+            let under_receive_key = encrypt(
+                &notice_key_under_receive_key(receive_key, &contact_id),
+                &state,
+            )
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+            self.conn.execute(
+                "UPDATE notice_states
+                 SET state_encrypted = ?1, sealed_with_receive_key = 1
+                 WHERE contact_id = ?2 AND kind = ?3 AND peer_device_id = ?4",
+                params![under_receive_key, contact_id, kind, peer_device_id],
             )?;
         }
         Ok(())

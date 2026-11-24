@@ -94,6 +94,11 @@ pub enum StorageError {
     #[error("The session changed since it was read")]
     RatchetMoved,
 
+    /// A notice-core state changed since this connection read it; saving it
+    /// would let two connections advance one direction (vauchi/private#1375).
+    #[error("The notice state changed since it was read")]
+    NoticeMoved,
+
     /// The row is sealed under the Background Receive Key, which this
     /// storage was not given (vauchi/private#1093).
     #[error("Receive state needs the background receive key")]

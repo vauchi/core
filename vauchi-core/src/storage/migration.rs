@@ -289,7 +289,7 @@ pub const fn all_migrations() -> &'static [Migration] {
     &MIGRATIONS
 }
 
-const MIGRATIONS: [Migration; 119] = [
+const MIGRATIONS: [Migration; 120] = [
     Migration {
         version: 1,
         name: "baseline_schema",
@@ -885,6 +885,11 @@ const MIGRATIONS: [Migration; 119] = [
         name: "contact_device_key_pins",
         action: MigrationAction::Sql(MIGRATION_V119_CONTACT_DEVICE_KEY_PINS),
     },
+    Migration {
+        version: 120,
+        name: "notice_states",
+        action: MigrationAction::Sql(MIGRATION_V120_NOTICE_STATES),
+    },
 ];
 
 /// v118 (vauchi/private#1093): a version on each ratchet row, so a save from
@@ -914,6 +919,21 @@ fn migrate_v118_ratchet_row_version(
 /// known device's key, sealed like the broadcast it came from, and gone
 /// with the contact row. A removed device keeps its pin: the key may not
 /// come back under that id.
+/// v120 (vauchi/private#1375): the notice core's saved state, one sealed,
+/// versioned row per contact, kind and peer device (`stores/notice.rs`).
+const MIGRATION_V120_NOTICE_STATES: &str = "
+CREATE TABLE IF NOT EXISTS notice_states (
+    contact_id TEXT NOT NULL,
+    kind INTEGER NOT NULL,
+    peer_device_id BLOB NOT NULL,
+    state_encrypted BLOB NOT NULL,
+    sealed_with_receive_key INTEGER NOT NULL DEFAULT 0,
+    row_version INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (contact_id, kind, peer_device_id)
+);
+";
+
 const MIGRATION_V119_CONTACT_DEVICE_KEY_PINS: &str = "
     CREATE TABLE IF NOT EXISTS contact_device_key_pins (
         contact_id TEXT PRIMARY KEY REFERENCES contacts(id) ON DELETE CASCADE,

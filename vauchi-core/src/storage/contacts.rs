@@ -25,6 +25,10 @@ impl Storage {
             params![id],
         )?;
         self.conn.execute(
+            "DELETE FROM notice_states WHERE contact_id = ?1",
+            params![id],
+        )?;
+        self.conn.execute(
             "DELETE FROM contact_device_delta_versions WHERE contact_id = ?1",
             params![id],
         )?;

@@ -53,6 +53,12 @@ fn ratchet_subkey(sek: &SymmetricKey, contact_id: &str) -> SymmetricKey {
     SymmetricKey::from_bytes(*derived)
 }
 
+fn notice_subkey(sek: &SymmetricKey, contact_id: &str) -> SymmetricKey {
+    let mut info = b"vauchi-notice-storage-v1:".to_vec();
+    info.extend_from_slice(contact_id.as_bytes());
+    SymmetricKey::from_bytes(*HKDF::derive_key(None, sek.as_bytes(), &info))
+}
+
 fn label_hmac(sek: &SymmetricKey, plain_name: &[u8]) -> Vec<u8> {
     let key_bytes = HKDF::derive_key(None, sek.as_bytes(), b"Vauchi_Label_Name_HMAC_v1");
     let mut mac = HmacSha256::new_from_slice(&*key_bytes).unwrap();
@@ -189,6 +195,20 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
          (contact_id, ratchet_state_encrypted, is_initiator, updated_at) \
          VALUES (?1, ?2, 1, ?3)",
         params![CONTACT_ID, ratchet_blob, now],
+    )
+    .unwrap();
+
+    // ── notice state: per-contact derived key ──────────────────
+    let notice_blob = encrypt(
+        &notice_subkey(key, CONTACT_ID),
+        &fx("notice_states", "state_encrypted"),
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO notice_states \
+         (contact_id, kind, peer_device_id, state_encrypted, updated_at) \
+         VALUES (?1, 1, ?2, ?3, ?4)",
+        params![CONTACT_ID, [7u8; 32].as_slice(), notice_blob, now],
     )
     .unwrap();
 
@@ -636,6 +656,20 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
         plain,
         fx("contact_ratchets", "ratchet_state_encrypted"),
         "ratchet plaintext through new per-contact key"
+    );
+
+    // ── notice state: per-contact derived key ───────────────
+    let blob: Vec<u8> = conn
+        .query_row(
+            "SELECT state_encrypted FROM notice_states WHERE contact_id = ?1",
+            [&CONTACT_ID],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        decrypt(&notice_subkey(new_key, CONTACT_ID), &blob).unwrap(),
+        fx("notice_states", "state_encrypted"),
+        "notice state plaintext through new per-contact key"
     );
 
     // ── contact_field_notes ─────────────────────────────────

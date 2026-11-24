@@ -57,6 +57,9 @@ pub const CONTACT_REFERENCES: &[(&str, &str, ContactReference)] = &[
     ("resync_honored", "contact_id", ContactReference::Id),
     ("pending_updates", "contact_id", ContactReference::StaleId),
     ("replay_nonces", "contact_id", ContactReference::StaleId),
+    // A moved contact is a new relationship with a new shared key, which
+    // seeds new notice directions (vauchi/private#1375).
+    ("notice_states", "contact_id", ContactReference::StaleId),
     ("tags", "contact_ids_json", ContactReference::IdList),
     ("local_groups", "contact_ids_json", ContactReference::IdList),
     (

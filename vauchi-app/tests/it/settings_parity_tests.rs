@@ -39,16 +39,12 @@ const EXPECTED_ADVANCED_GROUP_IDS: &[&str] = &[
 
 fn sample_settings_config() -> SettingsConfig {
     SettingsConfig {
-        content_updates: Default::default(),
         content_updates_in_background: true,
         display_name: "Sample User".into(),
-        new_field_default_visible: false,
         contact_added_notifications: true,
-        remember_where_met: false,
         card_update_notifications: true,
         relay_url: "https://relay.test".into(),
         device_count: 1,
-        password_set: false,
         theme_id: "follow_system".into(),
         available_themes: vec![DropdownOption {
             id: "light".into(),
@@ -59,19 +55,11 @@ fn sample_settings_config() -> SettingsConfig {
             id: "en".into(),
             label: "English".into(),
         }],
-        system_locale: None,
-        reduce_motion: false,
-        large_touch: false,
         show_help_icons: true,
         version: "0.0.0-test".into(),
-        build: String::new(),
-        pending_updates: 0,
-        failed_deliveries: 0,
-        debug_mode: false,
         backup_reminder_frequency: "Weekly".into(),
-        last_backup_display: None,
         delayed_fetching: DelayedFetching::Off,
-        offline: false,
+        ..Default::default()
     }
 }
 

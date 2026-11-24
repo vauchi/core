@@ -6,33 +6,15 @@ use vauchi_app::ui::*;
 
 fn sample_config() -> SettingsConfig {
     SettingsConfig {
-        content_updates: Default::default(),
         content_updates_in_background: true,
         display_name: "Alice".into(),
-        new_field_default_visible: false,
-        contact_added_notifications: false,
-        remember_where_met: false,
         card_update_notifications: true,
         relay_url: "https://relay.vauchi.app".into(),
         device_count: 3,
         password_set: true,
-        theme_id: String::new(),
-        available_themes: vec![],
-        language_id: String::new(),
-        available_languages: vec![],
-        system_locale: None,
-        reduce_motion: false,
-        large_touch: false,
         show_help_icons: true,
-        version: String::new(),
-        build: String::new(),
-        pending_updates: 0,
-        failed_deliveries: 0,
-        debug_mode: false,
         backup_reminder_frequency: "Weekly".into(),
-        last_backup_display: None,
-        delayed_fetching: Default::default(),
-        offline: false,
+        ..Default::default()
     }
 }
 

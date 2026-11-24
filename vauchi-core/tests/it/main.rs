@@ -539,6 +539,7 @@ mod registry_push_per_device_tests;
 mod registry_push_retry_tests;
 mod registry_reconcile_tests;
 mod registry_sibling_naming_tests;
+mod registry_signer_held_active_tests;
 mod rekey_all_columns_tests;
 mod rekey_coverage_tests;
 mod rekey_failure_tests;

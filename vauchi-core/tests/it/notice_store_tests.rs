@@ -252,3 +252,55 @@ fn notice_state_saved_before_the_receive_key_moves_under_it() {
         .unwrap();
     assert_eq!(under_receive_key, 1);
 }
+
+// Gate 16 (Claude; checked: storage runs WAL with synchronous=NORMAL): a
+// save a power loss undoes after its notices were uploaded would seal new
+// plaintexts under used keys (ADR-019 amendment 2026-11-24), so the notice
+// save commits at FULL, and other writes stay at NORMAL.
+// @internal
+#[test]
+fn a_notice_save_commits_at_full_sync_and_other_writes_stay_normal() {
+    let world = World::new();
+    let storage = world.open();
+    let observer = rusqlite::Connection::open(world.dir.path().join("vauchi.db")).unwrap();
+    observer
+        .execute_batch(
+            "CREATE TABLE observed_sync (written TEXT, level INTEGER);
+             CREATE TRIGGER notice_sync AFTER INSERT ON notice_states BEGIN
+                 INSERT INTO observed_sync SELECT 'notice', synchronous FROM pragma_synchronous;
+             END;
+             CREATE TRIGGER contact_sync AFTER INSERT ON contacts BEGIN
+                 INSERT INTO observed_sync SELECT 'contact', synchronous FROM pragma_synchronous;
+             END;",
+        )
+        .unwrap();
+
+    storage
+        .notices()
+        .save(
+            &world.contact,
+            NoticeStateKind::Sender,
+            &DEVICE_A,
+            &state(1),
+        )
+        .unwrap();
+    let another = Contact::from_exchange(
+        *Identity::create("Carol", 0).signing_public_key(),
+        ContactCard::new("Carol"),
+        SymmetricKey::generate(),
+        0,
+    );
+    storage.contacts().save_contact(&another).unwrap();
+
+    let observed: Vec<(String, i64)> = observer
+        .prepare("SELECT written, level FROM observed_sync ORDER BY rowid")
+        .unwrap()
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(
+        observed,
+        vec![("notice".to_string(), 2), ("contact".to_string(), 1)]
+    );
+}

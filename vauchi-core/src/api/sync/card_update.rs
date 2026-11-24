@@ -809,6 +809,17 @@ fn receive_genesis_card_delta(
     if !delta.verify(peer_identity, identity.signing_public_key()) {
         return Err(CardUpdateError::SignatureInvalid);
     }
+    // The device check reads the newest registry this receiver holds; on a
+    // cold start the envelope's registry is the only one it can see, and a
+    // newer one that revokes the sender must not be dropped (private#1387).
+    // A storage error here is not acknowledged, so the blob stays on the
+    // relay and the retry finds the registry already held.
+    retain_carried_registry(
+        storage,
+        sender_id,
+        peer_identity,
+        &opened.sender_registry_broadcast_json,
+    )?;
     verify_delta_device_signature(storage, sender_id, &delta)?;
     if storage.replay().is_replay_nonce(sender_id, &delta.nonce)? {
         return Err(CardUpdateError::ReplayDetected);

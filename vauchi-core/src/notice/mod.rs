@@ -4,9 +4,13 @@
 
 //! The notice core: per-direction keys and records for mailbox cohorts.
 //!
-//! Experimental and wired to nothing. It is the executable form of a
-//! protocol still under review (vauchi/private#1281), built behind the
-//! `notice-core` feature so that no shipped build contains it.
+//! What it is for (ADR-081, owner 2026-11-24): Vauchi's relays must not
+//! be able to reconstruct who is in touch with whom, alone or with the
+//! OHTTP relay, at any growth stage; the alpha ships with this path
+//! (release gate RG-16, vauchi/private#1281).
+//!
+//! Not yet wired into the app (vauchi/private#1375) and built only behind
+//! the `notice-core` feature, so no shipped build contains it until then.
 
 pub mod chain;
 pub mod content;

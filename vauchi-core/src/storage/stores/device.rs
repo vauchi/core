@@ -525,6 +525,24 @@ impl DeviceStore<'_> {
         // key, and no key a device showed before may change under its id
         // (vauchi/private#970).
         refuse_unusable_signing_keys(broadcast)?;
+        // Every linked device holds the identity key, so a revoked device can
+        // sign a registry that un-revokes it. A device this contact pinned
+        // that the held registry no longer lists was removed, and may not
+        // sign; a device never seen (a restored install, an unseen sibling)
+        // still may (vauchi/private#1391; owner, 2026-11-24).
+        if let Some(signer) = broadcast.signer_device_id()
+            && !previously_active.is_empty()
+            && !previously_active
+                .iter()
+                .any(|device| device.device_id == signer)
+            && self
+                .load_contact_device_pins(contact_id)?
+                .is_some_and(|pins| pins.pinned(&signer).is_some())
+        {
+            return Err(StorageError::InvalidData(
+                "registry signer was removed from the held registry".into(),
+            ));
+        }
         let mut pins = self
             .load_contact_device_pins(contact_id)?
             .unwrap_or_default();

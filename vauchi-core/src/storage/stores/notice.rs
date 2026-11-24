@@ -175,6 +175,7 @@ impl NoticeStore<'_> {
     /// Opens and saves the directions `contact_id` lacks with each of `peers`,
     /// and returns how many devices it opened. A saved direction is never
     /// opened again: that would restart its chain under keys it already used.
+    #[cfg(feature = "notice-core")]
     pub fn ensure_directions(
         &self,
         contact_id: &str,
@@ -300,6 +301,7 @@ impl NoticeStore<'_> {
     }
 }
 
+#[cfg(feature = "notice-core")]
 fn saved_notice_error(error: crate::notice::saved::SavedError) -> StorageError {
     StorageError::Serialization(format!("notice state: {error:?}"))
 }

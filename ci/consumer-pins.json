@@ -2,7 +2,6 @@
   "_comment": "Every consumer of Core and where its pin lives (ADR-026 amendment 2026-09-30). The native pin is the only copy of the version. bumped_by names the Core tag-pipeline job that opens the bump MR; scripts/core-pins.py reads this table.",
   "consumers": [
     { "repo": "cli-display", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
-    { "repo": "tui-display", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
     { "repo": "e2e", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },
     { "repo": "e2e", "kind": "pins-env", "file": "ci/pins.env", "bumped_by": "bump:consumer-pins" },
     { "repo": "linux-app", "kind": "cargo", "file": "Cargo.toml", "bumped_by": "bump:consumer-pins" },

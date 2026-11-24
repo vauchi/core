@@ -189,6 +189,7 @@ mod emergency_broadcast_screen_tests;
 mod emergency_shred_crypto_tests;
 mod emergency_shred_screen_tests;
 mod emergency_shred_wipe_tests;
+mod emergency_wipe_sends_nothing_tests;
 mod engine_output_tests;
 mod engine_update_tests;
 mod entry_detail_delete_tests;

@@ -7,6 +7,7 @@
 import re
 import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -33,10 +34,22 @@ def retire(package: Path) -> None:
     if "VauchiHardware" in updated or "vauchiHardware" in updated:
         raise ValueError("unsupported VauchiHardware manifest layout")
 
-    if updated != original:
-        manifest.write_text(updated)
-    if hardware.exists():
-        shutil.rmtree(hardware)
+    if not hardware.exists():
+        if updated != original:
+            manifest.write_text(updated)
+        return
+
+    with tempfile.TemporaryDirectory(prefix="vauchi-retired-swift-hardware-") as temporary:
+        backup = Path(temporary) / "VauchiHardware"
+        shutil.copytree(hardware, backup, symlinks=True)
+        try:
+            if updated != original:
+                manifest.write_text(updated)
+            shutil.rmtree(hardware)
+        except OSError:
+            manifest.write_text(original)
+            shutil.copytree(backup, hardware, dirs_exist_ok=True, symlinks=True)
+            raise
 
 
 if __name__ == "__main__":

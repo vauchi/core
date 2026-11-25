@@ -1,10 +1,13 @@
 # SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import importlib.util
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts/retire-swift-hardware.py"
@@ -78,6 +81,26 @@ class RetireSwiftHardwareTests(unittest.TestCase):
         self.assertIn("unsupported VauchiHardware manifest layout", result.stderr)
         self.assertEqual(self.manifest.read_text(), manifest)
         self.assertEqual((self.hardware / "LocationService.swift").read_text(), "legacy location")
+
+    def test_later_removal_failure_restores_manifest_and_partially_deleted_source(self):
+        spec = importlib.util.spec_from_file_location("retirement", SCRIPT)
+        retirement = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(retirement)
+        original_rmtree = shutil.rmtree
+
+        def failing_removal(path, *args, **kwargs):
+            if Path(path) == self.hardware:
+                (self.hardware / "LocationService.swift").unlink()
+                raise OSError("injected partial removal failure")
+            return original_rmtree(path, *args, **kwargs)
+
+        with patch.object(retirement.shutil, "rmtree", side_effect=failing_removal):
+            with self.assertRaisesRegex(OSError, "injected partial removal failure"):
+                retirement.retire(self.package)
+
+        self.assertEqual(self.manifest.read_text(), MANIFEST)
+        self.assertEqual((self.hardware / "LocationService.swift").read_text(), "legacy location")
+        self.assertEqual(self.bindings.read_text(), "keep bindings")
 
     def test_source_symlink_is_rejected_without_touching_its_target_or_manifest(self):
         (self.hardware / "LocationService.swift").unlink()

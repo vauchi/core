@@ -20,7 +20,7 @@ ALL="run-ci-self-tests dev-tag-no-retest formal-triggers formal-lane core-trigge
 swift-bindings-timeout packaging-matrix-isolation security-provenance
 fuzz-security mutation-nightly-budget mutation-nightly-exit-codes
 coverage-features e2e-smoke e2e-tui-journey build-tests-needs
-shared-target-kept"
+shared-target-kept build-lock"
 
 dir=${CI_SELF_TESTS_DIR:-ci/tests}
 tests=${*:-$ALL}

@@ -253,6 +253,16 @@ file-size:advisory:
 # hence this local tier.
 .timeout-cold-rebuild:
   timeout: 2 hours
+  # The shared template's one lock, cold-rebuild-tree, serves the oldest
+  # pipeline first, and a merge train car's pipeline is created when it
+  # joins the train, after the merge request pipelines already waiting:
+  # cars waited 12 to 123 min to build (vauchi/private#1399). One lane per
+  # pipeline kind: merge requests (merged_result), train cars
+  # (merge_train), and main, tags and schedules (empty). At most one build
+  # of each kind runs at once. A new lane starts unordered; the merge
+  # request and train lanes are set to oldest_first through the API. A stale
+  # lock: `just gitlab resource-group-reset core cold-rebuild-tree-<kind>`.
+  resource_group: cold-rebuild-tree-${CI_MERGE_REQUEST_EVENT_TYPE}
 
 # Cosign pinned version + checksum (used by update:swift-bindings and publish:maven)
 # Single source of truth for cosign binary integrity — update BOTH values together.
@@ -734,6 +744,12 @@ build:tests:
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
   script:
+    # Main runs the commit its merge train car just built and tested here:
+    # use that car's archives when they are on this host (private#1399).
+    - |
+      if [ "${CI_COMMIT_BRANCH:-}" = "$CI_DEFAULT_BRANCH" ] && sh ci/train-archives.sh reuse; then
+        exit 0
+      fi
     # What this slot's target/ holds before the first compile, so a cold
     # build names what it found (vauchi/private#1305).
     - sh ci/target-state.sh
@@ -804,6 +820,7 @@ build:tests:
       cp "$cucumber" "$ARCHIVE_DIR/cucumber_tests"
     - hostname > "$ARCHIVE_DIR/built-on"
     - ls -la "$ARCHIVE_DIR"
+    - if [ "${CI_MERGE_REQUEST_EVENT_TYPE:-}" = merge_train ]; then sh ci/train-archives.sh record; fi
     - sh ci/target-state.sh leave
 
 # SemVer compatibility check — catch breaking API changes before they cascade

@@ -27,7 +27,7 @@
 # Overrides .self-hosted SSH clone — tag pipelines need HTTPS checkout
 # since the runner may not have gitlab.com in known_hosts
 release:verify: # vci02-ok: tag verification must replace the SSH-oriented runner setup
-  extends: [.linux-runner, .release-or-rc]
+  extends: [.linux-runner, .release-or-rc, .own-checkout]
   stage: build
   # release:ratchet-zero (lint stage) runs the exact-zero boundary gate
   # (ADR-066); everything below release:verify is DAG-ordered off it, so
@@ -38,9 +38,7 @@ release:verify: # vci02-ok: tag verification must replace the SSH-oriented runne
   needs: [release:ratchet-zero]
   interruptible: false
   variables:
-    GIT_STRATEGY: clone
-    GIT_DEPTH: "100"
-  before_script: []
+    OWN_CHECKOUT_DEPTH: "100"
   script:
     - |
       echo "Verifying tag $CI_COMMIT_TAG is on main branch..."

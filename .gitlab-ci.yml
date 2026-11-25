@@ -164,6 +164,27 @@ workflow:
   variables:
     RUSTC_WRAPPER: ""
 
+# A job that needs its own checkout (a tag job that configures and pushes
+# with the release token) gets it in a directory of its own. GIT_STRATEGY
+# clone would delete the runner slot's directory, and with it the target/
+# the slot's next build:tests compiles in (vauchi/private#1395); the token
+# and the bot's git identity also stay out of the slot's .git/config.
+# Fetches the pipeline's own ref, as the runner does, and checks out
+# exactly CI_COMMIT_SHA.
+.own-checkout:
+  variables:
+    GIT_STRATEGY: none
+    OWN_CHECKOUT_DEPTH: "50"
+  before_script:
+    - export OWN_CHECKOUT="${TMPDIR:-/tmp}/vauchi-own-checkout-${CI_JOB_ID}"
+    - rm -rf "$OWN_CHECKOUT" && git init -q "$OWN_CHECKOUT" && cd "$OWN_CHECKOUT"
+    - git remote add origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/${CI_PROJECT_PATH}.git"
+    - git fetch -q --depth "$OWN_CHECKOUT_DEPTH" origin "+refs/pipelines/${CI_PIPELINE_ID}:refs/pipelines/${CI_PIPELINE_ID}"
+    - git checkout -q --detach "refs/pipelines/${CI_PIPELINE_ID}"
+    - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA" || { echo "own checkout is at $(git rev-parse HEAD), not $CI_COMMIT_SHA" >&2; exit 1; }
+  after_script:
+    - rm -rf "${TMPDIR:-/tmp}/vauchi-own-checkout-${CI_JOB_ID}"
+
 variables:
   # MUST match the include: ref above. The templates come from that ref and
   # the scripts this variable fetches at job runtime come from this one; two
@@ -216,6 +237,13 @@ variables:
   #                      humantime, dev-only via cucumber. Mirrors deny.toml;
   #                      clears with private#1274.
   AUDIT_IGNORES: "--ignore RUSTSEC-2026-0192 --ignore RUSTSEC-2026-0374 --ignore RUSTSEC-2026-0543 --ignore RUSTSEC-2026-0555 --ignore RUSTSEC-2026-0542"
+  # Every shell job of a runner slot shares the slot's target/. The runner's
+  # own fetch runs `git clean` with these flags, and its default -ffdx
+  # removed target/ and .cargo/ whenever lint:typos or test:packaging-matrix
+  # ran in a slot: the next build:tests compiled everything again, 15 to 27
+  # min against 6.5 to 7.3 warm (vauchi/private#1395). Same exclusions as
+  # the shared .shell-checkout.
+  GIT_CLEAN_FLAGS: "-ffdx -e target/ -e .cargo/ -e .cache/"
 
 # vauchi/scripts is public, but its job-token allowlist rejects core's token.
 # Fetch these scripts without authentication, as check:binding-abi does.

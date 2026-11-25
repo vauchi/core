@@ -28,7 +28,7 @@
 # (v{version}-dev.N) so every merge to main produces a testable build.
 
 auto-tag:version:
-  extends: [.linux-runner-nocache, .main-only]
+  extends: [.linux-runner-nocache, .main-only, .own-checkout]
   # Never cut a (dev) tag on a SCHEDULED (nightly) pipeline. A tag push
   # triggers the downstream release verify/build chain (release:verify,
   # build:validate-bindings, build:apple, build:android). The nightly exists
@@ -45,10 +45,6 @@ auto-tag:version:
   # must pass before a tag can exist.
   stage: tag
   resource_group: auto-tag
-  variables:
-    GIT_STRATEGY: clone
-    GIT_DEPTH: "50"
-  before_script: []
   script:
     - |
       VERSION=$(grep -A5 '^\[workspace\.package\]' Cargo.toml | grep '^version' | sed 's/.*"\(.*\)"/\1/')

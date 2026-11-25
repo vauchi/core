@@ -380,6 +380,24 @@ release:create:
 # Update vauchi-platform-swift Package.swift + Swift bindings directly.
 # Uses CI_PUSH_TOKEN_SWIFT (scoped project access token) for git push —
 # CI_JOB_TOKEN pushes don't trigger downstream pipelines in ios/macos.
+check:swift-hardware-retirement:
+  extends: [.timeout-quick]
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
+  tags: [docker]
+  needs: []
+  before_script:
+    - apk add --no-cache python3
+  script:
+    - python3 -m unittest discover -s ci/tests -p retire_swift_hardware_test.py
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - scripts/retire-swift-hardware.py
+        - ci/tests/retire_swift_hardware_test.py
+        - ci/publish-and-trigger.yml
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
 update:swift-bindings:
   # The XCFramework artifact is currently about 684 MB. GitLab downloads
   # `needs:` artifacts before the script starts, and the 10-minute quick tier
@@ -446,6 +464,8 @@ update:swift-bindings:
       # Clone platform-swift repo
       rm -rf "$PLATFORM_SWIFT_DIR"
       git clone --depth 1 "https://vauchi-gitlab-runner:${CI_PUSH_TOKEN_SWIFT}@gitlab.com/vauchi/vauchi-platform-swift.git" "$PLATFORM_SWIFT_DIR"
+      # private#774: merge this cleanup only after both apps use AppleHw.
+      python3 "$CI_PROJECT_DIR/scripts/retire-swift-hardware.py" "$PLATFORM_SWIFT_DIR"
       cd "$PLATFORM_SWIFT_DIR"
 
       # Update Package.swift version + checksum only.
@@ -480,7 +500,7 @@ update:swift-bindings:
       # Commit and push
       git config user.name "${BOT_NAME:-${GITLAB_USER_NAME}}"
       git config user.email "${BOT_EMAIL:-${GITLAB_USER_EMAIL}}"
-      git add Package.swift Sources/VauchiPlatform/vauchi_platform.swift
+      git add -u -- Package.swift Sources
       if git diff --cached --quiet; then
         echo "No changes — bindings already up to date"
         exit 0

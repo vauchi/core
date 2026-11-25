@@ -115,3 +115,16 @@ fn test_connection_state_debug() {
     assert!(debug.contains("Reconnecting"));
     assert!(debug.contains("3"));
 }
+
+// @scenario: relay_transport_security :: Defense in depth
+#[cfg(feature = "network-rustls")]
+#[test]
+fn the_tls_provider_core_installs_offers_hybrid_post_quantum_key_exchange_first() {
+    ensure_rustls_provider_installed();
+    let provider =
+        rustls::crypto::CryptoProvider::get_default().expect("Core installs a TLS provider");
+
+    let first_group = provider.kx_groups.first().map(|group| group.name());
+
+    assert_eq!(first_group, Some(rustls::NamedGroup::X25519MLKEM768));
+}

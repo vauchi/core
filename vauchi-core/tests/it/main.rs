@@ -421,6 +421,7 @@ mod nfc_apdu_codec_tests;
 mod nfc_apdu_protocol_tests;
 mod nfc_card_payload_tests;
 mod nfc_handshake_tests;
+mod notice_card_tests;
 mod notice_chain_tests;
 mod notice_conformance_tests;
 mod notice_content_tests;

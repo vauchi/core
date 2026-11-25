@@ -33,6 +33,7 @@ pub(crate) enum Kind {
     Publisher = 3,
     Pending = 4,
     Session = 5,
+    Groups = 6,
 }
 
 /// A state that cannot be encoded is an error, never an empty save that a

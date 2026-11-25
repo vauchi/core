@@ -59,6 +59,7 @@ impl super::Storage {
     }
 }
 
+// INLINE_TEST_REQUIRED: observe connection durability and inject commit failures.
 #[cfg(all(test, feature = "notice-core"))]
 mod tests {
     use super::*;

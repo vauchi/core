@@ -16,18 +16,37 @@ use crate::card::ContactCard;
 pub struct VisibleCard {
     contact: String,
     card: ContactCard,
+    publication: Option<Zeroizing<Vec<u8>>>,
 }
 
 impl VisibleCard {
-    pub fn new(contact: String, mut card: ContactCard) -> Self {
-        // Visibility rules name other contacts; they are owner-only metadata.
-        *card.field_visibility_mut() = Default::default();
-        *card.fields_mut() = card
-            .fields()
-            .iter()
-            .map(crate::card::ContactField::strip_private)
-            .collect();
-        Self { contact, card }
+    #[cfg(any(test, feature = "testing"))]
+    pub fn new(contact: String, card: ContactCard) -> Self {
+        Self {
+            contact,
+            card: super::card::shared_card(&card),
+            publication: None,
+        }
+    }
+
+    pub fn signed(
+        contact: String,
+        card: ContactCard,
+        identity: &crate::identity::Identity,
+        device: &crate::crypto::SigningKeyPair,
+        revision: u64,
+    ) -> Result<Self, GroupsError> {
+        let card = super::card::shared_card(&card);
+        let publication = super::card::SignedCard::sign(&card, identity, device, revision)
+            .map_err(|error| match error {
+                super::card::CardError::BodySize => GroupsError::BodySize,
+                _ => GroupsError::Encoding,
+            })?;
+        Ok(Self {
+            contact,
+            card,
+            publication: Some(publication),
+        })
     }
 }
 
@@ -61,6 +80,7 @@ struct Group {
     members: BTreeSet<String>,
     // ContactCard omits optional fields; JSON preserves them in a postcard save.
     body: Zeroizing<Vec<u8>>,
+    card_json: Zeroizing<Vec<u8>>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -72,6 +92,7 @@ pub struct Groups {
 
 struct Desired {
     body: Zeroizing<Vec<u8>>,
+    card_json: Zeroizing<Vec<u8>>,
     members: BTreeSet<String>,
 }
 
@@ -133,6 +154,7 @@ impl Groups {
                     audience,
                     members: desired.members,
                     body: desired.body,
+                    card_json: desired.card_json,
                 },
             );
         }
@@ -150,7 +172,7 @@ impl Groups {
         self.views
             .values()
             .find(|group| group.members.contains(contact))
-            .and_then(|group| serde_json::from_slice(&group.body).ok())
+            .and_then(|group| serde_json::from_slice(&group.card_json).ok())
     }
 
     pub fn publications(&self) -> &[Publisher] {
@@ -183,6 +205,7 @@ impl Groups {
                 || !ids.insert(audience.group)
                 || group.members.is_empty()
                 || !group.members.iter().all(|member| members.insert(member))
+                || record_count(group.body.len()).is_err()
                 || commitment(&audience.update_key, &group.body) != audience.commitment
                 || !self.publishers.iter().any(|publisher| {
                     publisher.group() == audience.group && publisher.publishes(&audience.update_key)
@@ -209,8 +232,9 @@ fn partition(cards: Vec<VisibleCard>) -> Result<BTreeMap<Vec<String>, Desired>, 
             .map(|field| field.id().to_string())
             .collect();
         fields.sort();
-        let body =
+        let card_json =
             Zeroizing::new(serde_json::to_vec(&view.card).map_err(|_| GroupsError::Encoding)?);
+        let body = view.publication.unwrap_or_else(|| card_json.clone());
         record_count(body.len()).map_err(|_| GroupsError::BodySize)?;
         if let Some(group) = desired.get_mut(&fields) {
             if group.body != body {
@@ -222,10 +246,37 @@ fn partition(cards: Vec<VisibleCard>) -> Result<BTreeMap<Vec<String>, Desired>, 
                 fields,
                 Desired {
                     body,
+                    card_json,
                     members: [view.contact].into(),
                 },
             );
         }
     }
     Ok(desired)
+}
+
+// INLINE_TEST_REQUIRED: corrupt private saved-state fixtures to test bounded decoding.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // @internal
+    #[test]
+    fn a_saved_group_with_an_invalid_body_size_is_refused_without_panicking() {
+        for length in [0, super::super::content::MAX_BODY_BYTES + 1] {
+            let mut groups = Groups::default();
+            groups
+                .reconcile(vec![VisibleCard::new(
+                    "bob".into(),
+                    ContactCard::new("Alice"),
+                )])
+                .unwrap();
+            groups.views.values_mut().next().unwrap().body = Zeroizing::new(vec![0; length]);
+            let saved = groups.save().unwrap();
+            assert!(matches!(
+                Groups::load(&saved),
+                Err(super::super::saved::SavedError)
+            ));
+        }
+    }
 }

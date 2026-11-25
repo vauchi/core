@@ -12,6 +12,7 @@
 //! Not yet wired into the app (vauchi/private#1375) and built only behind
 //! the `notice-core` feature, so no shipped build contains it until then.
 
+pub mod card;
 pub mod chain;
 pub mod content;
 pub mod direction;

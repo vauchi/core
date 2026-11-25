@@ -12,6 +12,12 @@
 # name one of its own; `cargo clean -p <crate>` removes one crate and is
 # left alone.
 #
+# Two checkouts empty it as well (vauchi/private#1395): GIT_STRATEGY clone
+# deletes the slot's directory and clones it again, and the runner's own
+# fetch runs `git clean -ffdx`, which removes target/ and .cargo/ unless
+# GIT_CLEAN_FLAGS keeps them. lint:typos, test:packaging-matrix and
+# auto-tag:version emptied a slot before 8 of 8 cold build:tests runs.
+#
 # Usage: ci/tests/shared-target-kept.test.sh [ci-config...]
 #        (from anywhere; defaults to Core's pipeline files)
 
@@ -37,10 +43,44 @@ offenders=$(awk '
     END { report() }
 ' "$@")
 
+failed=0
 if [ -n "$offenders" ]; then
     echo "FAIL: these jobs run cargo clean in the slot's shared target/:"
     echo "$offenders" | sed 's/^/  /'
     echo "  Give the job its own CARGO_TARGET_DIR, or clean one crate with -p."
-    exit 1
+    failed=1
 fi
-echo "PASS: no job cleans the target directory the other jobs build in"
+
+clones=$(awk '
+    FNR == 1 { job = "" }
+    /^[^[:space:]#][^[:space:]]*:[[:space:]]*(#.*)?$/ {
+        job = $0; sub(/:[[:space:]]*(#.*)?$/, "", job)
+        next
+    }
+    /^[[:space:]]*#/ { next }
+    /GIT_STRATEGY:[[:space:]]*"?clone/ { print FILENAME ": " job }
+' "$@")
+if [ -n "$clones" ]; then
+    echo "FAIL: these jobs clone afresh, which deletes the slot and its target/:"
+    echo "$clones" | sed 's/^/  /'
+    echo "  Use GIT_STRATEGY: none and check out into a directory of the job's own."
+    failed=1
+fi
+
+clean_flags=$(awk '
+    /^variables:[[:space:]]*$/ { top = 1; next }
+    /^[^[:space:]#]/ { top = 0 }
+    top && /^[[:space:]]+GIT_CLEAN_FLAGS:/ { print }
+' "$@")
+for kept in target/ .cargo/ .cache/; do
+    case "$clean_flags" in
+        *"-e $kept"*) ;;
+        *)
+            echo "FAIL: the top-level GIT_CLEAN_FLAGS does not keep $kept, so the runner's own checkout removes it"
+            failed=1
+            ;;
+    esac
+done
+
+[ "$failed" -eq 0 ] || exit 1
+echo "PASS: no job cleans, clones over or git-cleans the target directory the other jobs build in"

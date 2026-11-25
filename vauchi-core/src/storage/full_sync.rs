@@ -16,19 +16,46 @@ pub(crate) struct FullSync<'a> {
 impl<'a> FullSync<'a> {
     pub(crate) fn full(conn: &'a Connection) -> Result<Self, StorageError> {
         let previous: i64 = conn.pragma_query_value(None, "synchronous", |row| row.get(0))?;
-        conn.pragma_update(None, "synchronous", previous.max(2))?;
+        if previous < 2 {
+            conn.pragma_update(None, "synchronous", 2)?;
+        }
         Ok(Self { conn, previous })
     }
 }
 
 impl Drop for FullSync<'_> {
     fn drop(&mut self) {
+        if self.previous >= 2 {
+            return;
+        }
         if let Err(error) = self.conn.pragma_update(None, "synchronous", self.previous) {
             // #1178: restoration cannot turn an already committed write into a failure.
             tracing::warn!(target: "vauchi.storage",
                 sqlite_error_code = ?error.sqlite_error().map(|e| e.extended_code),
                 "could not restore storage sync policy after a durable write");
         }
+    }
+}
+
+#[cfg(feature = "notice-core")]
+impl super::Storage {
+    /// The result leaves only after all notice state has committed durably.
+    /// A savepoint is insufficient: its outer transaction could still roll back.
+    pub(crate) fn with_notice_transaction<T, E>(
+        &self,
+        operation: impl FnOnce() -> Result<T, E>,
+    ) -> Result<T, E>
+    where
+        E: From<StorageError>,
+    {
+        if !self.conn.is_autocommit() {
+            return Err(StorageError::InvalidData(
+                "notice save requires its own transaction".into(),
+            )
+            .into());
+        }
+        let _durable = FullSync::full(&self.conn).map_err(E::from)?;
+        self.with_transaction(operation)
     }
 }
 

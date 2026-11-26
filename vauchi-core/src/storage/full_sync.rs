@@ -53,12 +53,23 @@ impl super::Storage {
     where
         E: From<StorageError>,
     {
-        if !self.conn.is_autocommit() {
+        if !self.conn.is_autocommit()
+            || self
+                .seal_target
+                .as_ref()
+                .is_some_and(|file| !file.is_autocommit())
+        {
             return Err(StorageError::InvalidData(
                 "notice save requires its own transaction".into(),
             )
             .into());
         }
+        let _file_durable = self
+            .seal_target
+            .as_ref()
+            .map(FullSync::full)
+            .transpose()
+            .map_err(E::from)?;
         let _durable = FullSync::full(&self.conn).map_err(E::from)?;
         self.with_transaction(operation)
     }

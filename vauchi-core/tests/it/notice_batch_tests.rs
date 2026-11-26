@@ -154,3 +154,61 @@ fn a_stale_writer_cannot_resurrect_a_direction_erased_with_its_contact() {
     assert!(matches!(refused, Err(StorageError::NoticeMoved)));
     assert_eq!(load(&first, NoticeStateKind::Sender), None);
 }
+
+// @internal
+#[test]
+fn a_deleted_and_recreated_direction_does_not_match_an_old_snapshot() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("vauchi.db");
+    let key = SymmetricKey::generate();
+    let first = Storage::open(&path, key.clone()).unwrap();
+    first
+        .notices()
+        .save_many(&[write(NoticeStateKind::Sender, b"initial")])
+        .unwrap();
+    let second = Storage::open(&path, key).unwrap();
+    assert_eq!(
+        load(&second, NoticeStateKind::Sender),
+        Some(b"initial".to_vec())
+    );
+    first
+        .notices()
+        .save_many(&[write(NoticeStateKind::Sender, b"advanced")])
+        .unwrap();
+    first.delete_contact("contact").unwrap();
+    assert_eq!(load(&first, NoticeStateKind::Sender), None);
+    first
+        .notices()
+        .save_many(&[write(NoticeStateKind::Sender, b"fresh")])
+        .unwrap();
+    let refused = second
+        .notices()
+        .save_many(&[write(NoticeStateKind::Sender, b"stale")]);
+    assert!(matches!(refused, Err(StorageError::NoticeMoved)));
+    assert_eq!(
+        load(&first, NoticeStateKind::Sender),
+        Some(b"fresh".to_vec())
+    );
+}
+
+// @internal
+#[test]
+fn a_connection_that_never_read_a_direction_cannot_replace_it() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("vauchi.db");
+    let key = SymmetricKey::generate();
+    let first = Storage::open(&path, key.clone()).unwrap();
+    first
+        .notices()
+        .save_many(&[write(NoticeStateKind::Sender, b"advanced")])
+        .unwrap();
+    let second = Storage::open(&path, key).unwrap();
+    let refused = second
+        .notices()
+        .save("contact", NoticeStateKind::Sender, &DEVICE, b"unobserved");
+    assert!(matches!(refused, Err(StorageError::NoticeMoved)));
+    assert_eq!(
+        load(&first, NoticeStateKind::Sender),
+        Some(b"advanced".to_vec())
+    );
+}

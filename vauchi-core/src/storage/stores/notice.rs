@@ -109,8 +109,8 @@ impl NoticeStore<'_> {
     /// Saves `state` for `contact_id`'s `kind` on `peer_device_id`.
     ///
     /// [`StorageError::NoticeMoved`] when another connection saved the row
-    /// after this one last read or saved it; a row this connection never
-    /// read is replaced.
+    /// after this one last read or saved it. An unobserved row can only be
+    /// created, never replaced.
     pub fn save(
         &self,
         contact_id: &str,
@@ -121,7 +121,9 @@ impl NoticeStore<'_> {
         let (key, sealed_with_receive_key) = self.sealing_key(contact_id)?;
         let state_encrypted = crate::crypto::encrypt(&key, state)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
-        let seen = self.version_seen(contact_id, kind, peer_device_id)?;
+        let (seen, previous) = self
+            .version_seen(contact_id, kind, peer_device_id)?
+            .unwrap_or((-1, Vec::new()));
         // The notices this state assigned leave after this save; a save a
         // power loss could undo would let the next session seal new
         // plaintexts under keys already used (ADR-019 amendment 2026-11-24).
@@ -133,10 +135,12 @@ impl NoticeStore<'_> {
                  (contact_id, kind, peer_device_id, state_encrypted,
                   sealed_with_receive_key, updated_at)
              SELECT ?1, ?2, ?3, ?4, ?5, ?6
-             WHERE ?7 IS NULL OR COALESCE(
+             WHERE COALESCE(
                  (SELECT row_version FROM notice_states
                   WHERE contact_id = ?1 AND kind = ?2 AND peer_device_id = ?3),
-                 -1) = ?7
+                 -1) = ?7 AND (?7 = -1 OR
+                 (SELECT state_encrypted FROM notice_states
+                  WHERE contact_id = ?1 AND kind = ?2 AND peer_device_id = ?3) = ?8)
              ON CONFLICT (contact_id, kind, peer_device_id) DO UPDATE SET
                  state_encrypted = excluded.state_encrypted,
                  sealed_with_receive_key = excluded.sealed_with_receive_key,
@@ -151,12 +155,19 @@ impl NoticeStore<'_> {
                     sealed_with_receive_key,
                     self.clock.unix_seconds() as i64,
                     seen,
+                    previous,
                 ],
                 |row| row.get(0),
             )
             .optional()?
             .ok_or(StorageError::NoticeMoved)?;
-        self.remember_version(contact_id, kind, peer_device_id, row_version)
+        self.remember_version(
+            contact_id,
+            kind,
+            peer_device_id,
+            row_version,
+            &state_encrypted,
+        )
     }
 
     /// The state saved for `contact_id`'s `kind` on `peer_device_id`.
@@ -177,7 +188,7 @@ impl NoticeStore<'_> {
             )
             .optional()?;
         let Some((encrypted, sealed_with_receive_key, row_version)) = row else {
-            self.remember_version(contact_id, kind, peer_device_id, -1)?;
+            self.remember_version(contact_id, kind, peer_device_id, -1, &[])?;
             return Ok(None);
         };
         let key = self.opening_key(contact_id, sealed_with_receive_key)?;
@@ -185,7 +196,7 @@ impl NoticeStore<'_> {
             crate::crypto::decrypt(&key, &encrypted)
                 .map_err(|e| StorageError::Encryption(e.to_string()))?,
         );
-        self.remember_version(contact_id, kind, peer_device_id, row_version)?;
+        self.remember_version(contact_id, kind, peer_device_id, row_version, &encrypted)?;
         Ok(Some(state))
     }
 
@@ -276,6 +287,7 @@ impl NoticeStore<'_> {
                 kind INTEGER NOT NULL,
                 peer_device_id BLOB NOT NULL,
                 row_version INTEGER NOT NULL,
+                state_encrypted BLOB NOT NULL,
                 PRIMARY KEY (contact_id, kind, peer_device_id)
             )",
         )?;
@@ -287,15 +299,15 @@ impl NoticeStore<'_> {
         contact_id: &str,
         kind: NoticeStateKind,
         peer_device_id: &[u8; 32],
-    ) -> Result<Option<i64>, StorageError> {
+    ) -> Result<Option<(i64, Vec<u8>)>, StorageError> {
         self.ensure_versions_seen()?;
         Ok(self
             .conn
             .query_row(
-                "SELECT row_version FROM temp.notice_versions_seen
+                "SELECT row_version, state_encrypted FROM temp.notice_versions_seen
                  WHERE contact_id = ?1 AND kind = ?2 AND peer_device_id = ?3",
                 params![contact_id, kind.code(), peer_device_id],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .optional()?)
     }
@@ -306,13 +318,21 @@ impl NoticeStore<'_> {
         kind: NoticeStateKind,
         peer_device_id: &[u8; 32],
         row_version: i64,
+        state_encrypted: &[u8],
     ) -> Result<(), StorageError> {
         self.ensure_versions_seen()?;
         self.conn.execute(
-            "INSERT INTO temp.notice_versions_seen VALUES (?1, ?2, ?3, ?4)
+            "INSERT INTO temp.notice_versions_seen VALUES (?1, ?2, ?3, ?4, ?5)
              ON CONFLICT (contact_id, kind, peer_device_id)
-             DO UPDATE SET row_version = excluded.row_version",
-            params![contact_id, kind.code(), peer_device_id, row_version],
+             DO UPDATE SET row_version = excluded.row_version,
+                 state_encrypted = excluded.state_encrypted",
+            params![
+                contact_id,
+                kind.code(),
+                peer_device_id,
+                row_version,
+                state_encrypted
+            ],
         )?;
         Ok(())
     }

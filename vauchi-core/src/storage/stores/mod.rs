@@ -70,6 +70,8 @@ pub use kept_blobs::KeptBlobStore;
 pub use labels::LabelStore;
 pub use mask_public_values::{MaskPublicValues, MaskPublicValuesStore};
 pub use mask_seed::{MaskSeed, MaskSeedStore};
+#[cfg(feature = "notice-core")]
+pub use notice::NoticeWrite;
 pub use notice::{NoticeStateKind, NoticeStore};
 pub use ohttp_cache::OhttpCacheStore;
 pub use own_card::OwnCardStore;

@@ -66,6 +66,8 @@ fn per_contact_key(root: &SymmetricKey, label: &[u8], contact_id: &str) -> Symme
 
 /// Scoped persistence view for the notice core's state.
 pub struct NoticeStore<'a> {
+    #[cfg(feature = "notice-core")]
+    storage: &'a Storage,
     conn: &'a Connection,
     key: Option<&'a SymmetricKey>,
     receive_key: Option<&'a SymmetricKey>,
@@ -76,6 +78,8 @@ impl Storage {
     /// Scoped persistence view for the notice core's state.
     pub fn notices(&self) -> crate::storage::Sealed<'_, NoticeStore<'_>> {
         self.sealed(NoticeStore {
+            #[cfg(feature = "notice-core")]
+            storage: self,
             conn: &self.conn,
             key: Some(&self.encryption_key),
             receive_key: self.receive_key(),
@@ -85,6 +89,23 @@ impl Storage {
 }
 
 impl NoticeStore<'_> {
+    /// Advances every row of a session in one durable commit. A stale row or
+    /// failed commit refuses the entire batch, leaving no partly advanced pair.
+    #[cfg(feature = "notice-core")]
+    pub fn save_many(&self, writes: &[NoticeWrite<'_>]) -> Result<(), StorageError> {
+        self.storage.with_notice_transaction(|| {
+            for write in writes {
+                self.save(
+                    write.contact_id,
+                    write.kind,
+                    &write.peer_device_id,
+                    write.state,
+                )?;
+            }
+            Ok(())
+        })
+    }
+
     /// Saves `state` for `contact_id`'s `kind` on `peer_device_id`.
     ///
     /// [`StorageError::NoticeMoved`] when another connection saved the row
@@ -101,45 +122,40 @@ impl NoticeStore<'_> {
         let state_encrypted = crate::crypto::encrypt(&key, state)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
         let seen = self.version_seen(contact_id, kind, peer_device_id)?;
-        let current: Option<i64> = self
-            .conn
-            .query_row(
-                "SELECT row_version FROM notice_states
-                 WHERE contact_id = ?1 AND kind = ?2 AND peer_device_id = ?3",
-                params![contact_id, kind.code(), peer_device_id],
-                |row| row.get(0),
-            )
-            .optional()?;
-        if let (Some(current), Some(seen)) = (current, seen)
-            && current != seen
-        {
-            return Err(StorageError::NoticeMoved);
-        }
         // The notices this state assigned leave after this save; a save a
         // power loss could undo would let the next session seal new
         // plaintexts under keys already used (ADR-019 amendment 2026-11-24).
         let _durable = crate::storage::full_sync::FullSync::full(self.conn)?;
-        let row_version: i64 = self.conn.query_row(
-            "INSERT INTO notice_states
+        let row_version: i64 = self
+            .conn
+            .query_row(
+                "INSERT INTO notice_states
                  (contact_id, kind, peer_device_id, state_encrypted,
                   sealed_with_receive_key, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             SELECT ?1, ?2, ?3, ?4, ?5, ?6
+             WHERE ?7 IS NULL OR COALESCE(
+                 (SELECT row_version FROM notice_states
+                  WHERE contact_id = ?1 AND kind = ?2 AND peer_device_id = ?3),
+                 -1) = ?7
              ON CONFLICT (contact_id, kind, peer_device_id) DO UPDATE SET
                  state_encrypted = excluded.state_encrypted,
                  sealed_with_receive_key = excluded.sealed_with_receive_key,
                  updated_at = excluded.updated_at,
                  row_version = notice_states.row_version + 1
              RETURNING row_version",
-            params![
-                contact_id,
-                kind.code(),
-                peer_device_id,
-                state_encrypted,
-                sealed_with_receive_key,
-                self.clock.unix_seconds() as i64,
-            ],
-            |row| row.get(0),
-        )?;
+                params![
+                    contact_id,
+                    kind.code(),
+                    peer_device_id,
+                    state_encrypted,
+                    sealed_with_receive_key,
+                    self.clock.unix_seconds() as i64,
+                    seen,
+                ],
+                |row| row.get(0),
+            )
+            .optional()?
+            .ok_or(StorageError::NoticeMoved)?;
         self.remember_version(contact_id, kind, peer_device_id, row_version)
     }
 
@@ -161,6 +177,7 @@ impl NoticeStore<'_> {
             )
             .optional()?;
         let Some((encrypted, sealed_with_receive_key, row_version)) = row else {
+            self.remember_version(contact_id, kind, peer_device_id, -1)?;
             return Ok(None);
         };
         let key = self.opening_key(contact_id, sealed_with_receive_key)?;
@@ -298,6 +315,32 @@ impl NoticeStore<'_> {
             params![contact_id, kind.code(), peer_device_id, row_version],
         )?;
         Ok(())
+    }
+}
+
+/// One serialized notice state in a session's atomic write set.
+#[cfg(feature = "notice-core")]
+pub struct NoticeWrite<'a> {
+    contact_id: &'a str,
+    kind: NoticeStateKind,
+    peer_device_id: [u8; 32],
+    state: &'a [u8],
+}
+
+#[cfg(feature = "notice-core")]
+impl<'a> NoticeWrite<'a> {
+    pub fn new(
+        contact_id: &'a str,
+        kind: NoticeStateKind,
+        peer_device_id: [u8; 32],
+        state: &'a [u8],
+    ) -> Self {
+        Self {
+            contact_id,
+            kind,
+            peer_device_id,
+            state,
+        }
     }
 }
 

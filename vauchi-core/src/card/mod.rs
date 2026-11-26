@@ -19,10 +19,12 @@ mod uri;
 pub mod catalog;
 
 pub use catalog::{CatalogEntry, FieldCategory, FieldTypeCatalog};
+#[cfg(feature = "notice-core")]
+pub(crate) use field::MAX_LABEL_LENGTH;
+pub(crate) use field::MAX_VALUE_LENGTH;
 pub use field::{
     ContactField, FieldType, ValidationError, validate_social_username, validate_value,
 };
-pub(crate) use field::{MAX_LABEL_LENGTH, MAX_VALUE_LENGTH};
 pub use uri::{
     ContactAction, MapProvider, is_allowed_scheme, is_blocked_scheme, is_safe_url, is_valid_email,
     is_valid_phone, is_valid_relay_url, map_uri,

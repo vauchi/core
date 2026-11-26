@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use crate::crypto::SymmetricKey;
-use crate::storage::{NoticeStateKind, Storage, StorageError};
+use crate::storage::{NoticeStateKind, NoticeWrite, Storage, StorageError};
 use rusqlite::Connection;
 
 fn sealed_profile(path: &std::path::Path) -> Storage {
@@ -79,4 +79,79 @@ fn a_sealed_notice_receipt_never_escapes_an_uncommitted_file_transaction() {
             .unwrap(),
         None
     );
+}
+
+// @internal
+#[test]
+fn independently_opened_mask_profiles_cannot_both_advance_one_observation() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("vauchi.db");
+    let initial = sealed_profile(&path);
+    let key = initial.encryption_key.clone();
+    initial.with_notice_transaction(|| save(&initial)).unwrap();
+    drop(initial);
+    let first = Storage::open_mask_profile(&path, key.clone()).unwrap();
+    let second = Storage::open_mask_profile(&path, key.clone()).unwrap();
+    let before_first = first
+        .notices()
+        .snapshot("contact", NoticeStateKind::Sender, &[1; 32])
+        .unwrap();
+    let before_second = second
+        .notices()
+        .snapshot("contact", NoticeStateKind::Sender, &[1; 32])
+        .unwrap();
+    assert_eq!(before_first.state(), Some(b"state".as_slice()));
+    assert_eq!(before_second.state(), before_first.state());
+    first
+        .notices()
+        .save_many(&[NoticeWrite::new(&before_first, b"first")])
+        .unwrap();
+    let refused = second
+        .notices()
+        .save_many(&[NoticeWrite::new(&before_second, b"stale")]);
+    assert!(matches!(refused, Err(StorageError::NoticeMoved)));
+    let reopened = Storage::open_mask_profile(&path, key).unwrap();
+    let held = reopened
+        .notices()
+        .snapshot("contact", NoticeStateKind::Sender, &[1; 32])
+        .unwrap();
+    assert_eq!(held.state(), Some(b"first".as_slice()));
+    reopened
+        .notices()
+        .save_many(&[NoticeWrite::new(&held, b"recovered")])
+        .unwrap();
+    assert_eq!(
+        reopened
+            .notices()
+            .snapshot("contact", NoticeStateKind::Sender, &[1; 32])
+            .unwrap()
+            .state(),
+        Some(b"recovered".as_slice())
+    );
+}
+
+// @internal
+#[test]
+fn a_stale_embedded_mask_cannot_replace_a_lent_profiles_notice_commit() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("vauchi.db");
+    let key = SymmetricKey::generate();
+    let mut owner = Storage::open(&path, key.clone()).unwrap();
+    let stale = Storage::open(&path, key).unwrap();
+    let live = owner.lend_mask_profile().unwrap();
+    let observed = live
+        .notices()
+        .snapshot("contact", NoticeStateKind::Sender, &[1; 32])
+        .unwrap();
+    live.notices()
+        .save_many(&[NoticeWrite::new(&observed, b"advanced")])
+        .unwrap();
+    assert!(matches!(stale.seal_mask(), Err(StorageError::NoticeMoved)));
+    owner.take_back_mask_profile(live).unwrap();
+    let held = owner
+        .mask_profile()
+        .notices()
+        .snapshot("contact", NoticeStateKind::Sender, &[1; 32])
+        .unwrap();
+    assert_eq!(held.state(), Some(b"advanced".as_slice()));
 }

@@ -23,6 +23,7 @@ use crate::crypto::{HKDF, Signature, SigningKeyPair};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+mod capability;
 mod reconcile;
 pub use reconcile::Reconciled;
 
@@ -298,38 +299,6 @@ mod signature_serde {
 }
 
 impl DeviceRegistry {
-    pub fn set_notice_cohort(
-        &mut self,
-        device_id: &[u8; 32],
-        cohort: Option<u32>,
-        signing_key: &SigningKeyPair,
-    ) -> Result<bool, DeviceError> {
-        let device = self
-            .devices
-            .iter_mut()
-            .find(|device| &device.device_id == device_id)
-            .ok_or(DeviceError::DeviceNotFound)?;
-        if device.revoked {
-            return Err(DeviceError::SignerNotActive);
-        }
-        if device.notice_cohort == cohort {
-            return Ok(false);
-        }
-        let next = device
-            .notice_capability_version
-            .checked_add(1)
-            .ok_or(DeviceError::CapabilityVersionExhausted)?;
-        let version = self
-            .version
-            .checked_add(1)
-            .ok_or(DeviceError::CapabilityVersionExhausted)?;
-        device.notice_cohort = cohort;
-        device.notice_capability_version = next;
-        self.version = version;
-        self.sign(signing_key);
-        Ok(true)
-    }
-
     /// Creates a new registry with a single device.
     pub fn new(device: RegisteredDevice, signing_key: &SigningKeyPair) -> Self {
         let mut registry = Self {

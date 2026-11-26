@@ -330,6 +330,24 @@ fn switches(sent: &[Command]) -> usize {
 
 const SWITCH_LABEL: &str = "Use Front Camera";
 
+// @internal — native capability counts must not suppress Hover's initial front selector.
+#[test]
+fn a_single_camera_hover_still_prepares_its_front_selector_without_a_switch_button() {
+    for mode in [ExchangeMode::Hover, ExchangeMode::TapHoverShake] {
+        let mut engine = attached_with(r#"{"has_camera":true,"camera_count":1}"#);
+        engine.navigate_to(AppScreen::MultiStageExchange { mode });
+        let display = engine.initial_commands().unwrap();
+        let hardware = engine.drain_hardware_commands();
+        assert!(hardware.contains(&Command::SwitchCamera { use_front: true }));
+        assert_eq!(switches(&hardware), 1);
+        let json = serde_json::to_string(&display).unwrap();
+        assert!(
+            !json.contains("Use Back Camera"),
+            "no camera switch: {json}"
+        );
+    }
+}
+
 // @internal — private#772: on a laptop with one camera there is nothing to
 // switch to (the maintainer, Windows rig, 2026-11-23).
 #[test]
@@ -338,7 +356,8 @@ fn a_device_with_one_camera_is_offered_no_switch() {
 
     let (sent, json) = entering_glance(&mut engine);
 
-    assert_eq!(switches(&sent), 0, "{json}");
+    assert_eq!(switches(&sent), 1, "one initial selection: {json}");
+    assert!(sent.contains(&Command::SwitchCamera { use_front: false }));
     assert!(!json.contains(SWITCH_LABEL), "no switch button: {json}");
 }
 

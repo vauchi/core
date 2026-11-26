@@ -945,26 +945,17 @@ impl WorkflowEngine for MultiStageExchangeEngine {
     /// `android/app/src/main/kotlin/app/vauchi/ui/FaceToFaceExchangeScreen.kt`.
     /// Phase 2b + Phase 2c of `2026-05-04-exchange-command-screen-presentation`.
     fn screen_entered(&mut self) -> Vec<vauchi_core::Command> {
-        let mut entered = vec![
+        vec![
             vauchi_core::Command::SetScreenBrightness { level: Some(0.35) },
             vauchi_core::Command::SetIdleTimerDisabled { disabled: true },
             vauchi_core::Command::SetOrientationLock {
                 orientation: Some(vauchi_core::Orientation::Portrait),
             },
-        ];
-        // Announce the engine's chosen camera selector explicitly so the
-        // consumer aligns with engine state on entry rather than
-        // coincidentally matching its own back-default. Hover ships
-        // `use_front: true` here (face-to-face screen-to-screen UX); Glance
-        // keeps `use_front: false`. Phase 1.B of
-        // `2026-05-11-hover-graduation-plan.md`. A device that counted one
-        // camera has no selector to align (private#772).
-        if self.can_switch_camera() {
-            entered.push(vauchi_core::Command::SwitchCamera {
+            // Initial selection is required even when there is no switch affordance (#773).
+            vauchi_core::Command::SwitchCamera {
                 use_front: self.use_front_camera,
-            });
-        }
-        entered
+            },
+        ]
     }
 
     /// Symmetric counterpart to [`Self::screen_entered`]: restore the

@@ -355,6 +355,7 @@ check:ci-self-tests:
   tags: [docker]
   needs: []
   script:
+    - apk add --no-cache python3
     - sh ci/run-ci-self-tests.sh
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -1390,6 +1391,8 @@ test:e2e-tui-journey:
     E2E_PINNED_BIN_CACHE: ${HOME}/.cache/vauchi-ci/e2e-pinned-bin
     TARGET_CORE_DIR: ${CI_PROJECT_DIR}/../core-tui-target-${CI_JOB_ID}
   script:
+    - python3 ci/tests/point-tui-cohort.test.py
+    - sh ci/tests/e2e-tui-journey.test.sh
     - git clone --depth=1 "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/e2e.git" "$E2E_DIR"
     - git clone --depth=1 --branch "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/vauchi/core.git" "$TARGET_CORE_DIR"
     - sh ci/e2e-tui-journey.sh "$E2E_DIR" "$CI_PROJECT_DIR" "$TARGET_CORE_DIR"
@@ -1407,6 +1410,10 @@ test:e2e-tui-journey:
           - vauchi-core/src/sync/**/*
           - vauchi-protocol/**/*
           - ci/e2e-tui-journey.sh
+          - ci/point-tui-cohort.py
+          - scripts/align-contract-pins.py
+          - ci/tests/point-tui-cohort.test.py
+          - ci/tests/e2e-tui-journey.test.sh
           - Cargo.lock
 
 test:cucumber:

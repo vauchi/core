@@ -16,12 +16,9 @@
 # When the target fails too, tui or e2e is behind Core, not this MR's
 # doing: exit 3, which the job allows as a warning.
 #
-# A merge request that moves Core's contract pin is behind the same way:
-# e2e's tools pin the contract themselves and follow a new one only after
-# a Core release, so on this Core they build with two contracts and do
-# not compile (core!2403, vauchi/private#1343). Then the target is not
-# tried and the job exits 3 naming both pins. A journey regression in
-# such a merge request shows only once the tools have moved.
+# Each attempt aligns its job-private consumer, tagged TUI renderer and
+# hardware shell with that Core's contract. Otherwise a contract move cannot compile
+# the journeys and also hides candidate-only regressions (#773).
 #
 # The relays the journeys run against stay at e2e's pins and do not depend
 # on this Core, so E2E_PINNED_BIN_CACHE keeps them between jobs: building
@@ -34,6 +31,7 @@
 # Exit:  0 the MR passes; 1 only the MR fails; 3 the target fails too.
 
 set -eu
+script_dir=$(CDPATH='' cd "$(dirname "$0")" && pwd)
 
 e2e=${1:?usage: e2e-tui-journey.sh <e2e-checkout> <mr-core-dir> <target-core-dir>}
 mr_core=${2:?mr core dir}
@@ -69,6 +67,17 @@ save_cache() {
 journeys_against() { # core-dir name
     copy="$work/$2"
     cp -R "$e2e" "$copy"
+    cp "$copy/ci/point-core-at.sh" "$copy/ci/point-core-original.sh"
+    cp "$script_dir/point-tui-cohort.py" "$copy/ci/point-tui-cohort.py"
+    cp "$script_dir/../scripts/align-contract-pins.py" "$copy/ci/align-contract-pins.py"
+    # The same entry point is called for the Linux app cloned by e2e later.
+    cat > "$copy/ci/point-core-at.sh" <<'POINT'
+#!/bin/sh
+set -eu
+here=$(CDPATH='' cd "$(dirname "$0")" && pwd)
+sh "$here/point-core-original.sh" "$@"
+python3 "$here/point-tui-cohort.py" "$@"
+POINT
     rc=0
     sh "$copy/ci/point-core-at.sh" "$1" "$copy/Cargo.toml" &&
         (cd "$copy" && E2E_CORE_DIR="$1" E2E_BIN_DIR="$bin" sh ci/tui-journey.sh "$work/$2-job" -E "$journeys") ||
@@ -77,20 +86,9 @@ journeys_against() { # core-dir name
     return "$rc"
 }
 
-contract_pin() { # core-dir
-    sed -n -E 's/^vauchi-contract *=.*tag *= *"([^"]+)".*/\1/p' "$1/Cargo.toml" 2>/dev/null | head -n 1
-}
-
 if journeys_against "$mr_core" mr; then
     echo "the TUI journeys pass against this merge request's Core"
     exit 0
-fi
-mr_pin=$(contract_pin "$mr_core")
-target_pin=$(contract_pin "$target_core")
-if [ -n "$mr_pin" ] && [ -n "$target_pin" ] && [ "$mr_pin" != "$target_pin" ]; then
-    echo "WARN: this merge request moves the contract from $target_pin to $mr_pin; e2e's tools still pin" >&2
-    echo "      their own and follow only after a Core release. A journey regression shows once they moved." >&2
-    exit 3
 fi
 echo "the TUI journeys failed against this merge request's Core; trying the target branch's Core"
 if journeys_against "$target_core" target; then

@@ -31,9 +31,11 @@ block=$(awk -v job="$job" '
 if [ -z "$block" ]; then
     fail "$job is not in $ci_config"
 else
+    # shellcheck disable=SC2016 # match the CI command's literal variables
     for step in \
         'gitlab.com/vauchi/e2e.git' \
         'CI_MERGE_REQUEST_TARGET_BRANCH_NAME' \
+        'sh ci/tests/e2e-tui-journey.test.sh' \
         'sh ci/e2e-tui-journey.sh "$E2E_DIR" "$CI_PROJECT_DIR" "$TARGET_CORE_DIR"' \
         'merge_request_event' \
         'exit_codes: [3]'; do
@@ -59,12 +61,26 @@ fi
 fake=$(mktemp -d)
 trap 'rm -rf "$fake"' EXIT
 mkdir -p "$fake/e2e/ci" "$fake/mr" "$fake/target"
+pin() { # dir tag
+    printf '[workspace.dependencies]\nvauchi-contract = { git = "https://gitlab.com/vauchi/contract.git", tag = "%s", version = "=%s" }\n' "$2" "${2#v}" > "$1/Cargo.toml"
+}
+pin "$fake/mr" v0.101.0
+pin "$fake/target" v0.101.0
+printf '[dependencies]\nvauchi-contract = { git = "https://gitlab.com/vauchi/contract.git", tag = "v0.101.0", version = "=0.101.0" }\n' > "$fake/e2e/Cargo.toml"
+cp "$fake/e2e/Cargo.toml" "$fake/e2e/ci/fixture-consumer.toml"
 printf '#!/bin/sh\nexit 0\n' > "$fake/e2e/ci/point-core-at.sh"
 cat > "$fake/e2e/ci/tui-journey.sh" <<'FAKE'
 #!/bin/sh
 [ -n "${E2E_CORE_DIR:-}" ] || { echo "no E2E_CORE_DIR"; exit 9; }
 [ "${2:-}" = -E ] && [ -n "${3:-}" ] || { echo "no filter"; exit 9; }
 echo "journeys on $E2E_CORE_DIR"
+pin_of() { sed -n -E 's/^vauchi-contract *=.*tag *= *"([^"]+)".*/\1/p' "$1"; }
+expected=$(pin_of "$E2E_CORE_DIR/Cargo.toml")
+[ "$(pin_of Cargo.toml)" = "$expected" ] || { echo "root uses another contract"; exit 8; }
+mkdir -p "$1/client"
+cp ci/fixture-consumer.toml "$1/client/Cargo.toml"
+sh ci/point-core-at.sh "$E2E_CORE_DIR" "$1/client/Cargo.toml" || exit 8
+[ "$(pin_of "$1/client/Cargo.toml")" = "$expected" ] || { echo "client uses another contract"; exit 8; }
 [ ! -f "$E2E_CORE_DIR/BROKEN" ] || exit 1
 [ -n "${E2E_BIN_DIR:-}" ] || { echo "no E2E_BIN_DIR"; exit 9; }
 if [ -f "$E2E_BIN_DIR/relay.sha" ]; then
@@ -92,30 +108,23 @@ attribution no no 0
 attribution yes no 1
 attribution yes yes 3
 
-# A merge request that moves Core to another contract cannot build e2e's
-# tools on its own Core: they pin the contract themselves and can follow
-# only after a Core release (vauchi/private#1343; core!2403 moved 0.98.0
-# to 0.99.0 and failed with two versions of the contract in one build).
-# That is "behind", exit 3, and the target is not tried. With the pins
-# equal a failure is still the merge request's.
-pin() { # dir tag
-    printf 'vauchi-contract = { git = "https://gitlab.com/vauchi/contract.git", tag = "%s", version = "^0" }\n' "$2" > "$1/Cargo.toml"
-}
+# Contract moves get coherent isolated consumers too. A real journey
+# regression must still fail when only the candidate is broken.
 pin "$fake/mr" v0.99.0
 pin "$fake/target" v0.98.0
 rm -f "$fake/mr/BROKEN" "$fake/target/BROKEN"
 : > "$fake/mr/BROKEN"
 rc=0
 sh ci/e2e-tui-journey.sh "$fake/e2e" "$fake/mr" "$fake/target" > "$fake/out" 2>&1 || rc=$?
-if [ "$rc" = 3 ] && grep -qF "v0.98.0 to v0.99.0" "$fake/out" && ! grep -qF "journeys on $fake/target" "$fake/out"; then
-    echo "PASS: a merge request that moves the contract and fails exits 3 without trying the target"
+if [ "$rc" = 1 ] && grep -qF "journeys on $fake/target" "$fake/out"; then
+    echo "PASS: a contract move aligns both attempts and still rejects a candidate-only regression"
 else
-    fail "a contract move that fails must exit 3 naming both pins and not try the target, got $rc: $(tail -3 "$fake/out")"
+    fail "a contract move must test aligned candidate and target consumers, got $rc: $(tail -3 "$fake/out")"
 fi
+attribution yes yes 3
 attribution no no 0
 pin "$fake/target" v0.99.0
 attribution yes no 1
-rm -f "$fake/mr/Cargo.toml" "$fake/target/Cargo.toml"
 
 # The relay binaries are kept between jobs: the first run builds and saves
 # them, the next one reuses them, and a job never works in the kept

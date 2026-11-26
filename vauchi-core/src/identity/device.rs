@@ -25,6 +25,7 @@ use thiserror::Error;
 
 mod capability;
 mod reconcile;
+use capability::append_device_capabilities;
 pub use reconcile::Reconciled;
 
 /// Device type classification based on device name.
@@ -464,16 +465,14 @@ impl DeviceRegistry {
             data.extend_from_slice(&device.device_id);
             data.extend_from_slice(&device.exchange_public_key);
             data.push(if device.revoked { 1 } else { 0 });
-            if names_keys || names_cohorts {
-                // The marker keeps a missing key distinct from an all-zero one.
-                data.push(u8::from(device.signing_public_key.is_some()));
-                data.extend_from_slice(&device.signing_public_key.unwrap_or([0u8; 32]));
-            }
-            if names_cohorts {
-                data.extend_from_slice(&device.notice_capability_version.to_le_bytes());
-                data.push(u8::from(device.notice_cohort.is_some()));
-                data.extend_from_slice(&device.notice_cohort.unwrap_or(0).to_le_bytes());
-            }
+            append_device_capabilities(
+                &mut data,
+                device.signing_public_key,
+                device.notice_cohort,
+                device.notice_capability_version,
+                names_keys,
+                names_cohorts,
+            );
         }
         data
     }
@@ -938,16 +937,14 @@ impl RegistryBroadcast {
         for device in &self.active_devices {
             data.extend_from_slice(&device.device_id);
             data.extend_from_slice(&device.exchange_public_key);
-            if names_keys || names_cohorts {
-                // The marker keeps a missing key distinct from an all-zero one.
-                data.push(u8::from(device.signing_public_key.is_some()));
-                data.extend_from_slice(&device.signing_public_key.unwrap_or([0u8; 32]));
-            }
-            if names_cohorts {
-                data.extend_from_slice(&device.notice_capability_version.to_le_bytes());
-                data.push(u8::from(device.notice_cohort.is_some()));
-                data.extend_from_slice(&device.notice_cohort.unwrap_or(0).to_le_bytes());
-            }
+            append_device_capabilities(
+                &mut data,
+                device.signing_public_key,
+                device.notice_cohort,
+                device.notice_capability_version,
+                names_keys,
+                names_cohorts,
+            );
         }
         data
     }

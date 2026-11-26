@@ -4,6 +4,26 @@
 use super::{DeviceError, DeviceRegistry};
 use crate::crypto::SigningKeyPair;
 
+pub(super) fn append_device_capabilities(
+    data: &mut Vec<u8>,
+    signing_public_key: Option<[u8; 32]>,
+    cohort: Option<u32>,
+    revision: u64,
+    names_keys: bool,
+    names_cohorts: bool,
+) {
+    if names_keys || names_cohorts {
+        // The marker keeps a missing key distinct from an all-zero one.
+        data.push(u8::from(signing_public_key.is_some()));
+        data.extend_from_slice(&signing_public_key.unwrap_or([0u8; 32]));
+    }
+    if names_cohorts {
+        data.extend_from_slice(&revision.to_le_bytes());
+        data.push(u8::from(cohort.is_some()));
+        data.extend_from_slice(&cohort.unwrap_or(0).to_le_bytes());
+    }
+}
+
 impl DeviceRegistry {
     pub fn set_notice_cohort(
         &mut self,

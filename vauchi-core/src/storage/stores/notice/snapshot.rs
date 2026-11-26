@@ -43,16 +43,7 @@ impl NoticeStore<'_> {
         kind: NoticeStateKind,
         peer_device_id: &[u8; 32],
     ) -> Result<NoticeSnapshot, StorageError> {
-        let row: Option<(Vec<u8>, bool, i64)> = self
-            .conn
-            .query_row(
-                "SELECT state_encrypted, sealed_with_receive_key, row_version
-             FROM notice_states
-             WHERE contact_id = ?1 AND kind = ?2 AND peer_device_id = ?3",
-                params![contact_id, kind.code(), peer_device_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-            )
-            .optional()?;
+        let row = self.read_row(contact_id, kind, peer_device_id)?;
         let mut observed = NoticeSnapshot {
             contact_id: contact_id.to_string(),
             kind,

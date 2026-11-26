@@ -22,6 +22,8 @@ use zeroize::Zeroizing;
 
 use super::super::{Storage, StorageError};
 
+type NoticeRow = (Vec<u8>, bool, i64);
+
 #[cfg(feature = "notice-core")]
 mod snapshot;
 #[cfg(feature = "notice-core")]
@@ -180,16 +182,7 @@ impl NoticeStore<'_> {
         kind: NoticeStateKind,
         peer_device_id: &[u8; 32],
     ) -> Result<Option<Zeroizing<Vec<u8>>>, StorageError> {
-        let row: Option<(Vec<u8>, bool, i64)> = self
-            .conn
-            .query_row(
-                "SELECT state_encrypted, sealed_with_receive_key, row_version
-                 FROM notice_states
-                 WHERE contact_id = ?1 AND kind = ?2 AND peer_device_id = ?3",
-                params![contact_id, kind.code(), peer_device_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-            )
-            .optional()?;
+        let row = self.read_row(contact_id, kind, peer_device_id)?;
         let Some((encrypted, sealed_with_receive_key, row_version)) = row else {
             self.remember_version(contact_id, kind, peer_device_id, -1, &[])?;
             return Ok(None);
@@ -201,6 +194,24 @@ impl NoticeStore<'_> {
         );
         self.remember_version(contact_id, kind, peer_device_id, row_version, &encrypted)?;
         Ok(Some(state))
+    }
+
+    fn read_row(
+        &self,
+        contact_id: &str,
+        kind: NoticeStateKind,
+        peer_device_id: &[u8; 32],
+    ) -> Result<Option<NoticeRow>, StorageError> {
+        self.conn
+            .query_row(
+                "SELECT state_encrypted, sealed_with_receive_key, row_version
+                 FROM notice_states
+                 WHERE contact_id = ?1 AND kind = ?2 AND peer_device_id = ?3",
+                params![contact_id, kind.code(), peer_device_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()
+            .map_err(StorageError::from)
     }
 
     /// Opens and saves the directions `contact_id` lacks with each of `peers`,

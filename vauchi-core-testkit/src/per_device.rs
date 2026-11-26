@@ -134,6 +134,8 @@ pub fn tablet_entry(key: &SigningKeyPair) -> RegisteredDevice {
         device_id: [7u8; 32],
         exchange_public_key: [8u8; 32],
         signing_public_key: Some(*key.public_key().as_bytes()),
+        notice_cohort: None,
+        notice_capability_version: 0,
         device_name: "tablet".into(),
         created_at: 0,
         revoked: false,

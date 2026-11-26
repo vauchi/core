@@ -487,6 +487,8 @@ fn test_rekey_preserves_all_encrypted_tables() {
         device_id: [0x42; 32],
         exchange_public_key: [0x43; 32],
         signing_public_key: None,
+        notice_cohort: None,
+        notice_capability_version: 0,
         device_name: "Test Device".to_string(),
         created_at: 1000,
         revoked: false,

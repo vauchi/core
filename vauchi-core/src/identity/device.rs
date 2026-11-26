@@ -101,6 +101,8 @@ pub enum DeviceError {
     CannotTransferToRevoked,
     #[error("Broadcast is stale: {0}")]
     BroadcastStale(String),
+    #[error("Device capability version exhausted")]
+    CapabilityVersionExhausted,
 }
 
 /// Device-specific cryptographic material and metadata.
@@ -203,6 +205,8 @@ impl DeviceInfo {
             revoked_at: None,
             last_sync_at: None,
             signing_public_key: None,
+            notice_cohort: None,
+            notice_capability_version: 0,
         }
     }
 }
@@ -218,6 +222,13 @@ pub struct RegisteredDevice {
     /// seed (ADR-079). `None` until the device has generated one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub signing_public_key: Option<[u8; 32]>,
+    /// The mailbox cohort this device reads, if it supports the notice path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notice_cohort: Option<u32>,
+    /// Per-device capability revision; a nonzero revision with no cohort is
+    /// a withdrawal, so a stale sibling cannot advertise support again.
+    #[serde(default, skip_serializing_if = "notice_version_is_zero")]
+    pub notice_capability_version: u64,
     /// Human-readable name.
     pub device_name: String,
     /// Creation timestamp.
@@ -287,6 +298,38 @@ mod signature_serde {
 }
 
 impl DeviceRegistry {
+    pub fn set_notice_cohort(
+        &mut self,
+        device_id: &[u8; 32],
+        cohort: Option<u32>,
+        signing_key: &SigningKeyPair,
+    ) -> Result<bool, DeviceError> {
+        let device = self
+            .devices
+            .iter_mut()
+            .find(|device| &device.device_id == device_id)
+            .ok_or(DeviceError::DeviceNotFound)?;
+        if device.revoked {
+            return Err(DeviceError::SignerNotActive);
+        }
+        if device.notice_cohort == cohort {
+            return Ok(false);
+        }
+        let next = device
+            .notice_capability_version
+            .checked_add(1)
+            .ok_or(DeviceError::CapabilityVersionExhausted)?;
+        let version = self
+            .version
+            .checked_add(1)
+            .ok_or(DeviceError::CapabilityVersionExhausted)?;
+        device.notice_cohort = cohort;
+        device.notice_capability_version = next;
+        self.version = version;
+        self.sign(signing_key);
+        Ok(true)
+    }
+
     /// Creates a new registry with a single device.
     pub fn new(device: RegisteredDevice, signing_key: &SigningKeyPair) -> Self {
         let mut registry = Self {
@@ -437,7 +480,13 @@ impl DeviceRegistry {
         // Once any device names a key, every entry is fixed-width behind a
         // versioned prefix, so an entry with a key cannot parse as one without.
         let names_keys = self.devices.iter().any(|d| d.signing_public_key.is_some());
-        if names_keys {
+        let names_cohorts = self
+            .devices
+            .iter()
+            .any(|d| d.notice_capability_version > 0 || d.notice_cohort.is_some());
+        if names_cohorts {
+            data.extend_from_slice(b"REGISTRY-V3:");
+        } else if names_keys {
             data.extend_from_slice(b"REGISTRY-V2:");
         }
         data.extend_from_slice(&self.version.to_le_bytes());
@@ -446,10 +495,15 @@ impl DeviceRegistry {
             data.extend_from_slice(&device.device_id);
             data.extend_from_slice(&device.exchange_public_key);
             data.push(if device.revoked { 1 } else { 0 });
-            if names_keys {
+            if names_keys || names_cohorts {
                 // The marker keeps a missing key distinct from an all-zero one.
                 data.push(u8::from(device.signing_public_key.is_some()));
                 data.extend_from_slice(&device.signing_public_key.unwrap_or([0u8; 32]));
+            }
+            if names_cohorts {
+                data.extend_from_slice(&device.notice_capability_version.to_le_bytes());
+                data.push(u8::from(device.notice_cohort.is_some()));
+                data.extend_from_slice(&device.notice_cohort.unwrap_or(0).to_le_bytes());
             }
         }
         data
@@ -680,6 +734,10 @@ pub struct BroadcastDevice {
     /// Public half of the device's own signing key (ADR-079).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub signing_public_key: Option<[u8; 32]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notice_cohort: Option<u32>,
+    #[serde(default, skip_serializing_if = "notice_version_is_zero")]
+    pub notice_capability_version: u64,
 }
 
 impl RegistryBroadcast {
@@ -695,6 +753,8 @@ impl RegistryBroadcast {
                 device_id: d.device_id,
                 exchange_public_key: d.exchange_public_key,
                 signing_public_key: d.signing_public_key,
+                notice_cohort: d.notice_cohort,
+                notice_capability_version: d.notice_capability_version,
             })
             .collect();
 
@@ -891,8 +951,14 @@ impl RegistryBroadcast {
             .active_devices
             .iter()
             .any(|d| d.signing_public_key.is_some());
+        let names_cohorts = self
+            .active_devices
+            .iter()
+            .any(|d| d.notice_capability_version > 0 || d.notice_cohort.is_some());
         let mut data = Vec::new();
-        data.extend_from_slice(if names_keys {
+        data.extend_from_slice(if names_cohorts {
+            b"BROADCAST-V3:".as_slice()
+        } else if names_keys {
             b"BROADCAST-V2:".as_slice()
         } else {
             b"BROADCAST:".as_slice()
@@ -903,10 +969,15 @@ impl RegistryBroadcast {
         for device in &self.active_devices {
             data.extend_from_slice(&device.device_id);
             data.extend_from_slice(&device.exchange_public_key);
-            if names_keys {
+            if names_keys || names_cohorts {
                 // The marker keeps a missing key distinct from an all-zero one.
                 data.push(u8::from(device.signing_public_key.is_some()));
                 data.extend_from_slice(&device.signing_public_key.unwrap_or([0u8; 32]));
+            }
+            if names_cohorts {
+                data.extend_from_slice(&device.notice_capability_version.to_le_bytes());
+                data.push(u8::from(device.notice_cohort.is_some()));
+                data.extend_from_slice(&device.notice_cohort.unwrap_or(0).to_le_bytes());
             }
         }
         data
@@ -939,4 +1010,8 @@ impl RegistryBroadcast {
         }
         Ok(broadcast)
     }
+}
+
+fn notice_version_is_zero(version: &u64) -> bool {
+    *version == 0
 }

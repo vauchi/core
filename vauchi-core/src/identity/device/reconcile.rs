@@ -101,6 +101,17 @@ fn merged_entry(base: &RegisteredDevice, other: &RegisteredDevice) -> Registered
     RegisteredDevice {
         exchange_public_key: base.exchange_public_key.min(other.exchange_public_key),
         signing_public_key: either(base.signing_public_key, other.signing_public_key),
+        notice_cohort: match base
+            .notice_capability_version
+            .cmp(&other.notice_capability_version)
+        {
+            Ordering::Greater => base.notice_cohort,
+            Ordering::Less => other.notice_cohort,
+            Ordering::Equal => base.notice_cohort.min(other.notice_cohort),
+        },
+        notice_capability_version: base
+            .notice_capability_version
+            .max(other.notice_capability_version),
         revoked: base.revoked || other.revoked,
         revoked_at: match (base.revoked_at, other.revoked_at) {
             (Some(a), Some(b)) => Some(a.min(b)),
@@ -120,6 +131,8 @@ fn same_signed_devices(a: &[RegisteredDevice], b: &[RegisteredDevice]) -> bool {
             x.device_id == y.device_id
                 && x.exchange_public_key == y.exchange_public_key
                 && x.signing_public_key == y.signing_public_key
+                && x.notice_cohort == y.notice_cohort
+                && x.notice_capability_version == y.notice_capability_version
                 && x.revoked == y.revoked
         })
 }

@@ -12,7 +12,7 @@
 
 use std::sync::Arc;
 
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use zeroize::Zeroizing;
 
 use super::super::{Storage, StorageError};
@@ -37,6 +37,11 @@ pub struct DeviceStore<'a> {
     /// A mask profile's identity is derived from the mask seed and has no
     /// identity row of its own (ADR-080).
     identity_is_derived: bool,
+}
+
+struct HeldContactRegistry {
+    broadcast: RegistryBroadcast,
+    encrypted: Vec<u8>,
 }
 
 impl Storage {
@@ -491,20 +496,16 @@ impl DeviceStore<'_> {
                 "contact device registry version exceeds storage range".into(),
             )
         })?;
-        let previously_active = self.load_contact_active_devices(contact_id)?;
-        let last_stored_version = self
-            .conn
-            .query_row(
-                "SELECT version FROM contact_device_registries WHERE contact_id = ?1",
-                params![contact_id],
-                |row| row.get::<_, i64>(0),
+        let held = self.load_contact_registry_snapshot(contact_id)?;
+        let previously_active = held
+            .as_ref()
+            .map(|held| held.broadcast.active_devices())
+            .unwrap_or(&[]);
+        let last_version = held.as_ref().map_or(0, |held| held.broadcast.version());
+        let last_stored_version = i64::try_from(last_version).map_err(|_| {
+            StorageError::InvalidData(
+                "stored contact device registry version exceeds storage range".into(),
             )
-            .or_else(|error| match error {
-                rusqlite::Error::QueryReturnedNoRows => Ok(0),
-                other => Err(other),
-            })?;
-        let last_version = u64::try_from(last_stored_version).map_err(|_| {
-            StorageError::InvalidData("stored contact device registry version is negative".into())
         })?;
 
         let contact_identity = PublicKey::from_bytes(*contact_signing_key);
@@ -554,6 +555,21 @@ impl DeviceStore<'_> {
         pins.accept(&contact_identity, broadcast)
             .map_err(|error| StorageError::InvalidData(error.to_string()))?;
 
+        if broadcast.active_devices().iter().any(|incoming| {
+            previously_active
+                .iter()
+                .find(|held| held.device_id == incoming.device_id)
+                .is_some_and(|held| {
+                    incoming.notice_capability_version < held.notice_capability_version
+                        || (incoming.notice_capability_version == held.notice_capability_version
+                            && incoming.notice_cohort > held.notice_cohort)
+                })
+        }) {
+            return Err(StorageError::InvalidData(
+                "contact device capability moved backwards".into(),
+            ));
+        }
+
         let json = serde_json::to_vec(broadcast)
             .map_err(|error| StorageError::Serialization(error.to_string()))?;
         let encrypted = crate::crypto::encrypt(self.key, &json)
@@ -561,15 +577,23 @@ impl DeviceStore<'_> {
         self.conn
             .execute_batch("SAVEPOINT save_contact_device_registry")?;
         let mutation_result = (|| -> Result<(), StorageError> {
-            self.conn.execute(
+            let changed = self.conn.execute(
                 "INSERT INTO contact_device_registries (contact_id, broadcast_encrypted, version, updated_at)
                  VALUES (?1, ?2, ?3, ?4)
                  ON CONFLICT(contact_id) DO UPDATE SET
                     broadcast_encrypted = excluded.broadcast_encrypted,
                     version = excluded.version,
-                    updated_at = excluded.updated_at",
-                params![contact_id, encrypted, stored_version, self.now_secs() as i64],
+                    updated_at = excluded.updated_at
+                 WHERE contact_device_registries.version = ?5
+                   AND contact_device_registries.broadcast_encrypted = ?6",
+                params![contact_id, encrypted, stored_version, self.now_secs() as i64,
+                    last_stored_version, held.as_ref().map(|held| held.encrypted.as_slice())],
             )?;
+            if changed != 1 {
+                return Err(StorageError::InvalidData(
+                    "contact device registry moved during acceptance".into(),
+                ));
+            }
             self.save_contact_device_pins(contact_id, &pins)?;
             for removed in previously_active.iter().filter(|old| {
                 !broadcast
@@ -719,22 +743,36 @@ impl DeviceStore<'_> {
         &self,
         contact_id: &str,
     ) -> Result<Option<RegistryBroadcast>, StorageError> {
-        let result = self.conn.query_row(
-            "SELECT broadcast_encrypted FROM contact_device_registries WHERE contact_id = ?1",
+        Ok(self
+            .load_contact_registry_snapshot(contact_id)?
+            .map(|held| held.broadcast))
+    }
+
+    fn load_contact_registry_snapshot(
+        &self,
+        contact_id: &str,
+    ) -> Result<Option<HeldContactRegistry>, StorageError> {
+        let row: Option<(Vec<u8>, i64)> = self.conn.query_row(
+            "SELECT broadcast_encrypted, version FROM contact_device_registries WHERE contact_id = ?1",
             params![contact_id],
-            |row| row.get::<_, Vec<u8>>(0),
-        );
-        match result {
-            Ok(encrypted) => {
-                let json = crate::crypto::decrypt(self.key, &encrypted)
-                    .map_err(|error| StorageError::Encryption(error.to_string()))?;
-                serde_json::from_slice(&json)
-                    .map(Some)
-                    .map_err(|error| StorageError::Serialization(error.to_string()))
-            }
-            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-            Err(error) => Err(StorageError::Database(error)),
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        ).optional()?;
+        let Some((encrypted, version)) = row else {
+            return Ok(None);
+        };
+        let json = crate::crypto::decrypt(self.key, &encrypted)
+            .map_err(|error| StorageError::Encryption(error.to_string()))?;
+        let broadcast: RegistryBroadcast = serde_json::from_slice(&json)
+            .map_err(|error| StorageError::Serialization(error.to_string()))?;
+        if i64::try_from(broadcast.version()).ok() != Some(version) {
+            return Err(StorageError::InvalidData(
+                "stored contact device registry version does not match its broadcast".into(),
+            ));
         }
+        Ok(Some(HeldContactRegistry {
+            broadcast,
+            encrypted,
+        }))
     }
 
     /// Returns the contact devices that core currently authorizes as targets.

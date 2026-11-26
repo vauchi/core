@@ -14,6 +14,12 @@ use super::duress_content::{decode_tables, insert_tables};
 use super::mask_profile::NEVER_SEALED;
 use super::{Storage, StorageError};
 
+// INLINE_TEST_REQUIRED: the backup's private transfer must omit keys before
+// encryption, and legacy transfer payloads cannot be built through the API.
+#[cfg(all(test, feature = "notice-core"))]
+#[path = "mask_transfer_tests.rs"]
+mod tests;
+
 /// The mask profile's rows under a transfer key that only the backup holds.
 pub(crate) struct MaskTransfer {
     pub(crate) key: SymmetricKey,

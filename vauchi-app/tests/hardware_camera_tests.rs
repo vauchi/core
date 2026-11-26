@@ -338,7 +338,16 @@ fn a_single_camera_hover_still_prepares_its_front_selector_without_a_switch_butt
         engine.navigate_to(AppScreen::MultiStageExchange { mode });
         let display = engine.initial_commands().unwrap();
         let hardware = engine.drain_hardware_commands();
-        assert!(hardware.contains(&Command::SwitchCamera { use_front: true }));
+        let selector = hardware
+            .iter()
+            .position(|command| matches!(command, Command::SwitchCamera { use_front: true }))
+            .expect("Hover must prepare front selection before capture");
+        if let Some(capture) = hardware
+            .iter()
+            .position(|command| matches!(command, Command::CameraCapture { .. }))
+        {
+            assert!(selector < capture, "select before acquiring the camera");
+        }
         assert_eq!(switches(&hardware), 1);
         let json = serde_json::to_string(&display).unwrap();
         assert!(

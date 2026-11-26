@@ -11,6 +11,8 @@ use vauchi_core::notice::card::{CardError, SignedCard};
 use vauchi_core::notice::groups::{Groups, VisibleCard};
 use vauchi_core::notice::publish::Pending;
 
+const GROUP: [u8; 16] = [9; 16];
+
 fn card() -> ContactCard {
     let mut card = ContactCard::new("Alice");
     card.add_field(ContactField::new(
@@ -28,7 +30,7 @@ fn card() -> ContactCard {
 fn a_signed_cohort_card_binds_the_owner_device_and_revision() {
     let owner = Identity::create("Alice", 0);
     let device = SigningKeyPair::generate();
-    let bytes = SignedCard::sign(&card(), &owner, &device, 7).unwrap();
+    let bytes = SignedCard::sign(&card(), &owner, &device, GROUP, 7).unwrap();
     let verified = SignedCard::verify(
         &bytes,
         owner.signing_public_key(),
@@ -37,6 +39,7 @@ fn a_signed_cohort_card_binds_the_owner_device_and_revision() {
     )
     .unwrap();
     assert_eq!(verified.revision, 7);
+    assert_eq!(verified.group, GROUP);
     assert_eq!(verified.card.display_name(), "Alice");
     assert_eq!(verified.card.fields()[0].value(), "alice@example.org");
     let other = Identity::create("Mallory", 0);
@@ -74,10 +77,11 @@ fn a_signed_cohort_card_binds_the_owner_device_and_revision() {
 fn changing_a_signed_cohort_revision_or_body_is_refused() {
     let owner = Identity::create("Alice", 0);
     let device = SigningKeyPair::generate();
-    let bytes = SignedCard::sign(&card(), &owner, &device, 7).unwrap();
+    let bytes = SignedCard::sign(&card(), &owner, &device, GROUP, 7).unwrap();
     for (field, value) in [
         ("revision", serde_json::json!(8)),
         ("card", serde_json::json!("{}")),
+        ("group", serde_json::json!("00".repeat(16))),
     ] {
         let mut changed: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         changed[field] = value;
@@ -99,7 +103,7 @@ fn changing_a_signed_cohort_revision_or_body_is_refused() {
 fn unknown_card_formats_and_oversized_bodies_are_refused() {
     let owner = Identity::create("Alice", 0);
     let device = SigningKeyPair::generate();
-    let bytes = SignedCard::sign(&card(), &owner, &device, 7).unwrap();
+    let bytes = SignedCard::sign(&card(), &owner, &device, GROUP, 7).unwrap();
     let mut changed: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
     changed["format"] = serde_json::json!(2);
     assert!(matches!(
@@ -134,7 +138,7 @@ fn signed_bodies_strip_private_notes_and_audience_metadata() {
         .unwrap();
     card.field_visibility_mut()
         .set_contacts(&id, ["private-contact-id".to_string()].into());
-    let bytes = SignedCard::sign(&card, &owner, &device, 1).unwrap();
+    let bytes = SignedCard::sign(&card, &owner, &device, GROUP, 1).unwrap();
     let text = std::str::from_utf8(&bytes).unwrap();
     assert!(!text.contains("private-note"));
     assert!(!text.contains("private-contact-id"));
@@ -216,7 +220,7 @@ fn authentic_signatures_do_not_make_malformed_card_fields_acceptable() {
     cases.push(duplicate);
     for changed in cases {
         let card: ContactCard = serde_json::from_value(changed).unwrap();
-        let bytes = SignedCard::sign(&card, &owner, &device, 1).unwrap();
+        let bytes = SignedCard::sign(&card, &owner, &device, GROUP, 1).unwrap();
         assert!(matches!(
             SignedCard::verify(
                 &bytes,
@@ -227,4 +231,36 @@ fn authentic_signatures_do_not_make_malformed_card_fields_acceptable() {
             Err(CardError::Malformed)
         ));
     }
+}
+
+// @internal
+#[test]
+fn a_publication_carries_the_specs_opaque_sixteen_byte_group_id() {
+    let owner = Identity::create("Alice", 0);
+    let device = SigningKeyPair::generate();
+    let bytes = SignedCard::sign(&card(), &owner, &device, GROUP, 1).unwrap();
+    let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let group = value["group"].as_str().expect("the body names its group");
+    assert_eq!(group.len(), 32);
+    assert_eq!(hex::decode(group).unwrap().len(), 16);
+}
+
+// @internal
+#[test]
+fn a_version_above_thirty_two_bits_is_refused_at_the_decode_boundary() {
+    let owner = Identity::create("Alice", 0);
+    let device = SigningKeyPair::generate();
+    let bytes = SignedCard::sign(&card(), &owner, &device, GROUP, 1).unwrap();
+    let mut value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    value["revision"] = serde_json::json!(u64::from(u32::MAX) + 1);
+    let bytes = serde_json::to_vec(&value).unwrap();
+    assert!(matches!(
+        SignedCard::verify(
+            &bytes,
+            owner.signing_public_key(),
+            owner.device_id(),
+            device.public_key().as_bytes()
+        ),
+        Err(CardError::Malformed)
+    ));
 }

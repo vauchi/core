@@ -303,7 +303,11 @@ impl AppEngine {
         let identity_key = *identity.signing_public_key();
         let x3dh = identity.x3dh_keypair();
         let exchange_pub = *x3dh.public_key();
-        let display_name = identity.display_name().to_string();
+        let display_name = self
+            .pending_exchange_display_name
+            .as_deref()
+            .unwrap_or_else(|| identity.display_name())
+            .to_string();
         // G2 privacy filter (shared chokepoint): share only the fields the
         // selected exchange group(s) may see. `pending_exchange_groups` is set
         // at the mode handoff (`result_routing.rs`) and consumed later at
@@ -574,6 +578,7 @@ impl AppEngine {
         // exchange). Same `pending_exchange_groups` carry the multi-stage
         // path uses; populated by `start_exchange_to` on mode dispatch.
         let pending_groups = std::mem::take(&mut self.pending_exchange_groups);
+        let _ = self.pending_exchange_display_name.take();
         let mut group_names = Vec::new();
         for group_id in &pending_groups {
             // Best-effort; names collected for the rich success summary

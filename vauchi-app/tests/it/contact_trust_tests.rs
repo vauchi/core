@@ -88,6 +88,25 @@ fn the_trust_shown_follows_the_exchange_and_cannot_be_tapped() {
 }
 
 // @claim: S10
+// @scenario: navigation :: Contact shows trust level badge
+#[test]
+fn proximity_high_is_not_fingerprint_verification_or_recovery_consent() {
+    let mut contact = exchanged("Carol");
+    contact.set_trust_metrics(Some(vauchi_core::exchange::TrustMetrics::new(
+        vauchi_core::exchange::ExchangeTransport::Nfc,
+        vauchi_core::exchange::ProximityConfidence::Unknown,
+        0,
+    )));
+    let (engine, screen) = screen_of(contact);
+
+    assert_eq!(trust(&screen), (Some("High".to_string()), false));
+    let stored = &engine.vauchi().list_contacts().unwrap()[0];
+    assert!(!stored.is_fingerprint_verified());
+    assert!(!stored.is_recovery_trusted());
+    assert!(!stored.is_proposal_trusted());
+}
+
+// @claim: S10
 // @internal
 #[test]
 fn a_link_contact_shows_remote_and_offers_the_fingerprint_comparison() {

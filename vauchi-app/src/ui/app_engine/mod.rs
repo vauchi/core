@@ -125,6 +125,9 @@ pub struct AppEngine {
     /// `persist_exchanged_contact` can assign the new contact + show the
     /// group on the success screen (2026-06-04-exchange-terminal-screens).
     pending_exchange_groups: Vec<String>,
+    /// Display name chosen in the exchange preview, carried through the same
+    /// handoff so the transmitted presentation matches the confirmed preview.
+    pending_exchange_display_name: Option<String>,
     /// A restore submitted and not yet run: it runs on the next wakeup.
     pending_restore: Option<pending_restore::PendingRestore>,
     /// Navigation history stack for back-button support.
@@ -567,6 +570,7 @@ impl AppEngine {
             engine,
             engine_cache: HashMap::new(),
             pending_exchange_groups: Vec::new(),
+            pending_exchange_display_name: None,
             pending_restore: None,
             nav_history: Vec::new(),
             pending_field_undo: None,

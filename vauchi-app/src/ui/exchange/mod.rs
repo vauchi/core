@@ -367,6 +367,12 @@ impl ExchangeEngine {
         &self.selected_groups
     }
 
+    pub fn selected_display_name(&self) -> Option<&str> {
+        self.field_preview
+            .as_ref()
+            .map(|preview| preview.display_name.as_str())
+    }
+
     /// Mark the exchange as successfully verified.
     pub fn mark_success(&mut self) {
         self.step = ExchangeStep::Success;

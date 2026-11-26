@@ -167,3 +167,23 @@ fn exchange_location_is_encrypted_at_rest() {
         "plaintext coordinates must not appear in the stored BLOB"
     );
 }
+
+// @internal
+#[test]
+fn exchange_location_never_appears_in_card_wire_form() {
+    let wb = setup();
+    let bob = add_contact(&wb, "Bob");
+    wb.set_exchange_location(&bob, 52.5200, 13.405099).unwrap();
+    let location = wb.exchange_location(&bob).unwrap().unwrap();
+    assert_eq!(location.latitude, 52.5200);
+    assert_eq!(location.longitude, 13.405099);
+
+    let contact = wb.get_contact(&bob).unwrap().unwrap();
+    let wire = serde_json::to_string(contact.card()).expect("serialize card");
+    assert!(!wire.contains("52.52"), "latitude reached the card");
+    assert!(!wire.contains("13.405099"), "longitude reached the card");
+    assert!(
+        !wire.contains("exchange_location"),
+        "location field name reached the card"
+    );
+}

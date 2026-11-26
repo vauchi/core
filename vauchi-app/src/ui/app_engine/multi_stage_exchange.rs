@@ -688,6 +688,7 @@ impl AppEngine {
         // resolve their names for the success screen (best-effort: a
         // group failure doesn't block the exchange).
         let pending_groups = std::mem::take(&mut self.pending_exchange_groups);
+        let _ = self.pending_exchange_display_name.take();
         let mut group_names = Vec::new();
         for group_id in &pending_groups {
             if self

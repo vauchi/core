@@ -159,17 +159,17 @@ impl AppEngine {
         }
     }
 
-    /// Capture the exchange-mode group selection across the engine handoff
-    /// (navigate_to replaces the ExchangeEngine) so persist_exchanged_contact
-    /// can assign the new contact + show the group on the success screen
-    /// (2026-06-04-exchange-terminal-screens), then navigate to `target`.
+    /// Capture the exchange-mode presentation choices across the engine
+    /// handoff, then navigate to `target`.
     fn start_exchange_to(&mut self, target: AppScreen, mode: ExchangeMode) -> ActionResult {
         tracing::info!("[Exchange] started: {}", mode.display_name());
         // A transport engine's fallback (RG-9) re-enters here without a
-        // picker to read from; the groups picked for the failed attempt
-        // still apply to the fallback attempt.
+        // picker to read from; retain the choices made for that attempt.
         if let Some(groups) = self.picker_selected_groups() {
             self.pending_exchange_groups = groups;
+        }
+        if let Some(display_name) = self.picker_selected_display_name() {
+            self.pending_exchange_display_name = display_name;
         }
         // M2 S1: the committed (groups, mode) pair becomes the last-used
         // default, so the next exchange skips the group gate.
@@ -197,6 +197,16 @@ impl AppEngine {
             .as_any()
             .and_then(|a| a.downcast_ref::<crate::ui::exchange::ExchangeEngine>())
             .map(|ex| ex.selected_groups().to_vec())
+    }
+
+    /// The outer `Option` distinguishes no picker from a picker that skipped
+    /// the optional preview, so a fresh start clears stale presentation state
+    /// while a transport fallback retains the choice made for that attempt.
+    fn picker_selected_display_name(&self) -> Option<Option<String>> {
+        self.engine
+            .as_any()
+            .and_then(|a| a.downcast_ref::<crate::ui::exchange::ExchangeEngine>())
+            .map(|ex| ex.selected_display_name().map(str::to_owned))
     }
 
     /// Persist the last-used exchange defaults (M2 S1). Best-effort: a

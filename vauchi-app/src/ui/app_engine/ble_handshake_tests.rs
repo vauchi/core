@@ -10,6 +10,7 @@
 // and set the private `pending_exchange_groups` field — neither is reachable
 // from a `tests/` integration directory.
 use super::*;
+use crate::ui::engine::WorkflowEngine;
 use vauchi_core::api::Vauchi;
 use vauchi_core::contact_card::{ContactField, FieldType};
 use vauchi_core::platform::BleLinkDirection;
@@ -100,6 +101,72 @@ fn ble_payload_empty_when_selected_group_exposes_nothing() {
     assert!(
         labels.is_empty(),
         "empty group → share nothing, got {labels:?}"
+    );
+}
+
+// @internal
+#[test]
+fn group_display_name_selection_reaches_ble_payload() {
+    let (mut engine, work) = engine_with_card_and_group();
+    engine
+        .vauchi
+        .set_group_display_name_override(&work, Some("Alice at Work"))
+        .expect("set group display name");
+    let _ = engine.navigate_to(AppScreen::Exchange);
+    let _ = crate::ui::engine::WorkflowEngine::handle_action(
+        &mut engine,
+        crate::ui::UserAction::ItemToggled {
+            component_id: "group_picker".into(),
+            item_id: work.clone(),
+        },
+    );
+    let _ = crate::ui::engine::WorkflowEngine::handle_action(
+        &mut engine,
+        crate::ui::UserAction::ActionPressed {
+            action_id: "continue".into(),
+        },
+    );
+    let _ = crate::ui::engine::WorkflowEngine::handle_action(
+        &mut engine,
+        crate::ui::UserAction::ListItemSelected {
+            component_id: "category:fun".into(),
+            item_id: "mode:glance".into(),
+        },
+    );
+    assert_eq!(engine.current_screen().screen_id, "exchange_field_preview");
+    let _ = crate::ui::engine::WorkflowEngine::handle_action(
+        &mut engine,
+        crate::ui::UserAction::ListItemSelected {
+            component_id: "preview_name_picker".into(),
+            item_id: work.clone(),
+        },
+    );
+
+    let selected = engine
+        .current_screen()
+        .components
+        .iter()
+        .find_map(|c| match c {
+            crate::ui::Component::Dropdown { id, selected, .. } if id == "preview_name_picker" => {
+                selected.clone()
+            }
+            _ => None,
+        });
+    assert_eq!(selected.as_deref(), Some(work.as_str()));
+
+    let _ = crate::ui::engine::WorkflowEngine::handle_action(
+        &mut engine,
+        crate::ui::UserAction::ActionPressed {
+            action_id: "start_exchange".into(),
+        },
+    );
+    let (_identity_key, _x3dh, card) = engine
+        .build_ble_session_inputs()
+        .expect("identity and card present");
+    assert_eq!(card.display_name, "Alice at Work");
+    assert_eq!(
+        card.fields,
+        vec![("Email".to_string(), "a@b.com".to_string())]
     );
 }
 

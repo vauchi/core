@@ -6,6 +6,9 @@
 use vauchi_core::crypto::SigningKeyPair;
 use vauchi_core::identity::{DeviceInfo, DeviceRegistry, Reconciled, RegistryBroadcast};
 
+#[path = "notice_capability_acceptance_tests.rs"]
+mod acceptance;
+
 fn registry() -> (DeviceRegistry, SigningKeyPair, [u8; 32]) {
     let key = SigningKeyPair::generate();
     let device = DeviceInfo::derive(&[7; 32], 0, "Phone".into(), 0).to_registered(&[7; 32]);
@@ -85,4 +88,64 @@ fn a_registry_that_never_announced_cohorts_keeps_its_existing_wire_shape() {
             .unwrap()
             .verify(&key.public_key())
     );
+}
+
+proptest::proptest! {
+    // @internal
+    #[test]
+    fn any_stale_capability_snapshot_keeps_the_latest_withdrawal_or_announcement(
+        changes in proptest::collection::vec(proptest::option::of(0u32..10), 1..40),
+        cut in 0usize..100,
+    ) {
+        let (mut current, key, id) = registry();
+        let mut history = vec![current.clone()];
+        let mut expected = None;
+        let mut revision = 0;
+        for change in &changes {
+            if *change != expected { revision += 1; }
+            current.set_notice_cohort(&id, *change, &key).unwrap();
+            expected = *change;
+            history.push(current.clone());
+        }
+        let stale = &history[cut % history.len()];
+        for merged in [merge(&current, stale, &key), merge(stale, &current, &key)] {
+            let device = merged.find_device(&id).unwrap();
+            proptest::prop_assert_eq!(device.notice_cohort, expected);
+            proptest::prop_assert_eq!(device.notice_capability_version, revision);
+            proptest::prop_assert!(merged.verify(&key.public_key()));
+        }
+    }
+}
+
+// @internal
+#[test]
+fn conflicting_capability_announcements_merge_the_same_in_both_orders() {
+    let (mut left, key, id) = registry();
+    let mut right = left.clone();
+    left.set_notice_cohort(&id, Some(7), &key).unwrap();
+    right.set_notice_cohort(&id, Some(8), &key).unwrap();
+    let a = merge(&left, &right, &key);
+    let b = merge(&right, &left, &key);
+    assert_eq!(a.find_device(&id).unwrap().notice_cohort, Some(7));
+    assert_eq!(b.find_device(&id).unwrap().notice_cohort, Some(7));
+    // A side that already holds the winning value may keep its version;
+    // one more exchange adopts the other side's published merge version.
+    assert_eq!(merge(&a, &b, &key).to_json(), merge(&b, &a, &key).to_json());
+}
+
+// @internal
+#[test]
+fn an_exhausted_capability_revision_cannot_rewind_or_change_the_announcement() {
+    let (registry, key, id) = registry();
+    let mut device = registry.find_device(&id).unwrap().clone();
+    device.notice_cohort = Some(7);
+    device.notice_capability_version = u64::MAX;
+    let mut registry = DeviceRegistry::new(device, &key);
+    let before = registry.to_json();
+    let failed = registry.set_notice_cohort(&id, None, &key);
+    assert!(matches!(
+        failed,
+        Err(vauchi_core::identity::device::DeviceError::CapabilityVersionExhausted)
+    ));
+    assert_eq!(registry.to_json(), before);
 }

@@ -32,8 +32,7 @@ impl Storage {
         let mask = self.mask_profile();
         let copy = Self::empty_mask_profile(mask.encryption_key.clone(), None)?;
         copy.load_body(&mask.sealed_body()?, &mask.encryption_key)?;
-        copy.conn
-            .execute_batch("DELETE FROM device_signing_key; DELETE FROM notice_states;")?;
+        copy.clear_transferred_device_state()?;
         let key = SymmetricKey::generate();
         copy.rekey_mask_rows(&mask.encryption_key, &key)?;
         Ok(MaskTransfer {
@@ -62,7 +61,7 @@ impl Storage {
     ) -> Result<(), StorageError> {
         let copy = Self::empty_mask_profile(transfer.key.clone(), None)?;
         copy.load_body(&transfer.body, &transfer.key)?;
-        copy.conn.execute("DELETE FROM notice_states", [])?;
+        copy.clear_transferred_device_state()?;
         copy.renew_mask_device(self.clock.unix_seconds())?;
         let mask = self.mask_profile();
         copy.rekey_mask_rows(&transfer.key, &mask.encryption_key)?;
@@ -109,7 +108,6 @@ impl Storage {
                 break candidate;
             }
         };
-        self.device().clear_device_signing_key()?;
         // Saving only storage bytes preserves the real identity shown by the
         // mask's public_values (ADR-080), while retaining the new device index.
         self.identity()
@@ -138,6 +136,31 @@ impl Storage {
             }
         };
         self.device().save_device_registry(&registry)
+    }
+
+    fn clear_transferred_device_state(&self) -> Result<(), StorageError> {
+        // A restored mask is a new device, as a normal password restore is.
+        // Old sessions and sealed outboxes belong to the previous device;
+        // carrying them would fork its chains or reuse its activation (B5).
+        self.conn.execute_batch(
+            "DELETE FROM notice_states;
+             DELETE FROM contact_ratchets;
+             DELETE FROM registry_activation;
+             DELETE FROM pending_updates;
+             DELETE FROM retry_entries;
+             DELETE FROM device_signing_key;
+             DELETE FROM device_info;
+             DELETE FROM device_sync_state;
+             DELETE FROM device_sync_checkpoints;
+             DELETE FROM sync_checkpoints;
+             DELETE FROM contact_sync_timestamps;
+             DELETE FROM receive_inbox;
+             DELETE FROM receive_checkpoints;
+             DELETE FROM receive_tokens_ahead;
+             DELETE FROM receive_key_check;
+             DELETE FROM resync_honored;",
+        )?;
+        Ok(())
     }
 
     fn clear_rows(&self) -> Result<(), StorageError> {

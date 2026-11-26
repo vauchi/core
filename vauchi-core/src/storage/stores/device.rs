@@ -23,6 +23,11 @@ use crate::identity::device::{
     BroadcastDevice, DeviceRegistry, MAX_DEVICES, PinnedDeviceKeys, RegistryBroadcast,
 };
 
+// INLINE_TEST_REQUIRED: inject a stored version that belongs to a different registry snapshot.
+#[cfg(all(test, feature = "notice-core"))]
+#[path = "device_snapshot_tests.rs"]
+mod snapshot_tests;
+
 /// Scoped persistence view for the device domain: this device's info record and
 /// the device registry.
 pub struct DeviceStore<'a> {

@@ -68,4 +68,63 @@ fn restoring_a_legacy_mask_transfer_also_discards_its_notice_keys() {
     let target = Storage::in_memory(SymmetricKey::generate()).unwrap();
     target.restore_mask_from_backup(&legacy).unwrap();
     assert_no_chain(target.mask_profile(), &contact);
+    let identity = target.mask_seed().identity("Mask", 0).unwrap().unwrap();
+    assert_ne!(identity.device_info().device_index(), 0);
+    assert_eq!(
+        target.mask_seed().load().unwrap(),
+        source.mask_seed().load().unwrap()
+    );
+}
+
+// @internal
+#[test]
+fn a_failed_mask_import_rolls_back_the_device_identity_and_sessions_together() {
+    let (source, _) = seeded();
+    let mask = source.mask_profile();
+    let transfer = MaskTransfer {
+        key: mask.encryption_key.clone(),
+        body: mask.sealed_body().unwrap(),
+    };
+    let (target, contact) = seeded();
+    let identity = target.mask_seed().identity("Mask", 0).unwrap().unwrap();
+    let mask = target.mask_profile();
+    let registry = mask.device().own_device_registry(&identity).unwrap();
+    mask.device().save_device_registry(&registry).unwrap();
+    mask.conn
+        .execute_batch(
+            "CREATE TEMP TRIGGER refuse_restored_identity BEFORE INSERT ON identity
+         BEGIN SELECT RAISE(ABORT, 'injected restore failure'); END;",
+        )
+        .unwrap();
+    let refused = target.restore_mask_from_backup(&transfer);
+    assert!(matches!(refused, Err(StorageError::Database(_))));
+    let after = target.mask_seed().identity("Mask", 0).unwrap().unwrap();
+    assert_eq!(after.device_id(), identity.device_id());
+    assert_eq!(after.signing_public_key(), identity.signing_public_key());
+    assert_eq!(
+        mask.device().own_device_registry(&after).unwrap().to_json(),
+        registry.to_json()
+    );
+    assert_eq!(
+        mask.notices()
+            .load(&contact, NoticeStateKind::Sender, &PEER)
+            .unwrap()
+            .unwrap()
+            .as_slice(),
+        b"old-chain"
+    );
+}
+
+// @internal
+#[test]
+fn a_mask_refuses_a_saved_device_identity_from_another_seed() {
+    let (storage, _) = seeded();
+    let other = crate::identity::Identity::create("Other", 0);
+    storage
+        .mask_profile()
+        .identity()
+        .save_identity(&other.to_storage_bytes())
+        .unwrap();
+    let refused = storage.mask_seed().identity("Mask", 0);
+    assert!(matches!(refused, Err(StorageError::InvalidData(_))));
 }

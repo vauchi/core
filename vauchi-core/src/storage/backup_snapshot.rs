@@ -134,11 +134,10 @@ impl BackupSnapshot {
                 "no duress PIN to lock a decoy".into(),
             ));
         };
-        let seed = storage
+        let identity = storage
             .mask_seed()
-            .load()?
+            .identity(display_name, now)?
             .ok_or_else(|| StorageError::InvalidData("the mask profile has no seed".into()))?;
-        let identity = Identity::for_mask(seed.as_bytes(), display_name, now);
         let mut snapshot = Self::capture(storage.mask_profile(), &identity, now)
             .map_err(|e| StorageError::InvalidData(e.to_string()))?;
         let synthetic = Storage::synthetic_mask_for_backup()?;

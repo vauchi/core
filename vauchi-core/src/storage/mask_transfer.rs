@@ -32,7 +32,8 @@ impl Storage {
         let mask = self.mask_profile();
         let copy = Self::empty_mask_profile(mask.encryption_key.clone(), None)?;
         copy.load_body(&mask.sealed_body()?, &mask.encryption_key)?;
-        copy.conn.execute("DELETE FROM device_signing_key", [])?;
+        copy.conn
+            .execute_batch("DELETE FROM device_signing_key; DELETE FROM notice_states;")?;
         let key = SymmetricKey::generate();
         copy.rekey_mask_rows(&mask.encryption_key, &key)?;
         Ok(MaskTransfer {
@@ -61,7 +62,8 @@ impl Storage {
     ) -> Result<(), StorageError> {
         let copy = Self::empty_mask_profile(transfer.key.clone(), None)?;
         copy.load_body(&transfer.body, &transfer.key)?;
-        copy.conn.execute("DELETE FROM device_signing_key", [])?;
+        copy.conn.execute("DELETE FROM notice_states", [])?;
+        copy.renew_mask_device(self.clock.unix_seconds())?;
         let mask = self.mask_profile();
         copy.rekey_mask_rows(&transfer.key, &mask.encryption_key)?;
         let tables = decode_tables(&copy.sealed_body()?)?;
@@ -80,6 +82,62 @@ impl Storage {
             }
         }
         self.seal_mask()
+    }
+
+    fn renew_mask_device(&self, now: u64) -> Result<(), StorageError> {
+        use crate::identity::{DeviceRegistry, Identity};
+
+        let old = self
+            .mask_seed()
+            .identity("", now)?
+            .ok_or_else(|| StorageError::InvalidData("the mask profile has no seed".into()))?;
+        let saved = self.device().load_device_registry_if_own(&old)?;
+        let identity = loop {
+            let index = u32::from_le_bytes(crate::crypto::random_bytes::<4>()) | 0x8000_0000;
+            let candidate = Identity::from_device_link(
+                *old.master_seed(),
+                old.display_name().to_owned(),
+                index,
+                old.device_info().device_name().to_owned(),
+                now,
+            );
+            if candidate.device_id() != old.device_id()
+                && saved
+                    .as_ref()
+                    .is_none_or(|registry| registry.find_device(candidate.device_id()).is_none())
+            {
+                break candidate;
+            }
+        };
+        self.device().clear_device_signing_key()?;
+        // Saving only storage bytes preserves the real identity shown by the
+        // mask's public_values (ADR-080), while retaining the new device index.
+        self.identity()
+            .save_identity(&identity.to_storage_bytes())?;
+        let key = self.device().load_or_create_device_signing_key(&identity)?;
+        let entry = identity
+            .device_info()
+            .to_registered(identity.master_seed())
+            .with_signing_key(*key.public_key().as_bytes());
+        let registry = match saved {
+            Some(mut registry) => {
+                registry
+                    .register_restored_device(
+                        entry,
+                        old.device_id(),
+                        identity.signing_keypair(),
+                        now,
+                    )
+                    .map_err(|e| StorageError::InvalidData(e.to_string()))?;
+                registry
+            }
+            None => {
+                let mut registry = DeviceRegistry::new(entry, identity.signing_keypair());
+                registry.lift_version_to(now, identity.signing_keypair());
+                registry
+            }
+        };
+        self.device().save_device_registry(&registry)
     }
 
     fn clear_rows(&self) -> Result<(), StorageError> {

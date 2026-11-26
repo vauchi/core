@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 use super::{AuthMode, BiometricUnlockOutcome, ProfileEngine, Vauchi};
 use crate::api::{AppPasswordConfig, EventDispatcher, VauchiError, VauchiResult};
-use crate::identity::Identity;
 use crate::storage::Storage;
 
 impl Vauchi {
@@ -88,12 +87,17 @@ impl ProfileEngine {
         session_password: AppPasswordConfig,
     ) -> Result<ProfileEngine, (VauchiError, Box<Storage>)> {
         let loaded = (|| {
-            let seed = mask.mask_seed().load()?;
             let shown = mask.mask_public_values().load()?;
-            Ok::<_, crate::storage::StorageError>((seed, shown))
+            let identity = match &shown {
+                Some(shown) => mask
+                    .mask_seed()
+                    .identity(shown.display_name(), self.clock.unix_seconds())?,
+                None => None,
+            };
+            Ok::<_, crate::storage::StorageError>((identity, shown))
         })();
-        let (seed, shown) = match loaded {
-            Ok((Some(seed), Some(shown))) => (seed, shown),
+        let (identity, shown) = match loaded {
+            Ok((Some(identity), Some(shown))) => (identity, shown),
             Ok(_) => {
                 let missing = VauchiError::InvalidState(
                     "the mask profile has no seed or public values".into(),
@@ -102,11 +106,6 @@ impl ProfileEngine {
             }
             Err(error) => return Err((error.into(), Box::new(mask))),
         };
-        let identity = Identity::for_mask(
-            seed.as_bytes(),
-            shown.display_name(),
-            self.clock.unix_seconds(),
-        );
         let mut config = self.config.clone();
         config.storage_key = None;
         Ok(ProfileEngine {

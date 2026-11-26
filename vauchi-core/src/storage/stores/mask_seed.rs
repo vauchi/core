@@ -51,6 +51,36 @@ impl Storage {
 }
 
 impl MaskSeedStore<'_> {
+    pub(crate) fn identity(
+        &self,
+        display_name: &str,
+        now: u64,
+    ) -> Result<Option<crate::identity::Identity>, StorageError> {
+        use crate::identity::Identity;
+
+        let Some(seed) = self.load()? else {
+            return Ok(None);
+        };
+        let Some(bytes) = self.mask.identity().load_identity()? else {
+            return Ok(Some(Identity::for_mask(seed.as_bytes(), display_name, now)));
+        };
+        let bytes = Zeroizing::new(bytes);
+        let saved = Identity::from_storage_bytes(&bytes, now)
+            .map_err(|e| StorageError::InvalidData(e.to_string()))?;
+        if !bool::from(seed.as_bytes().ct_eq(saved.master_seed())) {
+            return Err(StorageError::InvalidData(
+                "the stored mask identity belongs to another seed".into(),
+            ));
+        }
+        Ok(Some(Identity::from_device_link(
+            *seed.as_bytes(),
+            display_name.to_owned(),
+            saved.device_info().device_index(),
+            saved.device_info().device_name().to_owned(),
+            now,
+        )))
+    }
+
     pub fn load(&self) -> Result<Option<MaskSeed>, StorageError> {
         let Some(sealed) = self
             .mask

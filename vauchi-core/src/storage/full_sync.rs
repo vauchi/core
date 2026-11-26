@@ -5,6 +5,11 @@ use rusqlite::Connection;
 
 use super::StorageError;
 
+// INLINE_TEST_REQUIRED: inject file transactions and observe the actual sealed-row durability.
+#[cfg(all(test, feature = "notice-core"))]
+#[path = "full_sync_sealed_tests.rs"]
+mod sealed_tests;
+
 /// Raises the connection to at least FULL synchronous durability while it
 /// lives, for writes a power loss must not undo, and restores the previous
 /// policy when dropped.

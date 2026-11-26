@@ -24,7 +24,8 @@ pub enum CardError {
 #[serde(deny_unknown_fields)]
 pub struct SignedCard {
     format: u8,
-    revision: u64,
+    revision: u32,
+    group: String,
     device: String,
     card: Zeroizing<String>,
     identity_signature: String,
@@ -32,7 +33,8 @@ pub struct SignedCard {
 }
 
 pub struct VerifiedCard {
-    pub revision: u64,
+    pub revision: u32,
+    pub group: [u8; 16],
     pub card: ContactCard,
 }
 
@@ -54,7 +56,8 @@ impl SignedCard {
         card: &ContactCard,
         owner: &Identity,
         device: &SigningKeyPair,
-        revision: u64,
+        group: [u8; 16],
+        revision: u32,
     ) -> Result<Zeroizing<Vec<u8>>, CardError> {
         if revision == 0 {
             return Err(CardError::Format);
@@ -65,6 +68,7 @@ impl SignedCard {
         let message = signing_data(
             owner.signing_public_key(),
             owner.device_id(),
+            &group,
             revision,
             card.as_bytes(),
         );
@@ -76,6 +80,7 @@ impl SignedCard {
         let publication = Self {
             format: 1,
             revision,
+            group: hex::encode(group),
             device: hex::encode(owner.device_id()),
             card,
             identity_signature: hex::encode(identity_signature.as_bytes()),
@@ -109,9 +114,15 @@ impl SignedCard {
         }
         let identity_signature = signature(&publication.identity_signature)?;
         let device_signature = signature(&publication.device_signature)?;
+        let mut group = [0u8; 16];
+        if publication.group.len() != 32 {
+            return Err(CardError::Format);
+        }
+        hex::decode_to_slice(&publication.group, &mut group).map_err(|_| CardError::Format)?;
         let message = signing_data(
             owner,
             device,
+            &group,
             publication.revision,
             publication.card.as_bytes(),
         );
@@ -138,6 +149,7 @@ impl SignedCard {
         }
         Ok(VerifiedCard {
             revision: publication.revision,
+            group,
             card,
         })
     }
@@ -167,13 +179,33 @@ fn signature(text: &str) -> Result<Signature, CardError> {
     Ok(Signature::from_bytes(bytes))
 }
 
-fn signing_data(owner: &[u8; 32], device: &[u8; 32], revision: u64, card: &[u8]) -> Vec<u8> {
+fn signing_data(
+    owner: &[u8; 32],
+    device: &[u8; 32],
+    group: &[u8; 16],
+    revision: u32,
+    card: &[u8],
+) -> Vec<u8> {
     let mut message = b"Vauchi_Notice_Card_v1".to_vec();
     message.extend_from_slice(owner);
     message.extend_from_slice(device);
+    message.extend_from_slice(group);
     message.extend_from_slice(&revision.to_be_bytes());
     message.extend_from_slice(&Sha256::digest(card));
     message
+}
+
+/// The opaque body ID is stable for a device's visible-field set, independently
+/// of the scheduler's local u32 group index (notice spec section 4).
+pub(crate) fn group_identifier(card: &ContactCard, owner: &Identity) -> [u8; 16] {
+    let mut fields: Vec<_> = card.fields().iter().map(|field| field.id()).collect();
+    fields.sort_unstable();
+    let mut info = b"Vauchi_Notice_Group_Id_v1".to_vec();
+    info.extend_from_slice(owner.device_id());
+    for field in fields {
+        info.extend_from_slice(&Sha256::digest(field.as_bytes()));
+    }
+    *crate::crypto::HKDF::derive_array::<16>(None, owner.master_seed(), &info)
 }
 
 fn device_signing_data(message: &[u8], identity_signature: &[u8; 64]) -> Vec<u8> {

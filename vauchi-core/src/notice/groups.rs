@@ -34,14 +34,15 @@ impl VisibleCard {
         card: ContactCard,
         identity: &crate::identity::Identity,
         device: &crate::crypto::SigningKeyPair,
-        revision: u64,
+        revision: u32,
     ) -> Result<Self, GroupsError> {
         let card = super::card::shared_card(&card);
-        let publication = super::card::SignedCard::sign(&card, identity, device, revision)
+        let group = super::card::group_identifier(&card, identity);
+        let publication = super::card::SignedCard::sign(&card, identity, device, group, revision)
             .map_err(|error| match error {
-                super::card::CardError::BodySize => GroupsError::BodySize,
-                _ => GroupsError::Encoding,
-            })?;
+            super::card::CardError::BodySize => GroupsError::BodySize,
+            _ => GroupsError::Encoding,
+        })?;
         Ok(Self {
             contact,
             card,

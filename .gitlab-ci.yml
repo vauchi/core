@@ -1823,7 +1823,7 @@ check:conformance-sync:
   tags: [docker]
   needs: []
   variables:
-    CONFORMANCE_SCRIPTS_REF: "ci-templates-v2026.11.17.3"
+    CONFORMANCE_SCRIPTS_REF: "ci-templates-v2026.11.26"
   before_script:
     - apk add --no-cache python3
     - |

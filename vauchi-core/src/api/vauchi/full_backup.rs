@@ -176,43 +176,39 @@ impl ProfileEngine {
         let fallback_card = ContactCard::new(identity.display_name());
         let own_card = snapshot.own_card.as_ref().unwrap_or(&fallback_card);
 
-        self.storage.begin_transaction()?;
-        let restored = (|| -> VauchiResult<()> {
-            // Startup loads the storage encoding without the user's backup password.
-            self.storage.identity().save(&identity)?;
-            self.storage.contacts().save_own_card(own_card)?;
-            for contact in &contacts {
-                self.storage.contacts().save_contact(contact)?;
-            }
-            for group in &groups {
-                self.storage.labels().save_group(group)?;
-            }
-            for item in &snapshot.overrides {
-                self.storage.labels().save_contact_override(
-                    &item.contact_id,
-                    &item.field_id,
-                    item.visible,
+        self.storage
+            .with_backup_restore(|storage| -> VauchiResult<()> {
+                // Startup loads the storage encoding without the user's backup password.
+                storage.identity().save(&identity)?;
+                storage.contacts().save_own_card(own_card)?;
+                for contact in &contacts {
+                    storage.contacts().save_contact(contact)?;
+                }
+                for group in &groups {
+                    storage.labels().save_group(group)?;
+                }
+                for item in &snapshot.overrides {
+                    storage.labels().save_contact_override(
+                        &item.contact_id,
+                        &item.field_id,
+                        item.visible,
+                    )?;
+                }
+                if let Some(duress) = &snapshot.duress {
+                    duress.restore(storage)?;
+                }
+                // A backup carries no device key; one left on this install
+                // belongs to an identity it held before (ADR-079).
+                storage.device().clear_device_signing_key()?;
+                Self::register_restored_device(
+                    storage,
+                    &identity,
+                    backed_up_registry.clone(),
+                    &backed_up_device,
+                    now,
                 )?;
-            }
-            if let Some(duress) = &snapshot.duress {
-                duress.restore(&self.storage)?;
-            }
-            // A backup carries no device key; one left on this install
-            // belongs to an identity it held before (ADR-079).
-            self.storage.device().clear_device_signing_key()?;
-            self.register_restored_device(
-                &identity,
-                backed_up_registry.clone(),
-                &backed_up_device,
-                now,
-            )?;
-            self.storage.commit()?;
-            Ok(())
-        })();
-        if let Err(error) = restored {
-            self.storage.rollback();
-            return Err(error);
-        }
+                Ok(())
+            })?;
         self.identity = Some(identity);
         Ok(())
     }
@@ -244,7 +240,13 @@ impl ProfileEngine {
         self.storage.with_savepoint(|| -> VauchiResult<()> {
             self.storage.identity().save(&identity)?;
             self.storage.device().clear_device_signing_key()?;
-            self.register_restored_device(&identity, None, backed_up.device_id(), now)
+            Self::register_restored_device(
+                &self.storage,
+                &identity,
+                None,
+                backed_up.device_id(),
+                now,
+            )
         })?;
         Ok(identity)
     }
@@ -253,14 +255,13 @@ impl ProfileEngine {
     /// none for a backup that predates carrying it, with this install added
     /// as a new device. The next sync pushes it to every contact.
     fn register_restored_device(
-        &self,
+        storage: &crate::storage::Storage,
         identity: &Identity,
         backed_up: Option<DeviceRegistry>,
         backed_up_device: &[u8; 32],
         now: u64,
     ) -> VauchiResult<()> {
-        let device_key = self
-            .storage
+        let device_key = storage
             .device()
             .load_or_create_device_signing_key(identity)?;
         let entry = identity
@@ -285,7 +286,7 @@ impl ProfileEngine {
                 registry
             }
         };
-        self.storage.device().save_device_registry(&registry)?;
+        storage.device().save_device_registry(&registry)?;
         Ok(())
     }
 }

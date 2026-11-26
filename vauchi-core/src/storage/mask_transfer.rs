@@ -27,6 +27,40 @@ pub(crate) struct MaskTransfer {
 }
 
 impl Storage {
+    pub(crate) fn with_backup_restore<T, E>(
+        &mut self,
+        operation: impl FnOnce(&Storage) -> Result<T, E>,
+    ) -> Result<T, E>
+    where
+        E: From<StorageError>,
+    {
+        if self.mask_lent {
+            return Err(StorageError::InvalidData("the mask profile is lent".into()).into());
+        }
+        let current = self.mask.as_deref().ok_or_else(|| {
+            StorageError::InvalidData("backup restore requires an owned mask profile".into())
+        })?;
+        let body = zeroize::Zeroizing::new(current.sealed_body()?);
+        let mut staged = Self::empty_mask_profile(current.encryption_key.clone(), None)?;
+        staged.clock = current.clock.clone();
+        staged.receive_key = current.receive_key.clone();
+        staged.load_body(&body, &current.encryption_key)?;
+        self.begin_transaction()?;
+        // The embedded database commits independently of the real file.
+        // Keep the original until both commits succeed, so rollback can swap
+        // it back without executing SQL on a connection that just failed.
+        let previous = self.mask.replace(Box::new(staged));
+        let result = operation(self).and_then(|value| {
+            self.commit()?;
+            Ok(value)
+        });
+        if result.is_err() {
+            self.rollback();
+            self.mask = previous;
+        }
+        result
+    }
+
     /// This install's mask profile, re-encrypted under a fresh transfer key.
     pub(crate) fn mask_for_backup(&self) -> Result<MaskTransfer, StorageError> {
         let mask = self.mask_profile();

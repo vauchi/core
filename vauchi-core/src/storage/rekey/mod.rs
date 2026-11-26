@@ -566,7 +566,7 @@ impl Storage {
 
             super::key_check::rewrite(&self.conn, &new_key)?;
             match &self.mask {
-                Some(mask) => super::mask::SealedSlot::of(&self.conn).write(
+                Some(mask) => super::mask::SealedSlot::of(&self.conn).write_observed(
                     &super::duress_content::seal_body(&new_mask_key, &mask.sealed_body()?)?,
                 ),
                 None => Ok(()),

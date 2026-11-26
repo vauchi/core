@@ -213,7 +213,7 @@ impl Storage {
         let Some(file) = &self.seal_target else {
             return Ok(());
         };
-        super::mask::SealedSlot::of(file).write(&self.sealed_mask()?)
+        super::mask::SealedSlot::of(file).write_observed(&self.sealed_mask()?)
     }
 
     /// Arm a one-shot commit fault: the next [`Self::commit`] fails with the

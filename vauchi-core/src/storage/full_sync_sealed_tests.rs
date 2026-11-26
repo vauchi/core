@@ -10,6 +10,9 @@ fn sealed_profile(path: &std::path::Path) -> Storage {
     drop(storage);
     let target = Connection::open(path).unwrap();
     Storage::configure_pragmas(&target).unwrap();
+    super::super::mask::SealedSlot::of(&target)
+        .read_observed()
+        .unwrap();
     Storage::empty_mask_profile(SymmetricKey::generate(), Some(target)).unwrap()
 }
 
@@ -154,4 +157,23 @@ fn a_stale_embedded_mask_cannot_replace_a_lent_profiles_notice_commit() {
         .snapshot("contact", NoticeStateKind::Sender, &[1; 32])
         .unwrap();
     assert_eq!(held.state(), Some(b"advanced".as_slice()));
+}
+
+// @internal
+#[test]
+fn the_seal_observation_rolls_back_with_its_file_transaction() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let slot = super::super::mask::SealedSlot::of(&storage.conn);
+    let original = slot.read_observed().unwrap();
+    let abandoned = storage.mask_profile().sealed_mask().unwrap();
+    storage.begin_transaction().unwrap();
+    slot.write_observed(&abandoned).unwrap();
+    assert_eq!(slot.observed().unwrap(), Some(abandoned));
+    storage.rollback();
+    assert_eq!(slot.read().unwrap(), original);
+    assert_eq!(slot.observed().unwrap(), original);
+    let committed = storage.mask_profile().sealed_mask().unwrap();
+    slot.write_observed(&committed).unwrap();
+    assert_eq!(slot.read().unwrap(), Some(committed.clone()));
+    assert_eq!(slot.observed().unwrap(), Some(committed));
 }

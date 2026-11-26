@@ -99,6 +99,10 @@ impl NoticeStore<'_> {
     /// [`StorageError::NoticeMoved`] when another connection saved the row
     /// after this one last read or saved it. An unobserved row can only be
     /// created, never replaced.
+    ///
+    /// Session callers use `snapshot` and `save_many` before releasing
+    /// ciphertext. This single-row helper uses the connection's last read;
+    /// it does not return a sealed-profile transport receipt.
     pub fn save(
         &self,
         contact_id: &str,
@@ -124,9 +128,8 @@ impl NoticeStore<'_> {
         let (key, sealed_with_receive_key) = self.sealing_key(contact_id)?;
         let state_encrypted = crate::crypto::encrypt(&key, state)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
-        // The notices this state assigned leave after this save; a save a
-        // power loss could undo would let the next session seal new
-        // plaintexts under keys already used (ADR-019 amendment 2026-11-24).
+        // Direct file saves need FULL too; compound sessions also guard the
+        // sealed backing file through with_notice_transaction (#1375).
         let _durable = crate::storage::full_sync::FullSync::full(self.conn)?;
         let row_version: i64 = self
             .conn

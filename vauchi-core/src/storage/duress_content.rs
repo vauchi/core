@@ -398,7 +398,7 @@ impl Storage {
     /// from before the mask key (ADR-080); it converts and is sealed again
     /// under the mask key, as is one in the legacy shape.
     pub(super) fn load_duress_content(&self) -> Result<(), StorageError> {
-        let Some(sealed) = SealedSlot::of(&self.conn).read()? else {
+        let Some(sealed) = SealedSlot::of(&self.conn).read_observed()? else {
             return self.seal_mask();
         };
         let mask = self.mask_profile();

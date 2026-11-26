@@ -62,7 +62,7 @@ impl Storage {
             ));
         }
         match &self.mask {
-            Some(mask) => SealedSlot::of(&self.conn).write(&mask.sealed_mask()?),
+            Some(mask) => SealedSlot::of(&self.conn).write_observed(&mask.sealed_mask()?),
             None => self.reseal(),
         }
     }
@@ -92,6 +92,8 @@ impl Storage {
             Some(path) => {
                 let file = Connection::open(path)?;
                 Self::configure_pragmas(&file)?;
+                let observed = SealedSlot::of(&self.conn).observed()?;
+                SealedSlot::of(&file).remember(observed.as_deref())?;
                 Some(file)
             }
             None => None,
@@ -117,6 +119,10 @@ impl Storage {
     pub fn take_back_mask_profile(&mut self, mut mask: Storage) -> Result<(), StorageError> {
         if !self.mask_lent {
             return Err(StorageError::InvalidData("no mask profile is lent".into()));
+        }
+        if let Some(file) = &mask.seal_target {
+            let observed = SealedSlot::of(file).observed()?;
+            SealedSlot::of(&self.conn).remember(observed.as_deref())?;
         }
         mask.seal_target = None;
         self.mask = Some(Box::new(mask));
@@ -161,7 +167,7 @@ impl Storage {
     pub fn open_mask_profile(path: &Path, mask_key: SymmetricKey) -> Result<Storage, StorageError> {
         let file = Connection::open(path)?;
         Self::configure_pragmas(&file)?;
-        let sealed = SealedSlot::of(&file).read()?;
+        let sealed = SealedSlot::of(&file).read_observed()?;
         let mask = Self::empty_mask_profile(mask_key, Some(file))?;
         if let Some(sealed) = sealed {
             let body = open_seal(&mask.encryption_key, &sealed)?;

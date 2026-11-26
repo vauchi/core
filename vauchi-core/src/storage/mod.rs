@@ -69,8 +69,6 @@ pub use error::{
     UpdateStatus,
 };
 pub use secure::{FileKeyStorage, KeyAccess, SecureStorage};
-#[cfg(feature = "notice-core")]
-pub use stores::NoticeWrite;
 pub use stores::RevokedSender;
 pub use stores::{
     ActivityLogStore, ConsentStore, ContactStore, DecoyStore, DeliveryStore, DeviceDeliveryStore,
@@ -82,6 +80,8 @@ pub use stores::{
     RecoveryStore, ReplayStore, RetryStore, SafetyAlertFactStore, StoredSafetyAlertFact, SyncStore,
     TagStore, UxStore,
 };
+#[cfg(feature = "notice-core")]
+pub use stores::{NoticeSnapshot, NoticeWrite};
 
 #[cfg(any(test, feature = "testing"))]
 pub use secure::MemoryKeyStorage;

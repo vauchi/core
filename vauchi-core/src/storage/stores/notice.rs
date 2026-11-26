@@ -22,6 +22,11 @@ use zeroize::Zeroizing;
 
 use super::super::{Storage, StorageError};
 
+#[cfg(feature = "notice-core")]
+mod snapshot;
+#[cfg(feature = "notice-core")]
+pub use snapshot::{NoticeSnapshot, NoticeWrite};
+
 /// Which notice-core object a row holds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NoticeStateKind {
@@ -89,23 +94,6 @@ impl Storage {
 }
 
 impl NoticeStore<'_> {
-    /// Advances every row of a session in one durable commit. A stale row or
-    /// failed commit refuses the entire batch, leaving no partly advanced pair.
-    #[cfg(feature = "notice-core")]
-    pub fn save_many(&self, writes: &[NoticeWrite<'_>]) -> Result<(), StorageError> {
-        self.storage.with_notice_transaction(|| {
-            for write in writes {
-                self.save(
-                    write.contact_id,
-                    write.kind,
-                    &write.peer_device_id,
-                    write.state,
-                )?;
-            }
-            Ok(())
-        })
-    }
-
     /// Saves `state` for `contact_id`'s `kind` on `peer_device_id`.
     ///
     /// [`StorageError::NoticeMoved`] when another connection saved the row
@@ -118,12 +106,24 @@ impl NoticeStore<'_> {
         peer_device_id: &[u8; 32],
         state: &[u8],
     ) -> Result<(), StorageError> {
-        let (key, sealed_with_receive_key) = self.sealing_key(contact_id)?;
-        let state_encrypted = crate::crypto::encrypt(&key, state)
-            .map_err(|e| StorageError::Encryption(e.to_string()))?;
         let (seen, previous) = self
             .version_seen(contact_id, kind, peer_device_id)?
             .unwrap_or((-1, Vec::new()));
+        self.save_observed(contact_id, kind, peer_device_id, state, seen, &previous)
+    }
+
+    fn save_observed(
+        &self,
+        contact_id: &str,
+        kind: NoticeStateKind,
+        peer_device_id: &[u8; 32],
+        state: &[u8],
+        seen: i64,
+        previous: &[u8],
+    ) -> Result<(), StorageError> {
+        let (key, sealed_with_receive_key) = self.sealing_key(contact_id)?;
+        let state_encrypted = crate::crypto::encrypt(&key, state)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
         // The notices this state assigned leave after this save; a save a
         // power loss could undo would let the next session seal new
         // plaintexts under keys already used (ADR-019 amendment 2026-11-24).
@@ -335,32 +335,6 @@ impl NoticeStore<'_> {
             ],
         )?;
         Ok(())
-    }
-}
-
-/// One serialized notice state in a session's atomic write set.
-#[cfg(feature = "notice-core")]
-pub struct NoticeWrite<'a> {
-    contact_id: &'a str,
-    kind: NoticeStateKind,
-    peer_device_id: [u8; 32],
-    state: &'a [u8],
-}
-
-#[cfg(feature = "notice-core")]
-impl<'a> NoticeWrite<'a> {
-    pub fn new(
-        contact_id: &'a str,
-        kind: NoticeStateKind,
-        peer_device_id: [u8; 32],
-        state: &'a [u8],
-    ) -> Self {
-        Self {
-            contact_id,
-            kind,
-            peer_device_id,
-            state,
-        }
     }
 }
 
